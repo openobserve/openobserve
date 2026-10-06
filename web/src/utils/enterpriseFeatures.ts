@@ -41,7 +41,11 @@ export type FeatureKey =
   | "genAiAgentMapping"
   | "incidents"
   | "workflows"
-  | "oncall";
+  | "oncall"
+  | "logPatterns"
+  | "correlation"
+  | "aiAssistant"
+  | "alertInsights";
 
 /**
  * The flags every predicate below reads — EDITION-only, plus RBAC's own
@@ -187,6 +191,38 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "menu.onCall",
     pitchKey: "enterpriseFeature.pitch.oncall",
+  },
+  // Log-pattern mining — the Logs search "Patterns" toggle AND the stream
+  // Schema page's per-field pattern-association picker are the same
+  // capability surfaced in two places, so they share this one gate.
+  logPatterns: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "search.showPatternsLabel",
+    pitchKey: "enterpriseFeature.pitch.logPatterns",
+    cloudOffers: false,
+  },
+  // Service-stream correlation — the Logs row drawer's View Related button
+  // and its Logs/Metrics/Traces tabs.
+  correlation: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "search.viewRelated",
+    pitchKey: "enterpriseFeature.pitch.correlation",
+    cloudOffers: false,
+  },
+  // The AI assistant family (header chat panel, query-editor "Ask AI" bar).
+  // Cloud is always built with isEnterprise=true too, so `isEnterprise ||
+  // isCloud` matches today's real-world behavior while following the same
+  // dual-predicate convention as rbac/workflows/oncall above.
+  aiAssistant: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "menu.aiAssistant",
+    pitchKey: "enterpriseFeature.pitch.aiAssistant",
+  },
+  alertInsights: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "alerts.insights.title",
+    pitchKey: "enterpriseFeature.pitch.alertInsights",
+    cloudOffers: false,
   },
 };
 

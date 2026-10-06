@@ -454,7 +454,7 @@ describe("Header Component", () => {
       aiWrapper.unmount();
     });
 
-    it("should not display AI button if not enterprise", async () => {
+    it("should show the AI button locked (not hidden) if not enterprise", async () => {
       const aiWrapper = createWrapper({
         mountType: "mount",
         storeOverrides: {
@@ -472,9 +472,10 @@ describe("Header Component", () => {
 
       await aiWrapper.vm.$nextTick();
 
-      // Verify AI button is NOT rendered
+      // Visible, but disabled — upsell, not a hidden feature.
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
-      expect(aiButton.exists()).toBe(false);
+      expect(aiButton.exists()).toBe(true);
+      expect(aiButton.attributes("disabled")).toBeDefined();
 
       aiWrapper.unmount();
     });
@@ -741,10 +742,23 @@ describe("Header Component", () => {
       expect(wrapper.emitted("goToHome")).toBeTruthy();
     });
 
-    it("should emit toggleAIChat when toggleAIChat is called", () => {
+    it("should emit toggleAIChat when toggleAIChat is called on an entitled build", () => {
+      const aiWrapper = createWrapper({
+        configOverrides: { isEnterprise: "true" },
+      });
+
+      aiWrapper.vm.toggleAIChat();
+
+      expect(aiWrapper.emitted("toggleAIChat")).toBeTruthy();
+    });
+
+    it("should NOT emit toggleAIChat when called on a build that doesn't unlock AI (defense in depth)", () => {
+      // Default wrapper is OSS (isEnterprise: "false") — the guard inside
+      // toggleAIChat must block this even if some other path called it
+      // directly, bypassing the button's own `disabled`.
       wrapper.vm.toggleAIChat();
 
-      expect(wrapper.emitted("toggleAIChat")).toBeTruthy();
+      expect(wrapper.emitted("toggleAIChat")).toBeFalsy();
     });
 
     it("should emit openSlack when openSlack is called", () => {

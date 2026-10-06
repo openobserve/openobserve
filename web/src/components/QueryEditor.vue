@@ -109,12 +109,12 @@
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
-        v-if="aiFeatureEnabled && !hideNlToggle && !isAIMode"
+        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         variant="ghost"
         size="icon-toolbar"
-        :disabled="props.disableAi"
-        @click="nlpMode = true"
+        :disabled="props.disableAi || !aiAccess.allowed"
+        @click="onAiToggleClick"
         class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
@@ -123,12 +123,26 @@
           :alt="t('search.aiModeIconAlt')"
           class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
         />
+        <span
+          v-if="!aiAccess.allowed"
+          aria-hidden="true"
+          class="bg-surface-overlay text-text-secondary border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+        >
+          <OIcon name="lock" size="xs" class="size-2.5!" />
+        </span>
         <OTooltip
+          v-if="aiAccess.allowed"
           :content="
             props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')
           "
         />
       </OButton>
+      <LockedFeatureTooltip
+        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode && !aiAccess.allowed"
+        :message="aiAccess.message"
+        icon="auto-awesome"
+        :title="t('menu.aiAssistant')"
+      />
     </div>
   </div>
 </template>
@@ -145,8 +159,10 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatMessage } from "@/ts/interfaces/chat";
-import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
 
@@ -234,6 +250,12 @@ const nlpMode = computed({
     }
   },
 });
+// Defense in depth — the toggle's own `disabled` already blocks this, but
+// that attribute can be stripped via devtools.
+const onAiToggleClick = () => {
+  if (!aiAccess.value.allowed) return;
+  nlpMode.value = true;
+};
 const isNaturalLanguageDetected = ref(false);
 const isGenerating = ref(false);
 const editorRef = ref<any>(null);
@@ -265,10 +287,18 @@ const nlpIcon = computed(() => {
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => "h-7! flex-1 my-px");
 
-// AI features require an enterprise build with ai_enabled; OSS/AI-off must never surface the AI bar.
-const aiFeatureEnabled = computed(
-  () => config.isEnterprise == "true" && store.state.zoConfig.ai_enabled,
+// AI features require an enterprise/cloud build with ai_enabled; an
+// already-entitled org that's turned ai_enabled off (an admin preference,
+// not an upsell target) still never sees the bar. A NOT-entitled build shows
+// the toggle locked instead, regardless of ai_enabled — that flag has no
+// real meaning on a build that can't reach the feature anyway.
+const aiAccess = computed(() =>
+  checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
 );
+const aiFeatureVisible = computed(
+  () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
+);
+const aiFeatureEnabled = computed(() => aiFeatureVisible.value && aiAccess.value.allowed);
 
 // Computed: Is in AI mode?
 // When externally controlled (nlpMode prop passed), only show AI bar when nlpMode is explicitly ON.

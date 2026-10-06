@@ -29,15 +29,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="lt.label"
             :icon="lt.icon"
           />
-          <!-- Correlation tabs are only present when service streams are enabled
-               and an enterprise license is active; see availableTabs. -->
-          <OTab
-            v-for="tabItem in tabOrder"
-            :key="tabItem.name"
-            :data-test="tabItem.dataTest"
-            :name="tabItem.name"
-            :label="tabItem.label"
-          />
+          <!-- Correlation tabs are present whenever service streams are
+               enabled; shown locked (not hidden) without an enterprise
+               license — see availableTabs. -->
+          <template v-for="tabItem in tabOrder" :key="tabItem.name">
+            <OTab
+              :data-test="tabItem.dataTest"
+              :name="tabItem.name"
+              :label="tabItem.label"
+              :disable="tabItem.locked"
+              :suffix-icon="tabItem.locked ? 'lock' : undefined"
+            />
+            <LockedFeatureTooltip
+              v-if="tabItem.locked"
+              :message="correlationAccess.message"
+              :title="tabItem.label"
+            />
+          </template>
         </OTabs>
       </div>
       <div class="flex shrink-0 items-center gap-2 pe-3">
@@ -511,6 +519,8 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -532,6 +542,7 @@ export default defineComponent({
     OCardSection,
     OTabs,
     OTab,
+    LockedFeatureTooltip,
     OTabPanels,
     OTabPanel,
     EqualIcon,
@@ -685,6 +696,11 @@ export default defineComponent({
     watch(
       () => props.initialTab,
       (newInitialTab) => {
+        // Defense in depth: a locked correlation tab is disabled in the UI,
+        // but a caller could still pass one directly as `initialTab`.
+        if (newInitialTab && newInitialTab.startsWith("correlated-") && !correlationAccess.value.allowed) {
+          return;
+        }
         if (newInitialTab) {
           tab.value = newInitialTab;
         }
@@ -701,6 +717,7 @@ export default defineComponent({
           newRowData &&
           Object.keys(newRowData).length > 0 &&
           tab.value.startsWith("correlated-") &&
+          correlationAccess.value.allowed &&
           !props.correlationProps
         ) {
           // Emit the original modelValue (not flattened rowData) as it has _timestamp
@@ -713,6 +730,14 @@ export default defineComponent({
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
       const isCorrelationTab = newTab.startsWith("correlated-");
+
+      // Defense in depth: a locked correlation tab is disabled in the UI (and
+      // can't become active via click), but `tab` could still be reassigned
+      // programmatically/via devtools — bounce back rather than load data.
+      if (isCorrelationTab && !correlationAccess.value.allowed) {
+        tab.value = oldTab && !oldTab.startsWith("correlated-") ? oldTab : "json";
+        return;
+      }
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
       // Skip if this is the initial load (oldTab is undefined) as rowData watcher handles it
@@ -786,13 +811,18 @@ export default defineComponent({
       return store.state.zoConfig.service_streams_enabled !== false;
     });
 
+    // Shown locked (not hidden) in builds that don't unlock it.
+    const correlationAccess = computed(() =>
+      checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
+    );
+
     // Tab bar is drag-to-reorder (same pattern as the home page): the list of
     // tabs that *may* be shown is derived from config, while the user's chosen
     // order lives in localStorage.
     const LS_TAB_ORDER_KEY = "o2_log_detail_tab_order";
 
     const availableTabs = computed(() => {
-      const tabs = [
+      const tabs: DetailTab[] = [
         {
           name: "json",
           label: t("common.json"),
@@ -804,29 +834,33 @@ export default defineComponent({
           dataTest: "log-detail-table-tab",
         },
       ];
-      if (serviceStreamsEnabled.value && config.isEnterprise === "true") {
+      if (serviceStreamsEnabled.value) {
+        const locked = !correlationAccess.value.allowed;
         tabs.push(
           {
             name: "correlated-logs",
             label: t("correlation.correlatedLogs"),
             dataTest: "correlated-logs-tab",
+            locked,
           },
           {
             name: "correlated-metrics",
             label: t("correlation.correlatedMetrics"),
             dataTest: "correlated-metrics-tab",
+            locked,
           },
           {
             name: "correlated-traces",
             label: t("correlation.correlatedTraces"),
             dataTest: "correlated-traces-tab",
+            locked,
           },
         );
       }
       return tabs;
     });
 
-    type DetailTab = { name: string; label: I18nText; dataTest: string };
+    type DetailTab = { name: string; label: I18nText; dataTest: string; locked?: boolean };
 
     const loadTabOrder = (): DetailTab[] => {
       try {
@@ -1141,6 +1175,7 @@ export default defineComponent({
       tableRows,
       detailSearchQuery,
       serviceStreamsEnabled,
+      correlationAccess,
       tabOrder,
       onTabReorder,
       config,

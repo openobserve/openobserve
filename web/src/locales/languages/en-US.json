@@ -4269,7 +4269,12 @@
       "workflows": "Automate runbooks that respond to alerts for you.",
       "oncall": "Schedule on-call rotations and auto-route pages to the right person.",
       "serviceGraph": "See how your services call each other and catch failures before they spread.",
-      "rbac": "Create custom roles with fine-grained permissions for your team."
+      "rbac": "Create custom roles with fine-grained permissions for your team.",
+      "logPatterns": "Spot recurring log patterns automatically instead of reading line by line.",
+      "correlation": "Jump from a log line straight to its related metrics and traces.",
+      "aiAssistant": "Ask AI to write queries and explain your data in plain English.",
+      "alertInsights": "See how often an alert fires and spot correlated alerts at a glance.",
+      "anomalyDetection": "Catch unusual metric behavior automatically, before it fires a threshold alert."
     }
   },
   "errorInsights": {
