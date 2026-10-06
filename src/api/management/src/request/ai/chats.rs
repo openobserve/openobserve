@@ -108,21 +108,20 @@ pub(super) async fn owned_chat(
 /// A chat's projected turns through `row.last_committed_seq` (lower it to cut the history).
 pub(super) async fn load_turns(
     row: &Model,
-    auth: &str,
+    auth: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, Response> {
     let (org_id, session_id) = (&row.org_id, &row.session_id);
     let events = match openobserve_core::ai_chat::read_committed_events(row, -1).await {
         Ok(events) => events,
         // Logged and counted by the reader. Never a partial chat presented as
         // whole: the caller keeps whatever it had and may retry.
-        Err(e) => {
+        Err(_) => {
             return Err((
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(serde_json::json!({
                     "code": StatusCode::SERVICE_UNAVAILABLE.as_u16(),
                     "message": "This conversation's history could not be read in full; please retry",
                     "error_code": "history_unavailable",
-                    "detail": e.to_string(),
                 })),
             )
                 .into_response());
@@ -479,7 +478,7 @@ pub async fn get(
 
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-    let turns = match load_turns(&row, &auth).await {
+    let turns = match load_turns(&row, Some(&auth)).await {
         Ok(turns) => turns,
         Err(resp) => return resp,
     };
@@ -611,13 +610,16 @@ pub async fn delete(
         }
     }
     super::shares::revoke_for_deleted(&org_id, std::slice::from_ref(&session_id), now).await;
-    // Drop the replica's working copy too. Best effort: the chat is already
+    // Drop every replica's working copy too. Best effort: the chat is already
     // unreadable, and a leftover opencode session is never served again.
     if let Some(client) = get_agent_client() {
         let (parts, _) = in_req.into_parts();
         let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         tokio::spawn(async move {
-            if let Err(e) = client.delete_session(&session_id, &org_id, &auth).await {
+            if let Err(e) = client
+                .delete_session_everywhere(&session_id, &org_id, &auth)
+                .await
+            {
                 log::warn!("[AI-CHAT] cached copy of deleted chat {session_id} not removed: {e:#}");
             }
         });
@@ -676,7 +678,10 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
                 .for_each_concurrent(4, |session_id| {
                     let (client, org_id, auth) = (client.clone(), org_id.clone(), auth.clone());
                     async move {
-                        if let Err(e) = client.delete_session(&session_id, &org_id, &auth).await {
+                        if let Err(e) = client
+                            .delete_session_everywhere(&session_id, &org_id, &auth)
+                            .await
+                        {
                             log::warn!(
                                 "[AI-CHAT] cached copy of deleted chat {session_id} not removed: {e:#}"
                             );

@@ -485,6 +485,18 @@ pub async fn ingest(
                         }
 
                         let destination_stream = stream_params.stream_name.to_string();
+                        if config::meta::pipeline::is_forbidden_destination(
+                            &stream_name,
+                            &destination_stream,
+                            false,
+                        ) {
+                            log::warn!(
+                                "[Pipeline] {org_id}/{stream_name}: dropped records routed to \
+                                 internal stream {destination_stream}"
+                            );
+                            stream_status.status.failed += stream_pl_results.len() as u32;
+                            continue;
+                        }
                         let dest_dbm_gate =
                             cfg.db_monitoring.enabled && is_dbm_server_stream(&destination_stream);
                         if !derived_streams.contains(&destination_stream) {

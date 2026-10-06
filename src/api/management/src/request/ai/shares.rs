@@ -16,6 +16,7 @@
 //! Sharing persisted AI chats; every unservable share answers the same 404.
 
 use std::{
+    collections::{HashMap, HashSet},
     sync::{LazyLock, RwLock},
     time::Duration,
 };
@@ -34,13 +35,20 @@ use infra::table::{
         VISIBILITY_ORG, VISIBILITY_PUBLIC,
     },
 };
+use o2_enterprise::enterprise::ai::chat::{
+    batcher::DurableEvent,
+    lease::{self, LeaseError},
+};
+use openobserve_core::ai_chat::ReadError;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
+use tokio::sync::{Semaphore, SemaphorePermit};
 use utoipa::ToSchema;
 
 use super::chats::{MAX_TITLE_CHARS, is_uuid, load_turns, owned_chat, resolve_owner, user_email};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    request::public_rate_limit::{Counters, client_ip, over_budget},
+    request::public_rate_limit::{Counters, client_ip, over_budget, too_many_requests},
     service::auth::check_permissions,
 };
 
@@ -49,12 +57,19 @@ const MIN_EXPIRY_SECS: i64 = 60;
 const MAX_EXPIRY_SECS: i64 = 365 * 24 * 60 * 60;
 const MAX_BODY_BYTES: usize = 16 * 1024;
 const PUBLIC_READ_WINDOW: Duration = Duration::from_secs(60);
+const PUBLIC_READ_SLOTS: usize = 8;
 // o2-ai refuses a longer seed with 413 instead of truncating it.
 const SEED_MAX_MESSAGES: usize = 200;
 const SEED_MAX_CHARS: usize = 200_000;
 const FALLBACK_TITLE: &str = "Shared chat";
+const TURN_RUNNING: &str = "A response is still being generated; share again when it finishes";
+const SEED_HEADER: &str = "[Restored conversation]\n";
+const SEED_FENCE: &str = "\n---\n\n";
+const CONTEXT_HEADER: &str = "[Context]\n";
 
 static PUBLIC_READS: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
+// Reads that resolve no client address still cannot pile up without bound.
+static PUBLIC_READ_GATE: Semaphore = Semaphore::const_new(PUBLIC_READ_SLOTS);
 
 /// A share as its owner sees it.
 #[derive(Debug, Serialize, ToSchema)]
@@ -103,6 +118,7 @@ pub struct ShareListResponse {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CreateShareRequest {
     /// `snapshot` or `live`.
     pub mode: String,
@@ -113,6 +129,7 @@ pub struct CreateShareRequest {
 }
 
 #[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct UpdateShareRequest {
     pub mode: Option<String>,
     /// A number sets a new expiry from now; `null` removes the expiry.
@@ -162,6 +179,127 @@ struct Served {
     chat: ChatModel,
 }
 
+/// A chat's stored events folded to final message and part snapshots, like o2-ai's projection.
+#[derive(Default)]
+struct Folded {
+    /// Message ids in first-seen order.
+    order: Vec<String>,
+    infos: HashMap<String, Value>,
+    /// Per message: its parts' final snapshots in first-seen order.
+    parts: HashMap<String, Vec<(String, Value)>>,
+}
+
+impl Folded {
+    fn new(events: &[DurableEvent]) -> Self {
+        let mut folded = Self::default();
+        let mut seen = HashSet::new();
+        for event in events {
+            folded.apply(live_type(&event.event_type), &event.data, &mut seen);
+        }
+        folded
+    }
+
+    fn apply(&mut self, event_type: &str, data: &Value, seen: &mut HashSet<String>) {
+        match event_type {
+            "message.updated" => {
+                let info = &data["info"];
+                if let Some(id) = info["id"].as_str().filter(|_| info["role"].is_string()) {
+                    if seen.insert(id.to_string()) {
+                        self.order.push(id.to_string());
+                    }
+                    self.infos.insert(id.to_string(), info.clone());
+                }
+            }
+            "message.part.updated" => {
+                let part = &data["part"];
+                if let (Some(id), Some(message)) = (part["id"].as_str(), part["messageID"].as_str())
+                {
+                    let parts = self.parts.entry(message.to_string()).or_default();
+                    match parts.iter_mut().find(|(pid, _)| pid == id) {
+                        Some((_, snapshot)) => *snapshot = part.clone(),
+                        None => parts.push((id.to_string(), part.clone())),
+                    }
+                }
+            }
+            "message.part.removed" => {
+                if let (Some(message), Some(id)) =
+                    (data["messageID"].as_str(), data["partID"].as_str())
+                    && let Some(parts) = self.parts.get_mut(message)
+                {
+                    parts.retain(|(pid, _)| pid != id);
+                }
+            }
+            "message.removed" => {
+                if let Some(id) = data["messageID"].as_str() {
+                    self.infos.remove(id);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn messages_with_role<'a>(&'a self, role: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+        self.order
+            .iter()
+            .filter(move |id| self.infos.get(*id).is_some_and(|i| i["role"] == role))
+            .map(String::as_str)
+    }
+
+    fn parts_of(&self, message: &str) -> &[(String, Value)] {
+        self.parts
+            .get(message)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    }
+
+    /// The user's own words: o2-ai's injected preamble parts are not part of them.
+    fn user_text(&self, message: &str) -> String {
+        let texts: Vec<(&str, bool)> = self
+            .parts_of(message)
+            .iter()
+            .filter(|(_, p)| p["type"] == "text")
+            .map(|(_, p)| {
+                let injected = p["metadata"]["o2_injected"] == true;
+                (p["text"].as_str().unwrap_or_default(), injected)
+            })
+            .collect();
+        let tagged = texts.iter().any(|(_, injected)| *injected);
+        let mut plain: Vec<&str> = texts
+            .into_iter()
+            .filter(|(_, injected)| !injected)
+            .map(|(text, _)| text)
+            .collect();
+        if !tagged && plain.len() == 1 {
+            plain[0] = strip_legacy_prefix(plain[0]);
+        }
+        plain
+            .into_iter()
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+            .trim()
+            .to_string()
+    }
+
+    fn assistant_text(&self, message: &str, text: &mut String) {
+        for (_, part) in self.parts_of(message) {
+            match part["type"].as_str() {
+                Some("text") if part["synthetic"] != true && part["ignored"] != true => {
+                    text.push_str(part["text"].as_str().unwrap_or_default());
+                }
+                Some("tool") => {
+                    let name = part["tool"].as_str().unwrap_or("unknown");
+                    if !text.is_empty() && !text.ends_with('\n') {
+                        text.push('\n');
+                    }
+                    text.push_str(&format!("[tool {name}]\n"));
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 /// CreateAiChatShare
 #[utoipa::path(
     post,
@@ -208,6 +346,11 @@ pub async fn create(
         Err(resp) => return resp,
     };
     let chat = match owned_chat(&org_id, &session_id, &owner).await {
+        Ok(chat) if req.mode == MODE_SNAPSHOT => settled_chat(&chat, &owner).await,
+        Ok(chat) => Ok(chat),
+        Err(resp) => Err(resp),
+    };
+    let chat = match chat {
         Ok(chat) => chat,
         Err(resp) => return resp,
     };
@@ -394,6 +537,14 @@ pub async fn update(
         Ok(None) => return not_found(),
         Err(resp) => return resp,
     };
+    let chat = if moves_snapshot(&share, &req) {
+        match settled_chat(&chat, &owner).await {
+            Ok(chat) => chat,
+            Err(resp) => return resp,
+        }
+    } else {
+        chat
+    };
     let settings = match apply_update(&share, &req, chat.last_committed_seq, now) {
         Ok(settings) => settings,
         Err(msg) => return MetaHttpResponse::bad_request(msg),
@@ -512,7 +663,7 @@ pub async fn get_shared(
     };
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-    read_shared(served, params.known_seq, &auth, VISIBILITY_ORG).await
+    read_shared(served, params.known_seq, Some(&auth), VISIBILITY_ORG).await
 }
 
 /// ForkSharedAiChat
@@ -605,10 +756,11 @@ pub async fn fork(
 pub async fn get_public(ip: Option<Extension<RealIp>>, Path(token): Path<String>) -> Response {
     let ip = ip.map(|e| e.0);
     if public_rate_limited(ip) {
-        return with_public_headers(
-            (StatusCode::TOO_MANY_REQUESTS, "Too many requests").into_response(),
-        );
+        return with_public_headers(too_many_requests(PUBLIC_READ_WINDOW));
     }
+    let Some(_slot) = enter(&PUBLIC_READ_GATE) else {
+        return with_public_headers(too_many_requests(Duration::from_secs(1)));
+    };
     log::info!(
         "[AI-CHAT-SHARE] public read of {}… from {}",
         token_prefix(&token),
@@ -622,18 +774,7 @@ pub async fn get_public(ip: Option<Extension<RealIp>>, Path(token): Path<String>
         Ok(None) => return with_public_headers(not_found()),
         Err(resp) => return with_public_headers(resp),
     };
-    let auth =
-        match openobserve_core::organization::sre_agent_auth_header(&served.share.org_id).await {
-            Ok(auth) => auth,
-            Err(e) => {
-                log::error!(
-                    "[AI-CHAT-SHARE] no agent credentials for {}: {e}",
-                    served.share.org_id
-                );
-                return with_public_headers(unavailable());
-            }
-        };
-    let resp = read_shared(served, None, &auth, VISIBILITY_PUBLIC).await;
+    let resp = read_shared(served, None, None, VISIBILITY_PUBLIC).await;
     // Internal error details are for signed-in readers only.
     if resp.status().is_server_error() {
         return with_public_headers(unavailable());
@@ -649,13 +790,12 @@ pub(super) async fn revoke_for_deleted(org_id: &str, session_ids: &[String], now
     }
 }
 
-/// The transcript a fork's first turn starts from, if this is one and its source chat still exists.
+/// The transcript a fork's first turn starts from, if this is one and its share is still live.
 pub(super) async fn fork_seed(
     org_id: &str,
     session_id: Option<&str>,
     user_email: &str,
-    auth: &str,
-) -> Result<Option<Vec<serde_json::Value>>, Response> {
+) -> Result<Option<Vec<Value>>, Response> {
     let Some(session_id) = session_id.filter(|s| is_uuid(s)) else {
         return Ok(None);
     };
@@ -688,16 +828,21 @@ pub(super) async fn fork_seed(
     if cut.last_committed_seq == NO_SEQ {
         return Ok(None);
     }
-    let turns = load_turns(&cut, auth).await?;
-    let seed = fit_seed(transcript(&turns));
+    let events = match openobserve_core::ai_chat::read_committed_events(&cut, NO_SEQ).await {
+        Ok(events) => events,
+        // Logged by the reader; only an unreadable stream is worth a retry.
+        Err(ReadError::Search(_)) => return Err(unavailable()),
+        Err(_) => return Ok(None),
+    };
+    let seed = fit_seed(transcript(&events));
     Ok((!seed.is_empty()).then_some(seed))
 }
 
-/// The active chat a fork's share points at, if both still exist.
+/// The active chat a fork's share points at, while the share is live and the chat exists.
 async fn seed_source(org_id: &str, share_id: &str) -> Result<Option<ChatModel>, Response> {
     let share = match ai_chat_shares::get(org_id, share_id).await {
-        Ok(Some(share)) => share,
-        Ok(None) => return Ok(None),
+        Ok(Some(share)) if ai_chat_shares::is_live(&share, now_micros()) => share,
+        Ok(_) => return Ok(None),
         Err(e) => {
             log::error!("[AI-CHAT-SHARE] cannot read share {org_id}/{share_id}: {e}");
             return Err(unavailable());
@@ -799,10 +944,26 @@ async fn owned_share(
     }
 }
 
+/// The owner's chat re-read while no turn runs in it, so a snapshot never cuts a turn in half.
+async fn settled_chat(chat: &ChatModel, owner: &str) -> Result<ChatModel, Response> {
+    let (org_id, session_id) = (&chat.org_id, &chat.session_id);
+    let lease = match lease::acquire(org_id, session_id, 0).await {
+        Ok(lease) => lease,
+        Err(LeaseError::Busy) => return Err(MetaHttpResponse::conflict(TURN_RUNNING)),
+        Err(LeaseError::Backend(e)) => {
+            log::error!("[AI-CHAT-SHARE] turn lease unavailable for {org_id}/{session_id}: {e}");
+            return Err(unavailable());
+        }
+    };
+    let fresh = owned_chat(org_id, session_id, owner).await;
+    lease.release().await;
+    fresh
+}
+
 async fn read_shared(
     served: Served,
     known_seq: Option<i64>,
-    auth: &str,
+    auth: Option<&str>,
     route: &'static str,
 ) -> Response {
     let Served { share, chat } = served;
@@ -870,7 +1031,15 @@ fn public_links_enabled() -> bool {
 
 fn public_rate_limited(ip: Option<RealIp>) -> bool {
     let rpm = u32::try_from(config::get_config().public_ai_chat.rpm).unwrap_or(u32::MAX);
-    rpm != 0 && over_budget(&PUBLIC_READS, client_ip(ip), PUBLIC_READ_WINDOW, rpm)
+    // Unresolved clients would share one bucket any of them could exhaust; the gate bounds them.
+    let Some(ip) = ip else {
+        return false;
+    };
+    rpm != 0 && over_budget(&PUBLIC_READS, ip.0.to_string(), PUBLIC_READ_WINDOW, rpm)
+}
+
+fn enter(gate: &Semaphore) -> Option<SemaphorePermit<'_>> {
+    gate.try_acquire().ok()
 }
 
 fn count_op(op: &str) {
@@ -992,6 +1161,13 @@ fn apply_update(
     })
 }
 
+/// Whether `req` points the share at the chat's current history.
+fn moves_snapshot(share: &ShareModel, req: &UpdateShareRequest) -> bool {
+    let mode = req.mode.as_deref().unwrap_or(&share.mode);
+    mode == MODE_SNAPSHOT
+        && (req.refresh_snapshot || share.mode != MODE_SNAPSHOT || share.snapshot_seq.is_none())
+}
+
 fn display_name(first: &str, last: &str) -> Option<String> {
     let name = format!("{} {}", first.trim(), last.trim());
     let name = name.trim();
@@ -1012,20 +1188,26 @@ fn fork_title(source: &str) -> String {
     title
 }
 
-/// A projected chat as `{role, content}` messages, tool calls as `[tool <name>]` notes.
-fn transcript(turns: &[serde_json::Value]) -> Vec<serde_json::Value> {
+/// A chat's stored events as `{role, content}` messages, tool calls as `[tool <name>]` notes.
+fn transcript(events: &[DurableEvent]) -> Vec<Value> {
+    let folded = Folded::new(events);
+    let mut answers: HashMap<&str, Vec<&str>> = HashMap::new();
+    for id in folded.messages_with_role("assistant") {
+        if let Some(parent) = folded.infos[id]["parentID"].as_str() {
+            answers.entry(parent).or_default().push(id);
+        }
+    }
     let mut messages = Vec::new();
-    for turn in turns {
-        let user = turn
-            .pointer("/user/text")
-            .and_then(|t| t.as_str())
-            .unwrap_or_default()
-            .trim();
+    for id in folded.messages_with_role("user") {
+        let user = folded.user_text(id);
         if !user.is_empty() {
             messages.push(serde_json::json!({"role": "user", "content": user}));
         }
-        let frames = turn.get("frames").and_then(|f| f.as_array());
-        let assistant = assistant_text(frames.map(Vec::as_slice).unwrap_or_default());
+        let mut assistant = String::new();
+        for answer in answers.get(id).map(Vec::as_slice).unwrap_or_default() {
+            folded.assistant_text(answer, &mut assistant);
+        }
+        let assistant = assistant.trim();
         if !assistant.is_empty() {
             messages.push(serde_json::json!({"role": "assistant", "content": assistant}));
         }
@@ -1033,29 +1215,26 @@ fn transcript(turns: &[serde_json::Value]) -> Vec<serde_json::Value> {
     messages
 }
 
-fn assistant_text(frames: &[serde_json::Value]) -> String {
-    let mut text = String::new();
-    for frame in frames {
-        match frame.get("type").and_then(|t| t.as_str()) {
-            Some("message_delta") => {
-                if let Some(content) = frame.get("content").and_then(|c| c.as_str()) {
-                    text.push_str(content);
-                }
-            }
-            Some("tool_call") => {
-                let name = frame
-                    .get("tool")
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("unknown");
-                if !text.is_empty() && !text.ends_with('\n') {
-                    text.push('\n');
-                }
-                text.push_str(&format!("[tool {name}]\n"));
-            }
-            _ => {}
-        }
+/// A durable event type without opencode's version suffix (`message.updated.1`).
+fn live_type(event_type: &str) -> &str {
+    match event_type.rsplit_once('.') {
+        Some((head, tail)) if !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()) => head,
+        _ => event_type,
     }
-    text.trim().to_string()
+}
+
+/// Drops o2-ai's preamble from a prompt stored before it became a separate tagged part.
+fn strip_legacy_prefix(text: &str) -> &str {
+    let mut text = text;
+    if text.starts_with(SEED_HEADER) {
+        text = text
+            .find(SEED_FENCE)
+            .map_or("", |end| &text[end + SEED_FENCE.len()..]);
+    }
+    if text.starts_with(CONTEXT_HEADER) {
+        text = text.find("\n\n").map_or("", |end| &text[end + 2..]);
+    }
+    text
 }
 
 /// The most recent messages that fit o2-ai's seed limits, oldest first.
@@ -1265,28 +1444,151 @@ mod tests {
         assert!(long.ends_with(" (copy)"));
     }
 
+    fn event(seq: i64, event_type: &str, data: Value) -> DurableEvent {
+        DurableEvent {
+            id: format!("evt_{seq}"),
+            aggregate_id: "ses_test".into(),
+            seq,
+            event_type: event_type.into(),
+            data,
+        }
+    }
+
+    fn message(seq: i64, id: &str, role: &str, parent: Option<&str>) -> DurableEvent {
+        let mut info = json!({"id": id, "role": role});
+        if let Some(parent) = parent {
+            info["parentID"] = json!(parent);
+        }
+        event(seq, "message.updated.1", json!({ "info": info }))
+    }
+
+    fn part(seq: i64, message: &str, part: Value) -> DurableEvent {
+        let mut part = part;
+        part["messageID"] = json!(message);
+        event(seq, "message.part.updated.1", json!({ "part": part }))
+    }
+
     #[test]
-    fn transcripts_keep_text_and_note_tool_calls() {
-        let turns = vec![
-            json!({
-                "user": {"text": " why is p99 up? ", "images": []},
-                "frames": [
-                    {"type": "tool_call", "tool": "SearchSQL", "message": "Running"},
-                    {"type": "tool_result", "tool": "SearchSQL", "result": "rows"},
-                    {"type": "message_delta", "content": "Because "},
-                    {"type": "message_delta", "content": "of GC."},
-                    {"type": "complete"},
-                ],
-            }),
-            json!({"user": {"text": ""}, "frames": [{"type": "cancelled"}]}),
+    fn transcripts_are_built_from_stored_events() {
+        let events = vec![
+            message(0, "msg_u1", "user", None),
+            part(
+                1,
+                "msg_u1",
+                json!({"id": "p0", "type": "text", "text": "[Context]\nstream: x", "metadata": {"o2_injected": true}}),
+            ),
+            part(
+                2,
+                "msg_u1",
+                json!({"id": "p1", "type": "text", "text": " why is p99 up? "}),
+            ),
+            message(3, "msg_a1", "assistant", Some("msg_u1")),
+            part(
+                4,
+                "msg_a1",
+                json!({"id": "p2", "type": "text", "text": "Because "}),
+            ),
+            part(
+                5,
+                "msg_a1",
+                json!({"id": "p3", "type": "tool", "tool": "SearchSQL", "state": {"status": "running"}}),
+            ),
+            part(
+                6,
+                "msg_a1",
+                json!({"id": "p3", "type": "tool", "tool": "SearchSQL", "state": {"status": "completed", "output": "rows"}}),
+            ),
+            part(
+                7,
+                "msg_a1",
+                json!({"id": "p2", "type": "text", "text": "Because of GC."}),
+            ),
+            part(
+                8,
+                "msg_a1",
+                json!({"id": "p4", "type": "text", "text": "hidden", "synthetic": true}),
+            ),
+            part(
+                9,
+                "msg_a1",
+                json!({"id": "p5", "type": "reasoning", "text": "thinking"}),
+            ),
+            message(10, "msg_u2", "user", None),
+            part(
+                11,
+                "msg_u2",
+                json!({"id": "p6", "type": "text", "text": "and now?"}),
+            ),
+            part(
+                12,
+                "msg_u2",
+                json!({"id": "p7", "type": "text", "text": "gone"}),
+            ),
+            event(
+                13,
+                "message.part.removed.1",
+                json!({"messageID": "msg_u2", "partID": "p7"}),
+            ),
+            message(14, "msg_x", "assistant", Some("msg_u2")),
+            event(15, "message.removed.1", json!({"messageID": "msg_x"})),
         ];
         assert_eq!(
-            transcript(&turns),
+            transcript(&events),
             vec![
                 json!({"role": "user", "content": "why is p99 up?"}),
-                json!({"role": "assistant", "content": "[tool SearchSQL]\nBecause of GC."}),
+                json!({"role": "assistant", "content": "Because of GC.\n[tool SearchSQL]"}),
+                json!({"role": "user", "content": "and now?"}),
             ]
         );
+    }
+
+    #[test]
+    fn legacy_prompts_lose_the_restored_seed_and_context_preamble() {
+        assert_eq!(
+            strip_legacy_prefix(
+                "[Restored conversation]\nUser: hi\n---\n\n[Context]\na: b\n\nreal"
+            ),
+            "real"
+        );
+        assert_eq!(strip_legacy_prefix("[Context]\na: b\n\nreal"), "real");
+        assert_eq!(strip_legacy_prefix("plain question"), "plain question");
+        assert_eq!(live_type("message.part.updated.1"), "message.part.updated");
+        assert_eq!(live_type("session.updated"), "session.updated");
+    }
+
+    #[test]
+    fn share_requests_reject_unknown_fields() {
+        assert!(serde_json::from_str::<UpdateShareRequest>(r#"{"refresh":true}"#).is_err());
+        assert!(serde_json::from_str::<UpdateShareRequest>(r#"{"refresh_snapshot":true}"#).is_ok());
+        let create = r#"{"mode":"live","visibility":"org","public":true}"#;
+        assert!(serde_json::from_str::<CreateShareRequest>(create).is_err());
+    }
+
+    #[test]
+    fn only_requests_that_move_a_snapshot_need_a_settled_chat() {
+        let snap = share(MODE_SNAPSHOT, VISIBILITY_ORG);
+        let live = share(MODE_LIVE, VISIBILITY_ORG);
+        let req = |mode: Option<&str>, refresh: bool| UpdateShareRequest {
+            mode: mode.map(str::to_string),
+            refresh_snapshot: refresh,
+            ..Default::default()
+        };
+        assert!(!moves_snapshot(&snap, &req(None, false)));
+        assert!(moves_snapshot(&snap, &req(None, true)));
+        assert!(!moves_snapshot(&snap, &req(Some(MODE_LIVE), true)));
+        assert!(!moves_snapshot(&live, &req(None, false)));
+        assert!(moves_snapshot(&live, &req(Some(MODE_SNAPSHOT), false)));
+    }
+
+    #[test]
+    fn public_reads_are_limited_per_ip_and_by_a_global_gate() {
+        assert!(!public_rate_limited(None));
+        let gate = Semaphore::new(1);
+        let first = enter(&gate);
+        assert!(first.is_some());
+        assert!(enter(&gate).is_none());
+        drop(first);
+        assert!(enter(&gate).is_some());
     }
 
     #[test]
