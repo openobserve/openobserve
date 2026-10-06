@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
+use std::ops::ControlFlow;
+
+use sqlparser::{
+    ast::{Expr, Statement, Visit, Visitor},
+    dialect::GenericDialect,
+    parser::Parser,
+};
 
 use super::{
     helpers::{has_cte, has_join, has_limit},
@@ -34,16 +40,42 @@ pub fn is_eligible_for_histogram(
             if has_subquery(statement) {
                 return Ok((true, true));
             } else if has_distinct(statement)
-                || has_limit(query)
                 || has_cte(query)
                 || has_join(query)
                 || has_union(query)
+                || (has_limit(query) && !uses_histogram_function(statement))
             {
                 return Ok((false, false));
             }
         }
     }
     Ok((true, false))
+}
+
+// A histogram LIMIT guards the default-limit cap; it must not disqualify the result.
+fn uses_histogram_function(statement: &Statement) -> bool {
+    let mut visitor = HistogramDetector::default();
+    let _ = statement.visit(&mut visitor);
+    visitor.found
+}
+
+#[derive(Default)]
+struct HistogramDetector {
+    found: bool,
+}
+
+impl Visitor for HistogramDetector {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        if let Expr::Function(func) = expr
+            && func.name.to_string().eq_ignore_ascii_case("histogram")
+        {
+            self.found = true;
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 #[cfg(test)]
@@ -97,6 +129,23 @@ mod tests {
             is_eligible_for_histogram("SELECT x FROM (SELECT x FROM t)", false).unwrap();
         assert!(eligible);
         assert!(is_sub);
+    }
+
+    // Regression (upstream #10129): LIMIT on a histogram query must stay eligible.
+    #[test]
+    fn test_histogram_query_with_limit_stays_eligible() {
+        let queries = [
+            r#"SELECT histogram(_timestamp) AS x_axis_1, count(*) AS y_axis_1 FROM "traefik" GROUP BY x_axis_1 ORDER BY x_axis_1 LIMIT 100000"#,
+            r#"SELECT histogram(_timestamp, '5 minutes') AS t, count(*) AS n FROM t GROUP BY t ORDER BY t LIMIT 100"#,
+        ];
+        for q in queries {
+            let (eligible, is_sub) = is_eligible_for_histogram(q, false).unwrap();
+            assert!(eligible, "histogram+limit should stay eligible: {q}");
+            assert!(!is_sub);
+        }
+        // a plain LIMIT (no histogram) stays ineligible
+        let (eligible, _) = is_eligible_for_histogram("SELECT * FROM t LIMIT 100", false).unwrap();
+        assert!(!eligible);
     }
 
     #[test]
