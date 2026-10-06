@@ -541,7 +541,14 @@ read it once, it is the backbone of everything below.
      the top.
    - **Tables keep every column** and scroll within the frame (OTable does it);
      inline row actions get `max-md:hidden` plus one `md:hidden` kebab mirroring them
-     with `<data-test>-menu` items; the footer count is `max-md:hidden`.
+     with `<data-test>-menu` items.
+   - **The table footer is never hand-built.** `OTable` draws the one bar every
+     list shares: the pager on the end edge and, on the start edge, nothing —
+     unless rows are selected (the "N of M selected" count plus the page's bulk
+     actions from `#selection-actions`) or the page has something the pager cannot
+     say (`#footer-note`). There is no total label; the pager's "x – y of z" is the
+     count. Below md the count and actions take a row above the pager and a note
+     takes its own row; a note whose root is `max-md:hidden` leaves no row.
    - **Nothing clipped, nothing hover-only.** Popups use library components and
      `min(<w>, calc(100vw - 1.5rem))` widths; an `h-full` pane beside a stacked
      sibling gets `max-md:h-auto max-md:min-h-0`; hover-revealed controls get
@@ -697,6 +704,14 @@ considering the UI done:
       (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
       columns hidden by default via `:column-visibility`.
+- [ ] **The table footer is `OTable`'s, never hand-built** — bulk actions on
+      selected rows are in `#selection-actions` (the buttons only: no wrapper, no
+      `v-if` on the selection length, no margin/height/padding classes, every
+      button `size="sm"`, a destructive action last, no count in a label); a line
+      the pager cannot say (a cap, partial data, "filtered x of y") is in
+      `#footer-note`, with the `v-if` on the `<template>` so it renders only while
+      it says more; nothing restates the row total. See
+      [core-controls-table § Footer](references/core-controls-table.md).
 - [ ] Every empty/zero state is a single `OEmptyState` (never a hand-rolled
       `<div>` + centered text + button). Use a `preset` + **`:filtered`**
       (search/filter active) + `@action` resetting on `clear-filters`; `#error` if

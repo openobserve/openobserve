@@ -9,6 +9,7 @@ export class RumSessionsPage {
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
         this.tableRow = page.locator('[data-test^="o2-table-row-"]');
         this.sessionViewerNoReplay = '[data-test="session-viewer-no-replay"]';
+        this.sessionViewerEventsOnly = '[data-test="session-viewer-events-only"]';
         this.sessionViewerSubtitle = '[data-test="session-viewer-subtitle"]';
         this.sessionViewerShareLinkBtn = '[data-test="session-viewer-share-link-btn"]';
         this.sessionViewerBackBtn = '[data-test="session-viewer-back-btn"]';
@@ -73,6 +74,12 @@ export class RumSessionsPage {
         await expect(empty).toBeVisible({ timeout: 15000 });
         await expect(empty).toContainText('No replay was recorded for this session');
         await expect(empty).toContainText(sessionId);
+    }
+
+    async expectEventsOnlyState() {
+        const eventsOnly = this.page.locator(this.sessionViewerEventsOnly);
+        await expect(eventsOnly).toBeVisible({ timeout: 15000 });
+        await expect(eventsOnly).toContainText('No replay was recorded for this session');
     }
 
     async expectSessionViewerSubtitleHidden() {

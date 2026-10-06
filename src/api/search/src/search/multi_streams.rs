@@ -219,6 +219,10 @@ pub async fn search_multi(
 
     let user_id = &user_email.user_id;
     let mut queries = multi_req.to_query_req();
+    // The count divides cached_ratio below; the router answers an empty sql with this message.
+    if queries.is_empty() {
+        return MetaHttpResponse::bad_request("Failed to parse multi search request");
+    }
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
 
     let per_query_resp = multi_req.per_query_response;
@@ -867,6 +871,7 @@ pub async fn _search_partition_multi(
             "size": 10,
             "scan_size": 28943
         })),
+        (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
@@ -906,6 +911,13 @@ pub async fn around_multi(
         .collect::<Vec<String>>();
     if let Some(v) = query.get("sql") {
         let sqls = v.split(',').collect::<Vec<&str>>();
+        if sqls.len() > around_sqls.len() {
+            return MetaHttpResponse::bad_request(format!(
+                "sql has more entries ({}) than streams ({})",
+                sqls.len(),
+                around_sqls.len()
+            ));
+        }
         for (i, sql) in sqls.into_iter().enumerate() {
             if let Ok(sql) = base64::decode_url(sql) {
                 around_sqls[i] = sql;
@@ -1591,8 +1603,20 @@ pub async fn report_to_audit(
 #[cfg(test)]
 mod tests {
 
+    use axum::{
+        extract::{Path, Query},
+        http::{HeaderMap, StatusCode},
+    };
     use chrono::Utc;
-    use config::meta::search::{MultiSearchPartitionRequest, MultiStreamRequest};
+    use config::{
+        meta::search::{MultiSearchPartitionRequest, MultiStreamRequest},
+        utils::base64,
+    };
+    use hashbrown::HashMap;
+    use openobserve_api_common::extractors::Headers;
+    use openobserve_core::auth::UserEmail;
+
+    use super::around_multi;
 
     #[test]
     fn test_multi_stream_request_structure() {
@@ -2199,5 +2223,50 @@ mod tests {
             queries[0].query.query_fn.is_some(),
             "per_query_response=false should always set query_fn on requests"
         );
+    }
+
+    // The cloud build checks the org's trial period first, which can answer 403 before this guard.
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn search_multi_refuses_an_empty_sql_list_instead_of_panicking() {
+        use axum::Json;
+        use config::utils::json;
+
+        use super::search_multi;
+
+        for body in [
+            r#"{"sql": [], "start_time": 1, "end_time": 2}"#,
+            r#"{"start_time": 1, "end_time": 2}"#,
+        ] {
+            let req: MultiStreamRequest = json::from_str(body).unwrap();
+            let resp = search_multi(
+                Path("default".to_string()),
+                Query(HashMap::new()),
+                Headers(UserEmail {
+                    user_id: "user@example.com".to_string(),
+                }),
+                HeaderMap::new(),
+                Json(req),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "{body}");
+        }
+    }
+
+    #[tokio::test]
+    async fn around_multi_refuses_more_sql_entries_than_streams_instead_of_panicking() {
+        let sql = base64::encode_url(r#"SELECT * FROM "default""#);
+        let mut query = HashMap::new();
+        query.insert("sql".to_string(), format!("{sql},{sql}"));
+        let resp = around_multi(
+            Path(("default".to_string(), base64::encode_url("default"))),
+            HeaderMap::new(),
+            Query(query),
+            Headers(UserEmail {
+                user_id: "user@example.com".to_string(),
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 }

@@ -150,7 +150,7 @@ export const useRoleSummary = (deps: SummaryDeps) => {
     const loaded = new Map<string, string>(
       (node.entities ?? []).map((item: any) => [item.name, item.display_name ?? item.name]),
     );
-    // Dashboard, alert and report ids carry their folder as `folderId/id`; synthetics and workflow ids are plain, so only the folder's loaded items place them.
+    // Dashboard, alert and report ids carry their folder as `folderId/id`; synthetics, workflow and prompt ids are plain, so only the folder's loaded items place them.
     const inside = (heldItemsByResource.value.get(node.childName) ?? []).filter(
       (entity) => node.type === "Type" || entity.startsWith(prefix) || loaded.has(entity),
     );

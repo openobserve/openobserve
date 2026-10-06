@@ -31,6 +31,7 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -145,6 +146,7 @@ const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
+const ImportFunction = () => import("@/components/functions/ImportFunction.vue");
 const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
@@ -152,6 +154,15 @@ const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const AppAnalytics = () => import("@/views/RUM/AppAnalytics.vue");
+const AnalyticsOverview = () => import("@/components/rum/productAnalytics/AnalyticsOverview.vue");
+const AnalyticsFunnels = () => import("@/components/rum/productAnalytics/AnalyticsFunnels.vue");
+const SavedFunnelsPage = () => import("@/components/rum/productAnalytics/SavedFunnelsPage.vue");
+const AnalyticsPaths = () => import("@/components/rum/productAnalytics/AnalyticsPaths.vue");
+const AnalyticsRetention = () => import("@/components/rum/productAnalytics/AnalyticsRetention.vue");
+const NamedEventsListPage = () =>
+  import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
+const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
@@ -180,6 +191,11 @@ const useRoutes = () => {
       meta: {
         titleKey: "login.login",
       },
+    },
+    {
+      // A redirect record resolves before the auth guard runs, so the guard only ever sees /login.
+      path: "/signup",
+      redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
     },
     {
       path: "/logout",
@@ -667,6 +683,17 @@ const useRoutes = () => {
           },
         },
         {
+          path: "functions/import",
+          name: "importFunction",
+          component: ImportFunction,
+          meta: {
+            titleKey: "function.import.title",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "enrichment-tables",
           name: "enrichmentTables",
           component: EnrichmentTableList,
@@ -1112,6 +1139,91 @@ const useRoutes = () => {
           ],
         },
       ],
+    },
+    {
+      path: "product-analytics",
+      name: PA_ROUTES.shell,
+      component: AppAnalytics,
+      meta: {
+        titleKey: "menu.productAnalytics",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "overview",
+          name: PA_ROUTES.overview,
+          component: AnalyticsOverview,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "funnels",
+          name: PA_ROUTES.funnels,
+          component: SavedFunnelsPage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "funnels/build",
+          name: PA_ROUTES.funnelBuilder,
+          component: AnalyticsFunnels,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "paths",
+          name: PA_ROUTES.paths,
+          component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "retention",
+          name: PA_ROUTES.retention,
+          component: AnalyticsRetention,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "events",
+          name: PA_ROUTES.events,
+          component: NamedEventsListPage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+      ],
+    },
+    // Siblings of the shell, not children, so the editor renders without its sub-tab strip.
+    {
+      path: "product-analytics/events/new",
+      name: PA_ROUTES.eventNew,
+      component: NamedEventEditor,
+      meta: {
+        titleKey: "rum.analytics.events.createTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "product-analytics/events/:id/edit",
+      name: PA_ROUTES.eventEdit,
+      component: NamedEventEditor,
+      props: true,
+      meta: {
+        titleKey: "rum.analytics.events.editTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),

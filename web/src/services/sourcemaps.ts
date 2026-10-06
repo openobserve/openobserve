@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 interface TranslateStackTraceRequest {
   stacktrace: string;
@@ -64,11 +65,16 @@ const sourcemapsService = {
 
   uploadSourceMaps: (org_identifier: string, formData: FormData): Promise<{ data: any }> => {
     const url = `/api/${org_identifier}/sourcemaps`;
-    return http().post(url, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    return http()
+      .post(url, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      .then((res) => {
+        analytics.track("sourcemaps_uploaded");
+        return res;
+      });
   },
 
   deleteSourceMaps: (

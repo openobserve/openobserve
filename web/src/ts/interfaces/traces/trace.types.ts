@@ -3,7 +3,7 @@
  * Types for distributed traces and trace metadata
  */
 
-import { type Span, type EnrichedSpan, type SpanStatus } from "./span.types";
+import { type Span, type SpanStatus } from "./span.types";
 
 /**
  * Search mode for the traces explorer
@@ -43,118 +43,6 @@ export interface Trace {
   spanCount: number; // Total number of spans
   serviceCount: number; // Number of unique services
   errorCount: number; // Number of error spans
-}
-
-/**
- * Trace Tree - Hierarchical representation of spans
- */
-export interface TraceTree {
-  trace_id: string;
-  rootSpan: EnrichedSpan;
-  flatSpans: EnrichedSpan[]; // All spans in flat array
-  spanMap: Map<string, EnrichedSpan>; // Quick lookup by span_id
-  criticalPath: string[]; // Span IDs on critical path
-  metadata: TraceMetadata;
-}
-
-/**
- * Trace Metadata - Aggregated information about the trace
- */
-export interface TraceMetadata {
-  // Identifiers
-  trace_id: string;
-  root_service: string;
-  root_operation: string;
-
-  // Timing
-  start_time: number;
-  end_time: number;
-  duration_ms: number;
-
-  // Counts
-  total_spans: number;
-  error_spans: number;
-  service_count: number;
-
-  // Services involved
-  services: string[];
-  service_spans: Map<string, number>; // service -> span count
-  service_durations: Map<string, number>; // service -> total duration
-
-  // Span kind breakdown
-  span_kinds: Map<string, number>; // kind -> count
-
-  // Status breakdown
-  status_counts: {
-    ok: number;
-    error: number;
-    unset: number;
-  };
-
-  // Performance
-  critical_path_duration: number; // Duration of longest path
-  critical_path_percent: number; // % of total duration
-  slowest_spans: EnrichedSpan[]; // Top 5 slowest spans
-
-  // Error information
-  has_errors: boolean;
-  error_services: string[]; // Services with errors
-  error_messages: string[]; // Unique error messages
-}
-
-/**
- * Trace Statistics - For analytics panel
- */
-export interface TraceStatistics {
-  // Overview
-  total_duration_ms: number;
-  total_spans: number;
-  services_count: number;
-  error_rate: number; // Percentage
-
-  // Service breakdown
-  service_breakdown: ServiceBreakdown[];
-
-  // Span kind distribution
-  span_kind_distribution: {
-    kind: string;
-    count: number;
-    percentage: number;
-  }[];
-
-  // Performance metrics
-  avg_span_duration: number;
-  median_span_duration: number;
-  p95_span_duration: number;
-  p99_span_duration: number;
-
-  // Database & external calls
-  database_calls: number;
-  external_api_calls: number;
-  internal_calls: number;
-}
-
-/**
- * Service Breakdown - Time spent per service
- */
-export interface ServiceBreakdown {
-  service_name: string;
-  span_count: number;
-  total_duration_ms: number;
-  percentage: number;
-  color: string; // From color palette
-  has_errors: boolean;
-  error_count: number;
-}
-
-/**
- * Critical Path - Longest chain of dependent spans
- */
-export interface CriticalPath {
-  span_ids: string[];
-  spans: EnrichedSpan[];
-  total_duration: number;
-  percentage_of_trace: number;
 }
 
 /**

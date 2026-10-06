@@ -282,4 +282,52 @@ describe("OnCallOwnershipRules", () => {
       expect(wrapper.emitted("clear-search")).toBeUndefined();
     });
   });
+
+  /// A phone's action column holds one control, so edit and remove are mirrored in a menu that must emit the same events.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      OTable: {
+        name: "OTable",
+        props: ["data"],
+        template: `<div><div v-for="row in data" :key="row.rule_id"><slot name="cell-actions" :row="row" /></div></div>`,
+      },
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    function renderWithMenu() {
+      return mount(OnCallOwnershipRules, {
+        props: { rules: [rule()], aliases: [{ id: "service", display: "Service" }] },
+        global: { plugins: [i18n, store], stubs: menuStubs },
+      });
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", () => {
+      const wrapper = renderWithMenu();
+
+      for (const action of ["edit", "delete"]) {
+        expect(wrapper.find(`[data-test="oncall-ownership-${action}-r1"]`).classes()).toContain(
+          "max-md:hidden",
+        );
+      }
+      expect(wrapper.find('[data-test="oncall-ownership-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("edits and removes the rule the row is for", async () => {
+      const wrapper = renderWithMenu();
+
+      await wrapper.find('[data-test="oncall-ownership-edit-r1-menu"]').trigger("click");
+      await wrapper.find('[data-test="oncall-ownership-delete-r1-menu"]').trigger("click");
+
+      expect(wrapper.emitted("edit")?.[0][0]).toMatchObject({ rule_id: "r1" });
+      expect(wrapper.emitted("remove")?.[0][0]).toMatchObject({ rule_id: "r1" });
+    });
+  });
 });

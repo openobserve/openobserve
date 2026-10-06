@@ -402,11 +402,10 @@ export class LogsPage {
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-        // TracesAnalysisDashboard.vue now renders inside <ODrawer data-test="traces-analysis-dashboard-drawer">
-        // The drawer's panel exposes that data-test on the root element; close button is from ODrawer's slot.
-        this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
-        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
-        this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
+        // Drill down renders the dashboard embedded; the Search toggle replaces close.
+        this.logsAnalyzeDimensionsButton = '[data-test="logs-drilldown-toggle"]';
+        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-page"]';
+        this.analysisDashboardClose = '[data-test="logs-logs-toggle"]';
         // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
         this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
         this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
@@ -414,14 +413,14 @@ export class LogsPage {
         // OInput's inner native <input> field — required for `fill()` (the wrapper div above isn't editable)
         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
         // Analysis dashboard states
-        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-state"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
+        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-page"] [data-test="traces-analysis-dashboard-loading-indicator"]';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-page"] [data-test="traces-analysis-dashboard-error"]';
         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
         // Dimension checkboxes (any value)
         this.dimensionCheckboxAny = '[data-test^="dimension-checkbox-"]';
-        // Dashboard chart panel inside the analysis dashboard drawer (via data-test prefix)
-        this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-drawer"] [data-test^="dashboard-panel-"]';
+        // Dashboard chart panel inside the analysis dashboard page (via data-test prefix)
+        this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-page"] [data-test^="dashboard-panel-"]';
         // SQL Mode toggle (OSwitch) — sourced from SearchBar.vue
         this.sqlModeToggleBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // Inner <button role="switch"> rendered by OSwitch — carries data-state="checked|unchecked"
@@ -4517,6 +4516,20 @@ export class LogsPage {
         }
     }
 
+    /**
+     * Open the saved-function dropdown and apply one by name.
+     *
+     * The dropdown only renders while the transform editor is on, so call
+     * toggleVrlEditor() first.
+     */
+    async selectSavedFunction(name) {
+        await this.page.locator(this.logsSearchBarFunctionDropdown).first().click();
+        const item = this.page.locator(`[data-test="logs-search-saved-function-${name}"]`);
+        await item.waitFor({ state: 'visible', timeout: 15000 });
+        await item.click();
+        testLogger.info('Applied saved function from the logs dropdown', { name });
+    }
+
     async clickVrlEditor() {
         // Wait for the VRL editor host to be visible before driving Monaco.
         // The data-test matches both outer container and inner Monaco div, so use .first().
@@ -7316,8 +7329,9 @@ export class LogsPage {
      * Expect Analyze Dimensions button to NOT be visible
      */
     async expectAnalyzeDimensionsButtonNotVisible() {
-        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).not.toBeVisible({ timeout: 5000 });
-        testLogger.info('Analyze Dimensions button is not visible (as expected)');
+        // The Drill down toggle stays visible but is disabled where the old button was hidden (SQL mode)
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).toBeDisabled({ timeout: 5000 });
+        testLogger.info('Drill down toggle is disabled (as expected)');
     }
 
     /**

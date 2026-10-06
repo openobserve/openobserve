@@ -17,11 +17,13 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h, KeepAlive, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import Index from "@/plugins/traces/Index.vue";
+import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import analytics from "@/services/product_analytics";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -213,9 +215,9 @@ vi.mock("@/composables/useTraces", () => ({
     formatTracesMetaData: vi.fn((hits) => hits),
     setServiceColors: mockSetServiceColors,
     loadLocalLogFilterField: vi.fn(),
-    updatedLocalLogFilterField: vi.fn(),
+    updatedLocalLogFilterField: mockUpdatedLocalLogFilterField,
     loadTracesParser: vi.fn().mockResolvedValue(undefined),
-    tracesParser: { value: { astify: vi.fn() } },
+    tracesParser: { value: trackTracesParser({ astify: vi.fn(() => ({ where: null })) }) },
   }),
 }));
 
@@ -230,6 +232,25 @@ const { mockGetStreams, mockGetStream, mockSetServiceColors } = vi.hoisted(() =>
   mockGetStream: vi.fn(),
   mockSetServiceColors: vi.fn(),
 }));
+
+const { mockUpdatedLocalLogFilterField, mockToast } = vi.hoisted(() => ({
+  mockUpdatedLocalLogFilterField: vi.fn(),
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...((await importOriginal()) as any),
+  toast: mockToast,
+}));
+
+// Each mount gets its own parser, so a spy call's parser argument identifies which test's mount made it.
+const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
+  const createdTracesParsers: unknown[] = [];
+  return {
+    createdTracesParsers,
+    trackTracesParser: <T extends object>(p: T): T => (createdTracesParsers.push(p), p),
+  };
+});
 
 // Hoisted so tests can assert resetSearchObj was called by the component lifecycle.
 const { mockResetSearchObj } = vi.hoisted(() => ({
@@ -262,12 +283,20 @@ const { mockCancelStreamQueryBasedOnRequestId, mockFetchQueryDataWithHttpStream 
   }),
 );
 
-vi.mock("@/composables/useStreamingSearch", () => ({
-  default: () => ({
-    fetchQueryDataWithHttpStream: mockFetchQueryDataWithHttpStream,
-    cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
-  }),
-}));
+// The owning instance becomes the call's `this`, so tests can tell their search from a leftover instance's.
+vi.mock("@/composables/useStreamingSearch", async () => {
+  const { getCurrentInstance } = await import("vue");
+  return {
+    default: () => {
+      const owner = getCurrentInstance();
+      return {
+        fetchQueryDataWithHttpStream: (...args: unknown[]) =>
+          mockFetchQueryDataWithHttpStream.apply(owner, args),
+        cancelStreamQueryBasedOnRequestId: mockCancelStreamQueryBasedOnRequestId,
+      };
+    },
+  };
+});
 
 vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -279,7 +308,9 @@ vi.mock("@/composables/useDurationPercentiles", async (importOriginal) => {
 
 // Hoisted so tests can assert on the spy and override its return value per test.
 const { mockParseSpanKindWhereClause } = vi.hoisted(() => ({
-  mockParseSpanKindWhereClause: vi.fn((whereClause: string) => whereClause),
+  mockParseSpanKindWhereClause: vi.fn(
+    (whereClause: string, _parser?: unknown, _streamName?: string) => whereClause,
+  ),
 }));
 
 // Use importOriginal so SPAN_KIND_MAP and SPAN_KIND_LABEL_TO_KEY remain available,
@@ -311,7 +342,7 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -362,6 +393,7 @@ describe("Index.vue (Main Traces Page)", () => {
     mockSearchObj.data.queryResults = { hits: [] };
     mockSearchObj.data.errorMsg = "";
     mockSearchObj.data.editorValue = "";
+    createdTracesParsers.length = 0;
 
     // Reset hoisted mocks to safe defaults for each test
     mockResetSearchObj.mockReset();
@@ -1289,6 +1321,30 @@ describe("Index.vue (Main Traces Page)", () => {
       const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
       expect(ids).toEqual(fresh.map((h) => h.span_id));
     });
+
+    it("tracks traces_search_completed when a new search completes", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(false);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      lastCallbacks().complete(null);
+
+      expect(analytics.track).toHaveBeenCalledWith("traces_search_completed");
+    });
+
+    it("does not track traces_search_completed when a page completes", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      vi.mocked(analytics.track).mockClear();
+
+      lastCallbacks().complete(null);
+
+      expect(analytics.track).not.toHaveBeenCalledWith("traces_search_completed");
+    });
   });
 
   describe("Metrics Filters Integration", () => {
@@ -1329,6 +1385,26 @@ describe("Index.vue (Main Traces Page)", () => {
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    it("should render the drill-down target in the search tab", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+
+      expect(wrapper.vm.activeTab).toBe("search");
+      expect(wrapper.find("#traces-drill-down-page").exists()).toBe(true);
+    });
+
+    it("should open the analysis dashboard on SearchResult when SearchBar emits drill-down", async () => {
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      const openUnifiedAnalysisDashboard = vi.fn();
+      wrapper.vm.searchResultRef = { openUnifiedAnalysisDashboard };
+
+      wrapper.findComponent('[data-test="logs-search-bar"]').vm.$emit("drill-down");
+      await flushPromises();
+
+      expect(openUnifiedAnalysisDashboard).toHaveBeenCalledTimes(1);
     });
 
     it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
@@ -2064,10 +2140,18 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
+      // Guards the parser filter below from going vacuous if the parser argument stops being passed.
+      expect(parseSpy.mock.calls.some(([, parser]) => createdTracesParsers.includes(parser))).toBe(
+        true,
+      );
+
       // parseDurationWhereClause returns the input unchanged for empty strings (no-op)
       // Either it was not called, or if called, it was with an empty string and returned it
       const callsWithNonEmpty = parseSpy.mock.calls.filter(
-        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+        ([clause, parser]) =>
+          createdTracesParsers.includes(parser) &&
+          typeof clause === "string" &&
+          clause.trim() !== "",
       );
       expect(callsWithNonEmpty.length).toBe(0);
     });
@@ -2266,10 +2350,20 @@ describe("Index.vue (Main Traces Page)", () => {
       await wrapper.vm.searchData();
       await flushPromises();
 
+      // Guards the parser filter below from going vacuous if the parser argument stops being passed.
+      expect(
+        mockParseSpanKindWhereClause.mock.calls.some(([, parser]) =>
+          createdTracesParsers.includes(parser),
+        ),
+      ).toBe(true);
+
       // parseSpanKindWhereClause is guarded by `whereClause.trim() != ""` in buildSearch;
       // for an empty editorValue the spy must not have been called with a non-empty string.
       const callsWithNonEmpty = mockParseSpanKindWhereClause.mock.calls.filter(
-        ([clause]) => typeof clause === "string" && clause.trim() !== "",
+        ([clause, parser]) =>
+          createdTracesParsers.includes(parser) &&
+          typeof clause === "string" &&
+          clause.trim() !== "",
       );
       expect(callsWithNonEmpty.length).toBe(0);
     });
@@ -2945,6 +3039,277 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.streamChangeDialog.show).toBe(false);
       // Stream must remain unchanged — the cancel did not apply the pending change
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+  });
+
+  describe("apply-saved-view", () => {
+    const originalDatetime = { ...mockSearchObj.data.datetime };
+
+    const savedView = (overrides: Record<string, unknown> = {}) => ({
+      version: 1,
+      stream: { label: "default", value: "default" },
+      editorValue: "service_name = 'checkout'",
+      datetime: { type: "absolute", relativeTimePeriod: "15m", startTime: 111, endTime: 222 },
+      searchMode: "spans",
+      sortBy: "duration",
+      sortOrder: "asc",
+      selectedFields: ["service_name", "http_method"],
+      ...overrides,
+    });
+
+    // Unmounted instances from earlier tests can still land a mount search on the shared mock.
+    const ownSearches = () =>
+      mockFetchQueryDataWithHttpStream.mock.contexts.filter((owner) => owner === wrapper.vm.$);
+
+    // Field grouping inside extractFields awaits across macrotasks.
+    const drain = async () => {
+      for (let i = 0; i < 3; i++) {
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    };
+
+    const mountPage = async (searchBar: any = true) => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": searchBar,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(
+        () => expect(mockSearchObj.data.stream.selectedStream.value).toBe("default"),
+        { timeout: 2000 },
+      );
+      await vi.waitFor(() => expect(ownSearches().length).toBeGreaterThan(0), {
+        timeout: 2000,
+      });
+      await drain();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockGetStream.mockClear();
+      mockUpdatedLocalLogFilterField.mockClear();
+      routerReplaceSpy.mockClear();
+    };
+
+    const applyView = async (view: Record<string, unknown>) => {
+      await wrapper.findComponent({ name: "search-bar" }).vm.$emit("apply-saved-view", view);
+      await drain();
+    };
+
+    const applyViewAndWaitForSearch = async (view: Record<string, unknown>) => {
+      await applyView(view);
+      await vi.waitFor(() => expect(ownSearches().length).toBeGreaterThan(0), {
+        timeout: 2000,
+      });
+      await drain();
+    };
+
+    afterEach(() => {
+      mockSearchObj.meta.resultGrid.sortBy = "start_time";
+      mockSearchObj.meta.resultGrid.sortOrder = "desc";
+      mockSearchObj.data.datetime = { ...originalDatetime };
+      mockSearchObj.data.stream.selectedFields = [];
+      mockSearchObj.data.resultGrid.columns = [];
+      mockFetchQueryDataWithHttpStream.mockReset();
+    });
+
+    it("restores every field before running exactly one search", async () => {
+      await mountPage();
+      const stateAtSearch: any[] = [];
+      mockFetchQueryDataWithHttpStream.mockImplementation(function (this: unknown) {
+        if (this !== wrapper.vm.$) return;
+        stateAtSearch.push({
+          editorValue: mockSearchObj.data.editorValue,
+          searchMode: mockSearchObj.meta.searchMode,
+          datetime: { ...mockSearchObj.data.datetime },
+          sortBy: mockSearchObj.meta.resultGrid.sortBy,
+          sortOrder: mockSearchObj.meta.resultGrid.sortOrder,
+          selectedFields: [...mockSearchObj.data.stream.selectedFields],
+        });
+      });
+
+      await applyViewAndWaitForSearch(savedView());
+
+      expect(stateAtSearch).toEqual([
+        {
+          editorValue: "service_name = 'checkout'",
+          searchMode: "spans",
+          datetime: expect.objectContaining({ type: "absolute", startTime: 111, endTime: 222 }),
+          sortBy: "duration",
+          sortOrder: "asc",
+          selectedFields: ["service_name", "http_method"],
+        },
+      ]);
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(mockUpdatedLocalLogFilterField).toHaveBeenCalledWith("spans");
+    });
+
+    describe("restores the picker's date type", () => {
+      const ABSOLUTE = {
+        type: "absolute",
+        relativeTimePeriod: "15m",
+        startTime: 1752490000000000,
+        endTime: 1752490900000000,
+      };
+      const RELATIVE = { type: "relative", relativeTimePeriod: "2h", startTime: 0, endTime: 0 };
+      let pickerEmits: any[];
+
+      // Pinned default-type, so only Index.vue itself can move the picker's type.
+      const searchBarWithPicker = (defaultType: string) =>
+        defineComponent({
+          name: "search-bar",
+          emits: ["apply-saved-view"],
+          setup() {
+            return { dateTimeRef: ref<any>(null) };
+          },
+          render() {
+            return h(DateTime, {
+              ref: "dateTimeRef",
+              autoApply: true,
+              defaultType,
+              defaultRelativeTime: "15m",
+              "onOn:date-change": (value: any) => pickerEmits.push(value),
+            });
+          },
+        });
+
+      const picker = () => wrapper.findComponent(DateTime).vm as any;
+
+      beforeEach(() => {
+        pickerEmits = [];
+      });
+
+      it("switches a relative picker to absolute with one search", async () => {
+        await mountPage(searchBarWithPicker("relative"));
+        pickerEmits.length = 0;
+
+        await applyViewAndWaitForSearch(savedView({ datetime: ABSOLUTE }));
+
+        expect(picker().selectedType).toBe("absolute");
+        expect(ownSearches()).toHaveLength(1);
+        expect(pickerEmits.filter((v) => v.userChangedValue)).toEqual([]);
+      });
+
+      it("switches an absolute picker to relative with one search", async () => {
+        await mountPage(searchBarWithPicker("absolute"));
+        pickerEmits.length = 0;
+
+        await applyViewAndWaitForSearch(savedView({ datetime: RELATIVE }));
+
+        expect(picker().selectedType).toBe("relative");
+        expect(picker().relativeValue).toBe(2);
+        expect(picker().relativePeriod).toBe("h");
+        expect(ownSearches()).toHaveLength(1);
+        expect(pickerEmits.filter((v) => v.userChangedValue)).toEqual([]);
+      });
+    });
+
+    it("extracts fields for a different stream without clearing the filter", async () => {
+      await mountPage();
+
+      await applyViewAndWaitForSearch(
+        savedView({ stream: { label: "test-stream", value: "test-stream" } }),
+      );
+
+      expect(mockGetStream).toHaveBeenCalledWith("test-stream", "traces", true);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("test-stream");
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(ownSearches()).toHaveLength(1);
+    });
+
+    it("applies only the latest view when an earlier apply finishes last", async () => {
+      await mountPage();
+      let resolveStreamA!: (value: unknown) => void;
+      mockGetStream.mockImplementationOnce(
+        () => new Promise((resolve) => (resolveStreamA = resolve)),
+      );
+      const streamA = { label: "test-stream", value: "test-stream" };
+      const searchBar = wrapper.findComponent({ name: "search-bar" });
+
+      searchBar.vm.$emit("apply-saved-view", savedView({ stream: streamA, editorValue: "a" }));
+      await flushPromises();
+      await applyViewAndWaitForSearch(savedView({ stream: streamA, editorValue: "b" }));
+      resolveStreamA(mockStreamList.list.find((s: any) => s.name === "test-stream"));
+      await drain();
+
+      expect(ownSearches()).toHaveLength(1);
+      expect(mockSearchObj.data.editorValue).toBe("b");
+    });
+
+    it("rebuilds the columns even when the search returns no hits", async () => {
+      await mountPage();
+
+      await applyViewAndWaitForSearch(savedView());
+
+      const ids = mockSearchObj.data.resultGrid.columns.map((c: any) => c.id);
+      expect(ids).toContain("http_method");
+    });
+
+    it("clears trace_id and span_id from a trace-detail URL", async () => {
+      await mountPage();
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { stream: "default", tab: "traces", trace_id: "abc", span_id: "def" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      await applyViewAndWaitForSearch(savedView());
+
+      expect(routerReplaceSpy).toHaveBeenCalledTimes(1);
+      const query = (routerReplaceSpy.mock.calls[0][0] as any).query;
+      expect(query).not.toHaveProperty("trace_id");
+      expect(query).not.toHaveProperty("span_id");
+      expect(query.tab).toBe("spans");
+    });
+
+    it("applies a view saved without selectedFields as no selected fields", async () => {
+      await mountPage();
+      mockSearchObj.data.stream.selectedFields = ["stale_field"];
+      const { selectedFields: _omitted, ...view } = savedView();
+
+      await applyViewAndWaitForSearch(view);
+
+      expect(mockSearchObj.data.stream.selectedFields).toEqual([]);
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(ownSearches()).toHaveLength(1);
+    });
+
+    it("toasts an error and leaves state unchanged for an unknown view version", async () => {
+      await mountPage();
+      const before = mockSearchObj.data.editorValue;
+      const modeBefore = mockSearchObj.meta.searchMode;
+
+      await applyView(savedView({ version: 2 }));
+
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(mockSearchObj.data.editorValue).toBe(before);
+      expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
+      expect(ownSearches()).toHaveLength(0);
+    });
+
+    it("toasts and leaves state unchanged when the stream no longer exists", async () => {
+      await mountPage();
+      const before = mockSearchObj.data.editorValue;
+      const modeBefore = mockSearchObj.meta.searchMode;
+
+      await applyView(savedView({ stream: { label: "gone", value: "gone" } }));
+
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+      expect(mockSearchObj.data.editorValue).toBe(before);
+      expect(mockSearchObj.meta.searchMode).toBe(modeBefore);
+      expect(ownSearches()).toHaveLength(0);
     });
   });
 

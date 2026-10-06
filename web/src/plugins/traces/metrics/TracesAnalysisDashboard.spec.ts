@@ -107,6 +107,10 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+// search service — dimension value counts on the Drill down page
+const mockSearch = vi.hoisted(() => vi.fn());
+vi.mock("@/services/search", () => ({ default: { search: mockSearch } }));
+
 // ---------------------------------------------------------------------------
 // zincutils
 // ---------------------------------------------------------------------------
@@ -291,6 +295,32 @@ describe("TracesAnalysisDashboard", () => {
     it("should pass width=80 to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
       expect(drawer.props("width")).toBe(80);
+    });
+
+    it("should render the full-page shell instead of ODrawer when fullPage is set", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ fullPage: true });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(false);
+      const page = wrapper.findComponent({ name: "TracesDrillDownPage" });
+      expect(page.exists()).toBe(true);
+      expect(page.attributes("data-test")).toBe("traces-analysis-dashboard-drawer");
+      expect(page.props("title")).toBe("Drill down");
+    });
+
+    it("should emit close when the full-page Back button is clicked", async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({ fullPage: true });
+      await flushPromises();
+
+      await wrapper.find('[data-test="traces-drill-down-back-btn"]').trigger("click");
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("should keep the analysis-type title on the drawer (logs) rather than Drill down", () => {
+      const drawer = wrapper.findComponent({ name: "ODrawer" });
+      expect(drawer.props("title")).not.toBe("Drill down");
     });
 
     it("should pass a non-empty title to ODrawer for the 'duration' analysisType", () => {
@@ -850,11 +880,10 @@ describe("TracesAnalysisDashboard", () => {
       expect(wrapper.vm.selectedDimensions).not.toContain("span_status");
     });
 
-    it("should NOT remove the last remaining dimension", () => {
+    it("removes the last remaining dimension too", () => {
       wrapper.vm.selectedDimensions = ["service_name"];
       wrapper.vm.toggleDimension("service_name");
-      expect(wrapper.vm.selectedDimensions).toContain("service_name");
-      expect(wrapper.vm.selectedDimensions).toHaveLength(1);
+      expect(wrapper.vm.selectedDimensions).toEqual([]);
     });
 
     it("should create a new array reference on add (reactive)", () => {
@@ -1060,6 +1089,8 @@ describe("TracesAnalysisDashboard", () => {
         await import("@/composables/useLatencyInsightsDashboard");
       const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
       wrapper.vm.selectedDimensions = ["service_name", "http_method"];
+      // Let the selection watcher append its panel first, so the last call is loadAnalysis'.
+      await flushPromises();
       await wrapper.vm.loadAnalysis();
       await flushPromises();
       const callArg = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.at(-1)[1];
@@ -1224,22 +1255,97 @@ describe("TracesAnalysisDashboard", () => {
   // Watcher: selectedDimensions triggers loadAnalysis on removal
   // -------------------------------------------------------------------------
   describe("watcher: selectedDimensions", () => {
-    it("should call loadAnalysis when a dimension is removed", async () => {
-      const { useLatencyInsightsDashboard } =
-        await import("@/composables/useLatencyInsightsDashboard");
-      const { generateDashboard } = useLatencyInsightsDashboard(gt) as any;
+    const chartsEl = () => wrapper.find('[data-test="render-dashboard-charts"]').element;
+    const panelTitles = () =>
+      wrapper.vm.dashboardData.tabs[0].panels.map((p: { title: string }) => p.title);
 
-      // Ensure there are at least 2 dimensions to allow removal
-      wrapper.vm.selectedDimensions = ["service_name", "span_status"];
+    it("removes only that dimension's panel, without regenerating or remounting the rest", async () => {
+      // Mount state: both panels (service_name, span_status) rendered once.
+      const dashboardBefore = wrapper.vm.dashboardData;
+      const renderKeyBefore = wrapper.vm.dashboardRenderKey;
+      const chartsBefore = chartsEl();
+      mockGenerateDashboard.mockClear();
+
+      wrapper.vm.handlePanelDelete("panel-service");
       await flushPromises();
 
-      const callsBefore = (generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length;
-      wrapper.vm.selectedDimensions = ["service_name"];
+      expect(panelTitles()).toEqual(["span_status"]);
+      // Same dashboard object: the remaining panel keeps its data and no new queries run.
+      expect(wrapper.vm.dashboardData).toBe(dashboardBefore);
+      expect(wrapper.vm.dashboardRenderKey).toBe(renderKeyBefore);
+      expect(chartsEl()).toBe(chartsBefore);
+      expect(mockGenerateDashboard).not.toHaveBeenCalled();
+    });
+
+    it("adds a panel for a newly ticked dimension without remounting the existing ones", async () => {
+      const dashboardBefore = wrapper.vm.dashboardData;
+      const chartsBefore = chartsEl();
+      mockGenerateDashboard.mockClear();
+      mockGenerateDashboard.mockReturnValueOnce({
+        tabs: [
+          {
+            panels: [
+              {
+                id: "panel-method",
+                title: "http_method",
+                layout: { x: 0, y: 0, w: 64, h: 16, i: "i-method" },
+              },
+            ],
+          },
+        ],
+      });
+
+      wrapper.vm.toggleDimension("http_method");
       await flushPromises();
 
-      expect((generateDashboard as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
-        callsBefore,
+      expect(panelTitles()).toEqual(["service_name", "span_status", "http_method"]);
+      expect(wrapper.vm.dashboardData).toBe(dashboardBefore);
+      expect(chartsEl()).toBe(chartsBefore);
+      // Only the added dimension is generated.
+      expect(mockGenerateDashboard).toHaveBeenCalledTimes(1);
+      expect(mockGenerateDashboard.mock.calls[0][0].map((a: any) => a.dimensionName)).toEqual([
+        "http_method",
+      ]);
+    });
+
+    it("deletes the last remaining panel and shows the no-dimensions state", async () => {
+      wrapper.vm.handlePanelDelete("panel-service");
+      await flushPromises();
+      wrapper.vm.handlePanelDelete("panel-status");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDimensions).toEqual([]);
+      expect(panelTitles()).toEqual([]);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-analysis-dashboard-no-dimensions"]').exists()).toBe(
+        true,
       );
+    });
+
+    it("brings the dashboard back when a dimension is ticked after removing them all", async () => {
+      wrapper.vm.handlePanelDelete("panel-service");
+      await flushPromises();
+      wrapper.vm.handlePanelDelete("panel-status");
+      await flushPromises();
+
+      mockGenerateDashboard.mockReturnValueOnce({
+        tabs: [
+          {
+            panels: [
+              {
+                id: "panel-service-2",
+                title: "service_name",
+                layout: { x: 0, y: 0, w: 64, h: 16, i: "i-service-2" },
+              },
+            ],
+          },
+        ],
+      });
+      wrapper.vm.toggleDimension("service_name");
+      await flushPromises();
+
+      expect(panelTitles()).toEqual(["service_name"]);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
   });
 
@@ -1338,6 +1444,151 @@ describe("TracesAnalysisDashboard", () => {
       });
       // Should not throw at the wrapper level
       await expect(wrapper.vm.loadAnalysis()).resolves.not.toThrow();
+    });
+  });
+});
+
+describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockGenerateDashboard.mockReturnValue(JSON.parse(JSON.stringify(mockGeneratedDashboard)));
+    wrapper = mountComponent({
+      embedded: true,
+      streamType: "logs",
+      analysisType: "volume",
+      availableAnalysisTypes: ["volume"],
+    });
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("renders in place as a page, not a drawer", () => {
+    expect(wrapper.findComponent({ name: "ODrawer" }).exists()).toBe(false);
+    expect(wrapper.find('[data-test="traces-analysis-dashboard-page"]').exists()).toBe(true);
+  });
+
+  it("keeps the header content (baseline time range chip) on the page", () => {
+    const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
+    expect(page.find(".baseline-chip").exists()).toBe(true);
+  });
+
+  it("loads the analysis and renders the dashboard on mount", () => {
+    expect(mockGenerateDashboard).toHaveBeenCalled();
+    expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+  });
+
+  it("shows the analysis title in the page header", () => {
+    const title = wrapper.find('[data-test="traces-analysis-dashboard-page-title"]');
+    expect(title.text()).toBe(gt("volumeInsights.title"));
+  });
+
+  it("does not leak drawer-only attributes onto the page root", () => {
+    const page = wrapper.find('[data-test="traces-analysis-dashboard-page"]');
+    expect(page.attributes("width")).toBeUndefined();
+    expect(page.attributes("title")).toBeUndefined();
+  });
+
+  describe("dimension value counts", () => {
+    const fields = [
+      { name: "alert_id" },
+      { name: "service_name" },
+      { name: "span_status" },
+      { name: "zone" },
+    ];
+
+    const remount = async (props: Record<string, unknown> = {}) => {
+      wrapper.unmount();
+      wrapper = mountComponent({
+        embedded: true,
+        streamType: "logs",
+        streamName: "app_logs",
+        analysisType: "volume",
+        availableAnalysisTypes: ["volume"],
+        streamFields: fields,
+        ...props,
+      });
+      await flushPromises();
+    };
+
+    it("counts every field in one count(field) query scoped to the search filter", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ c0: 5, c1: 900, c2: 900, c3: 40 }] } });
+      await remount({ baseFilter: "severity = 'ERROR'" });
+
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+      const { query, page_type } = mockSearch.mock.calls[0][0];
+      expect(page_type).toBe("logs");
+      expect(query.query.sql).toBe(
+        'SELECT count("alert_id") AS c0, count("service_name") AS c1, count("span_status") AS c2, count("zone") AS c3 FROM app_logs WHERE severity = \'ERROR\'',
+      );
+      expect(query.query.start_time).toBe(defaultProps.timeRange.startTime);
+      expect(query.query.end_time).toBe(defaultProps.timeRange.endTime);
+      expect(wrapper.find('[data-test="dimension-count-zone"]').text()).toBe("40");
+    });
+
+    it("counts the brushed window when the histogram has a selection", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({
+        rateFilter: { start: 0, end: 10, timeStart: 1_200_000_000, timeEnd: 1_300_000_000 },
+      });
+
+      const { query } = mockSearch.mock.calls[0][0].query;
+      expect(query.start_time).toBe(1_200_000_000);
+      expect(query.end_time).toBe(1_300_000_000);
+    });
+
+    it("quotes a stream name that is not a plain identifier", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({ streamName: 'my"logs' });
+
+      expect(mockSearch.mock.calls[0][0].query.query.sql).toContain('FROM "my""logs"');
+    });
+
+    it("sorts by count descending regardless of selection", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{ c0: 5, c1: 900, c2: 900, c3: 40 }] } });
+      await remount();
+      wrapper.vm.selectedDimensions = ["alert_id"];
+      await flushPromises();
+
+      expect(wrapper.vm.filteredDimensions.map((d: any) => d.value)).toEqual([
+        "service_name",
+        "span_status",
+        "zone",
+        "alert_id",
+      ]);
+    });
+
+    it("keeps the alphabetical list without counts when the query fails", async () => {
+      mockSearch.mockRejectedValue(new Error("boom"));
+      await remount();
+
+      expect(wrapper.find('[data-test^="dimension-count-"]').exists()).toBe(false);
+      expect(wrapper.vm.filteredDimensions.map((d: any) => d.value)).toEqual([
+        "service_name",
+        "span_status",
+        "alert_id",
+        "zone",
+      ]);
+    });
+
+    it("leaves field-group headers out of the dimensions and the count query", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({ streamFields: [{ name: "AWS", label: true }, ...fields] });
+
+      expect(wrapper.vm.availableDimensions.map((d: any) => d.value)).not.toContain("AWS");
+      expect(mockSearch.mock.calls[0][0].query.query.sql).not.toContain('"AWS"');
+    });
+
+    it("does not query counts outside the Drill down page", async () => {
+      wrapper.unmount();
+      mockSearch.mockClear();
+      wrapper = mountComponent({ streamFields: fields });
+      await flushPromises();
+      expect(mockSearch).not.toHaveBeenCalled();
     });
   });
 });

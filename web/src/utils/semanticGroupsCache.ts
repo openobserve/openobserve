@@ -55,7 +55,12 @@ export async function loadSemanticGroups(
     return await queryClient.fetchQuery(semanticGroupsQuery(org));
   } catch (err: any) {
     onError?.(err);
-    console.error("Error loading semantic groups:", err);
+    // A 403 means this org/user simply isn't entitled to semantic groups —
+    // every caller already falls back to `[]` and keeps going, so this is an
+    // expected permission state, not a failure worth logging as an error.
+    if (err?.response?.status !== 403) {
+      console.error("Error loading semantic groups:", err);
+    }
     return [];
   }
 }

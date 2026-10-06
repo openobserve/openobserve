@@ -67,6 +67,8 @@ vi.mock("vue-router", () => ({
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 const service = vi.mocked(oncallService);
 const toasted = vi.mocked(toast);
@@ -476,6 +478,24 @@ describe("OnCallTeamDetail", () => {
       // handed no params for its placeholders.
       expect(message).not.toMatch(/^\s*covers\s/);
     });
+
+    it("tracks oncall_override_created as a cover once it is saved", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("oncall_override_created", { kind: "cover" });
+    });
+
+    it("does not track a refused cover", async () => {
+      service.createOverride.mockRejectedValue({ response: { status: 409 } });
+      const wrapper = render();
+      await flushPromises();
+      await save(wrapper);
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
   });
 
   /// F6: a swap is two writes behind one button, which is exactly where a UI
@@ -568,6 +588,28 @@ describe("OnCallTeamDetail", () => {
       await swap(wrapper);
 
       expect(wrapper.findComponent({ name: "OnCallCoverForm" }).props("open")).toBe(false);
+    });
+
+    it("tracks one oncall_override_created swap once both covers are written", async () => {
+      service.createOverride.mockResolvedValue({ data: { id: "ov_1" } } as any);
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("oncall_override_created", { kind: "swap" });
+    });
+
+    it("tracks nothing for a swap that was rolled back", async () => {
+      service.createOverride
+        .mockResolvedValueOnce({ data: { id: "ov_1" } } as any)
+        .mockRejectedValueOnce({ response: { data: { message: "already covered" } } });
+      service.deleteOverride.mockResolvedValue({} as any);
+      const wrapper = render();
+      await flushPromises();
+      await swap(wrapper);
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

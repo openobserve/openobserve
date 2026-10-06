@@ -33,6 +33,7 @@ import type {
   WireStep,
 } from "@/types/synthetics";
 import { classifyRestoreFailure } from "@/utils/synthetics/replayFailure";
+import analytics from "@/services/product_analytics";
 import {
   DEFAULT_TEST_ID_ATTR,
   MIN_EXTENSION_VERSION,
@@ -821,6 +822,11 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       else replayPhase.value = "failed";
     } else {
       replayPhase.value = "idle";
+    }
+    if (replayPhase.value === "passed" || replayPhase.value === "failed") {
+      analytics.track("synthetic_test_replay_completed", {
+        passed: replayPhase.value === "passed",
+      });
     }
     return res;
   }

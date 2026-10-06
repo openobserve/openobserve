@@ -18,30 +18,45 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, createRole, setRolePerms, sweepRoles, uniq, org, rbacEnabled,
+    ns, req, listRoles, createRole, setRolePerms, makeTracker, uniq, org, rbacEnabled,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('edt');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 // Seeded once; each has a distinct grant shape so the read-side tests do not
 // depend on whatever happens to exist in the org.
-const R_EMPTY = `${PREFIX}_ed_empty`;
-const R_SMALL = `${PREFIX}_ed_small`;   // stream List+Get
-const R_WIDE = `${PREFIX}_ed_wide`;     // AllowList+AllowGet on many modules
+const R_EMPTY = `${NS}_ed_empty`;
+const R_SMALL = `${NS}_ed_small`;   // stream List+Get
+const R_WIDE = `${NS}_ed_wide`;     // AllowList+AllowGet on many modules
 
-test.describe('IAM · Edit Role · navigation and filtering', () => {
+test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. the empty/small/wide fixture roles are made once in beforeAll and shared.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     let pm;
 
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            for (const r of [R_EMPTY, R_SMALL, R_WIDE]) await createRole(page, r);
+            for (const r of [R_EMPTY, R_SMALL, R_WIDE]) { made.role(r); await createRole(page, r); }
             await setRolePerms(page, R_SMALL, [
                 { object: `stream:_all_${org()}`, permission: 'AllowList' },
                 { object: `stream:_all_${org()}`, permission: 'AllowGet' },
             ]);
             const resources = (await req(page, 'GET', '/resources')).body || [];
+            // rum_analytics has no GET or LIST in OpenFGA; granting either rejects the whole save.
             const tops = resources
-                .filter((r) => r.visible && !r.parent && r.key !== 'org')
+                .filter((r) => r.visible && !r.parent && r.key !== 'org' && r.key !== 'rum_analytics')
                 .map((r) => r.key);
             await setRolePerms(
                 page,
@@ -64,10 +79,10 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const removed = await sweepRoles(page);
+            const removed = (await made.cleanup(page)).roles;
             testLogger.info(`teardown removed ${removed.length} roles`);
-            const left = (await listRoles(page)).filter((r) => r.startsWith(PREFIX));
-            if (left.length) throw new Error(`teardown left roles behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }
@@ -90,7 +105,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
 
     // ---------------- rail search — DEFECT #1 ----------------
 
-    test('U-01 · rail search filters modules, case-insensitively', async () => {
+    test('U-01 · rail search filters modules, case-insensitively', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         const all = await pm.rolesPage.railItems().count();
         expect(all).toBeGreaterThan(10);
 
@@ -103,7 +120,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.railItem('pipeline')).toBeVisible();
     });
 
-    test('U-02 · a rail search with no match shows the empty state, and clearing restores every module', async () => {
+    test('U-02 · a rail search with no match shows the empty state, and clearing restores every module', {
+        tag: ['@iam', '@iamRolesEditor', '@P2', '@all']
+    }, async () => {
         const all = await pm.rolesPage.railItems().count();
 
         await pm.rolesPage.railSearch.fill('zzz_no_such_module_zzz');
@@ -114,7 +133,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.railItems()).toHaveCount(all);
     });
 
-    test('U-03 · searching the rail while a module is open keeps that module open', async () => {
+    test('U-03 · searching the rail while a module is open keeps that module open', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         await pm.rolesPage.openModule('pipeline');
         await expect(pm.rolesPage.paneTitle).toBeVisible();
         const before = await pm.rolesPage.paneTitle.innerText();
@@ -124,7 +145,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.paneTitle).toHaveText(before);
     });
 
-    test('U-04 · the rail Selected filter shows only modules the role holds', async ({ page }) => {
+    test('U-04 · the rail Selected filter shows only modules the role holds', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async ({ page }) => {
         await pm.rolesPage.railScopeGranted.click();
         const granted = await pm.rolesPage.railItems().count();
 
@@ -136,7 +159,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(granted).toBeLessThanOrEqual(all);
     });
 
-    test('U-05 · rail groups collapse and expand, and survive switching modules', async () => {
+    test('U-05 · rail groups collapse and expand, and survive switching modules', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         const toggle = pm.rolesPage.railGroupToggle('alerting');
         test.skip(!(await toggle.isVisible().catch(() => false)), 'alerting group not rendered');
 
@@ -154,7 +179,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
 
     // ---------------- pane search / filter ----------------
 
-    test('U-06 · the pane search filters rows inside a module, independently of the rail', async () => {
+    test('U-06 · the pane search filters rows inside a module, independently of the rail', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         await pm.rolesPage.openModule('stream');
         const hasSearch = await pm.rolesPage.paneSearch.isVisible().catch(() => false);
         test.skip(!hasSearch, 'module has <2 entities, so the pane search is not rendered');
@@ -169,7 +196,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.paneNoMatch).toHaveCount(0);
     });
 
-    test('U-07 · a module with no entities of its own lists itself as one row', async () => {
+    test('U-07 · a module with no entities of its own lists itself as one row', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         // Original premise was wrong: a `has_entities:false` resource does NOT render
         // the "no resources" hint. It has no pinned scope row either — it lists itself
         // as a single resource row whose checkboxes carry the ENTITY slug. Verified on
@@ -182,7 +211,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         await expect(pm.rolesPage.scopeRow('settings')).toHaveCount(0);
     });
 
-    test('U-08 · scope rows are pinned above the resource list', async () => {
+    test('U-08 · scope rows are pinned above the resource list', {
+        tag: ['@iam', '@iamRolesEditor', '@P2', '@all']
+    }, async () => {
         await pm.rolesPage.openModule('stream');
         await expect(pm.rolesPage.paneResources).toBeVisible();
         // "Every Stream" is the widest scope for the stream module.
@@ -191,7 +222,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
 
     // ---------------- volume — DEFECT #2 ----------------
 
-    test('U-12 · a module with many resources renders its first page quickly and pages', async ({ page }) => {
+    test('U-12 · a module with many resources renders its first page quickly and pages', {
+        tag: ['@iam', '@iamRolesEditor', '@P0', '@all']
+    }, async ({ page }) => {
         await pm.rolesPage.openModule('stream');
         const started = Date.now();
         await expect(pm.rolesPage.paneResources).toBeVisible({ timeout: 20000 });
@@ -202,13 +235,14 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(elapsed, 'module pane took too long to render its first page').toBeLessThan(20000);
 
         // The pane must stay interactive afterwards — a frozen page still "renders".
-        await pm.rolesPage.railSummaryItem.click();
-        await expect(pm.rolesPage.summary).toBeVisible({ timeout: 10000 });
+        await pm.rolesPage.openSummary({ timeout: 10000 });
     });
 
     // ---------------- summary ----------------
 
-    test('U-09 · the summary is the landing view and lists one card per held module', async ({ page }) => {
+    test('U-09 · the summary is the landing view and lists one card per held module', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async ({ page }) => {
         await expect(pm.rolesPage.summary).toBeVisible();
         const cards = await pm.rolesPage.summaryModules().count();
         expect(cards).toBeGreaterThan(0);
@@ -220,12 +254,16 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(cards).toBeLessThanOrEqual(modules.size);
     });
 
-    test('U-10 · the permissions count matches what the API stores', async ({ page }) => {
+    test('U-10 · the permissions count matches what the API stores', {
+        tag: ['@iam', '@iamRolesEditor', '@P0', '@all']
+    }, async ({ page }) => {
         const stored = (await req(page, 'GET', `/roles/${R_WIDE}/permissions`)).body || [];
         await pm.rolesPage.waitForGrantsSettled(stored.length);
     });
 
-    test('U-11 · returning to the summary from a module works', async () => {
+    test('U-11 · returning to the summary from a module works', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         await pm.rolesPage.openModule('pipeline');
         await expect(pm.rolesPage.pane).toBeVisible();
         await pm.rolesPage.openSummary();
@@ -234,7 +272,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
 
     // ---------------- empty role, presets, loading ----------------
 
-    test('U-13 · an empty role offers the three presets', async () => {
+    test('U-13 · an empty role offers the three presets', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async () => {
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.openRole(R_EMPTY);
         await pm.rolesPage.waitForGrantsSettled(0);
@@ -246,7 +286,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
     });
 
     // Guards o2-enterprise#2697: a populated role once read "0 Permissions" before its grants loaded.
-    test('U-14 · a populated role never renders a real 0 before its grants load [o2-enterprise#2697]', async ({ page }) => {
+    test('U-14 · a populated role never renders a real 0 before its grants load [o2-enterprise#2697]', {
+        tag: ['@iam', '@iamRolesEditor', '@P0', '@bug', '@all']
+    }, async ({ page }) => {
         const stored = (await req(page, 'GET', `/roles/${R_SMALL}/permissions`)).body || [];
         expect(stored.length).toBeGreaterThan(0);
 
@@ -267,25 +309,26 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
         expect(falseZero, `counter showed a real zero before loading finished: ${[...seen]}`).toBe(false);
     });
 
-    // SKIPPED — the assertion is wrong, and there is NO product defect here.
+    // SKIPPED — never seen green, and there is NO known product defect here.
     //
-    // It compares railModuleKeys().length against the number of visible top-level
-    // resources and sees 48 vs 49. Verified on pentest that the rail is complete: the
-    // `summary` module renders and is grantable. The rail holds 50 elements over 49
-    // distinct slugs, because "Role Overview" reuses the `summary` module's slug, and
-    // the helper filters that slug to stop Role Overview counting as a module — taking
-    // the real module with it. I filed this as o2-enterprise#2717 before checking the
-    // element behind the slug; it is closed as invalid.
+    // It last read 48 rail modules against 49 visible top-level resources, because
+    // railModuleKeys() dropped the real `summary` module: the helper filtered that slug
+    // believing "Role Overview" shared it. It does not — Role Overview is
+    // `edit-role-module-rail-overview` — so the filter is gone and the count should now
+    // line up. That was verified on pentest too: the rail is complete and `summary` is
+    // grantable. o2-enterprise#2717 was filed off the old reading and closed as invalid.
     //
-    // To re-enable: assert that every key from GET /resources appears in the rail,
-    // rather than comparing totals. Membership survives the collision; a count cannot.
-    test.fixme('U-15 · a role with grants across every module renders the whole rail', async ({ page }) => {
+    // To re-enable: run it, and if it is still off by one, assert that every key from
+    // GET /resources appears in the rail instead of comparing totals — membership names
+    // the missing module, a count only says the numbers differ.
+    test.fixme('U-15 · a role with grants across every module renders the whole rail', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async ({ page }) => {
         const resources = (await req(page, 'GET', '/resources')).body || [];
         const expected = resources.filter((r) => r.visible && !r.parent && r.key !== 'org').length;
         // The rail is built from GET /resources, so it must show every visible
         // top-level module — a client-side group map that silently drops one is the
-        // PR's own stated risk (unknown resources fall into "Other"). Compare distinct
-        // module keys: the rail is rendered twice (desktop + responsive copy).
+        // PR's own stated risk (unknown resources fall into "Other").
         await expect
             .poll(async () => (await pm.rolesPage.railModuleKeys()).length, { timeout: 20000 })
             .toBe(expected);
@@ -298,7 +341,9 @@ test.describe('IAM · Edit Role · navigation and filtering', () => {
     // innerText interleaves gutter line numbers, making JSON.parse unreliable — so
     // this assertion is coupled to the editor's exact output and is worth re-basing on
     // what it actually renders rather than patching the regex blind.
-    test.fixme('U-16 · JSON view matches the Table view and the API', async ({ page }) => {
+    test.fixme('U-16 · JSON view matches the Table view and the API', {
+        tag: ['@iam', '@iamRolesEditor', '@P1', '@all']
+    }, async ({ page }) => {
         const stored = (await req(page, 'GET', `/roles/${R_SMALL}/permissions`)).body || [];
 
         await pm.rolesPage.gotoRoles();

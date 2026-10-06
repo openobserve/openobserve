@@ -135,6 +135,10 @@ pub async fn create(
         data.usage_stream_enabled = usage_stream_enabled;
     }
 
+    if merge_red_insights_enabled(&mut data, settings.red_insights_enabled) {
+        field_found = true;
+    }
+
     if let Some(cross_links) = settings.cross_links {
         for link in &cross_links {
             if link.name.is_empty() {
@@ -365,8 +369,31 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
+fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool>) -> bool {
+    let Some(enabled) = value else {
+        return false;
+    };
+    data.red_insights_enabled = enabled;
+    true
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_red_insights_enabled_sets_and_leaves() {
+        let mut data = OrganizationSetting::default();
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(!data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(true)));
+        assert!(data.red_insights_enabled);
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(false)));
+        assert!(!data.red_insights_enabled);
+    }
+
     #[test]
     fn test_max_series_per_query_validation_valid_values() {
         // Test minimum valid value

@@ -2,6 +2,7 @@
 //methods: All configs related to dashboard panels
 
 import { expect } from "@playwright/test";
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
 
 export default class DashboardPanelConfigs {
   constructor(page) {
@@ -349,16 +350,100 @@ export default class DashboardPanelConfigs {
     return this.descriptionField;
   }
 
+  /**
+   * Open an OSelect dropdown and keep retrying until its search box holds, since a
+   * focus shift right after the popover opens dismisses it again.
+   * @returns {{trigger: import('@playwright/test').Locator, search: import('@playwright/test').Locator}}
+   */
+  async _openSelectDropdown(parentDataTest) {
+    const trigger = this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
+    const search = this.page.locator(`[data-test="${parentDataTest}-search"]`);
+    await trigger.waitFor({ state: "visible", timeout: 10000 });
+    await expect(async () => {
+      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+        await trigger.click();
+      }
+      await search.waitFor({ state: "visible", timeout: 2000 });
+    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
+    return { trigger, search };
+  }
+
   // Select unit
   async selectUnit(unit) {
-    const trigger = this.page.locator('[data-test="dashboard-config-unit-trigger"]');
-    await trigger.waitFor({ state: "visible" });
-    await trigger.click();
+    const { search } = await this._openSelectDropdown("dashboard-config-unit");
     // OSelect has 18+ items; use search to filter before clicking
-    const searchInput = this.page.locator('[data-test="dashboard-config-unit-search"]');
-    await searchInput.waitFor({ state: "visible" });
-    await searchInput.fill(unit);
+    await search.fill(unit);
     await this._clickVirtualOption("dashboard-config-unit", unit);
+  }
+
+  // ========== Unit select — the "Other Locale" group of per-locale Locale Format units ==========
+  // The locale options nest under a non-selectable "Other Locale" expander row, so they
+  // only exist in the DOM while that row is expanded or a search is flattening the list.
+
+  /** Trigger of a unit OSelect; carries the saved unit in data-test-selected-value. */
+  getUnitTrigger(parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
+  }
+
+  /** The non-selectable "Other Locale" expander row of a unit OSelect. */
+  getLocaleGroupRow(parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(
+      `[data-test="${parentDataTest}-expand"][data-test-value="other-locale"]`
+    );
+  }
+
+  /** Every currently rendered locale option ("locale:<tag>") of a unit OSelect. */
+  getLocaleOptions(parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(
+      `[data-test="${parentDataTest}-option"][data-test-value^="locale:"]`
+    );
+  }
+
+  /** The locale option for one BCP-47 tag, e.g. "de-DE". */
+  getLocaleOption(tag, parentDataTest = "dashboard-config-unit") {
+    return this.page.locator(
+      `[data-test="${parentDataTest}-option"][data-test-value="locale:${tag}"]`
+    );
+  }
+
+  /** Expand/collapse the "Other Locale" row and wait for its new aria-expanded state. */
+  async toggleLocaleGroup(parentDataTest = "dashboard-config-unit") {
+    const row = this.getLocaleGroupRow(parentDataTest);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    const wasExpanded = (await row.getAttribute("aria-expanded")) === "true";
+    await row.click();
+    await expect(row).toHaveAttribute(
+      "aria-expanded",
+      wasExpanded ? "false" : "true"
+    );
+    return !wasExpanded;
+  }
+
+  /**
+   * Type into a unit OSelect's search box. Searching by the underscored locale code
+   * ("de_DE") rather than the language name keeps lookups independent of the viewer's
+   * UI language, which is what renders the name half of each locale label.
+   */
+  async searchUnitOptions(term, parentDataTest = "dashboard-config-unit") {
+    const { search } = await this._openSelectDropdown(parentDataTest);
+    await search.fill(term);
+    return search;
+  }
+
+  /** Pick the Locale Format unit for `tag` (e.g. "de-DE") from a unit OSelect. */
+  async selectLocaleUnit(tag, parentDataTest = "dashboard-config-unit") {
+    await this.searchUnitOptions(tag.replaceAll("-", "_"), parentDataTest);
+    const option = this.getLocaleOption(tag, parentDataTest);
+    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.click();
+  }
+
+  /** Pick a per-locale Locale Format unit in the Column Formatting dialog's unit select. */
+  async selectFormatUnitLocale(tag) {
+    const unitSelect = this.getOverrideUnitSelect();
+    await unitSelect.waitFor({ state: "visible", timeout: 5000 });
+    const parentDataTest = await unitSelect.getAttribute("data-test");
+    await this.selectLocaleUnit(tag, parentDataTest);
   }
 
   //Decimals
@@ -617,17 +702,8 @@ export default class DashboardPanelConfigs {
     // nodes until scrolled to. Type into the built-in search box instead, which
     // narrows filteredOptions so the match renders immediately.
     const parentDataTest = await unitSelect.getAttribute("data-test");
-    const trigger = this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
-    const searchInput = this.page.locator(`[data-test="${parentDataTest}-search"]`);
-
-    // A focus shift can dismiss the popover right after it opens, so re-open until the search box holds.
-    await expect(async () => {
-      if ((await trigger.getAttribute("aria-expanded")) !== "true") {
-        await trigger.click();
-      }
-      await searchInput.waitFor({ state: "visible", timeout: 2000 });
-    }).toPass({ timeout: 15000, intervals: [500, 1000, 2000] });
-    await searchInput.fill(unitName);
+    const { search } = await this._openSelectDropdown(parentDataTest);
+    await search.fill(unitName);
 
     const unitOption = this.page.locator(
       `[data-test="${parentDataTest}-option"][data-test-label="${unitName}"]`
@@ -1239,6 +1315,34 @@ export default class DashboardPanelConfigs {
     await removeBtn.click();
   }
 
+  /** The offset picker trigger of added time-shift row `index` (the 0m reference row has none). */
+  timeShiftPickerTrigger(index = 0) {
+    return this.page
+      .locator(`[data-test="dashboard-addpanel-config-time-shift-remove-${index}"]`)
+      .locator("xpath=..")
+      .locator('[data-test="date-time-btn"]');
+  }
+
+  async openTimeShiftPicker(index = 0) {
+    await this.timeShiftPickerTrigger(index).click();
+  }
+
+  /** A relative-offset cell in the open picker, e.g. (1, "d") for "1 day". */
+  timeShiftOffsetOption(amount, unit) {
+    return this.page.locator(`[data-test="date-time-relative-${amount}-${unit}-btn"]:visible`);
+  }
+
+  /** Set time-shift row `index` to a relative offset such as (1, "d"), then close the picker. */
+  async setTimeShiftOffset(index, amount, unit) {
+    await this.openTimeShiftPicker(index);
+    const option = this.timeShiftOffsetOption(amount, unit);
+    await option.click();
+    // The picker stays open after a pick.
+    await this.page.keyboard.press("Escape");
+    await option.waitFor({ state: "hidden" });
+    await expect(this.timeShiftPickerTrigger(index)).toContainText(new RegExp(`\\b${amount}\\b`));
+  }
+
   // ========== Color By Series ==========
 
   /**
@@ -1837,4 +1941,34 @@ export default class DashboardPanelConfigs {
     return this.page.locator(`[data-test="dashboard-addpanel-config-markline-remove-${index}"]`);
   }
 
+  /**
+   * Hover the Drilldown section's info icon and return its tooltip.
+   *
+   * PanelEditor.vue mounts ConfigPanel in two layout branches, so the icon matches
+   * 2 nodes and the dormant one is parked OFF-VIEWPORT rather than hidden — it
+   * satisfies `visible=true` yet hover never reaches it ("element is outside of the
+   * viewport", retried to timeout). Probing each copy and keeping the one that
+   * actually opens the bubble is the only reliable discriminator.
+   */
+  async hoverDrilldownInfoForTooltip() {
+    const candidates = this.page.locator(SELECTORS.CONFIG_DRILLDOWN_INFO);
+    const total = await candidates.count();
+
+    for (let i = 0; i < total; i++) {
+      try {
+        await candidates.nth(i).hover({ timeout: 5000 });
+        const tooltip = this.page
+          .locator(visibleOnly(SELECTORS.TOOLTIP_CONTENT))
+          .first();
+        await tooltip.waitFor({ state: "visible", timeout: 5000 });
+        return tooltip;
+      } catch {
+        // Dormant layout branch — try the next copy.
+      }
+    }
+
+    throw new Error(
+      `hoverDrilldownInfoForTooltip: none of the ${total} drilldown info icons opened a tooltip`
+    );
+  }
 }

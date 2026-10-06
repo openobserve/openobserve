@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           icon-left="star-outline"
+          class="max-md:hidden"
           :loading="settingDefaultTeamId === row.id"
           :aria-label="t('oncall.setDefaultTeam')"
           :data-test="`oncall-team-set-default-${row.id}`"
@@ -156,12 +157,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
         </OButton>
-        <div v-else-if="canConfigure" class="h-8 w-8 shrink-0" />
+        <div v-else-if="canConfigure" class="h-8 w-8 shrink-0 max-md:hidden" />
         <OButton
           v-if="canConfigure"
           variant="ghost"
           size="icon-sm"
           icon-left="edit"
+          class="max-md:hidden"
           :aria-label="t('oncall.editTeam')"
           :data-test="`oncall-team-edit-${row.id}`"
           @click.stop="openEdit(row)"
@@ -173,12 +175,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           icon-left="delete-outline"
+          class="max-md:hidden"
           :aria-label="t('oncall.deleteTeam')"
           :data-test="`oncall-team-delete-${row.id}`"
           @click.stop="teamToDelete = row"
         >
           <OTooltip side="bottom" :content="t('oncall.deleteTeam')" />
         </OButton>
+        <ODropdown v-if="canConfigure" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              :loading="settingDefaultTeamId === row.id"
+              :aria-label="t('oncall.moreActions')"
+              data-test="oncall-teams-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            v-if="row.id !== defaultTeamId"
+            icon-left="star-outline"
+            class="md:hidden"
+            :data-test="`oncall-team-set-default-${row.id}-menu`"
+            @select="setDefaultTeam(row)"
+          >
+            <span>{{ t("oncall.setDefaultTeam") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="edit"
+            class="md:hidden"
+            :data-test="`oncall-team-edit-${row.id}-menu`"
+            @select="openEdit(row)"
+          >
+            <span>{{ t("oncall.editTeam") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="delete-outline"
+            variant="destructive"
+            class="md:hidden"
+            :data-test="`oncall-team-delete-${row.id}-menu`"
+            @select="teamToDelete = row"
+          >
+            <span>{{ t("oncall.deleteTeam") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </template>
 
       <template #error>
@@ -244,6 +287,8 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";

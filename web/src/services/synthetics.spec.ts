@@ -25,8 +25,60 @@ vi.mock("./http", () => ({
   })),
 }));
 
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
+
 import http from "./http";
 import store from "@/stores";
+import analytics from "./product_analytics";
+
+describe("Synthetics check analytics", () => {
+  let mockHttp: any;
+  const browserPayload = { name: "n", type: "browser" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHttp = {
+      post: vi.fn().mockResolvedValue({ data: {} }),
+      put: vi.fn().mockResolvedValue({ data: {} }),
+      delete: vi.fn().mockResolvedValue({ data: {} }),
+    };
+    (http as any).mockReturnValue(mockHttp);
+  });
+
+  it("tracks synthetic_test_created with the check type once the server confirms", async () => {
+    await synthetics.create("org", browserPayload);
+    expect(analytics.track).toHaveBeenCalledWith("synthetic_test_created", { type: "browser" });
+  });
+
+  it("does not track a failed create and still rejects", async () => {
+    mockHttp.post.mockRejectedValue(new Error("boom"));
+    await expect(synthetics.create("org", browserPayload)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("tracks synthetic_test_updated, not created, on update", async () => {
+    await synthetics.update("org", "id-1", { type: "http" });
+    expect(analytics.track).toHaveBeenCalledWith("synthetic_test_updated", { type: "http" });
+    expect(analytics.track).not.toHaveBeenCalledWith("synthetic_test_created", expect.anything());
+  });
+
+  it("does not track a failed update and still rejects", async () => {
+    mockHttp.put.mockRejectedValue(new Error("boom"));
+    await expect(synthetics.update("org", "id-1", browserPayload)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("does not track deletes, since the create-rollback path calls them too", async () => {
+    await synthetics.delete("org", "id-1");
+    await synthetics.bulkDelete("org", { ids: ["a", "b"] });
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("does not track runs, since a bulk run calls it once per test", async () => {
+    await synthetics.run("org", "id-1", {});
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
 
 describe("Synthetics locations service", () => {
   let mockHttp: any;

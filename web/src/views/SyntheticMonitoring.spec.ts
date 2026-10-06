@@ -104,6 +104,13 @@ vi.mock("@/services/status_pages", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),
 }));
@@ -145,7 +152,6 @@ const baseStubs = {
       "toggleLoadingMap",
       "triggerLoadingMap",
       "bulkActionLoading",
-      "footerTitle",
       "emptyMessage",
       "hasFilters",
     ],
@@ -999,6 +1005,110 @@ describe("SyntheticMonitoring", () => {
       await flushPromises();
 
       expect(mockServiceRun).toHaveBeenCalledWith("default", "mon-9", {}, "f_ksuid_prod");
+    });
+  });
+
+  describe("product analytics", () => {
+    const table = () => wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+    const runs = () =>
+      vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "synthetic_test_run_triggered");
+    const monitors = ["m1", "m2", "m3"].map((id) => ({
+      id,
+      name: id,
+      type: "http",
+      frequency: { type: "minutes", interval: 5 },
+      last_response_ms: null,
+      last_check_at: null,
+      enabled: true,
+      folder_id: "default",
+    }));
+
+    it("tracks a single run once it is accepted", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      table().vm.$emit("run", { id: "m1", name: "m1", enabled: true });
+      await flushPromises();
+
+      expect(runs()).toEqual([["synthetic_test_run_triggered", { count: 1 }]]);
+    });
+
+    it("tracks one bulk run counting only the accepted runs", async () => {
+      mockServiceList.mockResolvedValue({ data: { monitors } });
+      mockServiceRun
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce({});
+      wrapper = mountPage();
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["m1", "m2", "m3"]);
+      await flushPromises();
+
+      table().vm.$emit("trigger-selected");
+      await flushPromises();
+
+      expect(mockServiceRun).toHaveBeenCalledTimes(3);
+      expect(runs()).toEqual([["synthetic_test_run_triggered", { count: 2 }]]);
+    });
+
+    it("does not track a bulk run in which every run was rejected", async () => {
+      mockServiceList.mockResolvedValue({ data: { monitors } });
+      mockServiceRun.mockRejectedValue(new Error("boom"));
+      wrapper = mountPage();
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["m1", "m2"]);
+      await flushPromises();
+
+      table().vm.$emit("trigger-selected");
+      await flushPromises();
+
+      expect(mockServiceRun).toHaveBeenCalledTimes(2);
+      expect(runs()).toEqual([]);
+      mockServiceRun.mockResolvedValue({});
+    });
+
+    it("tracks synthetic_test_deleted once a single delete succeeds", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      table().vm.$emit("delete", { id: "m1", name: "n" });
+      await flushPromises();
+
+      expect(mockServiceDelete).toHaveBeenCalled();
+      expect(analytics.track).toHaveBeenCalledWith("synthetic_test_deleted", { count: 1 });
+    });
+
+    it("does not track synthetic_test_deleted when a single delete fails", async () => {
+      mockServiceDelete.mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountPage();
+      await flushPromises();
+
+      table().vm.$emit("delete", { id: "m1", name: "n" });
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("synthetic_test_deleted", expect.anything());
+    });
+
+    it("tracks synthetic_test_deleted with the selected count on bulk delete", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["a", "b"]);
+
+      await (wrapper.vm as any).bulkDeleteMonitors();
+
+      expect(mockServiceBulkDelete).toHaveBeenCalled();
+      expect(analytics.track).toHaveBeenCalledWith("synthetic_test_deleted", { count: 2 });
+    });
+
+    it("does not track synthetic_test_deleted when the bulk delete fails", async () => {
+      mockServiceBulkDelete.mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountPage();
+      await flushPromises();
+      table().vm.$emit("update:selected-ids", ["a", "b"]);
+
+      await (wrapper.vm as any).bulkDeleteMonitors();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("synthetic_test_deleted", expect.anything());
     });
   });
 });

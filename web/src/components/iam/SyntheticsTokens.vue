@@ -75,7 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100, 250, 500]"
           sorting="client"
           show-index
-          :footer-title="t('synthetics.tokens.title')"
         >
           <template #toolbar>
             <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">

@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
-        :footer-title="t('aiObservability.queues.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"

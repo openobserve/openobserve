@@ -256,6 +256,8 @@ export interface RichCardExtras {
 }
 
 export interface RichCardProvider {
+  /** Stable, non-localized key (the card's slug), safe to send to analytics. */
+  id: string;
   name: string;
   tagline: I18nText;
   /** Resolved logo asset URL for light mode (rendered on a neutral tile). */

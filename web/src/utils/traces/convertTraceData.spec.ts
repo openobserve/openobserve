@@ -597,6 +597,17 @@ describe("convertTraceData", () => {
       expect(links.find((l: any) => l.target === "gpt-4o")?.source).toBe("ResearchCrew");
     });
 
+    it("escapes service names in the node tooltip", () => {
+      const name = "<img src=x onerror=alert(1)>";
+      const res = convertServiceGraphToNetwork(
+        { nodes: [{ id: name, label: name, requests: 1, errors: 0 }], edges: [] },
+        "force",
+      );
+      const formatter = res.options.series[0].data[0].tooltip.formatter;
+      expect(formatter).toContain("&lt;img src=x onerror=alert(1)&gt;");
+      expect(formatter).not.toContain("<img");
+    });
+
     it("should convert service graph to network format", () => {
       const graphData = {
         nodes: [

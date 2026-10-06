@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="iam-group-users"
         :show-global-filter="false"
-        :footer-title="t('iam.basicUsers')"
         dense
       >
         <template #cell-select="{ row }">

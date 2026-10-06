@@ -371,7 +371,6 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
-            :footer-title="t('onlineEvals.job.detail.tabs.runs')"
             show-index
             width="100%"
             class="w-full"
@@ -424,7 +423,6 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
-            :footer-title="t('onlineEvals.job.detail.tabs.failures')"
             show-index
             width="100%"
             class="w-full"
