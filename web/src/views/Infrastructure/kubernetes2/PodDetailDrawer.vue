@@ -29,6 +29,7 @@ import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
@@ -130,7 +131,7 @@ const resources = computed<ResourceRow[]>(() => {
 });
 
 const resourceColumns = computed<OTableColumnDef<ResourceRow>[]>(() => [
-  { id: "label", header: raw(""), accessorKey: "label" },
+  { id: "label", header: raw(""), accessorKey: "label", size: 200 },
   { id: "usage", header: t("infra.k8s2.resourceUsage"), accessorKey: "usage" },
   { id: "request", header: t("infra.k8s2.resourceRequest"), accessorKey: "request" },
   { id: "limit", header: t("infra.k8s2.resourceLimit"), accessorKey: "limit" },
@@ -142,7 +143,7 @@ const optionalCores = (v: number | null) => (v == null ? dash : raw(formatCores(
 const optionalBytes = (v: number | null) => (v == null ? dash : raw(formatBytes(v)));
 
 const containerColumns = computed<OTableColumnDef<ContainerRow>[]>(() => [
-  { id: "name", header: t("infra.k8s2.containerName"), accessorKey: "name" },
+  { id: "name", header: t("infra.k8s2.containerName"), accessorKey: "name", size: 240 },
   {
     id: "waiting",
     header: t("infra.k8s2.factWaiting"),
@@ -373,9 +374,14 @@ const viewLogs = async () => {
 
       <section class="flex flex-col gap-2">
         <OText tag="h3" class="text-sm font-semibold">{{ t("infra.k8s2.sectionTrends") }}</OText>
-        <OText v-if="!hasUsage" variant="meta" data-test="k8s2-drawer-no-usage">{{
-          t("infra.k8s2.noUsageData")
-        }}</OText>
+        <OEmptyState
+          v-if="!hasUsage"
+          size="inline"
+          icon="query-stats"
+          :title="t('infra.k8s2.noUsageData')"
+          hide-action
+          data-test="k8s2-drawer-no-usage"
+        />
         <div
           v-for="trend in trends"
           :key="trend.id"

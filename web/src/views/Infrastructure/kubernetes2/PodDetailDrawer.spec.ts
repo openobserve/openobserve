@@ -198,6 +198,28 @@ describe("PodDetailDrawer", () => {
     }
   });
 
+  it("prints each trend's current and peak value", async () => {
+    rangeQuery.mockImplementation((({ query }: { query: string }) =>
+      Promise.resolve(
+        query.includes("cpu") ? matrix([0.2, 0.9, 0.5]) : matrix([64 * 1024 ** 2, 96 * 1024 ** 2]),
+      )) as any);
+    await mountDrawer();
+    expect(wrapper.find('[data-test="k8s2-drawer-trend-cpu"]').text()).toContain(
+      "Current 500m · peak 900m",
+    );
+    expect(wrapper.find('[data-test="k8s2-drawer-trend-memory"]').text()).toContain(
+      "Current 96.0MB · peak 96.0MB",
+    );
+  });
+
+  it("sizes the label and container columns for their longest names", async () => {
+    await mountDrawer();
+    const tables = wrapper.findAllComponents({ name: "OTable" });
+    const first = (i: number) => (tables[i].props("columns") as any[])[0].size;
+    expect(first(0)).toBeGreaterThanOrEqual(200);
+    expect(first(1)).toBeGreaterThanOrEqual(240);
+  });
+
   it("points each trend at its own series' cluster spelling and uid", async () => {
     await mountDrawer({
       pod: makePod({
@@ -245,7 +267,9 @@ describe("PodDetailDrawer", () => {
     await mountDrawer({
       pod: makePod({ series: { cpu: null, memory: null }, cpuCores: null, memoryBytes: null }),
     });
-    expect(wrapper.find('[data-test="k8s2-drawer-no-usage"]').text()).toBe("No usage data");
+    const empty = wrapper.findComponent({ name: "OEmptyState" });
+    expect(empty.attributes("data-test")).toBe("k8s2-drawer-no-usage");
+    expect(empty.text()).toContain("No usage data");
     expect(rangeQuery).not.toHaveBeenCalled();
   });
 
