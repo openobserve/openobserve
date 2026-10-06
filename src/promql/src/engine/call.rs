@@ -1441,6 +1441,10 @@ mod tests {
                 "0.5 is given twice",
             ),
             (
+                r#"histogram_quantiles(vector(0), "q", 0.5, 0.5)"#.to_string(),
+                "0.5 is given twice",
+            ),
+            (
                 format!(r#"histogram_quantiles({h}, "g", 0.5)"#),
                 r#""g" already"#,
             ),

@@ -133,10 +133,23 @@ pub(crate) fn histogram_quantiles(
     phis: &[ScalarParam],
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
+    let timestamps = eval_ctx.timestamps();
+    // a repeated φ is an error at any step, whether or not a histogram has data there
+    for &eval_ts in &timestamps {
+        let mut step_values = Vec::with_capacity(phis.len());
+        for phi in phis {
+            let value = quantile_label(phi.at(eval_ts));
+            if step_values.contains(&value) {
+                return Err(DataFusionError::Plan(format!(
+                    "histogram_quantiles: quantile {value} is given twice"
+                )));
+            }
+            step_values.push(value);
+        }
+    }
     let Some(in_matrix) = histogram_input(data, "histogram_quantiles")? else {
         return Ok(Value::None);
     };
-    let timestamps = eval_ctx.timestamps();
     let mut range_values = Vec::new();
     let mut scratch = Vec::new();
     let mut coalesced = Vec::new();
@@ -150,15 +163,9 @@ pub(crate) fn histogram_quantiles(
         let mut series: Vec<(String, Vec<Sample>)> = Vec::new();
         let mut slot_of: HashMap<String, usize> = HashMap::new();
         for_each_step(&bucket_series, &timestamps, |eval_ts, buckets| {
-            let mut step_values = Vec::with_capacity(phis.len());
             for phi in phis {
                 let phi = phi.at(eval_ts);
                 let value = quantile_label(phi);
-                if step_values.contains(&value) {
-                    return Err(DataFusionError::Plan(format!(
-                        "histogram_quantiles: quantile {value} is given twice"
-                    )));
-                }
                 scratch.clear();
                 scratch.extend_from_slice(buckets);
                 let sample = Sample::new(
@@ -170,7 +177,6 @@ pub(crate) fn histogram_quantiles(
                     series.len() - 1
                 });
                 series[slot].1.push(sample);
-                step_values.push(value);
             }
             Ok(())
         })?;

@@ -46,7 +46,6 @@ impl AggFunc for Limit {
     }
 }
 
-/// The series picked at each evaluation slot.
 pub(crate) struct LimitAccumulator {
     limit: Limit,
     picked: Vec<BinaryHeap<Picked>>,
