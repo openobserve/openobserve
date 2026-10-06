@@ -464,7 +464,7 @@ describe("TracesMetricsDashboard", () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       const query = getPanelQuery(wrapper, "Rate");
-      expect(query).toContain("duration >= 1000 and duration <= 5000");
+      expect(query).toContain("duration >= 1000 and duration < 5000");
       expect(query).toContain("env = 'prod'");
     });
   });
@@ -696,6 +696,41 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.vm.defaultAnalysisTab).toBe("volume");
     });
 
+    it("should give Drill down the applied range of a Duration entry, not its box instants", async () => {
+      mockMetricsRangeFilters.set("heatmap", {
+        panelTitle: "Duration",
+        start: 100,
+        end: 500,
+        timeStart: 1_000_437,
+        timeEnd: 2_000_437,
+        appliedStart: 1_000_000,
+        appliedEnd: 2_000_000,
+      });
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+      expect(wrapper.vm.analysisDurationFilter).toEqual({
+        start: 100,
+        end: 500,
+        timeStart: 1_000_000,
+        timeEnd: 2_000_000,
+      });
+      expect(wrapper.vm.defaultAnalysisTab).toBe("duration");
+    });
+
+    it("should keep a Rate entry's box instants for Drill down", async () => {
+      mockMetricsRangeFilters.set("rate", {
+        panelTitle: "Rate",
+        start: -1,
+        end: -1,
+        timeStart: 1_000_437,
+        timeEnd: 2_000_437,
+      });
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+      expect(wrapper.vm.analysisRateFilter.timeStart).toBe(1_000_437);
+      expect(wrapper.vm.analysisRateFilter.timeEnd).toBe(2_000_437);
+    });
+
     it("should pass the decoded filter, not the raw display string, as baseFilter", async () => {
       // Regression test: the query editor shows human-readable duration literals
       // (e.g. duration <= '1.64s') which must be decoded to raw SQL values before
@@ -757,7 +792,40 @@ describe("TracesMetricsDashboard", () => {
       });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toHaveLength(1);
-      expect(filters[0]).toBe("duration >= 100 and duration <= 500");
+      expect(filters[0]).toBe("duration >= 100 and duration < 500");
+    });
+
+    it("should write only the upper bound for an end-only Duration range", () => {
+      mockMetricsRangeFilters.set("panel-3", {
+        panelTitle: "Duration",
+        start: null,
+        end: 1000,
+        timeStart: null,
+        timeEnd: null,
+      });
+      expect(wrapper.vm.getBaseFilters()).toEqual(["duration < 1000"]);
+    });
+
+    it("should write only the lower bound for a start-only Duration range", () => {
+      mockMetricsRangeFilters.set("panel-3", {
+        panelTitle: "Duration",
+        start: 1000,
+        end: null,
+        timeStart: null,
+        timeEnd: null,
+      });
+      expect(wrapper.vm.getBaseFilters()).toEqual(["duration >= 1000"]);
+    });
+
+    it("should add nothing for a Duration range with both bounds null", () => {
+      mockMetricsRangeFilters.set("panel-3", {
+        panelTitle: "Duration",
+        start: null,
+        end: null,
+        timeStart: 1,
+        timeEnd: 2,
+      });
+      expect(wrapper.vm.getBaseFilters()).toEqual([]);
     });
 
     it("should include span_status = 'ERROR' when filter prop contains it", () => {
@@ -843,7 +911,7 @@ describe("TracesMetricsDashboard", () => {
       mockSearchObj.data.editorValue = "span_kind='Internal'";
       wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("duration >= 100 and duration <= 500");
+      expect(filters).toContain("duration >= 100 and duration < 500");
       expect(filters).toContain("span_kind='1'");
       expect(filters.join(" ")).not.toContain("span_kind='Internal'");
     });

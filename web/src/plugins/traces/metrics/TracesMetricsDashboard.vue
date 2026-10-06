@@ -232,13 +232,10 @@ const getBaseFilters = () => {
   let baseFilters = [];
   rangeFilters.value.forEach((rangeFilter) => {
     if (rangeFilter.panelTitle === "Duration") {
-      if (rangeFilter.start !== null && rangeFilter.end !== null) {
-        baseFilters.push(`duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`);
-      } else {
-        baseFilters.push(
-          `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
-        );
-      }
+      const bounds: string[] = [];
+      if (rangeFilter.start !== null) bounds.push(`duration >= ${rangeFilter.start}`);
+      if (rangeFilter.end !== null) bounds.push(`duration < ${rangeFilter.end}`);
+      if (bounds.length) baseFilters.push(bounds.join(" and "));
     }
   });
 
@@ -461,8 +458,9 @@ const openUnifiedAnalysisDashboard = () => {
       if (filter.panelTitle === "Duration") {
         durationStart = filter.start;
         durationEnd = filter.end;
-        durationTimeStart = filter.timeStart;
-        durationTimeEnd = filter.timeEnd;
+        // The picker applies the box to the second, so Selected must use what it applied.
+        durationTimeStart = filter.appliedStart ?? filter.timeStart;
+        durationTimeEnd = filter.appliedEnd ?? filter.timeEnd;
         latestFilterType = "duration";
       } else if (filter.panelTitle === "Rate") {
         rateStart = filter.start;

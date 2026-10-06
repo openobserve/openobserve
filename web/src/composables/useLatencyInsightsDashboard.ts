@@ -176,7 +176,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
       filterClause = "";
     } else if (config.durationFilter) {
       // For latency analysis: filter by duration
-      filterClause = `duration >= ${config.durationFilter.start} AND duration <= ${config.durationFilter.end}`;
+      filterClause = `duration >= ${config.durationFilter.start} AND duration < ${config.durationFilter.end}`;
     }
 
     const selectedFiltersArray = [selectedTimeFilter, filterClause, baseFilters].filter((f) => f);
@@ -366,6 +366,18 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
         return singleQuery;
       }
 
+      // The traces table query ends its range exclusively, so Selected must too.
+      const latencySelectedWhere =
+        config.streamType === "traces"
+          ? `WHERE ${[
+              `_timestamp >= ${config.selectedTimeRange.startTime} AND _timestamp < ${config.selectedTimeRange.endTime}`,
+              filterClause,
+              baseFilters,
+            ]
+              .filter((f) => f)
+              .join(" AND ")}`
+          : selectedWhere;
+
       // Comparison mode: baseline vs selected
       const baselineQuery = `
         SELECT
@@ -383,7 +395,7 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
           'Selected' AS series,
           approx_percentile_cont(duration, \${percentile}) AS percentile_latency
         FROM "${config.streamName}"
-        ${selectedWhere}
+        ${latencySelectedWhere}
         GROUP BY ${dimensionName}
       `.trim();
 
