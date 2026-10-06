@@ -2233,6 +2233,8 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should not call cancelStreamQueryBasedOnRequestId when there is no active trace id", async () => {
+      // With a stream list, mount starts a search a variable number of macrotask hops later; no streams means none.
+      mockGetStreams.mockResolvedValueOnce({ list: [] });
       wrapper = mount(Index, {
         attachTo: node,
         global: {
@@ -2249,12 +2251,20 @@ describe("Index.vue (Main Traces Page)", () => {
         },
       });
 
-      await flushPromises();
+      for (let i = 0; i < 3; i++) {
+        await flushPromises();
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      // Unmounted instances from earlier tests can still search on the shared mocks, so only this instance counts.
+      const ownSearches = mockFetchQueryDataWithHttpStream.mock.contexts.filter(
+        (owner) => owner === wrapper.vm.$,
+      );
+      expect(ownSearches).toHaveLength(0);
 
+      // cancelSearch is synchronous, so bracketing it keeps a leftover instance's cancel out of the count.
+      const cancelsBefore = mockCancelStreamQueryBasedOnRequestId.mock.calls.length;
       wrapper.vm.cancelSearch();
-      await flushPromises();
-
-      expect(mockCancelStreamQueryBasedOnRequestId).not.toHaveBeenCalled();
+      expect(mockCancelStreamQueryBasedOnRequestId.mock.calls.length).toBe(cancelsBefore);
     });
 
     it.skip("should call cancelStreamQueryBasedOnRequestId with trace id and org id when a search is in-flight", async () => {
