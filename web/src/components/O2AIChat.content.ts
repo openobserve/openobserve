@@ -246,9 +246,34 @@ export function chatErrorMessage(error: any, t: TranslateFn): string {
   }
 }
 
-export function processHtmlBlock(content: string): string {
+// Read-only views render other people's chats, so nothing may load remote content or restyle the page.
+const STRICT_PURIFY = {
+  USE_PROFILES: { html: true },
+  FORBID_TAGS: ["style", "video", "audio", "source", "picture", "track", "form", "button"],
+  FORBID_ATTR: ["style", "srcset", "background", "poster"],
+  ALLOW_DATA_ATTR: false,
+};
+
+const SHARED_LINK_REL = "noopener noreferrer nofollow";
+
+/** Sanitize with the read-only profile: inline (data:) images only, no styles, links that leak nothing. */
+export function sanitizeStrict(content: string): string {
+  const fragment = DOMPurify.sanitize(content, { ...STRICT_PURIFY, RETURN_DOM_FRAGMENT: true });
+  fragment.querySelectorAll("img").forEach((img) => {
+    if (!/^data:image\//i.test(img.getAttribute("src") ?? "")) img.remove();
+  });
+  fragment.querySelectorAll("a").forEach((link) => {
+    link.setAttribute("rel", SHARED_LINK_REL);
+    link.setAttribute("target", "_blank");
+  });
+  const container = document.createElement("div");
+  container.appendChild(fragment);
+  return container.innerHTML;
+}
+
+export function processHtmlBlock(content: string, strict = false): string {
   // Sanitize HTML to prevent XSS attacks
-  const sanitized = DOMPurify.sanitize(content);
+  const sanitized = strict ? sanitizeStrict(content) : DOMPurify.sanitize(content);
   return sanitized
     .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
     .replace(/<\/pre>/g, "</span>");

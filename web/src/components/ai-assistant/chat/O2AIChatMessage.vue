@@ -140,6 +140,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
           <!-- Stream-level error block -->
           <div
             v-else-if="block.type === 'error'"
+            data-test="o2-ai-chat-stream-error"
             class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-s-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
           >
             <div class="stream-error-header flex items-center gap-2">
@@ -160,6 +161,14 @@ const isLogEntryExpanded = (blockIndex: number) =>
             >
               {{ t("aiAssistant.errorMayBeTemporary") }}
             </div>
+          </div>
+          <div
+            v-else-if="block.type === 'status'"
+            class="text-text-secondary mb-2 flex items-center gap-2 text-xs"
+            :data-test="`o2-ai-chat-turn-status-${block.turnStatus}`"
+          >
+            <OIcon name="hourglass-empty" size="sm" />
+            <span>{{ block.message }}</span>
           </div>
           <!-- Navigation block - standalone navigation button -->
           <div
@@ -229,7 +238,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
               <div
                 v-else
                 class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
-                v-html="processHtmlBlock(textBlock.content)"
+                v-html="processHtmlBlock(textBlock.content, readonly)"
               ></div>
             </template>
           </template>
@@ -286,7 +295,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
             <div
               v-else
               class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
-              v-html="processHtmlBlock(block.content)"
+              v-html="processHtmlBlock(block.content, readonly)"
             ></div>
           </template>
         </template>

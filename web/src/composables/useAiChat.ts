@@ -319,10 +319,13 @@ const useAiChat = () => {
     return chatsRequest(`${chatsUrl(org_id)}?${params}`);
   };
 
-  /** A stored conversation; `not_modified` when `knownSeq` is still current. */
-  const getServerChat = (org_id: string, sessionId: string, knownSeq?: number) => {
-    const query = knownSeq === undefined ? "" : `?known_seq=${knownSeq}`;
-    return chatsRequest(`${chatsUrl(org_id, sessionId)}${query}`);
+  /** A stored conversation; `not_modified` when `knownSeq` is current, only newer turns when it is stale. */
+  const getServerChat = (org_id: string, sessionId: string, knownSeq?: number, limit?: number) => {
+    const params = new URLSearchParams();
+    if (knownSeq !== undefined) params.set("known_seq", String(knownSeq));
+    if (limit !== undefined) params.set("limit", String(limit));
+    const query = params.toString();
+    return chatsRequest(`${chatsUrl(org_id, sessionId)}${query ? `?${query}` : ""}`);
   };
 
   const renameServerChat = (org_id: string, sessionId: string, title: string) =>
@@ -342,8 +345,8 @@ const useAiChat = () => {
     enabled: () =>
       !!store.state.zoConfig?.ai_enabled && !!store.state.zoConfig?.ai_chat_persistence_enabled,
     list: (orgId: string, limit: number) => listServerChats(orgId, limit),
-    get: (orgId: string, sessionId: string, knownSeq?: number) =>
-      getServerChat(orgId, sessionId, knownSeq),
+    get: (orgId: string, sessionId: string, knownSeq?: number, limit?: number) =>
+      getServerChat(orgId, sessionId, knownSeq, limit),
     rename: renameServerChat,
     remove: deleteServerChat,
     removeAll: deleteAllServerChats,

@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { messagesFromTurns, type StoredTurn } from "@/components/O2AIChat.history";
-import type { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
+import { foldTurns, mergeIncremental, type StoredTurn } from "@/components/O2AIChat.history";
+import type { ChatMessage, ChatHistoryEntry, TurnSpan } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
@@ -22,6 +22,8 @@ const DB_NAME = "o2ChatDB";
 const DB_VERSION = 2;
 const STORE_NAME = "chatHistory";
 const MAX_HISTORY_ITEMS = 100;
+// Turns a top-up read may return; a longer gap is cheaper as one full read.
+const INCREMENTAL_TURN_LIMIT = 50;
 
 // Opening a connection per call leaked one IDBDatabase per operation, so the
 // single connection is memoised and reused for the page's lifetime.
@@ -96,6 +98,12 @@ export interface ServerChatSummary {
 export interface ServerChatDetail extends ServerChatSummary {
   not_modified: boolean;
   turns?: StoredTurn[];
+  /** A turn is still being generated. */
+  active_turn?: boolean;
+  /** Set when `turns` holds only the turns past this `known_seq`. */
+  partial_from_seq?: number;
+  /** `limit` cut older turns off `turns`. */
+  has_more?: boolean;
 }
 
 /**
@@ -109,7 +117,12 @@ export interface ChatHistoryServer {
     orgId: string,
     limit: number,
   ) => Promise<{ chats: ServerChatSummary[]; next_cursor?: string }>;
-  get: (orgId: string, sessionId: string, knownSeq?: number) => Promise<ServerChatDetail>;
+  get: (
+    orgId: string,
+    sessionId: string,
+    knownSeq?: number,
+    limit?: number,
+  ) => Promise<ServerChatDetail>;
   rename: (orgId: string, sessionId: string, title: string) => Promise<unknown>;
   remove: (orgId: string, sessionId: string) => Promise<unknown>;
   removeAll: (orgId: string) => Promise<unknown>;
@@ -126,6 +139,14 @@ const idFromSessionId = (sessionId: string): number =>
 
 const statusOf = (error: unknown): number | undefined =>
   (error as { status?: number } | null)?.status;
+
+const spansCover = (record: ChatHistoryEntry): boolean =>
+  !!record.cachedTurnSpans &&
+  record.cachedTurnSpans.reduce((sum, span) => sum + span.count, 0) === record.messages.length;
+
+/** A chat whose turns may still change without its committed seq moving must be revalidated in full. */
+const isSettled = (detail: ServerChatDetail, turns: StoredTurn[]): boolean =>
+  !detail.active_turn && !turns.some((turn) => turn.status === "running");
 
 /**
  * Composable for managing AI chat history in IndexedDB.
@@ -509,13 +530,36 @@ export function useChatHistory(
     return merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
 
+  type Folded = { messages: ChatMessage[]; spans: TurnSpan[] };
+
+  // A top-up read with a gap (`has_more`) or nothing cached to merge into falls back to a full read.
+  const fetchFolded = async (
+    sessionId: string,
+    record: ChatHistoryEntry | null,
+  ): Promise<{ detail: ServerChatDetail; folded: Folded | null }> => {
+    const knownSeq = record?.cachedLastSeq;
+    const limit = knownSeq === undefined ? undefined : INCREMENTAL_TURN_LIMIT;
+    const detail = await server!.get(getOrgIdentifier(), sessionId, knownSeq, limit);
+    if (detail.not_modified) return { detail, folded: null };
+    const partial = detail.partial_from_seq !== undefined && detail.partial_from_seq !== null;
+    if (!partial) return { detail, folded: foldTurns(detail.turns ?? [], t) };
+    if (!detail.has_more && record && spansCover(record)) {
+      const cached = { messages: record.messages, spans: record.cachedTurnSpans! };
+      const merged = mergeIncremental(cached, detail.partial_from_seq!, detail.turns ?? [], t);
+      return { detail, folded: merged };
+    }
+    const full = await server!.get(getOrgIdentifier(), sessionId);
+    return { detail: full, folded: foldTurns(full.turns ?? [], t) };
+  };
+
   const loadChat = async (chatId: number): Promise<ChatHistoryEntry | null> => {
     const record = await loadLocalChat(chatId);
     const sessionId = record?.sessionId ?? listedSessions.get(chatId);
     if (!serverOn() || !sessionId) return record;
     let detail: ServerChatDetail;
+    let folded: Folded | null;
     try {
-      detail = await server!.get(getOrgIdentifier(), sessionId, record?.cachedLastSeq);
+      ({ detail, folded } = await fetchFolded(sessionId, record));
     } catch (error) {
       if (statusOf(error) === 404 && record?.serverBacked) {
         // Deleted on the server: the cached copy must not resurface.
@@ -525,9 +569,9 @@ export function useChatHistory(
       // Browser-only chat (404), or offline/transient: show what is cached.
       return record;
     }
-    if (detail.not_modified && record) return record;
+    if (!folded) return record;
 
-    const messages = messagesFromTurns(detail.turns ?? [], t);
+    const { messages, spans } = folded;
     // A live save ahead of the server (a stopped turn commits after its cancel returns) must not be replaced by the older copy.
     const liveSaveAhead =
       record?.serverBacked &&
@@ -542,6 +586,7 @@ export function useChatHistory(
         if (record.messages[i]?.feedback) msg.feedback = record.messages[i].feedback;
       });
     }
+    const settled = isSettled(detail, detail.turns ?? []);
     const entry: ChatHistoryEntry = {
       id: record?.id ?? chatId,
       timestamp: new Date(detail.updated_at / 1000).toISOString(),
@@ -550,7 +595,7 @@ export function useChatHistory(
       sessionId,
       userOrgKey: await getUserOrgKey(),
       serverBacked: true,
-      cachedLastSeq: detail.last_committed_seq,
+      ...(settled && { cachedLastSeq: detail.last_committed_seq, cachedTurnSpans: spans }),
       forkedFromShare: detail.forked_from_share,
     };
     try {

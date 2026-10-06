@@ -38,6 +38,13 @@ export const mySharesQuery = (org: string) =>
     staleTime: MEDIUM_STALE_TIME,
   });
 
+export const allSharesQuery = (org: string) =>
+  queryOptions({
+    queryKey: aiChatShareKeys.orgWide(org),
+    queryFn: async (): Promise<ShareView[]> => (await aiChatShare.listAll(org)).data?.shares ?? [],
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
 /** A live share moves with the source chat, so it sits on the live tier. */
 export const sharedChatQuery = (org: string, token: string) =>
   queryOptions({

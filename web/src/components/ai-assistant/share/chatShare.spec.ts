@@ -16,12 +16,16 @@
 import { describe, it, expect } from "vitest";
 import {
   EXPIRY_PRESETS,
+  applyVisibility,
   buildCreateRequest,
   canShareChat,
   defaultShareForm,
+  expiryPresetsFor,
   isChatPersistenceEnabled,
+  isOrgAdmin,
   isPublicChatEnabled,
   otherMode,
+  publicMaxExpirySecs,
   serverMessageOf,
   shareUrl,
   statusOfError,
@@ -29,23 +33,97 @@ import {
 } from "./chatShare";
 
 describe("chatShare", () => {
-  it("defaults to an org snapshot that never expires", () => {
-    expect(defaultShareForm()).toEqual({ mode: "snapshot", visibility: "org", expiresInSecs: 0 });
+  const DAY = 86400;
+  const MAX = 90 * DAY;
+
+  it("defaults to an org snapshot that never expires and shows tool data", () => {
+    expect(defaultShareForm()).toEqual({
+      mode: "snapshot",
+      visibility: "org",
+      expiresInSecs: 0,
+      redactTools: false,
+    });
   });
 
-  it("omits expires_in_secs for never and keeps it otherwise", () => {
-    expect(
-      buildCreateRequest({ mode: "live", visibility: "org", expiresInSecs: 0 }, false),
-    ).toEqual({ mode: "live", visibility: "org" });
-    expect(
-      buildCreateRequest({ mode: "snapshot", visibility: "org", expiresInSecs: 3600 }, false),
-    ).toEqual({ mode: "snapshot", visibility: "org", expires_in_secs: 3600 });
+  it("omits expires_in_secs for a never-expiring org link and keeps it otherwise", () => {
+    const org = { mode: "live" as const, visibility: "org" as const, redactTools: false };
+    expect(buildCreateRequest({ ...org, expiresInSecs: 0 }, false)).toEqual({
+      mode: "live",
+      visibility: "org",
+      redact_tools: false,
+    });
+    expect(buildCreateRequest({ ...org, expiresInSecs: 3600 }, false)).toEqual({
+      mode: "live",
+      visibility: "org",
+      expires_in_secs: 3600,
+      redact_tools: false,
+    });
   });
 
   it("never sends public visibility while public links are disabled", () => {
-    const form = { mode: "snapshot" as const, visibility: "public" as const, expiresInSecs: 0 };
+    const form = {
+      mode: "snapshot" as const,
+      visibility: "public" as const,
+      expiresInSecs: 7 * DAY,
+      redactTools: true,
+    };
     expect(buildCreateRequest(form, false).visibility).toBe("org");
-    expect(buildCreateRequest(form, true).visibility).toBe("public");
+    expect(buildCreateRequest(form, true, MAX)).toEqual({
+      mode: "snapshot",
+      visibility: "public",
+      expires_in_secs: 7 * DAY,
+      redact_tools: true,
+    });
+  });
+
+  it("always sends a public link an expiry within the maximum", () => {
+    const form = {
+      mode: "snapshot" as const,
+      visibility: "public" as const,
+      expiresInSecs: 0,
+      redactTools: true,
+    };
+    expect(buildCreateRequest(form, true, MAX).expires_in_secs).toBe(30 * DAY);
+    expect(
+      buildCreateRequest({ ...form, expiresInSecs: 365 * DAY }, true, MAX).expires_in_secs,
+    ).toBe(30 * DAY);
+    expect(buildCreateRequest(form, true, 10 * DAY).expires_in_secs).toBe(7 * DAY);
+  });
+
+  it("switching visibility resets redaction to its default and keeps public expiry valid", () => {
+    const form = defaultShareForm();
+    applyVisibility(form, "public", MAX);
+    expect(form).toMatchObject({
+      visibility: "public",
+      redactTools: true,
+      expiresInSecs: 30 * DAY,
+    });
+    form.expiresInSecs = DAY;
+    applyVisibility(form, "org", MAX);
+    expect(form).toMatchObject({ visibility: "org", redactTools: false, expiresInSecs: DAY });
+    applyVisibility(form, "public", MAX);
+    expect(form.expiresInSecs).toBe(DAY);
+  });
+
+  it("offers public links only expiries within the maximum, never 'never'", () => {
+    const publicValues = expiryPresetsFor("public", MAX).map((p) => p.value);
+    expect(publicValues).not.toContain(0);
+    expect(Math.max(...publicValues)).toBe(MAX);
+    expect(expiryPresetsFor("org", MAX)).toBe(EXPIRY_PRESETS);
+  });
+
+  it("reads the public expiry cap from /config, defaulting to 90 days", () => {
+    expect(publicMaxExpirySecs({})).toBe(MAX);
+    expect(publicMaxExpirySecs({ public_ai_chat_max_expiry_days: 30 })).toBe(30 * DAY);
+    expect(publicMaxExpirySecs({ public_ai_chat_max_expiry_days: 0 })).toBe(MAX);
+  });
+
+  it("treats root and org admins as admins", () => {
+    expect(isOrgAdmin({ userInfo: { role: "root" } })).toBe(true);
+    expect(isOrgAdmin({ userInfo: { role: "Admin" } })).toBe(true);
+    expect(isOrgAdmin({ currentuser: { role: "admin" } })).toBe(true);
+    expect(isOrgAdmin({ userInfo: { role: "editor" } })).toBe(false);
+    expect(isOrgAdmin({})).toBe(false);
   });
 
   it("offers the public option only when enabled", () => {

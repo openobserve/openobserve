@@ -33,10 +33,15 @@ describe("ai_chat_share service", () => {
   });
 
   it("creates a share on the chat's shares collection", async () => {
-    await aiChatShare.create("org1", "sess-1", { mode: "snapshot", visibility: "org" });
+    await aiChatShare.create("org1", "sess-1", {
+      mode: "snapshot",
+      visibility: "org",
+      redact_tools: false,
+    });
     expect(api.post).toHaveBeenCalledWith("/api/org1/ai/chats/sess-1/shares", {
       mode: "snapshot",
       visibility: "org",
+      redact_tools: false,
     });
   });
 
@@ -45,6 +50,11 @@ describe("ai_chat_share service", () => {
     await aiChatShare.listMine("org1");
     expect(api.get).toHaveBeenNthCalledWith(1, "/api/org1/ai/chats/sess-1/shares");
     expect(api.get).toHaveBeenNthCalledWith(2, "/api/org1/ai/shares");
+  });
+
+  it("lists every share in the org with all=true", async () => {
+    await aiChatShare.listAll("org1");
+    expect(api.get).toHaveBeenCalledWith("/api/org1/ai/shares", { params: { all: true } });
   });
 
   it("patches and revokes a share by id", async () => {
@@ -66,7 +76,11 @@ describe("ai_chat_share service", () => {
   it("forks through the org route and reads public links outside it", async () => {
     await aiChatShare.fork("org1", "tok");
     await aiChatShare.getPublic("tok");
-    expect(api.post).toHaveBeenCalledWith("/api/org1/ai/shared/tok/fork");
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/org1/ai/shared/tok/fork",
+      {},
+      { headers: { "Content-Type": "application/json" } },
+    );
     expect(api.get).toHaveBeenCalledWith("/api/public/ai_chats/tok");
   });
 

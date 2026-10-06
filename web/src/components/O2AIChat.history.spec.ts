@@ -15,7 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { messagesFromTurns, type StoredTurn } from "./O2AIChat.history";
+import {
+  foldTurns,
+  mergeIncremental,
+  messagesFromTurns,
+  type StoredTurn,
+} from "./O2AIChat.history";
 
 const t = ((key: string, params?: { message?: string }) =>
   params?.message ? `${key}: ${params.message}` : key) as any;
@@ -141,5 +146,135 @@ describe("messagesFromTurns", () => {
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(messages[1].contentBlocks?.map((b) => b.type)).toEqual(["tool_call", "text"]);
     expect(messages[1].content).toBe("_[aiAssistant.responseStoppedByUser]_");
+  });
+
+  it("marks a running turn as still generating", () => {
+    const [, assistant] = messagesFromTurns(
+      [
+        {
+          user: { text: "go" },
+          frames: [{ type: "message_delta", content: "So far" }],
+          status: "running",
+        },
+      ],
+      t,
+    );
+    expect(assistant.contentBlocks?.at(-1)).toEqual({
+      type: "status",
+      turnStatus: "running",
+      message: "aiAssistant.turnRunning",
+    });
+  });
+
+  it("marks an interrupted turn after its partial answer, with the error code", () => {
+    const [, assistant] = messagesFromTurns(
+      [
+        {
+          user: { text: "go" },
+          frames: [{ type: "message_delta", content: "Partial" }],
+          status: "interrupted",
+          error_code: "stream_interrupted",
+        },
+      ],
+      t,
+    );
+    expect(assistant.contentBlocks?.map((b) => b.type)).toEqual(["text", "error"]);
+    expect(assistant.contentBlocks?.[1]).toMatchObject({
+      message: "aiAssistant.turnInterrupted",
+      suggestion: "aiAssistant.turnErrorCode",
+      recoverable: true,
+    });
+  });
+
+  it("marks a failed turn without an error frame, but not one that has its own", () => {
+    const withoutFrame = messagesFromTurns(
+      [{ user: { text: "go" }, frames: [{ type: "complete" }], status: "failed" }],
+      t,
+    );
+    expect(withoutFrame[1].contentBlocks).toEqual([
+      { type: "error", message: "aiAssistant.turnFailed", suggestion: undefined },
+    ]);
+    const withFrame = messagesFromTurns(
+      [{ user: { text: "go" }, frames: [{ type: "error", error: "bad model" }], status: "failed" }],
+      t,
+    );
+    expect(withFrame[1].contentBlocks?.map((b) => b.type)).toEqual(["text"]);
+  });
+
+  it("shows a turn that stored nothing as a message that failed to send", () => {
+    const messages = messagesFromTurns(
+      [
+        turn("hello", [{ type: "message_delta", content: "Hi" }]),
+        { turn_id: "t2", status: "failed", error_code: "turn_limit", user: null, frames: [] },
+      ],
+      t,
+    );
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "assistant"]);
+    expect(messages[2].contentBlocks?.[0]).toMatchObject({
+      type: "error",
+      message: "aiAssistant.messageFailedToSend",
+    });
+  });
+
+  it("adds the stop marker once for a cancelled turn without a cancelled frame", () => {
+    const [, assistant] = messagesFromTurns(
+      [
+        {
+          user: { text: "go" },
+          frames: [{ type: "message_delta", content: "P" }],
+          status: "cancelled",
+        },
+      ],
+      t,
+    );
+    expect(assistant.content).toBe("P\n\n_[aiAssistant.responseStoppedByUser]_");
+    const [, stopped] = messagesFromTurns(
+      [
+        {
+          user: { text: "go" },
+          frames: [{ type: "message_delta", content: "P" }, { type: "cancelled" }],
+          status: "cancelled",
+        },
+      ],
+      t,
+    );
+    expect(stopped.content).toBe("P\n\n_[aiAssistant.responseStoppedByUser]_");
+  });
+});
+
+describe("mergeIncremental", () => {
+  const seqTurn = (text: string, first: number, last: number): StoredTurn => ({
+    ...turn(text, [{ type: "message_delta", content: `re ${text}` }]),
+    first_seq: first,
+    last_seq: last,
+  });
+  const failed = (id: string): StoredTurn => ({
+    turn_id: id,
+    status: "failed",
+    user: null,
+    frames: [],
+  });
+
+  it("keeps committed turns, replaces a grown turn and appends new ones", () => {
+    const cached = foldTurns([seqTurn("a", 1, 2), seqTurn("b", 3, 4)], t);
+    cached.messages[1].feedback = "thumbs_up";
+    const merged = mergeIncremental(cached, 4, [seqTurn("b2", 3, 6), seqTurn("c", 7, 8)], t);
+    expect(merged.messages.map((m) => m.content)).toEqual([
+      "a",
+      "re a",
+      "b2",
+      "re b2",
+      "c",
+      "re c",
+    ]);
+    expect(merged.messages[1].feedback).toBe("thumbs_up");
+    expect(merged.spans.map((s) => s.first_seq)).toEqual([1, 3, 7]);
+  });
+
+  it("keeps never-stored failed turns after the stored ones, deduplicated by turn id", () => {
+    const cached = foldTurns([seqTurn("a", 1, 2), failed("f1")], t);
+    const merged = mergeIncremental(cached, 2, [seqTurn("b", 3, 4), failed("f1"), failed("f2")], t);
+    expect(merged.spans.map((s) => s.first_seq ?? s.turn_id)).toEqual([1, 3, "f1", "f2"]);
+    expect(merged.messages).toHaveLength(6);
   });
 });

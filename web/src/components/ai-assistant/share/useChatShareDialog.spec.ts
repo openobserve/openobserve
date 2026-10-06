@@ -23,6 +23,7 @@ const service = vi.hoisted(() => ({
   create: vi.fn(),
   listForChat: vi.fn(),
   listMine: vi.fn(),
+  listAll: vi.fn(),
   update: vi.fn(),
   revoke: vi.fn(),
   getShared: vi.fn(),
@@ -53,6 +54,7 @@ const share = (extra: Partial<ShareView> = {}): ShareView => ({
   last_accessed_at: null,
   session_id: "sess-1",
   title: "Chat",
+  redact_tools: false,
   ...extra,
 });
 
@@ -67,6 +69,7 @@ function setup(opts: { publicEnabled?: boolean; open?: boolean } = {}) {
         sessionId: ref("sess-1"),
         open,
         publicEnabled,
+        maxPublicSecs: ref(90 * 86400),
         t,
       });
       return () => h("div");
@@ -106,6 +109,7 @@ describe("useChatShareDialog", () => {
       mode: "live",
       visibility: "org",
       expires_in_secs: 86400,
+      redact_tools: false,
     });
     expect(api().createdShare.value?.id).toBe("sh2");
     expect(api().createdLink.value).toContain("ai/shared/tok1?org_identifier=org1");
@@ -120,6 +124,28 @@ describe("useChatShareDialog", () => {
     await nextTick();
     expect(api().form.visibility).toBe("org");
     expect(api().visibilityOptions.value).toEqual(["org"]);
+  });
+
+  it("defaults a public link to hidden tool data and a bounded expiry", async () => {
+    service.create.mockResolvedValue({ data: share({ visibility: "public" }) });
+    const { api } = setup({ publicEnabled: true });
+    api().setVisibility("public");
+    expect(api().form.redactTools).toBe(true);
+    expect(api().expiryPresets.value.some((p) => p.value === 0)).toBe(false);
+    await api().create();
+    expect(service.create).toHaveBeenCalledWith("org1", "sess-1", {
+      mode: "snapshot",
+      visibility: "public",
+      expires_in_secs: 30 * 86400,
+      redact_tools: true,
+    });
+  });
+
+  it("toggles a share's tool redaction", async () => {
+    service.update.mockResolvedValue({ data: share({ redact_tools: true }) });
+    const { api } = setup();
+    await api().toggleRedaction(share({ redact_tools: false }));
+    expect(service.update).toHaveBeenLastCalledWith("org1", "sh1", { redact_tools: true });
   });
 
   it("shows the server's message when creation fails", async () => {

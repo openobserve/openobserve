@@ -15,11 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { mySharesQuery } from "@/services/ai_chat_share.queries";
+import { allSharesQuery, mySharesQuery } from "@/services/ai_chat_share.queries";
+import { isOrgAdmin, statusOfError } from "./chatShare";
 import { useShareActions } from "./useChatShareDialog";
 import AiChatShareRow from "./AiChatShareRow.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -27,33 +29,51 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const open = defineModel<boolean>("open", { required: true });
 
+type Scope = "mine" | "all";
+
+const store = useStore();
 const { t } = useI18nTyped();
 const orgId = useOrgId();
 
+const isAdmin = computed(() => isOrgAdmin(store.state));
+const scope = ref<Scope>("mine");
+const showAll = computed(() => isAdmin.value && scope.value === "all");
+
+watch(isAdmin, (admin) => {
+  if (!admin) scope.value = "mine";
+});
+
 const sharesQuery = useQuery(() =>
-  Object.assign(mySharesQuery(orgId.value), { enabled: open.value && !!orgId.value }),
+  Object.assign(showAll.value ? allSharesQuery(orgId.value) : mySharesQuery(orgId.value), {
+    enabled: open.value && !!orgId.value,
+  }),
 );
 const shares = computed(() => sharesQuery.data.value ?? []);
 const loading = computed(() => sharesQuery.isPending.value && sharesQuery.isFetching.value);
 const fetching = sharesQuery.isFetching;
-const failed = computed(() => !!sharesQuery.error.value);
+const forbidden = computed(() => statusOfError(sharesQuery.error.value) === 403);
+const failed = computed(() => !!sharesQuery.error.value && !forbidden.value);
 const refreshShares = () => sharesQuery.refetch();
 
-const { pendingShareId, refreshSnapshot, switchMode, revoke, copyLink } = useShareActions({
-  orgId,
-  t,
-});
+const setScope = (value: unknown) => {
+  if (value === "mine" || value === "all") scope.value = value;
+};
+
+const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, copyLink } =
+  useShareActions({ orgId, t });
 </script>
 
 <template>
   <ODrawer
     v-model:open="open"
     size="md"
-    :title="t('aiChatShare.sharedByMe')"
+    :title="showAll ? t('aiChatShare.allShares') : t('aiChatShare.sharedByMe')"
     data-test="ai-chat-shared-by-me"
   >
     <template #header-right>
@@ -69,9 +89,31 @@ const { pendingShareId, refreshSnapshot, switchMode, revoke, copyLink } = useSha
       </OButton>
     </template>
     <div class="flex flex-col">
+      <OToggleGroup
+        v-if="isAdmin"
+        :model-value="scope"
+        type="single"
+        class="mb-3 self-start"
+        data-test="ai-chat-shared-by-me-scope"
+        @update:model-value="setScope"
+      >
+        <OToggleGroupItem value="mine" size="sm" data-test="ai-chat-shared-by-me-scope-mine">
+          {{ t("aiChatShare.scopeMine") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="all" size="sm" data-test="ai-chat-shared-by-me-scope-all">
+          {{ t("aiChatShare.scopeAll") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
       <div v-if="loading" class="flex justify-center py-6">
         <OSpinner size="sm" />
       </div>
+      <OEmptyState
+        v-else-if="forbidden"
+        size="inline"
+        icon="lock"
+        :title="t('aiChatShare.allSharesForbidden')"
+        data-test="ai-chat-shared-by-me-forbidden"
+      />
       <OEmptyState
         v-else-if="failed"
         size="inline"
@@ -85,7 +127,7 @@ const { pendingShareId, refreshSnapshot, switchMode, revoke, copyLink } = useSha
         v-else-if="shares.length === 0"
         size="inline"
         icon="share"
-        :title="t('aiChatShare.sharedByMeEmpty')"
+        :title="showAll ? t('aiChatShare.allSharesEmpty') : t('aiChatShare.sharedByMeEmpty')"
         data-test="ai-chat-shared-by-me-empty"
       />
       <template v-else>
@@ -94,10 +136,13 @@ const { pendingShareId, refreshSnapshot, switchMode, revoke, copyLink } = useSha
           :key="share.id"
           :share="share"
           show-title
+          :show-owner="showAll"
+          :read-only-settings="showAll"
           :busy="pendingShareId === share.id"
           @copy="copyLink(share)"
           @refresh-snapshot="refreshSnapshot(share)"
           @switch-mode="switchMode(share)"
+          @toggle-redaction="toggleRedaction(share)"
           @revoke="revoke(share)"
         />
       </template>

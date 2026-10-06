@@ -34,6 +34,11 @@ export interface ShareView {
   last_accessed_at: number | null;
   session_id: string;
   title: string;
+  /** Tool inputs and outputs are hidden from viewers; only tool names show. */
+  redact_tools: boolean;
+  /** Who created the share; set on the org-wide admin list. */
+  owner_name?: string;
+  created_by?: string;
 }
 
 /** A shared chat, as a viewer reads it. `turns` is absent when `not_modified`. */
@@ -51,13 +56,16 @@ export interface SharedChat {
 export interface CreateShareRequest {
   mode: ShareMode;
   visibility: ShareVisibility;
+  /** Required for public links. */
   expires_in_secs?: number;
+  redact_tools: boolean;
 }
 
 export interface UpdateShareRequest {
   mode?: ShareMode;
   expires_in_secs?: number;
   refresh_snapshot?: boolean;
+  redact_tools?: boolean;
 }
 
 export interface ForkResult {
@@ -76,6 +84,10 @@ const aiChatShare = {
 
   listMine: (org: string) => http().get<{ shares: ShareView[] }>(`/api/${enc(org)}/ai/shares`),
 
+  /** Every active share in the org; org admins only (403 otherwise). */
+  listAll: (org: string) =>
+    http().get<{ shares: ShareView[] }>(`/api/${enc(org)}/ai/shares`, { params: { all: true } }),
+
   update: (org: string, shareId: string, body: UpdateShareRequest) =>
     http().patch<ShareView>(`/api/${enc(org)}/ai/shares/${enc(shareId)}`, body),
 
@@ -87,8 +99,13 @@ const aiChatShare = {
       params: knownSeq === undefined ? undefined : { known_seq: knownSeq },
     }),
 
+  // The server only accepts a JSON body here, which a cross-site form post cannot send.
   fork: (org: string, token: string) =>
-    http().post<ForkResult>(`/api/${enc(org)}/ai/shared/${enc(token)}/fork`),
+    http().post<ForkResult>(
+      `/api/${enc(org)}/ai/shared/${enc(token)}/fork`,
+      {},
+      { headers: { "Content-Type": "application/json" } },
+    ),
 
   getPublic: (token: string) => http().get<SharedChat>(`/api/public/ai_chats/${enc(token)}`),
 };

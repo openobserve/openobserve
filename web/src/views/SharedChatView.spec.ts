@@ -18,10 +18,6 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { queryClient } from "@/composables/query/queryClient";
 
-vi.mock("dompurify", () => ({
-  default: { sanitize: vi.fn((html: string) => html) },
-}));
-
 const service = vi.hoisted(() => ({
   create: vi.fn(),
   listForChat: vi.fn(),
@@ -100,6 +96,69 @@ describe("SharedChatView", () => {
     expect(wrapper.text()).toContain("Because of a deploy.");
     expect(wrapper.find('[data-test="o2-ai-chat-thumbs-up-btn"]').exists()).toBe(false);
     expect(wrapper.find("textarea").exists()).toBe(false);
+  });
+
+  it("marks failed, interrupted and running turns", async () => {
+    service.getShared.mockResolvedValue({
+      data: {
+        ...sharedChat,
+        turns: [
+          {
+            user: { text: "first" },
+            frames: [{ type: "message", content: "Partial" }],
+            status: "interrupted",
+            error_code: "stream_interrupted",
+            first_seq: 1,
+            last_seq: 2,
+          },
+          {
+            user: { text: "second" },
+            frames: [{ type: "message", content: "Working" }],
+            status: "running",
+            first_seq: 3,
+            last_seq: 3,
+          },
+          { turn_id: "t3", status: "failed", error_code: "turn_limit", user: null, frames: [] },
+        ],
+      },
+    });
+    const { wrapper } = mountView({ token: "tok" });
+    await flushPromises();
+    const errors = wrapper.findAll('[data-test="o2-ai-chat-stream-error"]');
+    expect(errors.map((e) => e.text())).toEqual([
+      expect.stringContaining("interrupted"),
+      expect.stringContaining("Message failed to send"),
+    ]);
+    expect(errors[1].text()).toContain("turn_limit");
+    expect(wrapper.find('[data-test="o2-ai-chat-turn-status-running"]').exists()).toBe(true);
+  });
+
+  it("renders shared markdown with the strict profile", async () => {
+    service.getShared.mockResolvedValue({
+      data: {
+        ...sharedChat,
+        turns: [
+          {
+            user: { text: "q" },
+            frames: [
+              {
+                type: "message",
+                content:
+                  '![x](https://evil.example/p.png) [docs](https://docs.example) <span style="color:red">hi</span>',
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const { wrapper } = mountView({ token: "tok" });
+    await flushPromises();
+    const html = wrapper.find('[data-test="o2-ai-chat-transcript"]').html();
+    expect(html).not.toContain("evil.example");
+    expect(html).not.toContain("color:red");
+    expect(wrapper.find('a[href="https://docs.example"]').attributes("rel")).toBe(
+      "noopener noreferrer nofollow",
+    );
   });
 
   it("shows the uniform not-found state for a 404", async () => {

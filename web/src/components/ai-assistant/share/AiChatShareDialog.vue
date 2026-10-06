@@ -20,7 +20,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { ShareMode, ShareVisibility } from "@/services/ai_chat_share";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { EXPIRY_PRESETS, isPublicChatEnabled } from "./chatShare";
+import { isPublicChatEnabled, publicMaxExpirySecs } from "./chatShare";
 import { useChatShareDialog } from "./useChatShareDialog";
 import AiChatShareRow from "./AiChatShareRow.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -30,6 +30,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
@@ -44,6 +45,8 @@ const store = useStore();
 const { t } = useI18nTyped();
 const orgId = useOrgId();
 const publicEnabled = computed(() => isPublicChatEnabled(store.state.zoConfig));
+const maxPublicSecs = computed(() => publicMaxExpirySecs(store.state.zoConfig));
+const maxPublicDays = computed(() => Math.round(maxPublicSecs.value / 86400));
 
 const {
   form,
@@ -55,10 +58,13 @@ const {
   sharesError,
   creating,
   visibilityOptions,
+  expiryPresets,
+  setVisibility: applyVisibility,
   resetForm,
   create,
   refreshSnapshot,
   switchMode,
+  toggleRedaction,
   revoke,
   copyLink,
 } = useChatShareDialog({
@@ -66,11 +72,12 @@ const {
   sessionId: toRef(props, "sessionId"),
   open,
   publicEnabled,
+  maxPublicSecs,
   t,
 });
 
 const expiryOptions = computed(() =>
-  EXPIRY_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.value })),
+  expiryPresets.value.map((preset) => ({ label: t(preset.labelKey), value: preset.value })),
 );
 
 const setMode = (value: unknown) => {
@@ -78,11 +85,15 @@ const setMode = (value: unknown) => {
 };
 
 const setVisibility = (value: unknown) => {
-  if (value === "org" || value === "public") form.visibility = value as ShareVisibility;
+  if (value === "org" || value === "public") applyVisibility(value as ShareVisibility);
 };
 
 const setExpiry = (value: unknown) => {
   form.expiresInSecs = Number(value) || 0;
+};
+
+const setRedactTools = (value: unknown) => {
+  form.redactTools = value === true;
 };
 </script>
 
@@ -98,11 +109,20 @@ const setExpiry = (value: unknown) => {
   >
     <div class="flex flex-col gap-5">
       <OBanner
+        v-if="createdShare ? !createdShare.redact_tools : !form.redactTools"
         variant="warning"
         icon="warning"
         dense
         :content="t('aiChatShare.toolDataWarning')"
         data-test="ai-chat-share-dialog-tool-warning"
+      />
+      <OBanner
+        v-else
+        variant="info"
+        icon="visibility-off"
+        dense
+        :content="t('aiChatShare.toolDataRedacted')"
+        data-test="ai-chat-share-dialog-tool-redacted"
       />
 
       <div v-if="createdShare" class="flex flex-col gap-2" data-test="ai-chat-share-dialog-result">
@@ -194,14 +214,34 @@ const setExpiry = (value: unknown) => {
           </span>
         </div>
 
-        <OSelect
-          :model-value="form.expiresInSecs"
-          :options="expiryOptions"
-          :label="t('aiChatShare.expiry')"
-          class="max-w-60"
-          data-test="ai-chat-share-dialog-expiry"
-          @update:model-value="setExpiry"
-        />
+        <div class="flex flex-col gap-2">
+          <OSwitch
+            :model-value="form.redactTools"
+            :label="t('aiChatShare.redactTools')"
+            size="sm"
+            data-test="ai-chat-share-dialog-redact"
+            @update:model-value="setRedactTools"
+          />
+          <span class="text-text-secondary text-xs">{{ t("aiChatShare.redactToolsHelp") }}</span>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <OSelect
+            :model-value="form.expiresInSecs"
+            :options="expiryOptions"
+            :label="t('aiChatShare.expiry')"
+            class="max-w-60"
+            data-test="ai-chat-share-dialog-expiry"
+            @update:model-value="setExpiry"
+          />
+          <span
+            v-if="form.visibility === 'public'"
+            class="text-text-secondary text-xs"
+            data-test="ai-chat-share-dialog-public-expiry-help"
+          >
+            {{ t("aiChatShare.publicExpiryHelp", { days: maxPublicDays }) }}
+          </span>
+        </div>
 
         <div>
           <OButton
@@ -243,6 +283,7 @@ const setExpiry = (value: unknown) => {
             @copy="copyLink(share)"
             @refresh-snapshot="refreshSnapshot(share)"
             @switch-mode="switchMode(share)"
+            @toggle-redaction="toggleRedaction(share)"
             @revoke="revoke(share)"
           />
         </template>
