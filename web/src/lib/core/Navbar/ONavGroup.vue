@@ -746,7 +746,7 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-tight">{{ childLabel(child) }}</span>
               <BetaBadge v-if="child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(child)"
+                v-if="isChildPaywalled(child) || child.locked"
                 name="lock"
                 size="xs"
                 class="text-text-secondary ms-auto shrink-0"
@@ -766,6 +766,8 @@ function onChildMouseenter(event: MouseEvent) {
             <LockedFeatureTooltip
               v-if="child.locked && child.lockedMessage"
               :message="child.lockedMessage"
+              :icon="child.icon"
+              :title="child.title ? raw(child.title) : t(child.titleKey)"
               @mouseenter="clearTimers"
               @mouseleave="scheduleClose"
             />
@@ -807,7 +809,7 @@ function onChildMouseenter(event: MouseEvent) {
             <span class="leading-tight">{{ childLabel(block.child) }}</span>
             <BetaBadge v-if="block.child.beta" size="xs" />
             <OIcon
-              v-if="isChildPaywalled(block.child)"
+              v-if="isChildPaywalled(block.child) || block.child.locked"
               name="lock"
               size="xs"
               class="text-text-secondary ms-auto shrink-0"
@@ -824,6 +826,8 @@ function onChildMouseenter(event: MouseEvent) {
           <LockedFeatureTooltip
             v-if="block.child.locked && block.child.lockedMessage"
             :message="block.child.lockedMessage"
+            :icon="block.child.icon"
+            :title="block.child.title ? raw(block.child.title) : t(block.child.titleKey)"
             @mouseenter="clearTimers"
             @mouseleave="scheduleClose"
           />
@@ -926,7 +930,7 @@ function onChildMouseenter(event: MouseEvent) {
                 <span class="leading-none">{{ childLabel(child) }}</span>
                 <BetaBadge v-if="child.beta" size="xs" />
                 <OIcon
-                  v-if="isChildPaywalled(child)"
+                  v-if="isChildPaywalled(child) || child.locked"
                   name="lock"
                   size="xs"
                   class="text-text-secondary ms-auto shrink-0"
@@ -946,6 +950,8 @@ function onChildMouseenter(event: MouseEvent) {
               <LockedFeatureTooltip
                 v-if="child.locked && child.lockedMessage"
                 :message="child.lockedMessage"
+                :icon="child.icon"
+                :title="child.title ? raw(child.title) : t(child.titleKey)"
                 @mouseenter="clearTimers"
                 @mouseleave="scheduleClose"
               />
@@ -994,7 +1000,7 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-none">{{ childLabel(block.child) }}</span>
               <BetaBadge v-if="block.child.beta" size="xs" />
               <OIcon
-                v-if="isChildPaywalled(block.child)"
+                v-if="isChildPaywalled(block.child) || block.child.locked"
                 name="lock"
                 size="xs"
                 class="text-text-secondary ms-auto shrink-0"
@@ -1011,6 +1017,8 @@ function onChildMouseenter(event: MouseEvent) {
             <LockedFeatureTooltip
               v-if="block.child.locked && block.child.lockedMessage"
               :message="block.child.lockedMessage"
+              :icon="block.child.icon"
+              :title="block.child.title ? raw(block.child.title) : t(block.child.titleKey)"
               @mouseenter="clearTimers"
               @mouseleave="scheduleClose"
             />

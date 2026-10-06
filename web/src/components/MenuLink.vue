@@ -88,7 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
   </OTooltip>
-  <LockedFeatureTooltip v-if="locked && lockedMessage" :message="lockedMessage" />
+  <LockedFeatureTooltip
+    v-if="locked && lockedMessage"
+    :message="lockedMessage"
+    :icon="icon || undefined"
+    :title="title"
+  />
 </template>
 
 <script lang="ts">
