@@ -919,12 +919,15 @@ watch(
               <OCollapsible
                 v-if="hasStrip"
                 v-model="stripExpanded"
-                class="border-border-default rounded-surface min-w-0 flex-1 border px-2 py-1"
-                trigger-class="py-1"
+                class="min-w-0 flex-1"
+                trigger-class="border-border-default w-fit! border py-1!"
                 data-test="curated-strip"
                 :label="collapsedCapabilities"
               >
-                <div class="flex flex-col gap-1 pb-1" data-test="curated-strip-expanded">
+                <div
+                  class="border-border-default rounded-surface mt-1 flex max-w-3xl flex-col gap-1 border px-2 py-1"
+                  data-test="curated-strip-expanded"
+                >
                   <ul class="divide-border-default flex flex-col divide-y">
                     <li
                       v-for="row in stripRows"
@@ -1006,7 +1009,7 @@ watch(
               </OCollapsible>
 
               <!-- The caveats are reference, not news: one line opens them instead of a paragraph above every panel. -->
-              <div v-if="sectionNoteKey" class="ms-auto shrink-0 py-2">
+              <div v-if="sectionNoteKey" class="ms-auto shrink-0 py-0.5">
                 <OPopover
                   v-model:open="noteOpen"
                   side="bottom"
