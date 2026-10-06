@@ -105,6 +105,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 
+const MINUTE_US = 60 * 1_000_000;
 const DAY_US = 24 * 3600 * 1_000_000;
 
 const status = ref<"idle" | "loading" | "ready" | "empty" | "unavailable" | "error">("idle");
@@ -174,7 +175,12 @@ onBeforeUnmount(() => {
 const columnLabels = computed(() => {
   const g = grid.value;
   if (!g) return [];
-  const format = g.rangeEndUs - g.rangeStartUs > DAY_US ? "MM-dd HH:mm" : "HH:mm:ss";
+  const format =
+    g.rangeEndUs - g.rangeStartUs > DAY_US
+      ? "MM-dd HH:mm"
+      : g.intervalUs >= MINUTE_US
+        ? "HH:mm"
+        : "HH:mm:ss";
   return g.colStartUs.map((us) => timestampToTimezoneDate(us / 1000, store.state.timezone, format));
 });
 
@@ -245,7 +251,8 @@ const options = computed(() => {
       {
         type: "heatmap",
         data: g.cells,
-        itemStyle: { borderColor: chartColor("--color-surface-base"), borderWidth: 1 },
+        // Hundreds of narrow columns: a cell border would cover most of each cell.
+        itemStyle: { borderWidth: 0 },
         label: { show: false },
         ...heatmapLargeGridDefaults(g.cells.length),
       },

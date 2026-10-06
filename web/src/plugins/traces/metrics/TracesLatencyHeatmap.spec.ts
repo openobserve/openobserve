@@ -202,6 +202,22 @@ describe("TracesLatencyHeatmap", () => {
       expect(o.series[0].type).toBe("heatmap");
     });
 
+    it("draws cells without borders, so a dense grid is not striped", async () => {
+      wrapper = await mountHeatmap();
+      expect(options(wrapper).series[0].itemStyle.borderWidth).toBe(0);
+    });
+
+    it("labels columns to the second for sub-minute buckets", async () => {
+      wrapper = await mountHeatmap();
+      expect(options(wrapper).xAxis.data[0]).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    });
+
+    it("labels columns to the minute for minute buckets, like the Rate chart", async () => {
+      respond({ hits: HITS, histogram_interval: 60 });
+      wrapper = await mountHeatmap();
+      expect(options(wrapper).xAxis.data[0]).toMatch(/^\d{2}:\d{2}$/);
+    });
+
     it("colours cells from the latency token", async () => {
       wrapper = await mountHeatmap();
       expect(chartColor).toHaveBeenCalledWith("--color-latency-p95");
