@@ -4753,9 +4753,8 @@ async fn handle_derived_stream_triggers(
             err_msg
         ));
     };
-    let start_time = new_trigger_data
-        .period_end_time
-        .map(|period_end_time| period_end_time + 1);
+    // Search excludes a window's end, so the next window starts exactly there.
+    let start_time = new_trigger_data.period_end_time;
 
     // in case the range [start_time, end_time] is greater than querying period, it needs to
     // evaluate and ingest 1 period at a time.

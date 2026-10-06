@@ -18,12 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :key="org"
     data-test="rum-analytics-page"
-    :title="t('rum.analytics.title')"
     :subtitle="t('rum.analytics.subtitle')"
     title-data-test="rum-analytics-title"
     icon="insights"
     bleed
   >
+    <!-- Beta tag rides inside the title line, like Workflows (see BetaBadge.vue). -->
+    <template #title>
+      <span class="inline-flex items-center gap-2">
+        {{ t("rum.analytics.title") }}
+        <BetaBadge />
+      </span>
+    </template>
     <template #actions>
       <OSelect
         v-if="appOptions.length > 1"
@@ -279,6 +285,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
