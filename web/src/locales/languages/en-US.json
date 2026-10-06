@@ -18656,7 +18656,8 @@
       "drawerDisk": "Disk",
       "drawerUsed": "Used",
       "drawerEventsNoStream": "No {stream} stream in this organization",
-      "limitMarker": "(limit)"
+      "limitMarker": "(limit)",
+      "drawerEventsFailed": "Events could not be loaded"
     }
   },
   "dbm": {

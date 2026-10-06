@@ -61,6 +61,7 @@ const recorder = (name: string, emits: string[] = []) =>
       row: Object,
       chip: String,
       anchorMissing: String,
+      loading: Boolean,
     },
     emits,
     setup(props) {
@@ -341,6 +342,16 @@ describe("KubernetesPage", () => {
       await mountPage({ view: "events" }, { metrics: [], eventFields: [] });
       expect(wrapper.find('[data-test="k8s2-cluster-select"]').exists()).toBe(false);
     });
+  });
+
+  it("marks the list loading, not empty, while a new view's data is on its way", async () => {
+    await mountPage({ view: "pods" });
+    expect(wrapper.findComponent(ListStub).props("loading")).toBe(false);
+    metricsQuery.mockImplementation((() => new Promise(() => {})) as any);
+    await wrapper.find('[data-test="k8s2-rail-nodes"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.findComponent(ListStub).props("view")).toBe("nodes");
+    expect(wrapper.findComponent(ListStub).props("loading")).toBe(true);
   });
 
   describe("drawer", () => {

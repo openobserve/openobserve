@@ -98,6 +98,8 @@ interface Settled {
   sql: Map<string, any[]>;
   failed: Map<string, number | null>;
   firstError: string | null;
+  // Network requests sent; synthetic empties for absent sparse streams are not requests.
+  attempted: number;
   updatedAt: number;
 }
 
@@ -140,6 +142,7 @@ export function useKubernetesInventory(
     cluster: string | null;
     end: number;
     details: DetailsRef | null;
+    viewKey: string;
   } | null>(null);
 
   // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
@@ -177,7 +180,8 @@ export function useKubernetesInventory(
   const eventLinksEnabled = computed(() => eventsScoped.value || metricClusters.value.length === 1);
 
   const gate = (id: QueryId): "send" | "empty" | "absent" => {
-    if (/^P\d+$/.test(id) && !has(POD_ANCHOR)) return "absent";
+    // P5 also serves ReplicaSet owners, so it does not depend on the pod anchor.
+    if (/^P\d+$/.test(id) && id !== "P5" && !has(POD_ANCHOR)) return "absent";
     if (has(QUERY_STREAM[id])) return "send";
     return SPARSE_STREAMS.has(QUERY_STREAM[id]) ? "empty" : "absent";
   };
@@ -275,6 +279,7 @@ export function useKubernetesInventory(
       sql: new Map(),
       failed: new Map(),
       firstError: null,
+      attempted: settled.length,
       updatedAt: Date.now(),
     };
     for (const id of ids) if (gate(id) === "empty") out.results.set(id, []);
@@ -436,13 +441,11 @@ export function useKubernetesInventory(
       sqlRequests(s, t, cluster),
     );
     if (gen !== generation) return;
-    const sent = [...main.results.keys(), ...main.sql.keys(), ...main.failed.keys()];
-    const allRejected = main.failed.size > 0 && main.failed.size === sent.length;
-    if (allRejected) {
+    if (main.attempted > 0 && main.failed.size === main.attempted) {
       fail(main.firstError);
       return;
     }
-    commit(main, cluster, t, s.details);
+    commit(main, cluster, t, s);
     const detail = s.details;
     if (detail) {
       const row = findRow(
@@ -480,17 +483,12 @@ export function useKubernetesInventory(
     detailLoading.value = false;
   };
 
-  const commit = (
-    main: Settled,
-    cluster: string | null,
-    t: K8sTime,
-    details: DetailsRef | null,
-  ) => {
+  const commit = (main: Settled, cluster: string | null, t: K8sTime, s: K8sUrlState) => {
     pageError.value = null;
     results.value = main.results;
     sql.value = main.sql;
     failed.value = main.failed;
-    loadedFor.value = { cluster, end: t.end, details };
+    loadedFor.value = { cluster, end: t.end, details: s.details, viewKey: viewKeyOf(s) };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
     loaded.value = true;
@@ -548,6 +546,11 @@ export function useKubernetesInventory(
     const hits = sql.value.get("DE");
     return hits && detailCurrent.value ? parseEvents(hits) : null;
   });
+
+  // Rows on screen belong to another view or scope until the current one commits.
+  const viewStale = computed(() => loadedFor.value?.viewKey !== viewKeyOf(state()));
+
+  const detailEventsFailed = computed(() => detailCurrent.value && failed.value.has("DE"));
 
   const detailObserved = computed(
     () => detailCurrent.value && parseObjects(sql.value.get("O1obj") ?? []).some((r) => !r.deleted),
@@ -639,7 +642,9 @@ export function useKubernetesInventory(
     events,
     eventsCapped,
     detailEvents,
+    detailEventsFailed,
     detailObserved,
+    viewStale,
     namespaceOptions,
     banners,
     has,
@@ -648,6 +653,10 @@ export function useKubernetesInventory(
     load,
     reset,
   };
+}
+
+function viewKeyOf(s: K8sUrlState) {
+  return JSON.stringify([s.view, s.cluster, s.namespaces, s.entity, s.group]);
 }
 
 function dedupe(requests: SqlRequest[]): SqlRequest[] {

@@ -315,6 +315,38 @@ describe("useKubernetesInventory", () => {
       expect(sentIds().filter((id) => !id.startsWith("CL"))).toEqual([]);
     });
 
+    it("shows the page error when CL succeeds but every sent view request fails, despite sparse empties", async () => {
+      const sparse = [
+        "kube_pod_container_status_waiting_reason",
+        "kube_pod_container_resource_limits",
+        "kube_pod_container_status_terminated_reason",
+      ];
+      reject = ALL_IDS.filter((id) => !CLUSTER_QUERIES.includes(id));
+      search.mockRejectedValue(Object.assign(new Error("sql down"), { response: { status: 500 } }));
+      const { inv } = await setup(
+        { view: "pods" },
+        { metrics: ALL_STREAMS.filter((s) => !sparse.includes(s)) },
+      );
+      await inv.load();
+      expect(inv.results.value.size).toBe(0);
+      expect(inv.pageError.value).toContain("boom");
+    });
+
+    it("sends the ReplicaSet owner query on its own stream, without the pod anchor", async () => {
+      fixture = {
+        ...CL(),
+        RS2: [ksm({ namespace: "a", replicaset: "rs" }, 1)],
+        P5: [ksm({ namespace: "a", replicaset: "rs", owner_kind: "Deployment", owner_name: "d" })],
+      };
+      const { inv } = await setup(
+        { view: "replicasets" },
+        { metrics: ALL_STREAMS.filter((s) => s !== "kube_pod_status_phase") },
+      );
+      await inv.load();
+      expect(sentIds()).toContain("P5");
+      expect(inv.inventory.value.replicasets[0].owner).toEqual({ kind: "Deployment", name: "d" });
+    });
+
     it("treats a failed k8s_events schema lookup as a stream error, never as unlabelled", async () => {
       getStreams.mockImplementation(async (type: string) => ({
         list: (type === "metrics" ? ALL_STREAMS : ["k8s_events"]).map((name) => ({ name })),
@@ -621,6 +653,20 @@ describe("useKubernetesInventory", () => {
       state.value = parseUrlState({ view: "pods", details: "pod/prod/a/q" });
       expect(inv.detailEvents.value).toBeNull();
       expect(inv.detailObserved.value).toBe(false);
+    });
+
+    it("reports the drawer's events as failed, not as still loading, when DE is rejected", async () => {
+      fixture = { ...CL(), ...pods };
+      search.mockImplementation((async (args: any) => {
+        if (args.query.query.sql.endsWith("LIMIT 100")) {
+          throw Object.assign(new Error("no"), { response: { status: 403 } });
+        }
+        return { data: { hits: [] } };
+      }) as any);
+      const { inv } = await setup({ view: "pods", details: "pod/prod/a/p" });
+      await inv.load();
+      expect(inv.detailEvents.value).toBeNull();
+      expect(inv.detailEventsFailed.value).toBe(true);
     });
 
     it("treats a latest DELETED record as not observed", async () => {

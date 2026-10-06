@@ -58,6 +58,7 @@ const props = defineProps<{
   pending: boolean;
   observed: boolean;
   hasEvents: boolean;
+  eventsFailed: boolean;
   eventsScoped: boolean;
   events: EventRow[] | null;
   range: { start: number; end: number };
@@ -357,6 +358,9 @@ const viewLogs = async () => {
           }}</OText>
           <OText v-else-if="!eventsScoped" variant="meta" data-test="k8s2-drawer-events-unscoped">{{
             t("infra.k8s2.drawerEventsUnscoped")
+          }}</OText>
+          <OText v-else-if="eventsFailed" variant="meta" data-test="k8s2-drawer-events-failed">{{
+            t("infra.k8s2.drawerEventsFailed")
           }}</OText>
           <OSpinner v-else-if="events === null" size="sm" data-test="k8s2-drawer-events-pending" />
           <OText

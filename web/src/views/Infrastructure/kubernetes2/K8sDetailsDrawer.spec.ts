@@ -167,6 +167,7 @@ const mountDrawer = (ref: DetailsRef, extra: Record<string, unknown> = {}) =>
       pending: false,
       observed: false,
       hasEvents: true,
+      eventsFailed: false,
       eventsScoped: true,
       events: [],
       range: RANGE,
@@ -547,6 +548,14 @@ describe("K8sDetailsDrawer events", () => {
         .find('[data-test="k8s2-drawer-events-unscoped"]')
         .text(),
     ).toBe("Events are not cluster-labelled");
+  });
+
+  it("says events are unavailable, not loading, when the events query failed", () => {
+    const wrapper = mountDrawer(refOf("pod", "web-abc-1"), { events: null, eventsFailed: true });
+    expect(wrapper.find('[data-test="k8s2-drawer-events-pending"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="k8s2-drawer-events-failed"]').text()).toBe(
+      "Events could not be loaded",
+    );
   });
 
   it("says there is no events stream, not that events are unlabelled, in a metrics-only org", () => {
