@@ -532,6 +532,7 @@ import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import config from "@/aws-exports";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
@@ -661,8 +662,11 @@ interface RedInsight {
 const insights = ref<RedInsight[]>([]);
 let insightsRequest = 0;
 let catalogLoad = 0;
+// The RED insights job is enterprise-only, so OSS never fetches the _anomalies schema for it.
 const redInsightsEnabled = computed(
-  () => store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
+  () =>
+    config.isEnterprise == "true" &&
+    store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
 );
 
 // OTable owns pagination internally; `currentPage` is retained only as the

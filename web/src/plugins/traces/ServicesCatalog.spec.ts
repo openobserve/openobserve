@@ -19,6 +19,12 @@ import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
+// web/.env sets VITE_OPENOBSERVE_ENTERPRISE=true locally but CI does not, so pin it.
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { default: { ...actual.default, isEnterprise: "false", isCloud: "false" } };
+});
+
 // ---------------------------------------------------------------------------
 // Mock search service
 // ---------------------------------------------------------------------------
@@ -206,6 +212,7 @@ vi.mock("vue-router", async () => {
 // Import the component (must come after all vi.mock calls so hoisting applies)
 // ---------------------------------------------------------------------------
 import ServicesCatalog from "./ServicesCatalog.vue";
+import config from "@/aws-exports";
 
 // ---------------------------------------------------------------------------
 // Mock store
@@ -226,6 +233,7 @@ function createMockStore(overrides: Record<string, any> = {}) {
         organizationSettings: {
           trace_id_field_name: "trace_id",
           span_id_field_name: "span_id",
+          red_insights_enabled: true,
         },
         streams: {},
       },
@@ -2673,6 +2681,7 @@ describe("ServicesCatalog", () => {
     }
 
     beforeEach(() => {
+      config.isEnterprise = "true";
       stubSchemas(() => Promise.resolve(anomaliesSchema("is_absence", "direction")));
       mockSearchFn.mockResolvedValue({ data: { hits: [anomalyRow()] } });
       mockAnomalyList.mockResolvedValue({
@@ -2681,6 +2690,7 @@ describe("ServicesCatalog", () => {
     });
 
     afterEach(() => {
+      config.isEnterprise = "false";
       mockStreamSchema.mockReset();
       mockStreamSchema.mockResolvedValue({ data: { schema: [] } });
       mockSearchFn.mockReset();
@@ -2690,9 +2700,29 @@ describe("ServicesCatalog", () => {
       mockSearchObj.data.datetime.type = "relative";
     });
 
-    it("does not query _anomalies when the setting is off", async () => {
+    const anomaliesSchemaCalls = () =>
+      mockStreamSchema.mock.calls.filter((call: any[]) => call[1] === "_anomalies");
+
+    it("never fetches the _anomalies schema on an OSS build, although the setting is on", async () => {
+      config.isEnterprise = "false";
       wrapper = mountServicesCatalog();
       await flushPromises();
+      expect(anomaliesSchemaCalls()).toHaveLength(0);
+      expect(anomalyCalls()).toHaveLength(0);
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+    });
+
+    it("does not query _anomalies when the setting is explicitly off", async () => {
+      wrapper = mountServicesCatalog({
+        storeOverrides: {
+          organizationData: {
+            organizationSettings: { red_insights_enabled: false },
+            streams: {},
+          },
+        },
+      });
+      await flushPromises();
+      expect(anomaliesSchemaCalls()).toHaveLength(0);
       expect(anomalyCalls()).toHaveLength(0);
       expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
     });
