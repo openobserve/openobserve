@@ -296,6 +296,23 @@ describe("MetricDetailView", () => {
       });
     });
 
+    it("keeps the drawn chart's own step through a refresh, until the new results land", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, compare: "1d", stepSeconds: 30 });
+      await flushPromises();
+      const answers: Array<(value: any) => void> = [];
+      runQuery.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
+
+      const wider = { start_time: WINDOW.start_time - HOUR_US, end_time: WINDOW.end_time };
+      await wrapper.setProps({ timeRange: wider, stepSeconds: 60 });
+      await flushPromises();
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart().props("stepSeconds")).toBe(30);
+
+      answers.forEach((answer) => answer(SERIES));
+      await flushPromises();
+      expect(chart().props("stepSeconds")).toBe(60);
+    });
+
     it("runs each expression once without a comparison", async () => {
       wrapper = mountView({ overview: LINE, timeRange: WINDOW });
       await flushPromises();

@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :run-query="heatmap ? runHeatmapQuery : runQuery"
         legend
         allow-alert-creation
-        :compare="heatmap ? null : compare"
+        :compare="compare"
         :step-seconds="stepSeconds"
         data-test="metrics-breakdown-chart"
         @results="focused = $event"

@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="overviewState.status === 'done'"
               :results="overviewState.results"
               :shifted="overviewState.shifted ?? []"
-              :step-seconds="stepSeconds"
+              :step-seconds="overviewState.stepSeconds ?? 0"
               :queries="overviewQueries"
               :chart-type="overview.chartType"
               :unit="overviewUnit.unit"
@@ -483,6 +483,8 @@ interface OverviewState {
   /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
   timeRange?: { start_time: number; end_time: number };
   shifted?: ShiftedResult[];
+  /** The step `results` were queried at, kept with them like `timeRange`. */
+  stepSeconds?: number;
 }
 
 const IDLE: OverviewState = { status: "idle", results: [], error: "" };
@@ -732,6 +734,7 @@ export default defineComponent({
         return;
       }
       const timeRange = props.timeRange;
+      const stepSeconds = props.stepSeconds;
       const compare = compareShift.value;
       active = new AbortController();
       const { signal } = active;
@@ -754,7 +757,14 @@ export default defineComponent({
         const shifted = compare
           ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
           : [];
-        overviewState.value = { status: "done", results, shifted, error: "", timeRange };
+        overviewState.value = {
+          status: "done",
+          results,
+          shifted,
+          error: "",
+          timeRange,
+          stepSeconds,
+        };
       } catch (error: any) {
         if (mine !== generation) return;
         cancelActive();

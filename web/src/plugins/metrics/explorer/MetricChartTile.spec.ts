@@ -109,6 +109,22 @@ describe("MetricChartTile", () => {
     ]);
   });
 
+  it("keeps the drawn chart's own step through a refresh, until the new results land", async () => {
+    wrapper = mountTile({ stepSeconds: 15 });
+    await flushPromises();
+    let answer!: (value: any) => void;
+    runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+
+    await wrapper.setProps({ timeRange: { start_time: 0, end_time: 2 }, stepSeconds: 60 });
+    await flushPromises();
+    const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+    expect(chart().props("stepSeconds")).toBe(15);
+
+    answer(SERIES);
+    await flushPromises();
+    expect(chart().props("stepSeconds")).toBe(60);
+  });
+
   it("reloads when the comparison changes", async () => {
     wrapper = mountTile();
     await flushPromises();

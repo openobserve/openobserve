@@ -304,7 +304,7 @@ describe("MetricCardChart feeds the queue's results in as injected data", () => 
       [],
       injected.metadata,
       injected.resultMetaData,
-      true,
+      false,
     );
 
     const named = options.series.filter((s: any) => s.name);

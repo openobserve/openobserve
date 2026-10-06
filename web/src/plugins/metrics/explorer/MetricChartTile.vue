@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :legend="legend"
           :allow-alert-creation="allowAlertCreation"
           :shifted="state.shifted ?? []"
-          :step-seconds="stepSeconds"
+          :step-seconds="state.stepSeconds ?? 0"
           @error="onRenderError"
         />
       </slot>
@@ -130,6 +130,8 @@ interface TileState {
   status: "idle" | "loading" | "done" | "error";
   results: any[];
   shifted?: ShiftedResult[];
+  /** The step `results` were queried at, kept with them like `timeRange`. */
+  stepSeconds?: number;
   error: string;
   /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
   timeRange?: { start_time: number; end_time: number };
@@ -216,6 +218,7 @@ const load = async () => {
   stale = false;
   const timeRange = props.timeRange;
   const compare = props.compare;
+  const stepSeconds = props.stepSeconds;
   loadedFor = { key: queryKey() ?? "", timeRange };
   active = new AbortController();
   const { signal } = active;
@@ -237,7 +240,7 @@ const load = async () => {
     const shifted = compare
       ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
       : [];
-    state.value = { status: "done", results, shifted, error: "", timeRange };
+    state.value = { status: "done", results, shifted, error: "", timeRange, stepSeconds };
   } catch (error: any) {
     if (mine !== generation) return;
     // The other queries of a failed load are not worth finishing.

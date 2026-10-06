@@ -1568,10 +1568,14 @@ describe("MetricsExplorer wiring", () => {
       });
       expect(routerState.push).not.toHaveBeenCalled();
 
+      const prefixes = grid.selectedPrefixes.value;
+      const labels = grid.labelFilters.value;
       routerState.query = { metric: CARD.name, compare: "1h" };
       (wrapper.vm as any).onRouteQueryChange();
       await wrapper.vm.$nextTick();
       expect(detailView(wrapper).props("compare")).toBe("1h");
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.labelFilters.value).toBe(labels);
       expect(grid.requestPreview).not.toHaveBeenCalled();
       expect(grid.sweepSlice).not.toHaveBeenCalled();
     });

@@ -688,6 +688,7 @@ import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
   type LabelFilter,
+  type QueryWindow,
 } from "@/composables/metrics/useMetricsExplorerGrid";
 import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
@@ -1446,7 +1447,7 @@ export default defineComponent({
       expr: string,
       signal: AbortSignal,
       card = detailCard.value,
-      opts?: { maxSeries?: number },
+      opts?: { maxSeries?: number; window?: QueryWindow },
     ) => {
       if (!card) return null;
       // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
