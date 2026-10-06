@@ -167,7 +167,8 @@ function groupLabel(g: RowGroup): string {
       : node?.status
         ? chipLabel(node.status, t)
         : "";
-  return word ? `${g.name} · ${word}` : g.name;
+  // The status word leads, because a narrow frame truncates the end of its label.
+  return word ? `${word} · ${g.name}` : g.name;
 }
 
 function linkOf(g: RowGroup): (() => void) | null {

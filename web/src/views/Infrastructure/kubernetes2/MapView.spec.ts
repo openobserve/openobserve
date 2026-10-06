@@ -383,10 +383,10 @@ describe("MapView groups (AC 44, 45)", () => {
     expect(labels[groups.indexOf(unscheduled)]).toBe("Unscheduled (1)");
     const pressured = groups.findIndex((g: any) => g.name === NODES[1]);
     expect(labels[pressured]).toBe(
-      `${NODES[1]} · MemoryPressure (${groups[pressured].rows.length})`,
+      `MemoryPressure · ${NODES[1]} (${groups[pressured].rows.length})`,
     );
     const ready = groups.findIndex((g: any) => g.name === NODES[0]);
-    expect(labels[ready]).toBe(`${NODES[0]} · Ready (${groups[ready].rows.length})`);
+    expect(labels[ready]).toBe(`Ready · ${NODES[0]} (${groups[ready].rows.length})`);
   });
 
   it("groups by workload: Deployment via ReplicaSet, DaemonSet, and No owner", async () => {
