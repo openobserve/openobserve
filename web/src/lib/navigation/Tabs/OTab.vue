@@ -234,6 +234,7 @@ const heightClasses = computed<string>(() => {
           :tooltip="tooltip ? false : undefined"
           >{{ label }}</OTruncatedText
         >
+        <OIcon v-if="suffixIcon" :name="suffixIcon as any" size="xs" class="ms-auto shrink-0" />
       </template>
       <slot v-else />
     </TabsTrigger>
