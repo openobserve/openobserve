@@ -155,14 +155,6 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("size-6");
   });
 
-  it("applies icon-toolbar-menu size classes with side padding instead of a fixed width", () => {
-    const wrapper = mount(OButton, { props: { size: "icon-toolbar-menu" } });
-    const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("h-[1.875rem]");
-    expect(classes).toContain("ps-1.5");
-    expect(classes).not.toContain("size-[1.875rem]");
-  });
-
   it("applies icon-circle size classes with rounded-full", () => {
     const wrapper = mount(OButton, { props: { size: "icon-circle" } });
     const classes = wrapper.classes().join(" ");

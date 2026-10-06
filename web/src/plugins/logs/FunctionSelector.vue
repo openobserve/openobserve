@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
           class="ms-1!"
-          size="icon-toolbar-menu"
+          size="sm-toolbar"
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
           <OIcon name="arrow-drop-down" size="sm" />

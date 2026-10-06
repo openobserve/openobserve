@@ -301,8 +301,6 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
   "icon-toolbar": "size-[1.875rem] shrink-0 p-0 rounded-default gap-x-0",
-  // 30px tall, auto width — icon plus dropdown caret; a fixed square would clip the pair
-  "icon-toolbar-menu": "h-[1.875rem] shrink-0 ps-1.5 pe-1 rounded-default gap-x-0.5",
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
   "icon-panel": "size-[1.625rem] shrink-0 p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons

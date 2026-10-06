@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
-                  size="icon-toolbar-menu"
+                  size="sm-toolbar"
                 >
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="arrow-drop-down" size="sm" />
