@@ -1220,7 +1220,24 @@ pub async fn apply_regex_to_response(
     }
 
     let start = std::time::Instant::now();
-    let pattern_manager = get_pattern_manager().await?;
+    let pattern_manager = match get_pattern_manager().await {
+        Ok(manager) => manager,
+        Err(e) => {
+            log::error!(
+                "[trace_id {trace_id}] SDR patterns application: pattern manager unavailable: {e}"
+            );
+            // Can't tell which streams have search-time patterns without the
+            // manager, so assume the worst case: fail closed treats this as
+            // "yes, redaction may have been skipped"; fail open (the default)
+            // returns unredacted hits rather than breaking search entirely.
+            return redaction_skipped(
+                config::get_config().common.sdr_fail_closed,
+                || true,
+                all_streams,
+                &format!("pattern manager unavailable: {e}"),
+            );
+        }
+    };
     redaction_skipped(
         config::get_config().common.sdr_fail_closed,
         || {
