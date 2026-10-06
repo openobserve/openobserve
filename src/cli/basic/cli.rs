@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 
 use chrono::TimeZone;
-use clap::{Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use common::{infra::config::USERS, meta};
 use config::{DEFAULT_ORG, utils::file::set_permission};
 use db;
@@ -163,19 +163,30 @@ fn create_cli_app() -> Command {
         ])
 }
 
-pub async fn cli() -> Result<bool, anyhow::Error> {
-    let mut app = create_cli_app().get_matches();
+pub fn init() -> Result<ArgMatches, anyhow::Error> {
+    let app = create_cli_app().get_matches();
+    init_config(&app)?;
+    Ok(app)
+}
 
+fn init_config(app: &ArgMatches) -> Result<(), anyhow::Error> {
     // Handle config file argument
     if let Some(config_file_path) = app.get_one::<String>("config") {
         let path = PathBuf::from(config_file_path);
         config::config_path_manager::set_config_file_path(path.clone())
-            .and_then(|_| openobserve_jobs::job::config_watcher::reload_config(&path))
             .map_err(|e|
                 anyhow::anyhow!(
                     "set config from file path {config_file_path} failed with {e}, stopping boot up... ",
                 )
             )?;
+    }
+
+    Ok(())
+}
+
+pub async fn cli(mut app: ArgMatches) -> Result<bool, anyhow::Error> {
+    if let Some(path) = app.get_one::<String>("config") {
+        openobserve_jobs::job::config_watcher::reload_config(&PathBuf::from(path))?;
     }
 
     if app.subcommand().is_none() {
@@ -625,6 +636,123 @@ mod tests {
     // Helper function to create the CLI app for testing
     fn create_test_app() -> Command {
         create_cli_app()
+    }
+
+    #[test]
+    fn runtime_config_loads_before_main_runtime() {
+        if let Ok(case) = std::env::var("O2_RUNTIME_STARTUP_CASE") {
+            let mut args = vec!["openobserve"];
+            if case == "file" {
+                args.extend(["--config", "runtime.env"]);
+            }
+            let app = create_cli_app().try_get_matches_from(args).unwrap();
+            assert!(tokio::runtime::Handle::try_current().is_err());
+            init_config(&app).unwrap();
+            let runtime = infra::runtime::create_main_runtime().unwrap();
+            assert_eq!(
+                runtime.metrics().num_workers(),
+                if case == "env" { 3 } else { 2 }
+            );
+            assert_eq!(config::get_config().main_runtime.blocking_worker_num, 1);
+            return;
+        }
+        for case in ["file", "dotenv", "env"] {
+            let directory = tempfile::tempdir().unwrap();
+            if case != "env" {
+                let filename = if case == "file" {
+                    "runtime.env"
+                } else {
+                    ".env"
+                };
+                std::fs::write(
+                    directory.path().join(filename),
+                    "ZO_MAIN_RUNTIME_BLOCKING_WORKER_NUM=1\nTOKIO_WORKER_THREADS=2\n",
+                )
+                .unwrap();
+            }
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            for (key, _) in std::env::vars().filter(|(key, _)| key.starts_with("ZO_")) {
+                command.env_remove(key);
+            }
+            let output = command
+                .args([
+                    "--exact",
+                    "cli::basic::cli::tests::runtime_config_loads_before_main_runtime",
+                    "--nocapture",
+                ])
+                .current_dir(directory.path())
+                .env("O2_RUNTIME_STARTUP_CASE", case)
+                .env("TOKIO_WORKER_THREADS", "3")
+                .env(
+                    "ZO_MAIN_RUNTIME_BLOCKING_WORKER_NUM",
+                    if case == "env" { "1" } else { "2" },
+                )
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{case}: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    #[test]
+    fn local_cli_does_not_initialize_server_config() {
+        if let Ok(command) = std::env::var("O2_RUNTIME_LOCAL_CLI_CASE") {
+            let args = if command == "init-dir" {
+                vec!["openobserve", "init-dir", "--path", "."]
+            } else {
+                vec!["openobserve", "ttv-inspect", "--file", "missing.ttv"]
+            };
+            let app = create_cli_app().try_get_matches_from(args).unwrap();
+            init_config(&app).unwrap();
+            let runtime = infra::runtime::create_main_runtime().unwrap();
+            let result = runtime.block_on(cli(app));
+            if command == "init-dir" {
+                assert!(result.unwrap());
+            } else {
+                assert!(result.is_err());
+            }
+            assert!(!std::path::Path::new("data").exists());
+            return;
+        }
+        for command in ["init-dir", "ttv-inspect"] {
+            let directory = tempfile::tempdir().unwrap();
+            let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+            for (key, _) in std::env::vars().filter(|(key, _)| key.starts_with("ZO_")) {
+                child.env_remove(key);
+            }
+            let output = child
+                .args([
+                    "--exact",
+                    "cli::basic::cli::tests::local_cli_does_not_initialize_server_config",
+                    "--nocapture",
+                ])
+                .current_dir(directory.path())
+                .env("O2_RUNTIME_LOCAL_CLI_CASE", command)
+                .env("ZO_HTTP_PORT", "invalid")
+                .env("ZO_DATA_CACHE_DIR", "/dev/null/cache")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{command}: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    #[test]
+    fn runtime_config_rejects_missing_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("missing.env");
+        let app = create_cli_app()
+            .try_get_matches_from(["openobserve", "--config", path.to_str().unwrap()])
+            .unwrap();
+        assert!(init_config(&app).is_err());
     }
 
     #[test]

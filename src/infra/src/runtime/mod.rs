@@ -21,8 +21,10 @@ use tokio::runtime::Runtime;
 const THREAD_STACK_SIZE: usize = 16 * 1024 * 1024;
 
 pub fn create_main_runtime() -> std::io::Result<Runtime> {
+    let cfg = config::config::MainRuntime::load().map_err(std::io::Error::other)?;
     tokio::runtime::Builder::new_multi_thread()
         .thread_name("main_runtime")
+        .max_blocking_threads(cfg.blocking_worker_num)
         .thread_stack_size(THREAD_STACK_SIZE)
         .enable_all()
         .build()
@@ -56,6 +58,7 @@ pub static DATAFUSION_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
             .thread_name("datafusion_runtime")
             .thread_stack_size(THREAD_STACK_SIZE)
             .worker_threads(get_config().limit.cpu_num)
+            .max_blocking_threads(get_config().limit.datafusion_runtime_blocking_worker_num)
             .enable_all()
             .build()
             .unwrap(),
@@ -88,6 +91,7 @@ pub static WAL_RUNTIME: Lazy<Option<Arc<Runtime>>> = Lazy::new(|| {
         .thread_name("wal-runtime")
         .thread_stack_size(THREAD_STACK_SIZE)
         .worker_threads(thread_num)
+        .max_blocking_threads(cfg.limit.wal_runtime_blocking_worker_num)
         .enable_all()
         .build()
         .ok()
