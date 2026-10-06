@@ -127,12 +127,18 @@ export function shortGroupNames(names: readonly string[]): string[] {
   return [...names];
 }
 
-// Keeps the head and the tail, where node names differ, around an ellipsis.
-export function middleTruncate(text: string, maxPx: number, measure: (s: string) => number) {
+// Keeps head and tail, where names differ, around "…"; the first `pin` chars always stay.
+export function middleTruncate(
+  text: string,
+  maxPx: number,
+  measure: (s: string) => number,
+  pin = 0,
+) {
   if (measure(text) <= maxPx) return text;
+  const [head, rest] = [text.slice(0, pin), text.slice(pin)];
   const cut = (kept: number) =>
-    `${text.slice(0, Math.ceil(kept / 2))}…${text.slice(text.length - Math.floor(kept / 2))}`;
-  let [lo, hi] = [0, text.length - 1];
+    `${head}${rest.slice(0, Math.ceil(kept / 2))}…${rest.slice(rest.length - Math.floor(kept / 2))}`;
+  let [lo, hi] = [0, rest.length - 1];
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
     if (measure(cut(mid)) <= maxPx) lo = mid;

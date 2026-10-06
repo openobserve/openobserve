@@ -326,4 +326,13 @@ describe("group titles (AC 83)", () => {
     expect(ta).not.toBe(tb);
     expect(middleTruncate("short", 72, sixPx)).toBe("short");
   });
+
+  it("never cuts into a pinned head, and drops the title when the head cannot fit", () => {
+    const title = "Deployment · recommendation-service";
+    const cut = middleTruncate(title, 120, sixPx, "Deployment · ".length);
+    expect(cut.startsWith("Deployment · ")).toBe(true);
+    expect(cut).toContain("…");
+    expect(sixPx(cut)).toBeLessThanOrEqual(120);
+    expect(middleTruncate(title, 60, sixPx, "Deployment · ".length)).toBe("");
+  });
 });

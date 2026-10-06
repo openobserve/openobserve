@@ -276,7 +276,7 @@ function headerTexts(
       x: x0 + HEADER_PAD_PX,
       y: lineOne,
       style: {
-        text: middleTruncate(header.title, titleWidth, (s) => textWidth(s, TITLE_FONT)),
+        text: middleTruncate(header.title, titleWidth, (s) => textWidth(s, TITLE_FONT), header.pin),
         fill: colors.heading,
         font: TITLE_FONT,
         verticalAlign: "middle",

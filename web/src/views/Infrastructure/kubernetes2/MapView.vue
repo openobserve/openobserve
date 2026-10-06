@@ -262,6 +262,7 @@ const headers = computed<GroupHeader[]>(() =>
       g.special === "noLabel" ? t("infra.k8s2.mapNoLabelSplit", noLabelCounts(g)) : undefined;
     return {
       title: shortNames.value.get(g.id) ?? title,
+      pin: props.state.group === "workload" && g.owner ? `${g.owner.kind} · `.length : 0,
       count: String(g.rows.length),
       summary,
       word: props.state.group === "node" && !g.special ? nodeWord(g.name) : null,
@@ -559,6 +560,7 @@ function linkText(g: RowGroup): I18nText {
           </OText>
           <OToggleGroup
             v-model="highlight"
+            class="shrink-0"
             type="multiple"
             :aria-label="t('infra.k8s2.mapLegendOf', { fill: t(FILL_LABEL[state.fill]) })"
             data-test="k8s2-map-scale"
@@ -579,50 +581,57 @@ function linkText(g: RowGroup): I18nText {
           </OToggleGroup>
         </template>
       </K8sHexMap>
-      <nav
+      <!-- not-sr-only resets position to static, so this wrapper does the overlay positioning. -->
+      <div
         v-if="navGroups.length"
-        class="bg-surface-overlay rounded-surface sr-only absolute start-3 top-3 flex max-h-[calc(100%-1.5rem)] flex-col items-start gap-1 overflow-y-auto p-2 focus-within:not-sr-only"
-        :aria-label="t('infra.k8s2.mapGroups')"
-        data-test="k8s2-map-groups"
+        class="pointer-events-none absolute start-3 top-3 bottom-3 flex flex-col items-start"
       >
-        <template v-for="g in navGroups" :key="g.id">
+        <nav
+          class="bg-surface-overlay rounded-surface pointer-events-auto sr-only flex max-h-full flex-col items-start gap-1 overflow-y-auto p-2 focus-within:not-sr-only"
+          :aria-label="t('infra.k8s2.mapGroups')"
+          data-test="k8s2-map-groups"
+        >
+          <template v-for="g in navGroups" :key="g.id">
+            <OButton
+              v-if="linkOf(g)"
+              variant="ghost-primary"
+              size="xs"
+              data-test="k8s2-map-group-link"
+              @click="linkOf(g)?.()"
+            >
+              {{ linkText(g) }}
+            </OButton>
+            <OCollapsible v-else :label="linkText(g)" data-test="k8s2-map-group-disclosure">
+              <div class="flex flex-col items-start gap-0.5 ps-2">
+                <OButton
+                  v-for="row in g.rows.slice(0, MAX_GROUP_MEMBERS)"
+                  :key="row.key"
+                  variant="ghost-primary"
+                  size="xs"
+                  data-test="k8s2-map-group-member"
+                  @click="onSelect(row)"
+                >
+                  {{ raw(row.name) }}
+                </OButton>
+                <OText v-if="g.rows.length > MAX_GROUP_MEMBERS" tag="span" class="text-xs">
+                  {{
+                    t("infra.k8s2.mapMoreUseSearch", { count: g.rows.length - MAX_GROUP_MEMBERS })
+                  }}
+                </OText>
+              </div>
+            </OCollapsible>
+          </template>
           <OButton
-            v-if="linkOf(g)"
+            v-if="grouped.totalGroups > navGroups.length"
             variant="ghost-primary"
             size="xs"
-            data-test="k8s2-map-group-link"
-            @click="linkOf(g)?.()"
+            data-test="k8s2-map-show-all"
+            @click="showList"
           >
-            {{ linkText(g) }}
+            {{ t("infra.k8s2.mapShowAll", { count: grouped.totalGroups }) }}
           </OButton>
-          <OCollapsible v-else :label="linkText(g)" data-test="k8s2-map-group-disclosure">
-            <div class="flex flex-col items-start gap-0.5 ps-2">
-              <OButton
-                v-for="row in g.rows.slice(0, MAX_GROUP_MEMBERS)"
-                :key="row.key"
-                variant="ghost-primary"
-                size="xs"
-                data-test="k8s2-map-group-member"
-                @click="onSelect(row)"
-              >
-                {{ raw(row.name) }}
-              </OButton>
-              <OText v-if="g.rows.length > MAX_GROUP_MEMBERS" tag="span" class="text-xs">
-                {{ t("infra.k8s2.mapMoreUseSearch", { count: g.rows.length - MAX_GROUP_MEMBERS }) }}
-              </OText>
-            </div>
-          </OCollapsible>
-        </template>
-        <OButton
-          v-if="grouped.totalGroups > navGroups.length"
-          variant="ghost-primary"
-          size="xs"
-          data-test="k8s2-map-show-all"
-          @click="showList"
-        >
-          {{ t("infra.k8s2.mapShowAll", { count: grouped.totalGroups }) }}
-        </OButton>
-      </nav>
+        </nav>
+      </div>
     </div>
   </div>
 </template>

@@ -85,6 +85,7 @@ const headersOf = (groups: RowGroup[], clickable = (g: RowGroup) => !g.special):
     count: String(g.rows.length),
     summary: statusCounts(g.rows),
     word: null,
+    pin: 0,
     tip: `<b>${g.special ? "Unscheduled" : g.name}</b>`,
     clickable: clickable(g),
   }));
@@ -359,9 +360,19 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
       workload: { kind: "Deployment", name: "api-gateway" },
     }));
     await mountMap(rows as PodRow[], { group: "workload" });
+    await wrapper.setProps({
+      headers: wrapper.props("headers").map((h: GroupHeader) => ({ ...h, pin: 13 })),
+    });
     const [title] = texts(cardAt(0, 10));
     expect(title.startsWith("Deployment · ")).toBe(true);
     expect(texts(cardAt(0, 20))[0]).toBe("Deployment · api-gateway");
+    await wrapper.setProps({
+      headers: [{ ...wrapper.props("headers")[0], title: "Deployment · recommendation-service" }],
+    });
+    for (const scale of [10, 14, 20]) {
+      const line = texts(cardAt(0, scale))[0];
+      if (line !== "") expect(line.startsWith("Deployment · ")).toBe(true);
+    }
   });
 
   it("makes only header bands hit targets, with a pointer only where a click goes somewhere", async () => {

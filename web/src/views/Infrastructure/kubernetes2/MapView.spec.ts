@@ -255,6 +255,11 @@ describe("MapView groups (AC 44, 45)", () => {
   });
 
   it("groups by workload: Deployment via ReplicaSet, DaemonSet, and No owner", async () => {
+    await mountView(mapState({ group: "workload" }));
+    const headers = hexMap().props("headers");
+    const gatewayHeader = headers.find((h: any) => h.title === "Deployment · api-gateway");
+    expect(gatewayHeader.pin).toBe("Deployment · ".length);
+    expect(headers.find((h: any) => h.title === "No owner").pin).toBe(0);
     const { groups } = groupRows(inventory().pods, "workload");
     const named = (name: string) => groups.find((g) => g.name === name)!;
     expect(
@@ -410,6 +415,7 @@ describe("MapView on phones (§4.8)", () => {
     await mountView();
     expect(wrapper.find('[data-test="k8s2-map-area"]').classes()).toContain("max-md:min-h-96");
     expect(wrapper.find('[data-test="k8s2-map-filter"]').classes()).toContain("max-md:w-full");
+    expect(wrapper.find('[data-test="k8s2-map-scale"]').classes()).toContain("shrink-0");
   });
 });
 
@@ -741,6 +747,8 @@ describe("MapView group headers and nav (AC 85)", () => {
     await mountView(mapState({ group: "namespace" }));
     const nav = wrapper.find('[data-test="k8s2-map-groups"]');
     expect(nav.classes()).toEqual(expect.arrayContaining(["sr-only", "focus-within:not-sr-only"]));
+    expect(nav.element.parentElement!.classList).toContain("absolute");
+    expect(nav.element.parentElement!.classList).toContain("top-3");
     expect(nav.findAll('[data-test="k8s2-map-group-link"]')).toHaveLength(6);
   });
 

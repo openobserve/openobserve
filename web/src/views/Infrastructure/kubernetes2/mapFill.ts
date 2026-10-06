@@ -49,6 +49,8 @@ export interface RowGroup {
 // What a group card's header shows; built by the view, drawn by the canvas.
 export interface GroupHeader {
   title: string;
+  // Leading title chars truncation must keep, e.g. a workload's kind.
+  pin: number;
   count: string;
   summary: { cls: StatusClass; count: number }[];
   word: { text: string; tone: StatusClass | null } | null;
