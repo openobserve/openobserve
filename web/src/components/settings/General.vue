@@ -603,6 +603,7 @@ import { useRouter } from "vue-router";
 import organizations from "@/services/organizations";
 import usersService from "@/services/users";
 import settingsService from "@/services/settings";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
@@ -982,6 +983,11 @@ export default defineComponent({
 
         //update settings in backend
         await updateOrgSettings.mutateAsync(owned);
+        analytics.track("org_general_settings_saved", {
+          custom_theme:
+            owned.light_mode_theme_color !== DEFAULT_LIGHT_COLOR ||
+            owned.dark_mode_theme_color !== DEFAULT_DARK_COLOR,
+        });
 
         // Apply the current mode's theme
         const currentMode = isDark.value ? "dark" : "light";

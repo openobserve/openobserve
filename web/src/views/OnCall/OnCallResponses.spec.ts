@@ -44,6 +44,9 @@ vi.mock("@/services/oncall", () => ({
 
 // The permission probe reads the org member list. Left unmocked it would fire
 // a real request from every test in this file.
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/services/users", () => ({
   default: { orgUsers: vi.fn().mockResolvedValue({ data: { data: [] } }) },
 }));
@@ -1255,6 +1258,92 @@ describe("OnCallResponses", () => {
 
       expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
       expect(wrapper.find('[data-test="oncall-bulk-ack"]').exists()).toBe(false);
+    });
+
+    describe("product analytics", () => {
+      const tracked = (event: string) =>
+        vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === event);
+
+      beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+      it("tracks one acknowledge per row action, counting every firing acknowledged", async () => {
+        service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+        const wrapper = await withPages([
+          page({ id: "f3", opened_at: 300 }),
+          page({ id: "f2", opened_at: 200 }),
+        ]);
+
+        await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt"]').trigger("click");
+        await flushPromises();
+
+        expect(tracked("oncall_page_acknowledged")).toEqual([
+          ["oncall_page_acknowledged", { count: 2 }],
+        ]);
+      });
+
+      it("counts only the acknowledgements that succeeded in a bulk action", async () => {
+        service.acknowledgeResponse
+          .mockResolvedValueOnce({ data: {} } as any)
+          .mockRejectedValueOnce(new Error("boom"));
+        const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+        wrapper
+          .findComponent({ name: "OTable" })
+          .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+        await flushPromises();
+
+        await wrapper.find('[data-test="oncall-bulk-ack"]').trigger("click");
+        await flushPromises();
+
+        expect(tracked("oncall_page_acknowledged")).toEqual([
+          ["oncall_page_acknowledged", { count: 1 }],
+        ]);
+      });
+
+      it("tracks nothing when every acknowledgement failed", async () => {
+        service.acknowledgeResponse.mockRejectedValue(new Error("boom"));
+        const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+        wrapper
+          .findComponent({ name: "OTable" })
+          .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+        await flushPromises();
+
+        await wrapper.find('[data-test="oncall-bulk-ack"]').trigger("click");
+        await flushPromises();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      });
+
+      it("tracks one resolve per bulk action with its cause and count", async () => {
+        service.resolveResponse.mockResolvedValue({ data: {} } as any);
+        const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+        wrapper
+          .findComponent({ name: "OTable" })
+          .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+        await flushPromises();
+        await wrapper.find('[data-test="oncall-bulk-resolve"]').trigger("click");
+        await flushPromises();
+
+        await wrapper.find('[data-test="oncall-bulk-resolve-confirm"]').trigger("click");
+        await flushPromises();
+
+        expect(tracked("oncall_page_resolved")).toEqual([
+          ["oncall_page_resolved", { cause: "none", count: 2 }],
+        ]);
+      });
+
+      it("tracks one resolve per row action", async () => {
+        service.resolveResponse.mockResolvedValue({ data: {} } as any);
+        const wrapper = await withPages([
+          page({ state: "acknowledged", acked_by: "engineer@example.com" }),
+        ]);
+
+        await wrapper.find('[data-test="oncall-row-resolve-alert:al_ckt"]').trigger("click");
+        await flushPromises();
+
+        expect(tracked("oncall_page_resolved")).toEqual([
+          ["oncall_page_resolved", { cause: "none", count: 1 }],
+        ]);
+      });
     });
 
     /// The whole point of the Alert column: a woken engineer cannot act on a

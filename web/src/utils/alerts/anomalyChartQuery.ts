@@ -34,18 +34,23 @@ export const ANOMALY_THRESHOLD_ALIAS = "threshold_value";
 export const ANOMALY_DEVIATION_ALIAS = "deviation_value";
 export const ANOMALY_DROP_ALIAS = "drop_value";
 export const ANOMALY_EXPECTED_ALIAS = "expected_value";
+export const ANOMALY_LOWER_ALIAS = "expected_lower";
+export const ANOMALY_UPPER_ALIAS = "expected_upper";
+export const ANOMALY_EVENT_ALIAS = "event_value";
 
 /** Opt-in per-kind columns: referencing one the stream never saw fails the whole query, and its absence proves no such record exists. */
 export interface AnomalyKindColumns {
   isAbsence: boolean;
   isPartialDrop: boolean;
   expectedValue: boolean;
+  expectedBounds: boolean;
 }
 
 export const NO_KIND_COLUMNS: AnomalyKindColumns = {
   isAbsence: false,
   isPartialDrop: false,
   expectedValue: false,
+  expectedBounds: false,
 };
 
 /** `histogram()`'s interval grammar, as the config stores it ("5m", "1h"). */
@@ -80,38 +85,72 @@ function buildQuery(
   );
 }
 
-/** The metric, plus a second series carrying only the flagged buckets — the
- *  renderer colours a line per SERIES and cannot colour a segment, so the
- *  flagged stretches have to be their own null-gapped line.
- *
- *  The flag gates the BUCKET and the value stays `max(actual_value)`, so red
- *  lands exactly on blue. Maxing `actual_value` over the flagged rows alone
- *  reads a different row whenever a bucket holds several — one flagged, one
- *  not — and plots the overlay BELOW the metric it is supposed to mark. */
+/** Latest-row readers shared by every per-bucket series; event rows rank below scored rows. */
+function scoredRowPicker(kinds: AnomalyKindColumns) {
+  const kindFlags = [
+    ...(kinds.isAbsence ? ["is_absence"] : []),
+    ...(kinds.isPartialDrop ? ["is_partial_drop"] : []),
+  ];
+  // IS NOT TRUE keeps flag-less legacy rows, which are all scored.
+  const scoredRank = kindFlags.length
+    ? `CASE WHEN ${kindFlags.map((flag) => `${flag} IS NOT TRUE`).join(" AND ")} THEN 1 ELSE 0 END`
+    : null;
+  const order = scoredRank ? `ORDER BY ${scoredRank}, created_at` : "ORDER BY created_at";
+  const latest = (column: string) => `last_value(${column} ${order})`;
+  // An event-only bucket has no scored row, and its latest row must not stand in for one.
+  const scored = (expr: string) =>
+    scoredRank ? `CASE WHEN max(${scoredRank}) = 1 THEN ${expr} END` : expr;
+  return { kindFlags, scoredRank, latest, scored };
+}
+
+/** Value, band, expected value and verdict come from one row, or a re-judged bucket draws red inside a band that never flagged it. */
 export function buildAnomalyMetricQuery(
   anomalyId?: string,
   interval?: string,
   kinds: AnomalyKindColumns = NO_KIND_COLUMNS,
 ): string | null {
-  // Older records carry no expected_value; max() over NULLs gaps the line there.
-  const expected = kinds.expectedValue ? `, max(expected_value) AS ${ANOMALY_EXPECTED_ALIAS}` : "";
+  const { kindFlags, scoredRank, latest, scored } = scoredRowPicker(kinds);
+  const verdict = scoredRank
+    ? `max(${scoredRank}) = 1 AND ${latest("is_anomaly")}`
+    : latest("is_anomaly");
+  const expected = kinds.expectedValue
+    ? `, ${scored(latest("expected_value"))} AS ${ANOMALY_EXPECTED_ALIAS}`
+    : "";
+  const bounds = kinds.expectedBounds
+    ? `, ${scored(latest("expected_lower"))} AS ${ANOMALY_LOWER_ALIAS}, ` +
+      `${scored(latest("expected_upper"))} AS ${ANOMALY_UPPER_ALIAS}`
+    : "";
+  // Marked at the event row's own value: a drop is judged on a partial bucket, not the scored aggregate.
+  const event = kindFlags.length
+    ? `, max(CASE WHEN ${kindFlags.map((flag) => `${flag} IS TRUE`).join(" OR ")} ` +
+      `THEN actual_value END) AS ${ANOMALY_EVENT_ALIAS}`
+    : "";
   return buildQuery(
     anomalyId,
     interval,
-    `max(actual_value) AS ${ANOMALY_VALUE_ALIAS}, ` +
-      `CASE WHEN max(CASE WHEN is_anomaly THEN 1 ELSE 0 END) = 1 ` +
-      `THEN max(actual_value) END AS ${ANOMALY_FLAGGED_ALIAS}` +
-      expected,
+    `${scored(latest("actual_value"))} AS ${ANOMALY_VALUE_ALIAS}, ` +
+      `CASE WHEN ${verdict} THEN ${latest("actual_value")} END AS ${ANOMALY_FLAGGED_ALIAS}, ` +
+      `${scored(latest("threshold_value"))} AS ${ANOMALY_THRESHOLD_ALIAS}` +
+      expected +
+      bounds +
+      event,
   );
 }
 
 /** The threshold is a SERIES, not a mark line: it steps when the config
  *  retrains, and a mark line would draw today's value over scores it never judged. */
-export function buildAnomalyScoreQuery(anomalyId?: string, interval?: string): string | null {
+export function buildAnomalyScoreQuery(
+  anomalyId?: string,
+  interval?: string,
+  kinds: AnomalyKindColumns = NO_KIND_COLUMNS,
+): string | null {
+  // Score and threshold from one row: a retrain changes both, and event rows carry sentinels.
+  const { latest, scored } = scoredRowPicker(kinds);
   return buildQuery(
     anomalyId,
     interval,
-    `max(score) AS ${ANOMALY_SCORE_ALIAS}, ` + `max(threshold_value) AS ${ANOMALY_THRESHOLD_ALIAS}`,
+    `${scored(latest("score"))} AS ${ANOMALY_SCORE_ALIAS}, ` +
+      `${scored(latest("threshold_value"))} AS ${ANOMALY_THRESHOLD_ALIAS}`,
   );
 }
 
@@ -121,18 +160,11 @@ export function buildAnomalyDeviationQuery(
   interval?: string,
   kinds: AnomalyKindColumns = NO_KIND_COLUMNS,
 ): string | null {
-  // deviation_percent lives in a different space per kind, so kinds never share one max(); absence is a sentinel, excluded.
-  const scoredOnly = [
-    ...(kinds.isAbsence ? ["is_absence IS NOT TRUE"] : []),
-    ...(kinds.isPartialDrop ? ["is_partial_drop IS NOT TRUE"] : []),
-  ];
-  // IS NOT TRUE keeps flag-less legacy rows (all score-space) in the scored series.
-  const scored = scoredOnly.length
-    ? `max(CASE WHEN ${scoredOnly.join(" AND ")} THEN deviation_percent END) ` +
-      `AS ${ANOMALY_DEVIATION_ALIAS}`
-    : `max(deviation_percent) AS ${ANOMALY_DEVIATION_ALIAS}`;
+  // deviation_percent lives in a different space per kind, so the scored series never reads an event row.
+  const { latest, scored } = scoredRowPicker(kinds);
+  const scoredSeries = `${scored(latest("deviation_percent"))} AS ${ANOMALY_DEVIATION_ALIAS}`;
   const drop = kinds.isPartialDrop
     ? `, max(CASE WHEN is_partial_drop IS TRUE THEN deviation_percent END) AS ${ANOMALY_DROP_ALIAS}`
     : "";
-  return buildQuery(anomalyId, interval, scored + drop);
+  return buildQuery(anomalyId, interval, scoredSeries + drop);
 }

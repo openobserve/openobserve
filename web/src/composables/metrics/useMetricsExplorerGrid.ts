@@ -54,7 +54,12 @@ import {
   resolveVariant,
   toO2Unit,
 } from "@/utils/metrics/metricDefaults";
-import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
+import {
+  createPreviewQueue,
+  isCancelled,
+  PreviewCancelledError,
+  PRIORITY,
+} from "./useMetricsPreviewQueue";
 import { useMetricsExplorerExemplars } from "./useMetricsExplorerExemplars";
 
 export interface LabelFilter {
@@ -563,9 +568,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * card would quietly render unfiltered data. Narrowing the grid — rather than
    * charting a lie — is what makes the chips safe.
    */
-  const isLabelEligible = (card: MetricCard): boolean => {
-    if (labelFilters.value.length === 0) return true;
-    if (!membershipKnown.value) return true;
+  const isLabelEligible = (card: MetricCard): boolean =>
+    inapplicableLabelFilters(card).length === 0;
+
+  /** The active filters this card cannot apply (those `isLabelEligible` fails on). */
+  const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => {
+    if (labelFilters.value.length === 0) return [];
+    if (!membershipKnown.value) return [];
 
     // The streams the EFFECTIVE variant reads — not the card kind's default ones.
     // A ⚙ override changes the operands: a histogram switched to "Rate of count"
@@ -575,13 +584,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the card would chart unfiltered data under an active filter chip. That is
     // the exact lie this whole eligibility rule exists to prevent.
     const operands = operandStreamsOfVariant(card);
-    return labelFilters.value.every((filter) =>
-      operands.every((stream) => {
-        const labels = labelsByStream.value[stream];
-        // A stream we have no schema for (e.g. a `_count` sibling that is not in
-        // the list) cannot be proven to carry the label.
-        return !!labels && labels.includes(filter.label);
-      }),
+    return labelFilters.value.filter(
+      (filter) =>
+        !operands.every((stream) => {
+          const labels = labelsByStream.value[stream];
+          // A stream with no known schema cannot be proven to carry the label.
+          return !!labels && labels.includes(filter.label);
+        }),
     );
   };
 
@@ -1157,10 +1166,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * the queue's AbortSignal is what the grid already fires on scroll-away,
    * filter change and refresh, so it is bridged to `cancelStreamQueryBasedOnRequestId`.
    */
-  const streamQuery = (query: string, step: number, signal: AbortSignal) =>
+  const streamQuery = (query: string, step: number, signal: AbortSignal, seriesLimit?: number) =>
     new Promise<any>((resolve, reject) => {
       const { traceId } = generateTraceContext();
-      const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+      const maxSeries = seriesLimit ?? store.state?.zoConfig?.max_dashboard_series ?? 100;
       const chunkProcessor = createPromQLChunkProcessor({
         maxSeries,
         enableLogging: false,
@@ -1899,6 +1908,37 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     }
   };
 
+  /** The metric detail view's queries: dialog-grade priority, their own owner. */
+  const DETAIL_OWNER = "\u0000detail";
+  let detailRequests = 0;
+
+  /** One owner per request, so the queue drops only the aborting chart's waiter from a shared job. */
+  const runDetailQuery = (
+    expr: string,
+    card: MetricCard,
+    signal: AbortSignal,
+    opts?: { maxSeries?: number },
+  ) => {
+    const step = dialogStepFor(card);
+    const key = previewCacheKey(expr, step);
+    if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
+    const owner = `${DETAIL_OWNER}:${++detailRequests}`;
+    const onAbort = () => queue.cancel(key, owner);
+    signal.addEventListener("abort", onAbort, { once: true });
+    return queue
+      .run(key, PRIORITY.DIALOG, (abort) => streamQuery(expr, step, abort, opts?.maxSeries), owner)
+      .finally(() => signal.removeEventListener("abort", onAbort));
+  };
+
+  /** The rate window the card charts with, widened if it was, so a breakdown measures alike. */
+  const rateWindowFor = (card: MetricCard): string =>
+    previews.value[card.name]?.widenedRateWindow ??
+    computeRateWindow(rangeSeconds.value, pointsFor(card), scrapeIntervalSeconds.value);
+
+  /** The family map the cards were built from (`buildMetricFamilies`). */
+  const familyByName = computed(() => new Map(cards.value.map((c) => [c.name, c.familyName])));
+  const familyOf = (name: string) => familyByName.value.get(name) ?? name;
+
   /* ------------------------------------------------------ label filtering */
 
   const labelNames = ref<string[]>([]);
@@ -2362,6 +2402,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     addLabelFilter,
     removeLabelFilter,
     ensureSchemas,
+    isLabelEligible,
+    inapplicableLabelFilters,
 
     // local state
     overrides,
@@ -2373,6 +2415,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     exemplarStateOf: exemplars.stateOf,
     exemplarKeysOf: exemplars.exemplarKeysOf,
     retryExemplars: exemplars.retry,
+    ensureExemplars: exemplars.ensure,
     exemplarEligible,
     exemplarSwapsVariant,
     toggleExemplars,
@@ -2386,6 +2429,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     effectiveVariant,
     runDialogQuery,
     cancelDialogQueries,
+    runDetailQuery,
+    rateWindowFor,
+
+    labelsByStream,
+    prefixAssignment,
+    prefixOf,
+    familyOf,
 
     // lifecycle
     loadStreams,

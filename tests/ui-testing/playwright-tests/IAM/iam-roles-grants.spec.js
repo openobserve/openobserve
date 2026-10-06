@@ -318,6 +318,8 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         if (byResource.settings) {
             expect(byResource.settings.sort()).toEqual(['AllowGet']);
         }
+        // OpenFGA's rum_analytics type has no GET or LIST, so staging one rejects the whole save.
+        expect(byResource.rum_analytics ?? []).toEqual([]);
     });
 
     test('G-13 · a role created with "start from Read-Only" is seeded, not empty', {

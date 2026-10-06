@@ -704,6 +704,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
@@ -1230,6 +1231,7 @@ async function resolveRecord() {
       cause: resolveCause.value || undefined,
       causeNote: resolveNote.value.trim() || undefined,
     });
+    analytics.track("oncall_page_resolved", { cause: resolveCause.value || "none", count: 1 });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
   } catch (err: any) {
@@ -1246,6 +1248,7 @@ async function acknowledgeRecord() {
   acking.value = true;
   try {
     await ackWrite.mutateAsync(responseId.value);
+    analytics.track("oncall_page_acknowledged", { count: 1 });
     toast({ variant: "success", message: t("oncall.acknowledged") });
     await fetchResponse();
   } catch (err: any) {

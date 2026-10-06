@@ -300,6 +300,7 @@ import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDash
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import analytics from "@/services/product_analytics";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 export default defineComponent({
   name: "Import Dashboard",
@@ -490,6 +491,9 @@ export default defineComponent({
       return converted;
     };
 
+    // Counts confirmed creates for the running import action; a later refresh failure must not hide them.
+    let createdInAction = 0;
+
     const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
       const data =
         typeof jsonObj == "string"
@@ -508,6 +512,8 @@ export default defineComponent({
         data,
         selectedFolder.value,
       );
+      analytics.track("dashboard_created");
+      createdInAction++;
 
       //update store
       await getAllDashboards(store, selectedFolder.value, true);
@@ -534,6 +540,7 @@ export default defineComponent({
         return;
       }
 
+      createdInAction = 0;
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
         return new Promise((resolve, reject) => {
           (async () => {
@@ -599,6 +606,9 @@ export default defineComponent({
 
       Promise.allSettled(data).then(async (results) => {
         filesImportResults.value = results;
+        if (createdInAction > 0) {
+          analytics.track("dashboard_imported", { source: "file", count: createdInAction });
+        }
 
         const successfulImports = results.filter((r) => r.status === "fulfilled").length;
 
@@ -655,6 +665,7 @@ export default defineComponent({
     //import dashboard from url
     const importFromUrl = async () => {
       isLoading.value = ImportType.URL;
+      createdInAction = 0;
       try {
         const urlData = url.value.trim();
 
@@ -690,6 +701,9 @@ export default defineComponent({
 
         const successCount = results.filter((r) => r.status === "fulfilled").length;
         const failedCount = results.length - successCount;
+        if (createdInAction > 0) {
+          analytics.track("dashboard_imported", { source: "url", count: createdInAction });
+        }
 
         if (successCount > 0) {
           await resetAndRefresh(ImportType.URL, selectedFolder.value);
@@ -718,6 +732,7 @@ export default defineComponent({
     // import dashboard from json string
     const importFromJsonStr = async () => {
       isLoading.value = ImportType.JSON_STRING;
+      createdInAction = 0;
       try {
         // get the dashboard
 
@@ -746,6 +761,9 @@ export default defineComponent({
       } catch (error) {
         showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
       } finally {
+        if (createdInAction > 0) {
+          analytics.track("dashboard_imported", { source: "json", count: createdInAction });
+        }
         isLoading.value = false;
       }
     };

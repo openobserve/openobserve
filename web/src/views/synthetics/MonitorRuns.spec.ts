@@ -140,6 +140,9 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: $t })),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -468,6 +471,28 @@ describe("MonitorRuns", () => {
         1_700_003_600_000_000,
         "ap1",
       );
+    });
+  });
+
+  describe("synthetic_test_run_triggered analytics", () => {
+    it("tracks a run once it is accepted", async () => {
+      wrapper = mountRuns();
+      await flushPromises();
+
+      await (wrapper.vm as any).triggerRun();
+
+      expect(analytics.track).toHaveBeenCalledWith("synthetic_test_run_triggered", { count: 1 });
+    });
+
+    it("does not track a rejected run", async () => {
+      mockRun.mockRejectedValueOnce(new Error("boom"));
+      wrapper = mountRuns();
+      await flushPromises();
+
+      await (wrapper.vm as any).triggerRun();
+
+      expect(mockRun).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

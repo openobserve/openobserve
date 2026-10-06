@@ -54,8 +54,9 @@ test.describe('IAM · Edit Role · navigation and filtering', { tag: '@enterpris
                 { object: `stream:_all_${org()}`, permission: 'AllowGet' },
             ]);
             const resources = (await req(page, 'GET', '/resources')).body || [];
+            // rum_analytics has no GET or LIST in OpenFGA; granting either rejects the whole save.
             const tops = resources
-                .filter((r) => r.visible && !r.parent && r.key !== 'org')
+                .filter((r) => r.visible && !r.parent && r.key !== 'org' && r.key !== 'rum_analytics')
                 .map((r) => r.key);
             await setRolePerms(
                 page,

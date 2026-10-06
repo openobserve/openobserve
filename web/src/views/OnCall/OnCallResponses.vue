@@ -927,6 +927,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import type { IncidentWithAlerts } from "@/services/incidents";
@@ -1549,7 +1550,9 @@ const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
 async function acknowledgeRow(row: PageRow) {
   busyId.value = row.rowKey;
   try {
-    await Promise.allSettled(row.escalating.map((r) => ackWrite.mutateAsync(r.id)));
+    const results = await Promise.allSettled(row.escalating.map((r) => ackWrite.mutateAsync(r.id)));
+    const acked = results.filter((r) => r.status === "fulfilled").length;
+    if (acked > 0) analytics.track("oncall_page_acknowledged", { count: acked });
     // Once per batch, and unforced: the write already expired what it moved.
     await fetchResponses();
   } finally {
@@ -1573,11 +1576,13 @@ async function snoozeRow(row: PageRow, minutes: number) {
 async function resolveRow(row: PageRow) {
   busyId.value = row.rowKey;
   try {
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       row.firings
         .filter((r) => r.state !== "resolved")
         .map((r) => resolveWrite.mutateAsync({ responseId: r.id })),
     );
+    const resolved = results.filter((r) => r.status === "fulfilled").length;
+    if (resolved > 0) analytics.track("oncall_page_resolved", { cause: "none", count: resolved });
     await fetchResponses();
   } finally {
     busyId.value = "";
@@ -1625,11 +1630,13 @@ async function runBulk(
   call: (id: string) => Promise<unknown>,
   doneKey: BulkDoneKey,
   partialKey: BulkPartialKey,
+  onSucceeded?: (count: number) => void,
 ) {
   bulkBusy.value = true;
   try {
     const results = await Promise.allSettled(ids.map(call));
     const failed = results.filter((r) => r.status === "rejected").length;
+    if (results.length - failed > 0) onSucceeded?.(results.length - failed);
     if (failed) {
       toast({ variant: "error", message: t(`oncall.${partialKey}`, { count: failed }) });
     } else {
@@ -1648,6 +1655,7 @@ async function bulkAcknowledge() {
     (id) => ackWrite.mutateAsync(id),
     "bulkAckDone",
     "bulkAckPartial",
+    (count) => analytics.track("oncall_page_acknowledged", { count }),
   );
 }
 
@@ -1677,6 +1685,7 @@ async function bulkResolve() {
     (id) => resolveWrite.mutateAsync({ responseId: id, cause, causeNote: cause_note }),
     "bulkResolveDone",
     "bulkResolvePartial",
+    (count) => analytics.track("oncall_page_resolved", { cause: cause ?? "none", count }),
   );
 }
 

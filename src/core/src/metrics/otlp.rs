@@ -725,7 +725,12 @@ fn prepare_sum(
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) {
-    metadata.metric_type = MetricType::Counter;
+    // a sum that can go down is a Prometheus gauge, not a counter
+    metadata.metric_type = if sum.is_monotonic {
+        MetricType::Counter
+    } else {
+        MetricType::Gauge
+    };
     prom_meta.insert(
         METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
@@ -2328,20 +2333,33 @@ mod tests {
 
         #[test]
         fn test_sum_non_monotonic() {
-            let metric = create_test_sum_metric("non_monotonic_sum", 50.0, false);
-            let mut rec = json!({"__name__": "non_monotonic_sum", "__type__": "counter"});
-            let metadata = Metadata {
-                metric_family_name: String::new(),
-                metric_type: MetricType::Unknown,
-                help: String::new(),
-                unit: String::new(),
-            };
-            let mut prom_meta = HashMap::new();
+            for temporality in [
+                AggregationTemporality::Cumulative,
+                AggregationTemporality::Delta,
+            ] {
+                let mut metric = create_test_sum_metric("non_monotonic_sum", 50.0, false);
+                if let Some(Data::Sum(sum)) = &mut metric.data {
+                    sum.aggregation_temporality = temporality as i32;
+                }
+                let mut rec = json!({"__name__": "non_monotonic_sum", "__type__": "counter"});
+                let metadata = Metadata {
+                    metric_family_name: String::new(),
+                    metric_type: MetricType::Unknown,
+                    help: String::new(),
+                    unit: String::new(),
+                };
+                let mut prom_meta = HashMap::new();
 
-            if let Some(Data::Sum(sum)) = &metric.data {
-                let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
-                assert!(!result.is_empty());
-                assert_eq!(result[0]["is_monotonic"], "false");
+                if let Some(Data::Sum(sum)) = &metric.data {
+                    let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
+                    assert!(!result.is_empty());
+                    assert_eq!(result[0]["is_monotonic"], "false");
+                    let metadata = prom_meta
+                        .get(METADATA_LABEL)
+                        .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                        .unwrap();
+                    assert_eq!(metadata.metric_type, MetricType::Gauge, "{temporality:?}");
+                }
             }
         }
 

@@ -67,8 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @drill-down="searchResultRef?.openUnifiedAnalysisDashboard()"
             />
           </div>
         </template>
@@ -103,8 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="activeTab === 'search'"
               id="tracesThirdLevel"
-              class="traces-search-result-container relative-position h-full"
+              class="traces-search-result-container relative-position relative h-full"
             >
+              <!-- Drill down teleports into this; it covers the results so their scroll and brush state survive. -->
+              <div id="traces-drill-down-page" class="absolute inset-0 z-20 hidden has-[>*]:flex" />
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"
@@ -343,7 +347,7 @@ import {
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
@@ -379,6 +383,17 @@ import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+
+interface TracesSavedView {
+  version?: number;
+  stream: { label: string; value: string };
+  editorValue: string;
+  datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
+  searchMode: "spans" | "traces";
+  sortBy: string;
+  sortOrder: string;
+  selectedFields?: string[];
+}
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -430,7 +445,7 @@ const correlationFilters = useCorrelationFilters({
 correlationFilters.watchQuery();
 
 let refreshIntervalID = 0;
-const searchResultRef = ref(null);
+const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
@@ -1064,6 +1079,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           }
           delete tracesRequestState[searchTraceId];
           if (!isPagination) {
+            analytics.track("traces_search_completed");
             fetchTracesCount();
           }
           correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
@@ -1868,39 +1884,103 @@ const searchData = () => {
 
   runQueryFn();
 
-  if (config.isCloud == "true") {
-    segment.track("Button Click", {
-      button: "Search Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      show_query: searchObj.meta.showQuery,
-      show_histogram: searchObj.meta.showHistogram,
-      sqlMode: searchObj.meta.sqlMode,
-      showFields: searchObj.meta.showFields,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("Button Click", {
+    button: "Search Data",
+    user_org: store.state.selectedOrganization.identifier,
+    user_id: store.state.userInfo.email,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    show_query: searchObj.meta.showQuery,
+    show_histogram: searchObj.meta.showHistogram,
+    sqlMode: searchObj.meta.sqlMode,
+    showFields: searchObj.meta.showFields,
+    page: "Search Logs",
+  });
 };
 
 const getMoreData = () => {
   if (searchObj.meta.refreshInterval == 0) {
     getQueryData(true);
 
-    if (config.isCloud == "true") {
-      segment.track("Button Click", {
-        button: "Get More Data",
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        stream_name: searchObj.data.stream.selectedStream.value,
-        page: "Search Logs",
-      });
-    }
+    analytics.track("Button Click", {
+      button: "Get More Data",
+      user_org: store.state.selectedOrganization.identifier,
+      user_id: store.state.userInfo.email,
+      stream_name: searchObj.data.stream.selectedStream.value,
+      page: "Search Logs",
+    });
   }
 };
 
 const onChangeStream = async () => {
   await extractFields();
+  runQueryFn();
+};
+
+const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
+  const picker = searchBarRef.value?.dateTimeRef;
+  if (!picker) return;
+  // The picker's date watcher emits after its programmatic marker resets, so the flag mutes it instead.
+  store.dispatch("setSavedViewFlag", true);
+  try {
+    if (datetime.type === "relative") picker.setRelativeTime(datetime.relativeTimePeriod);
+    else picker.setAbsoluteTime(datetime.startTime, datetime.endTime);
+    picker.setDateType(datetime.type);
+    await nextTick();
+  } finally {
+    store.dispatch("setSavedViewFlag", false);
+  }
+};
+
+let savedViewApplySeq = 0;
+const onApplySavedView = async (view: TracesSavedView) => {
+  const seq = ++savedViewApplySeq;
+  if (view.version !== undefined && view.version !== 1) {
+    toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
+    return;
+  }
+  const streamName = view.stream?.value;
+  const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
+  if (
+    streamChanged &&
+    !searchObj.data.stream.streamLists.some((s: any) => s.value === streamName)
+  ) {
+    toast({
+      variant: "warning",
+      message: t("traces.savedViewStreamMissing", { stream: streamName }),
+    });
+    return;
+  }
+  if (streamChanged) {
+    searchObj.data.stream.selectedStream = { label: streamName, value: streamName };
+    // Not onChangeStream: it runs a search of its own before the view is restored.
+    await extractFields();
+    if (seq !== savedViewApplySeq) return;
+  }
+
+  searchObj.meta.searchMode = view.searchMode;
+  searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
+  await syncSavedViewDateTime(view.datetime);
+  if (seq !== savedViewApplySeq) return;
+  searchObj.data.editorValue = view.editorValue;
+  searchBarRef.value?.setEditorValue?.(view.editorValue);
+  searchObj.meta.resultGrid.sortBy = view.sortBy;
+  searchObj.meta.resultGrid.sortOrder = view.sortOrder;
+
+  // A zero-hit search never rebuilds the columns, so the view's columns are applied here.
+  searchObj.data.stream.selectedFields = [...(view.selectedFields ?? [])];
+  rebuildColumns();
+  updatedLocalLogFilterField(view.searchMode);
+
+  // getUrlQueryParams copies trace_id/span_id from the route, which would reopen a trace.
+  const query = { ...router.currentRoute.value.query, tab: view.searchMode };
+  delete query.trace_id;
+  delete query.span_id;
+  await router.replace({ query });
+  if (seq !== savedViewApplySeq) return;
+
+  if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
+    restoreFilters(view.editorValue);
+  }
   runQueryFn();
 };
 

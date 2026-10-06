@@ -215,7 +215,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -525,7 +525,7 @@ export default defineComponent({
         loadingNotification();
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Save Function",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

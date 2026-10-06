@@ -7,6 +7,8 @@ license.workspace = true
 [features]
 default = []
 cloud = []
+# Exposes table creators to other crates' tests.
+test-utils = []
 
 [dependencies]
 anyhow.workspace = true

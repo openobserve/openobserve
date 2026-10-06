@@ -335,7 +335,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -511,7 +511,7 @@ export default defineComponent({
       }
 
       window.open(url, "_blank", "noopener,noreferrer");
-      segment.track("AWS Complete Integration Started", {
+      analytics.track("AWS Complete Integration Started", {
         mode: "single",
         region: selectedRegion.value,
         services: enabledServices.value,
@@ -528,7 +528,7 @@ export default defineComponent({
       window.open(consoleUrl, "_blank", "noopener,noreferrer");
       showParamHelper.value = true;
 
-      segment.track("AWS StackSet Integration Started", {
+      analytics.track("AWS StackSet Integration Started", {
         mode: "stackset",
         model: stackSetModel.value,
         admin_region: selectedRegion.value,

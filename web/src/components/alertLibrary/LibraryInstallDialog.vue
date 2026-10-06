@@ -424,6 +424,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { saveAlertMutation } from "@/services/alerts.queries";
 import { useMutation } from "@tanstack/vue-query";
 import destinationService from "@/services/alert_destination";
+import analytics from "@/services/product_analytics";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getFoldersListByType } from "@/utils/commons";
@@ -833,6 +834,7 @@ const install = async (ids: string[]) => {
 
   if (installedNow.length > 0) {
     emit("installed", { entryIds: installedNow });
+    analytics.track("library_alert_installed", { count: installedNow.length });
   }
 
   const failed = failedIds.value.length;

@@ -163,7 +163,9 @@
       "function-delete-confirm.spec.js",
       "pipeline-query-filter-removal.spec.js",
       "enrichment-explore-context.spec.js",
-      "pipeline-default-destination-guard.spec.js"
+      "pipeline-default-destination-guard.spec.js",
+      "function-import-non-object-entry.spec.js",
+      "function-import-rejection-prompt.spec.js"
     ],
     "disabled": []
   },

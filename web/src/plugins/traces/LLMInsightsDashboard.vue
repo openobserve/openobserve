@@ -315,6 +315,7 @@ import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
@@ -540,6 +541,9 @@ async function onCompareRun(payload: {
   const sharedWindow =
     payload.align === "sameWallClock" ? { start: props.startTime, end: props.endTime } : undefined;
   await versionCompare.run(effectiveStream.value, payload.manual, sharedWindow);
+  if (versionCompare.result.value && !versionCompare.errorA.value && !versionCompare.errorB.value) {
+    analytics.track("agent_version_compare_completed", { align: payload.align });
+  }
 }
 
 // sameWallClock re-runs the compare whenever the page date-picker changes —

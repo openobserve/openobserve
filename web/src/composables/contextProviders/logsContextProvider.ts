@@ -160,9 +160,10 @@ export const createLogsContextProvider = (
         // Always use the selected stream - it's what the user explicitly chose
         let actualStreams: string[] = [];
 
-        // Handle logs and patterns mode - always use selected stream
+        // Handle logs, drill down and patterns mode - always use selected stream
         if (
           searchObj.meta.logsVisualizeToggle === "logs" ||
+          searchObj.meta.logsVisualizeToggle === "drilldown" ||
           searchObj.meta.logsVisualizeToggle === "patterns"
         ) {
           actualStreams = searchObj.data.stream.selectedStream || [];
@@ -177,7 +178,8 @@ export const createLogsContextProvider = (
         }
 
         const streamType =
-          searchObj.meta.logsVisualizeToggle === "logs"
+          searchObj.meta.logsVisualizeToggle === "logs" ||
+          searchObj.meta.logsVisualizeToggle === "drilldown"
             ? searchObj.data.stream.streamType
             : dashboardPanelData
               ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields

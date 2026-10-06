@@ -58,3 +58,19 @@ export function spanWindowUs(
   if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return null;
   return { start: Math.floor(startNs / 1000), end: Math.ceil(endNs / 1000) };
 }
+
+/** The padded server-arrival window (µs) spanned by `_rumdata` hits carrying `_first_ts`/`_last_ts`. */
+export function arrivalTraceWindowUs(
+  hits: Array<{ _first_ts?: unknown; _last_ts?: unknown }>,
+): { start: number; end: number } | null {
+  let first = Infinity;
+  let last = -Infinity;
+  for (const hit of hits) {
+    const start = toFiniteNumber(hit?._first_ts);
+    const end = toFiniteNumber(hit?._last_ts);
+    if (start !== null && start > 0 && start < first) first = start;
+    if (end !== null && end > 0 && end > last) last = end;
+  }
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
+  return { start: first - TRACE_RANGE_PADDING_US, end: last + TRACE_RANGE_PADDING_US };
+}
