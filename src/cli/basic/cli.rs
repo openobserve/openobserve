@@ -169,21 +169,6 @@ pub fn init() -> Result<ArgMatches, anyhow::Error> {
     Ok(app)
 }
 
-fn init_config(app: &ArgMatches) -> Result<(), anyhow::Error> {
-    // Handle config file argument
-    if let Some(config_file_path) = app.get_one::<String>("config") {
-        let path = PathBuf::from(config_file_path);
-        config::config_path_manager::set_config_file_path(path.clone())
-            .map_err(|e|
-                anyhow::anyhow!(
-                    "set config from file path {config_file_path} failed with {e}, stopping boot up... ",
-                )
-            )?;
-    }
-
-    Ok(())
-}
-
 pub async fn cli(mut app: ArgMatches) -> Result<bool, anyhow::Error> {
     if let Some(path) = app.get_one::<String>("config") {
         openobserve_jobs::job::config_watcher::reload_config(&PathBuf::from(path))?;
@@ -623,6 +608,20 @@ pub async fn cli(mut app: ArgMatches) -> Result<bool, anyhow::Error> {
 
     println!("command {name} execute successfully");
     Ok(true)
+}
+
+fn init_config(app: &ArgMatches) -> Result<(), anyhow::Error> {
+    if let Some(config_file_path) = app.get_one::<String>("config") {
+        let path = PathBuf::from(config_file_path);
+        config::config_path_manager::set_config_file_path(path.clone())
+            .map_err(|e|
+                anyhow::anyhow!(
+                    "set config from file path {config_file_path} failed with {e}, stopping boot up... ",
+                )
+            )?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
