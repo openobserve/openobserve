@@ -32,7 +32,6 @@ import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
 import type { TranslateFn } from "@/types/i18n";
 
-/** Warnings about turning the chart's range into the alert's period. */
 const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
 
 // Helper function to properly wrap CSV values
@@ -50,7 +49,7 @@ export const wrapCsvValue = (val: any): string => {
   return needsQuotes ? `"${str}"` : str;
 };
 
-/** Where a right-clicked forecast line starts (its fit at the range end) and when the click landed, in seconds. */
+/** Times in seconds; the line's first point is its fit at the range end. */
 export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   const times: number[] = series?._timestamps ?? [];
   const data: any[] = series?.data ?? [];
@@ -174,7 +173,6 @@ export function usePanelAlertCreation({
     contextMenuVisible.value = false;
   };
 
-  /** The chart's forecast as a forecast alert: the form opens in Forecast mode on it. */
   const forecastPrefill = (
     base: AlertPrefill,
     T: number,
