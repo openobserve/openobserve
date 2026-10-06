@@ -947,6 +947,27 @@ describe("TestModelMatchDialog", () => {
       expect(mockTest.mock.calls[0][1].timestamp).toBeCloseTo(Date.now() * 1000, -7);
     });
 
+    it("sends the service tier as a model parameter when one is entered", async () => {
+      mockTest.mockResolvedValue({ data: null });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      (wrapper.vm as any).testServiceTier = " flex ";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest.mock.calls[0][1].model_params).toEqual({ service_tier: "flex" });
+    });
+
+    it("omits model parameters when no service tier is entered", async () => {
+      mockTest.mockResolvedValue({ data: null });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest.mock.calls[0][1].model_params).toBeUndefined();
+    });
+
     it("re-runs the test when the time changes while a result is shown", async () => {
       mockTest.mockResolvedValue({
         data: { matched: { name: "gpt-4", source: "org" }, tier: "Default" },

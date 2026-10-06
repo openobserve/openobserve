@@ -40,7 +40,12 @@ const modelPricing = {
   },
   test: (
     org_identifier: string,
-    data: { model_name: string; usage?: Record<string, number>; timestamp?: number | null },
+    data: {
+      model_name: string;
+      usage?: Record<string, number>;
+      timestamp?: number | null;
+      model_params?: Record<string, string>;
+    },
   ) => {
     return http().post(`/api/${org_identifier}/llm/models/test`, data);
   },

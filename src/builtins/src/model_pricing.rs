@@ -234,6 +234,60 @@ mod tests {
         }
     }
 
+    /// Pins the JSON shape of a service-tier entry (OpenAI Standard / Flex with a
+    /// large-context tier) in `llm_pricing.json`.
+    #[test]
+    fn test_parse_built_in_entry_with_param_conditions() {
+        let json = r#"[
+          {
+            "name": "GPT-6 Sol",
+            "provider": "OpenAI",
+            "description": "OpenAI GPT-6 Sol",
+            "match_pattern": "(?i)gpt-6-sol",
+            "tiers": [
+              {
+                "name": "Default",
+                "prices": { "input": 2e-06, "output": 1e-05 }
+              },
+              {
+                "name": "Extended Context (272k+)",
+                "condition": { "usage_key": "input", "operator": "gte", "value": 272000 },
+                "prices": { "input": 4e-06, "output": 1.5e-05 }
+              },
+              {
+                "name": "Flex · Extended Context (272k+)",
+                "condition": { "usage_key": "input", "operator": "gte", "value": 272000 },
+                "param_conditions": [{ "key": "service_tier", "values": ["flex"] }],
+                "prices": { "input": 2e-06, "output": 7.5e-06 }
+              },
+              {
+                "name": "Flex",
+                "param_conditions": [{ "key": "service_tier", "values": ["flex"] }],
+                "prices": { "input": 1e-06, "output": 5e-06 }
+              }
+            ]
+          }
+        ]"#;
+
+        let entries: Vec<BuiltInModelPricingEntry> = serde_json::from_str(json).unwrap();
+        let tiers = &entries[0].tiers;
+        assert_eq!(tiers.len(), 4);
+
+        // Default and plain context-length tiers are listed FIRST on purpose: a binary
+        // that predates `param_conditions` ignores the field, sees the Flex tiers as plain
+        // context-length / unconditional tiers, and takes the first match of each —
+        // which must be the standard rates. Default leads because the UI editor treats
+        // tier 0 as the unconditional tier when an entry is cloned.
+        assert!(tiers[0].param_conditions.is_empty() && tiers[0].condition.is_none());
+        assert!(tiers[1].param_conditions.is_empty() && tiers[1].condition.is_some());
+
+        assert_eq!(tiers[2].param_conditions[0].key, "service_tier");
+        assert_eq!(tiers[2].param_conditions[0].values, vec!["flex"]);
+        assert!(tiers[2].condition.is_some());
+        assert!(tiers[3].condition.is_none());
+        assert_eq!(tiers[3].param_conditions.len(), 1);
+    }
+
     #[test]
     fn test_sync_result_fields() {
         let r = SyncResult {

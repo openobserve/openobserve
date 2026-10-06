@@ -294,9 +294,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
                           </div>
                           <div
-                            v-if="!tier.condition && !tier.utc_windows?.length"
-                            class="text-2xs opacity-70"
+                            v-if="tier.param_conditions?.length"
+                            class="text-2xs font-mono opacity-70"
                           >
+                            {{ formatParamConditions(tier.param_conditions) }}
+                          </div>
+                          <div v-if="isUnrestrictedTier(tier)" class="text-2xs opacity-70">
                             {{ t("modelPricing.tierAlwaysActive") }}
                           </div>
                           <table class="mt-0.5 w-full border-collapse">
@@ -544,6 +547,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ tier.condition.value }}</OCode
                     >
                   </div>
+                  <div
+                    v-if="tier.param_conditions?.length"
+                    class="mt-0.5"
+                    data-test="model-pricing-drawer-tier-param-conditions"
+                  >
+                    <OCode>{{ formatParamConditions(tier.param_conditions) }}</OCode>
+                  </div>
                   <div v-if="tier.utc_windows?.length" class="mt-2">
                     <div class="text-2xs mb-1.5 opacity-55">
                       {{ t("modelPricing.timeWindows") }}
@@ -558,10 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <UtcHoursBar :windows="tier.utc_windows" />
                   </div>
-                  <div
-                    v-if="!tier.condition && !tier.utc_windows?.length"
-                    class="text-2xs mt-0.5 opacity-55"
-                  >
+                  <div v-if="isUnrestrictedTier(tier)" class="text-2xs mt-0.5 opacity-55">
                     {{ t("modelPricing.tierAlwaysActive") }}
                   </div>
                 </div>
@@ -871,11 +878,24 @@ function formatPerMillion(pricePerToken: number | undefined | null): string {
   return `$${perMillion.toFixed(2)}`;
 }
 
+/** A tier restricted by no usage condition, UTC window or request parameter. */
+function isUnrestrictedTier(tier: any): boolean {
+  return !tier?.condition && !tier?.utc_windows?.length && !tier?.param_conditions?.length;
+}
+
 // Mirrors the backend fallback rule: the default tier is the one restricted by
-// neither a usage condition nor a UTC time window (peak / off-peak pricing).
+// no usage condition, UTC time window (peak / off-peak) or request parameter
+// (service tier).
 function getDefaultTier(model: any) {
-  const fallback = model.tiers?.find((t: any) => !t.condition && !t.utc_windows?.length);
+  const fallback = model.tiers?.find(isUnrestrictedTier);
   return fallback || model.tiers?.[0];
+}
+
+/** Request-parameter conditions as `service_tier ∈ {flex, priority}`, joined by `·`. */
+function formatParamConditions(conditions: any[]): string {
+  return (conditions ?? [])
+    .map((c: any) => `${c.key} ∈ {${(c.values ?? []).join(", ")}}`)
+    .join(" · ");
 }
 
 /** True when any tier is restricted to UTC hours — i.e. peak / off-peak pricing. */

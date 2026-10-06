@@ -28,7 +28,7 @@ use std::{
 };
 
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, windows_match,
+    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, params_match, windows_match,
 };
 use dashmap::DashMap;
 use infra::table;
@@ -296,24 +296,47 @@ pub struct CostResult {
 /// `span_ts_micros` is the span's start time; it selects tiers restricted to recurring UTC
 /// time-of-day windows (peak / off-peak pricing). Pass `None` when the time is unknown —
 /// time-restricted tiers are then skipped in favour of the unrestricted default tier.
+///
+/// No request parameters are known here, so tiers restricted by `param_conditions`
+/// (service tier, speed) never apply; use [`calculate_cost_from_definition_with_params`]
+/// when the span's request parameters are available.
 pub fn calculate_cost_from_definition(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
 ) -> CostResult {
-    calculate_cost_from_definition_with_tier_usage(definition, usage, usage, span_ts_micros)
+    calculate_cost_from_definition_with_params(definition, usage, span_ts_micros, &HashMap::new())
+}
+
+/// Like [`calculate_cost_from_definition`], but also resolves tiers restricted by request
+/// parameters (e.g. `service_tier: "flex"`) against `model_params`.
+pub fn calculate_cost_from_definition_with_params(
+    definition: &ModelPricingDefinition,
+    usage: &HashMap<String, i64>,
+    span_ts_micros: Option<i64>,
+    model_params: &HashMap<String, String>,
+) -> CostResult {
+    calculate_cost_from_definition_with_tier_usage(
+        definition,
+        usage,
+        usage,
+        span_ts_micros,
+        model_params,
+    )
 }
 
 /// Calculate cost using `usage`, but select conditional pricing tiers with `tier_usage`.
 /// This lets callers price uncached input separately while selecting context-length tiers from
-/// total input tokens, including cached tokens.
+/// total input tokens, including cached tokens. `model_params` are the span's request
+/// parameters, used to select service-tier pricing.
 pub fn calculate_cost_from_definition_with_tier_usage(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
     tier_usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
+    model_params: &HashMap<String, String>,
 ) -> CostResult {
-    let tier = match select_tier(definition, tier_usage, span_ts_micros) {
+    let tier = match select_tier(definition, tier_usage, span_ts_micros, model_params) {
         Some(t) => t,
         None => {
             log::warn!(
@@ -366,15 +389,20 @@ pub fn calculate_cost_from_definition_with_tier_usage(
     }
 }
 
-/// Whether a tier is a candidate for `usage` at `span_ts_micros`.
-/// Both restrictions must hold: the span must fall in one of the tier's UTC windows
-/// (if any) *and* satisfy the tier's usage condition (if any).
+/// Whether a tier is a candidate for `usage` at `span_ts_micros` with `model_params`.
+/// Every restriction must hold: the span must fall in one of the tier's UTC windows
+/// (if any), satisfy the tier's usage condition (if any), and carry request parameters
+/// satisfying all of its param conditions (if any).
 fn tier_matches(
     tier: &config::meta::model_pricing::PricingTierDefinition,
     usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
+    model_params: &HashMap<String, String>,
 ) -> bool {
     if !windows_match(&tier.utc_windows, span_ts_micros) {
+        return false;
+    }
+    if !params_match(&tier.param_conditions, model_params) {
         return false;
     }
     match tier.condition {
@@ -386,26 +414,33 @@ fn tier_matches(
     }
 }
 
-/// A tier with neither a condition nor UTC windows — the unconditional fallback.
+/// A tier with no condition, UTC windows, or param conditions — the unconditional fallback.
 fn is_default_tier(tier: &config::meta::model_pricing::PricingTierDefinition) -> bool {
-    tier.condition.is_none() && tier.utc_windows.is_empty()
+    tier.condition.is_none() && tier.utc_windows.is_empty() && tier.param_conditions.is_empty()
 }
 
 fn select_tier<'a>(
     definition: &'a ModelPricingDefinition,
     usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
+    model_params: &HashMap<String, String>,
 ) -> Option<&'a config::meta::model_pricing::PricingTierDefinition> {
-    // Evaluate restricted tiers (conditional and/or time-windowed) in order; first match
-    // wins. The unconditional tier is skipped here so its position in the list — often
-    // first — does not shadow the restricted ones.
-    for tier in &definition.tiers {
-        if is_default_tier(tier) {
-            continue;
-        }
-        if tier_matches(tier, usage, span_ts_micros) {
-            return Some(tier);
-        }
+    // Evaluate restricted tiers (conditional, time-windowed and/or param-restricted) in
+    // order; first match wins. Param-restricted tiers go first: a span sent with
+    // `service_tier: "flex"` must get the Flex rate even when a plain context-length tier
+    // is listed earlier — built-in pricing lists those first so older binaries, which
+    // ignore `param_conditions`, still pick the right standard-tier rate. The
+    // unconditional tier is skipped here so its position in the list — often first —
+    // does not shadow the restricted ones.
+    let restricted = definition.tiers.iter().filter(|t| !is_default_tier(t));
+    let (with_params, without_params): (Vec<_>, Vec<_>) =
+        restricted.partition(|t| !t.param_conditions.is_empty());
+    if let Some(tier) = with_params
+        .into_iter()
+        .chain(without_params)
+        .find(|t| tier_matches(t, usage, span_ts_micros, model_params))
+    {
+        return Some(tier);
     }
 
     // Fallback: first unrestricted tier (validation guarantees at least one exists).
@@ -517,7 +552,7 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, anyhow::Error>
 #[cfg(test)]
 mod tests {
     use config::meta::model_pricing::{
-        PricingTierDefinition, TierCondition, TierOperator, UtcTimeWindow,
+        ParamCondition, PricingTierDefinition, TierCondition, TierOperator, UtcTimeWindow,
     };
 
     use super::*;
@@ -553,6 +588,7 @@ mod tests {
                     UtcTimeWindow::from_hm((1, 0), (4, 0)),
                     UtcTimeWindow::from_hm((6, 0), (10, 0)),
                 ],
+                param_conditions: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Off-Peak".to_string(),
@@ -562,6 +598,7 @@ mod tests {
                     ("output".to_string(), 0.00000198),
                 ]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
         ])
     }
@@ -643,12 +680,14 @@ mod tests {
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000001)]),
                 utc_windows: vec![UtcTimeWindow::from_hm((22, 0), (2, 0))],
+                param_conditions: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Day".to_string(),
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000002)]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
         ]);
         let usage = HashMap::from([("input".to_string(), 1_000i64)]);
@@ -682,12 +721,14 @@ mod tests {
                 }),
                 prices: HashMap::from([("input".to_string(), 0.00001)]),
                 utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+                param_conditions: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Default".to_string(),
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000001)]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
         ]);
 
@@ -724,6 +765,7 @@ mod tests {
             &billable,
             &tier_usage,
             at_utc(2, 0),
+            &HashMap::new(),
         );
         assert_eq!(result.tier_name, "Peak");
         assert!((result.cost["input"] - 0.132).abs() < 1e-12);
@@ -739,6 +781,7 @@ mod tests {
                 ("output".to_string(), 0.000015),
             ]),
             utc_windows: Vec::new(),
+            param_conditions: Vec::new(),
         }]);
 
         let usage = HashMap::from([("input".to_string(), 1000i64), ("output".to_string(), 500)]);
@@ -760,6 +803,7 @@ mod tests {
                     ("output".to_string(), 0.000015),
                 ]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Extended Context".to_string(),
@@ -773,6 +817,7 @@ mod tests {
                     ("output".to_string(), 0.0000225),
                 ]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
         ]);
 
@@ -807,6 +852,7 @@ mod tests {
                     ("cache_read_input_tokens".to_string(), 0.0000001),
                 ]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Extended Context".to_string(),
@@ -820,6 +866,7 @@ mod tests {
                     ("cache_read_input_tokens".to_string(), 0.0000002),
                 ]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             },
         ]);
 
@@ -834,6 +881,7 @@ mod tests {
             &billable_usage,
             &tier_usage,
             None,
+            &HashMap::new(),
         );
 
         assert_eq!(result.tier_name, "Extended Context");
@@ -894,6 +942,7 @@ mod tests {
                 ("output".to_string(), 0.000015),
             ]),
             utc_windows: Vec::new(),
+            param_conditions: Vec::new(),
         }]);
 
         let usage = HashMap::from([("input".to_string(), 0i64), ("output".to_string(), 0)]);
@@ -925,6 +974,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000001)]),
                         utc_windows: Vec::new(),
+                        param_conditions: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -939,6 +989,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000005)]),
                         utc_windows: Vec::new(),
+                        param_conditions: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -971,6 +1022,7 @@ mod tests {
                 ("total".to_string(), 0.0001), // should be ignored
             ]),
             utc_windows: Vec::new(),
+            param_conditions: Vec::new(),
         }]);
 
         let usage = HashMap::from([
@@ -993,6 +1045,7 @@ mod tests {
             condition: None,
             prices: HashMap::from([("input".to_string(), 0.000003)]),
             utc_windows: Vec::new(),
+            param_conditions: Vec::new(),
         }]);
 
         // "output" has tokens but no price configured → should not appear in cost
@@ -1016,12 +1069,14 @@ mod tests {
                     }),
                     prices: HashMap::from([("input".to_string(), 0.00001)]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 },
                 PricingTierDefinition {
                     name: "Default".to_string(),
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 },
             ])
         };
@@ -1115,6 +1170,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1127,6 +1183,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1147,6 +1204,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1159,6 +1217,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1180,6 +1239,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::new(),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1193,6 +1253,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::new(),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1214,6 +1275,7 @@ mod tests {
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000003)]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             }],
             ..Default::default()
         }]));
@@ -1238,6 +1300,7 @@ mod tests {
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000005)]),
                 utc_windows: Vec::new(),
+                param_conditions: Vec::new(),
             }],
             ..Default::default()
         }]));
@@ -1281,6 +1344,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000010)]),
                         utc_windows: Vec::new(),
+                        param_conditions: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -1296,6 +1360,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000003)]),
                         utc_windows: Vec::new(),
+                        param_conditions: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -1426,5 +1491,133 @@ mod tests {
         // At ts=15M, org entry is now applicable and wins by source priority
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(15_000_000));
         assert_eq!(result.unwrap().name, "gpt-4o-org");
+    }
+
+    // ── Request-parameter (service tier) conditions ───────────────────────
+
+    fn service_tier(values: &[&str]) -> Vec<ParamCondition> {
+        vec![ParamCondition {
+            key: "service_tier".to_string(),
+            values: values.iter().map(|v| v.to_string()).collect(),
+        }]
+    }
+
+    fn long_context() -> Option<TierCondition> {
+        Some(TierCondition {
+            usage_key: "input".to_string(),
+            operator: TierOperator::Gt,
+            value: 272_000.0,
+        })
+    }
+
+    fn input_price(per_mtok: f64) -> HashMap<String, f64> {
+        HashMap::from([("input".to_string(), per_mtok / 1_000_000.0)])
+    }
+
+    /// Mirrors the built-in OpenAI layout: plain context-length and default tiers first
+    /// (what older binaries see), service-tier tiers after.
+    fn service_tier_definition() -> ModelPricingDefinition {
+        make_definition(vec![
+            PricingTierDefinition {
+                name: "Large Context".to_string(),
+                condition: long_context(),
+                prices: input_price(4.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Standard".to_string(),
+                prices: input_price(2.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Fast mode · Large context".to_string(),
+                condition: long_context(),
+                param_conditions: service_tier(&["fast", "priority"]),
+                prices: input_price(8.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Flex · Large context".to_string(),
+                condition: long_context(),
+                param_conditions: service_tier(&["flex"]),
+                prices: input_price(2.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Fast mode".to_string(),
+                param_conditions: service_tier(&["fast", "priority"]),
+                prices: input_price(4.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Flex".to_string(),
+                param_conditions: service_tier(&["flex"]),
+                prices: input_price(1.0),
+                ..Default::default()
+            },
+        ])
+    }
+
+    fn tier_for(def: &ModelPricingDefinition, input: i64, tier: Option<&str>) -> String {
+        let usage = HashMap::from([("input".to_string(), input)]);
+        let params = tier
+            .map(|t| HashMap::from([("service_tier".to_string(), t.to_string())]))
+            .unwrap_or_default();
+        calculate_cost_from_definition_with_params(def, &usage, None, &params).tier_name
+    }
+
+    #[test]
+    fn test_service_tier_selects_param_tiers_before_context_tier() {
+        let def = service_tier_definition();
+        assert_eq!(tier_for(&def, 1_000, None), "Standard");
+        assert_eq!(tier_for(&def, 300_000, None), "Large Context");
+        assert_eq!(tier_for(&def, 1_000, Some("flex")), "Flex");
+        assert_eq!(tier_for(&def, 1_000, Some("priority")), "Fast mode");
+        assert_eq!(
+            tier_for(&def, 300_000, Some("fast")),
+            "Fast mode · Large context"
+        );
+        assert_eq!(
+            tier_for(&def, 300_000, Some("flex")),
+            "Flex · Large context"
+        );
+        // Values no tier lists ("default", "auto") price at the standard rates.
+        assert_eq!(tier_for(&def, 1_000, Some("default")), "Standard");
+        assert_eq!(tier_for(&def, 300_000, Some("auto")), "Large Context");
+    }
+
+    #[test]
+    fn test_service_tier_cost_uses_selected_tier_prices() {
+        let def = service_tier_definition();
+        let usage = HashMap::from([("input".to_string(), 100_000i64)]);
+        let params = HashMap::from([("service_tier".to_string(), "flex".to_string())]);
+        let result = calculate_cost_from_definition_with_params(&def, &usage, None, &params);
+        assert_eq!(result.tier_name, "Flex");
+        // 100K tokens at $1/MTok
+        assert!((result.cost["input"] - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_service_tier_ignored_without_params() {
+        // Callers without request parameters (e.g. eval cost calculator) never get a
+        // service-tier rate.
+        let def = service_tier_definition();
+        let usage = HashMap::from([("input".to_string(), 300_000i64)]);
+        assert_eq!(
+            calculate_cost_from_definition(&def, &usage, None).tier_name,
+            "Large Context"
+        );
+    }
+
+    #[test]
+    fn test_service_tier_layout_safe_for_binaries_without_param_conditions() {
+        // A binary that predates `param_conditions` deserializes these tiers without it.
+        // The built-in layout must still give such binaries the standard-tier rates.
+        let mut legacy = service_tier_definition();
+        for tier in &mut legacy.tiers {
+            tier.param_conditions.clear();
+        }
+        assert_eq!(tier_for(&legacy, 1_000, None), "Standard");
+        assert_eq!(tier_for(&legacy, 300_000, None), "Large Context");
     }
 }

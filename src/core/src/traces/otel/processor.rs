@@ -49,6 +49,8 @@ struct SpanExtractions {
     input: Option<json::Value>,
     output: Option<json::Value>,
     model_params: HashMap<String, String>,
+    /// Service tier the span was served on (e.g. "flex", "priority"), for pricing.
+    service_tier: Option<String>,
     usage: HashMap<String, i64>,
     input_includes_cache: bool,
     cost: HashMap<String, f64>,
@@ -196,6 +198,9 @@ impl OtelIngestionProcessor {
         let model_params = self
             .parameters_extractor
             .extract(span_attributes, scope_name_default);
+        let service_tier = self
+            .parameters_extractor
+            .extract_service_tier(span_attributes);
         let usage_details = self
             .usage_extractor
             .extract_usage_details(span_attributes, scope_name_default);
@@ -232,6 +237,7 @@ impl OtelIngestionProcessor {
             input,
             output,
             model_params,
+            service_tier,
             usage: usage_details.usage,
             input_includes_cache: usage_details.input_includes_cache,
             cost,
@@ -303,12 +309,14 @@ impl OtelIngestionProcessor {
 
             if cost.is_empty() {
                 if let Some(pricing_def) = matched_pricing {
+                    let pricing_params = pricing_params(extracted);
                     let result =
                         crate::db::model_pricing::calculate_cost_from_definition_with_tier_usage(
                             &pricing_def,
                             &billable_usage,
                             &tier_usage,
                             span_ts_micros,
+                            &pricing_params,
                         );
                     if !result.cost.is_empty() {
                         log::debug!(
@@ -683,6 +691,19 @@ impl OtelIngestionProcessor {
             span_start_nanos,
         );
     }
+}
+
+/// Request parameters used to select service-tier pricing: the extracted model
+/// parameters, with `service_tier` overridden by the tier read from dedicated span
+/// attributes (the response tier — what was actually billed — when present).
+fn pricing_params(extracted: &SpanExtractions) -> HashMap<String, String> {
+    let mut params = extracted.model_params.clone();
+    if let Some(tier) = &extracted.service_tier {
+        let key = config::meta::model_pricing::normalize_param_key("service_tier");
+        params.retain(|k, _| config::meta::model_pricing::normalize_param_key(k) != key);
+        params.insert("service_tier".to_string(), tier.clone());
+    }
+    params
 }
 
 fn build_pricing_usage(
@@ -1552,6 +1573,95 @@ mod tests {
         assert!(total_cost > 0.0);
     }
 
+    /// Runs a 1000-input-token span for "svc-tier-model" through a Standard/Flex
+    /// definition and returns the input cost.
+    fn service_tier_input_cost(extra_attrs: &[(&str, &str)]) -> f64 {
+        use config::meta::model_pricing::{
+            ModelPricingDefinition, ParamCondition, PricingTierDefinition,
+        };
+
+        let processor = OtelIngestionProcessor::new();
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert(
+            "gen_ai.request.model".to_string(),
+            json::json!("svc-tier-model"),
+        );
+        span_attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(1000));
+        span_attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(0));
+        for (k, v) in extra_attrs {
+            span_attrs.insert(k.to_string(), json::json!(v));
+        }
+
+        let tier = |name: &str, per_token: f64, values: &[&str]| PricingTierDefinition {
+            name: name.to_string(),
+            prices: HashMap::from([("input".to_string(), per_token)]),
+            param_conditions: if values.is_empty() {
+                Vec::new()
+            } else {
+                vec![ParamCondition {
+                    key: "service_tier".to_string(),
+                    values: values.iter().map(|v| v.to_string()).collect(),
+                }]
+            },
+            ..Default::default()
+        };
+        let pricing_entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Svc Tier Model".to_string(),
+                match_pattern: "(?i)^svc-tier-model".to_string(),
+                enabled: true,
+                tiers: vec![
+                    tier("Standard", 0.000002, &[]),
+                    tier("Flex", 0.000001, &["flex"]),
+                ],
+                ..Default::default()
+            },
+            compiled_regex: regex::Regex::new("(?i)^svc-tier-model").unwrap(),
+        }];
+
+        processor.process_span_with_pricing(
+            &mut span_attrs,
+            &HashMap::new(),
+            None,
+            &[],
+            &pricing_entries,
+            0,
+        );
+        span_attrs
+            .get(GenAiExtensions::USAGE_COST_INPUT)
+            .and_then(|v| v.as_f64())
+            .unwrap()
+    }
+
+    #[test]
+    fn test_process_span_service_tier_pricing() {
+        // No service tier → standard rate.
+        assert!((service_tier_input_cost(&[]) - 0.002).abs() < 1e-12);
+        // Request tier from gen_ai.request.* model params.
+        assert!(
+            (service_tier_input_cost(&[("gen_ai.request.service_tier", "flex")]) - 0.001).abs()
+                < 1e-12
+        );
+        // The response tier is what was billed and overrides the requested one.
+        assert!(
+            (service_tier_input_cost(&[
+                ("gen_ai.request.service_tier", "flex"),
+                ("openai.response.service_tier", "default"),
+            ]) - 0.002)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (service_tier_input_cost(&[
+                ("openai.request.service_tier", "auto"),
+                ("openai.response.service_tier", "flex"),
+            ]) - 0.001)
+                .abs()
+                < 1e-12
+        );
+    }
+
     #[test]
     fn test_process_span_with_user_defined_pricing() {
         use config::meta::model_pricing::{ModelPricingDefinition, PricingTierDefinition};
@@ -1593,6 +1703,7 @@ mod tests {
                         ("output".to_string(), 0.00002),
                     ]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1667,6 +1778,7 @@ mod tests {
                         ("cache_creation_input_tokens".to_string(), 0.0000005),
                     ]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1779,6 +1891,7 @@ mod tests {
                         ("cache_read_input_tokens".to_string(), 0.0000001),
                     ]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1856,6 +1969,7 @@ mod tests {
                         ),
                     ]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1951,6 +2065,7 @@ mod tests {
                         ("output".to_string(), 0.000002), // $2/1M
                     ]),
                     utc_windows: Vec::new(),
+                    param_conditions: Vec::new(),
                 }],
                 ..Default::default()
             },

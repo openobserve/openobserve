@@ -74,6 +74,21 @@ impl GenAiAttributes {
     /// Note: spec status is Development at the time of writing; subject to churn.
     pub const RESPONSE_TIME_TO_FIRST_CHUNK: &'static str = "gen_ai.response.time_to_first_chunk";
 
+    // Service tier (OpenAI `service_tier`, Gemini priority). The response value is the
+    // tier the provider actually served and billed (a request for `auto` comes back as
+    // `default`, `flex`, `priority`, ...), so it is preferred over the request value.
+    // `openai.*` is current semconv; `gen_ai.openai.*` is its deprecated predecessor.
+    pub const RESPONSE_SERVICE_TIER_KEYS: [&'static str; 3] = [
+        "openai.response.service_tier",
+        "gen_ai.openai.response.service_tier",
+        "gen_ai.response.service_tier",
+    ];
+    pub const REQUEST_SERVICE_TIER_KEYS: [&'static str; 3] = [
+        "openai.request.service_tier",
+        "gen_ai.openai.request.service_tier",
+        "gen_ai.request.service_tier",
+    ];
+
     // Gen-AI Prompt
     pub const PROMPT_NAME: &'static str = "gen_ai.prompt.name";
     pub const PROMPT_VERSION: &'static str = "gen_ai.prompt.version";

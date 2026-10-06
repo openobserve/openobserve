@@ -156,6 +156,65 @@ pub struct PricingTierDefinition {
     /// `condition` (if set) passes, so windows compose with context-length tiering.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub utc_windows: Vec<UtcTimeWindow>,
+    /// Request-parameter conditions that must all hold for this tier to apply.
+    ///
+    /// Empty (the default) means the tier is not restricted by request parameters.
+    /// Providers price the same model differently by service tier — OpenAI
+    /// `service_tier: "flex" | "priority" | "ultrafast"`, Gemini
+    /// `service_tier: "priority"`, Anthropic `speed: "fast"`. These compose with
+    /// `condition` and `utc_windows`, so "Fast mode · Large context" is one tier with
+    /// both a param condition and a usage condition.
+    ///
+    /// Tiers with param conditions are evaluated before tiers without them, so a
+    /// service-tier rate always wins over a plain context-length rate regardless of
+    /// list order. Binaries that predate this field ignore it, so built-in pricing
+    /// should list these tiers after the plain context-length and default tiers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub param_conditions: Vec<ParamCondition>,
+}
+
+/// A condition on a request parameter (e.g. `service_tier`) for a pricing tier.
+///
+/// Matches when the span's parameter `key` equals any of `values`. Keys are compared
+/// ignoring case and `_`/`-`/`.` separators (so `service_tier` also matches
+/// `serviceTier`); values are compared ignoring case and surrounding whitespace.
+/// A span without the parameter never matches.
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
+#[serde(default)]
+pub struct ParamCondition {
+    /// Request parameter name (e.g. "service_tier", "speed").
+    pub key: String,
+    /// Accepted values; the condition holds when the parameter equals any of them.
+    pub values: Vec<String>,
+}
+
+/// Normalize a request-parameter key for comparison: lowercase, separators removed.
+pub fn normalize_param_key(key: &str) -> String {
+    key.chars()
+        .filter(|c| !matches!(c, '_' | '-' | '.'))
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+impl ParamCondition {
+    /// Whether `params` (the span's request parameters) satisfy this condition.
+    pub fn matches(&self, params: &HashMap<String, String>) -> bool {
+        let want = normalize_param_key(&self.key);
+        params
+            .iter()
+            .find(|(k, _)| normalize_param_key(k) == want)
+            .is_some_and(|(_, actual)| {
+                let actual = actual.trim();
+                self.values
+                    .iter()
+                    .any(|v| v.trim().eq_ignore_ascii_case(actual))
+            })
+    }
+}
+
+/// Whether every condition holds. An empty list is unrestricted.
+pub fn params_match(conditions: &[ParamCondition], params: &HashMap<String, String>) -> bool {
+    conditions.iter().all(|c| c.matches(params))
 }
 
 /// Number of minutes in a day. Window bounds are normalized modulo this value, so
@@ -625,5 +684,83 @@ mod tests {
         assert_eq!(back.utc_windows.len(), 1);
         assert_eq!(back.utc_windows[0].start_minute, 60);
         assert_eq!(back.utc_windows[0].end_minute, 240);
+    }
+
+    // ── Request-parameter conditions ─────────────────────────────────────
+
+    fn params(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    fn service_tier_in(values: &[&str]) -> ParamCondition {
+        ParamCondition {
+            key: "service_tier".to_string(),
+            values: values.iter().map(|v| v.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn test_param_condition_matches_any_value() {
+        let cond = service_tier_in(&["fast", "priority"]);
+        assert!(cond.matches(&params(&[("service_tier", "priority")])));
+        assert!(cond.matches(&params(&[("service_tier", "fast")])));
+        assert!(!cond.matches(&params(&[("service_tier", "flex")])));
+    }
+
+    #[test]
+    fn test_param_condition_missing_param_never_matches() {
+        let cond = service_tier_in(&["flex"]);
+        assert!(!cond.matches(&HashMap::new()));
+        assert!(!cond.matches(&params(&[("temperature", "flex")])));
+    }
+
+    #[test]
+    fn test_param_condition_key_and_value_normalization() {
+        let cond = service_tier_in(&["flex"]);
+        assert!(cond.matches(&params(&[("serviceTier", " FLEX ")])));
+        assert!(cond.matches(&params(&[("Service-Tier", "Flex")])));
+        assert!(!cond.matches(&params(&[("service_tier", "flexible")])));
+    }
+
+    #[test]
+    fn test_params_match_requires_all_conditions() {
+        let conds = vec![
+            service_tier_in(&["priority"]),
+            ParamCondition {
+                key: "speed".to_string(),
+                values: vec!["fast".to_string()],
+            },
+        ];
+        assert!(params_match(&[], &HashMap::new()));
+        assert!(!params_match(
+            &conds,
+            &params(&[("service_tier", "priority")])
+        ));
+        assert!(params_match(
+            &conds,
+            &params(&[("service_tier", "priority"), ("speed", "fast")])
+        ));
+    }
+
+    #[test]
+    fn test_pricing_tier_param_conditions_default_empty_and_omitted() {
+        let tier: PricingTierDefinition = serde_json::from_str(r#"{"name":"default"}"#).unwrap();
+        assert!(tier.param_conditions.is_empty());
+        let val = serde_json::to_value(&tier).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("param_conditions"));
+    }
+
+    #[test]
+    fn test_pricing_tier_param_conditions_roundtrip() {
+        let json =
+            r#"{"name":"Flex","param_conditions":[{"key":"service_tier","values":["flex"]}]}"#;
+        let tier: PricingTierDefinition = serde_json::from_str(json).unwrap();
+        assert_eq!(tier.param_conditions, vec![service_tier_in(&["flex"])]);
+        let back: PricingTierDefinition =
+            serde_json::from_str(&serde_json::to_string(&tier).unwrap()).unwrap();
+        assert_eq!(back.param_conditions, tier.param_conditions);
     }
 }

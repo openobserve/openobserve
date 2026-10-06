@@ -110,6 +110,23 @@ impl ParametersExtractor {
         params
     }
 
+    /// Extract the service tier the span was served on, for service-tier pricing.
+    ///
+    /// Read from dedicated span attributes regardless of instrumentation framework,
+    /// because `extract` returns early for frameworks that carry their own parameter
+    /// blob. The response tier wins over the request tier: it is what was billed.
+    pub fn extract_service_tier(
+        &self,
+        attributes: &HashMap<String, json::Value>,
+    ) -> Option<String> {
+        GenAiAttributes::RESPONSE_SERVICE_TIER_KEYS
+            .iter()
+            .chain(GenAiAttributes::REQUEST_SERVICE_TIER_KEYS.iter())
+            .filter_map(|key| attributes.get(*key))
+            .map(|v| self.sanitize_param_value(v))
+            .find(|v| !v.trim().is_empty())
+    }
+
     fn sanitize_param_value(&self, value: &json::Value) -> String {
         match value {
             json::Value::String(s) => s.clone(),
@@ -284,5 +301,52 @@ mod tests {
         );
         let params = ParametersExtractor.extract(&attrs, "ai");
         assert_eq!(params.get("finishReason"), Some(&"stop".to_string()));
+    }
+
+    #[test]
+    fn test_extract_service_tier_prefers_response() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "openai.request.service_tier".to_string(),
+            json::json!("auto"),
+        );
+        attrs.insert(
+            "openai.response.service_tier".to_string(),
+            json::json!("flex"),
+        );
+        assert_eq!(
+            ParametersExtractor.extract_service_tier(&attrs),
+            Some("flex".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_service_tier_falls_back_to_request() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.openai.request.service_tier".to_string(),
+            json::json!("priority"),
+        );
+        assert_eq!(
+            ParametersExtractor.extract_service_tier(&attrs),
+            Some("priority".to_string())
+        );
+        attrs.clear();
+        attrs.insert(
+            "gen_ai.request.service_tier".to_string(),
+            json::json!("flex"),
+        );
+        assert_eq!(
+            ParametersExtractor.extract_service_tier(&attrs),
+            Some("flex".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_service_tier_absent_or_blank() {
+        let mut attrs = HashMap::new();
+        assert_eq!(ParametersExtractor.extract_service_tier(&attrs), None);
+        attrs.insert("openai.response.service_tier".to_string(), json::json!(""));
+        assert_eq!(ParametersExtractor.extract_service_tier(&attrs), None);
     }
 }

@@ -174,6 +174,7 @@ const tier = (overrides: Record<string, any> = {}) => ({
   name: "Default",
   condition: null,
   utc_windows: [] as any[],
+  param_conditions: [] as any[],
   prices: [] as any[],
   draftKey: "",
   draftValue: 0,
@@ -416,6 +417,124 @@ describe("ModelPricingEditor.vue", () => {
 
     it("rejects a window whose bounds are equal", () => {
       expect(windowIssue("01:00", "01:00", "end")).toContain("start and end must differ");
+    });
+  });
+
+  describe("Schema validation: request-parameter conditions", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    const paramIssue = (key: string, values: string, field: "key" | "values") => {
+      const res = schema.safeParse({
+        name: "X",
+        match_pattern: "gpt",
+        tiers: [
+          { name: "Default", condition: null, prices: [{ key: "input", value: 1 }] },
+          { name: "Flex", condition: null, param_conditions: [{ key, values }], prices: [] },
+        ],
+      });
+      return res.success
+        ? ""
+        : (res.error.issues.find(
+            (iss: any) =>
+              iss.path[0] === "tiers" &&
+              iss.path[2] === "param_conditions" &&
+              iss.path[4] === field,
+          )?.message ?? "");
+    };
+
+    it("accepts a key with comma-separated values", () => {
+      expect(paramIssue("service_tier", "fast, priority", "key")).toBe("");
+      expect(paramIssue("service_tier", "fast, priority", "values")).toBe("");
+    });
+
+    it("rejects an empty key", () => {
+      expect(paramIssue("  ", "flex", "key")).toContain("parameter name");
+    });
+
+    it("rejects values that are blank after splitting", () => {
+      expect(paramIssue("service_tier", " , ", "values")).toContain("at least one value");
+    });
+  });
+
+  describe("Request-parameter conditions (service-tier pricing)", () => {
+    it("splits comma-separated values into a list at submit", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 2)] }),
+        tier({
+          name: "Fast mode",
+          prices: [row("input", 4)],
+          param_conditions: [{ key: " service_tier ", values: "fast, priority ," }],
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      const payload = mockService.create.mock.calls[0][1];
+      expect(payload.tiers[0].param_conditions).toEqual([]);
+      expect(payload.tiers[1].param_conditions).toEqual([
+        { key: "service_tier", values: ["fast", "priority"] },
+      ]);
+      // A param-only tier carries no usage condition.
+      expect(payload.tiers[1].condition).toBeNull();
+    });
+
+    it("addParamCondition / removeParamCondition mutate the form-owned tier", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Flex", prices: [row("input", 0.5)] }),
+      ]);
+      await nextTick();
+
+      (wrapper.vm as any).addParamCondition(1);
+      await nextTick();
+      let tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].param_conditions).toEqual([{ key: "service_tier", values: "flex" }]);
+      expect(
+        wrapper.find('[data-test="model-pricing-tier-param-key-input-1-0"]').exists(),
+      ).toBe(true);
+
+      (wrapper.vm as any).removeParamCondition(1, 0);
+      await nextTick();
+      tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].param_conditions).toEqual([]);
+    });
+
+    it("hydrates a param-only tier from the API without inventing a condition", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "sol",
+          name: "GPT-6 Sol",
+          match_pattern: "(?i)gpt-6-sol",
+          enabled: true,
+          tiers: [
+            { name: "Default", condition: null, prices: { input: 0.000002 } },
+            {
+              name: "Flex",
+              condition: null,
+              param_conditions: [{ key: "service_tier", values: ["flex"] }],
+              prices: { input: 0.000001 },
+            },
+          ],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "sol" } });
+      await flushPromises();
+
+      const tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].condition).toBeNull();
+      expect(tiers[1].param_conditions).toEqual([{ key: "service_tier", values: "flex" }]);
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const payload = mockService.update.mock.calls[0][2];
+      expect(payload.tiers[1].param_conditions).toEqual([
+        { key: "service_tier", values: ["flex"] },
+      ]);
+      expect(payload.tiers[1].condition).toBeNull();
     });
   });
 
@@ -1071,10 +1190,17 @@ describe("ModelPricingEditor.vue", () => {
       expect(payload.match_pattern).toBe("gpt-4o");
       expect(Array.isArray(payload.tiers)).toBe(true);
 
-      // EXACT tier shape — only {condition, name, prices, utc_windows}; NO
-      // draftKey/draftValue leak
+      // EXACT tier shape — only {condition, name, param_conditions, prices,
+      // utc_windows}; NO draftKey/draftValue leak
       const t0 = payload.tiers[0];
-      expect(Object.keys(t0).sort()).toEqual(["condition", "name", "prices", "utc_windows"]);
+      expect(Object.keys(t0).sort()).toEqual([
+        "condition",
+        "name",
+        "param_conditions",
+        "prices",
+        "utc_windows",
+      ]);
+      expect(t0.param_conditions).toEqual([]); // default tier is never param-restricted
       expect(t0.condition).toBeNull(); // default (first) tier
       expect(t0.utc_windows).toEqual([]); // default tier is never time-restricted
       expect(typeof t0.name).toBe("string");

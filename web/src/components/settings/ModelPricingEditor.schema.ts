@@ -30,6 +30,14 @@ export function stripInlineFlags(pattern: string): string {
   return pattern.replace(/\(\?[imsxu]+\)/g, "");
 }
 
+/** Split a comma-separated parameter-values field into trimmed, non-empty values. */
+export function splitParamValues(values: string): string[] {
+  return String(values ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 // One committed price row. `value` is held as PER-MILLION in the form.
 export const priceRowSchema = z.object({
   key: z.string(),
@@ -50,12 +58,21 @@ export const tierWindowSchema = z.object({
   end: z.string(),
 });
 
+// One request-parameter condition, e.g. `service_tier` in `flex`. `values` is held
+// as a comma-separated string in the form and split into a list at submit.
+export const tierParamConditionSchema = z.object({
+  key: z.string(),
+  values: z.string(),
+});
+
 export const tierSchema = z.object({
   name: z.string(),
   // null for the default (first) tier; an object for conditional tiers.
   condition: tierConditionSchema.nullable().optional(),
   // Recurring UTC hours this tier is limited to. Empty = always active.
   utc_windows: z.array(tierWindowSchema).default([]),
+  // Request parameters (service tier, speed) this tier is limited to. Empty = any.
+  param_conditions: z.array(tierParamConditionSchema).default([]),
   prices: z.array(priceRowSchema).default([]),
   // Staging "add price" row — non-validated form state, auto-committed at submit.
   draftKey: z.string().optional().default(""),
@@ -179,10 +196,29 @@ export const makeModelPricingSchema = (
             });
           }
         });
+
+        // Request-parameter conditions: a key and at least one value.
+        (tier.param_conditions ?? []).forEach((cond, c) => {
+          if (!String(cond.key ?? "").trim()) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "param_conditions", c, "key"],
+              message: t("modelPricing.paramConditionKeyRequired", { name: tierLabel }),
+            });
+          }
+          if (splitParamValues(cond.values).length === 0) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "param_conditions", c, "values"],
+              message: t("modelPricing.paramConditionValuesRequired", { name: tierLabel }),
+            });
+          }
+        });
       });
     });
 
 export type ModelPricingForm = z.infer<ReturnType<typeof makeModelPricingSchema>>;
 export type ModelPricingTier = z.infer<typeof tierSchema>;
 export type ModelPricingTierWindow = z.infer<typeof tierWindowSchema>;
+export type ModelPricingTierParamCondition = z.infer<typeof tierParamConditionSchema>;
 export type ModelPricingPriceRow = z.infer<typeof priceRowSchema>;

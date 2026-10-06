@@ -51,6 +51,16 @@
             {{ t("modelPricing.localTimeHint", { range: testAtTimeLocalHint }) }}
           </OText>
         </div>
+
+        <!-- Optional service tier — lets Flex / Priority tiers be tested directly -->
+        <OInput
+          v-model="testServiceTier"
+          :label="t('modelPricing.testServiceTierLabel')"
+          :help-text="t('modelPricing.testServiceTierHint')"
+          :placeholder="raw('flex')"
+          clearable
+          data-test="test-match-service-tier-input"
+        />
       </div>
 
       <!-- ── Vertical divider ── -->
@@ -290,6 +300,8 @@ const testModelName = ref("");
 // Optional `HH:MM` UTC time-of-day to test at; empty = "right now". Lets a
 // peak / off-peak tier be exercised without waiting for its window.
 const testAtTime = ref("");
+// Optional `service_tier` request parameter (e.g. "flex", "priority"); empty = none.
+const testServiceTier = ref("");
 
 // Reset on open. Focus is OInput's `autofocus`, not a ref call — OInput is
 // `<script setup>` with no defineExpose, so it has no focus() to reach for.
@@ -298,6 +310,7 @@ watch(internalValue, (val) => {
     testResult.value = null;
     testModelName.value = "";
     testAtTime.value = "";
+    testServiceTier.value = "";
   }
 });
 
@@ -333,6 +346,9 @@ async function callTestApi() {
       model_name: testModelName.value,
       usage: undefined,
       timestamp: testTimestampMicros(),
+      model_params: testServiceTier.value.trim()
+        ? { service_tier: testServiceTier.value.trim() }
+        : undefined,
     });
     testResult.value = res.data;
   } catch {
@@ -355,7 +371,7 @@ watch(testModelName, (val) => {
 
 // A shown result answers "what applies at the tested time" — keep it honest by
 // re-running when that time changes rather than displaying a stale tier.
-watch(testAtTime, () => {
+watch([testAtTime, testServiceTier], () => {
   if (testResult.value !== null && testModelName.value) callTestApi();
 });
 

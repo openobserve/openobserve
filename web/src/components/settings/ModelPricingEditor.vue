@@ -335,6 +335,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
+                  <!-- Request-parameter conditions (non-default tiers only). Used for
+                       service-tier pricing, e.g. OpenAI Flex / Priority, Anthropic fast. -->
+                  <div
+                    v-if="idx > 0 && tierParamConditions(tier).length"
+                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                  >
+                    <OText variant="section">
+                      {{ t("modelPricing.paramConditions") }}
+                    </OText>
+                    <div class="text-2xs mt-px mb-2 opacity-55">
+                      {{ t("modelPricing.paramConditionsDesc") }}
+                    </div>
+                    <!-- Key by INDEX to match the index-based field names. -->
+                    <div
+                      v-for="(_cond, condIdx) in tierParamConditions(tier)"
+                      :key="condIdx"
+                      class="flex flex-nowrap items-end gap-2 py-0.5"
+                    >
+                      <div class="w-40 shrink-0">
+                        <OFormInput
+                          :name="`tiers[${idx}].param_conditions[${condIdx}].key`"
+                          :label="t('modelPricing.paramConditionKey')"
+                          :placeholder="raw('service_tier')"
+                          :data-test="`model-pricing-tier-param-key-input-${idx}-${condIdx}`"
+                        />
+                      </div>
+                      <div class="min-w-40 flex-1">
+                        <OFormInput
+                          :name="`tiers[${idx}].param_conditions[${condIdx}].values`"
+                          :label="t('modelPricing.paramConditionValues')"
+                          :placeholder="raw('flex, priority')"
+                          :data-test="`model-pricing-tier-param-values-input-${idx}-${condIdx}`"
+                        />
+                      </div>
+                      <div class="flex h-8.5 items-center">
+                        <OButton
+                          variant="outline-destructive"
+                          size="icon"
+                          type="button"
+                          :data-test="`model-pricing-tier-param-remove-btn-${idx}-${condIdx}`"
+                          @click="removeParamCondition(idx, condIdx)"
+                        >
+                          <OIcon name="delete" size="sm" />
+                          <OTooltip
+                            :side-offset="4"
+                            :content="t('modelPricing.removeParamCondition')"
+                          />
+                        </OButton>
+                      </div>
+                    </div>
+                  </div>
+
                   <!-- Add a restriction to a non-default tier -->
                   <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
                     <OButton
@@ -355,6 +407,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="addWindow(idx)"
                     >
                       {{ t("modelPricing.addTimeWindow") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      type="button"
+                      :data-test="`model-pricing-tier-add-param-btn-${idx}`"
+                      @click="addParamCondition(idx)"
+                    >
+                      {{ t("modelPricing.addParamCondition") }}
                     </OButton>
                   </div>
 
@@ -628,8 +689,10 @@ import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeModelPricingSchema,
+  splitParamValues,
   type ModelPricingForm,
   type ModelPricingTier,
+  type ModelPricingTierParamCondition,
   type ModelPricingTierWindow,
 } from "./ModelPricingEditor.schema";
 
@@ -714,6 +777,7 @@ function newTier(name: string, condition: any = null) {
     condition,
     prices: {} as Record<string, number>,
     utc_windows: [] as Array<{ start_minute: number; end_minute: number }>,
+    param_conditions: [] as Array<{ key: string; values: string[] }>,
   };
 }
 
@@ -724,6 +788,7 @@ function newFormTier(name: string, condition: any = null) {
     name,
     condition,
     utc_windows: [] as ModelPricingTierWindow[],
+    param_conditions: [] as ModelPricingTierParamCondition[],
     prices: [] as Array<{ key: string; value: number }>,
     draftKey: "",
     draftValue: 0,
@@ -756,6 +821,17 @@ function hhmmToMinutes(value: string): number | null {
 /** A tier's windows, tolerant of form state seeded before the field existed. */
 function tierWindows(tier: any): ModelPricingTierWindow[] {
   return (tier?.utc_windows ?? []) as ModelPricingTierWindow[];
+}
+
+/** A tier's request-parameter conditions, tolerant of form state seeded before the
+ *  field existed. */
+function tierParamConditions(tier: any): ModelPricingTierParamCondition[] {
+  return (tier?.param_conditions ?? []) as ModelPricingTierParamCondition[];
+}
+
+/** True when a tier carries any restriction besides a usage condition. */
+function hasNonUsageRestriction(tier: any): boolean {
+  return !!(tier?.utc_windows ?? []).length || !!(tier?.param_conditions ?? []).length;
 }
 
 /** True when a window crosses UTC midnight — surfaced as a hint next to the row. */
@@ -794,20 +870,27 @@ function modelToForm(m: any): ModelPricingForm {
       start: minutesToHhmm(w?.start_minute),
       end: minutesToHhmm(w?.end_minute),
     }));
+    const paramConditions: ModelPricingTierParamCondition[] = (tier.param_conditions ?? []).map(
+      (c: any) => ({
+        key: String(c?.key ?? ""),
+        values: (c?.values ?? []).join(", "),
+      }),
+    );
     return {
       name: tier.name ?? "",
       // Tier 0 is the unconditional default. A later tier keeps its own condition;
-      // one restricted only by time windows keeps `null` rather than being handed a
-      // usage condition it never had.
+      // one restricted only by time windows or request parameters keeps `null`
+      // rather than being handed a usage condition it never had.
       condition:
         i === 0
           ? null
           : tier.condition
             ? { ...tier.condition }
-            : windows.length
+            : windows.length || paramConditions.length
               ? null
               : { usage_key: "input", operator: "gt", value: 0 },
       utc_windows: i === 0 ? [] : windows,
+      param_conditions: i === 0 ? [] : paramConditions,
       prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
         key: k,
         value: toPerMillion(Number(v)),
@@ -861,6 +944,15 @@ function formToModelTiers(tiers: any[]): any[] {
               }
             : null,
       utc_windows: utcWindows,
+      param_conditions:
+        i === 0
+          ? []
+          : (tier.param_conditions ?? [])
+              .map((c: any) => ({
+                key: String(c?.key ?? "").trim(),
+                values: splitParamValues(c?.values),
+              }))
+              .filter((c: any) => c.key && c.values.length),
       prices,
     };
   });
@@ -935,6 +1027,21 @@ function addWindow(idx: number) {
   patchTier(idx, (tier) => ({
     ...tier,
     utc_windows: [...(tier.utc_windows ?? []), { start: "01:00", end: "04:00" }],
+  }));
+}
+
+// Seeded with OpenAI's Flex service tier — the common case this exists for.
+function addParamCondition(idx: number) {
+  patchTier(idx, (tier) => ({
+    ...tier,
+    param_conditions: [...(tier.param_conditions ?? []), { key: "service_tier", values: "flex" }],
+  }));
+}
+
+function removeParamCondition(tierIdx: number, condIdx: number) {
+  patchTier(tierIdx, (tier) => ({
+    ...tier,
+    param_conditions: (tier.param_conditions ?? []).filter((_: any, j: number) => j !== condIdx),
   }));
 }
 
@@ -1095,11 +1202,11 @@ async function save(value?: ModelPricingForm) {
     }
   }
 
-  // A non-default tier with neither a usage condition nor a time window can never
-  // be selected — the unconditional tier 0 always wins first.
+  // A non-default tier with no usage condition, time window or parameter condition
+  // can never be selected — the unconditional tier 0 always wins first.
   for (let i = 1; i < tiers.length; i++) {
     const tier = tiers[i];
-    if (!tier.condition && !(tier.utc_windows ?? []).length) {
+    if (!tier.condition && !hasNonUsageRestriction(tier)) {
       notifyWarn(t("modelPricing.tierNeedsRestriction", { name: tier.name || `#${i + 1}` }));
       return;
     }
@@ -1199,9 +1306,10 @@ onBeforeMount(async () => {
         }
         for (let i = 1; i < model.value.tiers.length; i++) {
           const tier = model.value.tiers[i];
-          // A tier restricted only by UTC time windows legitimately has no usage
-          // condition — leave it alone rather than fabricating one.
-          if (!tier.condition && !(tier.utc_windows ?? []).length) {
+          // A tier restricted only by UTC time windows or request parameters
+          // legitimately has no usage condition — leave it alone rather than
+          // fabricating one.
+          if (!tier.condition && !hasNonUsageRestriction(tier)) {
             tier.condition = {
               usage_key: "input",
               operator: "gt",
