@@ -99,22 +99,26 @@ export function buildHeatmapGrid(
   const colStartUs: number[] = [];
   for (let t = firstUs; t < rangeEndUs; t += intervalUs) colStartUs.push(t);
 
-  const buckets = hits.map((h) => Number(h.duration_bucket));
-  const minBucket = Math.min(...buckets);
-  const maxBucket = Math.max(...buckets);
-  const rows: number[] = [];
-  for (let k = minBucket; k <= maxBucket; k++) rows.push(k);
-
-  const cells: [number, number, number, number][] = [];
-  let maxValue = 0;
+  // Rows span only the hits drawn, so a bucket outside the columns cannot stretch the y axis.
+  const kept: { col: number; bucket: number; count: number }[] = [];
   for (const h of hits) {
     const col = Math.round((parseBucketUs(h.x_axis) - firstUs) / intervalUs);
     if (col < 0 || col >= colStartUs.length) continue;
-    const count = Number(h.span_count);
+    kept.push({ col, bucket: Number(h.duration_bucket), count: Number(h.span_count) });
+  }
+  if (!kept.length) return null;
+
+  const minBucket = Math.min(...kept.map((k) => k.bucket));
+  const maxBucket = Math.max(...kept.map((k) => k.bucket));
+  const rows: number[] = [];
+  for (let k = minBucket; k <= maxBucket; k++) rows.push(k);
+
+  let maxValue = 0;
+  const cells = kept.map(({ col, bucket, count }): [number, number, number, number] => {
     const value = Math.log1p(count);
     maxValue = Math.max(maxValue, value);
-    cells.push([col, Number(h.duration_bucket) - minBucket, value, count]);
-  }
+    return [col, bucket - minBucket, value, count];
+  });
 
   return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells, maxValue };
 }

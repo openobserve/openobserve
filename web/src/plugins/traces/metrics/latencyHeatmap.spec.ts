@@ -134,6 +134,22 @@ describe("buildHeatmapGrid", () => {
     expect(grid.cells).toContainEqual([0, 0, Math.log1p(2), 2]);
   });
 
+  it("builds rows only from hits that land inside the columns", () => {
+    const grid = buildHeatmapGrid(
+      [hit(10, 5, 1), hit(-600, 0, 9), hit(900, 28, 9)],
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    expect(grid.rows).toEqual([5]);
+    expect(grid.cells).toEqual([[1, 0, Math.log1p(1), 1]]);
+    expect(grid.maxValue).toBe(Math.log1p(1));
+  });
+
+  it("returns null when no hit lands inside the columns", () => {
+    expect(buildHeatmapGrid([hit(-600, 4, 3), hit(900, 6, 3)], 10, T0, T0 + 30 * S)).toBeNull();
+  });
+
   it("puts log1p(count) at index 2 and the raw count at index 3", () => {
     const grid = buildHeatmapGrid([hit(10, 4, 99)], 10, T0, T0 + 30 * S)!;
     expect(grid.cells[0]).toEqual([1, 0, Math.log1p(99), 99]);
