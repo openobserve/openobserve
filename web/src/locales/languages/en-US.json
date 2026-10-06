@@ -10500,6 +10500,12 @@
       "unavailable": "The latency heatmap is not available for this search",
       "loadFailed": "Failed to load the latency heatmap"
     },
+    "metrics": {
+      "perSecond": {
+        "traces": "traces/s",
+        "spans": "spans/s"
+      }
+    },
     "errLabel": "ERR",
     "agentDefaultVariant": "default",
     "agentNoEnv": "(No env)",

@@ -19,7 +19,9 @@
           "config": {
             "show_legends": false,
             "legends_position": null,
-            "decimals": 0,
+            "decimals": 2,
+            "unit": "custom",
+            "unit_custom": "",
             "line_thickness": 1.5,
             "step_value": "0",
             "top_results_others": false,
@@ -81,7 +83,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "SELECT histogram(_timestamp, '[INTERVAL]') AS time_bucket, approx_distinct(trace_id) / [INTERVAL_SECONDS].0 AS max_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -210,7 +212,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "SELECT histogram(_timestamp, '[INTERVAL]') AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {

@@ -176,6 +176,14 @@ function getPanelQuery(wrapper: VueWrapper<any>, title: string): string {
   return panel?.queries?.[0]?.query ?? "";
 }
 
+function getPanel(wrapper: VueWrapper<any>, title: string): any {
+  const panels: any[] = wrapper.vm.dashboardData?.tabs?.[0]?.panels ?? [];
+  return panels.find((p: any) => p.title === title);
+}
+
+const THIRTY_MIN_START = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
+const THIRTY_MIN_END = THIRTY_MIN_START + 30 * 60 * 1_000_000;
+
 function getHeatmapSql(wrapper: VueWrapper<any>): string {
   return wrapper.vm.heatmapRequest?.sql ?? "";
 }
@@ -252,14 +260,25 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("approx_distinct(trace_id)");
     });
 
-    it("should use approx_distinct(trace_id) FILTER for error counting in the Rate panel query", async () => {
+    it("plots Rate as traces per second on an explicit interval shared with Errors and the heatmap", async () => {
+      mockSearchObj.data.datetime = { startTime: THIRTY_MIN_START, endTime: THIRTY_MIN_END };
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Rate");
-      // The Rate panel template contains: approx_distinct(trace_id) filter (where span_status = 'ERROR')
-      expect(query).toMatch(
-        /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/i,
-      );
+      const rate = getPanelQuery(wrapper, "Rate");
+      expect(rate).toContain("histogram(_timestamp, '15 second')");
+      expect(rate).toContain("approx_distinct(trace_id) / 15.0");
+      expect(rate).not.toContain("[INTERVAL");
+      expect(getPanelQuery(wrapper, "Errors")).toContain("histogram(_timestamp, '15 second')");
+      expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp, '15 second')");
+    });
+
+    it("labels Rate in traces/s with two decimals", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const config = getPanel(wrapper, "Rate").config;
+      expect(config.unit).toBe("custom");
+      expect(config.unit_custom).toBe("traces/s");
+      expect(config.decimals).toBe(2);
     });
 
     it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
@@ -295,11 +314,12 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toMatch(/approx_distinct\(trace_id\)/i);
     });
 
-    it("should use count(*) FILTER for error counting in the Rate panel query in spans mode", async () => {
+    it("plots Rate as spans per second", async () => {
+      mockSearchObj.data.datetime = { startTime: THIRTY_MIN_START, endTime: THIRTY_MIN_END };
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Rate");
-      expect(query).toContain("count(*) FILTER (WHERE span_status = 'ERROR')");
+      expect(getPanelQuery(wrapper, "Rate")).toContain("count(*) / 15.0");
+      expect(getPanel(wrapper, "Rate").config.unit_custom).toBe("spans/s");
     });
 
     it("should replace approx_distinct(trace_id) with count(*) in the Errors panel query", async () => {
@@ -1345,7 +1365,7 @@ describe("TracesMetricsDashboard", () => {
       mockSearchObj.meta.searchMode = "spans";
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp)");
+      expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp, ");
       expect(getHeatmapSql(wrapper)).not.toMatch(/WHERE\b/);
     });
   });

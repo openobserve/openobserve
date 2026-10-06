@@ -69,13 +69,39 @@ export function formatDurationBound(us: number): string {
   return `${us}us`;
 }
 
-export function buildLatencyHeatmapSql(streamName: string, filters: string[]): string {
+const HOUR_S = 3600;
+const DAY_S = 24 * HOUR_S;
+// Mirrors generate_histogram_interval (src/search/src/sql/visitor/histogram_interval.rs), so explicit intervals keep today's column counts.
+const CHART_INTERVALS: [minRangeS: number, sql: string, seconds: number][] = [
+  [60 * DAY_S, "1 day", DAY_S],
+  [30 * DAY_S, "12 hour", 12 * HOUR_S],
+  [28 * DAY_S, "6 hour", 6 * HOUR_S],
+  [21 * DAY_S, "3 hour", 3 * HOUR_S],
+  [15 * DAY_S, "2 hour", 2 * HOUR_S],
+  [6 * HOUR_S, "1 hour", HOUR_S],
+  [2 * HOUR_S, "1 minute", 60],
+  [HOUR_S, "30 second", 30],
+  [30 * 60, "15 second", 15],
+  [10, "10 second", 10],
+];
+
+export function chartInterval(startUs: number, endUs: number): { seconds: number; sql: string } {
+  const rangeS = (endUs - startUs) / 1_000_000;
+  const match = CHART_INTERVALS.find(([minRangeS]) => rangeS >= minRangeS);
+  return match ? { sql: match[1], seconds: match[2] } : { sql: "1 second", seconds: 1 };
+}
+
+export function buildLatencyHeatmapSql(
+  streamName: string,
+  filters: string[],
+  interval: string,
+): string {
   const whens = DURATION_BOUNDS_US.map((bound, k) => `WHEN duration < ${bound} THEN ${k}`).join(
     " ",
   );
   const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
   return (
-    `SELECT histogram(_timestamp) AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
+    `SELECT histogram(_timestamp, '${interval}') AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
     `count(*) AS span_count FROM "${streamName}"${where} ` +
     `GROUP BY x_axis, duration_bucket LIMIT ${HEATMAP_ROW_LIMIT}`
   );

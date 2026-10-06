@@ -27,6 +27,7 @@ import {
   durationBand,
   composeFilter,
   isRangeSelectionCurrent,
+  chartInterval,
   type LatencyHeatmapHit,
 } from "./latencyHeatmap";
 
@@ -61,7 +62,7 @@ describe("buildLatencyHeatmapSql", () => {
   const bucketOf = (us: number) => DURATION_BOUNDS_US.filter((b) => b <= us).length;
 
   it("orders the CASE so the first matching WHEN is the reference bucket", () => {
-    const sql = buildLatencyHeatmapSql("default", []);
+    const sql = buildLatencyHeatmapSql("default", [], "15 second");
     const whens = [...sql.matchAll(/WHEN duration < (\d+) THEN (\d+)/g)].map((m) => ({
       bound: Number(m[1]),
       bucket: Number(m[2]),
@@ -76,17 +77,46 @@ describe("buildLatencyHeatmapSql", () => {
   });
 
   it("groups by time and duration bucket with an explicit row limit", () => {
-    const sql = buildLatencyHeatmapSql("default", []);
-    expect(sql).toContain("histogram(_timestamp) AS x_axis");
+    const sql = buildLatencyHeatmapSql("default", [], "15 second");
+    expect(sql).toContain("histogram(_timestamp, '15 second') AS x_axis");
     expect(sql).toContain("count(*) AS span_count");
     expect(sql).toContain("GROUP BY x_axis, duration_bucket");
     expect(sql).toContain("LIMIT 20000");
   });
 
   it("quotes the stream and joins filters into one WHERE", () => {
-    expect(buildLatencyHeatmapSql("my-stream", [])).toContain('FROM "my-stream"');
-    expect(buildLatencyHeatmapSql("s", [])).not.toMatch(/\bWHERE\b/);
-    expect(buildLatencyHeatmapSql("s", ["a", "b"])).toContain('FROM "s" WHERE a AND b GROUP BY');
+    expect(buildLatencyHeatmapSql("my-stream", [], "15 second")).toContain('FROM "my-stream"');
+    expect(buildLatencyHeatmapSql("s", [], "15 second")).not.toMatch(/\bWHERE\b/);
+    expect(buildLatencyHeatmapSql("s", ["a", "b"], "15 second")).toContain(
+      'FROM "s" WHERE a AND b GROUP BY',
+    );
+  });
+});
+
+describe("chartInterval", () => {
+  const SEC = 1_000_000;
+  const at = (seconds: number) => chartInterval(T0, T0 + seconds * SEC);
+
+  it("mirrors the backend's histogram interval table at every boundary", () => {
+    const H = 3600;
+    const D = 24 * H;
+    const cases: [number, string, number][] = [
+      [9, "1 second", 1],
+      [10, "10 second", 10],
+      [30 * 60 - 1, "10 second", 10],
+      [30 * 60, "15 second", 15],
+      [H, "30 second", 30],
+      [2 * H, "1 minute", 60],
+      [6 * H, "1 hour", 3600],
+      [15 * D, "2 hour", 7200],
+      [21 * D, "3 hour", 3 * H],
+      [28 * D, "6 hour", 6 * H],
+      [30 * D, "12 hour", 12 * H],
+      [60 * D, "1 day", D],
+    ];
+    for (const [seconds, sql, intervalSeconds] of cases) {
+      expect(at(seconds)).toEqual({ sql, seconds: intervalSeconds });
+    }
   });
 });
 

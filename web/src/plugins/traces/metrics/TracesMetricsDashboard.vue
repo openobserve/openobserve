@@ -75,6 +75,7 @@ import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
 import TracesLatencyHeatmap, { type LatencyHeatmapRequest } from "./TracesLatencyHeatmap.vue";
 import {
   buildLatencyHeatmapSql,
+  chartInterval,
   composeFilter,
   durationBand,
   instantToPickerMs,
@@ -266,14 +267,21 @@ const loadDashboard = async () => {
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
     const streamName = searchObj.data.stream.selectedStream.value;
+    const interval = chartInterval(
+      effectiveTimeRange.value.startTime,
+      effectiveTimeRange.value.endTime,
+    );
 
     heatmapRequest.value = {
-      sql: buildLatencyHeatmapSql(streamName, baseFilters),
+      sql: buildLatencyHeatmapSql(streamName, baseFilters, interval.sql),
       startTime: effectiveTimeRange.value.startTime,
       endTime: effectiveTimeRange.value.endTime,
     };
     convertedDashboard.tabs[0].panels.forEach(
-      (panel: { title?: string; queries: { query: string }[] }, index: number) => {
+      (
+        panel: { title?: string; config: Record<string, unknown>; queries: { query: string }[] },
+        index: number,
+      ) => {
         // Build WHERE clause based on filters
         let whereClause = "";
 
@@ -295,7 +303,16 @@ const loadDashboard = async () => {
         // Build the final query: substitute placeholders then apply mode transforms
         let query = panel["queries"][0].query
           .replace("[STREAM_NAME]", () => `"${streamName}"`)
-          .replace("[WHERE_CLAUSE]", () => whereClause);
+          .replace("[WHERE_CLAUSE]", () => whereClause)
+          .replace("[INTERVAL]", interval.sql)
+          // The range clips the first and last buckets, so their per-second value dips, as their heatmap columns thin.
+          .replace("[INTERVAL_SECONDS]", String(interval.seconds));
+
+        if (panel.title === "Rate") {
+          panel.config.unit_custom = isSpansMode
+            ? t("traces.metrics.perSecond.spans")
+            : t("traces.metrics.perSecond.traces");
+        }
 
         // Spans mode: replace trace-level distinct counts with span-level counts
         // in the Rate and Errors panels.
