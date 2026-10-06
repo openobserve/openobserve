@@ -15,20 +15,24 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use datafusion::common::TableReference;
-use hashbrown::HashMap;
+use datafusion::{common::TableReference, sql::planner::object_name_to_table_reference};
+use hashbrown::{HashMap, HashSet};
 use infra::schema::SchemaCache;
-use sqlparser::ast::{BinaryOperator, Expr, Query, VisitorMut};
+use sqlparser::ast::{BinaryOperator, Expr, Query, SetExpr, TableFactor, VisitorMut};
 
 use crate::{
     sql::visitor::utils::generate_table_reference,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
 };
 
-/// get all equal items from where clause
+/// get the equal items from where clause that hold for every read of a stream
 pub struct PartitionColumnVisitor<'a> {
     pub equal_items: HashMap<TableReference, Vec<(String, String)>>, // filed = value
     schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
+    // per stream and read: only the WHERE of the SELECT that reads it filters that read
+    reads: HashMap<TableReference, Vec<Vec<(String, String)>>>,
+    // the reads are all known only once the outermost query has been visited
+    depth: usize,
 }
 
 impl<'a> PartitionColumnVisitor<'a> {
@@ -36,6 +40,8 @@ impl<'a> PartitionColumnVisitor<'a> {
         Self {
             equal_items: HashMap::new(),
             schemas,
+            reads: HashMap::new(),
+            depth: 0,
         }
     }
 }
@@ -44,10 +50,50 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref()
-            && let Some(expr) = select.selection.as_ref()
-        {
-            let exprs = split_conjunction(expr);
+        self.depth += 1;
+        let mut bodies = vec![query.body.as_ref()];
+        while let Some(body) = bodies.pop() {
+            let select = match body {
+                SetExpr::Select(select) => select,
+                SetExpr::SetOperation { left, right, .. } => {
+                    bodies.push(left.as_ref());
+                    bodies.push(right.as_ref());
+                    continue;
+                }
+                // a parenthesized query is visited as a query of its own
+                _ => continue,
+            };
+            // the streams this SELECT reads itself; a derived table or CTE is a query of its own
+            let mut from: HashMap<TableReference, usize> = HashMap::new();
+            let mut factors = Vec::new();
+            for table in &select.from {
+                factors.push(&table.relation);
+                factors.extend(table.joins.iter().map(|join| &join.relation));
+            }
+            while let Some(factor) = factors.pop() {
+                match factor {
+                    TableFactor::Table { name, .. } => {
+                        if let Ok(table) = object_name_to_table_reference(name.clone(), true)
+                            && self.schemas.contains_key(&table)
+                        {
+                            *from.entry(table).or_insert(0) += 1;
+                        }
+                    }
+                    TableFactor::NestedJoin {
+                        table_with_joins, ..
+                    } => {
+                        factors.push(&table_with_joins.relation);
+                        factors.extend(table_with_joins.joins.iter().map(|join| &join.relation));
+                    }
+                    _ => {}
+                }
+            }
+            let mut equal_items: HashMap<TableReference, Vec<(String, String)>> = HashMap::new();
+            let exprs = select
+                .selection
+                .as_ref()
+                .map(split_conjunction)
+                .unwrap_or_default();
             for e in exprs {
                 match e {
                     Expr::BinaryOp {
@@ -74,7 +120,7 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                     }
                                 }
                                 if count == 1 {
-                                    self.equal_items
+                                    equal_items
                                         .entry(TableReference::from(table_name))
                                         .or_default()
                                         .push((
@@ -88,7 +134,7 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                 // check if table_name is in schemas, otherwise the table_name
                                 // maybe is a alias
                                 if self.schemas.contains_key(&table_name) {
-                                    self.equal_items.entry(table_name).or_default().push((
+                                    equal_items.entry(table_name).or_default().push((
                                         field_name,
                                         trim_quotes(right.to_string().as_str()),
                                     ));
@@ -114,8 +160,7 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                     }
                                 }
                                 if count == 1 {
-                                    let entry = self
-                                        .equal_items
+                                    let entry = equal_items
                                         .entry(TableReference::from(table_name))
                                         .or_default();
                                     for val in list.iter() {
@@ -131,7 +176,7 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                 // check if table_name is in schemas, otherwise the table_name
                                 // maybe is a alias
                                 if self.schemas.contains_key(&table_name) {
-                                    let entry = self.equal_items.entry(table_name).or_default();
+                                    let entry = equal_items.entry(table_name).or_default();
                                     for val in list.iter() {
                                         entry.push((
                                             field_name.clone(),
@@ -145,6 +190,44 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                     }
                     _ => {}
                 }
+            }
+            for (table, count) in from {
+                let reads = self.reads.entry(table.clone()).or_default();
+                // a filter can't be tied to one of two reads of a stream in the same FROM
+                if count == 1 {
+                    reads.push(equal_items.remove(&table).unwrap_or_default());
+                } else {
+                    reads.extend((0..count).map(|_| Vec::new()));
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn post_visit_query(&mut self, _query: &mut Query) -> ControlFlow<Self::Break> {
+        self.depth -= 1;
+        if self.depth > 0 {
+            return ControlFlow::Continue(());
+        }
+        for (table, reads) in self.reads.drain() {
+            // a field prunes only when every read of the stream filters it, by all their values
+            let mut reads_per_field: HashMap<&str, usize> = HashMap::new();
+            for read in &reads {
+                let fields: HashSet<&str> = read.iter().map(|(field, _)| field.as_str()).collect();
+                for field in fields {
+                    *reads_per_field.entry(field).or_insert(0) += 1;
+                }
+            }
+            let mut seen = HashSet::new();
+            let items: Vec<(String, String)> = reads
+                .iter()
+                .flatten()
+                .filter(|(field, _)| reads_per_field.get(field.as_str()) == Some(&reads.len()))
+                .filter(|item| seen.insert(*item))
+                .cloned()
+                .collect();
+            if !items.is_empty() {
+                self.equal_items.insert(table, items);
             }
         }
         ControlFlow::Continue(())
@@ -352,5 +435,89 @@ mod tests {
 
         // count == 2 (both tables have 'name') → not captured
         assert!(visitor.equal_items.is_empty());
+    }
+
+    /// The sorted equal items kept for `part` (pk, msg) in a query that may also read `other`.
+    fn part_items(sql: &str) -> Option<Vec<(String, String)>> {
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut schemas = HashMap::new();
+        for (name, fields) in [("part", ["pk", "msg"]), ("other", ["k", "note"])] {
+            let fields = fields.map(|f| Arc::new(Field::new(f, DataType::Utf8, false)));
+            schemas.insert(
+                TableReference::from(name),
+                Arc::new(SchemaCache::new(Schema::new(fields.to_vec()))),
+            );
+        }
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+        let mut items = visitor.equal_items.remove(&TableReference::from("part"))?;
+        items.sort();
+        Some(items)
+    }
+
+    #[test]
+    fn test_partition_visitor_keeps_no_filter_when_a_read_of_the_stream_has_none() {
+        for sql in [
+            "SELECT count(*) FROM part WHERE msg IN (SELECT msg FROM part WHERE pk = 'a')",
+            "WITH a AS (SELECT msg FROM part WHERE pk = 'a') \
+             SELECT count(*) FROM part WHERE msg IN (SELECT msg FROM a)",
+            "SELECT count(*), (SELECT count(*) FROM part WHERE pk = 'a') FROM part",
+            "SELECT msg FROM part WHERE pk = 'a' UNION ALL SELECT msg FROM part",
+            "SELECT count(*) FROM part JOIN part AS p2 ON part.msg = p2.msg WHERE part.pk = 'a'",
+            "SELECT count(*) FROM (other JOIN part ON other.note = part.msg) \
+             WHERE msg IN (SELECT msg FROM part WHERE pk = 'a')",
+            "SELECT count(*) FROM other WHERE note IN (SELECT msg FROM part WHERE pk = 'a') \
+             AND k IN (SELECT msg FROM part)",
+        ] {
+            assert_eq!(part_items(sql), None, "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_partition_visitor_ignores_a_filter_outside_the_select_that_reads_the_stream() {
+        // the outer pk is an aggregate's alias; a negated correlated filter keeps the other rows
+        for sql in [
+            "SELECT count(*) FROM (SELECT msg, max(pk) AS pk FROM part WHERE msg = 'x' GROUP BY msg) t \
+             WHERE pk = 'a'",
+            "SELECT count(*) FROM part WHERE msg = 'x' \
+             AND NOT EXISTS (SELECT 1 FROM other WHERE part.pk = 'a')",
+        ] {
+            assert_eq!(
+                part_items(sql),
+                Some(vec![("msg".to_string(), "x".to_string())]),
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_partition_visitor_keeps_the_filter_every_read_of_the_stream_has() {
+        let a = ("pk".to_string(), "a".to_string());
+        let b = ("pk".to_string(), "b".to_string());
+        for sql in [
+            "SELECT count(*) FROM other WHERE note IN (SELECT msg FROM part WHERE pk = 'a')",
+            "WITH a AS (SELECT msg FROM part WHERE pk = 'a') SELECT count(*) FROM a",
+            "SELECT count(*) FROM (SELECT msg FROM part WHERE pk = 'a') t",
+        ] {
+            assert_eq!(part_items(sql), Some(vec![a.clone()]), "{sql}");
+        }
+        // both reads filter pk, so the files of either value are read; only one filters msg
+        assert_eq!(
+            part_items(
+                "SELECT count(*) FROM part WHERE pk = 'b' AND msg = 'x' \
+                 AND msg IN (SELECT msg FROM part WHERE pk = 'a')"
+            ),
+            Some(vec![a.clone(), b.clone()])
+        );
+        assert_eq!(
+            part_items(
+                "SELECT msg FROM part WHERE pk = 'a' \
+                 UNION ALL SELECT msg FROM part WHERE pk IN ('a', 'b')"
+            ),
+            Some(vec![a, b])
+        );
     }
 }
