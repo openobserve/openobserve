@@ -4597,7 +4597,7 @@
       "anyWindowsHostNote": "Any Windows server or VM.",
       "arrow": "→",
       "askOnSlack": "Ask on Slack",
-      "autoInstrumentTracesDesc": "Optional. The OpenTelemetry operator injects instrumentation into annotated workloads, so you get **distributed traces without touching application code or rebuilding images**. Pick a language, then annotate the namespace it runs in.",
+      "autoInstrumentTracesDesc": "The OpenTelemetry operator injects instrumentation into annotated workloads, so you get **distributed traces without touching application code or rebuilding images**. Pick a language, then annotate the namespace it runs in.",
       "autoInstrumentTracesTitle": "Auto-instrument your applications for traces",
       "cassandraJmxNote": "Enable JMX remote access on Cassandra for the receiver to connect.",
       "cassandraTagline": "Collect Cassandra metrics via the OpenTelemetry Collector's JMX receiver and ship them to OpenObserve.",
