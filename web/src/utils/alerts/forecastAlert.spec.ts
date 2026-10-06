@@ -18,6 +18,7 @@ import {
   FORECAST_WINDOWS,
   buildForecastAlertPromql,
   forecastRowTemplate,
+  forecastAlertFromChart,
   isForecastHorizonValid,
   parseForecastAlertPromql,
   type ForecastAlert,
@@ -121,6 +122,43 @@ describe("parseForecastAlertPromql", () => {
     expect(parseForecastAlertPromql(text, condition(0))).toBeNull();
     expect(parseForecastAlertPromql(text, condition(31))).toBeNull();
     expect(parseForecastAlertPromql(text, null)).toBeNull();
+  });
+});
+
+describe("forecastAlertFromChart", () => {
+  const DAY = 86_400;
+  const point = (overrides: Record<string, number> = {}) => ({
+    U: "avg(disk)",
+    T: 0.9,
+    startValue: 0.8,
+    startTime: 1_000 * DAY,
+    clickedTime: 1_000 * DAY + 2.3 * DAY,
+    rangeSeconds: 6 * 3600,
+    ...overrides,
+  });
+
+  it("alerts on the charted expression rising to the clicked value, H days out, rounded up", () => {
+    expect(forecastAlertFromChart(point())).toEqual({
+      U: "avg(disk)",
+      T: 0.9,
+      direction: "rises",
+      W: "6h",
+      H: 3,
+    });
+  });
+
+  it("falls to a value below the forecast's start", () => {
+    expect(forecastAlertFromChart(point({ T: 0.5 })).direction).toBe("falls");
+  });
+
+  it("keeps H within 1 to 30 days", () => {
+    expect(forecastAlertFromChart(point({ clickedTime: 1_000 * DAY + 600 })).H).toBe(1);
+    expect(forecastAlertFromChart(point({ clickedTime: 1_045 * DAY })).H).toBe(30);
+  });
+
+  it("takes the history preset nearest the chart's visible range", () => {
+    const W = (rangeSeconds: number) => forecastAlertFromChart(point({ rangeSeconds })).W;
+    expect([W(3600), W(30 * 3600), W(3 * DAY), W(30 * DAY)]).toEqual(["6h", "1d", "2d", "7d"]);
   });
 });
 

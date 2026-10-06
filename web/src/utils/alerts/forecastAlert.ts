@@ -97,6 +97,27 @@ export const parseForecastAlertPromql = (
   return null;
 };
 
+/** A forecast alert matching what a right-clicked forecast line shows; times in seconds. */
+export const forecastAlertFromChart = (point: {
+  U: string;
+  T: number;
+  /** The line's first point: its fit at the range end. */
+  startValue: number;
+  startTime: number;
+  clickedTime: number;
+  rangeSeconds: number;
+}): ForecastAlert => {
+  const days = Math.ceil((point.clickedTime - point.startTime) / 86_400);
+  const nearest = (window: ForecastWindow) => Math.abs(WINDOW_SECONDS[window] - point.rangeSeconds);
+  return {
+    U: point.U,
+    T: point.T,
+    direction: point.T > point.startValue ? "rises" : "falls",
+    W: [...FORECAST_WINDOWS].sort((a, b) => nearest(a) - nearest(b))[0],
+    H: Math.min(FORECAST_MAX_DAYS, Math.max(FORECAST_MIN_DAYS, days)),
+  };
+};
+
 /** Alert form values for Forecast mode; per-series alerting requires the `>= 1` count gate. */
 export const forecastModeFields = (forecast: ForecastAlert): Record<string, unknown> => ({
   "query_condition.promql":

@@ -2040,6 +2040,36 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
     });
 
+    it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              data: [
+                ["x0", null],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.7, seriesIndex: 1, dataIndex: 3 });
+
+      expect(wrapper.vm.contextMenuData).toMatchObject({
+        seriesRole: "forecast",
+        forecastPoint: { startTime: 160, startValue: 0.5, clickedTime: 280 },
+      });
+    });
+
     it("should hide context menu", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 

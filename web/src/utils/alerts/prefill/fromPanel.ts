@@ -73,7 +73,7 @@ const MIN_EPOCH_MICROS = 1e14;
 const ROLLING_END_TOLERANCE_MICROS = 5 * 60_000_000;
 
 // Dashboards build these Dates from µs epochs, the Explorer from ms.
-const dateToMicros = (date: Date): number => {
+export const dateToMicros = (date: Date): number => {
   const value = date.getTime();
   return value > MIN_EPOCH_MICROS ? value : value * 1000;
 };

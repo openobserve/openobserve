@@ -25,6 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="alert-context-menu"
     >
       <div
+        v-if="seriesRole === 'forecast'"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+        @click="handleMenuItemClick('forecast')"
+        data-test="alert-context-menu-forecast"
+      >
+        <OIcon name="trending-up" size="sm" class="me-2" />
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.forecastReaches", { value: formattedValue })
+        }}</span>
+      </div>
+      <div
+        v-if="seriesRole !== 'forecast'"
         class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('above')"
         data-test="alert-context-menu-above"
@@ -35,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </div>
       <div
+        v-if="seriesRole !== 'forecast'"
         class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('below')"
         data-test="alert-context-menu-below"
@@ -104,7 +117,7 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
-    const handleMenuItemClick = (condition: "above" | "below") => {
+    const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {
       emit("select", {
         condition,
         threshold: props.value,

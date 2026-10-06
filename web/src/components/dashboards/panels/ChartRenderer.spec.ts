@@ -590,6 +590,7 @@ describe("ChartRenderer", () => {
         y: 2,
         value: 7,
         seriesIndex: 2,
+        dataIndex: 3,
       });
     });
 

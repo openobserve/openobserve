@@ -312,7 +312,11 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { usePanelAlertCreation, usePanelDownload } from "@/composables/dashboard/usePanelActions";
+import {
+  forecastPointOf,
+  usePanelAlertCreation,
+  usePanelDownload,
+} from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
@@ -1155,6 +1159,9 @@ export default defineComponent({
         ...event,
         panelQueryIndex: series?._panelQueryIndex,
         seriesRole: series?._seriesRole,
+        ...(series?._seriesRole === "forecast"
+          ? { forecastPoint: forecastPointOf(series, event.dataIndex) }
+          : {}),
       });
     };
 

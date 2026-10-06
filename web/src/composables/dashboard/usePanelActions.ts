@@ -15,12 +15,19 @@
 
 import {
   buildPrefillFromPanel,
+  dateToMicros,
   executedPanelQuery,
   panelQueryChoices,
 } from "@/utils/alerts/prefill/fromPanel";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
-import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import {
+  FORECAST_FREQUENCY_MINUTES,
+  FORECAST_PERIOD_MINUTES,
+  buildForecastAlertPromql,
+  forecastAlertFromChart,
+} from "@/utils/alerts/forecastAlert";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
 import type { TranslateFn } from "@/types/i18n";
@@ -38,6 +45,19 @@ export const wrapCsvValue = (val: any): string => {
   const needsQuotes =
     str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r");
   return needsQuotes ? `"${str}"` : str;
+};
+
+/** Where a right-clicked forecast line starts (its fit at the range end) and when the click landed, in seconds. */
+export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
+  const times: number[] = series?._timestamps ?? [];
+  const data: any[] = series?.data ?? [];
+  const start = data.findIndex((point) => point?.[1] != null);
+  if (start < 0) return undefined;
+  return {
+    startTime: times[start],
+    startValue: Number(data[start][1]),
+    clickedTime: times[dataIndex ?? -1] ?? times[times.length - 1],
+  };
 };
 
 /** The SQL column a right-clicked threshold applies to, read off the query's y-axis or its SQL. */
@@ -148,6 +168,29 @@ export function usePanelAlertCreation({
     contextMenuVisible.value = false;
   };
 
+  /** The chart's forecast as a forecast alert: the form opens in Forecast mode on it. */
+  const forecastPrefill = (
+    base: AlertPrefill,
+    U: string,
+    T: number,
+    point: { startTime: number; startValue: number; clickedTime: number },
+  ): AlertPrefill => {
+    const { start_time, end_time } = selectedTimeObj.value ?? {};
+    const rangeSeconds =
+      start_time instanceof Date && end_time instanceof Date
+        ? (dateToMicros(end_time) - dateToMicros(start_time)) / 1e6
+        : 0;
+    const forecast = forecastAlertFromChart({ U, T, rangeSeconds, ...point });
+    return {
+      ...base,
+      promql: buildForecastAlertPromql(forecast),
+      promqlCondition: { column: "value", operator: "<=", value: forecast.H },
+      promqlMultiAlert: true,
+      periodMinutes: FORECAST_PERIOD_MINUTES,
+      frequencyMinutes: FORECAST_FREQUENCY_MINUTES,
+    };
+  };
+
   const handleCreateAlert = (selection: {
     condition: string;
     threshold: number;
@@ -206,7 +249,17 @@ export function usePanelAlertCreation({
       });
     };
 
-    const prefill = normalizePrefill(build());
+    const point = contextMenuData.value?.forecastPoint;
+    const prefill = normalizePrefill(
+      selection.condition === "forecast" && point
+        ? forecastPrefill(
+            build(),
+            executedQueryOf(queries.indexOf(query)),
+            selection.threshold,
+            point,
+          )
+        : build(),
+    );
     if (needsConfirmation(prefill)) {
       requestAlertCreation(prefill, {}, build);
       return;

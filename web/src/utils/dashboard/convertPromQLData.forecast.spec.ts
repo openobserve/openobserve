@@ -121,6 +121,15 @@ describe("forecast entries", () => {
     expect(byName["api-1"]._seriesRole).toBe("primary");
   });
 
+  it("carry each point's timestamp, so a right-click knows when it landed", async () => {
+    const result = await convert([current(), ahead("api-1", "api-2")]);
+    const twin = named(result).find((s: any) => s.name === "api-1 (forecast)");
+    expect(twin._timestamps).toHaveLength(twin.data.length);
+    const at = (t: number) => twin.data[twin._timestamps.indexOf(t)][1];
+    expect(at(NOW_S + STEP_S)).toBe("1");
+    expect(named(result)[0]._timestamps).toBeUndefined();
+  });
+
   it("never take a primary's place at the series cap", async () => {
     const tight = { state: { ...store.state, zoConfig: { max_dashboard_series: 2 } } };
     const result = await convert([current(), ahead("api-1", "api-2")], tight);

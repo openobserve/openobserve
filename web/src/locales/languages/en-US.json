@@ -5226,7 +5226,8 @@
     "last": "Last",
     "alertContextMenu": {
       "thresholdAbove": "Create Alert with threshold above {value}",
-      "thresholdBelow": "Create Alert with threshold below {value}"
+      "thresholdBelow": "Create Alert with threshold below {value}",
+      "forecastReaches": "Alert when the forecast reaches {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Errors ({count})"

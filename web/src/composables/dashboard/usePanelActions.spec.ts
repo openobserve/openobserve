@@ -18,6 +18,7 @@ import { gt } from "@/types/i18n";
 import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { buildForecastAlertPromql, parseForecastAlertPromql } from "@/utils/alerts/forecastAlert";
 import {
   alertCreationDialog,
   closeAlertCreationDialog,
@@ -290,6 +291,80 @@ describe("usePanelActions", () => {
 
       expect(alertCreationDialog.value).toBeNull();
       expect(readAlertPrefill()?.promql).toBe("sum(rate(io_ops[1m]))");
+    });
+  });
+
+  describe("usePanelAlertCreation on a forecast line (entry B)", () => {
+    const DAY = 86_400;
+    const END_S = 1_800_000_000;
+    const explorerPanel = (expr: string, stream: string) => ({
+      panelSchema: {
+        value: {
+          id: "metrics-explorer-card",
+          title: "",
+          queryType: "promql",
+          queries: [{ query: expr, fields: { stream, stream_type: "metrics" } }],
+        },
+      },
+      allowAlertCreation: { value: true },
+      metadata: {
+        value: { queries: [{ startTime: (END_S - 6 * 3600) * 1e6, endTime: END_S * 1e6 }] },
+      },
+      // The Explorer's Date pair: built from ms epochs.
+      selectedTimeObj: {
+        value: {
+          start_time: new Date((END_S - 6 * 3600) * 1000),
+          end_time: new Date(END_S * 1000),
+        },
+      },
+      contextMenuData: {
+        value: {
+          seriesRole: "forecast",
+          forecastPoint: { startTime: END_S, startValue: 0.8, clickedTime: END_S + 2.5 * DAY },
+        },
+      },
+      store: { state: { selectedOrganization: { identifier: "org-1" } } },
+      router: { push: vi.fn() },
+      emit: vi.fn(),
+    });
+
+    it.each([
+      ["a gauge's avg", "avg(node_disk_used_ratio)", "node_disk_used_ratio"],
+      ["a gauge's sum", "sum(node_disk_used_bytes)", "node_disk_used_bytes"],
+      [
+        "a histogram percentile",
+        "histogram_quantile(0.99, sum by (le) (rate(req_seconds_bucket[5m])))",
+        "req_seconds_bucket",
+      ],
+    ])("alerts on %s as charted, with H from the clicked point", (_name, expr, stream) => {
+      const args = explorerPanel(expr, stream);
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({
+        condition: "forecast",
+        threshold: 0.9,
+        panelQueryIndex: 0,
+        seriesRole: "forecast",
+      });
+
+      expect(args.router.push).toHaveBeenCalledTimes(1);
+      const stored = readAlertPrefill();
+      expect(stored?.streamName).toBe(stream);
+      expect(stored?.promql).toBe(
+        buildForecastAlertPromql({ U: expr, T: 0.9, direction: "rises", W: "6h" }),
+      );
+      expect(stored?.promqlCondition).toEqual({ column: "value", operator: "<=", value: 3 });
+      expect(stored?.promqlMultiAlert).toBe(true);
+      expect(stored?.periodMinutes).toBe(5);
+      expect(stored?.frequencyMinutes).toBe(30);
+      // The form recognises its own output, so it opens in Forecast mode on these fields.
+      expect(parseForecastAlertPromql(stored?.promql, stored?.promqlCondition)).toEqual({
+        U: expr,
+        T: 0.9,
+        direction: "rises",
+        W: "6h",
+        H: 3,
+      });
     });
   });
 

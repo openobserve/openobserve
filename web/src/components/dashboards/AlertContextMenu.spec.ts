@@ -166,6 +166,23 @@ describe("AlertContextMenu Component", () => {
       });
     });
 
+    it("offers only the forecast alert on a forecast line", async () => {
+      wrapper = createWrapper({ value: 0.9, panelQueryIndex: 0, seriesRole: "forecast" });
+
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-context-menu-below"]').exists()).toBe(false);
+      const item = wrapper.find('[data-test="alert-context-menu-forecast"]');
+      expect(item.text()).toBe("Alert when the forecast reaches 0.9");
+
+      await item.trigger("click");
+      expect(wrapper.emitted("select")[0][0]).toEqual({
+        condition: "forecast",
+        threshold: 0.9,
+        panelQueryIndex: 0,
+        seriesRole: "forecast",
+      });
+    });
+
     it("should emit select with the current value as threshold", () => {
       wrapper = createWrapper({ value: 999 });
       wrapper.vm.handleMenuItemClick("above");
