@@ -266,9 +266,10 @@ const schema = computed(() =>
   }),
 );
 
+// The dashboard engine reads these Dates as microsecond epochs, as DbmMetricPanel passes them.
 const timeObj = computed(() => ({
-  start_time: new Date(props.range.start / 1000),
-  end_time: new Date(props.range.end / 1000),
+  start_time: new Date(props.range.start),
+  end_time: new Date(props.range.end),
 }));
 
 // A new object, tab or Refresh remounts the renderer, so a late response never paints here.

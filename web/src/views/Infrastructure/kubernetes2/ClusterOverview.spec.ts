@@ -230,8 +230,8 @@ describe("ClusterOverview", () => {
         { type: "yAxis", value: 16, name: "Allocatable" },
       ]);
       expect(props.selectedTimeObj).toEqual({
-        start_time: new Date((END - 60 * MIN) / 1000),
-        end_time: new Date(END / 1000),
+        start_time: new Date(END - 60 * MIN),
+        end_time: new Date(END),
       });
       expect(props.variablesData).toEqual({});
       expect(props.forceLoad).toBe(true);

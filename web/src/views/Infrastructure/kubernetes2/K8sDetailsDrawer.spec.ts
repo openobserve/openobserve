@@ -297,8 +297,8 @@ describe("K8sDetailsDrawer metric tabs", () => {
   it("passes the renderer its contract props over the picker range, in a sized parent", () => {
     const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
     const props = lastRenderer();
-    expect(props.selectedTimeObj.start_time).toEqual(new Date(RANGE.start / 1000));
-    expect(props.selectedTimeObj.end_time).toEqual(new Date(RANGE.end / 1000));
+    expect(props.selectedTimeObj.start_time).toEqual(new Date(RANGE.start));
+    expect(props.selectedTimeObj.end_time).toEqual(new Date(RANGE.end));
     expect(props.variablesData).toEqual({});
     expect(props.forceLoad).toBe(true);
     expect(props.searchType).toBe("ui");

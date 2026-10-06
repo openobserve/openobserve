@@ -153,9 +153,10 @@ const chartSchema = computed(() => {
   });
 });
 
+// The dashboard engine reads these Dates as microsecond epochs, as DbmMetricPanel passes them.
 const chartTime = computed(() => ({
-  start_time: new Date((props.range.end - HOUR_US) / 1000),
-  end_time: new Date(props.range.end / 1000),
+  start_time: new Date(props.range.end - HOUR_US),
+  end_time: new Date(props.range.end),
 }));
 
 const warningRows = computed(() => warningListRows(props.inventory, props.warnings, props.cluster));
