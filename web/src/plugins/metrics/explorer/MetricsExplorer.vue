@@ -581,6 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :is-favorite="!!detailMetric && grid.favorites.value.includes(detailMetric)"
       :all-cards="grid.cards.value"
       :labels-by-stream="grid.labelsByStream.value"
+      :ensure-schemas="grid.ensureSchemas"
       :prefix-of="grid.prefixOf"
       :family-of="grid.familyOf"
       :filters="grid.labelFilters.value"

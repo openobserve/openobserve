@@ -23,6 +23,14 @@ import { CARD_KIND, baseNameOf } from "@/utils/metrics/metricDefaults";
 import { MISC_GROUP_ID } from "@/utils/metrics/prefixGrouping";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
+import config from "@/aws-exports";
+
+const drilldownApi = vi.hoisted(() => ({
+  getIdentityConfig: vi.fn(),
+  getSemanticGroups: vi.fn(),
+  correlate: vi.fn(),
+}));
+vi.mock("@/services/service_streams", () => ({ default: drilldownApi }));
 
 const { getMetricUsage } = vi.hoisted(() => ({ getMetricUsage: vi.fn() }));
 vi.mock("@/services/metrics", () => ({ default: { getMetricUsage } }));
@@ -554,6 +562,97 @@ describe("MetricDetailView", () => {
       await flushPromises();
       expect(selectNamed(wrapper, "metrics-detail-forecast")).toBeUndefined();
       expect(runQuery.mock.calls.some(([, , , opts]) => opts?.instantAt)).toBe(false);
+    });
+  });
+
+  describe("logs & traces drilldown", () => {
+    const button = () => wrapper.find('[data-test="metrics-detail-drilldown"]');
+    const tooltipText = async () => {
+      vi.useFakeTimers();
+      await button().element.parentElement!.dispatchEvent(
+        new PointerEvent("pointermove", { bubbles: true }),
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      vi.useRealTimers();
+      await flushPromises();
+      return document.body.textContent ?? "";
+    };
+
+    beforeEach(() => {
+      (config as any).isCloud = "false";
+      drilldownApi.getIdentityConfig.mockResolvedValue({
+        data: { sets: [], tracked_alias_ids: [] },
+      });
+      drilldownApi.getSemanticGroups.mockResolvedValue({ data: [] });
+      store.state.zoConfig = { ...store.state.zoConfig, service_streams_enabled: true };
+    });
+
+    afterEach(() => {
+      (config as any).isEnterprise = "false";
+    });
+
+    describe("on an OSS build", () => {
+      beforeEach(() => {
+        (config as any).isEnterprise = "false";
+      });
+
+      it("is visible, disabled and locked, inside a span the tooltip hovers on, with no menu around it", () => {
+        wrapper = mountView();
+        expect(button().exists()).toBe(true);
+        expect(button().attributes("disabled")).toBeDefined();
+        expect(button().find('[data-test="metrics-detail-drilldown-lock"]').exists()).toBe(true);
+        expect(button().element.parentElement!.tagName).toBe("SPAN");
+        expect(
+          wrapper
+            .findAllComponents({ name: "ODropdown" })
+            .some((d) => d.find('[data-test="metrics-detail-drilldown"]').exists()),
+        ).toBe(false);
+      });
+
+      it("shows the Enterprise tooltip on hover over the span", async () => {
+        wrapper = mountView({}, { realHeader: false });
+        expect(await tooltipText()).toContain(
+          "Logs and traces drilldown is an Enterprise feature.",
+        );
+      });
+
+      it("opens nothing on click or Enter, and asks the server nothing", async () => {
+        wrapper = mountView();
+        await button().trigger("click");
+        await button().trigger("keydown", { key: "Enter" });
+        await flushPromises();
+        expect(wrapper.find('[data-test="metrics-detail-drilldown-menu"]').exists()).toBe(false);
+        expect(drilldownApi.getIdentityConfig).not.toHaveBeenCalled();
+        expect(drilldownApi.correlate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("on an Enterprise build", () => {
+      beforeEach(() => {
+        (config as any).isEnterprise = "true";
+      });
+
+      it("is an enabled dropdown trigger when service discovery is on", async () => {
+        wrapper = mountView();
+        await flushPromises();
+        expect(button().attributes("disabled")).toBeUndefined();
+        expect(button().find('[data-test="metrics-detail-drilldown-lock"]').exists()).toBe(false);
+        expect(
+          wrapper
+            .findAllComponents({ name: "ODropdown" })
+            .some((d) => d.find('[data-test="metrics-detail-drilldown"]').exists()),
+        ).toBe(true);
+      });
+
+      it("is disabled, with the discovery tooltip, when service discovery is off", async () => {
+        store.state.zoConfig = { ...store.state.zoConfig, service_streams_enabled: false };
+        wrapper = mountView();
+        await flushPromises();
+        expect(button().attributes("disabled")).toBeDefined();
+        expect(await tooltipText()).toContain(
+          "Service discovery is turned off for this organization.",
+        );
+      });
     });
   });
 

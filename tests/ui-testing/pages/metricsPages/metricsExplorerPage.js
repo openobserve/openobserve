@@ -83,6 +83,9 @@ export class MetricsExplorerPage {
         this.detailCreateAlert = '[data-test="metrics-detail-create-alert"]';
         this.alertContextMenuAbove = '[data-test="alert-context-menu-above"]';
         this.alertStreamName = '[data-test="add-alert-stream-name-select-dropdown"]';
+        this.detailDrilldown = '[data-test="metrics-detail-drilldown"]';
+        this.detailDrilldownLock = '[data-test="metrics-detail-drilldown-lock"]';
+        this.tooltipContent = '[data-test="o-tooltip-content"]';
         this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
         this.breakdownBack = '[data-test="metrics-breakdown-back"]';
         this.labelChipPrefix = 'metrics-explorer-label-chip-';
@@ -485,6 +488,18 @@ export class MetricsExplorerPage {
         await this.page.locator(this.detailMore).click();
         await this.page.locator(this.detailCreateAlert).click();
         await this.page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
+    }
+
+    /** OSS: the drilldown is shown locked; its span, not the disabled button, carries the tooltip. */
+    async expectDrilldownLocked(tooltipText) {
+        const button = this.page.locator(this.detailDrilldown);
+        await expect(button).toBeVisible({ timeout: 30000 });
+        await expect(button).toBeDisabled();
+        await expect(button.locator(this.detailDrilldownLock)).toBeVisible();
+        await button.locator('xpath=..').hover();
+        await expect(this.page.locator(this.tooltipContent)).toContainText(tooltipText, {
+            timeout: 10000,
+        });
     }
 
     async expectAlertFormStream(metric) {

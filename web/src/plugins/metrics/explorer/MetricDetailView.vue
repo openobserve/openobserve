@@ -224,6 +224,131 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="max-md:hidden">{{ t("metrics.explorer.detail.openInVisualize") }}</span>
             <OTooltip :content="t('metrics.explorer.detail.openInVisualize')" />
           </OButton>
+          <ODropdown
+            v-if="drilldown.availability.value === 'available'"
+            align="end"
+            @update:open="onDrilldownOpen"
+          >
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm-toolbar"
+                icon-left="manage-search"
+                icon-right="expand-more"
+                :aria-label="t('metrics.explorer.detail.drilldown.button')"
+                data-test="metrics-detail-drilldown"
+              >
+                <span class="max-md:hidden">{{
+                  t("metrics.explorer.detail.drilldown.button")
+                }}</span>
+                <OTooltip
+                  :content="t('metrics.explorer.detail.drilldown.help')"
+                  max-width="22.5rem"
+                />
+              </OButton>
+            </template>
+            <div data-test="metrics-detail-drilldown-menu">
+              <ODropdownItem v-if="drilldownMenu.kind === 'loading'" disabled>
+                {{ t("metrics.explorer.detail.drilldown.loading") }}
+              </ODropdownItem>
+              <template v-else-if="drilldownMenu.kind === 'error'">
+                <ODropdownItem disabled data-test="metrics-detail-drilldown-error">
+                  {{
+                    drilldownMenu.message === null
+                      ? t("metrics.explorer.detail.drilldown.schemaError")
+                      : raw(drilldownMenu.message)
+                  }}
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="replay"
+                  data-test="metrics-detail-drilldown-retry"
+                  @select="onDrilldownRetry"
+                >
+                  {{ t("metrics.explorer.detail.drilldown.retry") }}
+                </ODropdownItem>
+              </template>
+              <ODropdownItem
+                v-else-if="drilldownMenu.kind === 'notice'"
+                disabled
+                data-test="metrics-detail-drilldown-notice"
+              >
+                {{ t(`metrics.explorer.detail.drilldown.${drilldownMenu.notice}` as const) }}
+              </ODropdownItem>
+              <ODropdownGroup
+                v-else-if="drilldownMenu.kind === 'pickService'"
+                :label="
+                  t('metrics.explorer.detail.drilldown.pickService', { label: drilldownMenu.label })
+                "
+              >
+                <ODropdownItem
+                  v-for="value in drilldownMenu.values"
+                  :key="value"
+                  :data-test="`metrics-detail-drilldown-service-${value}`"
+                  @select="onDrilldownPick($event, value)"
+                >
+                  {{ raw(value) }}
+                </ODropdownItem>
+                <ODropdownItem v-if="!drilldownMenu.values.length" disabled>
+                  {{
+                    t("metrics.explorer.detail.drilldown.noServiceValues", {
+                      label: drilldownMenu.label,
+                    })
+                  }}
+                </ODropdownItem>
+              </ODropdownGroup>
+              <template v-else-if="drilldownMenu.kind === 'streams'">
+                <ODropdownGroup
+                  v-for="signal in DRILLDOWN_SIGNALS"
+                  :key="signal"
+                  :label="t(`metrics.explorer.detail.drilldown.${signal}` as const)"
+                >
+                  <ODropdownItem
+                    v-for="item in drilldownMenu[signal]"
+                    :key="item.name"
+                    :disabled="!item.openable"
+                    :data-test="`metrics-detail-drilldown-${signal}-${item.name}`"
+                    @select="drilldown.openStream(signal, item)"
+                  >
+                    <span class="flex min-w-0 flex-col">
+                      <span class="truncate">{{ raw(item.name) }}</span>
+                      <span v-if="!item.openable" class="text-text-secondary text-xs">{{
+                        t("metrics.explorer.detail.drilldown.noServiceField")
+                      }}</span>
+                    </span>
+                  </ODropdownItem>
+                  <ODropdownItem v-if="!drilldownMenu[signal].length" disabled>
+                    {{
+                      t(
+                        signal === "logs"
+                          ? "metrics.explorer.detail.drilldown.noLogsStream"
+                          : "metrics.explorer.detail.drilldown.noTracesStream",
+                        { service: drilldownMenu.service },
+                      )
+                    }}
+                  </ODropdownItem>
+                </ODropdownGroup>
+              </template>
+            </div>
+          </ODropdown>
+          <!-- A disabled button fires no pointer events, so the span is the tooltip's hover target. -->
+          <OTooltip v-else :content="drilldownBlockedReason" max-width="22.5rem">
+            <span class="inline-flex">
+              <OButton
+                variant="outline"
+                size="sm-toolbar"
+                disabled
+                :aria-label="t('metrics.explorer.detail.drilldown.button')"
+                data-test="metrics-detail-drilldown"
+              >
+                <template v-if="drilldown.availability.value === 'oss'" #icon-left>
+                  <OIcon name="lock" size="sm" data-test="metrics-detail-drilldown-lock" />
+                </template>
+                <span class="max-md:hidden">{{
+                  t("metrics.explorer.detail.drilldown.button")
+                }}</span>
+              </OButton>
+            </span>
+          </OTooltip>
           <ODropdown align="end">
             <template #trigger>
               <OButton
@@ -456,7 +581,6 @@ import MetricCardChart, { type ChartForecast, type ShiftedResult } from "./Metri
 import MetricBreakdown from "./MetricBreakdown.vue";
 import MetricChartTile, { type TileCompare, type TileQuery } from "./MetricChartTile.vue";
 import MetricUsageList from "./MetricUsageList.vue";
-import { useStore } from "vuex";
 import metricsService, { type MetricUsage } from "@/services/metrics";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -471,6 +595,12 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useMetricDrilldown } from "@/composables/metrics/useMetricDrilldown";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
@@ -503,6 +633,7 @@ import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
 const RELATED_LIMIT = 12;
+const DRILLDOWN_SIGNALS = ["logs", "traces"] as const;
 /** A compared period draws as a twin series, which a heatmap's cells cannot show. */
 const COMPARE_CHART_TYPES = ["line", "area", "bar"];
 const COMPARE_OFFSETS = Object.keys(COMPARE_OFFSET_MS) as CompareOffset[];
@@ -562,6 +693,8 @@ export default defineComponent({
     OTooltip,
     OBanner,
     ODropdown,
+    ODropdownItem,
+    ODropdownGroup,
     OSelect,
     CreateAlertAction,
   },
@@ -585,6 +718,11 @@ export default defineComponent({
     isFavorite: { type: Boolean, default: false },
     allCards: { type: Array as PropType<MetricCardModel[]>, required: true },
     labelsByStream: { type: Object as PropType<Record<string, string[]>>, required: true },
+    /** Loads every metric's labels, which the drilldown needs to find a service label. */
+    ensureSchemas: {
+      type: Function as PropType<() => Promise<void>>,
+      default: () => Promise.resolve(),
+    },
     prefixOf: { type: Function as PropType<(name: string) => string>, required: true },
     familyOf: { type: Function as PropType<(name: string) => string>, required: true },
     filters: { type: Array as PropType<LabelFilter[]>, required: true },
@@ -719,6 +857,46 @@ export default defineComponent({
     });
 
     const overviewState = ref<OverviewState>(IDLE);
+
+    const router = useRouter();
+    const drilldown = useMetricDrilldown({
+      org: () => store.state.selectedOrganization?.identifier ?? "",
+      metric: () => (props.card ? { name: props.card.name, labels: props.card.labels } : null),
+      labelsOf: (name) => props.labelsByStream[name],
+      ensureSchemas: () => props.ensureSchemas(),
+      filters: () => props.filters,
+      inapplicableFilters: () => props.inapplicableFilters,
+      timeRange: () => props.timeRange,
+      serviceStreamsEnabled: () => !!store.state.zoConfig?.service_streams_enabled,
+      router,
+      store,
+      onDropped: (labels) =>
+        toast({
+          variant: "warning",
+          message: t("metrics.explorer.detail.drilldown.notApplied", {
+            labels: labels.join(", "),
+          }),
+        }),
+    });
+    const drilldownMenu = computed(() => drilldown.menu.value);
+    const drilldownBlockedReason = computed(() => {
+      const state = drilldown.availability.value;
+      if (state === "oss") return t("metrics.explorer.detail.drilldown.enterprise");
+      if (state === "discoveryOff") return t("metrics.explorer.detail.drilldown.discoveryOff");
+      return t("metrics.explorer.detail.drilldown.forbidden");
+    });
+    const onDrilldownOpen = (open: boolean) => {
+      if (open) drilldown.open();
+    };
+    // Selecting an item closes the menu; these keep it open for the next step.
+    const onDrilldownPick = (event: Event, value: string) => {
+      event.preventDefault();
+      drilldown.pickService(value);
+    };
+    const onDrilldownRetry = (event: Event) => {
+      event.preventDefault();
+      drilldown.retry();
+    };
 
     const compareEligible = computed(() => COMPARE_CHART_TYPES.includes(props.overview.chartType));
     const comparePeriodLabel = (offset: CompareOffset) =>
@@ -991,6 +1169,13 @@ export default defineComponent({
       overviewState,
       overviewQueries,
       buildOverviewAlertPrefill,
+      drilldown,
+      drilldownMenu,
+      drilldownBlockedReason,
+      onDrilldownOpen,
+      onDrilldownPick,
+      onDrilldownRetry,
+      DRILLDOWN_SIGNALS,
       compareEligible,
       compareOptions,
       compareShift,
