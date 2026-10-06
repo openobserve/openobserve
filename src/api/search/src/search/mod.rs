@@ -414,7 +414,7 @@ pub async fn search(
                 start,
                 &org_id,
                 stream_type,
-                "500",
+                &err.http_status().to_string(),
                 "_search",
                 &search_type,
                 "",

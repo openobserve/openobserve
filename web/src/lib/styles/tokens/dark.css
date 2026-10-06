@@ -646,6 +646,9 @@
   /* Chart grid line — dark override, raised for perceptibility (see base.css) */
   --color-chart-gridline: rgba(255, 255, 255, 0.25);
 
+  /* Chart expected-range band fill — dark override (see base.css) */
+  --color-chart-band: rgba(255, 255, 255, 0.18);
+
   /* Crosshair axis-pointer label chip — dark-only. Light leaves this undefined so
      chartColor() resolves to "" and ECharts uses its auto default (see base.css). */
   --color-chart-crosshair-bg: #333;

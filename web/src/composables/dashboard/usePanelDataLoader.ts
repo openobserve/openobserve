@@ -365,6 +365,8 @@ export const usePanelDataLoader = (
         abortController.abort();
       }
 
+      invalidateRun();
+
       // Create a new AbortController for the new operation
       abortController = new AbortController();
       // Injected-data path: the caller already fetched the PromQL results and
@@ -598,14 +600,19 @@ export const usePanelDataLoader = (
 
   // Wire up search handlers composable (placed here so processApiError,
   // loadData, and removeTraceId are all already declared above).
-  const { handleSearchResponse, handleSearchClose, handleSearchReset, handleSearchError } =
-    usePanelSearchHandlers({
-      state,
-      processApiError,
-      saveCurrentStateToCache,
-      loadData,
-      removeTraceId,
-    });
+  const {
+    handleSearchResponse,
+    handleSearchClose,
+    handleSearchReset,
+    handleSearchError,
+    clearHitsBuffer,
+  } = usePanelSearchHandlers({
+    state,
+    processApiError,
+    saveCurrentStateToCache,
+    loadData,
+    removeTraceId,
+  });
 
   // Wire up PromQL and SQL executors (placed here so handleSearch* handlers,
   // processApiError, addTraceId, removeTraceId are all already declared above).
@@ -630,7 +637,7 @@ export const usePanelDataLoader = (
     removeTraceId,
   });
 
-  const { executeSQL, executeMultiSQL } = usePanelSQLExecutor({
+  const { executeSQL, executeMultiSQL, invalidateRun } = usePanelSQLExecutor({
     state,
     panelSchema,
     store,
@@ -652,6 +659,7 @@ export const usePanelDataLoader = (
     handleSearchClose,
     handleSearchError,
     handleSearchReset,
+    clearHitsBuffer,
     processApiError,
     saveCurrentStateToCache,
     addTraceId,

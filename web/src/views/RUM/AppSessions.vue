@@ -488,10 +488,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { isSessionLive } from "@/utils/rum/sessionReplayLive";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -591,7 +592,10 @@ const rumSessionStreamName = "_rumdata";
 // cannot edit would show there as permanently ticked.
 // The health/type/device segments stay out — they filter the fetched rows
 // client-side (see tableRows), not the underlying query.
-const fieldListBaseFilter = "session_has_replay IS NOT NULL";
+// session_has_replay may not exist yet, and no replay data means no session can match it, so the fallback is always-false, not unfiltered.
+const fieldListBaseFilter = computed(() =>
+  schemaMapping.value["session_has_replay"] ? "session_has_replay IS NOT NULL" : "1 = 0",
+);
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -773,8 +777,17 @@ const tableColumns = [
   },
 ];
 
+// The filter the list was last built from, so a return that brings a new one (from Product analytics) re-applies it.
+let lastAppliedUrlFilter: string | null = null;
+
+// The router returns every value as a string, so the list's own numeric from/to must compare as strings too.
+function urlFilterSignature(query: LocationQuery | Record<string, unknown>): string {
+  return JSON.stringify(["query", "from", "to", "period"].map((k) => String(query[k] ?? "")));
+}
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
+  lastAppliedUrlFilter = urlFilterSignature(router.currentRoute.value.query);
 });
 
 onMounted(async () => {
@@ -816,6 +829,18 @@ onActivated(() => {
     activatedBefore = true;
     return;
   }
+  const signature = urlFilterSignature(router.currentRoute.value.query);
+  if (
+    router.currentRoute.value.name === "Sessions" &&
+    enteredFromAnalytics &&
+    signature !== lastAppliedUrlFilter
+  ) {
+    lastAppliedUrlFilter = signature;
+    restoreUrlQueryParams();
+    syncDateTimeFromSession();
+    getSessions();
+    return;
+  }
   if (!hasCompleteResult.value) getSessions();
 });
 
@@ -836,6 +861,7 @@ const getStreamFields = () => {
           "action_frustration_type",
           "action_target_name",
           "error_message",
+          "session_has_replay",
         ]);
 
         // Define priority fields that should appear at the top
@@ -976,7 +1002,9 @@ const getSessions = () => {
   }
 
   // Build WHERE clause with session replay filter
-  let whereClause = "session_has_replay IS NOT NULL";
+  let whereClause = schemaMapping.value["session_has_replay"]
+    ? "session_has_replay IS NOT NULL"
+    : "1 = 0";
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1647,6 +1675,15 @@ const getSessionStatusColor = (row: any) => {
 
 const router = useRouter();
 
+// A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
+let enteredFromAnalytics = false;
+const stopEntryTracking = router.afterEach((to, from) => {
+  if (to.name === "Sessions") {
+    enteredFromAnalytics = from.matched.some((r) => r.name === PA_ROUTES.shell);
+  }
+});
+onBeforeUnmount(stopEntryTracking);
+
 const { shareUrl } = useRum();
 const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
 
@@ -1735,6 +1772,16 @@ function restoreUrlQueryParams() {
   }
 }
 
+function syncDateTimeFromSession() {
+  const date = sessionState.data.datetime;
+  if (date.valueType === "relative") {
+    const resolved = getConsumableRelativeTime(date.relativeTimePeriod);
+    if (resolved) dateTime.value = { ...dateTime.value, ...date, ...resolved };
+  } else {
+    dateTime.value = { ...dateTime.value, ...date };
+  }
+}
+
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
@@ -1755,6 +1802,7 @@ function updateUrlQueryParams() {
   if (deviceSegment.value !== "all") query["device"] = deviceSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
+  lastAppliedUrlFilter = urlFilterSignature(query);
   router.push({ query });
 }
 

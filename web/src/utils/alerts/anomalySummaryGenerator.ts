@@ -4,7 +4,14 @@
  * Generates human-readable summaries of anomaly detection configurations
  */
 
-import { raw, type TranslateFn } from "@/types/i18n";
+import { type TranslateFn } from "@/types/i18n";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyExpectedGroupingKey,
+  anomalyTrainedK,
+  anomalyIntervalSeconds,
+  anomalyWindowShareEffective,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // Escape user-controlled strings before embedding in HTML (XSS prevention) —
 // mirrors alertSummaryGenerator.ts's esc(), so both generators emit HTML that
@@ -66,10 +73,14 @@ export function generateAnomalySummary(
     const win = `${config.detection_window_value}${config.detection_window_unit}`;
     parts.push(t("alerts.anomaly.summaryDetectionWindow", { window: chip(win) }));
 
-    const seasonality =
-      (config.training_window_days || 14) >= 7
-        ? t("alerts.anomaly.seasonalityWeekly")
-        : raw("hour-of-day");
+    const seasonality = t(
+      anomalyExpectedGroupingKey(
+        anomalyIntervalSeconds(
+          Number(config.histogram_interval_value),
+          String(config.histogram_interval_unit),
+        ),
+      ) as any,
+    );
     parts.push(
       t("alerts.anomaly.summaryTraining", {
         days: chip(t("alerts.anomaly.summaryTrainingDays", { days: config.training_window_days })),
@@ -95,18 +106,19 @@ export function generateAnomalySummary(
     } else {
       // A cleared field reaches here as "", and Number("")/Number(null) are
       // both 0, so blanks need excluding before any number is shown.
-      const stored = config.threshold;
-      const percentile =
-        stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
-      if (Number.isFinite(percentile)) {
-        // The stored percentile indexes TRAINING scores; never restate it as
-        // a live anomaly rate — that arithmetic was measured false.
-        parts.push(
-          t("alerts.anomaly.summaryThreshold", {
-            threshold: chip(t("alerts.anomaly.summaryThresholdPercentile", { percentile })),
-          }),
-        );
-      }
+      const blankToNaN = (v: unknown) =>
+        v === null || v === undefined || v === "" ? NaN : Number(v);
+      const bandWidth = blankToNaN(config.band_width);
+      const trainedK = anomalyTrainedK(config);
+      const auto =
+        trainedK === null
+          ? t("alerts.anomaly.sensitivityAuto")
+          : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK });
+      parts.push(
+        t("alerts.anomaly.summaryThreshold", {
+          threshold: chip(Number.isFinite(bandWidth) ? `${bandWidth}σ` : auto),
+        }),
+      );
     }
   }
 
@@ -140,6 +152,15 @@ export function generateAnomalySummary(
         );
       }
     }
+    // The gates are configured whether or not notifications are on, so they show either way.
+    const directionKey =
+      ANOMALY_DIRECTION_KEYS[config.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both;
+    parts.push(t("alerts.anomaly.summaryDirection", { direction: chip(t(directionKey as any)) }));
+    parts.push(
+      t("alerts.anomaly.summaryWindowShare", {
+        rule: chip(t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(config))),
+      }),
+    );
   }
 
   const bulletPoints = parts.join("\n");
@@ -158,7 +179,7 @@ function generatePlainEnglish(config: any, wizardStep: number, t: TranslateFn): 
   const stream = esc(config.stream_name);
   const fn = esc(config.detection_function || "count");
   const schedule = esc(`${config.schedule_interval_value}${config.schedule_interval_unit}`);
-  const trainingDays = config.training_window_days || 14;
+  const trainingDays = config.training_window_days || 28;
 
   if (wizardStep < 2) {
     return t("alerts.anomaly.summaryConfiguring", {

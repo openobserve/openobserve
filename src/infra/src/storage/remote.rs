@@ -152,7 +152,12 @@ impl ObjectStore for Remote {
             .get_opts(&(self.format_key(&file).into()), options)
             .await
             .map_err(|e| {
-                log::error!("[STORAGE] get_opts remote file: {file}, error: {e:?}");
+                // NotFound is a normal probe outcome (optional blobs, head checks), not a fault.
+                if matches!(e, object_store::Error::NotFound { .. }) {
+                    log::debug!("[STORAGE] get_opts remote file: {file}, error: {e:?}");
+                } else {
+                    log::error!("[STORAGE] get_opts remote file: {file}, error: {e:?}");
+                }
                 e
             })?;
 

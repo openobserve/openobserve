@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { spanWindowUs, traceQueryWindow, TRACE_RANGE_PADDING_US } from "@/utils/rum/traceWindow";
+import {
+  arrivalTraceWindowUs,
+  spanWindowUs,
+  traceQueryWindow,
+  TRACE_RANGE_PADDING_US,
+} from "@/utils/rum/traceWindow";
 
 describe("traceQueryWindow", () => {
   it("pads an indexed range on both sides", () => {
@@ -99,5 +104,48 @@ describe("spanWindowUs", () => {
       end_time: 20_000_000 + i * 1_000,
     }));
     expect(spanWindowUs(spans)).toEqual({ start: 10_000, end: 169_999 });
+  });
+});
+
+describe("arrivalTraceWindowUs", () => {
+  it("pads the earliest first and latest last arrival across hits", () => {
+    const hits = [
+      { _first_ts: 5_000_000, _last_ts: 6_000_000 },
+      { _first_ts: 1_000_000, _last_ts: 2_000_000 },
+      { _first_ts: 3_000_000, _last_ts: 9_000_000 },
+    ];
+    expect(arrivalTraceWindowUs(hits)).toEqual({
+      start: 1_000_000 - TRACE_RANGE_PADDING_US,
+      end: 9_000_000 + TRACE_RANGE_PADDING_US,
+    });
+  });
+
+  it("parses numeric-string timestamps", () => {
+    expect(arrivalTraceWindowUs([{ _first_ts: "1000000", _last_ts: "2000000" }])).toEqual({
+      start: 1_000_000 - TRACE_RANGE_PADDING_US,
+      end: 2_000_000 + TRACE_RANGE_PADDING_US,
+    });
+  });
+
+  it("ignores null, blank, zero and NaN values", () => {
+    const hits = [
+      { _first_ts: null, _last_ts: null },
+      { _first_ts: "", _last_ts: "" },
+      { _first_ts: 0, _last_ts: 0 },
+      { _first_ts: NaN, _last_ts: NaN },
+      { _first_ts: "abc", _last_ts: -5 },
+      { _first_ts: 4_000_000, _last_ts: 7_000_000 },
+    ];
+    expect(arrivalTraceWindowUs(hits)).toEqual({
+      start: 4_000_000 - TRACE_RANGE_PADDING_US,
+      end: 7_000_000 + TRACE_RANGE_PADDING_US,
+    });
+  });
+
+  it("returns null when no hit has a usable timestamp", () => {
+    expect(arrivalTraceWindowUs([])).toBeNull();
+    expect(
+      arrivalTraceWindowUs([{}, { _first_ts: null, _last_ts: "" }, { _first_ts: 0 }]),
+    ).toBeNull();
   });
 });

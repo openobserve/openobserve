@@ -108,17 +108,27 @@ pub async fn get_profiles_meta(
         timeout,
     };
 
+    let [services_trace_id, types_trace_id] = sub_query_trace_ids(&request_trace_id);
+    let services_params = ProfilesSqlParams {
+        request_trace_id: &services_trace_id,
+        ..sql_params
+    };
+    let types_params = ProfilesSqlParams {
+        request_trace_id: &types_trace_id,
+        ..sql_params
+    };
+
     // Only DISTINCT columns present in schema — async-profiler data often has no service_name.
     let services_fut = async {
         if schema_fields.iter().any(|f| f == "service_name") {
-            distinct_values(&sql_params, &stream, "service_name", http_span.clone()).await
+            distinct_values(&services_params, &stream, "service_name", http_span.clone()).await
         } else {
             Ok(Vec::new())
         }
     };
     let profile_types_fut = async {
         if schema_fields.iter().any(|f| f == "profile_type") {
-            load_profile_types(&sql_params, &stream, http_span.clone()).await
+            load_profile_types(&types_params, &stream, http_span.clone()).await
         } else {
             Ok(Vec::new())
         }
@@ -142,6 +152,14 @@ pub async fn get_profiles_meta(
         took: started.elapsed().as_millis() as u64,
     })
     .into_response()
+}
+
+/// Concurrent searches need their own ids: the query manager keys running searches by trace_id.
+fn sub_query_trace_ids(request_trace_id: &str) -> [String; 2] {
+    [
+        format!("{request_trace_id}-services"),
+        format!("{request_trace_id}-types"),
+    ]
 }
 
 async fn distinct_values(
@@ -207,4 +225,17 @@ async fn load_profile_types(
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sub_query_trace_ids_are_distinct_and_keep_the_request_prefix() {
+        let [services, types] = sub_query_trace_ids("req123");
+        assert_ne!(services, types);
+        assert!(services.starts_with("req123"), "{services}");
+        assert!(types.starts_with("req123"), "{types}");
+    }
 }

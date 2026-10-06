@@ -44,6 +44,7 @@ vi.mock("./TracesAnalysisDashboard.vue", () => ({
 // ---------------------------------------------------------------------------
 const mockMetricsRangeFilters = new Map();
 const mockSearchObj = reactive({
+  loading: false,
   data: {
     editorValue: "",
     datetime: { startTime: 1_000_000, endTime: 2_000_000 },
@@ -138,6 +139,7 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
     global: {
       plugins: [mockStore, i18n],
       stubs: {
+        teleport: true,
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',
         },
@@ -146,7 +148,13 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         },
         TracesAnalysisDashboard: {
           template: '<div data-test="traces-analysis-dashboard"></div>',
-          props: ["streamName", "streamType", "timeRange", "analysisType"],
+          props: {
+            streamName: null,
+            streamType: null,
+            timeRange: null,
+            analysisType: null,
+            fullPage: Boolean,
+          },
           emits: ["close"],
         },
       },
@@ -175,6 +183,7 @@ describe("TracesMetricsDashboard", () => {
   beforeEach(async () => {
     // Reset all shared state before every test
     mockMetricsRangeFilters.clear();
+    mockSearchObj.loading = false;
     mockSearchObj.data.editorValue = "";
     mockSearchObj.meta.showHistogram = true;
     mockSearchObj.meta.searchMode = "traces";
@@ -590,6 +599,47 @@ describe("TracesMetricsDashboard", () => {
       await flushPromises();
       const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
       expect(analysisDashboard.exists()).toBe(true);
+    });
+
+    it("should render it full page, teleported into the traces drill-down target", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+      const teleport = wrapper.find("teleport-stub");
+      expect(teleport.attributes("to")).toBe("#traces-drill-down-page");
+      const analysisDashboard = wrapper.findComponent('[data-test="traces-analysis-dashboard"]');
+      expect(analysisDashboard.props("fullPage")).toBe(true);
+    });
+
+    it("should unmount the analysis dashboard when it emits close", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+      wrapper.findComponent('[data-test="traces-analysis-dashboard"]').vm.$emit("close");
+      await flushPromises();
+      expect(wrapper.find("teleport-stub").exists()).toBe(false);
+      expect(wrapper.vm.showAnalysisDashboard).toBe(false);
+    });
+
+    it("should close the analysis dashboard when a new search starts", async () => {
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      mockSearchObj.loading = true;
+      await flushPromises();
+
+      expect(wrapper.vm.showAnalysisDashboard).toBe(false);
+      expect(wrapper.find("teleport-stub").exists()).toBe(false);
+    });
+
+    it("should keep the analysis dashboard open when a search finishes", async () => {
+      mockSearchObj.loading = true;
+      await flushPromises();
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      mockSearchObj.loading = false;
+      await flushPromises();
+
+      expect(wrapper.vm.showAnalysisDashboard).toBe(true);
     });
 
     it("should set defaultAnalysisTab to volume when no brush selection exists", async () => {

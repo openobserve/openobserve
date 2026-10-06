@@ -25,6 +25,8 @@
 export interface PromQLChunkProcessorOptions {
   maxSeries: number;
   enableLogging?: boolean;
+  // Label sets that outrank point count, so a shifted window keeps the series its primary shows.
+  keepFirst?: () => Record<string, string>[];
 }
 
 export interface ProcessingStats {
@@ -42,7 +44,7 @@ export interface ProcessingStats {
  * Creates a PromQL chunk processor with optimized metric matching and series limiting
  */
 export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions) {
-  const { maxSeries, enableLogging = true } = options;
+  const { maxSeries, enableLogging = true, keepFirst } = options;
 
   // Partitions stream oldest-first, so a series born mid-window is absent from the
   // early chunks. Admitting by arrival order spends the cap on whatever existed
@@ -53,9 +55,13 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
   /** The cap exists to bound what the chart renders; keep the series carrying the most data. */
   function selectWithinCap(): any[] {
     if (candidates.size <= maxSeries) return [...candidates.values()];
-    return [...candidates.values()]
-      .sort((a, b) => (b.values?.length ?? 0) - (a.values?.length ?? 0))
-      .slice(0, maxSeries);
+    const first = new Set((keepFirst?.() ?? []).map(getMetricSignature));
+    const rank = ([signature, m]: [string, any]) =>
+      (first.has(signature) ? Number.MAX_SAFE_INTEGER : 0) + (m.values?.length ?? 0);
+    return [...candidates.entries()]
+      .sort((a, b) => rank(b) - rank(a))
+      .slice(0, maxSeries)
+      .map(([, m]) => m);
   }
 
   // Statistics tracking
@@ -223,6 +229,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
   return {
     processChunk,
+    select: selectWithinCap,
     getStats,
     logFinalStats,
   };

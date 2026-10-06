@@ -474,7 +474,7 @@ pub async fn search(
     crate::cache::apply_regex_to_response(
         &req,
         org_id,
-        &stream_name,
+        &all_streams,
         stream_type,
         &mut res,
         trace_id,
@@ -1221,13 +1221,42 @@ pub async fn apply_regex_to_response(
 
     let start = std::time::Instant::now();
     let pattern_manager = get_pattern_manager().await?;
+    redaction_skipped(
+        config::get_config().common.sdr_fail_closed,
+        || {
+            any_stream(all_streams, |stream| {
+                pattern_manager.has_unbuilt_patterns(
+                    org_id,
+                    stream_type,
+                    stream,
+                    o2_enterprise::enterprise::re_patterns::ApplyTime::Search,
+                )
+            })
+        },
+        all_streams,
+        "a configured pattern failed to build",
+    )?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
     let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Error parsing sql: {e}");
-            return Ok(());
+            log::error!("[trace_id {trace_id}] SDR patterns application: error parsing sql: {e}");
+            let at_ingestion =
+                infra::table::re_pattern_stream_map::ApplyPolicy::AtIngestion.to_string();
+            return redaction_skipped(
+                config::get_config().common.sdr_fail_closed,
+                || {
+                    all_streams.split(',').any(|stream| {
+                        pattern_manager
+                            .get_associations(org_id, stream_type, stream.trim())
+                            .iter()
+                            .any(|a| a.apply_at != at_ingestion)
+                    })
+                },
+                all_streams,
+                &e.to_string(),
+            );
         }
     };
 
@@ -1248,7 +1277,7 @@ pub async fn apply_regex_to_response(
             log::error!(
                 "[trace_id {trace_id}] SDR patterns application: error in processing records for stream: {all_streams}: {e}"
             );
-            Err(infra::errors::Error::Message(e.to_string()))
+            Err(redaction_error(all_streams, &e.to_string()))
         }
     };
     let took = start.elapsed().as_millis();
@@ -1259,9 +1288,67 @@ pub async fn apply_regex_to_response(
     ret
 }
 
+/// Every stream a query reads, not only the first: a join exposes the fields of each.
+#[cfg(any(feature = "vectorscan", test))]
+fn any_stream(all_streams: &str, pred: impl Fn(&str) -> bool) -> bool {
+    all_streams.split(',').any(|stream| pred(stream.trim()))
+}
+
+/// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
+#[cfg(any(feature = "vectorscan", test))]
+fn redaction_skipped(
+    fail_closed: bool,
+    has_search_patterns: impl FnOnce() -> bool,
+    all_streams: &str,
+    reason: &str,
+) -> Result<(), infra::errors::Error> {
+    if fail_closed && has_search_patterns() {
+        // 503, not 400: the refusal is a server-side condition, not a fault in the query.
+        return Err(infra::errors::Error::ResourceError(format!(
+            "sensitive-data redaction could not run for {all_streams}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)"
+        )));
+    }
+    Ok(())
+}
+
+/// A redaction failure is the server's fault, so it is a 503, not a 400.
+#[cfg(any(feature = "vectorscan", test))]
+fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
+    infra::errors::Error::ResourceError(format!(
+        "sensitive-data redaction failed for {all_streams}: {reason}; refusing to return unredacted hits"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_any_stream_checks_every_joined_stream() {
+        assert!(any_stream("first, second", |stream| stream == "second"));
+        assert!(!any_stream("first,second", |stream| stream == "third"));
+    }
+
+    #[test]
+    fn test_redaction_error_is_a_503() {
+        let err = redaction_error("app_logs", "scan failed");
+        assert_eq!(err.http_status(), 503, "{err}");
+        assert!(err.to_string().contains("app_logs"), "{err}");
+    }
+
+    #[test]
+    fn test_redaction_skipped_fails_open_by_default() {
+        assert!(redaction_skipped(false, || true, "app_logs", "parse error").is_ok());
+    }
+
+    #[test]
+    fn test_redaction_skipped_fails_closed_only_with_search_patterns() {
+        let err = redaction_skipped(true, || true, "app_logs", "parse error")
+            .expect_err("a stream with search-time patterns must not return unredacted hits");
+        assert!(err.to_string().contains("app_logs"), "{err}");
+        assert_eq!(err.http_status(), 503, "{err}");
+        assert!(redaction_skipped(true, || false, "app_logs", "parse error").is_ok());
+    }
 
     #[test]
     fn test_apply_vrl_to_response_preserves_hits_on_compile_failure() {

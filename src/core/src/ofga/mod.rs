@@ -74,6 +74,7 @@ struct PendingMigrations {
     synthetic_environments: bool,
     prompts: bool,
     prompt_folders: bool,
+    query_history: bool,
     public_dashboards: bool,
 }
 
@@ -535,6 +536,10 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.prompt_folders {
         keys.push("prompt_folders");
     }
+    // Members reach their own query history via owningOrg, which needs this tuple.
+    if pending.query_history {
+        keys.push("query_history");
+    }
     if pending.public_dashboards {
         keys.push("public_dashboards");
     }
@@ -577,7 +582,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
-    let v0_0_52 = version_compare::Version::from("0.0.52").unwrap();
+    let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
+    let v0_0_54 = version_compare::Version::from("0.0.54").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -692,7 +698,12 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] prompt folders permissions migration needed");
         pending.prompt_folders = true;
     }
-    if existing_model_version < v0_0_52 {
+    // 0.0.52 (`rum_analytics`) relies on explicit grants only, so it needs no back-fill.
+    if existing_model_version < v0_0_53 {
+        log::info!("[OFGA:Local] query history permissions migration needed");
+        pending.query_history = true;
+    }
+    if meta_version >= v0_0_54 && existing_model_version < v0_0_54 {
         log::info!("[OFGA:Local] public dashboards permissions migration needed");
         pending.public_dashboards = true;
     }
@@ -705,9 +716,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn public_dashboards_back_fill_runs_once_across_0_0_52() {
-        assert!(pending_migrations("0.0.52", "0.0.51").public_dashboards);
-        assert!(!pending_migrations("0.0.52", "0.0.52").public_dashboards);
+    fn test_query_history_back_fill_below_0_0_53() {
+        let pending = pending_migrations("0.0.53", "0.0.52");
+        assert!(pending.query_history);
+        assert!(!pending.prompt_folders);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["query_history"]);
+
+        let pending = pending_migrations("0.0.53", "0.0.53");
+        assert!(!pending.query_history);
+        assert!(all_org_ownership_keys(&pending).is_empty());
+    }
+
+    #[test]
+    fn public_dashboards_back_fill_runs_once_across_0_0_54() {
+        assert!(pending_migrations("0.0.54", "0.0.53").public_dashboards);
+        assert!(!pending_migrations("0.0.54", "0.0.54").public_dashboards);
         let pending = PendingMigrations {
             public_dashboards: true,
             ..Default::default()

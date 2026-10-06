@@ -54,53 +54,114 @@
     </div>
 
     <div
-      v-for="panel in panels"
-      :key="panel.key"
       class="rounded-default border-border-default flex flex-col overflow-hidden border"
-      :data-test="`alerts-anomalydetectionchart-${panel.key}`"
+      data-test="alerts-anomalydetectionchart-metric"
     >
-      <PanelBar class="w-full justify-between gap-2">
-        {{ panel.label }}
-        <span class="text-text-secondary text-2xs font-normal">{{ panel.hint }}</span>
+      <PanelBar class="w-full flex-wrap justify-between gap-x-2 gap-y-0.5">
+        {{ t("alerts.anomaly.metricChart") }}
+        <span class="flex flex-wrap items-center gap-x-2">
+          <span
+            v-if="bandCaption"
+            class="text-text-secondary text-2xs font-normal"
+            data-test="alerts-anomalydetectionchart-band-caption"
+          >
+            {{ bandCaption }}
+          </span>
+          <span class="text-text-secondary text-2xs font-normal">
+            {{ t("alerts.anomaly.metricChartHint") }}
+          </span>
+        </span>
       </PanelBar>
-      <div class="h-62.5 w-full">
+      <div class="h-100 w-full">
         <div
-          v-if="!kindColumnsReady"
+          v-if="!kindColumnsReady || metricLoading"
           class="flex h-full items-center justify-center"
-          :data-test="`alerts-anomalydetectionchart-${panel.key}-loading`"
+          data-test="alerts-anomalydetectionchart-metric-loading"
         >
           <OSpinner size="md" />
         </div>
-        <PanelSchemaRenderer
-          v-else-if="panel.schema"
-          :height="5"
-          :width="5"
-          :panelSchema="panel.schema"
-          :selectedTimeObj="selectedTimeObj"
-          :variablesData="{}"
-          searchType="ui"
-          :data-test="`alerts-anomalydetectionchart-${panel.key}-panel`"
-        />
         <div
-          v-else
+          v-else-if="!metricQuery || metricError"
           class="flex h-full items-center justify-center px-4 text-center"
-          :data-test="`alerts-anomalydetectionchart-${panel.key}-empty`"
+          data-test="alerts-anomalydetectionchart-metric-empty"
         >
           <span class="text-text-secondary text-sm">
-            {{ t("alerts.groups.chartUnavailable") }}
+            {{ metricError || t("alerts.groups.chartUnavailable") }}
           </span>
         </div>
+        <div
+          v-else-if="!metricRows.length"
+          class="flex h-full items-center justify-center px-4 text-center"
+          data-test="alerts-anomalydetectionchart-metric-nodata"
+        >
+          <span class="text-text-secondary text-sm">
+            {{ t("alerts.anomaly.noDetectionResults") }}
+          </span>
+        </div>
+        <ChartRenderer
+          v-else
+          :data="{ options: metricOptions }"
+          data-test="alerts-anomalydetectionchart-metric-chart"
+        />
       </div>
     </div>
+
+    <OCollapsible
+      :label="t('alerts.anomaly.detectorInternals')"
+      data-test="alerts-anomalydetectionchart-internals"
+    >
+      <div class="flex flex-col gap-3 pt-2">
+        <div
+          v-for="panel in panels"
+          :key="panel.key"
+          class="rounded-default border-border-default flex flex-col overflow-hidden border"
+          :data-test="`alerts-anomalydetectionchart-${panel.key}`"
+        >
+          <PanelBar class="w-full justify-between gap-2">
+            {{ panel.label }}
+            <span class="text-text-secondary text-2xs font-normal">{{ panel.hint }}</span>
+          </PanelBar>
+          <div class="h-62.5 w-full">
+            <div
+              v-if="!kindColumnsReady"
+              class="flex h-full items-center justify-center"
+              :data-test="`alerts-anomalydetectionchart-${panel.key}-loading`"
+            >
+              <OSpinner size="md" />
+            </div>
+            <PanelSchemaRenderer
+              v-else-if="panel.schema"
+              :height="5"
+              :width="5"
+              :panelSchema="panel.schema"
+              :selectedTimeObj="selectedTimeObj"
+              :variablesData="{}"
+              searchType="ui"
+              :data-test="`alerts-anomalydetectionchart-${panel.key}-panel`"
+            />
+            <div
+              v-else
+              class="flex h-full items-center justify-center px-4 text-center"
+              :data-test="`alerts-anomalydetectionchart-${panel.key}-empty`"
+            >
+              <span class="text-text-secondary text-sm">
+                {{ t("alerts.groups.chartUnavailable") }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </OCollapsible>
   </div>
 </template>
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -108,16 +169,21 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
+import searchService from "@/services/search";
 import streamService from "@/services/stream";
+import {
+  anomalyIntervalMs,
+  buildAnomalyBandOptions,
+  latestBandK,
+  toAnomalyBandRows,
+  type AnomalyBandRow,
+} from "@/utils/alerts/anomalyBandChart";
 import {
   ANOMALY_DEVIATION_ALIAS,
   ANOMALY_DROP_ALIAS,
-  ANOMALY_EXPECTED_ALIAS,
-  ANOMALY_FLAGGED_ALIAS,
   ANOMALY_SCORE_ALIAS,
   ANOMALY_STREAM,
   ANOMALY_THRESHOLD_ALIAS,
-  ANOMALY_VALUE_ALIAS,
   ANOMALY_X_ALIAS,
   buildAnomalyDeviationQuery,
   buildAnomalyMetricQuery,
@@ -125,6 +191,10 @@ import {
   NO_KIND_COLUMNS,
   type AnomalyKindColumns,
 } from "@/utils/alerts/anomalyChartQuery";
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
 
 const props = defineProps<{ alert: any; anomalyId: string }>();
 
@@ -136,8 +206,10 @@ const store = useStore();
 const METRIC_TOKEN = "--color-chart-series-1";
 const ANOMALY_TOKEN = "--color-status-error-text";
 const THRESHOLD_TOKEN = "--color-status-warning-text";
-const EXPECTED_TOKEN = "--color-chart-series-2";
 const DROP_TOKEN = "--color-status-warning-text";
+const BAND_TOKEN = "--color-chart-band";
+const AXIS_TOKEN = "--color-text-secondary";
+const GRID_TOKEN = "--color-border-default";
 
 const RANGE_MS: Record<string, number> = {
   "1h": 60 * 60 * 1000,
@@ -154,6 +226,7 @@ interface DetectionPanel {
 }
 
 const selectedTimeObj = ref<any>(null);
+const windowUs = ref({ startUs: 0, endUs: 0 });
 const range = ref<string>("1h");
 
 const rangeOptions = computed(() => [
@@ -163,6 +236,16 @@ const rangeOptions = computed(() => [
 ]);
 
 const interval = computed(() => props.alert?.histogram_interval);
+
+// In custom SQL the function's field names a query alias, not a stream column.
+const metricUnit = computed(() => {
+  const a = props.alert;
+  if (a?.stream_type !== "traces" || a?.query_mode === "custom_sql") return "numbers";
+  const match = /^(\w+)\((.+)\)$/.exec(String(a?.detection_function ?? ""));
+  return match?.[2] === "duration" && match[1].toLowerCase() !== "count"
+    ? "microseconds"
+    : "numbers";
+});
 
 // Kind flags serialize only when true, so the stream schema is what says which per-kind split a query may reference.
 const kindColumns = ref<AnomalyKindColumns>({ ...NO_KIND_COLUMNS });
@@ -183,6 +266,7 @@ async function loadKindColumns() {
       isAbsence: names.has("is_absence"),
       isPartialDrop: names.has("is_partial_drop"),
       expectedValue: names.has("expected_value"),
+      expectedBounds: names.has("expected_lower") && names.has("expected_upper"),
     };
   } catch {
     kindColumns.value = { ...NO_KIND_COLUMNS };
@@ -242,43 +326,10 @@ const buildPanel = (
   return panel.data;
 };
 
-const metricPanel = computed(() =>
-  buildPanel(
-    "line",
-    buildAnomalyMetricQuery(props.anomalyId, interval.value, kindColumns.value),
-    [
-      { alias: ANOMALY_VALUE_ALIAS, label: t("alerts.anomaly.seriesValue"), color: METRIC_TOKEN },
-      {
-        alias: ANOMALY_FLAGGED_ALIAS,
-        label: t("alerts.anomaly.seriesAnomaly"),
-        color: ANOMALY_TOKEN,
-      },
-      ...(kindColumns.value.expectedValue
-        ? [
-            {
-              alias: ANOMALY_EXPECTED_ALIAS,
-              label: t("alerts.anomaly.seriesExpected"),
-              color: EXPECTED_TOKEN as `--${string}`,
-            },
-          ]
-        : []),
-    ],
-    "numbers",
-    {
-      // A single flagged bucket is a one-point series, and a line through one
-      // point draws nothing — the isolated anomaly would be invisible.
-      show_symbol: true,
-      // Linear, not the default smooth: a spline invents curvature between
-      // buckets, and the shape of the excursion is the thing being read.
-      line_interpolation: "linear",
-    },
-  ),
-);
-
 const scorePanel = computed(() =>
   buildPanel(
     "line",
-    buildAnomalyScoreQuery(props.anomalyId, interval.value),
+    buildAnomalyScoreQuery(props.anomalyId, interval.value, kindColumns.value),
     [
       { alias: ANOMALY_SCORE_ALIAS, label: t("alerts.anomaly.seriesScore"), color: METRIC_TOKEN },
       {
@@ -320,12 +371,6 @@ const deviationPanel = computed(() =>
 
 const panels = computed<DetectionPanel[]>(() => [
   {
-    key: "metric",
-    label: t("alerts.anomaly.metricChart"),
-    hint: t("alerts.anomaly.metricChartHint"),
-    schema: metricPanel.value,
-  },
-  {
     key: "score",
     label: t("alerts.anomaly.scoreChart"),
     hint: t("alerts.anomaly.scoreChartHint"),
@@ -339,6 +384,91 @@ const panels = computed<DetectionPanel[]>(() => [
   },
 ]);
 
+const metricQuery = computed(() =>
+  buildAnomalyMetricQuery(props.anomalyId, interval.value, kindColumns.value),
+);
+const metricRows = ref<AnomalyBandRow[]>([]);
+const metricLoading = ref(false);
+const metricError = ref("");
+
+const bandCaption = computed(() => {
+  const k = latestBandK(metricRows.value);
+  return k === null ? "" : t("alerts.anomaly.bandCaption", { k: Math.round(k * 100) / 100 });
+});
+
+const metricOptions = computed(() => {
+  void store.state.theme; // The resolved token values are cached — re-read on a flip.
+  return buildAnomalyBandOptions(
+    metricRows.value,
+    {
+      value: t("alerts.anomaly.seriesValue"),
+      range: t("alerts.anomaly.seriesExpectedRange"),
+      expected: t("alerts.anomaly.seriesExpected"),
+      anomaly: t("alerts.anomaly.seriesAnomaly"),
+      anomalyAbove: t("alerts.anomaly.tooltipAnomalyAbove"),
+      anomalyBelow: t("alerts.anomaly.tooltipAnomalyBelow"),
+      event: t("alerts.anomaly.seriesDropAbsence"),
+    },
+    {
+      value: chartColor(METRIC_TOKEN),
+      band: chartColor(BAND_TOKEN),
+      anomaly: chartColor(ANOMALY_TOKEN),
+      event: chartColor(DROP_TOKEN),
+      axis: chartColor(AXIS_TOKEN),
+      grid: chartColor(GRID_TOKEN),
+    },
+    { startMs: windowUs.value.startUs / 1000, endMs: windowUs.value.endUs / 1000 },
+    anomalyIntervalMs(interval.value),
+    metricUnit.value,
+  );
+});
+
+// An abandoned search holds a work-group slot until it completes, so a superseded load aborts.
+let controller: AbortController | null = null;
+
+async function loadMetric() {
+  controller?.abort();
+  controller = null;
+  metricLoading.value = false;
+  const org = store.state.selectedOrganization?.identifier;
+  const sql = metricQuery.value;
+  metricRows.value = [];
+  metricError.value = "";
+  if (!org || !sql || !kindColumnsReady.value) return;
+
+  const mine = new AbortController();
+  controller = mine;
+  metricLoading.value = true;
+  try {
+    const res = await searchService.search(
+      {
+        org_identifier: org,
+        query: {
+          query: {
+            sql,
+            start_time: windowUs.value.startUs,
+            end_time: windowUs.value.endUs,
+            from: 0,
+            size: -1,
+          },
+        },
+        page_type: "logs",
+        signal: mine.signal,
+      },
+      "ui",
+    );
+    if (controller !== mine) return;
+    metricRows.value = toAnomalyBandRows(res?.data?.hits ?? []);
+  } catch (e: any) {
+    if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
+    if (controller !== mine) return;
+    metricError.value = e?.response?.data?.message || t("alerts.groups.chartUnavailable");
+  } finally {
+    // A superseded request's finally must not drop the spinner of the one in flight.
+    if (controller === mine) metricLoading.value = false;
+  }
+}
+
 // MICROSECONDS into `new Date(...)`, the convention every other alert chart
 // feeds the renderer — honest milliseconds draw an empty chart.
 function setTimeRange() {
@@ -348,6 +478,7 @@ function setTimeRange() {
     start_time: new Date(startUs),
     end_time: new Date(endUs),
   };
+  windowUs.value = { startUs, endUs };
 }
 
 const onRangeChange = (value: unknown) => {
@@ -364,8 +495,10 @@ watch(
     loadKindColumns();
   },
 );
+watch([metricQuery, windowUs, kindColumnsReady], loadMetric);
 onMounted(() => {
   setTimeRange();
   loadKindColumns();
 });
+onBeforeUnmount(() => controller?.abort());
 </script>

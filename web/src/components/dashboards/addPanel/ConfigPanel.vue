@@ -1683,7 +1683,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
         >
           <div class="flex items-center">
-            <CustomDateTimePicker v-model="picker.offSet" :picker="picker" :isFirstEntry="false" />
+            <CustomDateTimePicker
+              v-model="picker.offSet"
+              :picker="picker"
+              :isFirstEntry="false"
+              :excludeMonths="!!promqlMode"
+            />
             <OIcon
               class="ms-2 me-1 cursor-pointer"
               size="sm"

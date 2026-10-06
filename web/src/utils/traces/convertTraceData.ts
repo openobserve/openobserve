@@ -3,6 +3,7 @@ import { computeTreeLayout } from "./computeTreeLayout";
 import { resolveModelVendorLogo } from "./modelVendorLogo";
 import { cssToken } from "@/utils/theme";
 import { gt } from "@/types/i18n";
+import { escapeHtml } from "@/utils/html";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
@@ -1259,6 +1260,8 @@ export function getSpanTechIconDataUrl(name: string, isDark: boolean): string | 
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const MAX_NETWORK_NODE_SYMBOL_SIZE = 110;
+
 /**
  * Convert service graph data to ECharts Graph format (force-directed network)
  */
@@ -1410,7 +1413,10 @@ export const convertServiceGraphToNetwork = (
     }
 
     // Node size: scales with request volume (70–110 px range)
-    const baseSymbolSize = Math.max(70, Math.min(110, Math.log10(metrics.requests + 1) * 28));
+    const baseSymbolSize = Math.max(
+      70,
+      Math.min(MAX_NETWORK_NODE_SYMBOL_SIZE, Math.log10(metrics.requests + 1) * 28),
+    );
     // Agent accent treatment (tint/size/ping) applies only when the Agent
     // Graph page asks for it; elsewhere an un-highlighted agent renders like any
     // other node — downgrade its kind to null so the icon builder skips the
@@ -1462,7 +1468,7 @@ export const convertServiceGraphToNetwork = (
       },
       tooltip: {
         formatter: `
-          <strong>${node.label || node.id}</strong><br/>
+          <strong>${escapeHtml(node.label || node.id)}</strong><br/>
           ${gt("traces.graphTooltip.requests", { value: formatNumber(metrics.requests) })}<br/>
           ${gt("traces.graphTooltip.errors", { value: formatNumber(metrics.errors) })}<br/>
           ${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(2) })}

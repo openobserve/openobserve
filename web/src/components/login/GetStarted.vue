@@ -69,13 +69,23 @@
                 <template #label>
                   <span class="text-sm">
                     {{ t("login.agreeToTermsPrefix") }}
-                    <a href="#" class="text-text-link hover:underline">{{
-                      t("login.termsOfUse")
-                    }}</a>
+                    <a
+                      href="https://openobserve.ai/legal/terms-of-service/"
+                      target="_blank"
+                      rel="noopener"
+                      class="text-text-link hover:underline"
+                      data-test="onboarding-get-started-terms-link"
+                      >{{ t("login.termsOfUse") }}</a
+                    >
                     {{ t("login.and") }}
-                    <a href="#" class="text-text-link hover:underline">{{
-                      t("login.privacyPolicyStar")
-                    }}</a>
+                    <a
+                      href="https://openobserve.ai/legal/privacy-policy/"
+                      target="_blank"
+                      rel="noopener"
+                      class="text-text-link hover:underline"
+                      data-test="onboarding-get-started-privacy-link"
+                      >{{ t("login.privacyPolicyStar") }}</a
+                    >
                   </span>
                 </template>
               </OFormCheckbox>

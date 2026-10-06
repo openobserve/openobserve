@@ -156,7 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <router-view v-slot="{ Component }">
-                <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                <keep-alive :include="KEPT_ALIVE_VIEWS">
+                  <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+                </keep-alive>
               </router-view>
             </div>
           </div>
@@ -285,6 +287,9 @@ import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
+// Product Analytics hands off to RUM's Session Viewer, and Back must land on the same panels without rerunning them.
+const KEPT_ALIVE_VIEWS = ["AppAnalytics"];
+
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
   mainLayoutMixin = MainLayoutCloudMixin;
@@ -384,6 +389,8 @@ export default defineComponent({
     const { isDark } = useTheme();
     const router: any = useRouter();
     const { t } = useI18nTyped();
+    // Once, here: the mixin calls inject() and onMounted(), which outside setup() warn and do nothing.
+    const layoutMixin = mainLayoutMixin.setup();
     const miniMode = ref(false);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
@@ -515,6 +522,13 @@ export default defineComponent({
         icon: "devices",
         link: "/rum",
         name: "rum",
+      },
+      // Experience absorbs this tile; it stays here so custom_hide_menus and the group's `requires` can see it.
+      {
+        title: t("menu.productAnalytics"),
+        icon: "insights",
+        link: "/product-analytics",
+        name: "productAnalytics",
       },
       {
         title: t("menu.dashboard"),
@@ -740,7 +754,7 @@ export default defineComponent({
         getConfig();
       } else {
         if (config.isCloud == "false") {
-          linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+          linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           filterMenus();
         }
         menuReady.value = true;
@@ -896,6 +910,8 @@ export default defineComponent({
         store.state.zoConfig?.custom_hide_menus?.split(",")?.filter((val: string) => val?.trim()) ||
           [],
       );
+      // Product Analytics reads RUM's data and links to RUM setup; it can also be hidden on its own by name.
+      if (disableMenus.has("rum")) disableMenus.add("productAnalytics");
 
       store.dispatch("setHiddenMenus", disableMenus);
 
@@ -908,10 +924,11 @@ export default defineComponent({
 
     // additional links based on environment and conditions
     if (config.isCloud == "true") {
-      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+      linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
       filterMenus();
     } else {
-      linksList.value.splice(7, 0, {
+      const streamsIndex = linksList.value.findIndex((l) => l.name === "streams");
+      linksList.value.splice(streamsIndex + 1, 0, {
         title: t("menu.report"),
         icon: "description",
         link: "/reports",
@@ -923,8 +940,8 @@ export default defineComponent({
     //orgIdentifier query param exists then clear the localstorage and store.
     if (store.state.selectedOrganization != null) {
       if (
-        mainLayoutMixin.setup().customOrganization != undefined &&
-        mainLayoutMixin.setup().customOrganization != store.state.selectedOrganization?.identifier
+        layoutMixin.customOrganization != undefined &&
+        layoutMixin.customOrganization != store.state.selectedOrganization?.identifier
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
@@ -1187,6 +1204,7 @@ export default defineComponent({
         claim_parser_function: "",
         org_storage_enabled: false,
         domain_org_mappings: [],
+        red_insights_enabled: false,
       };
 
       try {
@@ -1231,6 +1249,8 @@ export default defineComponent({
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
           domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
+          red_insights_enabled:
+            orgSettings?.data?.data?.red_insights_enabled ?? defaultSettings.red_insights_enabled,
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
@@ -1299,7 +1319,7 @@ export default defineComponent({
         .then(async (data: any) => {
           const res = { data };
           if (config.isCloud == "false") {
-            linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+            linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           }
 
           store.dispatch("setConfig", res.data);
@@ -1348,7 +1368,7 @@ export default defineComponent({
     };
 
     if (config.isCloud == "true") {
-      mainLayoutMixin.setup().getDefaultOrganization(store);
+      layoutMixin.getDefaultOrganization(store);
     }
 
     const setRumUser = () => {
@@ -1513,6 +1533,7 @@ export default defineComponent({
       isDark,
       t,
       raw,
+      layoutMixin,
       router,
       store,
       config,
@@ -1530,6 +1551,7 @@ export default defineComponent({
       user,
       zoBackendUrl,
       isLoading,
+      KEPT_ALIVE_VIEWS,
       getImageURL,
       updateOrganization,
       setSelectedOrganization,
@@ -1580,7 +1602,7 @@ export default defineComponent({
   },
   watch: {
     forceFetchOrganization() {
-      mainLayoutMixin.setup().getDefaultOrganization(this.store);
+      this.layoutMixin.getDefaultOrganization(this.store);
     },
     changeOrganization: {
       handler() {

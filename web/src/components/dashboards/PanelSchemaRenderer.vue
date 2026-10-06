@@ -804,6 +804,14 @@ export default defineComponent({
       t,
     );
 
+    // Shifted results follow the primaries ([A, B, A', B']), so an array index is not a query index.
+    const isHiddenAt = (index: number) =>
+      hiddenQueries.value.includes(
+        panelSchema.value?.queryType === "promql"
+          ? (metadata.value?.queries?.[index]?.panelQueryIndex ?? index)
+          : index,
+      );
+
     // Filter data based on hiddenQueries for PromQL panels
     const filteredData = computed(() => {
       // If no data, return as is
@@ -817,11 +825,26 @@ export default defineComponent({
       }
 
       // Filter out hidden queries by index (works for both SQL and PromQL)
-      const filtered = data.value.filter(
-        (_: any, index: number) => !hiddenQueries.value.includes(index),
-      );
+      const filtered = data.value.filter((_: any, index: number) => !isHiddenAt(index));
 
       return filtered;
+    });
+
+    // PromQL: metadata.queries and resultMetaData stay index-aligned with filteredData.
+    const filtersPromQLMeta = () =>
+      panelSchema.value?.queryType === "promql" && hiddenQueries.value?.length > 0;
+    const filteredMetadata = computed(() => {
+      const queries = metadata.value?.queries;
+      if (!filtersPromQLMeta() || !Array.isArray(queries)) return metadata.value;
+      return {
+        ...metadata.value,
+        queries: queries.filter((_: any, index: number) => !isHiddenAt(index)),
+      };
+    });
+    const filteredResultMetaData = computed(() => {
+      const rmd = resultMetaData.value;
+      if (!filtersPromQLMeta() || !Array.isArray(rmd)) return rmd;
+      return rmd.filter((_: any, index: number) => !isHiddenAt(index));
     });
 
     // Keep metric sparkline hits index-aligned with filteredData (same filter).
@@ -1213,6 +1236,8 @@ export default defineComponent({
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
     });
+    // Conversions can resolve out of order; only the most recently started may land.
+    let conversionGeneration = 0;
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Preserve the previously rendered chart during a reload. While loading,
       // if the new data buffer has no rows yet but a chart is already rendered,
@@ -1230,6 +1255,10 @@ export default defineComponent({
       }
 
       if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
+        const generation = ++conversionGeneration;
+        // A stream error set while awaiting is newer than this conversion's data.
+        const superseded = () =>
+          generation !== conversionGeneration || !!errorDetail?.value?.message;
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -1237,13 +1266,15 @@ export default defineComponent({
             store,
             chartPanelRef,
             hoveredSeriesState,
-            resultMetaData,
-            metadata.value,
+            filteredResultMetaData,
+            filteredMetadata.value,
             chartPanelStyle.value,
             annotations,
             loading.value,
             filteredSparklineData.value,
           );
+          // Superseded while awaiting: its data is older than what is coming.
+          if (superseded()) return;
 
           // Apply overlay BEFORE assigning to panelData.value.
           // This ensures a single watcher trigger with the overlaid options,
@@ -1356,6 +1387,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
+          if (superseded()) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1483,6 +1515,8 @@ export default defineComponent({
           data.value?.length > 0 &&
           (data.value[0]?.result?.length > 0 ||
             (Array.isArray(data.value[0]) && data.value[0].length > 0));
+        // An emptied buffer is a new run: no conversion started before it may land.
+        if (!data.value?.length) conversionGeneration++;
 
         if (loading.value) {
           // ---- STREAMING (chunks arriving) ----

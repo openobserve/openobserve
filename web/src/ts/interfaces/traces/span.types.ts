@@ -86,7 +86,6 @@ export interface EnrichedSpan extends Span {
   // UI state
   isExpanded: boolean; // Tree expansion state
   isSelected: boolean; // Selected in UI
-  isOnCriticalPath: boolean; // Part of critical path
 
   // Computed values
   resolvedIdentity: string; // e.g. "postgresql:orders", "kafka:user-events", "checkout-api"
