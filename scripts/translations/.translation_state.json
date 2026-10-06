@@ -4893,6 +4893,7 @@
     "shortUrl": {
       "redirecting": "cd23991b4e02a17e"
     },
+    "show": "0df6f1cad36c49da",
     "showMore": "ba8a80fdd7376631",
     "sidePanel": "c28cdd98645b370f",
     "sidebar": {
@@ -5747,6 +5748,8 @@
       "streamOverview": "8a14c51d539d1b56"
     },
     "avg": "41835ff14ac6b8c7",
+    "axisLabelMode": "f24ce57fbbaa6c33",
+    "axisLabelModeTooltip": "1050da1788eaf7a0",
     "axisLabelRotate": "65c80d58470119da",
     "axisLabelRotateTooltipText": "21e881d34fca9b10",
     "axisLabelTooltipNotePrefix": "1150f05446e4d344",
