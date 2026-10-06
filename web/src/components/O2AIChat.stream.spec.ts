@@ -56,6 +56,8 @@ vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
     fetchAiChat: mockFetchAiChat,
     submitFeedback: mockSubmitFeedback,
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
+    cancelAiChat: vi.fn().mockResolvedValue(undefined),
     registerAiChatHandler: vi.fn(),
     removeAiChatHandler: vi.fn(),
     getStructuredContext: vi.fn().mockResolvedValue(null),

@@ -17,6 +17,7 @@ import DOMPurify from "dompurify";
 import hljs from "highlight.js";
 import { marked } from "marked";
 
+import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { TranslateFn } from "@/types/i18n";
 import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
 
@@ -251,4 +252,24 @@ export function processHtmlBlock(content: string): string {
   return sanitized
     .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
     .replace(/<\/pre>/g, "</span>");
+}
+
+/** A chat message prepared for `O2AIChatMessage`: markdown blocks plus inline log entries. */
+export function processChatMessage(message: ChatMessage) {
+  if (message.role === "user") {
+    const orderedBlocks = parseLogEntries(message.content);
+    return {
+      ...message,
+      blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
+      contentBlocks:
+        orderedBlocks.length > 0
+          ? [...orderedBlocks, ...(message.contentBlocks || [])]
+          : message.contentBlocks || [],
+    };
+  }
+  return {
+    ...message,
+    blocks: processMessageContent(message.content),
+    contentBlocks: message.contentBlocks || [],
+  };
 }

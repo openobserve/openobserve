@@ -1132,4 +1132,56 @@ describe("useChatHistory", () => {
       expect(historyOrg1[0].title).toBe("Org1 Chat");
     });
   });
+  describe("adoptServerChat", () => {
+    const SESSION = "0190a1b2-c3d4-7000-8000-000000000001";
+    const makeServer = () => ({
+      enabled: () => true,
+      list: vi.fn(),
+      get: vi.fn().mockResolvedValue({
+        session_id: SESSION,
+        title: "Fork",
+        created_at: 1,
+        updated_at: 2_000_000,
+        last_committed_seq: 0,
+        not_modified: false,
+        turns: [],
+      }),
+      rename: vi.fn(),
+      remove: vi.fn(),
+      removeAll: vi.fn(),
+    });
+
+    it("caches a forked server chat so loadChat opens it from the server", async () => {
+      const server = makeServer();
+      const { adoptServerChat, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const id = await adoptServerChat(SESSION, "Fork");
+      expect(id).toBe(parseInt("0190a1b2c3d4", 16));
+      const chat = await loadChat(id);
+      expect(server.get).toHaveBeenCalledWith(ORG1, SESSION, undefined);
+      expect(chat?.sessionId).toBe(SESSION);
+      expect(chat?.title).toBe("Fork");
+      expect(chat?.serverBacked).toBe(true);
+    });
+
+    it("keeps an already cached entry when adopted again", async () => {
+      const server = makeServer();
+      const { adoptServerChat, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const first = await adoptServerChat(SESSION, "Fork");
+      await loadChat(first);
+      const second = await adoptServerChat(SESSION, "Other title");
+      expect(second).toBe(first);
+      server.get.mockResolvedValue({ not_modified: true });
+      expect((await loadChat(second))?.title).toBe("Fork");
+    });
+  });
 });

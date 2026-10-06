@@ -225,6 +225,17 @@ const useRoutes = () => {
       },
     },
     {
+      // Outside MainLayout and the login redirect: anyone holding a public link can read it.
+      path: "/ai/public/:token",
+      name: "publicSharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token, isPublic: true }),
+      meta: {
+        public: true,
+        titleKey: "routeTitles.sharedChat",
+      },
+    },
+    {
       path: "/slack/oauth/callback",
       name: "slackOAuthCallback",
       component: () => import("@/views/SlackOAuthCallback.vue"),
@@ -1009,6 +1020,15 @@ const useRoutes = () => {
           return;
         }
         routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "ai/shared/:token",
+      name: "sharedChat",
+      component: () => import("@/views/SharedChatView.vue"),
+      props: (to: any) => ({ token: to.params.token }),
+      meta: {
+        titleKey: "routeTitles.sharedChat",
       },
     },
     {
