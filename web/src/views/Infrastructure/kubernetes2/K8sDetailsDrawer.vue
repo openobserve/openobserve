@@ -218,26 +218,6 @@ const viewLogs = async () => {
     data-test="k8s2-details-drawer"
     @update:open="(open: boolean) => !open && emit('close')"
   >
-    <template #header-right>
-      <span
-        v-if="headerStatus"
-        :class="TONE_TEXT_CLASS[headerStatus.tone]"
-        class="text-sm"
-        data-test="k8s2-drawer-status"
-        >{{ headerStatus.text }}</span
-      >
-      <OButton
-        v-if="details.kind === 'pod'"
-        variant="outline"
-        size="sm-action"
-        icon-left="article"
-        data-test="k8s2-drawer-view-logs"
-        :loading="logsBusy"
-        :disabled="logsBusy"
-        @click="viewLogs"
-        >{{ t("infra.k8s2.viewLogs") }}</OButton
-      >
-    </template>
     <div ref="body" class="flex flex-col gap-5">
       <div v-if="!row" class="flex justify-center py-6">
         <OSpinner v-if="pending" size="md" data-test="k8s2-drawer-pending" />
@@ -246,6 +226,31 @@ const viewLogs = async () => {
         }}</OText>
       </div>
       <template v-else>
+        <!-- A long name fills the header at lg and above, so the status and action sit here to keep the close button in view. -->
+        <div
+          v-if="headerStatus || details.kind === 'pod'"
+          class="flex items-center justify-between gap-2"
+          data-test="k8s2-drawer-actions"
+        >
+          <span
+            v-if="headerStatus"
+            :class="TONE_TEXT_CLASS[headerStatus.tone]"
+            class="text-sm"
+            data-test="k8s2-drawer-status"
+            >{{ headerStatus.text }}</span
+          >
+          <OButton
+            v-if="details.kind === 'pod'"
+            variant="outline"
+            size="sm-action"
+            icon-left="article"
+            data-test="k8s2-drawer-view-logs"
+            :loading="logsBusy"
+            :disabled="logsBusy"
+            @click="viewLogs"
+            >{{ t("infra.k8s2.viewLogs") }}</OButton
+          >
+        </div>
         <OBanner
           v-if="eventsScoped && !pending && !observed"
           variant="info"
