@@ -10525,11 +10525,9 @@
       "or": "Ou :",
       "askAi": "Demandez à l'IA de configurer le traçage"
     },
-    "configureFullTextSearch": "pour configurer un champ de recherche en texte intégral pour le flux.",
     "collapseFields": "Effondrer les champs",
     "openFields": "Champs ouverts",
     "timeRangeUpdated": "La plage horaire sélectionnée n'incluait pas cette trace. La plage horaire a été mise à jour pour correspondre à l'horodatage de la trace.",
-    "errorRetrievingTraces": "Une erreur est survenue lors de la récupération des traces.",
     "fetchingTraces": "Chargement des traces...",
     "noStream": {
       "title": "Choisissez un stream pour commencer à explorer",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Voir la tendance des requêtes dans Database Monitoring"
     },
     "index": {
-      "clickHere": "Cliquez ici",
       "changeStreamTitle": "Changer de flux ?",
       "switchStream": "Changer de flux",
       "cancel": "Annuler",

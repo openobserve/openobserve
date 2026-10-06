@@ -10525,11 +10525,9 @@
       "or": "O:",
       "askAi": "Pídele a la IA que configure el rastreo"
     },
-    "configureFullTextSearch": "para configurar un campo de búsqueda de texto completo para la transmisión.",
     "collapseFields": "Campos colapsados",
     "openFields": "Campos abiertos",
     "timeRangeUpdated": "El rango de tiempo seleccionado no incluía esta traza. El rango de tiempo se ha actualizado para coincidir con la marca de tiempo de la traza.",
-    "errorRetrievingTraces": "Se produjo un error al recuperar las trazas.",
     "fetchingTraces": "Cargando trazas...",
     "noStream": {
       "title": "Elige un arroyo para empezar a explorar",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Ver tendencia de consultas en Monitoreo de Base de Datos"
     },
     "index": {
-      "clickHere": "Haga clic aquí",
       "changeStreamTitle": "¿Cambiar stream?",
       "switchStream": "Cambiar stream",
       "cancel": "Cancelar",
