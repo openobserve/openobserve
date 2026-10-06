@@ -56,8 +56,11 @@ pub fn top_level_order(expr: &Expr) -> Option<ResultOrder> {
             match call.func.name {
                 "sort" | "sort_desc" => Some(ResultOrder::Value { descending }),
                 "sort_by_label" | "sort_by_label_desc" => Some(ResultOrder::Labels {
-                    labels: call.args.args[1..]
+                    labels: call
+                        .args
+                        .args
                         .iter()
+                        .skip(1)
                         .filter_map(|arg| match arg.as_ref() {
                             Expr::StringLiteral(label) => Some(label.val.clone()),
                             _ => None,

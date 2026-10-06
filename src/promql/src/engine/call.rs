@@ -1238,7 +1238,7 @@ mod tests {
         let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
         assert!(matches!(
             eval_at("pi()", instant).await,
-            Value::Float(pi) if pi == 3.141592653589793
+            Value::Float(pi) if pi.to_string() == "3.141592653589793"
         ));
         let values = step_values(eval_at("vector(pi())", range_ctx()).await);
         assert_eq!(values.len(), 3);
@@ -1405,7 +1405,7 @@ mod tests {
     #[tokio::test]
     async fn test_histogram_quantiles_rejects_what_upstream_rejects() {
         let h = classic("a", &[("1", 5.0), ("+Inf", 10.0)]);
-        let phis = vec!["0.5"; 11].join(", ");
+        let phis = ["0.5"; 11].join(", ");
         for (query, message) in [
             (
                 format!(r#"histogram_quantiles({h}, "q", {phis})"#),

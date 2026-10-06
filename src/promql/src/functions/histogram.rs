@@ -217,8 +217,7 @@ fn histogram_input(data: Value, func_name: &str) -> Result<Option<Vec<RangeValue
     }
 }
 
-/// Bucket series grouped by every label except `le`, `__name__` and `__hash__`, each group's
-/// series sorted by upper bound and paired with the group's labels.
+/// Bucket series sorted by bound, grouped by every label except `le`, `__name__` and `__hash__`.
 fn classic_histograms(in_matrix: Vec<RangeValue>) -> Vec<(Labels, Vec<(f64, RangeValue)>)> {
     let mut metrics_by_sig: HashMap<u64, Vec<(f64, RangeValue)>> = HashMap::default();
     for rv in in_matrix {
@@ -354,7 +353,10 @@ fn bucket_fraction(
         }
         rank = bucket.count;
     }
-    let capped = |rank: Option<f64>| rank.filter(|rank| !(*rank > count)).unwrap_or(count);
+    let capped = |rank: Option<f64>| {
+        rank.filter(|rank| *rank <= count || rank.is_nan())
+            .unwrap_or(count)
+    };
     (capped(upper_rank) - capped(lower_rank)) / count
 }
 

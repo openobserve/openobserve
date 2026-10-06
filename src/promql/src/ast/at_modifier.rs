@@ -74,8 +74,8 @@ pub fn resolve_at_modifiers(expr: &mut Expr, start: i64, end: i64) -> bool {
     changed
 }
 
-/// The query text with `@ start()` / `@ end()` pinned and `start()`, `end()`, `range()` and
-/// `step()` replaced by literals, `None` when it uses none of them.
+/// The query text with `@ start()` / `@ end()` and the window functions resolved, `None` if it has
+/// none.
 pub fn resolve_query(
     query: &str,
     start: i64,
@@ -212,9 +212,13 @@ fn replace_window_calls(expr: &mut Expr, value_of: &impl Fn(&str) -> Option<f64>
                 .is_some_and(|param| replace_window_calls(param, value_of));
             replace_window_calls(&mut agg.expr, value_of) || param
         }
-        Expr::Call(call) => call.args.args.iter_mut().fold(false, |changed, arg| {
-            replace_window_calls(arg, value_of) || changed
-        }),
+        Expr::Call(call) => {
+            let mut changed = false;
+            for arg in &mut call.args.args {
+                changed |= replace_window_calls(arg, value_of);
+            }
+            changed
+        }
         Expr::VectorSelector(_)
         | Expr::MatrixSelector(_)
         | Expr::NumberLiteral(_)

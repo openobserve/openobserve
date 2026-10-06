@@ -21,8 +21,7 @@ use hashbrown::HashMap;
 use super::{Accumulate, AggFunc};
 use crate::scalar_param::ScalarParam;
 
-/// `limitk` / `limit_ratio`: series picked by a hash of their label set, so every step and
-/// every query picks the same ones, whatever their values.
+/// `limitk` / `limit_ratio`: series picked by a hash of their label set, the same at every step.
 #[derive(Clone)]
 pub(crate) enum Limit {
     K(ScalarParam),
@@ -162,8 +161,8 @@ impl Ord for Picked {
     }
 }
 
-/// Whether `limit_ratio(ratio, …)` keeps a series: its hash, mapped onto `[0, 1)`, is below a
-/// positive ratio or at least `1 + ratio` for a negative one, so `r` and `r - 1` split the input.
+/// Whether `limit_ratio` keeps a hash: below `r` on `[0, 1)`, or at least `1 + r` for a negative
+/// `r`.
 fn ratio_keeps(ratio: f64, signature: u64) -> bool {
     let ratio = ratio.clamp(-1.0, 1.0);
     let position = (signature >> 11) as f64 / (1u64 << 53) as f64;
