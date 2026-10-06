@@ -43,10 +43,16 @@ async function getParser() {
 const S = 1_000_000;
 const T0 = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
 
-const hit = (secondsAfterT0: number, bucket: number, count: number): LatencyHeatmapHit => ({
+const hit = (
+  secondsAfterT0: number,
+  bucket: number,
+  count: number,
+  errors = 0,
+): LatencyHeatmapHit => ({
   x_axis: new Date((T0 + secondsAfterT0 * S) / 1000).toISOString().slice(0, 19),
   duration_bucket: bucket,
   span_count: count,
+  error_count: errors,
 });
 
 describe("bucketBounds", () => {
@@ -80,6 +86,7 @@ describe("buildLatencyHeatmapSql", () => {
     const sql = buildLatencyHeatmapSql("default", [], "15 second");
     expect(sql).toContain("histogram(_timestamp, '15 second') AS x_axis");
     expect(sql).toContain("count(*) AS span_count");
+    expect(sql).toContain("sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count");
     expect(sql).toContain("GROUP BY x_axis, duration_bucket");
     expect(sql).toContain("LIMIT 20000");
   });
@@ -150,7 +157,7 @@ describe("buildHeatmapGrid", () => {
     const grid = buildHeatmapGrid([hit(20, 5, 3)], 10, T0 + 5 * S, T0 + 60 * S)!;
     expect(grid.intervalUs).toBe(10 * S);
     expect(grid.colStartUs).toEqual([0, 10, 20, 30, 40, 50].map((s) => T0 + s * S));
-    expect(grid.cells).toEqual([[2, 0, 1, 3]]);
+    expect(grid.cells).toEqual([[2, 0, 1, 3, 0, 0]]);
   });
 
   it("keeps empty duration rows between two modes", () => {
@@ -161,7 +168,7 @@ describe("buildHeatmapGrid", () => {
   it("keeps bucket 0", () => {
     const grid = buildHeatmapGrid([hit(0, 0, 2), hit(0, 2, 1)], 10, T0, T0 + 10 * S)!;
     expect(grid.rows).toEqual([0, 1, 2]);
-    expect(grid.cells).toContainEqual([0, 0, 1, 2]);
+    expect(grid.cells).toContainEqual([0, 0, 1, 2, 0, 0]);
   });
 
   it("builds rows only from hits that land inside the columns", () => {
@@ -172,7 +179,7 @@ describe("buildHeatmapGrid", () => {
       T0 + 30 * S,
     )!;
     expect(grid.rows).toEqual([5]);
-    expect(grid.cells).toEqual([[1, 0, 1, 1]]);
+    expect(grid.cells).toEqual([[1, 0, 1, 1, 0, 0]]);
   });
 
   it("returns null when no hit lands inside the columns", () => {
@@ -217,6 +224,14 @@ describe("buildHeatmapGrid", () => {
       const inCol = grid.cells.filter((c) => c[0] === col).map((c) => c[2]);
       expect(Math.max(...inCol)).toBe(1);
     }
+  });
+
+  it("carries each cell's error share and error count at indices 4 and 5", () => {
+    const grid = buildHeatmapGrid([hit(10, 4, 20, 5), hit(10, 5, 8, 0)], 10, T0, T0 + 30 * S)!;
+    expect(grid.cells.map((c) => [c[3], c[4], c[5]])).toEqual([
+      [20, 0.25, 5],
+      [8, 0, 0],
+    ]);
   });
 
   it("keeps the raw count at index 3", () => {

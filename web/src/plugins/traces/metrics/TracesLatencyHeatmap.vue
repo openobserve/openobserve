@@ -19,8 +19,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="traces-latency-heatmap"
     class="border-border-default bg-surface-base rounded-default flex h-full min-h-0 flex-col overflow-hidden border"
   >
-    <PanelBar class="w-full" data-test="traces-latency-heatmap-title">
-      {{ t("traces.latencyHeatmap.title") }}
+    <PanelBar class="w-full justify-between gap-2" data-test="traces-latency-heatmap-title">
+      <span class="truncate">{{ t("traces.latencyHeatmap.title") }}</span>
+      <OToggleGroup
+        v-model="colorBy"
+        :label="t('traces.latencyHeatmap.colorBy.label')"
+        label-position="left"
+        mobile-dropdown
+        data-test="traces-latency-heatmap-color-toggle"
+      >
+        <OToggleGroupItem
+          value="spans"
+          size="xs"
+          data-test="traces-latency-heatmap-color-toggle-spans"
+        >
+          {{ t("traces.latencyHeatmap.colorBy.spans") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          value="errors"
+          size="xs"
+          data-test="traces-latency-heatmap-color-toggle-errors"
+        >
+          {{ t("traces.latencyHeatmap.colorBy.errors") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
     </PanelBar>
     <div class="relative min-h-0 flex-1">
       <div
@@ -70,6 +92,8 @@ import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { chartColor, chartTextColor, chartAxisLine, dataZoomBrushStyle } from "@/utils/chartTheme";
 import { heatmapLargeGridDefaults } from "@/utils/dashboard/heatmapDefaults";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -81,6 +105,7 @@ import {
   formatDurationBound,
   selectionFromBox,
   type HeatmapBox,
+  type LatencyHeatmapCell,
   type LatencyHeatmapGrid,
   type LatencyHeatmapSelection,
 } from "./latencyHeatmap";
@@ -110,6 +135,7 @@ const DAY_US = 24 * 3600 * 1_000_000;
 
 const status = ref<"idle" | "loading" | "ready" | "empty" | "unavailable" | "error">("idle");
 const grid = shallowRef<LatencyHeatmapGrid | null>(null);
+const colorBy = ref<"spans" | "errors">("spans");
 
 let controller: AbortController | null = null;
 
@@ -191,11 +217,21 @@ const rangeLabel = (bucket: number) => {
     : `${formatDurationBound(lo)} – ${formatDurationBound(hi)}`;
 };
 
+const cellSeries = (data: LatencyHeatmapCell[]) => ({
+  type: "heatmap",
+  data,
+  // Hundreds of narrow columns: a cell border would cover most of each cell.
+  itemStyle: { borderWidth: 0 },
+  label: { show: false },
+  ...heatmapLargeGridDefaults(data.length),
+});
+
 const options = computed(() => {
   void isDark.value; // The resolved token values are cached — re-read on a flip.
   const g = grid.value;
   if (!g) return {};
   const textColor = chartTextColor();
+  const byErrors = colorBy.value === "errors";
   return {
     animation: false,
     // ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.
@@ -206,11 +242,15 @@ const options = computed(() => {
       borderWidth: 0,
       textStyle: { color: chartColor("--color-tooltip-text"), fontSize: 12 },
       formatter: (params: any) => {
-        const [col, row, , count] = params.data;
+        const [col, row, , count, errorShare, errorCount] = params.data;
+        const share = `${+(errorShare * 100).toFixed(1)}%`;
         return [
           escapeHtml(columnLabels.value[col]),
           escapeHtml(rangeLabel(g.rows[row])),
           escapeHtml(t("traces.latencyHeatmap.tooltipSpans", { count }, count)),
+          escapeHtml(
+            t("traces.latencyHeatmap.tooltipErrors", { count: errorCount, share }, errorCount),
+          ),
         ].join("<br/>");
       },
     },
@@ -230,13 +270,33 @@ const options = computed(() => {
       axisLine: { lineStyle: { color: chartAxisLine() } },
       axisLabel: { color: textColor, fontSize: 10 },
     },
-    visualMap: {
-      show: false,
-      dimension: 2,
-      min: 0,
-      max: 1,
-      inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.2, 1] },
-    },
+    visualMap: byErrors
+      ? [
+          {
+            show: false,
+            seriesIndex: 0,
+            dimension: 4,
+            min: 0,
+            max: 1,
+            inRange: { color: [chartColor("--color-status-error-text")], colorAlpha: [0.2, 1] },
+          },
+          // ECharts refuses a heatmap series without a visual map, so the neutral series gets a constant one.
+          {
+            show: false,
+            seriesIndex: 1,
+            dimension: 5,
+            min: 0,
+            max: 1,
+            inRange: { color: [chartColor("--color-chart-band")] },
+          },
+        ]
+      : {
+          show: false,
+          dimension: 2,
+          min: 0,
+          max: 1,
+          inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.2, 1] },
+        },
     toolbox: {
       show: true,
       showTitle: false,
@@ -248,16 +308,13 @@ const options = computed(() => {
         dataZoom: { xAxisIndex: 0, yAxisIndex: 0, brushStyle: dataZoomBrushStyle() },
       },
     },
-    series: [
-      {
-        type: "heatmap",
-        data: g.cells,
-        // Hundreds of narrow columns: a cell border would cover most of each cell.
-        itemStyle: { borderWidth: 0 },
-        label: { show: false },
-        ...heatmapLargeGridDefaults(g.cells.length),
-      },
-    ],
+    series: byErrors
+      ? [
+          cellSeries(g.cells.filter((c) => c[5] > 0)),
+          // Zero-error cells keep the span footprint visible in a neutral grey.
+          cellSeries(g.cells.filter((c) => c[5] === 0)),
+        ]
+      : [cellSeries(g.cells)],
   };
 });
 

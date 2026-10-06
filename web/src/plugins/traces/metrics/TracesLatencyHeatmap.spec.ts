@@ -19,10 +19,24 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 import searchService from "@/services/search";
 
-const { tokenColors, labelOverride } = vi.hoisted(() => ({
+const { tokenColors, labelOverride, viewport } = vi.hoisted(() => ({
   tokenColors: { "--color-latency-p95": "#0a4ce8" } as Record<string, string>,
   labelOverride: { value: null as string | null },
+  viewport: { mdUp: true },
 }));
+
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !viewport.mdUp),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => viewport.mdUp),
+      mdUp: computed(() => viewport.mdUp),
+      lgUp: computed(() => viewport.mdUp),
+    }),
+  };
+});
 
 // Lets a test feed markup through the column label, the one tooltip line derived from formatting.
 vi.mock("@/utils/timezone", async (importOriginal) => {
@@ -67,8 +81,8 @@ const START = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
 const END = START + 60 * S;
 
 const HITS = [
-  { x_axis: "2026-10-06T10:00:10", duration_bucket: 16, span_count: 40 },
-  { x_axis: "2026-10-06T10:00:20", duration_bucket: 18, span_count: 3 },
+  { x_axis: "2026-10-06T10:00:10", duration_bucket: 16, span_count: 40, error_count: 4 },
+  { x_axis: "2026-10-06T10:00:20", duration_bucket: 18, span_count: 3, error_count: 0 },
 ];
 
 const respond = (data: Record<string, unknown>) => search.mockResolvedValue({ data } as any);
@@ -90,10 +104,13 @@ const settle = async () => {
   for (let i = 0; i < 6; i++) await flushPromises();
 };
 
-const mountHeatmap = async (props: Record<string, unknown> = { request: request() }) => {
+const mountHeatmap = async (
+  props: Record<string, unknown> = { request: request() },
+  stubs: Record<string, unknown> = {},
+) => {
   const wrapper = mount(TracesLatencyHeatmap, {
     props,
-    global: { plugins: [i18n, store] },
+    global: { plugins: [i18n, store], stubs },
   });
   await settle();
   return wrapper;
@@ -117,7 +134,10 @@ beforeEach(() => {
   search.mockReset();
   respond({ hits: HITS, histogram_interval: 10 });
   tokenColors["--color-latency-p95"] = "#0a4ce8";
+  tokenColors["--color-status-error-text"] = "#cc3645";
+  tokenColors["--color-chart-band"] = "#737373";
   labelOverride.value = null;
+  viewport.mdUp = true;
 });
 
 afterEach(() => {
@@ -333,5 +353,123 @@ describe("TracesLatencyHeatmap", () => {
         ],
       ]);
     });
+  });
+  describe("color by", () => {
+    const toggle = '[data-test="traces-latency-heatmap-color-toggle"]';
+    const toErrors = async (w: any) => {
+      await w.find('[data-test="traces-latency-heatmap-color-toggle-errors"]').trigger("click");
+      await settle();
+    };
+
+    it("defaults to Spans, which is the density option", async () => {
+      wrapper = await mountHeatmap();
+      const o = options(wrapper);
+      expect(o.series).toHaveLength(1);
+      expect(o.visualMap.dimension).toBe(2);
+      expect(o.visualMap.seriesIndex).toBeUndefined();
+      expect(o.visualMap.inRange).toEqual({ color: ["#0a4ce8"], colorAlpha: [0.2, 1] });
+      expect(o.series[0].data).toHaveLength(2);
+    });
+
+    it("colours cells by error share in Errors mode, with zero-error cells in a neutral series", async () => {
+      wrapper = await mountHeatmap();
+      await toErrors(wrapper);
+      const o = options(wrapper);
+      expect(o.series).toHaveLength(2);
+      expect(o.series[0].data.map((c: number[]) => c[3])).toEqual([40]);
+      expect(o.series[1].data.map((c: number[]) => c[3])).toEqual([3]);
+      // ECharts refuses a heatmap series without a visual map, so each series gets its own.
+      const [errorsMap, bandMap] = o.visualMap;
+      expect(errorsMap.show).toBe(false);
+      expect(errorsMap.seriesIndex).toBe(0);
+      expect(errorsMap.dimension).toBe(4);
+      expect(errorsMap.min).toBe(0);
+      expect(errorsMap.max).toBe(1);
+      expect(errorsMap.inRange).toEqual({ color: ["#cc3645"], colorAlpha: [0.2, 1] });
+      expect(chartColor).toHaveBeenCalledWith("--color-status-error-text");
+      expect(bandMap.show).toBe(false);
+      expect(bandMap.seriesIndex).toBe(1);
+      expect(bandMap.inRange).toEqual({ color: ["#737373"] });
+      expect(chartColor).toHaveBeenCalledWith("--color-chart-band");
+    });
+
+    it("labels the toggle Color by and collapses it to a dropdown on phones", async () => {
+      wrapper = await mountHeatmap();
+      const group = wrapper.findComponent({ name: "OToggleGroup" });
+      expect(wrapper.find(toggle).exists()).toBe(true);
+      expect(group.props("label")).toBe(i18n.global.t("traces.latencyHeatmap.colorBy.label"));
+      expect(group.props("labelPosition")).toBe("left");
+      expect(group.props("mobileDropdown")).toBe(true);
+    });
+
+    it("switches to Errors from the phone dropdown exactly as from the strip", async () => {
+      viewport.mdUp = false;
+      wrapper = await mountHeatmap(undefined, {
+        ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+        ODropdownItem: {
+          emits: ["select"],
+          template: "<div v-bind='$attrs' @click=\"$emit('select')\"><slot /></div>",
+        },
+      });
+      expect(
+        wrapper.find('[data-test="traces-latency-heatmap-color-toggle-dropdown-btn"]').exists(),
+      ).toBe(true);
+      await wrapper
+        .find('[data-test="traces-latency-heatmap-color-toggle-errors-item"]')
+        .trigger("click");
+      await settle();
+      expect(options(wrapper).visualMap[0].dimension).toBe(4);
+      expect(options(wrapper).series).toHaveLength(2);
+    });
+
+    for (const mode of ["spans", "errors"] as const) {
+      describe(`in ${mode} mode`, () => {
+        const mountIn = async () => {
+          const w = await mountHeatmap();
+          if (mode === "errors") await toErrors(w);
+          return w;
+        };
+
+        it("adds the escaped error count and share to the tooltip", async () => {
+          labelOverride.value = "<b>10:00</b>";
+          wrapper = await mountIn();
+          const html: string = options(wrapper).tooltip.formatter({
+            data: cellWithCount(wrapper, 40),
+          });
+          expect(html).toContain(
+            i18n.global.t("traces.latencyHeatmap.tooltipErrors", { count: 4, share: "10%" }, 4),
+          );
+          expect(html).not.toContain("<b>");
+        });
+
+        it("emits the same selection for a box", async () => {
+          wrapper = await mountIn();
+          wrapper
+            .findComponent({ name: "ChartRenderer" })
+            .vm.$emit("updated:dataZoom", { start: 1, end: 2, start1: 0, end1: 1 });
+          expect(wrapper.emitted("select")).toEqual([
+            [
+              {
+                timeStartUs: START + 10 * S,
+                timeEndUs: START + 30 * S,
+                durationLoUs: 100_000,
+                durationHiUs: 500_000,
+              },
+            ],
+          ]);
+        });
+
+        it("rebuilds the option when the theme flips", async () => {
+          wrapper = await mountIn();
+          tokenColors["--color-latency-p95"] = "#5586f7";
+          tokenColors["--color-status-error-text"] = "#eb938d";
+          store.state.theme = "dark";
+          await settle();
+          const o = options(wrapper);
+          const colourMap = mode === "spans" ? o.visualMap : o.visualMap[0];
+          expect(colourMap.inRange.color).toEqual([mode === "spans" ? "#5586f7" : "#eb938d"]);
+        });
+      });
+    }
   });
 });

@@ -31,7 +31,11 @@ export interface LatencyHeatmapHit {
   x_axis: string;
   duration_bucket: number;
   span_count: number;
+  error_count: number;
 }
+
+// [column, row, density colour, span count, error share, error count]
+export type LatencyHeatmapCell = [number, number, number, number, number, number];
 
 export interface LatencyHeatmapGrid {
   colStartUs: number[];
@@ -39,7 +43,7 @@ export interface LatencyHeatmapGrid {
   rangeStartUs: number;
   rangeEndUs: number;
   rows: number[];
-  cells: [number, number, number, number][];
+  cells: LatencyHeatmapCell[];
 }
 
 export interface LatencyHeatmapSelection {
@@ -102,7 +106,8 @@ export function buildLatencyHeatmapSql(
   const where = filters.length ? ` WHERE ${filters.join(" AND ")}` : "";
   return (
     `SELECT histogram(_timestamp, '${interval}') AS x_axis, CASE ${whens} ELSE ${TOP_BUCKET} END AS duration_bucket, ` +
-    `count(*) AS span_count FROM "${streamName}"${where} ` +
+    `count(*) AS span_count, sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count ` +
+    `FROM "${streamName}"${where} ` +
     `GROUP BY x_axis, duration_bucket LIMIT ${HEATMAP_ROW_LIMIT}`
   );
 }
@@ -125,11 +130,16 @@ export function buildHeatmapGrid(
   for (let t = firstUs; t < rangeEndUs; t += intervalUs) colStartUs.push(t);
 
   // Rows span only the hits drawn, so a bucket outside the columns cannot stretch the y axis.
-  const kept: { col: number; bucket: number; count: number }[] = [];
+  const kept: { col: number; bucket: number; count: number; errors: number }[] = [];
   for (const h of hits) {
     const col = Math.round((parseBucketUs(h.x_axis) - firstUs) / intervalUs);
     if (col < 0 || col >= colStartUs.length) continue;
-    kept.push({ col, bucket: Number(h.duration_bucket), count: Number(h.span_count) });
+    kept.push({
+      col,
+      bucket: Number(h.duration_bucket),
+      count: Number(h.span_count),
+      errors: Number(h.error_count ?? 0),
+    });
   }
   if (!kept.length) return null;
 
@@ -141,11 +151,13 @@ export function buildHeatmapGrid(
   const colMax = new Array<number>(colStartUs.length).fill(0);
   for (const k of kept) colMax[k.col] = Math.max(colMax[k.col], k.count);
   // Per-column square root: each column shows its own latency shape, and the faint tail keeps a gradient.
-  const cells = kept.map(({ col, bucket, count }): [number, number, number, number] => [
+  const cells = kept.map(({ col, bucket, count, errors }): LatencyHeatmapCell => [
     col,
     bucket - minBucket,
     Math.sqrt(count / colMax[col]),
     count,
+    errors / count,
+    errors,
   ]);
 
   return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells };

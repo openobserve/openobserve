@@ -272,6 +272,14 @@ describe("TracesMetricsDashboard", () => {
       expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp, '15 second')");
     });
 
+    it("asks the heatmap for each cell's error count, so both colour modes share one query", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      expect(getHeatmapSql(wrapper)).toContain(
+        "sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count",
+      );
+    });
+
     it("labels Rate in traces/s with two decimals", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();

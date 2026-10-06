@@ -10496,6 +10496,12 @@
     "latencyHeatmap": {
       "title": "Duration",
       "tooltipSpans": "{count} span | {count} spans",
+      "tooltipErrors": "{count} error ({share}) | {count} errors ({share})",
+      "colorBy": {
+        "label": "Color by",
+        "spans": "Spans",
+        "errors": "Errors"
+      },
       "noData": "No data",
       "unavailable": "The latency heatmap is not available for this search",
       "loadFailed": "Failed to load the latency heatmap"
