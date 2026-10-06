@@ -1602,12 +1602,25 @@ describe("SearchBar", () => {
       expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
     });
 
+    it("opens the save dialog from the save button beside the menu, as logs does", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const saveBtn = wrapper.find('[data-test="traces-search-bar-saved-views-create-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+      await saveBtn.trigger("click");
+      expect((wrapper.vm as any).saveViewDialogOpen).toBe(true);
+    });
+
     it.each(["service-graph", "services-catalog"])("is hidden on the %s tab", async (mode) => {
       searchObjInstance.meta.searchMode = mode as any;
       wrapper = mountSearchBar();
       await flushPromises();
 
       expect(wrapper.find('[data-test="traces-search-bar-saved-views-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-bar-saved-views-create-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("save serialises exactly the view fields", async () => {
