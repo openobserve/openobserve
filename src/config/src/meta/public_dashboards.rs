@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::meta::dashboards::Dashboard;
+
 /// Draft configures the share without exposing it; Public serves it and is the default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -206,6 +208,9 @@ pub struct PanelSnapshot {
 pub struct SnapshotData {
     pub panels: BTreeMap<String, PanelSnapshot>,
     pub built_at: i64,
+    /// The values this snapshot was built with, defaults included, as the viewer shows them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<PublicVariable>,
 }
 
 /// The sanitized config the anonymous plane returns — layout + viz specs and
@@ -237,7 +242,7 @@ pub struct KeyedRange {
 }
 
 /// A dashboard variable as the public viewer sees it: display label and frozen value only.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PublicVariable {
     pub label: String,
     pub value: serde_json::Value,
@@ -247,6 +252,51 @@ pub struct PublicVariable {
     /// Set for a panel-scoped variable: the panel this value belongs to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub panel_id: Option<String>,
+}
+
+impl PublicVariable {
+    /// One entry per visible scope instance, valued from `values` by its key (`name.t.<tab>`).
+    pub fn list(dash: &Dashboard, values: &BTreeMap<String, serde_json::Value>) -> Vec<Self> {
+        let Some(list) = dash.v8.as_ref().and_then(|v8| v8.variables.as_ref()) else {
+            return vec![];
+        };
+        list.list
+            .iter()
+            .filter(|v| v.hide_on_dashboard != Some(true) && v.type_field != "dynamic_filters")
+            .flat_map(|v| {
+                let label = if v.label.is_empty() {
+                    v.name.clone()
+                } else {
+                    v.label.clone()
+                };
+                let instances: Vec<(String, Option<String>, Option<String>)> =
+                    match v.scope.as_deref() {
+                        Some("tabs") => v
+                            .tabs
+                            .iter()
+                            .flatten()
+                            .map(|t| (format!("{}.t.{t}", v.name), Some(t.clone()), None))
+                            .collect(),
+                        Some("panels") => v
+                            .panels
+                            .iter()
+                            .flatten()
+                            .map(|p| (format!("{}.p.{p}", v.name), None, Some(p.clone())))
+                            .collect(),
+                        _ => vec![(v.name.clone(), None, None)],
+                    };
+                instances
+                    .into_iter()
+                    .map(|(key, tab_id, panel_id)| Self {
+                        label: label.clone(),
+                        value: values.get(&key).cloned().unwrap_or(serde_json::Value::Null),
+                        tab_id,
+                        panel_id,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -293,10 +343,12 @@ mod tests {
         let s = serde_json::to_string(&SnapshotData {
             panels,
             built_at: 1,
+            variables: vec![],
         })
         .unwrap();
         assert!(s.contains("resultMetaData"), "{s}");
         assert!(s.contains("\"panel-1\""), "{s}");
+        assert!(!s.contains("variables"), "{s}");
     }
 
     fn state() -> PublicLinkState {

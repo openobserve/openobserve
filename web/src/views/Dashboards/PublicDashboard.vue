@@ -194,7 +194,7 @@ const builtAt = computed<number | null>(
   () => snapshot.value?.built_at ?? config.value?.built_at ?? null,
 );
 
-// A variable missing from the capture falls back to its live default server-side, so empty means unset.
+// Missing values are filled with the live default before the build, so empty means the picker had nothing.
 const variableValue = (value: unknown): string => {
   if (value === null || value === undefined || value === "") {
     return t("dashboard.publicDashboard.variableUnset");
@@ -207,9 +207,12 @@ type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id
 
 // Constants are read-only and query nothing, and the grid places each by scope as the live page does.
 const frozenVariables = computed(() => {
-  const all: PublicVariable[] = Array.isArray(config.value?.variables)
-    ? config.value.variables
-    : [];
+  // The snapshot lists the values its data was built with, including defaults the link never froze.
+  const all: PublicVariable[] = Array.isArray(snapshot.value?.variables)
+    ? snapshot.value.variables
+    : Array.isArray(config.value?.variables)
+      ? config.value.variables
+      : [];
   return all.map((v, i) => ({
     // Scoped entries repeat a label, and the grid keys variables by name.
     name: `public_var_${i}`,

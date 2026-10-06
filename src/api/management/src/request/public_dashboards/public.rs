@@ -170,49 +170,10 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
 
 /// Visible variables with their frozen values; one missing from the capture shows as null.
 fn public_variables(dash: &Dashboard, frozen: Option<&str>) -> Vec<PublicVariable> {
-    let frozen: std::collections::BTreeMap<String, serde_json::Value> = frozen
+    let frozen = frozen
         .and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default();
-    let Some(list) = dash.v8.as_ref().and_then(|v8| v8.variables.as_ref()) else {
-        return vec![];
-    };
-    list.list
-        .iter()
-        .filter(|v| v.hide_on_dashboard != Some(true) && v.type_field != "dynamic_filters")
-        .flat_map(|v| {
-            let label = if v.label.is_empty() {
-                v.name.clone()
-            } else {
-                v.label.clone()
-            };
-            // One entry per scope instance, keyed as the link stores it (`name.t.<tab>`).
-            let instances: Vec<(String, Option<String>, Option<String>)> = match v.scope.as_deref()
-            {
-                Some("tabs") => v
-                    .tabs
-                    .iter()
-                    .flatten()
-                    .map(|t| (format!("{}.t.{t}", v.name), Some(t.clone()), None))
-                    .collect(),
-                Some("panels") => v
-                    .panels
-                    .iter()
-                    .flatten()
-                    .map(|p| (format!("{}.p.{p}", v.name), None, Some(p.clone())))
-                    .collect(),
-                _ => vec![(v.name.clone(), None, None)],
-            };
-            instances
-                .into_iter()
-                .map(|(key, tab_id, panel_id)| PublicVariable {
-                    label: label.clone(),
-                    value: frozen.get(&key).cloned().unwrap_or(serde_json::Value::Null),
-                    tab_id,
-                    panel_id,
-                })
-                .collect::<Vec<_>>()
-        })
-        .collect()
+    PublicVariable::list(dash, &frozen)
 }
 
 /// True if this IP is over its per-minute budget; 0 rpm disables the limiter.

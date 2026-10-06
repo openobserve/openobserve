@@ -312,6 +312,24 @@ describe("PublicDashboard viewer", () => {
     ]);
   });
 
+  it("shows the values the snapshot was built with over the link's frozen ones", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...CONFIG, variables: [{ label: "env", value: null }] },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: {
+        panels: { p1: { state: { state: "ok" }, data: [] } },
+        variables: [{ label: "env", value: "default-env" }],
+      },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const list = grid(w).props("dashboardData").variables.list;
+    expect(list.map((v: { value: string }) => v.value)).toEqual(["default-env"]);
+  });
+
   it("injects a Not-available error for a withheld panel", async () => {
     (service.getConfig as any).mockResolvedValue({ data: CONFIG, status: 200 });
     (service.getData as any).mockResolvedValue({

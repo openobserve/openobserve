@@ -18,6 +18,7 @@
 //! preset for the anonymous plane to point-read. The anonymous plane never runs
 //! a query — all query execution lives here, in a trusted background job.
 
+mod defaults;
 mod variables;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,7 +29,7 @@ use config::{
         dashboards::Dashboard,
         public_dashboards::{
             PanelSnapshot, PanelState, PublicDashboardConfig, PublicLinkState, PublicLinkStatus,
-            SnapshotData, TimeRange, TimeRangePolicy,
+            PublicVariable, SnapshotData, TimeRange, TimeRangePolicy,
         },
         search,
         sql::{TableReferenceExt, resolve_stream_names_with_type},
@@ -39,6 +40,7 @@ use config::{
         time::now_micros,
     },
 };
+use defaults::{Defaults, ValuesQuery};
 use infra::table::{
     dashboards, entity::public_dashboards::Model as PublicDashboard, public_dashboards as pd_table,
 };
@@ -96,16 +98,25 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
         .await
         .ok()
         .map(|s| f64::from(s.scrape_interval));
-    let vars = QueryVars::new(
-        &dash,
-        parse_frozen_vars(pd.frozen_variables.as_deref()),
-        scrape,
-    );
+    let frozen = parse_frozen_vars(pd.frozen_variables.as_deref());
     let mut authorized: BTreeSet<String> = BTreeSet::new();
     let mut unauthorized: BTreeSet<String> = BTreeSet::new();
 
     for range in &due {
         let (start, end) = range.window(now);
+        let values = fill_defaults(
+            &pd.org_id,
+            &pd.published_by,
+            &dash,
+            frozen.clone(),
+            start,
+            end,
+            &mut authorized,
+            &mut unauthorized,
+        )
+        .await;
+        let variables = PublicVariable::list(&dash, &values);
+        let vars = QueryVars::new(&dash, values, scrape);
         let panels = build_panels(
             &pd.org_id,
             &pd.published_by,
@@ -120,6 +131,7 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
         let json = serde_json::to_string(&SnapshotData {
             panels,
             built_at: now,
+            variables,
         })?;
         pd_table::upsert_snapshot(conn, &pd.id, &range.key(), &json, now).await?;
     }
@@ -342,7 +354,17 @@ async fn run_sql(
     };
     let sql = vars.substitute(sql_tmpl, "sql", start, end);
     let stream_type = q.fields.stream_type;
-    authorize_query(org, publisher, "sql", &sql, q, authorized, unauthorized).await?;
+    let target = (q.fields.stream_type, q.fields.stream.as_str());
+    authorize_query(
+        org,
+        publisher,
+        "sql",
+        &sql,
+        target,
+        authorized,
+        unauthorized,
+    )
+    .await?;
 
     let req = sql_request(sql, start, end, q.vrl_function_query.as_deref());
     match search_service::search(
@@ -393,7 +415,17 @@ async fn run_promql(
         return Err("no_query".to_string());
     };
     let expr = vars.substitute(expr_tmpl, "promql", start, end);
-    authorize_query(org, publisher, "promql", &expr, q, authorized, unauthorized).await?;
+    let target = (q.fields.stream_type, q.fields.stream.as_str());
+    authorize_query(
+        org,
+        publisher,
+        "promql",
+        &expr,
+        target,
+        authorized,
+        unauthorized,
+    )
+    .await?;
 
     let step = ((end - start) / 400).max(1_000_000);
     let req = promql_service::MetricsQueryRequest {
@@ -460,6 +492,94 @@ fn sql_request(sql: String, start: i64, end: i64, vrl: Option<&str>) -> search::
     }
 }
 
+/// The link's values, each missing one picked as the live dashboard would for this window.
+#[allow(clippy::too_many_arguments)]
+async fn fill_defaults(
+    org: &str,
+    publisher: &str,
+    dash: &Dashboard,
+    frozen: BTreeMap<String, serde_json::Value>,
+    start: i64,
+    end: i64,
+    authorized: &mut BTreeSet<String>,
+    unauthorized: &mut BTreeSet<String>,
+) -> BTreeMap<String, serde_json::Value> {
+    let mut defaults = Defaults::new(dash, frozen);
+    while let Some(pending) = defaults.next_query() {
+        let keys = run_values(
+            org,
+            publisher,
+            &pending.query,
+            start,
+            end,
+            authorized,
+            unauthorized,
+        )
+        .await;
+        defaults.settle(pending, keys);
+    }
+    defaults.into_values()
+}
+
+/// A picker's values query run as the publisher; None when it is denied or fails, as on the page.
+#[allow(clippy::too_many_arguments)]
+async fn run_values(
+    org: &str,
+    publisher: &str,
+    q: &ValuesQuery,
+    start: i64,
+    end: i64,
+    authorized: &mut BTreeSet<String>,
+    unauthorized: &mut BTreeSet<String>,
+) -> Option<Vec<String>> {
+    let target = (q.stream_type, q.stream.as_str());
+    authorize_query(
+        org,
+        publisher,
+        "sql",
+        &q.sql,
+        target,
+        authorized,
+        unauthorized,
+    )
+    .await
+    .ok()?;
+    let req = search::Request {
+        query: search::Query {
+            sql: q.sql.clone(),
+            start_time: start,
+            end_time: end,
+            size: q.size,
+            track_total_hits: false,
+            ..Default::default()
+        },
+        use_cache: false,
+        ..Default::default()
+    };
+    match search_service::search(
+        &ider::generate_trace_id(),
+        org,
+        q.stream_type,
+        Some(publisher.to_string()),
+        &req,
+    )
+    .await
+    {
+        Ok(resp) => Some(
+            resp.hits
+                .iter()
+                .filter_map(|hit| hit.get("zo_sql_key"))
+                .filter(|key| !key.is_null())
+                .map(variables::js_string)
+                .collect(),
+        ),
+        Err(e) => {
+            log::warn!("public dashboard variable values query failed: {e}");
+            None
+        }
+    }
+}
+
 fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> {
     json.and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default()
@@ -472,7 +592,7 @@ async fn authorize_query(
     user_id: &str,
     query_type: &str,
     text: &str,
-    q: &config::meta::dashboards::v8::Query,
+    (default_type, stream): (StreamType, &str),
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
 ) -> Result<(), String> {
@@ -482,7 +602,7 @@ async fn authorize_query(
             StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
         };
         // An unreadable query can't be proven safe, so it is withheld rather than run.
-        let streams = query_streams(query_type, text, q.fields.stream_type)
+        let streams = query_streams(query_type, text, default_type)
             .map_err(|_| "unauthorized".to_string())?;
         for (stream, stream_type) in &streams {
             let denied = check_stream_permissions(
@@ -509,8 +629,8 @@ async fn authorize_query(
         authorized.extend(streams.into_iter().map(|(stream, _)| stream));
     }
     #[cfg(not(feature = "enterprise"))]
-    if !q.fields.stream.is_empty() {
-        authorized.insert(q.fields.stream.clone());
+    if !stream.is_empty() {
+        authorized.insert(stream.to_string());
     }
     Ok(())
 }

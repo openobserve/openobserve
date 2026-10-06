@@ -22,7 +22,7 @@ use regex::{Captures, Regex};
 
 const VARIABLE_FORMATS: &str = "csv|pipe|doublequote|singlequote";
 /// What an unset or empty value becomes; the server reads a filter on it as "all".
-const SELECT_ALL_VALUE: &str = "_o2_all_";
+pub(super) const SELECT_ALL_VALUE: &str = "_o2_all_";
 const MIN_PERCENTILE_SAMPLES: f64 = 20.0;
 /// The live panel divides the range by its pixel width and falls back to this without one.
 const PANEL_WIDTH_PX: f64 = 1000.0;
@@ -168,7 +168,7 @@ impl PanelVars {
     }
 }
 
-fn placeholder_regex(names: &[&str]) -> Option<Regex> {
+pub(super) fn placeholder_regex(names: &[&str]) -> Option<Regex> {
     if names.is_empty() {
         return None;
     }
@@ -185,7 +185,7 @@ fn placeholder_regex(names: &[&str]) -> Option<Regex> {
 }
 
 /// `{{ v : csv }}` → `{{v:csv}}` and `${ v }` → `${v}`, as the live loader does first.
-fn normalize_syntax(query: &str) -> String {
+pub(super) fn normalize_syntax(query: &str) -> String {
     static MUSTACHE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
         Regex::new(r"\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*([a-zA-Z]+)\s*)?\}\}").unwrap()
     });
@@ -233,12 +233,12 @@ fn format_value(value: &serde_json::Value, format: Option<&str>, query_type: &st
     }
 }
 
-fn escape(s: &str) -> String {
+pub(super) fn escape(s: &str) -> String {
     s.replace('\'', "''")
 }
 
 /// JavaScript's `String(value)` for a JSON value.
-fn js_string(value: &serde_json::Value) -> String {
+pub(super) fn js_string(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(s) => s.clone(),
         serde_json::Value::Null => "null".to_string(),
