@@ -25,6 +25,8 @@ pub struct Model {
     pub last_accessed_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Readers see assistant text and tool names, never tool inputs or outputs.
+    pub redact_tools: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

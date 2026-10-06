@@ -197,6 +197,8 @@ struct ConfigResponse<'a> {
     ai_chat_persistence_enabled: bool,
     /// Persisted AI chats may be shared through public links.
     public_ai_chat_enabled: bool,
+    /// Longest expiry, in days, a public AI chat link may have.
+    public_ai_chat_max_expiry_days: u64,
     /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
     /// recovery window at all — deletion is immediate and permanent, which is what
     /// every OSS build reports.
@@ -600,6 +602,7 @@ pub async fn zo_config(
         ai_enabled,
         ai_chat_persistence_enabled,
         public_ai_chat_enabled: ai_chat_persistence_enabled && cfg.public_ai_chat.enabled,
+        public_ai_chat_max_expiry_days: cfg.public_ai_chat.expiry_limit_days(),
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,

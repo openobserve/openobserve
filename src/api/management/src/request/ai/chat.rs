@@ -56,6 +56,12 @@ use crate::{
 /// Context flag telling o2-ai that `history` is a forked share's transcript, not the caller's own.
 #[cfg(feature = "enterprise")]
 const FORK_SEED_CONTEXT_KEY: &str = "o2_fork_seed";
+/// How long a cancel waits for o2-ai before stopping the turn on this node.
+#[cfg(feature = "enterprise")]
+const UPSTREAM_CANCEL_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+/// How long a turn may keep settling after o2-ai accepted its abort.
+#[cfg(feature = "enterprise")]
+const CANCEL_GRACE: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
@@ -273,8 +279,13 @@ async fn check_chat_owner(
         .unwrap_or_default();
     let owner = super::chats::resolve_owner(user_id).await?;
     match infra::table::ai_chat_sessions::get(org_id, session_id).await {
-        Ok(Some(row)) if row.user_id == owner => Ok(()),
-        // Someone else's or unknown: indistinguishable to the caller.
+        Ok(Some(row))
+            if row.user_id == owner
+                && row.status == infra::table::ai_chat_sessions::STATUS_ACTIVE =>
+        {
+            Ok(())
+        }
+        // Someone else's, deleted or unknown: indistinguishable to the caller.
         Ok(_) => Err(MetaHttpResponse::not_found("Unknown conversation")),
         Err(e) => {
             log::error!("[AI-CHAT] cannot read session {org_id}/{session_id}: {e}");
@@ -283,6 +294,96 @@ async fn check_chat_owner(
             ))
         }
     }
+}
+
+/// Asks o2-ai to abort first so the partial reply is still stored, stopping the turn on this node
+/// when o2-ai cannot.
+#[cfg(feature = "enterprise")]
+async fn cancel_turn(org_id: String, session_id: String, auth: String) -> Response {
+    use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
+
+    let persisted = o2_enterprise::enterprise::ai::chat::is_enabled();
+    let upstream = match get_agent_client() {
+        Some(client) => {
+            let (org_id, session_id) = (org_id.clone(), session_id.clone());
+            let task =
+                tokio::spawn(
+                    async move { client.cancel_session(&session_id, &org_id, &auth).await },
+                );
+            Some(tokio::time::timeout(UPSTREAM_CANCEL_WAIT, task).await)
+        }
+        None => None,
+    };
+    let answered = match upstream {
+        Some(Ok(Ok(Ok(resp)))) => Some(resp),
+        Some(Ok(Ok(Err(e)))) => {
+            log::warn!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
+            None
+        }
+        Some(Ok(Err(e))) => {
+            log::error!("[AI-CHAT] cancel task for {session_id} failed: {e}");
+            None
+        }
+        Some(Err(_)) => {
+            log::warn!("[AI-CHAT] o2-ai did not answer the cancel for {session_id} in time");
+            None
+        }
+        None => None,
+    };
+    match answered {
+        Some(resp) if resp.status().is_success() => {
+            let body = resp.json::<serde_json::Value>().await.unwrap_or_default();
+            let upstream_active = body.get("active").and_then(|v| v.as_bool()) == Some(true)
+                || body.get("cancelled").and_then(|v| v.as_bool()) == Some(true);
+            let mut stopped = upstream_active;
+            if persisted && upstream_active {
+                schedule_cancel_fallback(org_id, session_id);
+            } else if persisted {
+                // o2-ai runs nothing for it, but this node may hold the turn (owner wait, restore).
+                stopped = registry::cancel(&org_id, &session_id, CancelReason::User);
+            }
+            MetaHttpResponse::json(serde_json::json!({"cancelled": stopped, "active": stopped}))
+        }
+        answered => {
+            if persisted && registry::cancel(&org_id, &session_id, CancelReason::User) {
+                return MetaHttpResponse::json(
+                    serde_json::json!({"cancelled": true, "active": true}),
+                );
+            }
+            match answered {
+                Some(resp) => relay_response(resp).await,
+                None => {
+                    MetaHttpResponse::internal_error("Failed to cancel the response; please retry")
+                }
+            }
+        }
+    }
+}
+
+/// Stops the turn here if it is still running once o2-ai has had time to settle the abort.
+#[cfg(feature = "enterprise")]
+fn schedule_cancel_fallback(org_id: String, session_id: String) {
+    use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
+
+    let Some(turn) = registry::get(&org_id, &session_id) else {
+        return;
+    };
+    tokio::spawn(async move {
+        tokio::time::sleep(CANCEL_GRACE).await;
+        if registry::get(&org_id, &session_id).is_some_and(|t| t.turn_id == turn.turn_id) {
+            registry::cancel(&org_id, &session_id, CancelReason::User);
+        }
+    });
+}
+
+#[cfg(feature = "enterprise")]
+async fn relay_response(resp: reqwest::Response) -> Response {
+    let status =
+        StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
+    let json = serde_json::from_str::<serde_json::Value>(&body)
+        .unwrap_or_else(|_| serde_json::json!({"message": body}));
+    (status, axum::Json(json)).into_response()
 }
 
 /// Extract headers from the request that match the configured passthrough patterns.
@@ -534,6 +635,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             turn_id: None,
             known_seq: None,
             known_opencode_session_id: None,
+            session_epoch: None,
         };
 
         // Forward the session id: without it every call load-balances to an
@@ -545,7 +647,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             if is_valid_session_id(val) {
                 forward_headers.insert(
                     X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-                    val.to_string(),
+                    val.to_ascii_lowercase(),
                 );
             } else {
                 return MetaHttpResponse::bad_request("Invalid session id");
@@ -768,9 +870,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         && let Ok(val) = session_id.to_str()
     {
         if is_valid_session_id(val) {
+            // One chat per UUID whatever its spelling: the id keys the index row and the routing.
             forward_headers.insert(
                 X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-                val.to_string(),
+                val.to_ascii_lowercase(),
             );
         } else {
             // Rejected, not dropped: dropping it would land the turn on an
@@ -1003,6 +1106,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             turn_id: None,
             known_seq: None,
             known_opencode_session_id: None,
+            session_epoch: None,
         };
 
         let headers_to_forward = if forward_headers.is_empty() {
@@ -1053,12 +1157,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 Ok(admitted) => admitted,
                 Err(resp) => return resp,
             };
-            let super::chats::AdmittedTurn {
-                row,
-                owner,
-                turn_id,
-                lease,
-            } = admitted;
             #[cfg(feature = "cloud")]
             if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
                 &org_id_str,
@@ -1067,9 +1165,15 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             )
             .await
             {
-                lease.release().await;
+                super::chats::abandon_turn(admitted, "usage_denied").await;
                 return ai_post_upstream_authorization_error_response(error);
             }
+            let super::chats::AdmittedTurn {
+                row,
+                owner,
+                turn_id,
+                lease,
+            } = admitted;
             report_to_audit(
                 user_id.clone(),
                 org_id_str.clone(),
@@ -1091,6 +1195,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             query_req.turn_id = Some(turn_id.clone());
             query_req.known_seq = Some(row.last_committed_seq);
             query_req.known_opencode_session_id = row.opencode_session_id.clone();
+            query_req.session_epoch = Some(row.session_epoch);
             if row.last_committed_seq == infra::table::ai_chat_sessions::NO_SEQ
                 && let Some(seed) = fork_seed
             {
@@ -1322,7 +1427,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         if is_valid_session_id(val) {
             forward_headers.insert(
                 X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
-                val.to_string(),
+                val.to_ascii_lowercase(),
             );
         } else {
             return MetaHttpResponse::bad_request("Invalid session id");
@@ -1458,6 +1563,7 @@ pub async fn confirm_action(
         if !is_valid_session_id(&session_id) {
             return MetaHttpResponse::bad_request("Invalid session id");
         }
+        let session_id = session_id.to_ascii_lowercase();
         if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
             return resp;
         }
@@ -1560,30 +1666,12 @@ pub async fn cancel(
         if !is_valid_session_id(&session_id) {
             return MetaHttpResponse::bad_request("Invalid session id");
         }
-        let client = match get_agent_client() {
-            Some(c) => c,
-            None => return MetaHttpResponse::bad_request("Agent service not configured"),
-        };
-
+        let session_id = session_id.to_ascii_lowercase();
         if let Err(resp) = check_chat_owner(&parts.headers, &org_id, &session_id).await {
             return resp;
         }
-
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-        match client.cancel_session(&session_id, &org_id, &auth_str).await {
-            Ok(resp) => {
-                let status = StatusCode::from_u16(resp.status().as_u16())
-                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-                let body = resp.text().await.unwrap_or_else(|_| "{}".to_string());
-                let json = serde_json::from_str::<serde_json::Value>(&body)
-                    .unwrap_or_else(|_| serde_json::json!({"message": body}));
-                (status, axum::Json(json)).into_response()
-            }
-            Err(e) => {
-                log::error!("[AI-CHAT] failed to forward cancel for {session_id}: {e}");
-                MetaHttpResponse::internal_error("Failed to cancel the response; please retry")
-            }
-        }
+        cancel_turn(org_id, session_id, auth_str).await
     }
 
     #[cfg(not(feature = "enterprise"))]

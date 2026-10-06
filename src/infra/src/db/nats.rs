@@ -731,11 +731,13 @@ static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
 // even the watcher no response still need to check if the key exists. unit: second
 const LOCKER_WATCHER_CHECK_TTL: u64 = 1;
 const LOCKER_WATCHER_UPDATE_TTL: i64 = 10;
+const LOCKER_STATE_LOCKING: u8 = 1;
+const LOCKER_STATE_LOST: u8 = 3;
 
 pub(crate) struct Locker {
     pub key: String,
     lock_id: String,
-    state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
+    state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release, 3: lost to another holder
     tx: Option<mpsc::Sender<()>>,
     keep_alive: Mutex<Option<JoinHandle<()>>>,
 }
@@ -786,12 +788,14 @@ impl Locker {
         _ = check_exist_lock(&bucket, &key, &self.key).await?;
 
         let mut last_err = None;
+        let mut revision = 0;
 
         let expiration = now + second_micros(timeout);
         while expiration > now_micros() {
             match bucket.create(&key, value.clone()).await {
-                Ok(_) => {
-                    self.state.store(1, Ordering::SeqCst);
+                Ok(created) => {
+                    self.state.store(LOCKER_STATE_LOCKING, Ordering::SeqCst);
+                    revision = created;
                     last_err = None;
                     break;
                 }
@@ -826,9 +830,13 @@ impl Locker {
         let bucket_key = key.clone();
         let state = self.state.clone();
         let handle = tokio::task::spawn(async move {
-            if let Err(e) =
-                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id, state).await
-            {
+            let held = HeldLock {
+                bucket: &bucket,
+                key: &bucket_key,
+                orig_key: &lock_key,
+                lock_id: &lock_id,
+            };
+            if let Err(e) = keep_alive_lock(&mut rx, held, revision, state).await {
                 log::error!("nats keep alive for key: {lock_key}, error: {e}");
             }
         });
@@ -838,7 +846,7 @@ impl Locker {
     }
 
     pub(crate) async fn unlock(&self) -> Result<()> {
-        if self.state.load(Ordering::SeqCst) != 1 {
+        if self.state.load(Ordering::SeqCst) != LOCKER_STATE_LOCKING {
             return Ok(());
         }
 
@@ -875,6 +883,24 @@ impl Locker {
         };
         Ok(())
     }
+}
+
+/// A lock this process holds, as the keep-alive task sees it.
+struct HeldLock<'a> {
+    bucket: &'a jetstream::kv::Store,
+    key: &'a str,
+    orig_key: &'a str,
+    lock_id: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Renewal {
+    /// The key now carries this revision.
+    Renewed(u64),
+    /// A transient failure; try again on the next tick.
+    Retry,
+    /// Another holder owns the key.
+    Lost,
 }
 
 async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &str) -> Result<()> {
@@ -953,10 +979,8 @@ async fn check_exist_lock(
 
 async fn keep_alive_lock(
     rx: &mut mpsc::Receiver<()>,
-    bucket: &jetstream::kv::Store,
-    key: &str,
-    orig_key: &str,
-    lock_id: &str,
+    held: HeldLock<'_>,
+    mut revision: u64,
     state: Arc<AtomicU8>,
 ) -> Result<()> {
     let interval = std::cmp::max(1, LOCKER_WATCHER_UPDATE_TTL as u64 / 3);
@@ -964,7 +988,7 @@ async fn keep_alive_lock(
     ticker.tick().await; // first tick will be immediate
     loop {
         tokio::select! {
-            // prefer the stop signal so we never issue a `put` once unlock began
+            // prefer the stop signal so we never issue an update once unlock began
             biased;
             _ = rx.recv() => {
                 break;
@@ -972,25 +996,72 @@ async fn keep_alive_lock(
             _ = ticker.tick() => {}
         }
         // the lock has been released, stop keeping it alive
-        if state.load(Ordering::SeqCst) != 1 {
+        if state.load(Ordering::SeqCst) != LOCKER_STATE_LOCKING {
             break;
         }
-        // update the locker time to keep alive
-        let value = Bytes::from(format!(
-            "{}:{}:{}",
-            lock_id,
-            cluster::LOCAL_NODE.uuid,
-            now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
-        ));
-        if let Err(e) = bucket.put(&key, value).await {
-            log::error!("nats keep alive for key: {orig_key}, error: {e}");
+        match renew_lock(&held, revision).await {
+            Renewal::Renewed(next) => {
+                revision = next;
+                log::debug!("nats keep alive for key: {} updated", held.orig_key);
+            }
+            Renewal::Retry => {}
+            Renewal::Lost => {
+                log::error!(
+                    "nats keep alive for key: {} found the lock taken over by another holder; \
+                     no longer renewing it",
+                    held.orig_key
+                );
+                state.store(LOCKER_STATE_LOST, Ordering::SeqCst);
+                break;
+            }
         }
-        log::debug!("nats keep alive for key: {orig_key} updated");
     }
 
-    log::debug!("nats keep alive for key: {orig_key} exit");
+    log::debug!("nats keep alive for key: {} exit", held.orig_key);
 
     Ok(())
+}
+
+/// Extend the lock only at the revision we last wrote, never overwriting another holder's lock.
+async fn renew_lock(held: &HeldLock<'_>, revision: u64) -> Renewal {
+    let value = Bytes::from(format!(
+        "{}:{}:{}",
+        held.lock_id,
+        cluster::LOCAL_NODE.uuid,
+        now_micros() + second_micros(LOCKER_WATCHER_UPDATE_TTL),
+    ));
+    let err = match held.bucket.update(held.key, value, revision).await {
+        Ok(next) => return Renewal::Renewed(next),
+        Err(e) => e,
+    };
+    if err.kind() != jetstream::kv::UpdateErrorKind::WrongLastRevision {
+        log::error!("nats keep alive for key: {}, error: {err}", held.orig_key);
+        return Renewal::Retry;
+    }
+    // A timed-out update may still have landed; the key is ours if it carries our lock id.
+    match held.bucket.entry(held.key).await {
+        Ok(entry) => revision_if_held(
+            entry
+                .as_ref()
+                .map(|e| (&e.value[..], e.revision, e.operation)),
+            held.lock_id,
+        )
+        .map_or(Renewal::Lost, Renewal::Renewed),
+        Err(e) => {
+            log::error!("nats keep alive for key: {}, error: {e}", held.orig_key);
+            Renewal::Retry
+        }
+    }
+}
+
+/// The entry's revision when it is a live value written by `lock_id`'s holder.
+fn revision_if_held(
+    entry: Option<(&[u8], u64, jetstream::kv::Operation)>,
+    lock_id: &str,
+) -> Option<u64> {
+    let (value, revision, operation) = entry?;
+    let owner = value.split(|b| *b == b':').next()?;
+    (operation == jetstream::kv::Operation::Put && owner == lock_id.as_bytes()).then_some(revision)
 }
 
 #[inline]
@@ -1178,6 +1249,67 @@ mod tests {
 
         // Each locker should have a unique lock_id
         assert_ne!(locker1.lock_id, locker2.lock_id);
+    }
+
+    #[test]
+    fn test_renewal_keeps_a_lock_still_written_by_us() {
+        let ours = format!("{}:node-1:123", "lock-a");
+        assert_eq!(
+            revision_if_held(
+                Some((ours.as_bytes(), 7, jetstream::kv::Operation::Put)),
+                "lock-a"
+            ),
+            Some(7)
+        );
+    }
+
+    #[test]
+    fn test_renewal_gives_up_a_lock_taken_by_another_holder() {
+        let theirs = "lock-b:node-2:456";
+        assert_eq!(
+            revision_if_held(
+                Some((theirs.as_bytes(), 9, jetstream::kv::Operation::Put)),
+                "lock-a"
+            ),
+            None
+        );
+        // A prefix of another id is not ours either.
+        assert_eq!(
+            revision_if_held(
+                Some((b"lock-ab:node-2:456", 9, jetstream::kv::Operation::Put)),
+                "lock-a"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_renewal_gives_up_a_purged_or_missing_lock() {
+        assert_eq!(revision_if_held(None, "lock-a"), None);
+        assert_eq!(
+            revision_if_held(
+                Some((b"lock-a:node-1:1", 4, jetstream::kv::Operation::Purge)),
+                "lock-a"
+            ),
+            None
+        );
+        assert_eq!(
+            revision_if_held(
+                Some((b"lock-a:node-1:1", 4, jetstream::kv::Operation::Delete)),
+                "lock-a"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_unlock_of_a_lost_lock_is_a_no_op() {
+        let locker = Locker::new("/lost");
+        locker.state.store(LOCKER_STATE_LOST, Ordering::SeqCst);
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        assert!(rt.block_on(locker.unlock()).is_ok());
     }
 
     #[test]

@@ -34,6 +34,8 @@ pub struct Model {
     pub forked_from_share: Option<String>,
     /// Last source event (seq) the fork's seed history includes.
     pub fork_seed_seq: Option<i64>,
+    /// When every live o2-ai replica confirmed it dropped this deleted chat's copy.
+    pub replica_purged_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
