@@ -33,7 +33,7 @@ export interface NavigationAction {
 
 // Content block for interleaved display (tool calls and text in order)
 export interface ContentBlock {
-  type: "tool_call" | "text" | "error" | "navigation";
+  type: "tool_call" | "text" | "error" | "navigation" | "status";
   // For tool_call type:
   tool?: string;
   message?: I18nText;
@@ -56,6 +56,8 @@ export interface ContentBlock {
   recoverable?: boolean; // for stream-level errors
   // Navigation action (from navigation_action events):
   navigationAction?: NavigationAction; // Optional navigation button for tool calls
+  // Stored-history marker of a turn still being generated:
+  turnStatus?: "running";
 }
 
 // Image attachment for multimodal chat
@@ -78,6 +80,15 @@ export interface ChatMessage {
   feedback?: "thumbs_up" | "thumbs_down"; // User feedback vote for assistant messages
 }
 
+/** Where one stored turn's messages sit in a folded message list, for incremental merges. */
+export interface TurnSpan {
+  turn_id?: string;
+  first_seq?: number | null;
+  last_seq?: number | null;
+  /** Number of messages the turn produced. */
+  count: number;
+}
+
 export interface ChatHistoryEntry {
   id: number;
   timestamp: string;
@@ -90,5 +101,7 @@ export interface ChatHistoryEntry {
   // while a live turn may have changed it, so the next open revalidates.
   serverBacked?: boolean;
   cachedLastSeq?: number;
+  // Per-turn seq ranges of `messages`, so a stale cache can be topped up with only the newer turns.
+  cachedTurnSpans?: TurnSpan[];
   forkedFromShare?: string;
 }

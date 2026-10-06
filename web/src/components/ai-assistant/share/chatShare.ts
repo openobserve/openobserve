@@ -27,6 +27,8 @@ export interface ShareForm {
   visibility: ShareVisibility;
   /** 0 means the link never expires. */
   expiresInSecs: number;
+  /** Viewers see tool names only, not tool inputs or outputs. */
+  redactTools: boolean;
 }
 
 export interface ExpiryPreset {
@@ -47,11 +49,53 @@ export const EXPIRY_PRESETS: readonly ExpiryPreset[] = [
   { value: 365 * DAY, labelKey: "aiChatShare.expiryYear" },
 ];
 
+export const DEFAULT_PUBLIC_MAX_EXPIRY_DAYS = 90;
+
+const PREFERRED_PUBLIC_EXPIRY = 30 * DAY;
+
 export const defaultShareForm = (): ShareForm => ({
   mode: "snapshot",
   visibility: "org",
   expiresInSecs: 0,
+  redactTools: false,
 });
+
+/** Longest lifetime the server accepts for a public link, in seconds. */
+export const publicMaxExpirySecs = (zoConfig: any): number => {
+  const days = Number(zoConfig?.public_ai_chat_max_expiry_days);
+  return (Number.isFinite(days) && days > 0 ? days : DEFAULT_PUBLIC_MAX_EXPIRY_DAYS) * DAY;
+};
+
+/** Public links must expire within the server's maximum, so "never" and longer presets drop out. */
+export const expiryPresetsFor = (
+  visibility: ShareVisibility,
+  maxPublicSecs: number,
+): readonly ExpiryPreset[] =>
+  visibility === "public"
+    ? EXPIRY_PRESETS.filter((preset) => preset.value > 0 && preset.value <= maxPublicSecs)
+    : EXPIRY_PRESETS;
+
+const validPublicExpiry = (secs: number, maxPublicSecs: number) =>
+  secs > 0 && secs <= maxPublicSecs;
+
+const defaultPublicExpiry = (maxPublicSecs: number): number => {
+  const allowed = expiryPresetsFor("public", maxPublicSecs);
+  const preferred = allowed.find((preset) => preset.value === PREFERRED_PUBLIC_EXPIRY);
+  return (preferred ?? allowed[allowed.length - 1])?.value ?? maxPublicSecs;
+};
+
+/** Switch visibility, resetting tool redaction to its default for it and keeping a public expiry valid. */
+export const applyVisibility = (
+  form: ShareForm,
+  visibility: ShareVisibility,
+  maxPublicSecs: number,
+): void => {
+  form.visibility = visibility;
+  form.redactTools = visibility === "public";
+  if (visibility === "public" && !validPublicExpiry(form.expiresInSecs, maxPublicSecs)) {
+    form.expiresInSecs = defaultPublicExpiry(maxPublicSecs);
+  }
+};
 
 export const isChatPersistenceEnabled = (zoConfig: any): boolean =>
   !!zoConfig?.ai_enabled && !!zoConfig?.ai_chat_persistence_enabled;
@@ -59,16 +103,34 @@ export const isChatPersistenceEnabled = (zoConfig: any): boolean =>
 export const isPublicChatEnabled = (zoConfig: any): boolean =>
   isChatPersistenceEnabled(zoConfig) && !!zoConfig?.public_ai_chat_enabled;
 
+/** Org admins (and root) may list and revoke every share in the org; the server enforces it too. */
+export const isOrgAdmin = (state: any): boolean => {
+  const role = String(state?.userInfo?.role ?? state?.currentuser?.role ?? "").toLowerCase();
+  return role === "root" || role === "admin";
+};
+
 export const visibilityChoices = (publicEnabled: boolean): ShareVisibility[] =>
   publicEnabled ? ["org", "public"] : ["org"];
 
-/** The server refuses `public` while public links are off, so never send it then. */
-export const buildCreateRequest = (form: ShareForm, publicEnabled: boolean): CreateShareRequest => {
+/** The server refuses `public` while public links are off, and a public link without a bounded expiry. */
+export const buildCreateRequest = (
+  form: ShareForm,
+  publicEnabled: boolean,
+  maxPublicSecs: number = DEFAULT_PUBLIC_MAX_EXPIRY_DAYS * DAY,
+): CreateShareRequest => {
+  const visibility = form.visibility === "public" && publicEnabled ? "public" : "org";
   const request: CreateShareRequest = {
     mode: form.mode,
-    visibility: form.visibility === "public" && publicEnabled ? "public" : "org",
+    visibility,
+    redact_tools: form.redactTools,
   };
-  if (form.expiresInSecs > 0) request.expires_in_secs = form.expiresInSecs;
+  if (visibility === "public") {
+    request.expires_in_secs = validPublicExpiry(form.expiresInSecs, maxPublicSecs)
+      ? form.expiresInSecs
+      : defaultPublicExpiry(maxPublicSecs);
+  } else if (form.expiresInSecs > 0) {
+    request.expires_in_secs = form.expiresInSecs;
+  }
   return request;
 };
 

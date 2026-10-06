@@ -13,12 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-
-vi.mock("dompurify", () => ({
-  default: { sanitize: vi.fn((html: string) => html) },
-}));
 
 import O2AIChatTranscript from "./O2AIChatTranscript.vue";
 

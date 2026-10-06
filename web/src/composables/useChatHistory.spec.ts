@@ -1190,6 +1190,108 @@ describe("useChatHistory", () => {
       expect(entry!.forkedFromShare).toBeUndefined();
     });
 
+    const seqTurn = (text: string, first: number, last: number, extra = {}) => ({
+      ...storedTurn(text),
+      first_seq: first,
+      last_seq: last,
+      ...extra,
+    });
+    const detail = (turns: unknown[], extra: Record<string, unknown> = {}) => ({
+      session_id: SESSION,
+      title: "Server",
+      created_at: 1,
+      updated_at: 2_000_000,
+      last_committed_seq: 7,
+      not_modified: false,
+      turns,
+      ...extra,
+    });
+
+    it("tops up a stale cache with only the newer turns, merged by first_seq", async () => {
+      const server = makeServer([seqTurn("first", 1, 3), seqTurn("second", 4, 5)]);
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("first", 1, 3), seqTurn("second", 4, 5)], { last_committed_seq: 5 }),
+      );
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      const first = await loadChat(chatId);
+      expect(first!.cachedLastSeq).toBe(5);
+      expect(first!.cachedTurnSpans?.map((s) => s.count)).toEqual([2, 2]);
+
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("second (more)", 4, 6), seqTurn("third", 7, 7)], {
+          partial_from_seq: 5,
+          last_committed_seq: 7,
+        }),
+      );
+      const entry = await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, 5, 50);
+      expect(entry!.messages.map((m) => m.content)).toEqual([
+        "first",
+        "re first",
+        "second (more)",
+        "re second (more)",
+        "third",
+        "re third",
+      ]);
+      expect(entry!.cachedLastSeq).toBe(7);
+    });
+
+    it("falls back to a full read when the top-up has a gap", async () => {
+      const server = makeServer([]);
+      server.get.mockResolvedValueOnce(detail([seqTurn("first", 1, 3)], { last_committed_seq: 3 }));
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      await loadChat(chatId);
+
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("late", 90, 91)], { partial_from_seq: 3, has_more: true }),
+      );
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("first", 1, 3), seqTurn("late", 90, 91)], { last_committed_seq: 91 }),
+      );
+      const entry = await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION);
+      expect(entry!.messages.map((m) => m.content)).toEqual([
+        "first",
+        "re first",
+        "late",
+        "re late",
+      ]);
+    });
+
+    it("does not cache the seq of a chat with a running turn", async () => {
+      const server = makeServer([]);
+      server.get.mockResolvedValue(
+        detail([seqTurn("first", 1, 2, { status: "running" })], { active_turn: true }),
+      );
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      const entry = await loadChat(chatId);
+      expect(entry!.cachedLastSeq).toBeUndefined();
+      expect(entry!.messages[1].contentBlocks?.at(-1)).toMatchObject({
+        type: "status",
+        turnStatus: "running",
+      });
+      await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, undefined, undefined);
+    });
+
     it("carries forked_from_share from the server listing", async () => {
       const server = makeServer([]);
       server.list.mockResolvedValue({
@@ -1245,7 +1347,7 @@ describe("useChatHistory", () => {
       const id = await adoptServerChat(SESSION, "Fork");
       expect(id).toBe(parseInt("0190a1b2c3d4", 16));
       const chat = await loadChat(id);
-      expect(server.get).toHaveBeenCalledWith(ORG1, SESSION, undefined);
+      expect(server.get).toHaveBeenCalledWith(ORG1, SESSION, undefined, undefined);
       expect(chat?.sessionId).toBe(SESSION);
       expect(chat?.title).toBe("Fork");
       expect(chat?.serverBacked).toBe(true);

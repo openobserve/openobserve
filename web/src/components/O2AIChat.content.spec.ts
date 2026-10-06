@@ -232,4 +232,41 @@ describe("processHtmlBlock", () => {
   it("strips script tags", () => {
     expect(processHtmlBlock("<script>alert(1)</script>ok")).toBe("ok");
   });
+
+  it("keeps the default profile for the live chat", () => {
+    expect(processHtmlBlock('<img src="https://x.example/a.png">')).toContain("x.example");
+  });
+
+  describe("strict (read-only) profile", () => {
+    it("drops remote images but keeps inline ones", () => {
+      const html = processHtmlBlock(
+        '<img src="https://x.example/a.png"><img src="data:image/png;base64,AAAA">',
+        true,
+      );
+      expect(html).not.toContain("x.example");
+      expect(html).toContain("data:image/png;base64,AAAA");
+    });
+
+    it("removes styles and style attributes", () => {
+      const html = processHtmlBlock(
+        '<style>body{display:none}</style><p style="color:red">hi</p>',
+        true,
+      );
+      expect(html).toBe("<p>hi</p>");
+    });
+
+    it("hardens links", () => {
+      const html = processHtmlBlock('<a href="https://docs.example">d</a>', true);
+      expect(html).toContain('rel="noopener noreferrer nofollow"');
+      expect(html).toContain('target="_blank"');
+    });
+
+    it("drops svg and media that could load remote content", () => {
+      const html = processHtmlBlock(
+        '<svg><image href="https://x.example/i"></image></svg><video src="https://x.example/v"></video>ok',
+        true,
+      );
+      expect(html).toBe("ok");
+    });
+  });
 });

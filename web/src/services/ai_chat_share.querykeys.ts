@@ -19,6 +19,7 @@ export const aiChatShareKeys = {
   all: (org: string) => orgKey(org, "aiChatShares"),
   forChat: (org: string, sessionId: string) => orgKey(org, "aiChatShares", "chat", sessionId),
   mine: (org: string) => orgKey(org, "aiChatShares", "mine"),
+  orgWide: (org: string) => orgKey(org, "aiChatShares", "orgWide"),
   shared: (org: string, token: string) => orgKey(org, "aiChatShares", "shared", token),
   public: (token: string) => globalKey("aiChatShares", "public", token),
 };

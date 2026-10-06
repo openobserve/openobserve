@@ -15,7 +15,7 @@
 
 import { computed, reactive, ref, watch, type Ref } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
-import type { ShareView, UpdateShareRequest } from "@/services/ai_chat_share";
+import type { ShareView, ShareVisibility, UpdateShareRequest } from "@/services/ai_chat_share";
 import {
   chatSharesQuery,
   createShareMutation,
@@ -26,8 +26,10 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
+  applyVisibility,
   buildCreateRequest,
   defaultShareForm,
+  expiryPresetsFor,
   otherMode,
   serverMessageOf,
   shareLinkOf,
@@ -76,6 +78,13 @@ export function useShareActions(options: ShareActionsOptions) {
   const switchMode = (share: ShareView) =>
     updateShare(share, { mode: otherMode(share.mode) }, t("aiChatShare.modeChanged"));
 
+  const toggleRedaction = (share: ShareView) =>
+    updateShare(
+      share,
+      { redact_tools: !share.redact_tools },
+      share.redact_tools ? t("aiChatShare.toolsShown") : t("aiChatShare.toolsHidden"),
+    );
+
   const revoke = (share: ShareView) =>
     withPending(share, async () => {
       try {
@@ -91,7 +100,7 @@ export function useShareActions(options: ShareActionsOptions) {
 
   const copyLink = (share: ShareView) => copyToClipboard(shareLinkOf(share), t);
 
-  return { pendingShareId, refreshSnapshot, switchMode, revoke, copyLink };
+  return { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, copyLink };
 }
 
 export interface ChatShareDialogOptions {
@@ -99,12 +108,14 @@ export interface ChatShareDialogOptions {
   sessionId: Ref<string | null | undefined>;
   open: Ref<boolean>;
   publicEnabled: Ref<boolean>;
+  /** Longest lifetime of a public link, in seconds. */
+  maxPublicSecs: Ref<number>;
   t: TranslateFn;
 }
 
 /** Create-form state, the chat's active shares, and the per-share actions of the share dialog. */
 export function useChatShareDialog(options: ChatShareDialogOptions) {
-  const { orgId, sessionId, open, publicEnabled, t } = options;
+  const { orgId, sessionId, open, publicEnabled, maxPublicSecs, t } = options;
 
   const form = reactive(defaultShareForm());
   const createdShare = ref<ShareView | null>(null);
@@ -131,6 +142,10 @@ export function useChatShareDialog(options: ChatShareDialogOptions) {
 
   const visibilityOptions = computed(() => visibilityChoices(publicEnabled.value));
   const createdLink = computed(() => (createdShare.value ? shareLinkOf(createdShare.value) : ""));
+  const expiryPresets = computed(() => expiryPresetsFor(form.visibility, maxPublicSecs.value));
+
+  const setVisibility = (visibility: ShareVisibility) =>
+    applyVisibility(form, visibility, maxPublicSecs.value);
 
   const resetForm = () => {
     Object.assign(form, defaultShareForm());
@@ -142,13 +157,15 @@ export function useChatShareDialog(options: ChatShareDialogOptions) {
   });
 
   watch(publicEnabled, (enabled) => {
-    if (!enabled && form.visibility === "public") form.visibility = "org";
+    if (!enabled && form.visibility === "public") setVisibility("org");
   });
 
   const create = async (): Promise<ShareView | null> => {
     if (!sessionId.value) return null;
     try {
-      const share = await createMutation.mutateAsync(buildCreateRequest(form, publicEnabled.value));
+      const share = await createMutation.mutateAsync(
+        buildCreateRequest(form, publicEnabled.value, maxPublicSecs.value),
+      );
       createdShare.value = share;
       toast({ variant: "success", message: t("aiChatShare.linkCreated") });
       return share;
@@ -168,6 +185,8 @@ export function useChatShareDialog(options: ChatShareDialogOptions) {
     sharesError,
     creating,
     visibilityOptions,
+    expiryPresets,
+    setVisibility,
     resetForm,
     create,
   };
