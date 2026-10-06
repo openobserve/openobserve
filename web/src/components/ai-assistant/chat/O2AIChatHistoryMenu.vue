@@ -8,8 +8,15 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
-defineProps<{
-  chats: Array<{ id: number; title: string; timestamp: string }>;
+const props = defineProps<{
+  chats: Array<{
+    id: number;
+    title: string;
+    timestamp: string;
+    sessionId?: string;
+    serverBacked?: boolean;
+  }>;
+  shareEnabled?: boolean;
 }>();
 
 const searchTerm = defineModel<string>("searchTerm", { required: true });
@@ -17,12 +24,16 @@ const searchTerm = defineModel<string>("searchTerm", { required: true });
 const emit = defineEmits<{
   (e: "select", chatId: number): void;
   (e: "delete", chatId: number): void;
+  (e: "share", chatId: number): void;
   (e: "clear-all"): void;
 }>();
 
 const { t } = useI18nTyped();
 
 const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString();
+
+const canShare = (chat: (typeof props.chats)[number]) =>
+  !!props.shareEnabled && !!chat.serverBacked && !!chat.sessionId;
 </script>
 
 <template>
@@ -48,6 +59,17 @@ const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString();
               {{ formatTime(chat.timestamp) }}
             </div>
           </div>
+          <OButton
+            v-if="canShare(chat)"
+            variant="ghost"
+            size="icon-xs-circle"
+            class="opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+            :data-test="`o2-ai-chat-history-menu-share-${chat.id}`"
+            @click.stop="emit('share', chat.id)"
+          >
+            <OIcon name="share" size="sm" />
+            <OTooltip :content="t('aiChatShare.share')" />
+          </OButton>
           <OButton
             variant="ghost"
             size="icon-xs-circle"

@@ -1918,9 +1918,40 @@ describe("O2AIChat SSE protocol", () => {
       await flushPromises();
 
       expect(blocks(vm)[0].text).toBe("half an ans");
+      expect(blocks(vm).map((b: any) => b.type)).toEqual(["text", "text"]);
+      expect(blocks(vm)[1].text).toContain("stopped");
 
       gate.close();
       await turn;
+    });
+
+    // Reloading before the Stop's save lands showed a stale copy without the partial answer.
+    it("reloads the chat only after the Stop's save has landed", async () => {
+      const gate = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(gate.response);
+      vm.inputMessage = "first question";
+      const turn = vm.sendMessage();
+      await flushPromises();
+      gate.push(sse({ type: "message_delta", content: "half an ans" }));
+      await flushPromises();
+
+      let landSave!: (id: number) => void;
+      mockSaveToHistory.mockImplementationOnce(
+        () => new Promise<number>((resolve) => (landSave = resolve)),
+      );
+      // The shared store keeps the flag an earlier unmount raised, which would swallow this turn's reload.
+      await store.dispatch("setChatUpdated", false);
+      mockLoadChat.mockClear();
+      const stop = vm.cancelCurrentRequest();
+      gate.close();
+      await flushPromises();
+      expect(mockLoadChat).not.toHaveBeenCalled();
+
+      landSave(42);
+      await stop;
+      await turn;
+      await flushPromises();
+      expect(mockLoadChat).toHaveBeenCalledWith(42);
     });
 
     it("exits quietly on an AbortError without adding an error message", async () => {

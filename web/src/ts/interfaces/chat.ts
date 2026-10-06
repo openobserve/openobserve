@@ -90,4 +90,5 @@ export interface ChatHistoryEntry {
   // while a live turn may have changed it, so the next open revalidates.
   serverBacked?: boolean;
   cachedLastSeq?: number;
+  forkedFromShare?: string;
 }

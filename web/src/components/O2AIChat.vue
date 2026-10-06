@@ -34,8 +34,10 @@
               <O2AIChatHistoryMenu
                 v-model:search-term="historySearchTerm"
                 :chats="filteredChatHistory"
+                :share-enabled="chatPersistenceEnabled"
                 @select="loadChat"
                 @delete="deleteChat"
+                @share="shareHistoryChat"
                 @clear-all="clearAllConversations"
               />
             </ODropdown>
@@ -57,7 +59,7 @@
               variant="ghost"
               size="icon-sm"
               data-test="o2-ai-chat-share-btn"
-              @click.stop="showShareDialog = true"
+              @click.stop="shareCurrentChat"
             >
               <OIcon name="share" size="sm" />
               <OTooltip :content="t('aiChatShare.share')" />
@@ -140,10 +142,10 @@
       </ODialog>
 
       <AiChatShareDialog
-        v-if="canShareCurrentChat || showShareDialog"
+        v-if="shareTarget"
         v-model:open="showShareDialog"
-        :session-id="currentSessionId"
-        :chat-title="displayedTitle"
+        :session-id="shareTarget.sessionId"
+        :chat-title="shareTarget.title"
       />
 
       <!-- Delete Chat Confirmation Dialog -->
@@ -210,6 +212,14 @@
               </div>
             </div>
           </div>
+          <OBanner
+            v-if="forkedFromShare && chatMessages.length > 0"
+            variant="info"
+            icon="fork-right"
+            dense
+            :content="t('aiChatShare.forkedFromShareBanner')"
+            data-test="o2-ai-chat-forked-banner"
+          />
           <O2AIChatMessage
             v-for="(message, index) in processedMessages"
             :key="index"
@@ -378,6 +388,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -421,6 +432,7 @@ export default defineComponent({
     ODrawer,
     ODialog,
     OSpinner,
+    OBanner,
     OIcon,
     OTooltip,
     OTruncatedText,
@@ -466,6 +478,7 @@ export default defineComponent({
     const { showInChat: showPaidUsageConsent } = useChatConsentSurface(() => props.isOpen);
     const currentTextSegment = ref("");
     const currentChatId = ref<number | null>(null);
+    const forkedFromShare = ref<string | null>(null);
     const store = useStore();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
@@ -821,6 +834,7 @@ export default defineComponent({
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
       lastTraceId.value = null;
+      forkedFromShare.value = null;
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true;
@@ -860,6 +874,7 @@ export default defineComponent({
 
           showHistory.value = false;
           shouldAutoScroll.value = true;
+          forkedFromShare.value = chat.forkedFromShare ?? null;
 
           displayedTitle.value = chat.title || "";
           aiGeneratedTitle.value = chat.title || null;
@@ -1089,14 +1104,29 @@ export default defineComponent({
     const processedMessages = computed(() => chatMessages.value.map(processChatMessage));
 
     const showShareDialog = ref(false);
+    const shareTarget = ref<{ sessionId: string; title: string } | null>(null);
+    const chatPersistenceEnabled = computed(() => isChatPersistenceEnabled(store.state.zoConfig));
     const canShareCurrentChat = computed(() =>
       canShareChat({
-        persistenceEnabled: isChatPersistenceEnabled(store.state.zoConfig),
+        persistenceEnabled: chatPersistenceEnabled.value,
         sessionId: currentSessionId.value,
         hasMessages: chatMessages.value.length > 0,
         isStreaming: isLoading.value,
       }),
     );
+
+    const openShareDialog = (sessionId: string | null | undefined, title: string) => {
+      if (!sessionId) return;
+      shareTarget.value = { sessionId, title };
+      showShareDialog.value = true;
+    };
+
+    const shareCurrentChat = () => openShareDialog(currentSessionId.value, displayedTitle.value);
+
+    const shareHistoryChat = (chatId: number) => {
+      const chat = chatHistory.value.find((c) => c.id === chatId);
+      if (chat) openShareDialog(chat.sessionId, chat.title);
+    };
 
     const retryGeneration = async (message: any) => {
       if (!message || message.role !== "assistant") return;
@@ -1220,6 +1250,11 @@ export default defineComponent({
       currentChatId,
       showShareDialog,
       canShareCurrentChat,
+      shareTarget,
+      chatPersistenceEnabled,
+      shareCurrentChat,
+      shareHistoryChat,
+      forkedFromShare,
       addNewChat,
       toggleExpand,
       openHistory,
