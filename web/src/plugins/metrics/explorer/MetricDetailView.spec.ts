@@ -24,6 +24,17 @@ import { MISC_GROUP_ID } from "@/utils/metrics/prefixGrouping";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 
+const { getMetricUsage } = vi.hoisted(() => ({ getMetricUsage: vi.fn() }));
+vi.mock("@/services/metrics", () => ({ default: { getMetricUsage } }));
+
+const USAGE = {
+  dashboards: [{ id: "d1", title: "Board", folder_id: "f1" }],
+  alerts: [{ id: "a1", name: "Alert", folder_id: "f2" }],
+  slos: [],
+  pipelines: [{ id: "p1", name: "Pipe", match: "text" }],
+  unparsed: 1,
+};
+
 const card = (name: string, over: Record<string, any> = {}): any => ({
   name,
   familyName: baseNameOf(name),
@@ -146,6 +157,7 @@ describe("MetricDetailView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     runQuery.mockResolvedValue(SERIES);
+    getMetricUsage.mockResolvedValue({ data: USAGE });
   });
 
   afterEach(() => wrapper?.unmount());
@@ -249,9 +261,9 @@ describe("MetricDetailView", () => {
   });
 
   describe("tabs", () => {
-    it("offers Breakdown and Related, Breakdown first", () => {
+    it("offers Breakdown, Related and Used in, Breakdown first", () => {
       wrapper = mountView();
-      expect(tabNames(wrapper)).toEqual(["breakdown", "related"]);
+      expect(tabNames(wrapper)).toEqual(["breakdown", "related", "used_in"]);
       expect(wrapper.find('[data-test="breakdown-stub"]').exists()).toBe(true);
     });
 
@@ -265,11 +277,55 @@ describe("MetricDetailView", () => {
     it("hides Breakdown for timestamp and other cards", () => {
       for (const cardKind of [CARD_KIND.TIMESTAMP, CARD_KIND.OTHER]) {
         wrapper = mountView({ card: { ...SELECTED, cardKind }, tab: "breakdown" });
-        expect(tabNames(wrapper)).toEqual(["related"]);
+        expect(tabNames(wrapper)).toEqual(["related", "used_in"]);
         expect(wrapper.find('[data-test="breakdown-stub"]').exists()).toBe(false);
         expect(wrapper.find('[data-test="metrics-detail-related"]').exists()).toBe(true);
         wrapper.unmount();
       }
+    });
+  });
+
+  describe("used in", () => {
+    const usedInLabel = (w: VueWrapper<any>) =>
+      w
+        .findAllComponents({ name: "OTab" })
+        .find((tab) => tab.props("name") === "used_in")!
+        .props("label");
+
+    it("asks where this metric is used, and counts the objects in the tab label", async () => {
+      wrapper = mountView();
+      expect(getMetricUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ org_identifier: "default", metric: SELECTED.name }),
+      );
+      expect(usedInLabel(wrapper)).toBe("Used in");
+      await flushPromises();
+      expect(usedInLabel(wrapper)).toBe("Used in (3)");
+    });
+
+    it("hands the result to the list on its tab, even for a card without Breakdown", async () => {
+      wrapper = mountView({ card: { ...SELECTED, cardKind: CARD_KIND.OTHER }, tab: "used_in" });
+      await flushPromises();
+      const list = wrapper.findComponent({ name: "MetricUsageList" });
+      expect(list.props("usage")).toEqual(USAGE);
+      expect(list.props("status")).toBe("done");
+      expect(wrapper.find('[data-test="metrics-detail-related"]').exists()).toBe(false);
+    });
+
+    it("reports a failed lookup to the list and keeps the tab label uncounted", async () => {
+      getMetricUsage.mockRejectedValue(new Error("boom"));
+      wrapper = mountView({ tab: "used_in" });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "MetricUsageList" }).props("status")).toBe("error");
+      expect(usedInLabel(wrapper)).toBe("Used in");
+    });
+
+    it("asks again for a different metric", async () => {
+      wrapper = mountView();
+      await flushPromises();
+      await wrapper.setProps({ card: card("node_load1"), metricName: "node_load1" });
+      expect(getMetricUsage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ metric: "node_load1" }),
+      );
     });
   });
 

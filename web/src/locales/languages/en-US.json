@@ -9340,6 +9340,18 @@
         "filtersNotApplied": "Filter {filters} does not apply to this metric; showing all its series | Filters {filters} do not apply to this metric; showing all its series",
         "tabBreakdown": "Breakdown",
         "tabRelated": "Related",
+        "tabUsedIn": "Used in",
+        "tabUsedInCount": "Used in ({count})",
+        "usedIn": {
+          "dashboards": "Dashboards ({count})",
+          "alerts": "Alerts ({count})",
+          "slos": "SLOs ({count})",
+          "pipelines": "Scheduled pipelines ({count})",
+          "empty": "No dashboard, alert, SLO or scheduled pipeline you can see uses this metric",
+          "error": "Could not look up where this metric is used",
+          "unparsed": "{count} query could not be parsed and was matched by name | {count} queries could not be parsed and were matched by name",
+          "textMatch": "Matched by name"
+        },
         "breakdown": {
           "distinctCount": "{count} value | {count} values",
           "distinctMany": "{count}+ values",

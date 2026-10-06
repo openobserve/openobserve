@@ -1373,17 +1373,29 @@ pub async fn list_v2<C: ConnectionTrait>(
     user_id: Option<&str>,
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let (permissions, is_all_permitted) =
-        match permitted_alerts(&params.org_id, user_id, params.folder_id.as_deref()).await? {
-            Some(ps) => {
-                let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
-                (ps, org_all_permitted)
-            }
-            None => (vec![], true),
-        };
+    let org_id = params.org_id.clone();
+    let folder_id = params.folder_id.clone();
+    let alerts = db::alerts::alert::list_with_folders(conn, params).await?;
+    filter_permitted_alerts(&org_id, user_id, folder_id.as_deref(), alerts).await
+}
 
-    let alerts = db::alerts::alert::list_with_folders(conn, params)
-        .await?
+/// Keeps the alerts `user_id` may get, as the alert list does for `folder_id`.
+pub(crate) async fn filter_permitted_alerts(
+    org_id: &str,
+    user_id: Option<&str>,
+    folder_id: Option<&str>,
+    alerts: Vec<(Folder, Alert)>,
+) -> Result<Vec<(Folder, Alert)>, AlertError> {
+    let (permissions, is_all_permitted) = match permitted_alerts(org_id, user_id, folder_id).await?
+    {
+        Some(ps) => {
+            let org_all_permitted = ps.contains(&format!("alert:_all_{org_id}"));
+            (ps, org_all_permitted)
+        }
+        None => (vec![], true),
+    };
+
+    let alerts = alerts
         .into_iter()
         .filter(|(f, a)| {
             // Include the alert if all alerts are permitted.
@@ -4098,6 +4110,54 @@ pub async fn permitted_alerts(
     Ok(None)
 }
 
+/// Whether `user_id` may get the alert folder `folder_id`, which also holds SLOs.
+#[cfg(not(feature = "enterprise"))]
+pub(crate) async fn can_get_alert_folder(
+    _org_id: &str,
+    _user_id: &str,
+    _folder_id: &str,
+) -> Result<bool, AlertError> {
+    Ok(true)
+}
+
+/// Whether `user_id` may get the alert folder `folder_id`, which also holds SLOs.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn can_get_alert_folder(
+    org_id: &str,
+    user_id: &str,
+    folder_id: &str,
+) -> Result<bool, AlertError> {
+    use db::user::get as get_user;
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    use crate::auth::AuthExtractor;
+
+    let user_role = match get_user(Some(org_id), user_id).await {
+        Ok(Some(user)) => user.role,
+        _ => return Err(AlertError::UserNotFound),
+    };
+    Ok(crate::authz::check_permissions(
+        user_id,
+        AuthExtractor {
+            org_id: org_id.to_string(),
+            o2_type: format!(
+                "{}:{folder_id}",
+                OFGA_MODELS.get("alert_folders").unwrap().key,
+            ),
+            method: "GET".to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: true,
+            auth: "".to_string(), // We don't need to pass the auth token here.
+        },
+        user_role,
+        false,
+    )
+    .await)
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn permitted_alerts(
     org_id: &str,
@@ -4121,41 +4181,14 @@ pub async fn permitted_alerts(
     // If the user has `GET` permission on the folder, then they will be able to see the folder and
     // all its contents. This includes the dashboards inside the folder.
 
-    use db::user::get as get_user;
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
-    use crate::auth::AuthExtractor;
-
-    if let Some(folder_id) = folder_id {
-        let user_role = match get_user(Some(org_id), user_id).await {
-            Ok(Some(user)) => user.role,
-            _ => return Err(AlertError::UserNotFound),
-        };
-        let permitted = crate::authz::check_permissions(
-            user_id,
-            AuthExtractor {
-                org_id: org_id.to_string(),
-                o2_type: format!(
-                    "{}:{folder_id}",
-                    OFGA_MODELS.get("alert_folders").unwrap().key,
-                ),
-                method: "GET".to_string(),
-                bypass_check: false,
-                parent_id: "".to_string(),
-                use_all_org: false,
-                use_self_context: false,
-                use_self_parent: true,
-                auth: "".to_string(), // We don't need to pass the auth token here.
-            },
-            user_role,
-            false,
-        )
-        .await;
-        if permitted {
-            // The user has `GET` permission on the folder.
-            // So, they will be able to see all the dashboards inside the folder.
-            return Ok(None);
-        }
+    if let Some(folder_id) = folder_id
+        && can_get_alert_folder(org_id, user_id, folder_id).await?
+    {
+        // The user has `GET` permission on the folder.
+        // So, they will be able to see all the dashboards inside the folder.
+        return Ok(None);
     }
 
     // We also check for the `GET_INDIVIDUAL_FROM_ROLE` permission on the dashboards.

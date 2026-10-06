@@ -1081,7 +1081,7 @@ pub async fn delete_panel_from_dashboard(
 
 /// Filters dashboards, returning only those that the user has permission to get.
 #[cfg(not(feature = "enterprise"))]
-async fn filter_permitted_dashboards(
+pub(crate) async fn filter_permitted_dashboards(
     _org_id: &str,
     _user_id: &str,
     dashboards: Vec<(Folder, Dashboard)>,
@@ -1092,7 +1092,7 @@ async fn filter_permitted_dashboards(
 
 /// Filters dashboards, returning only those that the user has permission to get.
 #[cfg(feature = "enterprise")]
-async fn filter_permitted_dashboards(
+pub(crate) async fn filter_permitted_dashboards(
     org_id: &str,
     user_id: &str,
     dashboards: Vec<(Folder, Dashboard)>,

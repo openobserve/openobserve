@@ -50,9 +50,9 @@ export interface ExplorerFilterState {
   breakdownLabel?: string | null;
 }
 
-export type DetailTab = "breakdown" | "related";
+export type DetailTab = "breakdown" | "related" | "used_in";
 
-const DETAIL_TABS = new Set<string>(["breakdown", "related"]);
+const DETAIL_TABS = new Set<string>(["breakdown", "related", "used_in"]);
 
 /** Every key this module may write — cleared before each sync so a removed filter leaves the URL. */
 export const EXPLORER_FILTER_PARAM_KEYS = [

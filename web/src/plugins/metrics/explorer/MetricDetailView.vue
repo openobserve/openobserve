@@ -275,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('metrics.explorer.detail.tabBreakdown')"
           />
           <OTab name="related" :label="t('metrics.explorer.detail.tabRelated')" />
+          <OTab name="used_in" :label="usedInLabel" />
         </OTabs>
 
         <OContent class="py-3">
@@ -294,6 +295,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panel-queries="panelQueries"
             @update:selected-label="$emit('update:breakdownLabel', $event)"
             @add-filter="$emit('add-filter', $event)"
+          />
+
+          <MetricUsageList
+            v-else-if="activeTab === 'used_in'"
+            :usage="usage"
+            :status="usageStatus"
           />
 
           <div v-else data-test="metrics-detail-related">
@@ -367,6 +374,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import MetricBreakdown from "./MetricBreakdown.vue";
 import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import MetricUsageList from "./MetricUsageList.vue";
+import { useStore } from "vuex";
+import metricsService, { type MetricUsage } from "@/services/metrics";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -426,6 +436,7 @@ export default defineComponent({
     MetricCardChart,
     MetricBreakdown,
     MetricChartTile,
+    MetricUsageList,
     OPageHeader,
     OContent,
     OButton,
@@ -538,9 +549,47 @@ export default defineComponent({
       () => !!props.card && supportsBreakdown(props.card.cardKind),
     );
     /** Breakdown is the default; a kind without one lands on Related. */
-    const activeTab = computed<DetailTab>(() =>
-      breakdownSupported.value ? (props.tab ?? "breakdown") : "related",
-    );
+    const activeTab = computed<DetailTab>(() => {
+      if (props.tab === "related" || props.tab === "used_in") return props.tab;
+      return breakdownSupported.value ? "breakdown" : "related";
+    });
+
+    const store = useStore();
+    const usage = ref<MetricUsage | null>(null);
+    const usageStatus = ref<"idle" | "loading" | "done" | "error">("idle");
+    let usageRequest: AbortController | null = null;
+
+    const loadUsage = async (metric: string | undefined) => {
+      usageRequest?.abort();
+      usage.value = null;
+      usageStatus.value = metric ? "loading" : "idle";
+      if (!metric) return;
+      const request = new AbortController();
+      usageRequest = request;
+      try {
+        const res = await metricsService.getMetricUsage({
+          org_identifier: store.state.selectedOrganization?.identifier,
+          metric,
+          signal: request.signal,
+        });
+        if (request.signal.aborted) return;
+        usage.value = res.data;
+        usageStatus.value = "done";
+      } catch {
+        if (!request.signal.aborted) usageStatus.value = "error";
+      }
+    };
+    watch(() => props.card?.name, loadUsage, { immediate: true });
+    onBeforeUnmount(() => usageRequest?.abort());
+
+    // The tab label is counted from the same lookup the tab lists.
+    const usedInLabel = computed(() => {
+      const found = usage.value;
+      if (!found) return t("metrics.explorer.detail.tabUsedIn");
+      const count =
+        found.dashboards.length + found.alerts.length + found.slos.length + found.pipelines.length;
+      return t("metrics.explorer.detail.tabUsedInCount", { count });
+    });
 
     const overviewState = ref<OverviewState>(IDLE);
     const overviewHasSamples = computed(() => overviewState.value.results.some(hasSamples));
@@ -672,6 +721,9 @@ export default defineComponent({
       loadOverview,
       onOverviewRenderError,
       related,
+      usage,
+      usageStatus,
+      usedInLabel,
     };
   },
 });

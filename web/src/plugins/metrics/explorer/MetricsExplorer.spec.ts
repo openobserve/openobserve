@@ -1191,6 +1191,19 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.paused.value).toBe(true);
     });
 
+    it("keeps the Used in tab in the URL", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onDetailTab("used_in");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "used_in",
+      });
+    });
+
     it("REPLACES the entry on a tab or breakdown-label change", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();

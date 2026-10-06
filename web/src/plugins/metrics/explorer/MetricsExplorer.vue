@@ -1478,7 +1478,7 @@ export default defineComponent({
     };
 
     const onDetailTab = (tab: string | number) => {
-      if (tab === "breakdown" || tab === "related") detailTab.value = tab;
+      if (tab === "breakdown" || tab === "related" || tab === "used_in") detailTab.value = tab;
     };
 
     const onBreakdownLabel = (label: string | null) => {

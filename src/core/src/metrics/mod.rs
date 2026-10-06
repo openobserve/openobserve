@@ -38,6 +38,7 @@ pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
 mod prom_decode;
+pub mod usage;
 
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;

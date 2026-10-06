@@ -176,6 +176,12 @@ describe("explorerUrlState", () => {
       });
     });
 
+    it("round-trips the used_in tab", () => {
+      const query = explorerFiltersToQuery({ ...defaults(), metric: "up", tab: "used_in" });
+      expect(query).toEqual({ metric: "up", tab: "used_in" });
+      expect(queryToExplorerFilters(query)).toEqual({ metric: "up", tab: "used_in" });
+    });
+
     it("never emits stream, whatever the detail state", () => {
       const query = explorerFiltersToQuery({
         ...defaults(),
