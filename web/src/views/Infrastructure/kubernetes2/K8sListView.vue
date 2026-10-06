@@ -122,11 +122,14 @@ const filtered = computed<any[]>(() => {
   if (props.view === "events") {
     return needle ? props.rows.filter((e: EventRow) => eventMatches(e, needle)) : props.rows;
   }
-  const namespaces = namespaced.value ? props.state.namespaces : [];
+  const namespaces = activeNamespaces.value;
   return filterRows(props.rows as AnyRow[], { cluster: null, namespaces }, props.state.search);
 });
 
-const narrowed = computed(() => !!props.state.search || props.state.namespaces.length > 0);
+// Nodes and Namespaces ignore the namespace selection, so it neither narrows nor gets cleared there.
+const activeNamespaces = computed(() => (namespaced.value ? props.state.namespaces : []));
+
+const narrowed = computed(() => !!props.state.search || activeNamespaces.value.length > 0);
 
 // A hand-edited or stale sort id names no column, and TanStack would warn and sort nothing.
 const urlSort = computed(() =>
@@ -158,7 +161,8 @@ const onRow = (row: any) => {
   if (target) emit("open", target);
 };
 
-const clear = () => emit("update", { search: "", namespaces: [] });
+const clear = () =>
+  emit("update", namespaced.value ? { search: "", namespaces: [] } : { search: "" });
 
 const setNamespace = (namespace: string) => {
   if (namespace) emit("update", { namespaces: [namespace] });
@@ -228,6 +232,7 @@ const namespaceOf = (row: any): string =>
     fill-height
     :data-test="`k8s2-table-${view}`"
     @sort-change="onSort"
+    @column-visibility-change="applySortVisibility"
     @row-click="onRow"
   >
     <template #toolbar>
@@ -239,7 +244,7 @@ const namespaceOf = (row: any): string =>
         :chip="chip"
         :namespaced="namespaced"
         :namespace-options="namespaceOptions"
-        :namespaces="state.namespaces"
+        :namespaces="activeNamespaces"
         :search="state.search"
         :search-placeholder="searchPlaceholder"
         @update:namespaces="(namespaces: string[]) => emit('update', { namespaces })"

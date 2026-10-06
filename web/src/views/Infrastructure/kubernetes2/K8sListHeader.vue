@@ -29,7 +29,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 const props = withDefaults(
   defineProps<{
     title: I18nText;
-    // Rows shown after search and namespace narrowing, out of `total`.
     count: number;
     total: number;
     countLabel?: I18nText;
@@ -92,6 +91,10 @@ const onNamespaces = (value: unknown) =>
           @click="emit('clear')"
           >{{ t("infra.k8s2.filtered") }}</OButton
         >{{ raw(` ${count} / ${total}`) }}
+        <span v-if="capped" data-test="k8s2-list-capped">
+          {{ t("infra.k8s2.limitMarker") }}
+          <OTooltip :content="t('infra.k8s2.itemsCappedTip')" />
+        </span>
       </template>
       <span v-else-if="capped" data-test="k8s2-list-capped">
         {{ t("infra.k8s2.itemsCapped", { count }) }}

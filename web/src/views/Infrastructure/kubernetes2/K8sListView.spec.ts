@@ -189,6 +189,16 @@ describe("K8sListView", () => {
     expect(drawer.props("anchor")).toBe(wrapper.find('[data-test="k8s2-list-header"]').element);
   });
 
+  it("ignores the namespace selection on Nodes: no Filtered count, and clearing keeps it", async () => {
+    await mountList({ view: "nodes", rows: [] }, { namespace: "shop" });
+    expect(wrapper.find('[data-test="k8s2-list-count"]').text()).toBe("0 items");
+    expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(false);
+    wrapper.unmount();
+    await mountList({ view: "nodes", rows: [] }, { namespace: "shop", search: "x" });
+    await wrapper.find('[data-test="k8s2-list-filtered-clear"]').trigger("click");
+    expect(wrapper.emitted("update")).toEqual([[{ search: "" }]]);
+  });
+
   it("searches the node and IP text, not just the name", async () => {
     await mountList({}, { search: "n2" });
     expect(order()).toEqual(["api"]);
@@ -200,6 +210,21 @@ describe("K8sListView", () => {
     await mountList({}, { sort: "memLim", desc: "true" });
     expect(visible()).toContain("memLim");
     expect(localStorage.getItem(STORAGE)).toBe(stored);
+    await wrapper.setProps({ state: parseUrlState({ view: "pods", sort: "cpu" }) });
+    await flushPromises();
+    expect(visible()).not.toContain("memLim");
+  });
+
+  it("keeps the sorted column visible when hidden through the toggle, saving the choice for later", async () => {
+    await mountList({}, { sort: "memLim", desc: "true" });
+    wrapper.findComponent({ name: "OTableColumnToggle" }).vm.$emit("update:column-visibility", {
+      memLim: false,
+    });
+    await flushPromises();
+    expect(visible()).toContain("memLim");
+    expect(JSON.parse(localStorage.getItem(STORAGE) ?? "{}")["k8s2-pods"].visibility).toEqual({
+      memLim: false,
+    });
     await wrapper.setProps({ state: parseUrlState({ view: "pods", sort: "cpu" }) });
     await flushPromises();
     expect(visible()).not.toContain("memLim");
@@ -313,6 +338,13 @@ describe("K8sListView", () => {
     it("reads 1000 items (limit) with a tooltip when E hit its cap", async () => {
       await mountList({ view: "events", rows: events(), capped: true });
       expect(wrapper.find('[data-test="k8s2-list-capped"]').text()).toContain("items (limit)");
+    });
+
+    it("keeps the limit marker next to the Filtered count while a search is active", async () => {
+      await mountList({ view: "events", rows: events(), capped: true }, { search: "backoff" });
+      const count = wrapper.find('[data-test="k8s2-list-count"]').text();
+      expect(count).toContain("Filtered");
+      expect(wrapper.find('[data-test="k8s2-list-capped"]').text()).toContain("(limit)");
     });
 
     it("shows a Warning message in error text", async () => {
