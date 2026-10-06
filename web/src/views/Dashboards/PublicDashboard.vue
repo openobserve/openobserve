@@ -32,18 +32,12 @@
     </div>
 
     <div
-      v-else-if="state === 'notfound' || state === 'unavailable' || state === 'expired'"
-      class="flex min-h-[60vh] flex-col items-center justify-center"
+      v-else-if="errorMessage"
+      class="flex min-h-[60vh] flex-col items-center justify-center px-4"
       data-test="dashboards-public-dashboard-error"
     >
-      <div class="text-text-secondary text-sm">
-        {{
-          state === "expired"
-            ? t("dashboard.publicDashboard.expired")
-            : state === "unavailable"
-              ? t("dashboard.publicDashboard.unavailable")
-              : t("dashboard.publicDashboard.notAvailable")
-        }}
+      <div class="text-text-secondary max-w-md text-center text-sm">
+        {{ errorMessage }}
       </div>
     </div>
 
@@ -166,9 +160,18 @@ const store = useStore();
 const { t } = useI18nTyped();
 const slug = String(route.params.slug || "");
 
-const state = ref<"loading" | "ready" | "preparing" | "notfound" | "unavailable" | "expired">(
-  "loading",
-);
+type ViewState =
+  | "loading"
+  | "ready"
+  | "preparing"
+  | "notfound"
+  | "expired"
+  | "unavailable"
+  | "ratelimited"
+  | "offline";
+const state = ref<ViewState>("loading");
+// Temporary failures in a row; while non-zero the page retries with backoff.
+const failures = ref(0);
 const config = ref<Record<string, any>>({});
 const snapshot = ref<Record<string, any>>({});
 const selectedKey = ref<string | null>(null);
@@ -307,9 +310,38 @@ const pickDefaultRange = (): string | null => {
   return rangeOptions.value[0]?.key ?? null;
 };
 
-const mapError = (e: unknown) => {
+const TRANSIENT_STATES: ViewState[] = ["unavailable", "ratelimited", "offline"];
+const RETRY_DELAYS_MS = [5_000, 10_000, 30_000, 60_000];
+
+const ERROR_MESSAGES: Partial<Record<ViewState, () => I18nText>> = {
+  notfound: () => t("dashboard.publicDashboard.notAvailable"),
+  expired: () => t("dashboard.publicDashboard.expired"),
+  unavailable: () => t("dashboard.publicDashboard.unavailable"),
+  ratelimited: () => t("dashboard.publicDashboard.rateLimited"),
+  offline: () => t("dashboard.publicDashboard.offline"),
+};
+const errorMessage = computed<I18nText | null>(() => ERROR_MESSAGES[state.value]?.() ?? null);
+
+// Only 404 and 410 are final; a paused link, a rate limit or a network error can clear up.
+const errorState = (e: unknown): ViewState => {
   const status = (e as { response?: { status?: number } })?.response?.status;
-  state.value = status === 410 ? "expired" : status === 503 ? "unavailable" : "notfound";
+  if (status === 410) return "expired";
+  if (status === 503) return "unavailable";
+  if (status === 429) return "ratelimited";
+  if (status === undefined || status >= 500) return "offline";
+  return "notfound";
+};
+
+const mapError = (e: unknown) => {
+  const next = errorState(e);
+  if (!TRANSIENT_STATES.includes(next)) {
+    failures.value = 0;
+    state.value = next;
+    return;
+  }
+  failures.value += 1;
+  // A hiccup keeps the last data on screen; a paused link must stop showing it.
+  if (state.value !== "ready" || next === "unavailable") state.value = next;
 };
 
 const loadData = async () => {
@@ -322,10 +354,12 @@ const loadData = async () => {
   try {
     const res = await publicDashboardsService.getData(slug, selectedKey.value);
     if (res.status === 202) {
+      failures.value = 0;
       state.value = "preparing";
       return;
     }
     snapshot.value = res.data ?? {};
+    failures.value = 0;
     state.value = "ready";
   } catch (e: unknown) {
     mapError(e);
@@ -377,7 +411,7 @@ const footerNote = computed<I18nText>(() =>
 
 // Re-read on the author's "Refresh every" cadence — the same interval the snapshot rebuilds on.
 const refresh = async () => {
-  if (state.value !== "ready" && state.value !== "preparing") return;
+  if (state.value === "notfound" || state.value === "expired") return;
   try {
     const res = await publicDashboardsService.getConfig(slug);
     applyConfig(res.data ?? {});
@@ -406,8 +440,11 @@ const nextRefreshLabel = computed<I18nText | "">(() => {
     : t("dashboard.publicDashboard.refreshingNow");
 });
 
-// Aim the next read just after the next rebuild is due; an overdue one is re-checked sooner, a missing one waits a cadence.
+// Aim the next read just after the next rebuild is due; overdue re-checks sooner, missing waits a cadence, failed backs off.
 const nextRefreshDelay = (): number => {
+  if (failures.value > 0) {
+    return RETRY_DELAYS_MS[Math.min(failures.value, RETRY_DELAYS_MS.length) - 1];
+  }
   const cadenceMs = refreshSecs.value * 1000;
   if (state.value === "preparing") return Math.min(cadenceMs, PREPARING_POLL_MS);
   if (!builtAt.value) return cadenceMs;
@@ -418,7 +455,7 @@ const nextRefreshDelay = (): number => {
 
 const scheduleRefresh = () => {
   if (refreshTimer) clearTimeout(refreshTimer);
-  if (!pollsForSelection.value && state.value !== "preparing") return;
+  if (!pollsForSelection.value && state.value !== "preparing" && failures.value === 0) return;
   refreshTimer = setTimeout(async () => {
     // Paused while the tab is hidden, so a background tab never polls.
     if (!document.hidden) await refresh();

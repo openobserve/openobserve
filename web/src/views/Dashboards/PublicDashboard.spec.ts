@@ -182,7 +182,7 @@ describe("PublicDashboard viewer", () => {
     const w = buildWrapper();
     await flushPromises();
     expect(has(w, "dashboards-public-dashboard-error")).toBe(true);
-    expect(w.text()).toContain("not available");
+    expect(w.text()).toContain("doesn't exist or was turned off");
   });
 
   it("shows the expired message on a 410", async () => {
@@ -190,15 +190,56 @@ describe("PublicDashboard viewer", () => {
     const w = buildWrapper();
     await flushPromises();
     expect(has(w, "dashboards-public-dashboard-error")).toBe(true);
-    expect(w.text()).toContain("This link has expired.");
+    expect(w.text()).toContain("Ask the person who shared it to extend it.");
   });
 
-  it("shows unavailable on a 503 (paused / org suspended)", async () => {
-    (service.getConfig as any).mockRejectedValue({ response: { status: 503 } });
+  it("shows a paused link as turned off, and brings it back once it is resumed", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockRejectedValueOnce({ response: { status: 503 } });
     const w = buildWrapper();
     await flushPromises();
-    expect(has(w, "dashboards-public-dashboard-error")).toBe(true);
-    expect(w.text()).toContain("currently unavailable");
+    expect(w.text()).toContain("turned off right now");
+
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
+    } as never);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
+    expect(grid(w).exists()).toBe(true);
+  });
+
+  it("asks the viewer to try again later after a rate limit or network error", async () => {
+    vi.mocked(service.getConfig).mockRejectedValueOnce({ response: { status: 429 } });
+    const limited = buildWrapper();
+    await flushPromises();
+    expect(limited.text()).toContain("Too many requests. Please try again in a while.");
+
+    vi.mocked(service.getConfig).mockRejectedValueOnce(new Error("Network Error"));
+    const offline = buildWrapper();
+    await flushPromises();
+    expect(offline.text()).toContain("Can't reach the server. Please try again in a while.");
+  });
+
+  it("keeps the dashboard on screen through a network error and retries with backoff", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    vi.mocked(service.getConfig).mockRejectedValue(new Error("Network Error"));
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(grid(w).exists()).toBe(true);
+    expect(has(w, "dashboards-public-dashboard-error")).toBe(false);
+    const calls = vi.mocked(service.getConfig).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(calls);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(calls + 1);
   });
 
   it("counts down to the next refresh", async () => {
@@ -340,6 +381,6 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     const p1 = grid(w).props("injectedPanelData").p1;
     expect(p1.data).toEqual([]);
-    expect(p1.errorDetail.message).toContain("Not available");
+    expect(p1.errorDetail.message).toContain("isn't available on the public view");
   });
 });

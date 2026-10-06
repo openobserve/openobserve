@@ -5228,8 +5228,10 @@
   },
   "dashboard": {
     "publicDashboard": {
-      "notAvailable": "This dashboard is not available.",
-      "unavailable": "This dashboard is currently unavailable.",
+      "notAvailable": "This link doesn't exist or was turned off. Ask the person who shared it for a new one.",
+      "unavailable": "This dashboard is turned off right now. It will come back here when it's turned on again.",
+      "rateLimited": "Too many requests. Please try again in a while.",
+      "offline": "Can't reach the server. Please try again in a while.",
       "preparing": "Preparing this dashboard…",
       "updatedAt": "Updated {time}",
       "nextRefreshIn": "Next refresh in {time}",
@@ -5243,7 +5245,7 @@
       "variableUnset": "Not set",
       "footerNote": "Read-only view. Anyone with the link can see this dashboard.",
       "footerNoteRefresh": "Read-only view, refreshed every {interval}. Anyone with the link can see this dashboard.",
-      "panelNotAvailable": "Not available",
+      "panelNotAvailable": "This panel isn't available on the public view.",
       "timeRange": "Time range",
       "renderError": "Unable to render panel",
       "shareTooltip": "Publish publicly",
@@ -5269,7 +5271,7 @@
       "linkCopied": "Link copied",
       "copyLink": "Copy link",
       "past": "Past {range}",
-      "expired": "This link has expired."
+      "expired": "This link has expired. Ask the person who shared it to extend it."
     },
     "approximately": "Approximately",
     "tableRowsWillBeDisplayed": "table rows will be displayed",
