@@ -70,13 +70,12 @@ pub async fn delete_ended_before(cutoff: i64) -> Result<usize, anyhow::Error> {
         return Ok(0);
     }
     table::delete_ended_before(cutoff).await?;
-    for (org, id) in &ended {
-        coordinator::emit_delete_event(org, id).await?;
-        let row = list_cached(org).iter().find(|d| &d.id == id).cloned();
-        if let Some(row) = row {
-            crate::authz::remove_ownership(org, "downtimes", ownership(&row)).await;
-        }
-        remove_cached(org, id);
+    // The listed rows carry the folder the OpenFGA tuple hangs off; the cache of this node
+    // need not hold them (a fresh node, or the flag off here), so it is not the source.
+    for row in &ended {
+        coordinator::emit_delete_event(&row.org, &row.id).await?;
+        crate::authz::remove_ownership(&row.org, "downtimes", ownership(row)).await;
+        remove_cached(&row.org, &row.id);
     }
     Ok(ended.len())
 }
@@ -101,6 +100,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 pub async fn watch() -> Result<(), anyhow::Error> {
     coordinator::watch_events(on_put, on_delete).await
 }
+
 /// Writes the folder ownership tuple of every cached row; rows created before the RBAC fix lack
 /// it, and OpenFGA ignores a tuple that already exists, so a rerun writes nothing new.
 pub async fn backfill_ownership() -> usize {
@@ -110,7 +110,6 @@ pub async fn backfill_ownership() -> usize {
     }
     tuples.len()
 }
-
 
 /// The cached rows of an org; cheap to clone, never partial.
 pub fn list_cached(org: &str) -> Arc<Vec<Downtime>> {
@@ -146,6 +145,7 @@ async fn on_delete(org: String, id: String) -> Result<(), anyhow::Error> {
     remove_cached(&org, &id);
     Ok(())
 }
+
 fn all_cached() -> Vec<Arc<Vec<Downtime>>> {
     DOWNTIMES
         .read()
@@ -162,7 +162,6 @@ fn ownership_backfill(orgs: &[Arc<Vec<Downtime>>]) -> Vec<(String, Authz)> {
         .map(|row| (row.org.clone(), ownership(row)))
         .collect()
 }
-
 
 fn replace_org(org: &str, rows: Vec<Downtime>) {
     let mut cache = DOWNTIMES.write().unwrap_or_else(|e| e.into_inner());
@@ -308,6 +307,7 @@ mod tests {
         assert_eq!(owner.obj_id, "dt-1");
         assert_eq!(owner.parent_type, "downtime_folders");
         assert_eq!(owner.parent, "payments");
+    }
 
     #[test]
     fn the_ownership_backfill_covers_every_row_of_every_org_under_its_folder() {
@@ -333,6 +333,5 @@ mod tests {
             ]
         );
         assert!(ownership_backfill(&[]).is_empty());
-    }
     }
 }

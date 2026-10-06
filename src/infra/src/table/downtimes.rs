@@ -78,7 +78,7 @@ pub async fn delete_ended_before(cutoff: i64) -> Result<u64, errors::Error> {
 }
 
 /// `(org, id)` of the rows [delete_ended_before] removes, for the cache and coordinator.
-pub async fn list_ended_before(cutoff: i64) -> Result<Vec<(String, String)>, errors::Error> {
+pub async fn list_ended_before(cutoff: i64) -> Result<Vec<Downtime>, errors::Error> {
     let client = get_orm_client_ro().await;
     list_ended_before_with(client, cutoff).await
 }
@@ -221,14 +221,12 @@ pub async fn delete_ended_before_with<C: ConnectionTrait>(
 pub async fn list_ended_before_with<C: ConnectionTrait>(
     conn: &C,
     cutoff: i64,
-) -> Result<Vec<(String, String)>, errors::Error> {
-    Ok(Entity::find()
+) -> Result<Vec<Downtime>, errors::Error> {
+    let models = Entity::find()
         .filter(ended_before(cutoff))
         .all(conn)
-        .await?
-        .into_iter()
-        .map(|m| (m.org, m.id))
-        .collect())
+        .await?;
+    into_downtimes(conn, models).await
 }
 
 pub async fn move_to_folder_with<C: ConnectionTrait>(
@@ -603,12 +601,10 @@ mod tests {
             put_with(&db, &d).await.unwrap();
         }
 
-        let mut listed = list_ended_before_with(&db, cutoff).await.unwrap();
+        let ended = list_ended_before_with(&db, cutoff).await.unwrap();
+        let mut listed = ids(&ended);
         listed.sort_unstable();
-        assert_eq!(
-            listed.iter().map(|(_, id)| id.as_str()).collect::<Vec<_>>(),
-            ["cancelled", "ended_once", "ended_weekly"]
-        );
+        assert_eq!(listed, ["cancelled", "ended_once", "ended_weekly"]);
         assert_eq!(delete_ended_before_with(&db, cutoff).await.unwrap(), 3);
         assert_eq!(
             ids(&list_with(&db, "acme", None).await.unwrap()),

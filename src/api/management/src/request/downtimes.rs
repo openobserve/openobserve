@@ -100,6 +100,9 @@ pub async fn create_downtime(
         if let Some(folder) = folder.folder.filter(|f| !f.is_empty()) {
             req.folder_id = folder;
         }
+        if req.folder_id.is_empty() {
+            req.folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
+        }
         if !crate::service::auth::check_folder_write_permissions(
             &org_id,
             &user_email.user_id,
@@ -175,15 +178,16 @@ pub async fn preview_downtime(
 )]
 pub async fn downtime_resources(
     Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     Json(req): Json<ResourcesRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        respond(openobserve_core::downtimes::resources(&org_id, &req).await)
+        respond(openobserve_core::downtimes::resources(&org_id, &user_email.user_id, &req).await)
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, req);
+        let _ = (org_id, user_email, req);
         not_supported()
     }
 }
@@ -324,6 +328,12 @@ pub async fn move_downtimes(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // The same rule as `resolve_folder`: an empty destination is the default folder, so the
+        // permission is checked on the folder the rows will land in.
+        let mut req = req;
+        if req.dst_folder_id.is_empty() {
+            req.dst_folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
+        }
         if !crate::service::auth::check_folder_write_permissions(
             &org_id,
             &user_email.user_id,

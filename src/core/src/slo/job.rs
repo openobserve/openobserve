@@ -927,6 +927,14 @@ pub async fn run_range(
 
 /// [`run_range`] with `rev = now` to win the dedupe, and no delta: `reconcile` sets totals.
 pub async fn remeasure_range(slo: &Slo, start: i64, end: i64) -> Result<usize, anyhow::Error> {
+    // The trigger was pushed by the node that edited the downtime; this node's cache may not
+    // have the row yet, and nothing re-triggers a remeasure that read the old windows.
+    if let Err(e) = db::downtimes::reload_org(&slo.org).await {
+        log::warn!(
+            "[SLO] could not refresh the downtimes of {} before a remeasure: {e}",
+            slo.org
+        );
+    }
     let rev = now_micros() / 1_000_000;
     Ok(measure_range(slo, start, end, rev).await?.slices.len())
 }

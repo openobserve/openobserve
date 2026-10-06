@@ -196,7 +196,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50, 100]"
-          />
+          >
+            <template #cell-matched_by="{ row }">
+              <span v-if="matchedByText(row)">{{ matchedByText(row) }}</span>
+              <span v-else class="text-text-muted">—</span>
+            </template>
+            <template #cell-folder_id="{ row }">
+              <span class="truncate">{{
+                targetFolderName(section.module, row.folder_id) ?? raw(row.folder_id)
+              }}</span>
+            </template>
+          </OTable>
         </div>
       </template>
 
@@ -269,6 +279,7 @@ import {
   type FolderNameFn,
 } from "@/utils/downtimes/targetSummary";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -279,7 +290,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -414,6 +424,9 @@ const MATCHED_BY_KEYS: Record<string, I18nKey> = {
   org: "alerts.downtimes.detail.matchedBy.org",
 };
 
+const matchedByText = (row: PreviewMatch) =>
+  row.matched_by && MATCHED_BY_KEYS[row.matched_by] ? t(MATCHED_BY_KEYS[row.matched_by]) : null;
+
 const affectedColumns = computed<OTableColumnDef<PreviewMatch>[]>(() => [
   {
     id: "name",
@@ -426,8 +439,7 @@ const affectedColumns = computed<OTableColumnDef<PreviewMatch>[]>(() => [
   {
     id: "matched_by",
     header: t("alerts.downtimes.detail.matchedByHeader"),
-    accessorFn: (row) =>
-      row.matched_by && MATCHED_BY_KEYS[row.matched_by] ? t(MATCHED_BY_KEYS[row.matched_by]) : "—",
+    accessorFn: (row) => matchedByText(row) ?? "",
     size: 160,
   },
   {

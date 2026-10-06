@@ -323,10 +323,11 @@ pub async fn preview(
 
 pub async fn resources(
     org: &str,
+    user_id: &str,
     req: &ResourcesRequest,
 ) -> Result<ResourcesResponse, DowntimeError> {
     ensure_enabled()?;
-    resources::resources(org, req).await
+    resources::resources(org, user_id, req).await
 }
 
 /// Counts of what a downtime covers today, cached for a minute per row version.
@@ -787,7 +788,6 @@ mod tests {
         assert_eq!(name_of(&named, 0), "CDN cutover");
     }
 
-    #[test]
     fn matched(ids: &[&str]) -> ModuleMatch {
         ModuleMatch {
             matched: ids
@@ -808,6 +808,7 @@ mod tests {
         DowntimeWindow { start, end }
     }
 
+    #[test]
     fn one_active_downtime_gets_its_own_banner_whose_id_changes_per_window() {
         let d = row(
             vec![TargetModule::Alerts, TargetModule::Slos],
@@ -832,8 +833,8 @@ mod tests {
         assert_eq!(banner.variant, BannerVariant::Warning);
         assert_eq!(banner.ends_at, Some(12 * HOUR));
         assert_eq!(banner.id.as_deref(), Some("downtime:d1:36000000000"));
-        assert_eq!(
         assert_eq!(banner.cta.unwrap().url, "/web/downtimes/d1");
+        assert_eq!(
             banner.counts.unwrap(),
             vec![
                 BannerCount {
@@ -857,7 +858,6 @@ mod tests {
         );
     }
 
-    #[test]
     #[test]
     fn no_active_downtime_gets_no_banner() {
         assert!(combined_banner(&[]).is_none());
@@ -939,6 +939,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn the_next_boundary_is_the_nearest_start_or_end() {
         let active = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
         let mut later = row(vec![TargetModule::Alerts], 11 * HOUR, 20 * HOUR);

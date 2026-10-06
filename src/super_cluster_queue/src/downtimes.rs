@@ -34,9 +34,23 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         DowntimeMessage::Put { org, mut downtime } => {
             downtime.org = org;
             downtime.folder_id = local_folder_id(&downtime).await?;
-            let coverage_changed = table::downtimes::get(&downtime.org, &downtime.id)
-                .await?
-                .is_some_and(|before| !before.same_coverage(&downtime));
+            let before = table::downtimes::get(&downtime.org, &downtime.id).await?;
+            // The queue neither orders nor deduplicates: a redelivered older Put must not revert
+            // a newer edit, such as a cancel, that this region already applied.
+            if before
+                .as_ref()
+                .is_some_and(|before| before.updated_at > downtime.updated_at)
+            {
+                log::info!(
+                    "[DOWNTIMES] skipping a stale put of {}/{} (updated_at {} < {})",
+                    downtime.org,
+                    downtime.id,
+                    downtime.updated_at,
+                    before.as_ref().map_or(0, |b| b.updated_at)
+                );
+                return Ok(());
+            }
+            let coverage_changed = before.is_some_and(|before| !before.same_coverage(&downtime));
             table::downtimes::put(&downtime).await?;
             coordinator::downtimes::emit_put_event(&downtime.org, &downtime.id).await?;
             if coverage_changed {

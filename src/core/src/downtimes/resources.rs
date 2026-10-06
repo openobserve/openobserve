@@ -43,6 +43,7 @@ pub struct StreamQuery {
 
 pub async fn resources(
     org: &str,
+    user_id: &str,
     req: &ResourcesRequest,
 ) -> Result<ResourcesResponse, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
@@ -64,7 +65,7 @@ pub async fn resources(
         (registry_values(&records, &req.refine_by), "registry")
     } else {
         let queries = stream_queries(&records, &pairs, &req.refine_by);
-        (search_values(org, &queries).await, "search")
+        (search_values(org, user_id, &queries).await, "search")
     };
     Ok(respond(&req.refine_by, values, source))
 }
@@ -147,10 +148,29 @@ pub fn respond(dimension: &str, mut values: Vec<ResourceValue>, source: &str) ->
     }
 }
 
-async fn search_values(org: &str, queries: &[StreamQuery]) -> Vec<ResourceValue> {
+/// Searches only the streams the caller may read: a value from a stream they cannot search is
+/// a leak, whatever the picker then does with it.
+async fn search_values(org: &str, user_id: &str, queries: &[StreamQuery]) -> Vec<ResourceValue> {
     let mut by_value: HashMap<String, ResourceValue> = HashMap::new();
     let end = config::utils::time::now_micros();
     for query in queries {
+        if crate::authz::check_stream_permissions(
+            &query.stream,
+            org,
+            user_id,
+            &query.stream_type,
+            crate::authz::StreamPermissionResourceType::Search,
+        )
+        .await
+        .is_some()
+        {
+            log::debug!(
+                "[DOWNTIMES] resources: {user_id} may not search {}/{}; skipped",
+                query.stream_type,
+                query.stream
+            );
+            continue;
+        }
         match run_search(org, query, end - SEARCH_WINDOW_MICROS, end).await {
             Ok(hits) => {
                 for hit in hits {

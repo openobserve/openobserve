@@ -652,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ODropdownSeparator />
                       <MuteMenuItems
                         :data-test-prefix="`alert-list-${row.name}-mute`"
-                        @preset="(secs) => muteRows([row], secs)"
+                        @preset="(secs) => muteAndRefresh([row], secs)"
                         @until="openMuteDialog([row])"
                       />
                     </template>
@@ -793,7 +793,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <MuteMenuItems
                     data-test-prefix="alert-list-bulk-mute"
-                    @preset="(secs) => muteRows(selectedAlerts, secs)"
+                    @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
                     @until="openMuteDialog(selectedAlerts)"
                   />
                 </ODropdown>
@@ -922,6 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="downtimesEnabled"
       v-model:open="muteDialogOpen"
       :selection="muteSelection"
+      @muted="refreshAlerts"
     />
     <ExportResourceDialog
       v-model:open="showExportDialog"
@@ -2274,6 +2275,14 @@ export default defineComponent({
       const apiType =
         tab === "realTime" ? "realtime" : tab === "anomalyDetection" ? "anomaly_detection" : tab;
       await getAlertsFn(store, activeFolderId.value, "", true, apiType);
+    };
+
+    // The rows paint from `fetchQuery`, with no observer the mutation's invalidation can
+    // refetch, so the Muted chip of a fresh quick mute needs an explicit reload.
+    const muteAndRefresh = async (rows: any[], seconds: number) => {
+      const id = await muteRows(rows, seconds);
+      if (id) await refreshAlerts();
+      return id;
     };
 
     const refreshAlerts = async () => {
@@ -3750,7 +3759,7 @@ export default defineComponent({
       downtimesEnabled,
       muteDialogOpen,
       muteSelection,
-      muteRows,
+      muteAndRefresh,
       openMuteDialog,
       oncallEnabled,
       oncallTeamName,

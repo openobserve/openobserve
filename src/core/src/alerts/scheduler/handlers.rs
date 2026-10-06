@@ -177,11 +177,19 @@ async fn persist_alert_run_state(
     // the same evaluation, and two `now_micros()` calls would let the coverage
     // record and the freshness clock disagree about when it happened.
     let now = now_micros();
+    // A suppressed run is a firing run to the state: the condition matched and only the
+    // notification was withheld. Writing `Suppressed` would reset "firing since" at both ends
+    // of a window and, through `may_age_groups`, freeze group aging inside it. The run record
+    // keeps `Suppressed`; only the state axis reads it as `Firing`.
+    let state_outcome = match outcome {
+        RunOutcome::Suppressed => RunOutcome::Firing,
+        other => other.clone(),
+    };
     let mut update = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
-        outcome.clone(),
+        state_outcome,
         level,
         now,
     );

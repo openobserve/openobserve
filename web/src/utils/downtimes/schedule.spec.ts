@@ -108,6 +108,21 @@ describe("currentOrNextWindow", () => {
     const ended = { ...weekly, ends_at: micros("2026-09-18T21:59:00Z") };
     expect(currentOrNextWindow(ended, micros("2026-09-17T12:00:00Z"))).toBeNull();
   });
+
+  it("returns a running window that started days ago", () => {
+    // Friday 18:00 UTC for 60 h runs until Monday 06:00; Sunday noon is inside it.
+    const long: DowntimeSchedule = {
+      ...weekly,
+      timezone: "UTC",
+      start_time_local: "18:00",
+      duration_secs: 60 * 3600,
+      weekdays: [5],
+    };
+    expect(currentOrNextWindow(long, micros("2026-09-20T12:00:00Z"))).toEqual({
+      start: micros("2026-09-18T18:00:00Z"),
+      end: micros("2026-09-21T06:00:00Z"),
+    });
+  });
 });
 
 describe("scheduleSentence", () => {

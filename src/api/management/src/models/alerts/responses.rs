@@ -664,12 +664,16 @@ pub async fn fill_active_downtimes(org: &str, list: &mut [ListAlertsResponseBody
     {
         return;
     }
+    // No downtime rows, no chip: neither branch below can yield one, so skip the state query.
+    let rows = db::downtimes::list_cached(org);
+    if rows.is_empty() {
+        return;
+    }
     let now = config::utils::time::now_micros();
     let ids: Vec<String> = list.iter().map(|item| item.alert_id.to_string()).collect();
     let recorded = infra::table::alert_states::last_downtime_ids(&ids)
         .await
         .unwrap_or_default();
-    let rows = db::downtimes::list_cached(org);
     for item in list.iter_mut() {
         item.active_downtime = list_item_downtime(org, item, now).or_else(|| {
             recorded

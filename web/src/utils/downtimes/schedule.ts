@@ -111,7 +111,9 @@ export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): Dow
   }
   if (!s.start_time_local || !isHhMm(s.start_time_local)) return null;
   const today = utcMicrosToLocal(nowMicros, s.timezone).date;
-  for (let offset = -1; offset <= 8; offset += 1) {
+  // A window that started up to `duration` ago is still running, so look back that many days.
+  const lookback = Math.max(1, Math.ceil(s.duration_secs / 86_400));
+  for (let offset = -lookback; offset <= 8; offset += 1) {
     const day = addDays(today, offset);
     if (!occursOn(s, day)) continue;
     const start = localToUtcMicros(day, s.start_time_local, s.timezone);
