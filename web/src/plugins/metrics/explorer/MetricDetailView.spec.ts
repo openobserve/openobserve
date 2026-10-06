@@ -495,6 +495,24 @@ describe("MetricDetailView", () => {
       expect(chart().props("forecast").entries).toHaveLength(2);
     });
 
+    it("drops the drawn forecast at once when the forecast is switched off", async () => {
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "linear",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart().props("forecast")).not.toBeNull();
+      runQuery.mockImplementation(() => new Promise(() => {}));
+
+      await wrapper.setProps({ forecast: null });
+      await flushPromises();
+      expect(chart().exists()).toBe(true);
+      expect(chart().props("forecast")).toBeNull();
+    });
+
     it("queues its fits after the chart's own queries, and still cancels the rest after one fails", async () => {
       const order: string[] = [];
       const fits: Array<{ signal: AbortSignal; fail: () => void }> = [];

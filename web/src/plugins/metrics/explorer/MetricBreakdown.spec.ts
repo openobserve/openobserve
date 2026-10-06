@@ -651,6 +651,8 @@ describe("MetricBreakdown", () => {
     it("forecasts the focused chart per label value, and only it", async () => {
       const forecast = { method: "linear", horizon: 900, label: "forecast" };
       const timeRange = { start_time: 1_000_000_000, end_time: 4_600_000_000 };
+      const twoValues = byMethod(["GET", [[4_600, "1"]]], ["POST", [[4_600, "3"]]]);
+      runQuery.mockResolvedValue(twoValues);
       wrapper = mountBreakdown({ forecast, stepSeconds: 60, timeRange });
       await flushPromises();
       expect(runQuery).toHaveBeenCalled();
@@ -666,6 +668,11 @@ describe("MetricBreakdown", () => {
       const chart = wrapper.findComponent({ name: "MetricCardChart" });
       expect(chart.props("forecast").until).toBe(4_600_000_000 + 900e6);
       expect(chart.props("forecast").entries).toHaveLength(1);
+      const lines = chart.props("forecast").entries[0].result.result;
+      expect(lines.map((line: any) => [line.metric.method, line.values[0][1]])).toEqual([
+        ["GET", "1"],
+        ["POST", "3"],
+      ]);
     });
 
     it("keeps the right-click alert off the small label tiles", async () => {

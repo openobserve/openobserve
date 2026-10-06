@@ -1156,13 +1156,15 @@ export default defineComponent({
         typeof event?.seriesIndex === "number"
           ? panelData.value?.options?.series?.[event.seriesIndex]
           : undefined;
+      const forecastPoint =
+        series?._seriesRole === "forecast" ? forecastPointOf(series, event.dataIndex) : undefined;
       openAlertContextMenu({
         ...event,
+        // A click on the seam targets the forecast's first point, the fit at the range end.
+        ...(forecastPoint?.onSeam ? { value: forecastPoint.startValue } : {}),
         panelQueryIndex: series?._panelQueryIndex,
         seriesRole: series?._seriesRole,
-        ...(series?._seriesRole === "forecast"
-          ? { forecastPoint: forecastPointOf(series, event.dataIndex) }
-          : {}),
+        ...(series?._seriesRole === "forecast" ? { forecastPoint } : {}),
       });
     };
 

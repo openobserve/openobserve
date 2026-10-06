@@ -1101,7 +1101,13 @@ export default defineComponent({
         () => props.timeRange,
       ],
       // Only the window or the forecast changed: the drawn chart stays up while the new one loads.
-      (now, before) => loadOverview(!!before && now.slice(0, -2).every((v, i) => v === before[i])),
+      (now, before) => {
+        // A kept chart must not go on drawing a forecast the control no longer asks for.
+        if (before && now[4] !== before[4] && overviewState.value.forecast) {
+          overviewState.value = { ...overviewState.value, forecast: null };
+        }
+        loadOverview(!!before && now.slice(0, -2).every((v, i) => v === before[i]));
+      },
       { immediate: true },
     );
 

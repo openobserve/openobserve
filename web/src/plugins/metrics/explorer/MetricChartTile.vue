@@ -258,7 +258,7 @@ const load = async () => {
     ]);
     const T = timeRange.end_time;
     const fitWindow = { T, rangeSeconds: (T - timeRange.start_time) / 1e6, stepSeconds };
-    // Queued after the chart's own queries, and never waited on by it: the fits are slower and optional.
+    // Issued after the chart's queries so they queue behind them, and not awaited: they are slower and optional.
     const pendingForecast =
       forecast && stepSeconds > 0
         ? fitForecasts(exprs, forecast, fitWindow, (query) =>
@@ -312,6 +312,10 @@ const invalidate = () => {
     return;
   // A new window or forecast alone keeps the drawn chart until the new result lands.
   const windowOnly = loadedFor?.key === queryKey();
+  // A kept chart must not go on drawing a forecast the control no longer asks for.
+  if (loadedFor?.forecastKey !== forecastKey() && state.value.forecast) {
+    state.value = { ...state.value, forecast: null };
+  }
   generation += 1;
   cancelActive();
   refreshing.value = false;

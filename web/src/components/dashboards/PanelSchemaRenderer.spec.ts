@@ -2166,10 +2166,14 @@ describe("PanelSchemaRenderer", () => {
       wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.4, seriesIndex: 1, dataIndex: 0 });
 
       const point = wrapper.vm.contextMenuData.forecastPoint;
-      expect(point).toMatchObject({ startTime: 160, startValue: 0.5, clickedTime: 100 });
-      expect(
-        forecastAlertFromChart({ ...point, U: "x", T: 0.4, rangeSeconds: 3600 }),
-      ).toMatchObject({ direction: "falls", H: FORECAST_MIN_DAYS });
+      expect(point).toMatchObject({ startTime: 160, startValue: 0.5, clickedTime: 160 });
+      // The seam lies before the range end, so the target is the fit there, not the seam's 0.4.
+      expect(wrapper.vm.contextMenuData.value).toBe(0.5);
+      const T = wrapper.vm.contextMenuData.value;
+      expect(forecastAlertFromChart({ ...point, U: "x", T, rangeSeconds: 3600 })).toMatchObject({
+        direction: "rises",
+        H: FORECAST_MIN_DAYS,
+      });
     });
 
     it("should hide context menu", () => {

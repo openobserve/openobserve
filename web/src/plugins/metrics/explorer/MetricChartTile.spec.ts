@@ -412,6 +412,18 @@ describe("MetricChartTile", () => {
       expect(chart().props("forecast").entries).toHaveLength(1);
     });
 
+    it("drops the drawn forecast at once when the forecast is switched off", async () => {
+      wrapper = mountForecast();
+      await flushPromises();
+      expect(chart().props("forecast")).not.toBeNull();
+      runQuery.mockImplementation(() => new Promise(() => {}));
+
+      await wrapper.setProps({ forecast: null });
+      await flushPromises();
+      expect(chart().props("results")).toEqual([SERIES]);
+      expect(chart().props("forecast")).toBeNull();
+    });
+
     it("cancels its fits when it unmounts", async () => {
       runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
         isFit(opts) ? new Promise(() => {}) : Promise.resolve(SERIES),
