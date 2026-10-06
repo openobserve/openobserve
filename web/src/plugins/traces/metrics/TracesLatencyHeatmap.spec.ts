@@ -247,6 +247,7 @@ describe("TracesLatencyHeatmap", () => {
       expect(o.toolbox.feature.dataZoom.yAxisIndex).toBe(0);
       expect(o.visualMap.show).toBe(false);
       expect(o.visualMap.dimension).toBe(2);
+      expect(o.visualMap.min).toBe(Math.log1p(3));
       expect(o.visualMap.max).toBe(Math.log1p(40));
       expect(o.series[0].type).toBe("heatmap");
     });
@@ -271,7 +272,7 @@ describe("TracesLatencyHeatmap", () => {
       wrapper = await mountHeatmap();
       expect(chartColor).toHaveBeenCalledWith("--color-latency-p95");
       expect(options(wrapper).visualMap.inRange.color).toEqual(["#0a4ce8"]);
-      expect(options(wrapper).visualMap.inRange.colorAlpha).toEqual([0.2, 1]);
+      expect(options(wrapper).visualMap.inRange.colorAlpha).toEqual([0.08, 1]);
     });
 
     it("rebuilds the option when the theme flips", async () => {

@@ -40,7 +40,8 @@ export interface LatencyHeatmapGrid {
   rangeEndUs: number;
   rows: number[];
   cells: [number, number, number, number][];
-  maxValue: number;
+  colorMin: number;
+  colorMax: number;
 }
 
 export interface LatencyHeatmapSelection {
@@ -113,14 +114,34 @@ export function buildHeatmapGrid(
   const rows: number[] = [];
   for (let k = minBucket; k <= maxBucket; k++) rows.push(k);
 
-  let maxValue = 0;
-  const cells = kept.map(({ col, bucket, count }): [number, number, number, number] => {
-    const value = Math.log1p(count);
-    maxValue = Math.max(maxValue, value);
-    return [col, bucket - minBucket, value, count];
-  });
+  const cells = kept.map(({ col, bucket, count }): [number, number, number, number] => [
+    col,
+    bucket - minBucket,
+    Math.log1p(count),
+    count,
+  ]);
+  const { colorMin, colorMax } = colorDomain(cells.map((c) => c[2]));
 
-  return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells, maxValue };
+  return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells, colorMin, colorMax };
+}
+
+const percentile = (sorted: number[], q: number) => {
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return sorted[lo] + (pos - lo) * (sorted[hi] - sorted[lo]);
+};
+
+// Every cell has a count of at least 1, so a domain from 0 would light most cells; spread it over the observed values.
+function colorDomain(values: number[]): { colorMin: number; colorMax: number } {
+  const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  if (min === max) return { colorMin: 0, colorMax: max };
+  const p5 = percentile(sorted, 0.05);
+  const p99 = percentile(sorted, 0.99);
+  if (new Set(sorted).size < 3 || p5 >= p99) return { colorMin: min, colorMax: max };
+  return { colorMin: p5, colorMax: p99 };
 }
 
 const clampIndex = (i: number, length: number) => Math.min(Math.max(i, 0), length - 1);

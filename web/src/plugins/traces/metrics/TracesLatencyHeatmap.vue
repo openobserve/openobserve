@@ -233,9 +233,10 @@ const options = computed(() => {
     visualMap: {
       show: false,
       dimension: 2,
-      min: 0,
-      max: g.maxValue,
-      inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.2, 1] },
+      // ECharts' default unbounded range clamps cells outside [min, max] to the ends of the ramp.
+      min: g.colorMin,
+      max: g.colorMax,
+      inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.08, 1] },
     },
     toolbox: {
       show: true,
