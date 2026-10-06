@@ -75,6 +75,7 @@ struct PendingMigrations {
     prompts: bool,
     prompt_folders: bool,
     query_history: bool,
+    ai_chat_shares: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -539,6 +540,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.query_history {
         keys.push("query_history");
     }
+    if pending.ai_chat_shares {
+        keys.push("ai_chat_shares");
+    }
     keys
 }
 
@@ -579,6 +583,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
+    let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -698,6 +703,11 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] query history permissions migration needed");
         pending.query_history = true;
     }
+    // 0.0.54 is taken by public dashboards, which needs no back-fill.
+    if existing_model_version < v0_0_55 {
+        log::info!("[OFGA:Local] AI chat share permissions migration needed");
+        pending.ai_chat_shares = true;
+    }
 
     pending
 }
@@ -708,13 +718,24 @@ mod tests {
 
     #[test]
     fn test_query_history_back_fill_below_0_0_53() {
-        let pending = pending_migrations("0.0.53", "0.0.52");
+        let pending = pending_migrations("0.0.55", "0.0.52");
         assert!(pending.query_history);
         assert!(!pending.prompt_folders);
-        assert_eq!(all_org_ownership_keys(&pending), vec!["query_history"]);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["query_history", "ai_chat_shares"]
+        );
 
-        let pending = pending_migrations("0.0.53", "0.0.53");
+        let pending = pending_migrations("0.0.55", "0.0.53");
         assert!(!pending.query_history);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["ai_chat_shares"]);
+    }
+
+    #[test]
+    fn test_ai_chat_shares_back_fill_below_0_0_55() {
+        assert!(pending_migrations("0.0.55", "0.0.54").ai_chat_shares);
+        let pending = pending_migrations("0.0.55", "0.0.55");
+        assert!(!pending.ai_chat_shares);
         assert!(all_org_ownership_keys(&pending).is_empty());
     }
 }

@@ -15,4 +15,5 @@
 
 pub mod chat;
 pub mod chats;
+pub mod shares;
 pub mod toolsets;

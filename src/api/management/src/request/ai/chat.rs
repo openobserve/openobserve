@@ -992,6 +992,18 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             {
                 return MetaHttpResponse::bad_request("The message is empty");
             }
+            // Read before admission so a failed read leaves the turn retryable.
+            let fork_seed = match super::shares::fork_seed(
+                &org_id_str,
+                session_id.as_deref(),
+                &user_id,
+                &auth_str,
+            )
+            .await
+            {
+                Ok(seed) => seed,
+                Err(resp) => return resp,
+            };
             let admitted = match super::chats::admit_turn(
                 &org_id_str,
                 session_id.as_deref(),
@@ -1044,6 +1056,11 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             query_req.turn_id = Some(turn_id.clone());
             query_req.known_seq = Some(row.last_committed_seq);
             query_req.known_opencode_session_id = row.opencode_session_id.clone();
+            if row.last_committed_seq == infra::table::ai_chat_sessions::NO_SEQ
+                && let Some(seed) = fork_seed
+            {
+                query_req.history = Some(seed);
+            }
 
             let settings = PersistSettings::from_config();
             let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(

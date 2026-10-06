@@ -46,7 +46,7 @@ pub const X_O2_ASSISTANT_TURN_ID: &str = "x-o2-assistant-turn-id";
 /// Largest projection request sent to o2-ai, in events (whole turns only; a
 /// single longer turn is sent alone).
 const PROJECT_CHUNK_EVENTS: usize = 5000;
-const MAX_TITLE_CHARS: usize = 200;
+pub(super) const MAX_TITLE_CHARS: usize = 200;
 const DEFAULT_PAGE: u64 = 50;
 const MAX_PAGE: u64 = 200;
 
@@ -63,7 +63,7 @@ fn prompt_title(prompt: &str) -> Option<String> {
 
 const PROMPT_TITLE_CHARS: usize = 80;
 
-fn is_uuid(value: &str) -> bool {
+pub(super) fn is_uuid(value: &str) -> bool {
     value.len() == 36 && uuid::Uuid::try_parse(value).is_ok()
 }
 
@@ -85,7 +85,11 @@ pub async fn resolve_owner(user_email: &str) -> Result<String, Response> {
 
 /// The caller's own active chat, or a 404 that does not reveal whether the
 /// id exists for someone else.
-async fn owned_chat(org_id: &str, session_id: &str, owner: &str) -> Result<Model, Response> {
+pub(super) async fn owned_chat(
+    org_id: &str,
+    session_id: &str,
+    owner: &str,
+) -> Result<Model, Response> {
     if !is_uuid(session_id) {
         return Err(MetaHttpResponse::bad_request("Invalid session id"));
     }
@@ -99,6 +103,55 @@ async fn owned_chat(org_id: &str, session_id: &str, owner: &str) -> Result<Model
             ))
         }
     }
+}
+
+/// A chat's projected turns through `row.last_committed_seq` (lower it to cut the history).
+pub(super) async fn load_turns(
+    row: &Model,
+    auth: &str,
+) -> Result<Vec<serde_json::Value>, Response> {
+    let (org_id, session_id) = (&row.org_id, &row.session_id);
+    let events = match openobserve_core::ai_chat::read_committed_events(row, -1).await {
+        Ok(events) => events,
+        // Logged and counted by the reader. Never a partial chat presented as
+        // whole: the caller keeps whatever it had and may retry.
+        Err(e) => {
+            return Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({
+                    "code": StatusCode::SERVICE_UNAVAILABLE.as_u16(),
+                    "message": "This conversation's history could not be read in full; please retry",
+                    "error_code": "history_unavailable",
+                    "detail": e.to_string(),
+                })),
+            )
+                .into_response());
+        }
+    };
+
+    let Some(client) = get_agent_client() else {
+        return Err(MetaHttpResponse::service_unavailable(
+            "Agent service not configured",
+        ));
+    };
+    let mut turns = Vec::new();
+    for chunk in openobserve_core::ai_chat::turn_chunks(&events, PROJECT_CHUNK_EVENTS) {
+        let payload: Vec<_> = chunk.iter().map(|e| e.to_replay_json()).collect();
+        match client.project_session(org_id, &payload, auth).await {
+            Ok(projected) => {
+                if let Some(chunk_turns) = projected.get("turns").and_then(|t| t.as_array()) {
+                    turns.extend(chunk_turns.iter().cloned());
+                }
+            }
+            Err(e) => {
+                log::error!("[AI-CHAT] projecting {org_id}/{session_id} failed: {e:#}");
+                return Err(MetaHttpResponse::service_unavailable(
+                    "This conversation could not be rendered right now; please retry",
+                ));
+            }
+        }
+    }
+    Ok(turns)
 }
 
 /// Everything a persisted turn needs once admitted.
@@ -240,6 +293,9 @@ pub struct ChatSummary {
     /// Highest durably stored event sequence (-1: nothing yet). A cached copy
     /// at this sequence is current and need not be fetched again.
     pub last_committed_seq: i64,
+    /// Set on a chat forked from a share: the share's id.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forked_from_share: Option<String>,
 }
 
 impl From<Model> for ChatSummary {
@@ -251,6 +307,7 @@ impl From<Model> for ChatSummary {
             created_at: row.created_at,
             updated_at: row.updated_at,
             last_committed_seq: row.last_committed_seq,
+            forked_from_share: row.forked_from_share,
         }
     }
 }
@@ -420,46 +477,12 @@ pub async fn get(
         .into_response();
     }
 
-    let events = match openobserve_core::ai_chat::read_committed_events(&row, -1).await {
-        Ok(events) => events,
-        // Logged and counted by the reader. Never a partial chat presented as
-        // whole: the caller keeps whatever it had and may retry.
-        Err(e) => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({
-                    "code": StatusCode::SERVICE_UNAVAILABLE.as_u16(),
-                    "message": "This conversation's history could not be read in full; please retry",
-                    "error_code": "history_unavailable",
-                    "detail": e.to_string(),
-                })),
-            )
-                .into_response();
-        }
-    };
-
-    let Some(client) = get_agent_client() else {
-        return MetaHttpResponse::service_unavailable("Agent service not configured");
-    };
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-    let mut turns = Vec::new();
-    for chunk in openobserve_core::ai_chat::turn_chunks(&events, PROJECT_CHUNK_EVENTS) {
-        let payload: Vec<_> = chunk.iter().map(|e| e.to_replay_json()).collect();
-        match client.project_session(&org_id, &payload, &auth).await {
-            Ok(projected) => {
-                if let Some(chunk_turns) = projected.get("turns").and_then(|t| t.as_array()) {
-                    turns.extend(chunk_turns.iter().cloned());
-                }
-            }
-            Err(e) => {
-                log::error!("[AI-CHAT] projecting {org_id}/{session_id} failed: {e:#}");
-                return MetaHttpResponse::service_unavailable(
-                    "This conversation could not be rendered right now; please retry",
-                );
-            }
-        }
-    }
+    let turns = match load_turns(&row, &auth).await {
+        Ok(turns) => turns,
+        Err(resp) => return resp,
+    };
     Json(ChatDetailResponse {
         chat: row.into(),
         not_modified: false,
@@ -587,6 +610,7 @@ pub async fn delete(
             );
         }
     }
+    super::shares::revoke_for_deleted(&org_id, std::slice::from_ref(&session_id), now).await;
     // Drop the replica's working copy too. Best effort: the chat is already
     // unreadable, and a leftover opencode session is never served again.
     if let Some(client) = get_agent_client() {
@@ -637,6 +661,7 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
             );
         }
     };
+    super::shares::revoke_for_deleted(&org_id, &session_ids, now).await;
     let deleted = session_ids.len();
     // Drop the replicas' working copies in the background, a few at a time:
     // the chats are already unreadable, this only reclaims o2-ai's disk.
@@ -664,7 +689,7 @@ pub async fn delete_all(Path(org_id): Path<String>, in_req: axum::extract::Reque
     MetaHttpResponse::json(serde_json::json!({ "deleted": deleted }))
 }
 
-fn user_email(req: &axum::extract::Request) -> Option<String> {
+pub(super) fn user_email(req: &axum::extract::Request) -> Option<String> {
     req.headers()
         .get("user_id")
         .and_then(|v| v.to_str().ok())

@@ -211,6 +211,7 @@ mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
 mod m20260923_000001_create_ai_chat_sessions;
+mod m20261006_000001_create_ai_chat_shares;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -524,6 +525,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
             Box::new(m20260923_000001_create_ai_chat_sessions::Migration),
+            Box::new(m20261006_000001_create_ai_chat_shares::Migration),
         ]
     }
 }
@@ -582,6 +584,7 @@ mod tests {
         (97, "m20261004_000001_create_query_history"),
         (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
         (99, "m20260923_000001_create_ai_chat_sessions"),
+        (100, "m20261006_000001_create_ai_chat_shares"),
     ];
 
     #[test]
@@ -661,6 +664,10 @@ mod tests {
             (
                 "m20260725_000001_create_alert_states_tables",
                 "m20260924_000001_add_recovery_episode_columns",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261006_000001_create_ai_chat_shares",
             ),
         ] {
             assert!(

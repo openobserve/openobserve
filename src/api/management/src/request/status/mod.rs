@@ -195,6 +195,8 @@ struct ConfigResponse<'a> {
     /// AI conversations are stored server-side (`/ai/chats`); the browser's
     /// IndexedDB copy is then only a cache.
     ai_chat_persistence_enabled: bool,
+    /// Persisted AI chats may be shared through public links.
+    public_ai_chat_enabled: bool,
     /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
     /// recovery window at all — deletion is immediate and permanent, which is what
     /// every OSS build reports.
@@ -597,6 +599,7 @@ pub async fn zo_config(
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
         ai_chat_persistence_enabled,
+        public_ai_chat_enabled: ai_chat_persistence_enabled && cfg.public_ai_chat.enabled,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,

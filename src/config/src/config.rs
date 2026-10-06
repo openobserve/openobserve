@@ -96,7 +96,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 97: create query_history.
 // 98: key alert_dedup_state by (org_id, fingerprint).
 // 99: create ai_chat_sessions (server-side AI chat persistence).
-pub const DB_SCHEMA_VERSION: u64 = 99;
+// 100: create ai_chat_shares and add fork columns to ai_chat_sessions.
+pub const DB_SCHEMA_VERSION: u64 = 100;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1038,6 +1039,24 @@ pub struct Config {
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
+    pub public_ai_chat: PublicAiChat,
+}
+
+/// Unauthenticated read-only links to shared AI chats.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicAiChat {
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_ENABLED",
+        default = false,
+        help = "Allow AI chats to be shared through public links. Off by default; the public route only exists when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_RPM",
+        default = 60,
+        help = "Per-IP requests-per-minute limit on the public shared-chat route (0 disables)."
+    )]
+    pub rpm: u64,
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.

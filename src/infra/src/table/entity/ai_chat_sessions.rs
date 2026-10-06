@@ -30,6 +30,10 @@ pub struct Model {
     /// Client-supplied id of the most recent turn, so a retried request does
     /// not start a second model run.
     pub last_turn_id: Option<String>,
+    /// The share this chat was forked from; its first turn is seeded from it.
+    pub forked_from_share: Option<String>,
+    /// Last source event (seq) the fork's seed history includes.
+    pub fork_seed_seq: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

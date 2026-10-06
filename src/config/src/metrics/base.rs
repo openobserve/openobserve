@@ -2626,6 +2626,30 @@ pub static AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|
     )
     .expect("Metric created")
 });
+pub static AI_CHAT_SHARE_OPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_share_ops_total",
+            "AI chat share operations (op=create|update|revoke|fork)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["op"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SHARE_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_share_reads_total",
+            "Shared AI chats served (visibility=org|public)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["visibility"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3298,6 +3322,8 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(AI_CHAT_RESTORES_TOTAL.clone()),
         Box::new(AI_CHAT_RESTORE_SECONDS.clone()),
         Box::new(AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL.clone()),
+        Box::new(AI_CHAT_SHARE_OPS_TOTAL.clone()),
+        Box::new(AI_CHAT_SHARE_READS_TOTAL.clone()),
     ] {
         registry.register(metric).expect("Metric registered");
     }

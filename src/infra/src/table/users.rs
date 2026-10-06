@@ -302,6 +302,20 @@ pub async fn get_id_by_email(email: &str) -> Result<Option<String>, errors::Erro
     Ok(id)
 }
 
+/// The `(first_name, last_name)` of the user with stable id `id`, if any.
+pub async fn get_name_by_id(id: &str) -> Result<Option<(String, String)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::FirstName)
+        .column(Column::LastName)
+        .filter(Column::Id.eq(id))
+        .into_tuple::<(String, String)>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
     let client = get_orm_client_ro().await;
     let record = Entity::find()
