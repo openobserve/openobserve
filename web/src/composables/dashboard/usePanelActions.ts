@@ -212,7 +212,7 @@ export function usePanelAlertCreation({
     const visible = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
     // A click on empty chart area hit no series, so only a lone visible query is certain.
     const queryIndex = selection.panelQueryIndex ?? (visible.length === 1 ? visible[0] : undefined);
-    const query = queries[queryIndex ?? visible[0] ?? 0];
+    const query = queries[queryIndex ?? visible[0]];
     if (!query) {
       return;
     }

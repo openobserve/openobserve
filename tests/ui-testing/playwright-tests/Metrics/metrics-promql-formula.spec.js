@@ -1,4 +1,3 @@
-// Formulas: build A / B * 100 over two hidden queries in /metrics/editor, save it to a dashboard, and reload.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
@@ -88,8 +87,9 @@ test.describe('Metrics PromQL formulas', () => {
     const sent = sentQueries(page);
     await builder.clickRunQuery();
     await expect.poll(() => sent, { timeout: 30000 }).toContain(COMBINED);
-    expect(sent.filter((q) => q === A || q === B)).toEqual([]);
     await expect(page.locator('[data-test="chart-renderer"] canvas').first()).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-test="no-data"]')).toHaveCount(0);
+    expect(sent.filter((q) => q === A || q === B)).toEqual([]);
 
     const panelTitle = `Error ratio ${Date.now().toString(36)}`;
     expect(await builder.clickAddToDashboard()).toBe(true);
@@ -107,6 +107,7 @@ test.describe('Metrics PromQL formulas', () => {
     const savedChart = builder.getPanelContainerByTitle(panelTitle);
     await expect(savedChart.locator('[data-test="chart-renderer"] canvas').first()).toBeVisible({ timeout: 30000 });
     await expect(savedChart.locator('[data-test="panel-schema-renderer-error-message"]')).toHaveCount(0);
+    await expect(savedChart.locator('[data-test="no-data"]')).toHaveCount(0);
 
     const saved = await getDashboardJson(dashboardId);
     const dash = saved[`v${saved.version}`] || saved;
@@ -122,5 +123,12 @@ test.describe('Metrics PromQL formulas', () => {
     for (const metric of [RELATED_METRIC, DETAIL_METRIC]) {
       await expect(page.locator(`[data-test="create-alert-stream-option-${metric}"]`)).toBeVisible({ timeout: 15000 });
     }
+    await page.locator('[data-test="create-alert-from-source-dialog"] [data-test="o-dialog-primary-btn"]').click();
+    await page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
+    await expect
+      .poll(() => page.evaluate((text) => !!window.monaco?.editor?.getEditors?.().some((e) => e.getValue() === text), COMBINED), {
+        timeout: 30000,
+      })
+      .toBe(true);
   });
 });

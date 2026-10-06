@@ -935,6 +935,20 @@ describe("PanelContainer", () => {
         expect(prefill.streamCandidates.map((c: any) => c.name)).toEqual(["errors", "requests"]);
       });
 
+      it("keeps the action for a formula whose inputs carry no stream pick", () => {
+        const panel = formulaPanel(true);
+        panel.queries.forEach((query: any) => (query.fields.stream = ""));
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeNull();
+      });
+
+      it("disables the action when every query is hidden", () => {
+        const panel = formulaPanel(true);
+        panel.queries[2].config.hide = true;
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+      });
+
       it("offers only the visible queries in the picker", async () => {
         wrapper = createWrapper({ data: formulaPanel(false) });
         await wrapper.vm.metaDataValue(metaData);

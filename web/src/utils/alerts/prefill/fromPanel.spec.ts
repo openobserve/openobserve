@@ -583,6 +583,16 @@ describe("buildPrefillFromPanel — a formula query", () => {
     expect(p.streamCandidates?.map((c) => c.name)).toEqual(["errors_v2", "requests_v2"]);
   });
 
+  it("ignores metric names inside an input's comment, but not a '#' in a label value", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].query = 'sum(rate(http_errors_total{path="/a#b"}[5m])) # was old_metric';
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
   it("takes a builder-mode input's metric from its builder stream", () => {
     const panel = formulaPanel("A / B");
     panel.queries![0].customQuery = false;

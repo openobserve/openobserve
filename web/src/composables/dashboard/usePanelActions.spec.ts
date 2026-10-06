@@ -355,6 +355,16 @@ describe("usePanelActions", () => {
       expect(prefill?.queryChoices).toBeUndefined();
     });
 
+    it("opens nothing on empty chart area when every query is hidden", () => {
+      const args = { ...makeFormula(), visibleQueryIndexes: { value: [] as number[] } };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 5 });
+
+      expect(args.router.push).not.toHaveBeenCalled();
+      expect(alertCreationDialog.value).toBeNull();
+    });
+
     it("on empty chart area, alerts on the one visible query, never a hidden input", () => {
       const args = makeFormula();
       const api = usePanelAlertCreation(args as any);

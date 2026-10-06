@@ -513,6 +513,7 @@ import {
   panelQueryChoices,
 } from "@/utils/alerts/prefill/fromPanel";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
 import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
@@ -1116,9 +1117,10 @@ export default defineComponent({
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
     const alertDisabledReason = computed(() => {
-      if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
-      // Any query with a stream can be alerted on; the confirm dialog picks between them.
-      if (!props.data.queries.some((query: any) => query?.fields?.stream)) {
+      const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
+      if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // A formula's stream comes from its inputs' text; any other query needs its own.
+      if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
         return t("panel.panelQueryMustHaveStream");
       }
       return null;

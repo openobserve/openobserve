@@ -1,4 +1,3 @@
-// Code -> builder -> code in /metrics/editor keeps a hand-written query byte for byte, and refuses what the builder cannot show.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');

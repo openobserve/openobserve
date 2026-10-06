@@ -1,4 +1,3 @@
-// "Used in": a dashboard whose panel queries a metric is listed on that metric's detail view, and links to it.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');

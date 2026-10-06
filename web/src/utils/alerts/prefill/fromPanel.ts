@@ -182,6 +182,10 @@ const conditionsFromFilters = (fields: any, makeId: () => string) => {
   };
 };
 
+// Quoted strings are matched first so a `#` inside a label value survives.
+const withoutComments = (text = ""): string =>
+  text.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')|#[^\n]*/g, (_, quoted) => quoted ?? "");
+
 /** The metrics a formula's inputs read, once each; an alert needs one of them as its stream. */
 const formulaInputStreams = (
   queries: any[],
@@ -194,7 +198,9 @@ const formulaInputStreams = (
   const metricsOf = (query: any, i: number): string[] =>
     query?.customQuery === false
       ? [query?.fields?.stream].filter(Boolean)
-      : selectorMetricNames(executedPanelQuery(metadataQueries, i) || query?.query || "");
+      : selectorMetricNames(
+          withoutComments(executedPanelQuery(metadataQueries, i) || query?.query),
+        );
   const names = queries.flatMap((query, i) => {
     const letter = letters[i];
     if (!letter || !referenced.has(letter) || isFormulaQuery(query)) return [];
