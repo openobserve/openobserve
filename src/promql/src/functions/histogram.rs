@@ -277,13 +277,26 @@ fn for_each_step(
     Ok(())
 }
 
-// upstream labels quantiles with `FormatOpenMetricsFloat`, which writes 1 as "1.0"
+/// Upstream's `FormatOpenMetricsFloat`: Go's shortest `'g'` form, with ".0" on an integral value.
 fn quantile_label(phi: f64) -> String {
+    if phi == 0.0 {
+        return "0.0".to_string();
+    }
     if phi.is_nan() {
         return "NaN".to_string();
     }
     if phi.is_infinite() {
         return if phi > 0.0 { "+Inf" } else { "-Inf" }.to_string();
+    }
+    let scientific = format!("{phi:e}");
+    let (mantissa, exponent) = scientific
+        .split_once('e')
+        .expect("`{:e}` always writes an exponent");
+    let exponent: i32 = exponent.parse().expect("`{:e}` writes a decimal exponent");
+    // Go's shortest `'g'` switches to an exponent below 1e-4 and from 1e6
+    if !(-4..6).contains(&exponent) {
+        let sign = if exponent < 0 { '-' } else { '+' };
+        return format!("{mantissa}e{sign}{:02}", exponent.abs());
     }
     let text = phi.to_string();
     if text.contains('.') {
@@ -977,6 +990,30 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, 1.0f64.to_bits()), (3, f64::NAN.to_bits())],
         );
+    }
+
+    /// Upstream `FormatOpenMetricsFloat`: Go's shortest `'g'`, with ".0" on an integral value.
+    #[test]
+    fn test_quantile_label_formats_like_openmetrics() {
+        for (phi, expected) in [
+            (0.5, "0.5"),
+            (0.0, "0.0"),
+            (-0.0, "0.0"),
+            (1.0, "1.0"),
+            (-1.0, "-1.0"),
+            (0.99, "0.99"),
+            (0.0001, "0.0001"),
+            (0.00001, "1e-05"),
+            (-0.000012, "-1.2e-05"),
+            (123456.0, "123456.0"),
+            (1e6, "1e+06"),
+            (1.5e300, "1.5e+300"),
+            (f64::NAN, "NaN"),
+            (f64::INFINITY, "+Inf"),
+            (f64::NEG_INFINITY, "-Inf"),
+        ] {
+            assert_eq!(quantile_label(phi), expected, "{phi}");
+        }
     }
 
     #[test]

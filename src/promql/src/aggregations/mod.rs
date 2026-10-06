@@ -62,8 +62,8 @@ const AGG_PARALLEL_CHUNK: usize = 32768;
 /// Trait for PromQL aggregation operators.
 ///
 /// One implementation per operator (`sum`, `avg`, `min`, `max`, `count`, `group`, `stddev`,
-/// `stdvar`, `topk`/`bottomk`, `limitk`/`limit_ratio`) shared by both evaluation paths: the generic
-/// path folds a materialized matrix through it in [`eval_aggregate`], and the streaming path folds
+/// `stdvar`, `topk`/`bottomk`) shared by both evaluation paths: the generic path
+/// folds a materialized matrix through it in [`eval_aggregate`], and the streaming path folds
 /// each hash partition of a series stream through it in `streaming_eval::aggregate`. The
 /// operator carries only its parameter (k, φ), if any; all per-group state lives in the
 /// [`Accumulate`] it builds, so a query holds one accumulator per label group (and per
@@ -212,8 +212,8 @@ impl AggOp {
             token::T_BOTTOMK => Self::Bottomk(k("bottomk")?),
             token::T_COUNT => Self::Count,
             token::T_GROUP => Self::Group,
-            token::T_LIMITK => Self::Limitk(not_nan("limitk", k("limitk")?)?),
-            token::T_LIMIT_RATIO => Self::LimitRatio(not_nan("limit_ratio", k("limit_ratio")?)?),
+            token::T_LIMITK => Self::Limitk(limitk_param(k("limitk")?)?),
+            token::T_LIMIT_RATIO => Self::LimitRatio(limit_ratio_param(k("limit_ratio")?)?),
             token::T_MAX => Self::Max,
             token::T_MIN => Self::Min,
             token::T_STDDEV => Self::Stddev,
@@ -482,16 +482,53 @@ where
     Ok(Value::Matrix(results))
 }
 
-/// A limit's parameter; upstream rejects a NaN one rather than reading it as zero.
-fn not_nan(name: &str, param: ScalarParam) -> Result<ScalarParam> {
-    let nan = match &param {
-        ScalarParam::Const(value) => value.is_nan(),
-        ScalarParam::PerStep { values, .. } => values.iter().any(|value| value.is_nan()),
-    };
-    if nan {
-        return Err(DataFusionError::Plan(format!("[{name}] param is NaN")));
+// upstream's bounds for a k converted to int64 (`engine.go`)
+const MAX_K: f64 = 9_223_372_036_854_774_784.0;
+const MIN_K: f64 = -9_223_372_036_854_775_808.0;
+
+/// `limitk`'s k: an error when NaN or beyond int64, as upstream.
+fn limitk_param(k: ScalarParam) -> Result<ScalarParam> {
+    let values = param_values(&k);
+    if values.iter().any(|value| value.is_nan()) {
+        return Err(DataFusionError::Plan("[limitk] param is NaN".to_string()));
     }
-    Ok(param)
+    let (min, max) = values
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), &v| {
+            (min.min(v), max.max(v))
+        });
+    // a k below 1 at every step selects nothing, so upstream returns before the range checks
+    if max < 1.0 {
+        return Ok(k);
+    }
+    if min <= MIN_K {
+        return Err(DataFusionError::Plan(format!(
+            "[limitk] scalar value {min} underflows int64"
+        )));
+    }
+    if max >= MAX_K {
+        return Err(DataFusionError::Plan(format!(
+            "[limitk] scalar value {max} overflows int64"
+        )));
+    }
+    Ok(k)
+}
+
+/// `limit_ratio`'s ratio: an error when NaN, as upstream.
+fn limit_ratio_param(ratio: ScalarParam) -> Result<ScalarParam> {
+    if param_values(&ratio).iter().any(|value| value.is_nan()) {
+        return Err(DataFusionError::Plan(
+            "[limit_ratio] param is NaN".to_string(),
+        ));
+    }
+    Ok(ratio)
+}
+
+fn param_values(param: &ScalarParam) -> &[f64] {
+    match param {
+        ScalarParam::Const(value) => std::slice::from_ref(value),
+        ScalarParam::PerStep { values, .. } => values,
+    }
 }
 
 #[cfg(test)]

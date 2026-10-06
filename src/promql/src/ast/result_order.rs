@@ -165,4 +165,246 @@ mod tests {
         }
         assert_eq!(natural_cmp("host2", "host2"), Ordering::Equal);
     }
+
+    /// Applies an order to an instant vector of the given label sets and returns them in order.
+    fn ordered(query: &str, series: &[&[(&str, &str)]]) -> Vec<Vec<(String, String)>> {
+        let mut value = Value::Vector(
+            series
+                .iter()
+                .map(|labels| {
+                    let mut labels: Vec<_> = labels
+                        .iter()
+                        .map(|(name, value)| {
+                            std::sync::Arc::new(config::meta::promql::value::Label::new(
+                                *name, *value,
+                            ))
+                        })
+                        .collect();
+                    labels.sort();
+                    InstantValue {
+                        labels,
+                        sample: config::meta::promql::value::Sample::new(0, 1.0),
+                    }
+                })
+                .collect(),
+        );
+        order(query).unwrap().apply(&mut value);
+        let Value::Vector(vector) = value else {
+            unreachable!();
+        };
+        vector
+            .into_iter()
+            .map(|v| {
+                v.labels
+                    .iter()
+                    .filter(|l| l.name != "__name__")
+                    .map(|l| (l.name.clone(), l.value.clone()))
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn label_sets(rows: &[&[(&str, &str)]]) -> Vec<Vec<(String, String)>> {
+        rows.iter()
+            .map(|row| {
+                let mut row: Vec<_> = row
+                    .iter()
+                    .map(|(n, v)| (n.to_string(), v.to_string()))
+                    .collect();
+                row.sort();
+                row
+            })
+            .collect()
+    }
+
+    /// `http_requests{group, instance, job}` as upstream loads it, in load order.
+    const HTTP_REQUESTS: [&[(&str, &str)]; 10] = [
+        &[
+            ("__name__", "http_requests"),
+            ("job", "api-server"),
+            ("instance", "0"),
+            ("group", "production"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "api-server"),
+            ("instance", "1"),
+            ("group", "production"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "api-server"),
+            ("instance", "0"),
+            ("group", "canary"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "api-server"),
+            ("instance", "1"),
+            ("group", "canary"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "api-server"),
+            ("instance", "2"),
+            ("group", "canary"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "app-server"),
+            ("instance", "0"),
+            ("group", "production"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "app-server"),
+            ("instance", "1"),
+            ("group", "production"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "app-server"),
+            ("instance", "0"),
+            ("group", "canary"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "app-server"),
+            ("instance", "1"),
+            ("group", "canary"),
+        ],
+        &[
+            ("__name__", "http_requests"),
+            ("job", "api-server"),
+            ("instance", "2"),
+            ("group", "production"),
+        ],
+    ];
+
+    /// `(group, instance, job)` rows of an expected upstream result.
+    fn gij(rows: &[(&'static str, &'static str, &'static str)]) -> Vec<Vec<(String, String)>> {
+        let rows: Vec<[(&str, &str); 3]> = rows
+            .iter()
+            .map(|(g, i, j)| [("group", *g), ("instance", *i), ("job", *j)])
+            .collect();
+        label_sets(&rows.iter().map(|r| r.as_slice()).collect::<Vec<_>>())
+    }
+
+    /// Cases from upstream `functions.test` (sort_by_label / sort_by_label_desc).
+    #[test]
+    fn test_sort_by_label_matches_upstream() {
+        let (c, p) = ("canary", "production");
+        let (api, app) = ("api-server", "app-server");
+        let by_instance = gij(&[
+            (c, "0", api),
+            (c, "0", app),
+            (p, "0", api),
+            (p, "0", app),
+            (c, "1", api),
+            (c, "1", app),
+            (p, "1", api),
+            (p, "1", app),
+            (c, "2", api),
+            (p, "2", api),
+        ]);
+        for labels in [r#""instance""#, r#""instance", "group""#] {
+            let query = format!("sort_by_label(http_requests, {labels})");
+            assert_eq!(ordered(&query, &HTTP_REQUESTS), by_instance, "{query}");
+        }
+        assert_eq!(
+            ordered(
+                r#"sort_by_label(http_requests, "group", "instance", "job")"#,
+                &HTTP_REQUESTS
+            ),
+            gij(&[
+                (c, "0", api),
+                (c, "0", app),
+                (c, "1", api),
+                (c, "1", app),
+                (c, "2", api),
+                (p, "0", api),
+                (p, "0", app),
+                (p, "1", api),
+                (p, "1", app),
+                (p, "2", api),
+            ])
+        );
+        assert_eq!(
+            ordered(
+                r#"sort_by_label(http_requests, "job", "instance", "group")"#,
+                &HTTP_REQUESTS
+            ),
+            gij(&[
+                (c, "0", api),
+                (p, "0", api),
+                (c, "1", api),
+                (p, "1", api),
+                (c, "2", api),
+                (p, "2", api),
+                (c, "0", app),
+                (p, "0", app),
+                (c, "1", app),
+                (p, "1", app),
+            ])
+        );
+        let desc = gij(&[
+            (p, "2", api),
+            (c, "2", api),
+            (p, "1", app),
+            (p, "1", api),
+            (c, "1", app),
+            (c, "1", api),
+            (p, "0", app),
+            (p, "0", api),
+            (c, "0", app),
+            (c, "0", api),
+        ]);
+        for labels in [
+            r#""instance""#,
+            r#""instance", "group""#,
+            r#""instance", "group", "job""#,
+        ] {
+            let query = format!("sort_by_label_desc(http_requests, {labels})");
+            assert_eq!(ordered(&query, &HTTP_REQUESTS), desc, "{query}");
+        }
+
+        let cpus = ["0", "1", "2", "3", "10", "11", "12", "20", "21", "100"];
+        let cpu_rows: Vec<[(&str, &str); 2]> = cpus
+            .iter()
+            .rev()
+            .map(|cpu| [("job", "cpu"), ("cpu", *cpu)])
+            .collect();
+        let cpu_rows: Vec<&[(&str, &str)]> = cpu_rows.iter().map(|r| r.as_slice()).collect();
+        let expected: Vec<[(&str, &str); 2]> = cpus
+            .iter()
+            .map(|cpu| [("job", "cpu"), ("cpu", *cpu)])
+            .collect();
+        assert_eq!(
+            ordered(r#"sort_by_label(cpu_time_total, "cpu")"#, &cpu_rows),
+            label_sets(&expected.iter().map(|r| r.as_slice()).collect::<Vec<_>>())
+        );
+
+        let uname: [&[(&str, &str)]; 3] = [
+            &[("instance", "4m600"), ("release", "1.2.3")],
+            &[("instance", "4m5"), ("release", "1.11.3")],
+            &[("instance", "4m1000"), ("release", "1.111.3")],
+        ];
+        let releases = |rows: Vec<Vec<(String, String)>>| -> Vec<String> {
+            rows.into_iter().map(|row| row[1].1.clone()).collect()
+        };
+        assert_eq!(
+            releases(ordered(
+                r#"sort_by_label(node_uname_info, "instance")"#,
+                &uname
+            )),
+            ["1.11.3", "1.2.3", "1.111.3"]
+        );
+        assert_eq!(
+            releases(ordered(
+                r#"sort_by_label(node_uname_info, "release")"#,
+                &uname
+            )),
+            ["1.2.3", "1.11.3", "1.111.3"]
+        );
+    }
 }

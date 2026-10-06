@@ -482,9 +482,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_limit_parameters_must_be_numbers() {
-        for query in ["limitk(NaN, vector(1))", "limit_ratio(NaN, vector(1))"] {
+        for (query, message) in [
+            ("limitk(NaN, vector(1))", "NaN"),
+            ("limit_ratio(NaN, vector(1))", "NaN"),
+            ("limitk(1e300, vector(1))", "overflows int64"),
+            (
+                "limitk((time() - 1640995260) * 1e300, vector(1))",
+                "underflows int64",
+            ),
+        ] {
             let err = eval(query).await.unwrap_err().to_string();
-            assert!(err.contains("NaN"), "{query}: {err}");
+            assert!(err.contains(message), "{query}: {err}");
         }
+        // a k below 1 at every step returns before the range checks, as upstream
+        assert!(matches!(
+            eval("limitk(-1e300, vector(1))").await,
+            Ok(Value::None)
+        ));
     }
 }

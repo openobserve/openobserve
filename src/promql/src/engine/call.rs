@@ -228,10 +228,11 @@ impl Engine {
                 functions::label_replace(input, &dst_label, &replacement, &src_label, &regex)
             }
             Func::MaxOf | Func::MinOf => {
-                let err = "Invalid args, expected min_of(a scalar, b scalar)";
-                self.ensure_args_len(args, 2, err)?;
-                let a = self.call_scalar_arg(args, 0, err).await?;
-                let b = self.call_scalar_arg(args, 1, err).await?;
+                let name: &'static str = func_name.into();
+                let err = format!("Invalid args, expected {name}(a scalar, b scalar)");
+                self.ensure_args_len(args, 2, &err)?;
+                let a = self.call_scalar_arg(args, 0, &err).await?;
+                let b = self.call_scalar_arg(args, 1, &err).await?;
 
                 Ok(functions::min_max_of(
                     &a,
@@ -568,6 +569,32 @@ mod tests {
             engine.call_builtin(Func::Abs, &FunctionArgs { args: vec![] }).await,
             Err(DataFusionError::NotImplemented(message)) if message == "Missing argument 0"
         ));
+    }
+
+    #[tokio::test]
+    async fn test_min_of_and_max_of_name_themselves_in_arity_errors() {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let args = FunctionArgs {
+            args: vec![Box::new(PromExpr::NumberLiteral(NumberLiteral {
+                val: 1.0,
+            }))],
+        };
+        for (func, name) in [(Func::MinOf, "min_of("), (Func::MaxOf, "max_of(")] {
+            let err = engine
+                .call_builtin(func, &args)
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(name), "{err}");
+        }
     }
 
     #[test]

@@ -74,8 +74,7 @@ pub fn resolve_at_modifiers(expr: &mut Expr, start: i64, end: i64) -> bool {
     changed
 }
 
-/// The query text with `@ start()` / `@ end()` and the window functions resolved, `None` if it has
-/// none.
+/// The query text with `@` and `start()`-like calls resolved, `None` when it has neither.
 pub fn resolve_query(
     query: &str,
     start: i64,
