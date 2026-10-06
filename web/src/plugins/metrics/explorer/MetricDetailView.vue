@@ -878,7 +878,11 @@ export default defineComponent({
           window
             ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, undefined, { window })))
             : [],
-          loadForecast(exprs, signal),
+          // The forecast is extra: a timeout or rejection of its queries must not cost the chart.
+          loadForecast(exprs, signal).catch((error) => {
+            if (isCancelled(error)) throw error;
+            return null;
+          }),
         ]);
         if (mine !== generation) return;
         active = null;

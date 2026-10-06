@@ -238,6 +238,13 @@ describe("explorerUrlState", () => {
       expect(queryToExplorerFilters({ forecast: "linear", forecast_h: "1h" })).toEqual({});
     });
 
+    it("reads and writes forecast_h only alongside a forecast", () => {
+      expect(queryToExplorerFilters({ metric: "up", forecast_h: "1w" })).toEqual({ metric: "up" });
+      expect(
+        explorerFiltersToQuery({ ...defaults(), metric: "up", forecastHorizon: "1w" }),
+      ).toEqual({ metric: "up" });
+    });
+
     it("rejects any compare value outside the three presets, and compare without a metric", () => {
       for (const compare of ["2h", "1mo", "1D", "", "1d,1w"]) {
         expect(queryToExplorerFilters({ metric: "up", compare })).toEqual({ metric: "up" });

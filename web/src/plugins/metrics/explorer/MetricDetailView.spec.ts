@@ -427,6 +427,23 @@ describe("MetricDetailView", () => {
       );
     });
 
+    it("keeps the overview when a forecast query fails, and draws no forecast", async () => {
+      runQuery.mockImplementation((expr: string, _s: any, _c: any, opts: any) =>
+        opts?.instantAt ? Promise.reject(new Error("timeout")) : Promise.resolve(SERIES),
+      );
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "smoothed",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.exists()).toBe(true);
+      expect(chart.props("results")).toEqual([SERIES, SERIES]);
+      expect(chart.props("forecast")).toBeNull();
+    });
+
     it("queries no forecast while it is off", async () => {
       wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 30 });
       await flushPromises();
@@ -467,7 +484,10 @@ describe("MetricDetailView", () => {
     });
 
     it("offers no forecast on a heatmap or on an info metric", async () => {
-      wrapper = mountView({ forecast: "linear", timeRange: WINDOW }, { stubs: selectStub });
+      wrapper = mountView(
+        { forecast: "linear", timeRange: WINDOW, stepSeconds: 30 },
+        { stubs: selectStub },
+      );
       await flushPromises();
       expect(selectNamed(wrapper, "metrics-detail-forecast")).toBeUndefined();
       expect(runQuery.mock.calls.some(([, , , opts]) => opts?.instantAt)).toBe(false);
@@ -479,11 +499,13 @@ describe("MetricDetailView", () => {
           overview: LINE,
           forecast: "linear",
           timeRange: WINDOW,
+          stepSeconds: 30,
         },
         { stubs: selectStub },
       );
       await flushPromises();
       expect(selectNamed(wrapper, "metrics-detail-forecast")).toBeUndefined();
+      expect(runQuery.mock.calls.some(([, , , opts]) => opts?.instantAt)).toBe(false);
     });
   });
 

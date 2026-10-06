@@ -58,7 +58,6 @@ export interface ShiftedResult {
 
 export interface ChartForecast {
   until: number;
-  /** Suffix of every forecast series' name. */
   label: string;
   entries: Array<{ result: any; parentIndex: number }>;
 }

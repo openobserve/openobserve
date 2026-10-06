@@ -75,7 +75,9 @@ const named = (result: any) => (result.options.series ?? []).filter((s: any) => 
 
 describe("forecast entries", () => {
   it("are suffixed, kept on their own timestamps, and limited to the primary's label sets", () => {
-    const forecast = ahead("api-1", "api-9");
+    // Off the primary's step grid, as a range end T and a horizon end T + H usually are.
+    const times = [NOW_S + 17, NOW_S + 17 + STEP_S, NOW_S + 100];
+    const forecast = matrix(series("api-1", times), series("api-9", times));
     const { data, nameSuffixes } = alignShiftedPromQLResults(
       [current(), forecast],
       metadata,
@@ -84,7 +86,20 @@ describe("forecast entries", () => {
 
     expect(nameSuffixes).toEqual(["", "forecast"]);
     expect(data[1].result.map((s: any) => s.metric.pod)).toEqual(["api-1"]);
-    expect(data[1].result[0].values.map((v: any) => v[0])).toEqual(grid(NOW_S, 3));
+    expect(data[1].result[0].values.map((v: any) => v[0])).toEqual(times);
+  });
+
+  it("match primaries that keep their metric name, which predict_linear drops", () => {
+    const named = matrix({
+      metric: { __name__: "rpc_latency", quantile: "0.99" },
+      values: [[START_S, "1"]],
+    });
+    const forecast = matrix({ metric: { quantile: "0.99" }, values: [[NOW_S, "2"]] });
+    const { data } = alignShiftedPromQLResults([named, forecast], metadata, stepMeta);
+
+    expect(data[1].result).toEqual([
+      { metric: { __name__: "rpc_latency", quantile: "0.99" }, values: [[NOW_S, "2"]] },
+    ]);
   });
 
   it("draw dashed in their primary's colour, tagged as forecasts of its query", async () => {

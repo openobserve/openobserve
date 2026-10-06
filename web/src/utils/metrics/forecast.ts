@@ -24,7 +24,6 @@ export const FORECAST_HORIZON_SECONDS = {
 } as const;
 export type ForecastHorizon = keyof typeof FORECAST_HORIZON_SECONDS;
 
-/** Smoothing and trend factors, fixed: users cannot tune them. */
 const HOLT_WINTERS_SF = 0.3;
 const HOLT_WINTERS_TF = 0.1;
 /** Holt-Winters smooths over this many trailing steps, so the fit still follows recent changes in level. */

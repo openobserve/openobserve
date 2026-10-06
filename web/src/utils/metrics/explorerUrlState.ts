@@ -135,8 +135,10 @@ export function explorerFiltersToQuery(
     if (state.tab) query.tab = state.tab;
     if (state.breakdownLabel) query.breakdown_label = state.breakdownLabel;
     if (state.compare) query.compare = state.compare;
-    if (state.forecast) query.forecast = state.forecast;
-    if (state.forecastHorizon) query.forecast_h = state.forecastHorizon;
+    if (state.forecast) {
+      query.forecast = state.forecast;
+      if (state.forecastHorizon) query.forecast_h = state.forecastHorizon;
+    }
   }
   return query;
 }
@@ -185,8 +187,10 @@ export function queryToExplorerFilters(
     if (typeof query.compare === "string" && Object.hasOwn(COMPARE_OFFSET_MS, query.compare)) {
       out.compare = query.compare as CompareOffset;
     }
-    if (isForecastMethod(query.forecast)) out.forecast = query.forecast;
-    if (isForecastHorizon(query.forecast_h)) out.forecastHorizon = query.forecast_h;
+    if (isForecastMethod(query.forecast)) {
+      out.forecast = query.forecast;
+      if (isForecastHorizon(query.forecast_h)) out.forecastHorizon = query.forecast_h;
+    }
   }
 
   return out;

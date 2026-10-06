@@ -123,7 +123,13 @@ export const alignShiftedPromQLResults = (
 
     const p = primaryAt.get(parentQueryIndex[i]);
     const primarySeries: any[] = (p === undefined ? undefined : data[p]?.result) ?? [];
-    const primaryByLabels = new Map(primarySeries.map((m: any) => [labelSetKey(m?.metric), m]));
+    // predict_linear drops __name__, so a forecast matches its primary on the other labels.
+    const keyOf = (metric: Record<string, string> = {}) => {
+      if (seriesRoles[i] !== "forecast") return labelSetKey(metric);
+      const { __name__: _name, ...labels } = metric;
+      return labelSetKey(labels);
+    };
+    const primaryByLabels = new Map(primarySeries.map((m: any) => [keyOf(m?.metric), m]));
 
     // Units: timeRangeGap ms, sample timestamps s, metadata times and step µs.
     const gapS = gapMs / 1000;
@@ -142,7 +148,7 @@ export const alignShiftedPromQLResults = (
 
     const result = entry.result
       .map((m: any) => {
-        const primary = primaryByLabels.get(labelSetKey(m?.metric));
+        const primary = primaryByLabels.get(keyOf(m?.metric));
         if (primarySeries.length && !primary) return null;
         return {
           ...m,
