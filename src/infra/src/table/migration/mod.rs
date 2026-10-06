@@ -219,6 +219,7 @@ mod m20261009_000004_add_kind_to_slo_backfill_jobs;
 mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
 mod m20260923_000001_create_ai_chat_sessions;
+mod m20261006_000001_create_ai_chat_shares;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -566,6 +567,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261009_000005_create_downtime_notifications::Migration),
             Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
             Box::new(m20260923_000001_create_ai_chat_sessions::Migration),
+            Box::new(m20261006_000001_create_ai_chat_shares::Migration),
         ]
     }
 }
@@ -629,6 +631,7 @@ mod tests {
         (102, "m20261009_000005_create_downtime_notifications"),
         (103, "m20261012_000001_create_alert_calibration_configs"),
         (104, "m20260923_000001_create_ai_chat_sessions"),
+        (105, "m20261006_000001_create_ai_chat_shares"),
     ];
 
     #[test]
@@ -732,6 +735,8 @@ mod tests {
             (
                 "m20261009_000001_create_downtimes",
                 "m20261009_000005_create_downtime_notifications",
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261006_000001_create_ai_chat_shares",
             ),
         ] {
             assert!(

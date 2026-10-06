@@ -78,6 +78,11 @@ async fn sweep() -> Result<(), infra::errors::Error> {
             Ok(n) => log::info!("[AI_CHAT_RETENTION] {org_id}: removed {n} expired chat(s)"),
             Err(e) => log::error!("[AI_CHAT_RETENTION] {org_id}: purge failed: {e}"),
         }
+        match infra::table::ai_chat_shares::purge_orphans(&org_id).await {
+            Ok(0) => {}
+            Ok(n) => log::info!("[AI_CHAT_RETENTION] {org_id}: removed {n} orphaned share(s)"),
+            Err(e) => log::error!("[AI_CHAT_RETENTION] {org_id}: share purge failed: {e}"),
+        }
     }
     Ok(())
 }

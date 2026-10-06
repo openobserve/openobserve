@@ -70,6 +70,19 @@ pub struct ListCursor {
     pub session_id: String,
 }
 
+/// A new chat forked from a share (see [`insert_fork`]).
+#[derive(Debug, Clone)]
+pub struct NewFork<'a> {
+    pub org_id: &'a str,
+    pub session_id: &'a str,
+    pub user_id: &'a str,
+    pub user_email: &'a str,
+    pub agent_type: &'a str,
+    pub title: &'a str,
+    pub share_id: &'a str,
+    pub seed_seq: i64,
+}
+
 /// `column` moved forward to `value`, never back (NULL counts as unset). The
 /// reader's time window ends at `last_event_at`, so it must never shrink
 /// under events already written (a history refresh and a turn can race).
@@ -157,6 +170,8 @@ pub async fn get_or_create_with<C: ConnectionTrait>(
         last_committed_seq: Set(NO_SEQ),
         session_epoch: Set(1),
         last_turn_id: Set(None),
+        forked_from_share: Set(None),
+        fork_seed_seq: Set(None),
     };
     if let Err(e) = Entity::insert(record).exec(conn).await {
         match e.sql_err() {
@@ -168,6 +183,66 @@ pub async fn get_or_create_with<C: ConnectionTrait>(
     get_with(conn, org_id, session_id)
         .await?
         .ok_or_else(|| errors::Error::Message("ai_chat_sessions row vanished after insert".into()))
+}
+
+/// Create a fork's index row; its title counts as the user's, so nothing renames it.
+pub async fn insert_fork(fork: &NewFork<'_>, now: i64) -> Result<Model, errors::Error> {
+    insert_fork_with(get_orm_client_rw().await, fork, now).await
+}
+
+pub async fn insert_fork_with<C: ConnectionTrait>(
+    conn: &C,
+    fork: &NewFork<'_>,
+    now: i64,
+) -> Result<Model, errors::Error> {
+    let record = ActiveModel {
+        org_id: Set(fork.org_id.to_string()),
+        session_id: Set(fork.session_id.to_string()),
+        user_id: Set(fork.user_id.to_string()),
+        user_email: Set(fork.user_email.to_string()),
+        opencode_session_id: Set(None),
+        agent_type: Set(fork.agent_type.to_string()),
+        title: Set(fork.title.to_string()),
+        title_source: Set(TITLE_FROM_USER.to_string()),
+        status: Set(STATUS_ACTIVE.to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+        first_event_at: Set(None),
+        last_event_at: Set(None),
+        last_committed_seq: Set(NO_SEQ),
+        session_epoch: Set(1),
+        last_turn_id: Set(None),
+        forked_from_share: Set(Some(fork.share_id.to_string())),
+        fork_seed_seq: Set(Some(fork.seed_seq)),
+    };
+    Entity::insert(record).exec(conn).await.map_err(db_err)?;
+    get_with(conn, fork.org_id, fork.session_id)
+        .await?
+        .ok_or_else(|| errors::Error::Message("ai_chat_sessions row vanished after insert".into()))
+}
+
+/// The rows of `session_ids` in `org_id` that exist, in no particular order.
+pub async fn get_many(org_id: &str, session_ids: &[String]) -> Result<Vec<Model>, errors::Error> {
+    get_many_with(get_orm_client_ro().await, org_id, session_ids).await
+}
+
+pub async fn get_many_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_ids: &[String],
+) -> Result<Vec<Model>, errors::Error> {
+    let mut rows = Vec::with_capacity(session_ids.len());
+    for chunk in session_ids.chunks(500) {
+        rows.extend(
+            Entity::find()
+                .filter(Column::OrgId.eq(org_id))
+                .filter(Column::SessionId.is_in(chunk.iter().cloned()))
+                .all(conn)
+                .await
+                .map_err(db_err)?,
+        );
+    }
+    Ok(rows)
 }
 
 /// Record the turn about to run. Returns `false` when `turn_id` is the turn
@@ -781,6 +856,45 @@ mod tests {
         assert_eq!(again.user_id, ALICE);
         assert_eq!(again.created_at, 10);
         assert!(get_with(&db, "other-org", SID).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_fork_keeps_its_title_and_remembers_its_seed() {
+        let db = db().await;
+        let fork = NewFork {
+            org_id: ORG,
+            session_id: SID,
+            user_id: BOB,
+            user_email: "b@x",
+            agent_type: "o2-ai",
+            title: "p99 regression (copy)",
+            share_id: "share-1",
+            seed_seq: 7,
+        };
+        let row = insert_fork_with(&db, &fork, 10).await.unwrap();
+        assert_eq!(row.user_id, BOB);
+        assert_eq!(row.last_committed_seq, NO_SEQ);
+        assert_eq!(row.forked_from_share.as_deref(), Some("share-1"));
+        assert_eq!(row.fork_seed_seq, Some(7));
+        assert!(insert_fork_with(&db, &fork, 11).await.is_err());
+
+        set_prompt_title_with(&db, ORG, SID, "first prompt", 12)
+            .await
+            .unwrap();
+        set_auto_title_with(&db, ORG, SID, "generated", 13)
+            .await
+            .unwrap();
+        assert_eq!(title_of(&db).await.0, "p99 regression (copy)");
+
+        chat(&db, "other", ALICE, 20).await;
+        let mut found: Vec<_> = get_many_with(&db, ORG, &[SID.into(), "other".into(), "x".into()])
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.session_id)
+            .collect();
+        found.sort();
+        assert_eq!(found, vec![SID.to_string(), "other".to_string()]);
     }
 
     #[tokio::test]
