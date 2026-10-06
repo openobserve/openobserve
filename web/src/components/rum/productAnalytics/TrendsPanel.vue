@@ -228,6 +228,7 @@ const panelSchema = computed(() =>
     props.events,
     interval.value,
     props.timezone,
+    props.range.endUs,
     t,
   ),
 );

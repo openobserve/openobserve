@@ -27,6 +27,7 @@ import {
 const t = i18n.global.t as unknown as TranslateFn;
 const scope: AnalyticsScope = { app: "web", env: [], version: [], schema: { usr_email: true } };
 const id = { field: "usr_email" as const, excluded: [] };
+const CS = 1790000000000000;
 
 type Panel = {
   type: string;
@@ -48,20 +49,31 @@ describe("buildTrendsPanel (AC-48)", () => {
       [],
       "1 day",
       "UTC",
+      CS,
       t,
     ) as unknown as Panel;
     expect(p.type).toBe("line");
     expect(p.queryType).toBe("sql");
     expect(p.queries[0].customQuery).toBe(true);
     expect(p.queries[0].fields.stream).toBe("_rumdata");
-    expect(p.queries[0].query).toBe(trendSql(scope, id, "1 day", "UTC", [], []));
+    expect(p.queries[0].query).toBe(trendSql(scope, id, "1 day", "UTC", CS, [], []));
     expect(p.queries[0].fields.x.map((x) => x.alias)).toEqual(["x_axis_1"]);
     expect(p.queries[0].fields.y.map((y) => y.alias)).toEqual(["y_axis_1"]);
     assertJoinFree(p.queries[0].query);
   });
 
   it("plots Users from y_axis_2 when the metric is users", () => {
-    const p = buildTrendsPanel(scope, id, "users", [], [], "1 week", "UTC", t) as unknown as Panel;
+    const p = buildTrendsPanel(
+      scope,
+      id,
+      "users",
+      [],
+      [],
+      "1 week",
+      "UTC",
+      CS,
+      t,
+    ) as unknown as Panel;
     expect(p.queries[0].fields.y.map((y) => y.alias)).toEqual(["y_axis_2"]);
     expect(p.queries[0].query).toContain("'1 week'");
   });
@@ -79,12 +91,29 @@ describe("buildTrendsPanel (AC-48)", () => {
       [],
       "1 day",
       "UTC",
+      CS,
       t,
     ) as unknown as Panel;
     expect(p.queries[0].fields.y.map((y) => [y.alias, y.label])).toEqual([
       ["y_axis_1", "/web"],
       ["y_axis_2", "save"],
     ]);
+  });
+
+  it("forwards the range end through to trendSql's UTC correction (o2-enterprise#2808)", () => {
+    const p = buildTrendsPanel(
+      scope,
+      id,
+      "sessions",
+      [],
+      [],
+      "1 day",
+      "Asia/Kolkata",
+      CS,
+      t,
+    ) as unknown as Panel;
+    expect(p.queries[0].query).toBe(trendSql(scope, id, "1 day", "Asia/Kolkata", CS, [], []));
+    expect(p.queries[0].query).toContain("- INTERVAL '19800 SECOND'");
   });
 });
 

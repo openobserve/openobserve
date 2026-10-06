@@ -74,6 +74,11 @@ describe("TrendsPanel (AC-48)", () => {
     const r = renderer(w);
     const schema = r.props("panelSchema") as Schema;
     expect(schema.queries[0].query).toContain("histogram(_timestamp, '1 day', 'Asia/Kolkata')");
+    // The viewer's offset must be undone once in SQL so the shared chart
+    // renderer's own display-time shift isn't doubled (o2-enterprise#2808).
+    expect(schema.queries[0].query).toContain(
+      "(histogram(_timestamp, '1 day', 'Asia/Kolkata') - INTERVAL '19800 SECOND') AS x_axis_1",
+    );
     expect(schema.queries[0].fields.y[0].alias).toBe("y_axis_1");
     expect(r.props("searchType")).toBe("RUM");
     expect(r.props("allowAnnotationsAPI")).toBe(false);
