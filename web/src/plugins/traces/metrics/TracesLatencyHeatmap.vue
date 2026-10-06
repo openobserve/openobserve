@@ -127,7 +127,7 @@ async function load(request: LatencyHeatmapRequest | null) {
   controller = mine;
   status.value = "loading";
   try {
-    // Trace search is never cached (ui-architect data-fetching: "What is never cached").
+    // Not a TanStack query: search reads are excluded from client caching (ui-architect data-fetching); the server cache still applies.
     const res: any = await searchService.search({
       org_identifier: store.state.selectedOrganization?.identifier,
       query: {
@@ -198,6 +198,7 @@ const options = computed(() => {
   const textColor = chartTextColor();
   return {
     animation: false,
+    // ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.
     grid: { left: 52, right: 8, top: 8, bottom: 22 },
     tooltip: {
       trigger: "item",
