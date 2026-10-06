@@ -130,26 +130,37 @@ def redacted_stream(create_session, base_url):
 
     yield {"stream": stream, "name": name, "id": pattern_id}
 
+    # Remove EVERY association a test in this module may have added, not just the one the
+    # fixture created: test_sdr_06 attempts a Detect association on `service` and skips
+    # where the node allows it, which would otherwise leave that association in place,
+    # block the pattern delete, and orphan an org-level pattern silently.
+    def _assoc(field, policy):
+        return {
+            "field": field,
+            "pattern_name": name,
+            "description": "sdr auto test",
+            "pattern": "[0-9]{16}",
+            "pattern_id": pattern_id,
+            "policy": policy,
+            "apply_at": "Both",
+        }
+
     create_session.put(
         f"{base_url}api/{ORG_ID}/streams/{stream}/settings?type=logs",
         json={
             "pattern_associations": {
                 "add": [],
-                "remove": [
-                    {
-                        "field": "body",
-                        "pattern_name": name,
-                        "description": "sdr auto test",
-                        "pattern": "[0-9]{16}",
-                        "pattern_id": pattern_id,
-                        "policy": "Redact",
-                        "apply_at": "Both",
-                    }
-                ],
+                "remove": [_assoc("body", "Redact"), _assoc("service", "Detect")],
             }
         },
     )
-    create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{pattern_id}")
+    deleted = create_session.delete(f"{base_url}api/{ORG_ID}/re_patterns/{pattern_id}")
+    # Assert rather than hope: a blocked delete means an association survived teardown,
+    # and the next run inherits a pattern it did not create.
+    assert deleted.status_code == 200, (
+        f"pattern {name} was not deleted ({deleted.status_code} {deleted.text}); "
+        "an association probably survived teardown"
+    )
     create_session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type=logs")
 
 
@@ -251,12 +262,15 @@ def test_sdr_06_detect_policy_needs_the_node_to_opt_in(create_session, base_url,
 # ---------------------------------------------------------------------------
 
 
-def test_sdr_07_config_reports_ai_enabled_only_with_an_agent_target(create_session, base_url):
-    """`ai_enabled` is reported off unless an AI agent target is configured.
+def test_sdr_07_config_always_reports_ai_enabled_as_a_bool(create_session, base_url):
+    """`/config` keeps reporting `ai_enabled`, and reports it as a boolean.
 
-    #15086 turned O2_AI_ENABLED on by default, so without this gate the UI would render
-    AI controls that can only fail. The value is a boolean either way — what must not
-    happen is the key disappearing, which would make the frontend treat it as undefined.
+    #15086 turned O2_AI_ENABLED on by default and gated the reported value on an agent
+    target being configured. This does NOT exercise that gate — the target is server
+    env (O2_AGENT_URL / O2_AI_HA_ENABLED) and cannot be toggled from a test against a
+    running instance. What it pins is the contract the frontend depends on: the key is
+    present and boolean. If it disappeared, the UI would read undefined and quietly
+    render AI controls that can only fail.
     """
     resp = create_session.get(f"{base_url}api/{ORG_ID}/config")
     assert resp.status_code == 200, f"config failed: {resp.status_code} {resp.text}"

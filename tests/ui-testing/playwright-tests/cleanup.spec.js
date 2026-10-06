@@ -94,7 +94,13 @@ test.describe("Pre-Test Cleanup", () => {
     // so parallel workers cannot collide — which also means nothing ever reuses them.
     // logs-highlighting, logs-default-columns and logs-search-around-multistream.
     await pm.apiCleanup.cleanupStreams(
-      [/^e2e_hl_filters_/, /^e2e_svc_cols_/, /^e2e_sa_one_/, /^e2e_sa_two_/],
+      [
+        /^e2e_hl_filters_/,
+        /^e2e_svc_cols_/,
+        /^e2e_svc_none_/,
+        /^e2e_sa_one_/,
+        /^e2e_sa_two_/,
+      ],
       ['default'],
     );
 
