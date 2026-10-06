@@ -1276,6 +1276,13 @@ export const convertPromQLData = async (
       .map((mapping: any) => String(mapping.value)),
   );
   for (const [twin, metric] of shiftedTwins) {
+    if (twin._seriesRole === "forecast") {
+      const drawn = (primaryByMetric.get(metric)?.data ?? []).filter(
+        (point: any) => point[1] != null,
+      );
+      // The series' own value at the range end; a forecast alert's direction is judged against it.
+      twin._rangeEndValue = drawn.length ? Number(drawn[drawn.length - 1][1]) : undefined;
+    }
     // A mapping on the twin's own name is the user's choice and outranks the primary's colour.
     if (!mappedNames.has(twin.name)) {
       const color = primaryByMetric.get(metric)?.itemStyle?.color;

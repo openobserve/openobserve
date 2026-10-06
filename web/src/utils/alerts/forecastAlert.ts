@@ -101,18 +101,24 @@ export const parseForecastAlertPromql = (
 export const forecastAlertFromChart = (point: {
   U: string;
   T: number;
-  /** The line's first point: its fit at the range end. */
+  /** The charted series' value at the range end. */
+  rangeEndValue?: number;
+  /** The forecast line's first and last values; the first is its fit at the range end. */
   startValue: number;
+  endValue: number;
   startTime: number;
   clickedTime: number;
   rangeSeconds: number;
 }): ForecastAlert => {
   const days = Math.ceil((point.clickedTime - point.startTime) / 86_400);
   const nearest = (window: ForecastWindow) => Math.abs(WINDOW_SECONDS[window] - point.rangeSeconds);
+  const base = point.rangeEndValue ?? point.startValue;
+  // A threshold at the current value is reached in whichever direction the line heads; flat counts as rising.
+  const rises = point.T === base ? point.endValue >= point.startValue : point.T > base;
   return {
     U: point.U,
     T: point.T,
-    direction: point.T > point.startValue ? "rises" : "falls",
+    direction: rises ? "rises" : "falls",
     W: [...FORECAST_WINDOWS].sort((a, b) => nearest(a) - nearest(b))[0],
     H: Math.min(FORECAST_MAX_DAYS, Math.max(FORECAST_MIN_DAYS, days)),
   };

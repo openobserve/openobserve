@@ -130,7 +130,9 @@ describe("forecastAlertFromChart", () => {
   const point = (overrides: Record<string, number> = {}) => ({
     U: "avg(disk)",
     T: 0.9,
+    rangeEndValue: 0.8,
     startValue: 0.8,
+    endValue: 1,
     startTime: 1_000 * DAY,
     clickedTime: 1_000 * DAY + 2.3 * DAY,
     rangeSeconds: 6 * 3600,
@@ -147,12 +149,25 @@ describe("forecastAlertFromChart", () => {
     });
   });
 
-  it("falls to a value below the forecast's start", () => {
+  it("falls to a value below the series' value at the range end", () => {
     expect(forecastAlertFromChart(point({ T: 0.5 })).direction).toBe("falls");
   });
 
+  it("compares with the series at the range end, not the forecast's fitted start", () => {
+    expect(forecastAlertFromChart(point({ rangeEndValue: 0.95, startValue: 0.85 })).direction).toBe(
+      "falls",
+    );
+  });
+
+  it("settles a tie by the line's slope, and a flat line as rising", () => {
+    const tie = (startValue: number, endValue: number) =>
+      forecastAlertFromChart(point({ T: 0.8, rangeEndValue: 0.8, startValue, endValue })).direction;
+    expect([tie(0.8, 1), tie(0.8, 0.5), tie(0.8, 0.8)]).toEqual(["rises", "falls", "rises"]);
+  });
+
   it("keeps H within 1 to 30 days", () => {
-    expect(forecastAlertFromChart(point({ clickedTime: 1_000 * DAY + 600 })).H).toBe(1);
+    expect(forecastAlertFromChart(point({ clickedTime: 1_000 * DAY })).H).toBe(1);
+    expect(forecastAlertFromChart(point({ clickedTime: 999 * DAY })).H).toBe(1);
     expect(forecastAlertFromChart(point({ clickedTime: 1_045 * DAY })).H).toBe(30);
   });
 

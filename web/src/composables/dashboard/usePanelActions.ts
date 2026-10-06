@@ -32,6 +32,9 @@ import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
 import type { TranslateFn } from "@/types/i18n";
 
+/** Warnings about turning the chart's range into the alert's period. */
+const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
+
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
   if (val === null || val === undefined) {
@@ -53,9 +56,12 @@ export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
   const data: any[] = series?.data ?? [];
   const start = data.findIndex((point) => point?.[1] != null);
   if (start < 0) return undefined;
+  const end = data.findLastIndex((point) => point?.[1] != null);
   return {
+    rangeEndValue: series?._rangeEndValue,
     startTime: times[start],
     startValue: Number(data[start][1]),
+    endValue: Number(data[end][1]),
     clickedTime: times[dataIndex ?? -1] ?? times[times.length - 1],
   };
 };
@@ -171,18 +177,19 @@ export function usePanelAlertCreation({
   /** The chart's forecast as a forecast alert: the form opens in Forecast mode on it. */
   const forecastPrefill = (
     base: AlertPrefill,
-    U: string,
     T: number,
-    point: { startTime: number; startValue: number; clickedTime: number },
+    point: Omit<Parameters<typeof forecastAlertFromChart>[0], "U" | "T" | "rangeSeconds">,
   ): AlertPrefill => {
     const { start_time, end_time } = selectedTimeObj.value ?? {};
     const rangeSeconds =
       start_time instanceof Date && end_time instanceof Date
         ? (dateToMicros(end_time) - dateToMicros(start_time)) / 1e6
         : 0;
-    const forecast = forecastAlertFromChart({ U, T, rangeSeconds, ...point });
+    const forecast = forecastAlertFromChart({ U: base.promql ?? "", T, rangeSeconds, ...point });
     return {
       ...base,
+      // The forecast reads its own history window, so the chart's range says nothing about its period.
+      warnings: base.warnings.filter((w) => !PERIOD_WARNINGS.includes(w.key)),
       promql: buildForecastAlertPromql(forecast),
       promqlCondition: { column: "value", operator: "<=", value: forecast.H },
       promqlMultiAlert: true,
@@ -252,12 +259,7 @@ export function usePanelAlertCreation({
     const point = contextMenuData.value?.forecastPoint;
     const prefill = normalizePrefill(
       selection.condition === "forecast" && point
-        ? forecastPrefill(
-            build(),
-            executedQueryOf(queries.indexOf(query)),
-            selection.threshold,
-            point,
-          )
+        ? forecastPrefill(build(), selection.threshold, point)
         : build(),
     );
     if (needsConfirmation(prefill)) {

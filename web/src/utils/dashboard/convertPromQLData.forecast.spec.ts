@@ -121,12 +121,22 @@ describe("forecast entries", () => {
     expect(byName["api-1"]._seriesRole).toBe("primary");
   });
 
-  it("carry each point's timestamp, so a right-click knows when it landed", async () => {
-    const result = await convert([current(), ahead("api-1", "api-2")]);
+  it("carry each point's timestamp and the series' value at the range end, for a right-click", async () => {
+    const rising = (pod: string) => ({
+      metric: { pod },
+      values: grid(NOW_S, 3).map((t, k) => [t, String(10 + k)]),
+    });
+    const now = matrix({
+      metric: { pod: "api-1" },
+      values: grid(START_S, 4).map((t, k) => [t, String(k)]),
+    });
+    const result = await convert([now, matrix(rising("api-1"))]);
     const twin = named(result).find((s: any) => s.name === "api-1 (forecast)");
     expect(twin._timestamps).toHaveLength(twin.data.length);
     const at = (t: number) => twin.data[twin._timestamps.indexOf(t)][1];
-    expect(at(NOW_S + STEP_S)).toBe("1");
+    expect([NOW_S, NOW_S + STEP_S, NOW_S + 2 * STEP_S].map(at)).toEqual(["10", "11", "12"]);
+    expect(at(NOW_S - STEP_S)).toBeNull();
+    expect(twin._rangeEndValue).toBe(3);
     expect(named(result)[0]._timestamps).toBeUndefined();
   });
 

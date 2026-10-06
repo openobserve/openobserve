@@ -2051,6 +2051,7 @@ describe("PanelSchemaRenderer", () => {
               _panelQueryIndex: 0,
               _seriesRole: "forecast",
               _timestamps: [100, 160, 220, 280],
+              _rangeEndValue: 0.45,
               data: [
                 ["x0", null],
                 ["x1", 0.5],
@@ -2066,7 +2067,13 @@ describe("PanelSchemaRenderer", () => {
 
       expect(wrapper.vm.contextMenuData).toMatchObject({
         seriesRole: "forecast",
-        forecastPoint: { startTime: 160, startValue: 0.5, clickedTime: 280 },
+        forecastPoint: {
+          rangeEndValue: 0.45,
+          startTime: 160,
+          startValue: 0.5,
+          endValue: 0.7,
+          clickedTime: 280,
+        },
       });
     });
 

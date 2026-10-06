@@ -297,6 +297,8 @@ describe("usePanelActions", () => {
   describe("usePanelAlertCreation on a forecast line (entry B)", () => {
     const DAY = 86_400;
     const END_S = 1_800_000_000;
+    // Executed text differs from the schema's, as variable substitution makes it.
+    const executed = (expr: string) => expr.replace("(", "( ");
     const explorerPanel = (expr: string, stream: string) => ({
       panelSchema: {
         value: {
@@ -308,7 +310,15 @@ describe("usePanelActions", () => {
       },
       allowAlertCreation: { value: true },
       metadata: {
-        value: { queries: [{ startTime: (END_S - 6 * 3600) * 1e6, endTime: END_S * 1e6 }] },
+        value: {
+          queries: [
+            {
+              query: executed(expr),
+              startTime: (END_S - 6 * 3600) * 1e6,
+              endTime: END_S * 1e6,
+            },
+          ],
+        },
       },
       // The Explorer's Date pair: built from ms epochs.
       selectedTimeObj: {
@@ -320,7 +330,13 @@ describe("usePanelActions", () => {
       contextMenuData: {
         value: {
           seriesRole: "forecast",
-          forecastPoint: { startTime: END_S, startValue: 0.8, clickedTime: END_S + 2.5 * DAY },
+          forecastPoint: {
+            rangeEndValue: 0.8,
+            startTime: END_S,
+            startValue: 0.8,
+            endValue: 1,
+            clickedTime: END_S + 2.5 * DAY,
+          },
         },
       },
       store: { state: { selectedOrganization: { identifier: "org-1" } } },
@@ -351,15 +367,16 @@ describe("usePanelActions", () => {
       const stored = readAlertPrefill();
       expect(stored?.streamName).toBe(stream);
       expect(stored?.promql).toBe(
-        buildForecastAlertPromql({ U: expr, T: 0.9, direction: "rises", W: "6h" }),
+        buildForecastAlertPromql({ U: executed(expr), T: 0.9, direction: "rises", W: "6h" }),
       );
       expect(stored?.promqlCondition).toEqual({ column: "value", operator: "<=", value: 3 });
       expect(stored?.promqlMultiAlert).toBe(true);
       expect(stored?.periodMinutes).toBe(5);
       expect(stored?.frequencyMinutes).toBe(30);
       // The form recognises its own output, so it opens in Forecast mode on these fields.
+      expect(stored?.warnings.map((w) => w.key)).toEqual([]);
       expect(parseForecastAlertPromql(stored?.promql, stored?.promqlCondition)).toEqual({
-        U: expr,
+        U: executed(expr),
         T: 0.9,
         direction: "rises",
         W: "6h",
