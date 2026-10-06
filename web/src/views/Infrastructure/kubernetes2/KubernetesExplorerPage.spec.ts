@@ -281,7 +281,7 @@ const radioStub = defineComponent({
 
 const drawerStub = defineComponent({
   name: "PodDetailDrawer",
-  props: ["target", "pod", "range", "orgId", "multiCluster", "usageStreams"],
+  props: ["target", "pod", "range", "orgId", "multiCluster", "usageStreams", "pending"],
   emits: ["close", "filter-node", "filter-owner"],
   setup() {
     return () => h("div", { "data-test": "drawer-stub" });
@@ -874,6 +874,14 @@ describe("KubernetesExplorerPage", () => {
       await mountPage();
       expect(wrapper.find('[data-test="k8s2-scope-cluster"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="k8s2-scope-skeleton"]').exists()).toBe(true);
+    });
+
+    it("drops the skeleton and the drawer spinner once every query has failed", async () => {
+      metricsQuery.mockRejectedValue(new Error("engine down"));
+      await mountPage({ pod: `${GEN}/chat/chat-service-8g7f88v79d-2hth6` });
+      expect(wrapper.find('[data-test="k8s2-page-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="k8s2-scope-skeleton"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "PodDetailDrawer" }).props("pending")).toBe(false);
     });
 
     it("names the All tile after the tab", async () => {

@@ -243,7 +243,13 @@ const onNodeRow = (row: NodeRow) => podsOnNode(row.cluster, row.name);
 const onDeploymentRow = (row: DeploymentRow) =>
   podsOfOwner(row.cluster, row.namespace, "Deployment", row.name);
 
-const drawerPending = computed(() => !k8s.loaded.value || loading.value);
+// A failed load has nothing more to wait for, so it must not leave a spinner behind.
+const awaitingInventory = computed(
+  () =>
+    !pageError.value &&
+    (detection.value === "unknown" || detection.value === "detected") &&
+    (!k8s.loaded.value || loading.value),
+);
 
 const drawerPod = computed(() =>
   state.value.pod ? k8s.podByKey(encodeCompound(state.value.pod)) : null,
@@ -267,7 +273,7 @@ const tableProps = computed(() => ({
     <template #actions>
       <div class="flex items-center gap-2">
         <OSkeleton
-          v-if="detection !== 'error' && detection !== 'undetected' && !k8s.loaded.value"
+          v-if="awaitingInventory && !k8s.loaded.value"
           type="text"
           class="w-28"
           data-test="k8s2-scope-skeleton"
@@ -554,7 +560,7 @@ const tableProps = computed(() => ({
       :org-id="orgId"
       :multi-cluster="multiCluster"
       :usage-streams="k8s.podUsageStreams.value"
-      :pending="drawerPending"
+      :pending="awaitingInventory"
       @close="closePod"
       @filter-node="onPodNode"
       @filter-owner="onPodOwner"
