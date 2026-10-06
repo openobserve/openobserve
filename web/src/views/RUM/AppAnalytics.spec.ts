@@ -773,6 +773,75 @@ describe("AppAnalytics shell", () => {
     expect(router.currentRoute.value.query.period).toBe("30d");
   });
 
+  it("a reload or shared link moves the already-mounted picker, not just the model (P1-M1)", async () => {
+    const setSavedDate = vi.fn();
+    router = makeRouter();
+    await router.push("/product-analytics/overview?app=web&period=4w");
+    wrapper = mount(
+      { template: "<router-view />" },
+      {
+        global: {
+          plugins: [router, store],
+          stubs: {
+            DateTimePickerDashboard: {
+              props: ["modelValue"],
+              setup: (_: unknown, { expose }: { expose: (e: object) => void }) => {
+                expose({ setSavedDate });
+                return {};
+              },
+              template: "<div data-test='date-picker-stub' />",
+            },
+            ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
+          },
+        },
+        attachTo: document.body,
+      },
+    );
+    await flushPromises();
+    await flushPromises();
+
+    expect(useProductAnalytics().state.datetime).toMatchObject({
+      valueType: "relative",
+      relativeTimePeriod: "4w",
+    });
+    expect(setSavedDate).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "4w" });
+  });
+
+  it("switching sub-tabs with a new range in the URL moves the mounted picker too (P1-M1)", async () => {
+    const setSavedDate = vi.fn();
+    router = makeRouter();
+    await router.push("/product-analytics/overview?app=web&period=7d");
+    wrapper = mount(
+      { template: "<router-view />" },
+      {
+        global: {
+          plugins: [router, store],
+          stubs: {
+            DateTimePickerDashboard: {
+              props: ["modelValue"],
+              setup: (_: unknown, { expose }: { expose: (e: object) => void }) => {
+                expose({ setSavedDate });
+                return {};
+              },
+              template: "<div data-test='date-picker-stub' />",
+            },
+            ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
+          },
+        },
+        attachTo: document.body,
+      },
+    );
+    await flushPromises();
+    await flushPromises();
+    setSavedDate.mockClear();
+
+    await router.push("/product-analytics/funnels?app=web&period=4w");
+    await flushPromises();
+    await flushPromises();
+
+    expect(setSavedDate).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "4w" });
+  });
+
   it("mounting inside keep-alive enters once, as a plain mount does (F6)", async () => {
     await mountAt("/product-analytics/overview?app=web&period=7d");
     await new Promise((r) => setTimeout(r, 30));
