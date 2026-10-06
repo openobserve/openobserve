@@ -109,6 +109,7 @@ const inFlight: Array<{
   query: string;
   start: number;
   end: number;
+  queryType: string;
   complete: (result: any) => void;
 }> = [];
 
@@ -147,6 +148,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
         query: payload.queryReq.query,
         start: payload.queryReq.start_time,
         end: payload.queryReq.end_time,
+        queryType: payload.queryReq.query_type,
         complete: (result: any) => {
           handlers.data({}, { type: "promql_response", content: { results: result } });
           handlers.complete();
@@ -1921,6 +1923,25 @@ describe("useMetricsExplorerGrid", () => {
       expect(requests.map((q) => [q.start, q.end])).toEqual([
         [start_time, end_time],
         [shifted.start, shifted.end],
+      ]);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("runs an instant query at T as its own request, with start and end both T", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const T = grid.timeRange.value.end_time;
+
+      grid.runDetailQuery("sum(up)", card, new AbortController().signal).catch(() => {});
+      grid
+        .runDetailQuery("sum(up)", card, new AbortController().signal, { instantAt: T })
+        .catch(() => {});
+      await flush();
+
+      const requests = inFlight.filter((q) => q.query === "sum(up)");
+      expect(requests.map((q) => [q.queryType, q.start, q.end])).toEqual([
+        ["range", grid.timeRange.value.start_time, T],
+        ["instant", T, T],
       ]);
       inFlight.splice(0).forEach((q) => q.complete(SERIES));
     });

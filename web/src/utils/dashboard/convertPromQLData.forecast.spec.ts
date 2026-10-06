@@ -1,0 +1,115 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, vi } from "vitest";
+import { alignShiftedPromQLResults, convertPromQLData } from "./convertPromQLData";
+
+vi.mock("./chartDimensionUtils", () => ({
+  calculateOptimalFontSize: vi.fn(() => 14),
+  calculateWidthText: vi.fn((text) => (text?.length || 0) * 8),
+  calculateDynamicNameGap: vi.fn(() => 25),
+  calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+  applyMeasuredYAxisLeftInset: vi.fn(),
+}));
+
+const START_S = 1_700_000_000;
+const STEP_S = 60;
+const NOW_S = START_S + 3 * STEP_S;
+const grid = (start: number, count: number) =>
+  Array.from({ length: count }, (_, i) => start + i * STEP_S);
+
+const series = (pod: string, ts: number[]) => ({
+  metric: { pod },
+  values: ts.map((t) => [t, "1"]),
+});
+const matrix = (...result: any[]) => ({ resultType: "matrix", result });
+
+const PRIMARY_META = { startTime: START_S * 1e6, endTime: NOW_S * 1e6 };
+const FORECAST_META = {
+  ...PRIMARY_META,
+  seriesRole: "forecast",
+  timeRangeGap: { seconds: 0, periodAsStr: "forecast" },
+  panelQueryIndex: 0,
+};
+const metadata = { queries: [PRIMARY_META, FORECAST_META] };
+const stepMeta = [[{ step: STEP_S * 1e6 }], [{ step: STEP_S * 1e6 }]];
+
+const current = () => matrix(series("api-1", grid(START_S, 4)), series("api-2", grid(START_S, 4)));
+const ahead = (...pods: string[]) => matrix(...pods.map((pod) => series(pod, grid(NOW_S, 3))));
+
+const store = {
+  state: { zoConfig: { max_dashboard_series: 100 }, timezone: "UTC", theme: "light" },
+};
+const panel = {
+  id: "p1",
+  type: "line",
+  queryType: "promql",
+  config: {},
+  queries: [{ query: "x", fields: {}, config: {} }],
+};
+const convert = (data: any[], storeOverride = store) =>
+  convertPromQLData(
+    panel,
+    data,
+    storeOverride,
+    { value: { offsetWidth: 500, offsetHeight: 300 } },
+    null,
+    [],
+    metadata,
+    stepMeta,
+    false,
+  );
+const named = (result: any) => (result.options.series ?? []).filter((s: any) => s?.name);
+
+describe("forecast entries", () => {
+  it("are suffixed, kept on their own timestamps, and limited to the primary's label sets", () => {
+    const forecast = ahead("api-1", "api-9");
+    const { data, nameSuffixes } = alignShiftedPromQLResults(
+      [current(), forecast],
+      metadata,
+      stepMeta,
+    );
+
+    expect(nameSuffixes).toEqual(["", "forecast"]);
+    expect(data[1].result.map((s: any) => s.metric.pod)).toEqual(["api-1"]);
+    expect(data[1].result[0].values.map((v: any) => v[0])).toEqual(grid(NOW_S, 3));
+  });
+
+  it("draw dashed in their primary's colour, tagged as forecasts of its query", async () => {
+    const result = await convert([current(), ahead("api-1", "api-2")]);
+    const byName = Object.fromEntries(named(result).map((s: any) => [s.name, s]));
+
+    expect(Object.keys(byName)).toEqual(["api-1", "api-2", "api-1 (forecast)", "api-2 (forecast)"]);
+    const twin = byName["api-1 (forecast)"];
+    expect(twin.lineStyle.type).toBe("dashed");
+    expect(twin.itemStyle.color).toBe(byName["api-1"].itemStyle.color);
+    expect(twin._seriesRole).toBe("forecast");
+    expect(twin._panelQueryIndex).toBe(0);
+    expect(twin._queryIndex).toBeUndefined();
+    expect(byName["api-1"]._seriesRole).toBe("primary");
+  });
+
+  it("never take a primary's place at the series cap", async () => {
+    const tight = { state: { ...store.state, zoConfig: { max_dashboard_series: 2 } } };
+    const result = await convert([current(), ahead("api-1", "api-2")], tight);
+
+    expect(named(result).map((s: any) => s.name)).toEqual([
+      "api-1",
+      "api-2",
+      "api-1 (forecast)",
+      "api-2 (forecast)",
+    ]);
+  });
+});

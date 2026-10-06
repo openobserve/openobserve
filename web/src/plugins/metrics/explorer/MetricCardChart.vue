@@ -56,6 +56,13 @@ export interface ShiftedResult {
   parentIndex: number;
 }
 
+export interface ChartForecast {
+  until: number;
+  /** Suffix of every forecast series' name. */
+  label: string;
+  entries: Array<{ result: any; parentIndex: number }>;
+}
+
 export default defineComponent({
   name: "MetricCardChart",
   components: { PanelSchemaRenderer },
@@ -99,6 +106,8 @@ export default defineComponent({
     shifted: { type: Array as PropType<ShiftedResult[]>, default: () => [] },
     /** The queries' step, so shifted samples snap onto the primaries' grid. */
     stepSeconds: { type: Number, default: 0 },
+    /** `until` (µs) widens the pinned x-axis past the range end, where the forecast lies. */
+    forecast: { type: Object as PropType<ChartForecast | null>, default: null },
     /** The card's exemplar state; the explorer grid owns the fetch. */
     injectedExemplars: {
       type: Object as PropType<InjectedExemplars | undefined>,
@@ -210,9 +219,22 @@ export default defineComponent({
         timeRangeGap: { seconds: entry.gapMs, periodAsStr: entry.periodAsStr },
         panelQueryIndex: entry.parentIndex,
       }));
-      const queries = [...props.results.map(() => ({ ...primary })), ...shifted];
+      const ahead = props.forecast;
+      const forecast = (ahead?.entries ?? []).map((entry) => ({
+        ...primary,
+        seriesRole: "forecast",
+        timeRangeGap: { seconds: 0, periodAsStr: ahead?.label ?? "" },
+        panelQueryIndex: entry.parentIndex,
+      }));
+      const queries = [...props.results.map(() => ({ ...primary })), ...shifted, ...forecast];
+      // The x-axis pin and the gap fill read the first entry's window only.
+      if (ahead) queries[0] = { ...queries[0], endTime: ahead.until };
       return {
-        data: [...props.results, ...props.shifted.map((entry) => entry.result)],
+        data: [
+          ...props.results,
+          ...props.shifted.map((entry) => entry.result),
+          ...(ahead?.entries ?? []).map((entry) => entry.result),
+        ],
         metadata: { queries },
         ...(props.stepSeconds > 0
           ? { resultMetaData: queries.map(() => [{ step: props.stepSeconds * 1e6 }]) }

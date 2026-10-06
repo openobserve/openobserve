@@ -210,6 +210,34 @@ describe("explorerUrlState", () => {
       }
     });
 
+    it("round-trips forecast and forecast_h, and owns both keys", () => {
+      expect(EXPLORER_FILTER_PARAM_KEYS).toEqual(
+        expect.arrayContaining(["forecast", "forecast_h"]),
+      );
+      const query = explorerFiltersToQuery({
+        ...defaults(),
+        metric: "up",
+        forecast: "smoothed",
+        forecastHorizon: "6h",
+      });
+      expect(query).toEqual({ metric: "up", forecast: "smoothed", forecast_h: "6h" });
+      expect(queryToExplorerFilters(query)).toEqual({
+        metric: "up",
+        forecast: "smoothed",
+        forecastHorizon: "6h",
+      });
+    });
+
+    it("rejects other forecast methods and horizons, and both without a metric", () => {
+      expect(queryToExplorerFilters({ metric: "up", forecast: "arima", forecast_h: "2h" })).toEqual(
+        { metric: "up" },
+      );
+      expect(
+        queryToExplorerFilters({ metric: "up", forecast: "linear", forecast_h: "1mo" }),
+      ).toEqual({ metric: "up", forecast: "linear" });
+      expect(queryToExplorerFilters({ forecast: "linear", forecast_h: "1h" })).toEqual({});
+    });
+
     it("rejects any compare value outside the three presets, and compare without a metric", () => {
       for (const compare of ["2h", "1mo", "1D", "", "1d,1w"]) {
         expect(queryToExplorerFilters({ metric: "up", compare })).toEqual({ metric: "up" });

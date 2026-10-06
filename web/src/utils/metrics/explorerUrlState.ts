@@ -26,6 +26,12 @@
  */
 
 import { raw } from "@/types/i18n";
+import {
+  isForecastHorizon,
+  isForecastMethod,
+  type ForecastHorizon,
+  type ForecastMethod,
+} from "./forecast";
 
 import type { LocationQuery } from "vue-router";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -50,6 +56,10 @@ export interface ExplorerFilterState {
   breakdownLabel?: string | null;
   /** The period the detail charts compare against. Meaningful only alongside `metric`. */
   compare?: CompareOffset | null;
+  /** The overview's forecast method. Meaningful only alongside `metric`. */
+  forecast?: ForecastMethod | null;
+  /** A forecast horizon preset; absent means a quarter of the visible range. */
+  forecastHorizon?: ForecastHorizon | null;
 }
 
 export type DetailTab = "breakdown" | "related" | "used_in";
@@ -80,6 +90,8 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "tab",
   "breakdown_label",
   "compare",
+  "forecast",
+  "forecast_h",
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
@@ -123,6 +135,8 @@ export function explorerFiltersToQuery(
     if (state.tab) query.tab = state.tab;
     if (state.breakdownLabel) query.breakdown_label = state.breakdownLabel;
     if (state.compare) query.compare = state.compare;
+    if (state.forecast) query.forecast = state.forecast;
+    if (state.forecastHorizon) query.forecast_h = state.forecastHorizon;
   }
   return query;
 }
@@ -171,6 +185,8 @@ export function queryToExplorerFilters(
     if (typeof query.compare === "string" && Object.hasOwn(COMPARE_OFFSET_MS, query.compare)) {
       out.compare = query.compare as CompareOffset;
     }
+    if (isForecastMethod(query.forecast)) out.forecast = query.forecast;
+    if (isForecastHorizon(query.forecast_h)) out.forecastHorizon = query.forecast_h;
   }
 
   return out;

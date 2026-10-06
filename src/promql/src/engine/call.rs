@@ -945,6 +945,30 @@ mod tests {
         }
     }
 
+    /// The detail view's Smoothed trend forecast: a linear fit over a holt_winters-smoothed series.
+    #[tokio::test]
+    async fn test_detail_forecast_is_finite_and_follows_a_line() {
+        let query = "predict_linear(holt_winters(vector(time())[10m:1m], 0.3, 0.1)[1h:1m], 60)";
+        let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
+        let values = step_values(eval_at(query, instant).await);
+        assert_eq!(values.len(), 1, "{values:?}");
+        assert!(values[0].1.is_finite(), "{values:?}");
+
+        // On a noiseless line both methods land within 1% of the line's value at T + H.
+        let line = format!("(vector(10 + 0.5 * (time() - {BASE})))");
+        let expected = 10.0 + 0.5 * 900.0;
+        for input in [
+            format!("{line}[1h:1m]"),
+            format!("holt_winters({line}[10m:1m], 0.3, 0.1)[1h:1m]"),
+        ] {
+            let query = format!("predict_linear({input}, 900)");
+            let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
+            let values = step_values(eval_at(&query, instant).await);
+            let got = values[0].1;
+            assert!((got - expected).abs() <= expected * 0.01, "{query}: {got}");
+        }
+    }
+
     /// Must match `buildForecastAlertPromql` in web/src/utils/alerts/forecastAlert.ts, at `W` = 2d.
     fn forecast_days(u: &str, threshold: f64, rises: bool) -> String {
         let (crossed, towards) = if rises { (">=", ">") } else { ("<=", "<") };

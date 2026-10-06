@@ -149,6 +149,7 @@ const mountView = (
             "allowAlertCreation",
             "shifted",
             "stepSeconds",
+            "forecast",
           ],
           template: "<div />",
         },
@@ -346,6 +347,143 @@ describe("MetricDetailView", () => {
       await flushPromises();
       expect(compareSelect(wrapper)).toBeUndefined();
       expect(runQuery).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("forecast", () => {
+    const HOUR_US = 3_600_000_000;
+    const WINDOW = { start_time: 100 * HOUR_US, end_time: 101 * HOUR_US };
+    const T_S = WINDOW.end_time / 1e6;
+    const LINE = {
+      queries: [{ expr: "sum(rate(x[4m]))" }, { expr: "max(rate(x[4m]))" }],
+      chartType: "line",
+      unit: "count-per-sec",
+      bucketUnit: null,
+    };
+    const fit = (expr: string) => ({
+      resultType: "vector",
+      result: [{ metric: { pod: "a" }, value: [T_S, expr.endsWith(", 0)") ? "1" : "2"] }],
+    });
+    const selectStub = {
+      OSelect: {
+        name: "OSelect",
+        props: ["modelValue", "options"],
+        emits: ["update:modelValue"],
+        template: "<div v-bind='$attrs' />",
+      },
+    };
+    const selectNamed = (wrapper: VueWrapper<any>, dataTest: string) =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c) => c.attributes("data-test") === dataTest);
+
+    beforeEach(() => {
+      runQuery.mockImplementation((expr: string, _s: any, _c: any, opts: any) =>
+        Promise.resolve(opts?.instantAt ? fit(expr) : SERIES),
+      );
+    });
+
+    it("asks two instant fits at the range end per expression and draws the line between them", async () => {
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "linear",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+
+      const instant = runQuery.mock.calls
+        .filter(([, , , opts]) => opts?.instantAt)
+        .map(([expr, , , opts]) => [expr, opts.instantAt]);
+      expect(instant).toEqual([
+        ["predict_linear((sum(rate(x[4m])))[3600s:30s], 0)", WINDOW.end_time],
+        ["predict_linear((sum(rate(x[4m])))[3600s:30s], 900)", WINDOW.end_time],
+        ["predict_linear((max(rate(x[4m])))[3600s:30s], 0)", WINDOW.end_time],
+        ["predict_linear((max(rate(x[4m])))[3600s:30s], 900)", WINDOW.end_time],
+      ]);
+      const forecast = wrapper.findComponent({ name: "MetricCardChart" }).props("forecast");
+      expect(forecast.until).toBe(WINDOW.end_time + 900e6);
+      expect(forecast.label).toBe("forecast");
+      expect(forecast.entries.map((e: any) => e.parentIndex)).toEqual([0, 1]);
+      const values = forecast.entries[0].result.result[0].values;
+      expect(values[0]).toEqual([T_S, "1"]);
+      expect(values.at(-1)).toEqual([T_S + 900, "2"]);
+    });
+
+    it("uses the chosen horizon preset", async () => {
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "smoothed",
+        forecastHorizon: "1h",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      const exprs = runQuery.mock.calls
+        .filter(([, , , opts]) => opts?.instantAt)
+        .map(([expr]) => expr);
+      expect(exprs[1]).toBe(
+        "predict_linear(holt_winters((sum(rate(x[4m])))[300s:30s], 0.3, 0.1)[3600s:30s], 3600)",
+      );
+    });
+
+    it("queries no forecast while it is off", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 30 });
+      await flushPromises();
+      expect(runQuery.mock.calls.some(([, , , opts]) => opts?.instantAt)).toBe(false);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("forecast")).toBeNull();
+    });
+
+    it("offers the method and the presets the range can train, and asks for the choice", async () => {
+      wrapper = mountView(
+        { overview: LINE, timeRange: WINDOW, forecast: "linear", stepSeconds: 30 },
+        { stubs: selectStub },
+      );
+      const method = selectNamed(wrapper, "metrics-detail-forecast")!;
+      expect(method.props("options").map((o: any) => o.value)).toEqual([
+        "off",
+        "linear",
+        "smoothed",
+      ]);
+      const horizon = selectNamed(wrapper, "metrics-detail-forecast-horizon")!;
+      expect(horizon.props("options").map((o: any) => o.value)).toEqual(["auto", "1h"]);
+
+      await method.vm.$emit("update:modelValue", "smoothed");
+      await method.vm.$emit("update:modelValue", "off");
+      await horizon.vm.$emit("update:modelValue", "1h");
+      await horizon.vm.$emit("update:modelValue", "auto");
+      expect(wrapper.emitted("update:forecast")).toEqual([["smoothed"], [null]]);
+      expect(wrapper.emitted("update:forecastHorizon")).toEqual([["1h"], [null]]);
+    });
+
+    it("says Smoothed trend is a linear projection of a smoothed series", () => {
+      wrapper = mountView(
+        { overview: LINE, timeRange: WINDOW, forecast: "smoothed", stepSeconds: 30 },
+        { realHeader: false },
+      );
+      expect(
+        wrapper.find('[data-test="metrics-detail-forecast-help"]').attributes("aria-label"),
+      ).toContain("linear projection of a smoothed series");
+    });
+
+    it("offers no forecast on a heatmap or on an info metric", async () => {
+      wrapper = mountView({ forecast: "linear", timeRange: WINDOW }, { stubs: selectStub });
+      await flushPromises();
+      expect(selectNamed(wrapper, "metrics-detail-forecast")).toBeUndefined();
+      expect(runQuery.mock.calls.some(([, , , opts]) => opts?.instantAt)).toBe(false);
+      wrapper.unmount();
+
+      wrapper = mountView(
+        {
+          card: { ...SELECTED, cardKind: CARD_KIND.INFO },
+          overview: LINE,
+          forecast: "linear",
+          timeRange: WINDOW,
+        },
+        { stubs: selectStub },
+      );
+      await flushPromises();
+      expect(selectNamed(wrapper, "metrics-detail-forecast")).toBeUndefined();
     });
   });
 

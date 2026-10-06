@@ -1139,8 +1139,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /* ------------------------------------------------------------- previews */
 
-  const previewCacheKey = (query: string, step: number, window?: QueryWindow) =>
-    `${org.value}|${query}|${window?.start ?? timeRange.value.start_time}|${window?.end ?? timeRange.value.end_time}|${step}`;
+  const previewCacheKey = (query: string, step: number, window?: QueryWindow, instant = false) =>
+    `${org.value}|${query}|${window?.start ?? timeRange.value.start_time}|${window?.end ?? timeRange.value.end_time}|${step}${instant ? "|instant" : ""}`;
 
   /**
    * Drops a card's rendered preview and abandons whatever it still has running.
@@ -1178,6 +1178,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     signal: AbortSignal,
     seriesLimit?: number,
     window?: QueryWindow,
+    queryType: "range" | "instant" = "range",
   ) =>
     new Promise<any>((resolve, reject) => {
       const { traceId } = generateTraceContext();
@@ -1219,7 +1220,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
             start_time: window?.start ?? timeRange.value.start_time,
             end_time: window?.end ?? timeRange.value.end_time,
             step: `${step}s`,
-            query_type: "range",
+            query_type: queryType,
           },
           type: "promql",
           traceId,
@@ -1929,11 +1930,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     expr: string,
     card: MetricCard,
     signal: AbortSignal,
-    opts?: { maxSeries?: number; window?: QueryWindow },
+    opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
   ) => {
     const step = dialogStepFor(card);
+    // The streaming transport reads an instant query's time from end_time, so start and end are both T.
+    const window =
+      opts?.instantAt === undefined ? opts?.window : { start: opts.instantAt, end: opts.instantAt };
+    const instant = opts?.instantAt !== undefined;
     // The window is in the key, so a shifted request gets its own job instead of joining the current one.
-    const key = previewCacheKey(expr, step, opts?.window);
+    const key = previewCacheKey(expr, step, window, instant);
     if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
     const owner = `${DETAIL_OWNER}:${++detailRequests}`;
     const onAbort = () => queue.cancel(key, owner);
@@ -1942,7 +1947,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       .run(
         key,
         PRIORITY.DIALOG,
-        (abort) => streamQuery(expr, step, abort, opts?.maxSeries, opts?.window),
+        (abort) =>
+          streamQuery(expr, step, abort, opts?.maxSeries, window, instant ? "instant" : "range"),
         owner,
       )
       .finally(() => signal.removeEventListener("abort", onAbort));

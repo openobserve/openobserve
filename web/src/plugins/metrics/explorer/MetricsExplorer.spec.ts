@@ -1580,6 +1580,34 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.sweepSlice).not.toHaveBeenCalled();
     });
 
+    it("restores the forecast from a deep link and writes a change without re-querying the grid", async () => {
+      routerState.query = { metric: CARD.name, forecast: "linear", forecast_h: "6h" };
+      const wrapper = mountExplorer();
+      expect(detailView(wrapper).props("forecast")).toBe("linear");
+      expect(detailView(wrapper).props("forecastHorizon")).toBe("6h");
+      routerState.replace.mockClear();
+      grid.requestPreview.mockClear();
+
+      detailView(wrapper).vm.$emit("update:forecast", "smoothed");
+      detailView(wrapper).vm.$emit("update:forecastHorizon", null);
+      await wrapper.vm.$nextTick();
+      const query = routerState.replace.mock.calls.at(-1)[0].query;
+      expect(query).toMatchObject({ metric: CARD.name, forecast: "smoothed" });
+      expect(query.forecast_h).toBeUndefined();
+
+      const prefixes = grid.selectedPrefixes.value;
+      routerState.query = { metric: CARD.name, forecast: "linear", forecast_h: "1d" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("forecastHorizon")).toBe("1d");
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      detailView(wrapper).vm.$emit("update:forecast", null);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("forecastHorizon")).toBeNull();
+      expect(routerState.replace.mock.calls.at(-1)[0].query.forecast_h).toBeUndefined();
+    });
+
     it("Back to the label grid clears the breakdown label, replacing the entry", async () => {
       routerState.query = { metric: CARD.name, tab: "breakdown", breakdown_label: "route" };
       const wrapper = mountExplorer();

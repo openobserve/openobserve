@@ -80,6 +80,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-compare"
             @update:model-value="onCompareChange"
           />
+          <template v-if="forecastEligible">
+            <OSelect
+              :model-value="forecast ?? 'off'"
+              :options="forecastOptions"
+              :label="t('metrics.explorer.detail.forecast.label')"
+              label-position="inside"
+              :searchable="false"
+              size="sm"
+              width="sm"
+              class="min-w-0"
+              data-test="metrics-detail-forecast"
+              @update:model-value="onForecastChange"
+            />
+            <OSelect
+              v-if="forecast"
+              :model-value="forecastHorizonChoice"
+              :options="forecastHorizonOptions"
+              :label="t('metrics.explorer.detail.forecast.horizon')"
+              label-position="inside"
+              :searchable="false"
+              size="sm"
+              width="sm"
+              class="min-w-0"
+              data-test="metrics-detail-forecast-horizon"
+              @update:model-value="onForecastHorizonChange"
+            />
+            <OButton
+              v-if="forecast === 'smoothed'"
+              variant="ghost"
+              size="icon"
+              icon-left="info-outline"
+              class="shrink-0"
+              :aria-label="t('metrics.explorer.detail.forecast.smoothedHelp')"
+              data-test="metrics-detail-forecast-help"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('metrics.explorer.detail.forecast.smoothedHelp')"
+              />
+            </OButton>
+          </template>
           <!-- The subtitle truncates and hides on a phone; this always holds the whole sentence. -->
           <OButton
             v-if="card.help"
@@ -284,6 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :results="overviewState.results"
               :shifted="overviewState.shifted ?? []"
               :step-seconds="overviewState.stepSeconds ?? 0"
+              :forecast="overviewState.forecast ?? null"
               :queries="overviewQueries"
               :chart-type="overview.chartType"
               :unit="overviewUnit.unit"
@@ -410,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import MetricCardChart, { type ShiftedResult } from "./MetricCardChart.vue";
+import MetricCardChart, { type ChartForecast, type ShiftedResult } from "./MetricCardChart.vue";
 import MetricBreakdown from "./MetricBreakdown.vue";
 import MetricChartTile, { type TileCompare, type TileQuery } from "./MetricChartTile.vue";
 import MetricUsageList from "./MetricUsageList.vue";
@@ -434,7 +476,15 @@ import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { parseSearchError } from "@/utils/query/searchError";
-import { supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
+import { CARD_KIND, supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
+import {
+  buildForecastQueries,
+  forecastHorizonOptions as forecastHorizonPresets,
+  forecastHorizonSeconds,
+  forecastSeries,
+  type ForecastHorizon,
+  type ForecastMethod,
+} from "@/utils/metrics/forecast";
 import { UNIT_LABELS } from "@/utils/metrics/metricPalette";
 import { rankRelatedMetrics, relatedCandidates } from "@/utils/metrics/relatedMetrics";
 import {
@@ -456,6 +506,8 @@ const RELATED_LIMIT = 12;
 /** A compared period draws as a twin series, which a heatmap's cells cannot show. */
 const COMPARE_CHART_TYPES = ["line", "area", "bar"];
 const COMPARE_OFFSETS = Object.keys(COMPARE_OFFSET_MS) as CompareOffset[];
+/** Kinds whose values are not a level that trends: labels, timestamps, or unknown. */
+const FORECAST_EXCLUDED_KINDS = [CARD_KIND.INFO, CARD_KIND.TIMESTAMP, CARD_KIND.OTHER];
 
 /** A metric's chart as its explorer card draws it. */
 export interface DetailChart {
@@ -485,6 +537,7 @@ interface OverviewState {
   shifted?: ShiftedResult[];
   /** The step `results` were queried at, kept with them like `timeRange`. */
   stepSeconds?: number;
+  forecast?: ChartForecast | null;
 }
 
 const IDLE: OverviewState = { status: "idle", results: [], error: "" };
@@ -548,6 +601,9 @@ export default defineComponent({
     },
     rateWindow: { type: String, required: true },
     compare: { type: String as PropType<CompareOffset | null>, default: null },
+    forecast: { type: String as PropType<ForecastMethod | null>, default: null },
+    /** A preset from the URL; absent, or longer than the visible range, the horizon is a quarter of it. */
+    forecastHorizon: { type: String as PropType<ForecastHorizon | null>, default: null },
     /** The detail queries' step, so a compared period snaps onto the current one. */
     stepSeconds: { type: Number, default: 0 },
     /** The rate window a dashboard panel built from this metric rates over. */
@@ -571,7 +627,7 @@ export default defineComponent({
           expr: string,
           signal: AbortSignal,
           card?: MetricCardModel,
-          opts?: { maxSeries?: number; window?: QueryWindow },
+          opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
         ) => Promise<any>
       >,
       required: true,
@@ -589,6 +645,8 @@ export default defineComponent({
     "open-related",
     "add-filter",
     "update:compare",
+    "update:forecast",
+    "update:forecastHorizon",
   ],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -680,6 +738,72 @@ export default defineComponent({
     );
     const onCompareChange = (value: unknown) =>
       emit("update:compare", value === "off" ? null : (value as CompareOffset));
+
+    const forecastEligible = computed(
+      () =>
+        props.overview.chartType === "line" &&
+        !!props.card &&
+        !FORECAST_EXCLUDED_KINDS.includes(props.card.cardKind),
+    );
+    const rangeSeconds = computed(
+      () => (props.timeRange.end_time - props.timeRange.start_time) / 1e6,
+    );
+    const forecastOptions = computed(() => [
+      { label: t("metrics.explorer.detail.forecast.off"), value: "off" },
+      { label: t("metrics.explorer.detail.forecast.linear"), value: "linear" },
+      { label: t("metrics.explorer.detail.forecast.smoothed"), value: "smoothed" },
+    ]);
+    const forecastHorizonOptions = computed(() => [
+      { label: t("metrics.explorer.detail.forecast.horizonAuto"), value: "auto" },
+      ...forecastHorizonPresets(rangeSeconds.value).map((preset) => ({
+        label: t(`metrics.explorer.detail.forecast.horizon${preset}` as const),
+        value: preset,
+      })),
+    ]);
+    const forecastHorizonChoice = computed(() =>
+      props.forecastHorizon &&
+      forecastHorizonPresets(rangeSeconds.value).includes(props.forecastHorizon)
+        ? props.forecastHorizon
+        : "auto",
+    );
+    /** The forecast the overview draws: none where it is not offered, whatever the URL says. */
+    const activeForecast = computed(() =>
+      forecastEligible.value && props.forecast && props.stepSeconds > 0
+        ? {
+            method: props.forecast,
+            horizon: forecastHorizonSeconds(props.forecastHorizon, rangeSeconds.value),
+          }
+        : null,
+    );
+    const onForecastChange = (value: unknown) =>
+      emit("update:forecast", value === "off" ? null : (value as ForecastMethod));
+    const onForecastHorizonChange = (value: unknown) =>
+      emit("update:forecastHorizon", value === "auto" ? null : (value as ForecastHorizon));
+
+    /** Two instant fits per expression at the range end; the line between them is the forecast. */
+    const loadForecast = async (exprs: string[], signal: AbortSignal) => {
+      const ahead = activeForecast.value;
+      if (!ahead) return null;
+      const { end_time: T } = props.timeRange;
+      const step = props.stepSeconds;
+      const fits = await Promise.all(
+        exprs.map((expr) =>
+          Promise.all(
+            buildForecastQueries(expr, ahead.method, rangeSeconds.value, step, ahead.horizon).map(
+              (query) => props.runQuery(query, signal, undefined, { instantAt: T }),
+            ),
+          ),
+        ),
+      );
+      return {
+        until: T + ahead.horizon * 1e6,
+        label: t("metrics.explorer.detail.forecast.suffix"),
+        entries: fits.map(([atT, atTH], parentIndex) => ({
+          result: forecastSeries(atT, atTH, T / 1e6, ahead.horizon, step),
+          parentIndex,
+        })),
+      };
+    };
     const overviewQueries = computed(() =>
       props.card ? withSourceStreams(props.overview.queries, props.card.name) : [],
     );
@@ -749,11 +873,12 @@ export default defineComponent({
           start: timeRange.start_time - compare.gapMs * 1000,
           end: timeRange.end_time - compare.gapMs * 1000,
         };
-        const [results, past] = await Promise.all([
+        const [results, past, forecast] = await Promise.all([
           Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
           window
             ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, undefined, { window })))
             : [],
+          loadForecast(exprs, signal),
         ]);
         if (mine !== generation) return;
         active = null;
@@ -768,6 +893,7 @@ export default defineComponent({
           error: "",
           timeRange,
           stepSeconds,
+          forecast,
         };
       } catch (error: any) {
         if (mine !== generation) return;
@@ -793,6 +919,7 @@ export default defineComponent({
         () => props.card?.name,
         () => props.overview.queries.map((query: any) => query.expr).join("\n"),
         () => compareShift.value?.gapMs,
+        () => `${activeForecast.value?.method}|${activeForecast.value?.horizon}`,
         () => props.timeRange,
       ],
       // Every source but the trailing window unchanged: a refresh, which must not blank the chart.
@@ -862,6 +989,12 @@ export default defineComponent({
       compareOptions,
       compareShift,
       onCompareChange,
+      forecastEligible,
+      forecastOptions,
+      forecastHorizonOptions,
+      forecastHorizonChoice,
+      onForecastChange,
+      onForecastHorizonChange,
       overviewHasSamples,
       overviewUnit,
       overviewBucketUnit,

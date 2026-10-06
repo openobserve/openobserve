@@ -81,6 +81,8 @@ const getMarkLineData = (panelSchema: any) => {
   );
 };
 
+export type SeriesRole = "primary" | "shifted" | "forecast";
+
 const labelSetKey = (metric: Record<string, string> = {}) =>
   JSON.stringify(Object.entries(metric).sort(([a], [b]) => a.localeCompare(b)));
 
@@ -89,22 +91,35 @@ export const alignShiftedPromQLResults = (
   data: any[],
   metadata: any,
   resultMetaData?: any,
-): { data: any[]; parentQueryIndex: number[]; nameSuffixes: string[] } => {
+): {
+  data: any[];
+  parentQueryIndex: number[];
+  nameSuffixes: string[];
+  seriesRoles: SeriesRole[];
+} => {
   const metas = metadata?.queries ?? [];
   const gapMsOf = (i: number) => Number(metas[i]?.timeRangeGap?.seconds) || 0;
+  const seriesRoles: SeriesRole[] = data.map((_, i) =>
+    metas[i]?.seriesRole === "forecast" ? "forecast" : gapMsOf(i) ? "shifted" : "primary",
+  );
   const parentQueryIndex = data.map((_, i) => metas[i]?.panelQueryIndex ?? i);
+  // A non-empty suffix is what marks an overlay to the series budget, so a forecast always has one.
   const nameSuffixes = data.map((_, i) =>
-    gapMsOf(i) ? (metas[i]?.timeRangeGap?.periodAsStr ?? "") : "",
+    seriesRoles[i] === "primary"
+      ? ""
+      : metas[i]?.timeRangeGap?.periodAsStr || (seriesRoles[i] === "forecast" ? "forecast" : ""),
   );
 
   const primaryAt = new Map<number, number>();
   data.forEach((_, i) => {
-    if (!gapMsOf(i) && !primaryAt.has(parentQueryIndex[i])) primaryAt.set(parentQueryIndex[i], i);
+    if (seriesRoles[i] === "primary" && !primaryAt.has(parentQueryIndex[i])) {
+      primaryAt.set(parentQueryIndex[i], i);
+    }
   });
 
   const aligned = data.map((entry, i) => {
     const gapMs = gapMsOf(i);
-    if (!gapMs || !Array.isArray(entry?.result)) return entry;
+    if (seriesRoles[i] === "primary" || !Array.isArray(entry?.result)) return entry;
 
     const p = primaryAt.get(parentQueryIndex[i]);
     const primarySeries: any[] = (p === undefined ? undefined : data[p]?.result) ?? [];
@@ -117,10 +132,13 @@ export const alignShiftedPromQLResults = (
     const anchorS =
       primarySeries.find((m: any) => m?.values?.length)?.values[0][0] ??
       Number(metas[i]?.startTime) / 1e6 + gapS;
+    // A forecast's own times lie past the range end, so they are kept as they are.
     const snap = (ts: number) =>
-      stepS > 0 && Number.isFinite(anchorS)
-        ? anchorS + Math.round((ts + gapS - anchorS) / stepS) * stepS
-        : ts + gapS;
+      seriesRoles[i] === "forecast"
+        ? ts
+        : stepS > 0 && Number.isFinite(anchorS)
+          ? anchorS + Math.round((ts + gapS - anchorS) / stepS) * stepS
+          : ts + gapS;
 
     const result = entry.result
       .map((m: any) => {
@@ -138,7 +156,7 @@ export const alignShiftedPromQLResults = (
     return { ...entry, result };
   });
 
-  return { data: aligned, parentQueryIndex, nameSuffixes };
+  return { data: aligned, parentQueryIndex, nameSuffixes, seriesRoles };
 };
 
 /**
@@ -176,7 +194,7 @@ export const convertPromQLData = async (
 
   const alignment = alignShiftedPromQLResults(searchQueryData, metadata, resultMetaData);
   searchQueryData = alignment.data;
-  const { parentQueryIndex, nameSuffixes } = alignment;
+  const { parentQueryIndex, nameSuffixes, seriesRoles } = alignment;
   const nameOf = (names: Map<any, string>, metric: any, index: number) => {
     const name = names.get(metric) ?? "";
     return nameSuffixes[index] ? `${name} (${nameSuffixes[index]})` : name;
@@ -809,7 +827,7 @@ export const convertPromQLData = async (
                 // A shifted series is never a query's first series.
                 ...(nameSuffixes[index] ? {} : { _queryIndex: index }),
                 _panelQueryIndex: parentQueryIndex[index],
-                _seriesRole: nameSuffixes[index] ? "shifted" : "primary",
+                _seriesRole: seriesRoles[index],
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",
@@ -900,7 +918,7 @@ export const convertPromQLData = async (
               return {
                 name: seriesName,
                 _panelQueryIndex: parentQueryIndex[index],
-                _seriesRole: nameSuffixes[index] ? "shifted" : "primary",
+                _seriesRole: seriesRoles[index],
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",

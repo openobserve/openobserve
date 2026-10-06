@@ -314,6 +314,38 @@ describe("MetricCardChart feeds the queue's results in as injected data", () => 
     expect(xs.size).toBe(10);
   });
 
+  it("appends the forecast after the primaries and extends the axis to its horizon", () => {
+    const ahead = { resultType: "matrix", result: [{ metric: {}, values: [[2, "5"]] }] };
+    const wrapper = mountChart({
+      results: [RESULTS[0], RESULTS[0]],
+      queries: [{ expr: "a" }, { expr: "b" }],
+      forecast: {
+        until: 3_000_000,
+        label: "forecast",
+        entries: [{ result: ahead, parentIndex: 1 }],
+      },
+    });
+    const injected = panelProp(wrapper, "injectedPromqlData");
+
+    expect(injected.data).toEqual([RESULTS[0], RESULTS[0], ahead]);
+    expect(injected.metadata.queries).toEqual([
+      { startTime: 1_000_000, endTime: 3_000_000 },
+      { startTime: 1_000_000, endTime: 2_000_000 },
+      {
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+        seriesRole: "forecast",
+        timeRangeGap: { seconds: 0, periodAsStr: "forecast" },
+        panelQueryIndex: 1,
+      },
+    ]);
+  });
+
+  it("keeps the axis on the queried window without a forecast", () => {
+    const injected = panelProp(mountChart(), "injectedPromqlData");
+    expect(injected.metadata.queries[0].endTime).toBe(2_000_000);
+  });
+
   it("passes no shifted entries or step metadata without a comparison", () => {
     const injected = panelProp(mountChart(), "injectedPromqlData");
     expect(injected.data).toEqual(RESULTS);

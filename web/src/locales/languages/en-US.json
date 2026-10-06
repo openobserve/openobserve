@@ -9356,6 +9356,20 @@
         "openInVisualize": "Open in Visualize",
         "moreActions": "More actions",
         "noAlertQuery": "This metric has no query to alert on",
+        "forecast": {
+          "label": "Forecast",
+          "off": "Off",
+          "linear": "Linear",
+          "smoothed": "Smoothed trend",
+          "smoothedHelp": "Smoothed trend is a linear projection of a smoothed series: each point is smoothed over the ten steps before it, then a straight line is fitted. It is not a seasonal forecast.",
+          "horizon": "Horizon",
+          "horizonAuto": "25% of range",
+          "horizon1h": "1 hour",
+          "horizon6h": "6 hours",
+          "horizon1d": "1 day",
+          "horizon1w": "1 week",
+          "suffix": "forecast"
+        },
         "compare": {
           "label": "Compare to",
           "off": "Off",

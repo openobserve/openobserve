@@ -89,6 +89,8 @@ describe("explorer saved views", () => {
         tab: "related",
         breakdown_label: "job",
         compare: "1d",
+        forecast: "linear",
+        forecast_h: "1h",
         stream: "x",
       },
     });
