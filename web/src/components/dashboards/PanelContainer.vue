@@ -1207,7 +1207,9 @@ export default defineComponent({
      */
     buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
       const queries = this.props.data.queries || [];
-      const queryIndex = options.queryIndex ?? 0;
+      // A saved-hidden query is not drawn, so it is not what the user means to alert on.
+      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
+      const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
         panelId: this.props.data.id,
@@ -1216,7 +1218,9 @@ export default defineComponent({
         queryType: this.props.data.queryType,
         queryIndex,
         queryChoices:
-          queries.length > 1 ? panelQueryChoices(queries, this.metaData?.queries) : undefined,
+          visible.length > 1
+            ? panelQueryChoices(queries, this.metaData?.queries, visible)
+            : undefined,
         executedQuery: executedPanelQuery(this.metaData?.queries, queryIndex),
         timeRange: this.props.selectedTimeDate,
       });

@@ -481,3 +481,75 @@ describe("panelQueryChoices", () => {
     ]);
   });
 });
+
+describe("buildPrefillFromPanel — a formula query", () => {
+  const formulaPanel = (formula: string, overrides: Partial<PanelPrefillInput> = {}) =>
+    promqlPanel({
+      queries: [
+        {
+          query: 'sum(rate(http_errors_total{code=~"5.."}[5m]))',
+          fields: { stream: "http_errors_total", stream_type: "metrics" },
+          config: { ref: "A", hide: true },
+        },
+        {
+          query: "sum(rate(http_requests_total[5m]))",
+          fields: { stream: "http_requests_total", stream_type: "metrics" },
+          config: { ref: "B", hide: true },
+        },
+        {
+          query: "",
+          fields: { stream: "", stream_type: "metrics" },
+          config: { formula },
+        },
+      ],
+      queryIndex: 2,
+      executedQuery:
+        '(sum(rate(http_errors_total{code=~"5.."}[5m]))) / (sum(rate(http_requests_total[5m]))) * 100',
+      ...overrides,
+    });
+
+  it("alerts on the combined expression and offers each input's metric as a stream", () => {
+    const p = normalizePrefill(buildPrefillFromPanel(formulaPanel("A / B * 100"), makeId));
+    expect(p.promql).toBe(
+      '(sum(rate(http_errors_total{code=~"5.."}[5m]))) / (sum(rate(http_requests_total[5m]))) * 100',
+    );
+    expect(p.streamCandidates).toEqual([
+      { name: "http_errors_total", type: "metrics" },
+      { name: "http_requests_total", type: "metrics" },
+    ]);
+    expect(isPrefillBlocked(p)).toBe(false);
+    expect(needsConfirmation(p)).toBe(true);
+  });
+
+  it("lists a metric two inputs share once, and needs no stream choice then", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].fields.stream = "http_requests_total";
+    const p = normalizePrefill(buildPrefillFromPanel(panel, makeId));
+    expect(p.streamCandidates).toBeUndefined();
+    expect(p.streamName).toBe("http_requests_total");
+    expect(needsConfirmation(p)).toBe(false);
+  });
+
+  it("takes only the inputs the formula references, by stored letter", () => {
+    const p = buildPrefillFromPanel(formulaPanel("B * 2"), makeId);
+    expect(p.streamName).toBe("http_requests_total");
+    expect(p.streamCandidates).toBeUndefined();
+  });
+
+  it("gives legacy inputs without a stored letter their positional one", () => {
+    const panel = formulaPanel("A + B");
+    delete panel.queries![0].config.ref;
+    delete panel.queries![1].config.ref;
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
+  it("leaves a plain query's single stream alone", () => {
+    const p = buildPrefillFromPanel(formulaPanel("A / B", { queryIndex: 1 }), makeId);
+    expect(p.streamName).toBe("http_requests_total");
+    expect(p.streamCandidates).toBeUndefined();
+  });
+});

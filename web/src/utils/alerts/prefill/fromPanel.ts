@@ -27,9 +27,11 @@ import {
   ALERT_PREFILL_VERSION,
   type AlertPrefill,
   type AlertPrefillQueryChoice,
+  type AlertPrefillStreamCandidate,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { sanitizeAlertNamePart, periodMinutesFromRange, warn } from "../alertPrefill";
+import { formulaRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
 
 /** Panel types whose shape has no meaningful row count to alert on. */
 const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
@@ -177,6 +179,21 @@ const conditionsFromFilters = (fields: any, makeId: () => string) => {
   };
 };
 
+/** The metrics a formula's inputs read, once each; an alert needs one of them as its stream. */
+const formulaInputStreams = (queries: any[], formula: string): AlertPrefillStreamCandidate[] => {
+  const referenced = new Set(formulaRefs(formula));
+  const letters = queryRefs(queries);
+  const seen = new Set<string>();
+  return queries.flatMap((query, i) => {
+    const name = query?.fields?.stream;
+    const letter = letters[i];
+    if (!name || !letter || !referenced.has(letter) || isFormulaQuery(query) || seen.has(name))
+      return [];
+    seen.add(name);
+    return [{ name, type: query.fields.stream_type || "metrics" }];
+  });
+};
+
 /** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
 export const executedPanelQuery = (
   metadataQueries: any[] | undefined,
@@ -218,6 +235,10 @@ export const buildPrefillFromPanel = (
   }
 
   const isPromql = input.queryType === "promql";
+  const inputStreams =
+    isPromql && isFormulaQuery(query)
+      ? formulaInputStreams(input.queries ?? [], query.config.formula)
+      : [];
   const sourceQuery = input.executedQuery || query?.query || "";
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
@@ -249,7 +270,8 @@ export const buildPrefillFromPanel = (
     sourceLabel: input.panelTitle || "panel",
     name: `Alert_from_${sanitizeAlertNamePart(input.panelTitle, "panel")}`,
     streamType: query?.fields?.stream_type || (isPromql ? "metrics" : "logs"),
-    streamName: query?.fields?.stream || "",
+    streamName: inputStreams[0]?.name ?? (query?.fields?.stream || ""),
+    ...(inputStreams.length > 1 ? { streamCandidates: inputStreams } : {}),
     queryType: isPromql ? "promql" : "sql",
     vrlFunction: query?.vrlFunctionQuery || null,
     aggregation,

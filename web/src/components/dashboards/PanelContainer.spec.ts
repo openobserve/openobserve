@@ -893,6 +893,59 @@ describe("PanelContainer", () => {
       expect(second.queryIndex).toBe(1);
     });
 
+    describe("with a formula and hidden inputs", () => {
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
+      const formulaPanel = (hideA: boolean) => ({
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: "sum(rate(errors[$__rate_interval]))",
+            fields: { stream: "errors", stream_type: "metrics" },
+            config: { ref: "A", hide: hideA },
+          },
+          {
+            query: "sum(rate(requests[$__rate_interval]))",
+            fields: { stream: "requests", stream_type: "metrics" },
+            config: { ref: "B", hide: true },
+          },
+          {
+            query: "",
+            tabName: "Ratio",
+            fields: { stream_type: "metrics" },
+            config: { formula: "A / B * 100" },
+          },
+        ],
+      });
+      const metaData = {
+        queries: [
+          { query: "sum(rate(errors[1m]))", panelQueryIndex: 0 },
+          { query: "sum(rate(requests[1m]))", panelQueryIndex: 1, notSent: true },
+          { query: combined, panelQueryIndex: 2 },
+        ],
+      };
+
+      it("alerts on the formula, its only visible query, with its inputs' metrics", async () => {
+        wrapper = createWrapper({ data: formulaPanel(true) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.promql).toBe(combined);
+        expect(prefill.queryChoices).toBeUndefined();
+        expect(prefill.streamCandidates.map((c: any) => c.name)).toEqual(["errors", "requests"]);
+      });
+
+      it("offers only the visible queries in the picker", async () => {
+        wrapper = createWrapper({ data: formulaPanel(false) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.queryChoices.map((c: any) => c.index)).toEqual([0, 2]);
+        expect(prefill.promql).toBe("sum(rate(errors[1m]))");
+        expect(wrapper.vm.buildPanelAlertPrefill({ queryIndex: 2 }).promql).toBe(combined);
+      });
+    });
+
     it("offers no query choice for a single-query panel", async () => {
       wrapper = createWrapper({
         data: {

@@ -165,6 +165,10 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
+import {
+  alertCreationDialog,
+  closeAlertCreationDialog,
+} from "@/composables/alerts/useAlertCreation";
 
 describe("PanelSchemaRenderer", () => {
   let wrapper: any;
@@ -2657,6 +2661,60 @@ describe("PanelSchemaRenderer", () => {
       const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
       expect(call[1].map((d: any) => d.result[0].metric.q)).toEqual(["A", "A1d"]);
       expect(call[6].queries.map((m: any) => m.panelQueryIndex)).toEqual([0, 0]);
+    });
+
+    it("right-click on empty chart area alerts on the formula, not its saved-hidden inputs", async () => {
+      closeAlertCreationDialog();
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m])))";
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([entry("A"), entry("B"), entry("F")]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [
+            { ...metaEntry(0), query: "sum(rate(errors[1m]))" },
+            { ...metaEntry(1), query: "sum(rate(requests[1m]))" },
+            { ...metaEntry(2), query: combined },
+          ],
+        }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 1 }], [{ step: 1 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          id: "panel-formula",
+          type: "line",
+          queryType: "promql",
+          queries: [
+            {
+              query: "sum(rate(errors[1m]))",
+              fields: { stream: "errors", stream_type: "metrics" },
+              config: { ref: "A", hide: true },
+            },
+            {
+              query: "sum(rate(requests[1m]))",
+              fields: { stream: "requests", stream_type: "metrics" },
+              config: { ref: "B", hide: true },
+            },
+            { query: "", fields: { stream_type: "metrics" }, config: { formula: "A / B" } },
+          ],
+          config: {},
+        },
+      });
+      await flushPromises();
+
+      wrapper.vm.handleCreateAlert({ condition: "above", threshold: 1 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.promql).toBe(combined);
+      expect(prefill?.queryChoices).toBeUndefined();
+      expect(prefill?.streamCandidates?.map((c: any) => c.name)).toEqual(["errors", "requests"]);
     });
 
     it("in the editor, follows the editor's live hide state over the applied panel's", async () => {

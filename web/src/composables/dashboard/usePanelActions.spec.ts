@@ -294,6 +294,80 @@ describe("usePanelActions", () => {
     });
   });
 
+  describe("usePanelAlertCreation on a formula series", () => {
+    const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
+    const makeFormula = () => ({
+      panelSchema: {
+        value: {
+          id: "panel-3",
+          title: "Error ratio",
+          queryType: "promql",
+          queries: [
+            {
+              query: "sum(rate(errors[$__rate_interval]))",
+              fields: { stream: "errors", stream_type: "metrics" },
+              config: { ref: "A", hide: true },
+            },
+            {
+              query: "sum(rate(requests[$__rate_interval]))",
+              fields: { stream: "requests", stream_type: "metrics" },
+              config: { ref: "B", hide: true },
+            },
+            { query: "", fields: { stream_type: "metrics" }, config: { formula: "A / B * 100" } },
+          ],
+        },
+      },
+      allowAlertCreation: { value: true },
+      metadata: {
+        value: {
+          queries: [
+            { query: "sum(rate(errors[1m]))", panelQueryIndex: 0, notSent: true },
+            { query: "sum(rate(requests[1m]))", panelQueryIndex: 1, notSent: true },
+            { query: combined, panelQueryIndex: 2, timeRangeGap: { seconds: 0 } },
+          ],
+        },
+      },
+      selectedTimeObj: { value: { start_time: 1, end_time: 2 } },
+      contextMenuData: { value: null as any },
+      store: { state: { selectedOrganization: { identifier: "org-1" } } },
+      router: { push: vi.fn() },
+      emit: vi.fn(),
+      visibleQueryIndexes: { value: [2] },
+    });
+
+    beforeEach(() => closeAlertCreationDialog());
+
+    it("prefills the combined expression and lets the user pick an input metric", () => {
+      const args = makeFormula();
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({
+        condition: "above",
+        threshold: 5,
+        panelQueryIndex: 2,
+        seriesRole: "primary",
+      });
+
+      expect(args.router.push).not.toHaveBeenCalled();
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.promql).toBe(combined);
+      expect(prefill?.streamCandidates?.map((c) => c.name)).toEqual(["errors", "requests"]);
+      expect(prefill?.queryChoices).toBeUndefined();
+    });
+
+    it("on empty chart area, alerts on the one visible query, never a hidden input", () => {
+      const args = makeFormula();
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 5 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.promql).toBe(combined);
+      expect(prefill?.queryChoices).toBeUndefined();
+      expect(prefill?.streamCandidates?.map((c) => c.name)).toEqual(["errors", "requests"]);
+    });
+  });
+
   describe("usePanelAlertCreation on a forecast line (entry B)", () => {
     const DAY = 86_400;
     const END_S = 1_800_000_000;
