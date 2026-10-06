@@ -18336,7 +18336,6 @@
       "scopeAllClusters": "All clusters",
       "scopeNamespace": "Namespace: {name}",
       "refresh": "Refresh",
-      "retry": "Retry",
       "streamsError": "Couldn't list the metric streams.",
       "pageError": "Couldn't load Kubernetes data.",
       "emptyHeadline": "No Kubernetes telemetry visible to you yet",
