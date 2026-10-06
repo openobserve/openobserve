@@ -1027,20 +1027,6 @@ async fn find_reserved_field<'a>(
         .map(String::from)
 }
 
-fn unapplied_type_change(
-    schema: &infra::schema::SchemaCache,
-    name: &str,
-    requested: &DataType,
-) -> Option<String> {
-    let current = schema.field_with_name(name)?.data_type();
-    if current == requested || infra::schema::is_widening_conversion(current, requested) {
-        return None;
-    }
-    Some(format!(
-        "field [{name}] is {current} and cannot be changed to {requested}"
-    ))
-}
-
 pub async fn delete_fields(
     org_id: &str,
     stream_name: &str,
@@ -1103,6 +1089,7 @@ pub async fn update_fields_type(
         ));
     }
 
+    let stream_schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
     // Build HashMap of field_name -> (DataType, nullable)
     let mut updates = HashMap::with_capacity(field_updates.len());
     for field_update in field_updates {
@@ -1112,16 +1099,19 @@ pub async fn update_fields_type(
                 field_update.data_type, field_update.name
             ))
         })?;
+        // handle_diff_schema would leave a non-widening change unapplied and still return Ok
+        if let Some(current) = stream_schema
+            .field_with_name(&field_update.name)
+            .map(|f| f.data_type())
+            && current != &dt
+            && !infra::schema::is_widening_conversion(current, &dt)
+        {
+            return Err(anyhow::anyhow!(
+                "field [{}] is {current} and cannot be changed to {dt}",
+                field_update.name
+            ));
+        }
         updates.insert(field_update.name.clone(), (dt, field_update.nullable));
-    }
-
-    // handle_diff_schema would leave a non-widening change unapplied and still return Ok
-    let stream_schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
-    if let Some(reason) = field_updates.iter().find_map(|f| {
-        let (requested, _) = updates.get(&f.name)?;
-        unapplied_type_change(&stream_schema, &f.name, requested)
-    }) {
-        return Err(anyhow::anyhow!(reason));
     }
 
     // create a new schema with updated field types
@@ -1439,39 +1429,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_unapplied_type_change() {
-        let schema = infra::schema::SchemaCache::new(Schema::new(vec![
-            Field::new("status_code", DataType::Utf8, true),
-            Field::new("count", DataType::Int64, true),
-        ]));
-        for requested in [
-            DataType::Int64,
-            DataType::UInt64,
-            DataType::Float64,
-            DataType::Boolean,
-        ] {
-            assert_eq!(
-                unapplied_type_change(&schema, "status_code", &requested),
-                Some(format!(
-                    "field [status_code] is Utf8 and cannot be changed to {requested}"
-                ))
-            );
-        }
-        for (name, requested) in [
-            ("status_code", DataType::Utf8),
-            ("status_code", DataType::LargeUtf8),
-            ("count", DataType::Float64),
-            ("new_field", DataType::Int64),
-        ] {
-            assert_eq!(
-                unapplied_type_change(&schema, name, &requested),
-                None,
-                "{name} -> {requested}"
-            );
-        }
-    }
-
     async fn create_update_fields_test_stream(name: &str) {
         infra::db::create_table().await.unwrap();
         let stream = StreamCreate {
@@ -1513,21 +1470,23 @@ mod tests {
         // the test DB outlives the run, so each run needs fresh stream names
         let name = &format!("refuse_{}", now_micros());
         create_update_fields_test_stream(name).await;
-        let err = update_fields_type(
-            "org1",
-            name,
-            Some(StreamType::Logs),
-            &[
-                field_update("count", "Float64"),
-                field_update("status_code", "Int64"),
-            ],
-        )
-        .await
-        .unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "field [status_code] is Utf8 and cannot be changed to Int64"
-        );
+        for requested in ["Int64", "UInt64", "Float64", "Boolean"] {
+            let err = update_fields_type(
+                "org1",
+                name,
+                Some(StreamType::Logs),
+                &[
+                    field_update("count", "Float64"),
+                    field_update("status_code", requested),
+                ],
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("field [status_code] is Utf8 and cannot be changed to {requested}")
+            );
+        }
         // refused as a whole, so the widening change sent with it is not applied either
         assert_eq!(
             persisted_field_type(name, "count").await.as_deref(),
