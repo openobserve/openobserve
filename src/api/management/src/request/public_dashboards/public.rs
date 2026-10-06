@@ -178,17 +178,39 @@ fn public_variables(dash: &Dashboard, frozen: Option<&str>) -> Vec<PublicVariabl
     };
     list.list
         .iter()
-        .filter(|v| v.hide_on_dashboard != Some(true))
-        .map(|v| PublicVariable {
-            label: if v.label.is_empty() {
+        .filter(|v| v.hide_on_dashboard != Some(true) && v.type_field != "dynamic_filters")
+        .flat_map(|v| {
+            let label = if v.label.is_empty() {
                 v.name.clone()
             } else {
                 v.label.clone()
-            },
-            value: frozen
-                .get(&v.name)
-                .cloned()
-                .unwrap_or(serde_json::Value::Null),
+            };
+            // One entry per scope instance, keyed as the link stores it (`name.t.<tab>`).
+            let instances: Vec<(String, Option<String>, Option<String>)> = match v.scope.as_deref()
+            {
+                Some("tabs") => v
+                    .tabs
+                    .iter()
+                    .flatten()
+                    .map(|t| (format!("{}.t.{t}", v.name), Some(t.clone()), None))
+                    .collect(),
+                Some("panels") => v
+                    .panels
+                    .iter()
+                    .flatten()
+                    .map(|p| (format!("{}.p.{p}", v.name), None, Some(p.clone())))
+                    .collect(),
+                _ => vec![(v.name.clone(), None, None)],
+            };
+            instances
+                .into_iter()
+                .map(|(key, tab_id, panel_id)| PublicVariable {
+                    label: label.clone(),
+                    value: frozen.get(&key).cloned().unwrap_or(serde_json::Value::Null),
+                    tab_id,
+                    panel_id,
+                })
+                .collect::<Vec<_>>()
         })
         .collect()
 }
@@ -331,6 +353,44 @@ mod tests {
         assert!(s.contains("keep me"), "{s}");
         assert!(s.contains("\"id\":\"p1\""), "{s}");
         assert!(s.contains("x_axis"), "{s}");
+    }
+
+    #[test]
+    fn public_variables_list_each_scope_instance_with_its_value() {
+        let dash = Dashboard {
+            v8: Some(
+                serde_json::from_value(serde_json::json!({
+                    "variables": { "list": [
+                        { "type": "custom", "name": "env", "label": "Env" },
+                        { "type": "custom", "name": "svc", "scope": "tabs", "tabs": ["t1", "t2"] },
+                        { "type": "custom", "name": "pod", "scope": "panels", "panels": ["p1"] },
+                        { "type": "custom", "name": "hidden", "hideOnDashboard": true }
+                    ] }
+                }))
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+        let frozen = r#"{"env":"prod","svc.t.t1":"api","pod.p.p1":["a","b"]}"#;
+        let got: Vec<_> = public_variables(&dash, Some(frozen))
+            .into_iter()
+            .map(|v| (v.label, v.value, v.tab_id, v.panel_id))
+            .collect();
+        let s = |x: &str| Some(x.to_string());
+        assert_eq!(
+            got,
+            vec![
+                ("Env".to_string(), serde_json::json!("prod"), None, None),
+                ("svc".to_string(), serde_json::json!("api"), s("t1"), None),
+                ("svc".to_string(), serde_json::Value::Null, s("t2"), None),
+                (
+                    "pod".to_string(),
+                    serde_json::json!(["a", "b"]),
+                    None,
+                    s("p1")
+                ),
+            ]
+        );
     }
 
     #[test]

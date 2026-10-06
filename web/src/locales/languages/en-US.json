@@ -6678,6 +6678,8 @@
       "summaryAll": "All",
       "revokeTitle": "Revoke and delete \"{name}\"?",
       "revokeMessage": "Anyone using this link loses access immediately. This can't be undone. Publishing again creates a new link.",
+      "tabVariables": "Tab: {name}",
+      "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "The public link always loads the dashboard with the values selected here. Viewers can see them but can't change them."
     }
   },

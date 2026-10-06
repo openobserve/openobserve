@@ -249,14 +249,34 @@
           :content="t('dashboard.publicLinks.frozenVariablesNote')"
           data-test="dashboards-public-links-panel-variables-note"
         />
-        <VariablesValueSelector
-          :key="formKey"
-          :variablesConfig="variablesConfig"
-          :selectedTimeDate="timeObj"
-          :initialVariableValues="variableSeed"
-          :showDynamicFilters="false"
-          @variablesData="onVariablesData"
-        />
+        <template v-if="formVarsReady">
+          <VariablesValueSelector
+            :key="`global-${formKey}`"
+            scope="global"
+            :variablesManager="formVars"
+            :variablesConfig="{ list: formVars.variablesData.global }"
+            :selectedTimeDate="timeObj"
+            :showDynamicFilters="false"
+            data-test="dashboards-public-links-panel-global-variables"
+          />
+          <div
+            v-for="group in scopedGroups"
+            :key="`${group.key}-${formKey}`"
+            class="flex flex-col gap-1"
+            :data-test="`dashboards-public-links-panel-${group.key}-variables`"
+          >
+            <div class="text-text-secondary text-xs">{{ group.label }}</div>
+            <VariablesValueSelector
+              :scope="group.scope"
+              :tabId="group.tabId"
+              :panelId="group.panelId"
+              :variablesManager="formVars"
+              :variablesConfig="{ list: group.vars }"
+              :selectedTimeDate="timeObj"
+              :showDynamicFilters="false"
+            />
+          </div>
+        </template>
       </div>
     </div>
 
@@ -508,6 +528,11 @@ import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import {
+  useVariablesManager,
+  type VariableConfig,
+  type VariableRuntimeState,
+} from "@/composables/dashboard/useVariablesManager";
 import DateTime from "@/components/DateTime.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
@@ -544,6 +569,12 @@ import {
 } from "./publicLinkDisplay";
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
+type DashboardLayout = {
+  tabs?: Array<{ tabId: string; name?: string; panels?: Array<{ id: string; title?: string }> }>;
+  variables?: Record<string, unknown>;
+};
+/** The live dashboard's variables manager, read to seed a new link with what the author sees. */
+type DashboardVariables = { getUrlParams: () => Record<string, unknown> };
 type PanelView = "list" | "form" | "created";
 
 interface PresetOption extends SelectOption {
@@ -570,6 +601,9 @@ const props = withDefaults(
     variablesConfig?: { list?: unknown[] };
     timeObj?: Record<string, unknown>;
     currentValues?: VariableValues;
+    // Tabs and panels, so tab- and panel-scoped variables can be shown and frozen per scope.
+    dashboardData?: DashboardLayout;
+    dashboardVariables?: DashboardVariables | null;
     // Open straight on this link's edit form (from the org-wide list).
     editLinkId?: string;
   }>(),
@@ -636,7 +670,9 @@ const editing = ref<PublicLink | null>(null);
 const createdLink = ref<PublicLink | null>(null);
 // Remounts the variable pickers so each form opens on its own seed.
 const formKey = ref(0);
-const liveVariables = ref<VariableValues | null>(null);
+// Its own manager, so editing a link's values never changes the dashboard's selection.
+const formVars = useVariablesManager(t);
+const formVarsReady = ref(false);
 
 // A dashboard with no links opens straight on the create form.
 const currentView = computed<PanelView>(() =>
@@ -709,15 +745,42 @@ const refreshOptions = computed<PresetOption[]>(() => {
   return secs.map((value) => ({ value, label: refreshLabel(value, t) }));
 });
 
-// Editing seeds the pickers from the link's frozen values, creating from the live selection.
-const variableSeed = computed(() => ({
-  value: editing.value
-    ? { ...editing.value.frozen_variables }
-    : (props.currentValues?.values ?? []).reduce<Record<string, unknown>>((m, v) => {
-        if (v?.name !== undefined && v?.name !== null) m[v.name] = v.value;
-        return m;
-      }, {}),
-}));
+// One labelled picker per tab and per panel that has its own scoped variables.
+const scopedGroups = computed(() => {
+  if (!formVarsReady.value) return [];
+  const tabs = props.dashboardData?.tabs ?? [];
+  const panels = tabs.flatMap((tab) =>
+    (tab.panels ?? []).map((panel) => ({ ...panel, tabId: tab.tabId })),
+  );
+  const tabGroups = Object.entries(formVars.variablesData.tabs)
+    .filter(([, vars]) => vars.length)
+    .map(([tabId, vars]) => ({
+      key: `tab-${tabId}`,
+      scope: "tabs" as const,
+      tabId,
+      panelId: undefined,
+      vars,
+      label: t("dashboard.publicLinks.tabVariables", {
+        name: raw(tabs.find((tab) => tab.tabId === tabId)?.name ?? tabId),
+      }),
+    }));
+  const panelGroups = Object.entries(formVars.variablesData.panels)
+    .filter(([, vars]) => vars.length)
+    .map(([panelId, vars]) => {
+      const panel = panels.find((p) => p.id === panelId);
+      return {
+        key: `panel-${panelId}`,
+        scope: "panels" as const,
+        tabId: panel?.tabId,
+        panelId,
+        vars,
+        label: t("dashboard.publicLinks.panelVariables", {
+          name: raw(panel?.title || panelId),
+        }),
+      };
+    });
+  return [...tabGroups, ...panelGroups];
+});
 
 const columns = publicLinkColumns(t);
 
@@ -753,23 +816,53 @@ function serverMessage(e: unknown): I18nText {
   return raw((e as { response?: { data?: { message?: string } } })?.response?.data?.message);
 }
 
-const onVariablesData = (d: VariableValues) => {
-  liveVariables.value = d;
-};
-
+// Keys follow the dashboard URL: `name`, `name.t.<tabId>`, `name.p.<panelId>`.
 function frozenVariables(): Record<string, unknown> {
-  const source = liveVariables.value ?? (editing.value ? null : props.currentValues);
   // Without the pickers (opened from the org list) an edit keeps the link's frozen values.
-  if (!source?.values) return editing.value ? { ...editing.value.frozen_variables } : {};
-  return source.values.reduce<Record<string, unknown>>((m, item) => {
-    if (item?.name !== undefined && item?.name !== null) m[item.name] = item.value;
-    return m;
-  }, {});
+  if (!formVarsReady.value) return editing.value ? { ...editing.value.frozen_variables } : {};
+  const out: Record<string, unknown> = {};
+  const put = (vars: VariableRuntimeState[], suffix: string) =>
+    vars.forEach((v) => {
+      if (v.type !== "dynamic_filters") out[`${v.name}${suffix}`] = v.value;
+    });
+  put(formVars.variablesData.global, "");
+  Object.entries(formVars.variablesData.tabs).forEach(([id, vars]) => put(vars, `.t.${id}`));
+  Object.entries(formVars.variablesData.panels).forEach(([id, vars]) => put(vars, `.p.${id}`));
+  return out;
+}
+
+// What the pickers start from, as URL-style params the manager already knows how to load.
+function variableSeedParams(): Record<string, unknown> {
+  if (editing.value) {
+    return Object.fromEntries(
+      Object.entries(editing.value.frozen_variables).map(([key, value]) => [`var-${key}`, value]),
+    );
+  }
+  if (props.dashboardVariables) return props.dashboardVariables.getUrlParams();
+  return Object.fromEntries(
+    (props.currentValues?.values ?? [])
+      .filter((v) => v?.name)
+      .map((v) => [`var-${v.name}`, v.value]),
+  );
+}
+
+async function seedFormVariables() {
+  formVarsReady.value = false;
+  const list = (props.variablesConfig?.list ?? []) as VariableConfig[];
+  if (!list.length) return;
+  // Dynamic filters are never part of a public link.
+  await formVars.initialize(list, {
+    ...props.dashboardData,
+    variables: { ...props.dashboardData?.variables, showDynamicFilters: false },
+  });
+  formVars.loadFromUrl({ query: variableSeedParams() });
+  Object.keys(formVars.variablesData.tabs).forEach((id) => formVars.setTabVisibility(id, true));
+  Object.keys(formVars.variablesData.panels).forEach((id) => formVars.setPanelVisibility(id, true));
+  formVarsReady.value = true;
 }
 
 function openForm(link: PublicLink | null) {
   editing.value = link;
-  liveVariables.value = null;
   formKey.value += 1;
   form.reset(link ? publicLinkFormFrom(link, timezone.value) : publicLinkDefaults());
   view.value = "form";
@@ -873,6 +966,14 @@ watch(
       form.reset(publicLinkDefaults());
     }
     pendingEditId.value = editId ?? null;
+  },
+  { immediate: true },
+);
+// Each time the form opens, its pickers start again from the link or the dashboard.
+watch(
+  () => (currentView.value === "form" ? formKey.value : null),
+  (session) => {
+    if (session !== null) seedFormVariables();
   },
   { immediate: true },
 );

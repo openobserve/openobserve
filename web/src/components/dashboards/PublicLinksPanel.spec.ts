@@ -81,11 +81,15 @@ const DateTimeStub = {
 const VVSStub = {
   name: "VariablesValueSelector",
   template: "<div />",
-  props: ["variablesConfig", "selectedTimeDate", "initialVariableValues", "showDynamicFilters"],
-  emits: ["variablesData"],
-  mounted() {
-    this.$emit("variablesData", { values: [{ name: "env", value: "prod" }] });
-  },
+  props: [
+    "variablesConfig",
+    "variablesManager",
+    "scope",
+    "tabId",
+    "panelId",
+    "selectedTimeDate",
+    "showDynamicFilters",
+  ],
 };
 
 const link = (over: Partial<PublicLink> = {}): PublicLink => ({
@@ -326,6 +330,65 @@ describe("PublicLinksPanel", () => {
     expect(linkId).toBe("l1");
     expect(cfg.frozen_variables).toEqual({ env: "stage" });
     expect(cfg.rebuild_secs).toBe(600);
+  });
+
+  it("shows and freezes tab- and panel-scoped variables per scope", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+    const w = build({
+      variablesConfig: {
+        list: [
+          { name: "env", type: "constant", value: "" },
+          { name: "svc", type: "constant", value: "", scope: "tabs", tabs: ["t1"] },
+          { name: "pod", type: "constant", value: "", scope: "panels", panels: ["p1"] },
+        ],
+      },
+      dashboardData: {
+        tabs: [{ tabId: "t1", name: "Overview", panels: [{ id: "p1", title: "CPU" }] }],
+      },
+      dashboardVariables: {
+        getUrlParams: () => ({ "var-env": "prod", "var-svc.t.t1": "api", "var-pod.p.p1": "a" }),
+      },
+    });
+    await flushPromises();
+    expect(w.find('[data-test="dashboards-public-links-panel-tab-t1-variables"]').text()).toContain(
+      "Tab: Overview",
+    );
+    expect(
+      w.find('[data-test="dashboards-public-links-panel-panel-p1-variables"]').text(),
+    ).toContain("Panel: CPU");
+
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "Scoped");
+    await submit(w);
+    expect(vi.mocked(admin.create).mock.calls[0][2].frozen_variables).toEqual({
+      env: "prod",
+      "svc.t.t1": "api",
+      "pod.p.p1": "a",
+    });
+  });
+
+  it("edits a link's scoped values from what it froze", async () => {
+    const scoped = link({ frozen_variables: { env: "stage", "svc.t.t1": "web" } });
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [scoped] } } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: scoped } as never);
+    const w = build({
+      editLinkId: "l1",
+      variablesConfig: {
+        list: [
+          { name: "env", type: "constant", value: "" },
+          { name: "svc", type: "constant", value: "", scope: "tabs", tabs: ["t1"] },
+        ],
+      },
+      dashboardData: { tabs: [{ tabId: "t1", name: "Overview", panels: [] }] },
+    });
+    await flushPromises();
+    await submit(w);
+    expect(vi.mocked(admin.update).mock.calls[0][3].frozen_variables).toEqual({
+      env: "stage",
+      "svc.t.t1": "web",
+    });
   });
 
   it("edits each range in its own picker row, flags bad rows and adds new ones", async () => {

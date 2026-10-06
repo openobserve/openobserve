@@ -203,6 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variables-config="currentDashboardData.data?.variables"
             :time-obj="currentTimeObj"
             :current-values="variablesData"
+            :dashboard-data="currentDashboardData.data"
+            :dashboard-variables="variablesManager"
           />
           <OButton
             v-if="!isFullscreen"

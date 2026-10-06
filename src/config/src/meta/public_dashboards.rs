@@ -241,6 +241,12 @@ pub struct KeyedRange {
 pub struct PublicVariable {
     pub label: String,
     pub value: serde_json::Value,
+    /// Set for a tab-scoped variable: the tab this value belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tab_id: Option<String>,
+    /// Set for a panel-scoped variable: the panel this value belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel_id: Option<String>,
 }
 
 #[cfg(test)]

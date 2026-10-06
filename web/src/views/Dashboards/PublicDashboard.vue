@@ -126,7 +126,7 @@
           >
             <div
               v-for="variable in publicVariables"
-              :key="variable.label"
+              :key="variable.key"
               class="max-w-[40rem] min-w-37.5"
             >
               <OInput
@@ -290,9 +290,32 @@ const windowLabel = computed<I18nText | "">(() => {
   return t("dashboard.publicDashboard.window", { start: fmt(startMs), end: fmt(endMs) });
 });
 
-const publicVariables = computed<Array<{ label: string; value: unknown }>>(() =>
-  Array.isArray(config.value?.variables) ? config.value.variables : [],
-);
+/** A frozen value as the public config lists it; scoped ones name their tab or panel. */
+type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id?: string };
+
+// Global values, plus those scoped to the open tab or to a panel on it, as the live page shows.
+const publicVariables = computed<Array<{ key: string; label: string; value: unknown }>>(() => {
+  const all: PublicVariable[] = Array.isArray(config.value?.variables)
+    ? config.value.variables
+    : [];
+  const tab = tabs.value.find((t) => t.tabId === selectedTabId.value);
+  const panelTitle = (id: string) =>
+    (tab?.panels ?? []).find((p: { id: string }) => p.id === id)?.title as string | undefined;
+  return all.flatMap((v) => {
+    if (v.tab_id) {
+      return v.tab_id === selectedTabId.value
+        ? [{ key: `${v.label}.t.${v.tab_id}`, label: v.label, value: v.value }]
+        : [];
+    }
+    if (v.panel_id) {
+      const title = panelTitle(v.panel_id);
+      return title === undefined
+        ? []
+        : [{ key: `${v.label}.p.${v.panel_id}`, label: `${title} · ${v.label}`, value: v.value }];
+    }
+    return [{ key: v.label, label: v.label, value: v.value }];
+  });
+});
 
 // A variable missing from the capture falls back to its live default server-side, so empty means unset.
 const variableValue = (value: unknown): string => {

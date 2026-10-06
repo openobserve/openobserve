@@ -277,6 +277,42 @@ describe("PublicDashboard viewer", () => {
     expect(fixed.findComponent(ODropdown).exists()).toBe(false);
   });
 
+  it("shows global values, the open tab's, and those of panels on it", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...CONFIG,
+        variables: [
+          { label: "env", value: "prod" },
+          { label: "svc", value: "api", tab_id: "t1" },
+          { label: "svc", value: "web", tab_id: "t2" },
+          { label: "pod", value: "a", panel_id: "p1" },
+          { label: "pod", value: "b", panel_id: "p9" },
+        ],
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "ok" }, data: [] } } },
+    } as never);
+    const w = shallowMount(PublicDashboard, {
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: { RenderDashboardCharts: { template: "<div><slot name='before_panels' /></div>" } },
+      },
+    });
+    await flushPromises();
+    const chips = w
+      .findAllComponents({ name: "OInput" })
+      .map((i) => [i.props("label"), i.props("modelValue")]);
+    expect(chips).toEqual([
+      ["env", "prod"],
+      ["svc", "api"],
+      ["Panel 1 · pod", "a"],
+    ]);
+  });
+
   it("passes frozen variables to the grid as a read-only row", async () => {
     (service.getConfig as any).mockResolvedValue({
       data: { ...CONFIG, variables: [{ label: "Namespace", value: "ziox" }] },

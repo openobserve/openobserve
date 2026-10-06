@@ -18,6 +18,8 @@
 //! preset for the anonymous plane to point-read. The anonymous plane never runs
 //! a query — all query execution lives here, in a trusted background job.
 
+mod variables;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use config::{
@@ -40,7 +42,7 @@ use config::{
 use infra::table::{
     dashboards, entity::public_dashboards::Model as PublicDashboard, public_dashboards as pd_table,
 };
-use regex::Regex;
+use variables::{PanelVars, QueryVars};
 
 const REBUILD_STATE_OK: i32 = 1;
 const REBUILD_STATE_ERROR: i32 = 2;
@@ -90,7 +92,15 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let vars = parse_frozen_vars(pd.frozen_variables.as_deref());
+    let scrape = db::organization::get_org_setting(&pd.org_id)
+        .await
+        .ok()
+        .map(|s| f64::from(s.scrape_interval));
+    let vars = QueryVars::new(
+        &dash,
+        parse_frozen_vars(pd.frozen_variables.as_deref()),
+        scrape,
+    );
     let mut authorized: BTreeSet<String> = BTreeSet::new();
     let mut unauthorized: BTreeSet<String> = BTreeSet::new();
 
@@ -159,7 +169,7 @@ async fn build_panels(
     org: &str,
     publisher: &str,
     dash: &Dashboard,
-    vars: &BTreeMap<String, serde_json::Value>,
+    vars: &QueryVars,
     start: i64,
     end: i64,
     authorized: &mut BTreeSet<String>,
@@ -169,7 +179,13 @@ async fn build_panels(
     let Some(v8) = dash.v8.as_ref() else {
         return out;
     };
-    for panel in v8.tabs.iter().flat_map(|tab| &tab.panels) {
+    // Collected up front: an iterator adapter held across the awaits below isn't Send.
+    let panels: Vec<_> = v8
+        .tabs
+        .iter()
+        .flat_map(|tab| tab.panels.iter().map(move |panel| (tab, panel)))
+        .collect();
+    for (tab, panel) in panels {
         // A custom chart runs the author's JavaScript in the viewer's origin, so it is never
         // public.
         if panel.typ == "custom_chart" {
@@ -184,6 +200,7 @@ async fn build_panels(
             continue;
         }
         let is_promql = panel.query_type == "promql";
+        let panel_vars = vars.for_panel(&tab.tab_id, &panel.id);
         let mut results = Vec::with_capacity(panel.queries.len());
         let mut failure = None;
         for q in &panel.queries {
@@ -192,7 +209,7 @@ async fn build_panels(
                 publisher,
                 &panel.query_type,
                 q,
-                vars,
+                &panel_vars,
                 start,
                 end,
                 authorized,
@@ -275,7 +292,7 @@ async fn run_query(
     publisher: &str,
     query_type: &str,
     q: &config::meta::dashboards::v8::Query,
-    vars: &BTreeMap<String, serde_json::Value>,
+    vars: &PanelVars,
     start: i64,
     end: i64,
     authorized: &mut BTreeSet<String>,
@@ -314,7 +331,7 @@ async fn run_sql(
     org: &str,
     publisher: &str,
     q: &config::meta::dashboards::v8::Query,
-    vars: &BTreeMap<String, serde_json::Value>,
+    vars: &PanelVars,
     start: i64,
     end: i64,
     authorized: &mut BTreeSet<String>,
@@ -323,23 +340,11 @@ async fn run_sql(
     let Some(sql_tmpl) = q.query.as_ref() else {
         return Err("no_query".to_string());
     };
-    let sql = substitute_vars(sql_tmpl, vars);
+    let sql = vars.substitute(sql_tmpl, "sql", start, end);
     let stream_type = q.fields.stream_type;
     authorize_query(org, publisher, "sql", &sql, q, authorized, unauthorized).await?;
 
-    let req = search::Request {
-        query: search::Query {
-            sql,
-            start_time: start,
-            end_time: end,
-            // Same as the live panel loader; the default (10) truncated every panel's result.
-            size: -1,
-            track_total_hits: false,
-            ..Default::default()
-        },
-        use_cache: false,
-        ..Default::default()
-    };
+    let req = sql_request(sql, start, end, q.vrl_function_query.as_deref());
     match search_service::search(
         &config::ider::generate_trace_id(),
         org,
@@ -378,7 +383,7 @@ async fn run_promql(
     org: &str,
     publisher: &str,
     q: &config::meta::dashboards::v8::Query,
-    vars: &BTreeMap<String, serde_json::Value>,
+    vars: &PanelVars,
     start: i64,
     end: i64,
     authorized: &mut BTreeSet<String>,
@@ -387,10 +392,7 @@ async fn run_promql(
     let Some(expr_tmpl) = q.query.as_ref() else {
         return Err("no_query".to_string());
     };
-    let expr = substitute_vars(
-        &substitute_vars(expr_tmpl, &promql_fixed_vars(start, end)),
-        vars,
-    );
+    let expr = vars.substitute(expr_tmpl, "promql", start, end);
     authorize_query(org, publisher, "promql", &expr, q, authorized, unauthorized).await?;
 
     let step = ((end - start) / 400).max(1_000_000);
@@ -436,79 +438,25 @@ async fn run_promql(
     }
 }
 
-/// The Grafana-style `$__interval`/`$__range`/`$__rate_interval` family, so a
-/// PromQL panel that uses them still parses. Values are range-derived (no chart
-/// width server-side), approximating the client's `replaceQueryValue`.
-fn promql_fixed_vars(start: i64, end: i64) -> BTreeMap<String, serde_json::Value> {
-    let range_secs = ((end - start) / 1_000_000).max(1);
-    let scrape = 15i64;
-    let step_secs = (range_secs / 400).max(scrape);
-    let rate = (4 * scrape).max(step_secs + scrape);
-    let mut m = BTreeMap::new();
-    m.insert(
-        "__interval".to_string(),
-        serde_json::json!(format!("{step_secs}s")),
-    );
-    m.insert(
-        "__interval_ms".to_string(),
-        serde_json::json!(format!("{}ms", step_secs * 1000)),
-    );
-    m.insert(
-        "__rate_interval".to_string(),
-        serde_json::json!(format!("{rate}s")),
-    );
-    m.insert(
-        "__percentile_interval".to_string(),
-        serde_json::json!(format!("{rate}s")),
-    );
-    m.insert(
-        "__range".to_string(),
-        serde_json::json!(format!("{range_secs}s")),
-    );
-    m.insert(
-        "__range_s".to_string(),
-        serde_json::json!(range_secs.to_string()),
-    );
-    m.insert(
-        "__range_ms".to_string(),
-        serde_json::json!((range_secs * 1000).to_string()),
-    );
-    m
-}
-
-/// Substitute captured variables into a saved query. Handles the three dashboard
-/// syntaxes (`$name`, `${name}`, `{{name}}`); the bare form is boundary-anchored
-/// so `$env` never clobbers `$environment`. List values join comma-separated.
-fn substitute_vars(query: &str, vars: &BTreeMap<String, serde_json::Value>) -> String {
-    let mut out = query.to_string();
-    for (name, value) in vars {
-        out = replace_var(out, name, &var_value_to_string(value));
-    }
-    out
-}
-
-fn replace_var(input: String, name: &str, value: &str) -> String {
-    let out = input
-        .replace(&format!("${{{name}}}"), value)
-        .replace(&format!("{{{{{name}}}}}"), value);
-    // `\b` (the regex crate has no lookahead) anchors the right edge so `$env`
-    // never eats the prefix of `$environment`.
-    match Regex::new(&format!(r"\${}\b", regex::escape(name))) {
-        Ok(re) => re.replace_all(&out, regex::NoExpand(value)).into_owned(),
-        Err(_) => out,
-    }
-}
-
-fn var_value_to_string(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Null => String::new(),
-        serde_json::Value::Array(arr) => arr
-            .iter()
-            .map(var_value_to_string)
-            .collect::<Vec<_>>()
-            .join(","),
-        other => other.to_string(),
+/// The search a SQL panel query runs, with the panel's VRL function applied as on the live panel.
+fn sql_request(sql: String, start: i64, end: i64, vrl: Option<&str>) -> search::Request {
+    search::Request {
+        query: search::Query {
+            sql,
+            start_time: start,
+            end_time: end,
+            // Same as the live panel loader; the default (10) truncated every panel's result.
+            size: -1,
+            track_total_hits: false,
+            // Stored as plain text; search() expects it decoded, unlike the HTTP API.
+            query_fn: vrl
+                .map(str::trim)
+                .filter(|f| !f.is_empty())
+                .map(str::to_string),
+            ..Default::default()
+        },
+        use_cache: false,
+        ..Default::default()
     }
 }
 
@@ -1024,13 +972,6 @@ mod tests {
 
     use super::*;
 
-    fn vars(pairs: &[(&str, serde_json::Value)]) -> BTreeMap<String, serde_json::Value> {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.clone()))
-            .collect()
-    }
-
     #[test]
     fn expiry_must_be_in_the_future() {
         assert!(check_expiry(None, 100).is_ok());
@@ -1053,69 +994,24 @@ mod tests {
     }
 
     #[test]
-    fn substitutes_all_three_syntaxes() {
-        let v = vars(&[("svc", json!("api"))]);
-        assert_eq!(
-            substitute_vars("a=$svc b=${svc} c={{svc}}", &v),
-            "a=api b=api c=api"
+    fn sql_request_carries_the_panel_vrl_function() {
+        let req = sql_request("SELECT 1".to_string(), 10, 20, Some("  del(.email)\n "));
+        assert_eq!(req.query.query_fn.as_deref(), Some("del(.email)"));
+        assert_eq!((req.query.start_time, req.query.end_time), (10, 20));
+        assert_eq!(req.query.size, -1);
+        assert!(!req.use_cache);
+        assert!(
+            sql_request("SELECT 1".to_string(), 0, 1, None)
+                .query
+                .query_fn
+                .is_none()
         );
-    }
-
-    #[test]
-    fn bare_form_respects_word_boundary() {
-        let v = vars(&[("env", json!("prod"))]);
-        // $env must not eat the prefix of $environment.
-        assert_eq!(
-            substitute_vars("$env $environment", &v),
-            "prod $environment"
+        assert!(
+            sql_request("SELECT 1".to_string(), 0, 1, Some("  "))
+                .query
+                .query_fn
+                .is_none()
         );
-    }
-
-    #[test]
-    fn bracketed_form_is_not_affected_by_boundary() {
-        let v = vars(&[("env", json!("prod"))]);
-        assert_eq!(substitute_vars("${env}x ${env}", &v), "prodx prod");
-    }
-
-    #[test]
-    fn list_value_joins_comma_separated() {
-        let v = vars(&[("hosts", json!(["a", "b", "c"]))]);
-        assert_eq!(substitute_vars("in (${hosts})", &v), "in (a,b,c)");
-    }
-
-    #[test]
-    fn dollar_in_value_is_literal_not_capture_reference() {
-        // NoExpand: a `$1` inside the replacement must stay literal.
-        let v = vars(&[("x", json!("a$1b"))]);
-        assert_eq!(substitute_vars("k=$x", &v), "k=a$1b");
-    }
-
-    #[test]
-    fn missing_variable_is_left_untouched() {
-        let v = vars(&[("a", json!("1"))]);
-        assert_eq!(
-            substitute_vars("$b + ${c} + {{d}}", &v),
-            "$b + ${c} + {{d}}"
-        );
-    }
-
-    #[test]
-    fn empty_vars_returns_query_unchanged() {
-        let v = BTreeMap::new();
-        assert_eq!(
-            substitute_vars("select * from t where a=$x", &v),
-            "select * from t where a=$x"
-        );
-    }
-
-    #[test]
-    fn var_value_to_string_covers_scalar_null_and_list() {
-        assert_eq!(var_value_to_string(&json!("s")), "s");
-        assert_eq!(var_value_to_string(&json!(42)), "42");
-        assert_eq!(var_value_to_string(&json!(true)), "true");
-        assert_eq!(var_value_to_string(&serde_json::Value::Null), "");
-        assert_eq!(var_value_to_string(&json!(["a", "b"])), "a,b");
-        assert_eq!(var_value_to_string(&json!([1, 2])), "1,2");
     }
 
     #[test]
@@ -1132,32 +1028,6 @@ mod tests {
         assert_eq!(m.get("a").unwrap(), &json!("b"));
         assert!(parse_frozen_vars(Some("garbage")).is_empty());
         assert!(parse_frozen_vars(None).is_empty());
-    }
-
-    #[test]
-    fn promql_fixed_vars_has_full_family_as_durations() {
-        let m = promql_fixed_vars(0, 3600 * 1_000_000);
-        for k in [
-            "__interval",
-            "__interval_ms",
-            "__rate_interval",
-            "__percentile_interval",
-            "__range",
-            "__range_s",
-            "__range_ms",
-        ] {
-            assert!(m.contains_key(k), "missing {k}");
-        }
-        assert!(m["__interval"].as_str().unwrap().ends_with('s'));
-    }
-
-    #[test]
-    fn promql_fixed_vars_short_range_floors_step_to_scrape() {
-        // A 200s range (< 400 * scrape) floors the step to the 15s scrape interval.
-        let m = promql_fixed_vars(0, 200 * 1_000_000);
-        assert_eq!(m["__interval"], json!("15s"));
-        assert_eq!(m["__range_s"], json!("200"));
-        assert_eq!(m["__range_ms"], json!("200000"));
     }
 
     fn names(streams: Vec<(String, StreamType)>) -> Vec<String> {
