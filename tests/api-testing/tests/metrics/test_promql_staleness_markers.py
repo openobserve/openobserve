@@ -149,3 +149,44 @@ def test_range_functions_ignore_the_marker(create_session, base_url, org_id, sta
                                    "time": str(at[8])})
     assert q.status_code == 200, f"instant query failed: {q.status_code} {q.text[:300]}"
     assert float(q.json()["data"]["result"][0]["value"][1]) == 6, "the marker must not count as a sample"
+
+
+def _schema_fields(session, base_url, org_id, metric):
+    r = session.get(f"{base_url}api/{org_id}/streams/{metric}/schema?type=metrics")
+    if r.status_code != 200:
+        return {}
+    return {f["name"]: f["type"] for f in r.json().get("schema", [])}
+
+
+def test_sql_aggregates_skip_the_marker(create_session, base_url, org_id, stale_metric):
+    metric, at = stale_metric
+    sql = (f'SELECT avg(value) AS a, sum(value) AS s, count(value) AS c, count(*) AS n '
+           f'FROM "{metric}" WHERE instance = \'a\'')
+    body = {"query": {"sql": sql, "start_time": (at[0] - 60) * 10**6,
+                      "end_time": (at[20] + 60) * 10**6, "size": 10}}
+
+    def marker_row_stored():
+        r = create_session.post(f"{base_url}api/{org_id}/_search?type=metrics", json=body)
+        hits = r.json().get("hits", []) if r.status_code == 200 else []
+        return hits[0] if hits and hits[0]["n"] == 7 else None
+
+    row = wait_until(marker_row_stored, timeout=120, interval=2, msg="the marker row was never stored")
+    # the marker is a visible row with a NULL value, which every aggregate over `value` skips
+    assert (row["a"], row["s"], row["c"]) == (2.5, 15, 6)
+
+
+def test_stale_only_first_batch_creates_no_stream(create_session, base_url, org_id):
+    session = create_session
+    metric = f"pytest_stale_first_{uuid.uuid4().hex[:8]}"
+    t0 = (int(time.time()) // 60) * 60 - 30 * 60
+    labels = {"__name__": metric, "job": "pytest", "instance": "a"}
+
+    _remote_write(session, base_url, org_id, [(labels, [(t0 * 1000, STALE_NAN)])])
+    try:
+        assert not _schema_fields(session, base_url, org_id, metric), "markers alone created a schema"
+        _remote_write(session, base_url, org_id, [(labels, [((t0 + 15) * 1000, 1.0)])])
+        fields = wait_until(lambda: _schema_fields(session, base_url, org_id, metric), timeout=60,
+                            interval=2, msg=f"{metric} never got a schema from its real sample")
+        assert fields.get("value") == "Float64", f"value must be Float64, got {fields}"
+    finally:
+        session.delete(f"{base_url}api/{org_id}/streams/{metric}?type=metrics")
