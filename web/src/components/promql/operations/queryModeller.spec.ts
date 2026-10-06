@@ -725,6 +725,19 @@ describe("QueryModeller", () => {
     });
   });
 
+  describe("a zero quantile", () => {
+    it("is rendered, not replaced by the default", () => {
+      const render = (operations: { id: string; params: any[] }[]) =>
+        promqlRenderer.renderQuery({ metric: "x", labels: [], operations });
+      expect(render([{ id: PromqlStepId.HistogramQuantile, params: [0] }])).toBe(
+        "histogram_quantile(0, x{})",
+      );
+      expect(render([{ id: PromqlStepId.QuantileOverTime, params: [0, "5m"] }])).toBe(
+        "quantile_over_time(0, x{}[5m])",
+      );
+    });
+  });
+
   describe("clamp_max and clamp_min", () => {
     it("render their bound", () => {
       const render = (id: string, value: number) =>

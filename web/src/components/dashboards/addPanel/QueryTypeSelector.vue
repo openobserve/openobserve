@@ -216,18 +216,16 @@ export default defineComponent({
       // }
     };
 
-    // Code -> builder keeps the user's text: it switches only if the builder can show it.
     const switchPromqlCodeToBuilder = async () => {
       const index = dashboardPanelData.layout.currentQueryIndex;
       const slot = dashboardPanelData.data.queries[index];
-      const mapped = await promqlToBuilder(
-        store.state.selectedOrganization?.identifier,
-        slot.query,
-      );
-      // The user moved to another tab while this parsed; the result is for a tab no longer shown.
+      const text = slot.query;
+      const mapped = await promqlToBuilder(store.state.selectedOrganization?.identifier, text);
+      // The user moved tab or edited the code while this parsed; the result describes neither.
       if (
         dashboardPanelData.layout.currentQueryIndex !== index ||
-        dashboardPanelData.data.queries[index] !== slot
+        dashboardPanelData.data.queries[index] !== slot ||
+        slot.query !== text
       ) {
         return;
       }

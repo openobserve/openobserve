@@ -171,6 +171,23 @@ describe("QueryTypeSelector code to builder", () => {
     expect(data.meta.errors.queryErrors).toEqual([]);
   });
 
+  it("discards the result if the user edited the code while it was parsing", async () => {
+    let resolve!: (value: any) => void;
+    parsePromqlQuery.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    parsePromqlQuery.mockResolvedValue({ data: { data: TREE } });
+    const data = mountWith(TEXT);
+
+    const pending = wrapper.vm.onUpdateBuilderMode("builder");
+    data.data.queries[0].query = "up";
+    resolve({ data: { data: TREE } });
+    await pending;
+    await flushPromises();
+
+    expect(data.data.queries[0].customQuery).toBe(true);
+    expect(data.data.queries[0].query).toBe("up");
+    expect(data.data.queries[0].fields.promql_operations).toEqual([]);
+  });
+
   it("stays in code mode with the parser's message for a query that does not parse", async () => {
     parsePromqlQuery.mockRejectedValue({
       response: { data: { error: "unclosed left parenthesis" } },

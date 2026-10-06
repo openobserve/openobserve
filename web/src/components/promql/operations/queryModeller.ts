@@ -25,7 +25,6 @@ import {
 } from "../types";
 import { buildPromqlStepCatalog } from "./index";
 
-/** PromQL binding strength of each scalar-math step's operator. */
 const SCALAR_PRECEDENCE: Partial<Record<string, number>> = {
   [PromqlStepId.Addition]: 1,
   [PromqlStepId.Subtraction]: 1,
@@ -83,7 +82,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
     // Handle quantile_over_time first (special case with 2 params)
     if (id === PromqlStepId.QuantileOverTime) {
-      const quantile = params[0] || 0.95;
+      const quantile = params[0] ?? 0.95;
       const range = params[1] || "$__interval";
       return `${id}(${quantile}, ${innerExpr}[${range}])`;
     }
@@ -139,7 +138,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
     // Handle histogram_quantile
     if (id === PromqlStepId.HistogramQuantile) {
-      const quantile = params[0] || 0.95;
+      const quantile = params[0] ?? 0.95;
       return `${id}(${quantile}, ${innerExpr})`;
     }
 

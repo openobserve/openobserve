@@ -1318,29 +1318,6 @@ pub async fn format_query_post(
     format_query(query)
 }
 
-fn format_query(query: &str) -> Response {
-    let expr = match promql_parser::parser::parse(query) {
-        Ok(expr) => expr,
-        Err(err) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
-                    err, None,
-                )),
-            )
-                .into_response();
-        }
-    };
-    (
-        StatusCode::OK,
-        axum::Json(config::meta::promql::ApiFuncResponse::ok(
-            expr.prettify(),
-            None,
-        )),
-    )
-        .into_response()
-}
-
 /// PromQL as a small JSON tree, for the visual builder to read a hand-written query.
 #[utoipa::path(
     post,
@@ -1386,6 +1363,29 @@ pub async fn parse_tree(
         )
             .into_response(),
     }
+}
+
+fn format_query(query: &str) -> Response {
+    let expr = match promql_parser::parser::parse(query) {
+        Ok(expr) => expr,
+        Err(err) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    err, None,
+                )),
+            )
+                .into_response();
+        }
+    };
+    (
+        StatusCode::OK,
+        axum::Json(config::meta::promql::ApiFuncResponse::ok(
+            expr.prettify(),
+            None,
+        )),
+    )
+        .into_response()
 }
 
 fn search_timeout(timeout: Option<String>) -> i64 {

@@ -95,6 +95,22 @@ describe("treeToBuilder", () => {
     expect(ok(call("abs", sel("x"))).operations).toEqual([{ id: "abs", params: [] }]);
   });
 
+  it("maps an aggregate times a constant", () => {
+    const tree = bin(
+      "*",
+      agg("avg", sel("node_load1", [{ label: "job", op: "=", value: "node" }]), ["instance"]),
+      num(100),
+    );
+    const query = ok(tree);
+    expect(query.operations).toEqual([
+      { id: "avg", params: [["instance"]] },
+      { id: "scalar_multiply", params: [100] },
+    ]);
+    expect(promqlRenderer.renderQuery(query)).toBe(
+      'avg by (instance) (node_load1{job="node"}) * 100',
+    );
+  });
+
   it("looks through parentheses", () => {
     expect(ok(bin("*", paren(bin("+", sel("x"), num(1))), num(2))).operations).toEqual([
       { id: "scalar_add", params: [1] },
@@ -155,8 +171,7 @@ describe("promqlToBuilder", () => {
     const result = await promqlToBuilder("org", TEXT);
     expect(result.ok).toBe(true);
     expect(parsePromqlQuery).toHaveBeenNthCalledWith(1, { org_identifier: "org", query: TEXT });
-    const rendered = parsePromqlQuery.mock.calls[1][0].query;
-    expect(rendered).toBe(promqlRenderer.renderQuery((result as any).query));
+    expect(parsePromqlQuery.mock.calls[1][0].query).toBe("sum by (job) (rate(x{}[5m]))");
   });
 
   it("refuses when the rendering parses to a different tree", async () => {

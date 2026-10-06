@@ -25,7 +25,6 @@ import {
   type PromqlStep,
 } from "./types";
 
-/** A node of the backend's `parse_tree` response. */
 export type PromqlTree = { type: string; [key: string]: any };
 
 export type BuilderMapping =
