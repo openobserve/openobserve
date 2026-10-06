@@ -41,6 +41,7 @@ describe("promqlPanelSchema", () => {
     ]);
     expect(schema.queries[1].config.promql_legend).toBe("Allocatable");
     expect(schema.config.mark_line).toEqual([]);
+    expect(schema.config.y_axis_max).toBeNull();
   });
 
   it("draws allocatable as a horizontal mark line", () => {
@@ -52,6 +53,8 @@ describe("promqlPanelSchema", () => {
       markLines: [{ value: 8, name: "Allocatable" }],
     });
     expect(schema.config.mark_line).toEqual([{ type: "yAxis", value: 8, name: "Allocatable" }]);
+    // The axis must reach the line, as Lens's suggestedMax does, or it is drawn off the chart.
+    expect(schema.config.y_axis_max).toBe(8);
     expect(schema.config.unit).toBe("bytes");
   });
 });

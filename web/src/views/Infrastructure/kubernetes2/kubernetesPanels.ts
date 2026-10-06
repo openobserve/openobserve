@@ -57,6 +57,8 @@ export function promqlPanelSchema(args: PanelArgs): Record<string, any> {
         value: m.value,
         name: m.name,
       })),
+      // The engine takes max(y_axis_max, data), so a line above the data is still on the chart.
+      y_axis_max: args.markLines?.length ? Math.max(...args.markLines.map((m) => m.value)) : null,
     },
     queryType: "promql",
     queries: args.queries.map((q) => ({
