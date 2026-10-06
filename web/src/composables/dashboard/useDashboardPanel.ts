@@ -236,6 +236,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     (newQueryType) => {
       if (newQueryType === "promql") {
         dashboardPanelData.layout.vrlFunctionToggle = false;
+      } else {
+        // A formula is PromQL-only; outside PromQL it would hide the query text from the editor.
+        dashboardPanelData.data.queries.forEach((query: any) => {
+          if (query?.config && "formula" in query.config) delete query.config.formula;
+        });
       }
     },
   );

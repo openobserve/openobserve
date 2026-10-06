@@ -629,7 +629,7 @@ export default defineComponent({
       );
     });
 
-    // Letters and hide flags are stored per query; legacy panels get both on load.
+    // Gives letterless PromQL queries a letter and mirrors config.hide into layout.hiddenQueries.
     watch(
       () => [
         promqlMode.value,

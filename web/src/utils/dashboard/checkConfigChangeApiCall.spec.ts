@@ -16,14 +16,29 @@
 import { describe, it, expect } from "vitest";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "./checkConfigChangeApiCall";
 
-const panel = (config: any) => ({ queries: [{ query: "up", config }] });
+const panel = (config: any, queryType = "promql") => ({
+  queryType,
+  queries: [{ query: "up", config }],
+});
 
 describe("checkIfConfigChangeRequiredApiCallOrNot", () => {
   it("needs no API call when only a query letter is assigned", () => {
     expect(checkIfConfigChangeRequiredApiCallOrNot(panel({}), panel({ ref: "A" }))).toBe(false);
   });
 
-  it("needs an API call when a query is hidden, since hidden queries are not sent", () => {
-    expect(checkIfConfigChangeRequiredApiCallOrNot(panel({}), panel({ hide: true }))).toBe(true);
+  it("needs no API call to hide a query, whose data is already loaded", () => {
+    expect(checkIfConfigChangeRequiredApiCallOrNot(panel({}), panel({ hide: true }))).toBe(false);
+  });
+
+  it("needs an API call to show a hidden PromQL query, which was never sent", () => {
+    expect(
+      checkIfConfigChangeRequiredApiCallOrNot(panel({ hide: true }), panel({ hide: false })),
+    ).toBe(true);
+  });
+
+  it("needs no API call to show a hidden SQL query, which still ran", () => {
+    expect(
+      checkIfConfigChangeRequiredApiCallOrNot(panel({ hide: true }, "sql"), panel({}, "sql")),
+    ).toBe(false);
   });
 });

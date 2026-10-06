@@ -132,7 +132,9 @@ export const substituteFormula = (
   let expr = "";
   let last = 0;
   for (const pos of positions) {
-    expr += `${formula.slice(last, pos)}(${inputsByLetter[formula[pos]]})`;
+    const text = inputsByLetter[formula[pos]] as string;
+    // A trailing `#` comment in the input would otherwise swallow the closing parenthesis.
+    expr += `${formula.slice(last, pos)}(${text}${text.includes("#") ? "\n" : ""})`;
     last = pos + 1;
   }
   return { expr: expr + formula.slice(last) };

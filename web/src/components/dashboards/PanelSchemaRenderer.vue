@@ -603,13 +603,13 @@ export default defineComponent({
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
-    // Saved hide flags apply everywhere; the editor's unapplied toggles add to them.
+    // The editor's live toggles win in the editor; elsewhere the saved hide flags apply.
     const hiddenQueries = computed((): number[] => {
-      const saved = (panelSchema.value?.queries ?? []).flatMap((query: any, i: number) =>
+      if (dashboardPanelDataForHiding)
+        return dashboardPanelDataForHiding.layout?.hiddenQueries || [];
+      return (panelSchema.value?.queries ?? []).flatMap((query: any, i: number) =>
         query?.config?.hide ? [i] : [],
       );
-      const editor: number[] = dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
-      return [...new Set([...saved, ...editor])];
     });
 
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config

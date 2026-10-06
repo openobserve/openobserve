@@ -34,6 +34,10 @@ const flattenObject = (obj: any, prefix = ""): Record<string, any> => {
   }, {});
 };
 
+// Hiding never needs a run; showing a hidden PromQL query does, since it was never sent.
+const isUnhiddenPromQL = (newConfig: any, key: string): boolean =>
+  newConfig?.queryType === "promql" && !flattenObject(newConfig)[key];
+
 /**
  * Gets changed keys between two objects
  */
@@ -71,9 +75,9 @@ export const checkIfConfigChangeRequiredApiCallOrNot = (
     return !IGNORED_QUERY_KEYS.has(leafKey);
   });
 
-  const configNeedsApiCall = meaningfulChanges.some((key) =>
-    Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)),
-  );
+  const configNeedsApiCall = meaningfulChanges
+    .filter((key) => !key.endsWith(".hide") || isUnhiddenPromQL(newConfig, key))
+    .some((key) => Array.from(API_REQUIRING_CHANGES).some((apiKey) => key.startsWith(apiKey)));
 
   return configNeedsApiCall;
 };

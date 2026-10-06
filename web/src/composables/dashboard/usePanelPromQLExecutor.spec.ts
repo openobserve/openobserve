@@ -853,6 +853,38 @@ describe("formulas and hidden queries", () => {
     expect(state.metadata.queries[2].panelQueryIndex).toBe(1);
   });
 
+  it("applies ad-hoc filters to the inputs but not to the formula text", async () => {
+    const panelSchema = makePanelSchema([
+      { query: "up", config: { ref: "A", hide: true } },
+      { query: "", config: { formula: "A * $factor" } },
+    ]);
+    const made = makeCtx({ panelSchema });
+    made.ctx.replaceQueryValue = vi.fn((q: string) => ({
+      query: q.replace("$factor", "3"),
+      metadata: [],
+    }));
+    made.ctx.applyDynamicVariables = vi.fn(async (q: string) => ({
+      query: `${q}{env="prod"}`,
+      metadata: [],
+    }));
+    await usePanelPromQLExecutor(made.ctx as any).executePromQL(0, 300_000_000, null);
+
+    const sent = (made.fetchQueryDataWithHttpStream as any).mock.calls.map(
+      (c: any) => c[0].queryReq.query,
+    );
+    expect(sent).toEqual(['(up{env="prod"}) * 3']);
+  });
+
+  it("marks queries that were not sent, so exemplars skip them", async () => {
+    const { state } = await run([
+      { query: "x", config: { ref: "A", hide: true } },
+      { query: "y", config: { ref: "B" } },
+      { query: "", config: { formula: "A / C" } },
+    ]);
+
+    expect(state.metadata.queries.map((m: any) => !!m.notSent)).toEqual([true, false, true]);
+  });
+
   it("does not time-shift a hidden query", async () => {
     const { payloads } = await run([
       { query: "x", config: { ref: "A", hide: true, time_shift: [{ offSet: "1d" }] } },

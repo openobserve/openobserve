@@ -114,6 +114,12 @@ describe("substituteFormula", () => {
     });
   });
 
+  it("keeps an input ending in a comment from swallowing its closing parenthesis", () => {
+    expect(substituteFormula("A * 2", { A: "up # note" })).toEqual({
+      expr: "(up # note\n) * 2",
+    });
+  });
+
   it("reports an unknown letter", () => {
     expect(substituteFormula("A / B", { A: "up" })).toEqual({
       error: "B is not a query in this panel",
@@ -162,14 +168,12 @@ describe("queryRefs", () => {
 });
 
 describe("formulaInputs", () => {
-  it("embeds an instant-configured input verbatim in a range formula", () => {
-    const queries = [
-      { query: "up", config: { ref: "A", query_type: "instant" } },
-      { query: "", config: { formula: "A * 2", query_type: "range" } },
-    ];
-    const inputs = formulaInputs(queries, ["up_final", "A * 2"]);
-    expect(inputs).toEqual({ A: "up_final" });
-    expect(substituteFormula("A * 2", inputs)).toEqual({ expr: "(up_final) * 2" });
+  it("maps each input's letter to its final text", () => {
+    const queries = [{ config: { ref: "B" } }, { config: {} }, { config: { formula: "A * B" } }];
+    expect(formulaInputs(queries, ["b_final", "a_final", "A * B"])).toEqual({
+      B: "b_final",
+      A: "a_final",
+    });
   });
 
   it("maps a lettered formula to null", () => {

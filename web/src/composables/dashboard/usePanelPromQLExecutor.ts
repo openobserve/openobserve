@@ -95,13 +95,16 @@ export const usePanelPromQLExecutor = (ctx: {
     removeTraceId,
   } = ctx;
 
-  const resolveQueryText = async (text: string, startISOTimestamp: any, endISOTimestamp: any) => {
+  const resolveQueryText = async (query: any, startISOTimestamp: any, endISOTimestamp: any) => {
+    const isFormula = isFormulaQuery(query);
     const { query: query1, metadata: metadata1 } = replaceQueryValue(
-      text,
+      isFormula ? query.config.formula : query.query,
       startISOTimestamp,
       endISOTimestamp,
       panelSchema.value.queryType,
     );
+    // Ad-hoc filters reach a formula through its inputs; on the formula text they break the parse.
+    if (isFormula) return { query: query1, variables: metadata1 || [] };
     const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
       query1,
       panelSchema.value.queryType,
@@ -151,13 +154,7 @@ export const usePanelPromQLExecutor = (ctx: {
 
       const queries: any[] = panelSchema.value.queries;
       const resolved = await Promise.all(
-        queries.map((it) =>
-          resolveQueryText(
-            isFormulaQuery(it) ? it.config.formula : it.query,
-            startISOTimestamp,
-            endISOTimestamp,
-          ),
-        ),
+        queries.map((it) => resolveQueryText(it, startISOTimestamp, endISOTimestamp)),
       );
       const plans = planQueries(
         queries,
@@ -195,6 +192,7 @@ export const usePanelPromQLExecutor = (ctx: {
           tabName: queries[i].tabName,
           timeRangeGap: { seconds: 0, periodAsStr: "" },
           panelQueryIndex: i,
+          notSent: true,
         };
       });
       state.data = markRaw([...queryResults]);
