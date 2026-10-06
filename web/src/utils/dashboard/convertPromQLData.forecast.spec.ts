@@ -140,7 +140,7 @@ describe("forecast entries", () => {
     expect(named(result)[0]._timestamps).toBeUndefined();
   });
 
-  it("start at their primary's last drawn sample, on the fitted line rather than at that sample", async () => {
+  it("start each at its own primary's last drawn sample, on the fitted line rather than at that sample", async () => {
     const at = (values: Array<[number, string]>) => ({ values });
     const now = matrix(
       {
@@ -152,21 +152,28 @@ describe("forecast entries", () => {
       },
       { metric: { pod: "api-2" }, ...at([[NOW_S - STEP_S, "5"]]) },
     );
-    // The fit rises one per step from 10 at the range end, so it was 8 two steps before.
-    const fit = matrix({
-      metric: { pod: "api-1" },
-      values: grid(NOW_S, 3).map((t, k) => [t, String(10 + k)]),
-    });
+    // api-1's fit rises one per step from 10 at the range end; api-2's falls one per step from 20.
+    const fit = matrix(
+      { metric: { pod: "api-1" }, values: grid(NOW_S, 3).map((t, k) => [t, String(10 + k)]) },
+      { metric: { pod: "api-2" }, values: grid(NOW_S, 3).map((t, k) => [t, String(20 - k)]) },
+    );
     const result = await convert([now, fit]);
-    const twin = named(result).find((s: any) => s.name === "api-1 (forecast)");
-    const valueAt = (t: number) => twin.data[twin._timestamps.indexOf(t)][1];
+    const twinOf = (pod: string) => named(result).find((s: any) => s.name === `${pod} (forecast)`);
+    const valueAt = (twin: any, t: number) => twin.data[twin._timestamps.indexOf(t)][1];
 
-    expect(valueAt(START_S)).toBeNull();
-    expect(Number(valueAt(START_S + STEP_S))).toBeCloseTo(8);
-    expect(Number(valueAt(NOW_S - STEP_S))).toBeCloseTo(9);
-    expect(valueAt(NOW_S)).toBe("10");
-    expect(twin._fitStartIndex).toBe(twin._timestamps.indexOf(NOW_S));
-    expect(twin._rangeEndValue).toBe(2);
+    const one = twinOf("api-1");
+    expect(valueAt(one, START_S)).toBeNull();
+    expect(Number(valueAt(one, START_S + STEP_S))).toBeCloseTo(8);
+    expect(Number(valueAt(one, NOW_S - STEP_S))).toBeCloseTo(9);
+    expect(valueAt(one, NOW_S)).toBe("10");
+    expect(one._fitStartIndex).toBe(one._timestamps.indexOf(NOW_S));
+    expect(one._rangeEndValue).toBe(2);
+
+    const two = twinOf("api-2");
+    expect(valueAt(two, START_S + STEP_S)).toBeNull();
+    expect(Number(valueAt(two, NOW_S - STEP_S))).toBeCloseTo(21);
+    expect(valueAt(two, NOW_S)).toBe("20");
+    expect(two._rangeEndValue).toBe(5);
   });
 
   it("label their points fitted in the tooltip", async () => {

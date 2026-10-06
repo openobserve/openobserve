@@ -383,6 +383,35 @@ describe("MetricChartTile", () => {
       );
     });
 
+    it("on a switch to another label, drops the first label's fits and never draws them", async () => {
+      const A = "avg by (method) (x)";
+      const B = "avg by (route) (x)";
+      const fits: Array<{ expr: string; signal: AbortSignal; answer: () => void }> = [];
+      runQuery.mockImplementation((expr: string, signal: AbortSignal, opts: any) =>
+        isFit(opts)
+          ? new Promise((resolve) => fits.push({ expr, signal, answer: () => resolve(fit(expr)) }))
+          : Promise.resolve(SERIES),
+      );
+      wrapper = mountForecast({ queries: [{ expr: A }] });
+      await flushPromises();
+      const fitsOf = (expr: string) => fits.filter((call) => call.expr.includes(expr));
+      expect(fitsOf(A)).toHaveLength(2);
+
+      await wrapper.setProps({ queries: [{ expr: B }] });
+      await flushPromises();
+      expect(fitsOf(A).map((call) => call.signal.aborted)).toEqual([true, true]);
+      expect(fitsOf(B)).toHaveLength(2);
+
+      fitsOf(A).forEach((call) => call.answer());
+      await flushPromises();
+      expect(chart().props("queries")).toEqual([{ expr: B }]);
+      expect(chart().props("forecast")).toBeNull();
+
+      fitsOf(B).forEach((call) => call.answer());
+      await flushPromises();
+      expect(chart().props("forecast").entries).toHaveLength(1);
+    });
+
     it("cancels its fits when it unmounts", async () => {
       runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
         isFit(opts) ? new Promise(() => {}) : Promise.resolve(SERIES),

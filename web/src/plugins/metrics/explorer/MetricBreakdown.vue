@@ -548,7 +548,7 @@ export default defineComponent({
         (
           expr: string,
           signal: AbortSignal,
-          opts?: { maxSeries?: number; window?: QueryWindow },
+          opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
         ) => Promise<any>
       >,
       required: true,

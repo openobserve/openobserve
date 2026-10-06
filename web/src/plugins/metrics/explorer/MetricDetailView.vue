@@ -1148,7 +1148,7 @@ export default defineComponent({
     const runBreakdownQuery = (
       expr: string,
       signal: AbortSignal,
-      opts?: { maxSeries?: number; window?: QueryWindow },
+      opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
     ) => props.runQuery(expr, signal, undefined, opts);
 
     return {
