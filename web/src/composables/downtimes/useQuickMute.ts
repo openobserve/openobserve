@@ -40,8 +40,9 @@ export function useQuickMute() {
     selection: QuickMuteSelection[],
     endsAtMicros: number,
     reason?: string,
-    folderId: string = defaultFolder.folderId.value,
+    folder?: string,
   ): Promise<string | null> => {
+    const folderId = folder ?? (await defaultFolder.resolve());
     const count = selectionCount(selection);
     const startsAt = Date.now() * 1000;
     const body = buildQuickMuteRequest(

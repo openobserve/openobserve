@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed } from "vue";
-import { useQuery } from "@tanstack/vue-query";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { permittedFoldersQuery } from "@/services/common.queries";
 import {
@@ -27,6 +27,7 @@ import {
 export function useDefaultDowntimeFolder(options: { rememberLast?: boolean } = {}) {
   const { rememberLast = true } = options;
   const orgId = useOrgId();
+  const queryClient = useQueryClient();
   const folders = useQuery(() =>
     Object.assign(permittedFoldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
   );
@@ -43,5 +44,26 @@ export function useDefaultDowntimeFolder(options: { rememberLast?: boolean } = {
 
   const remember = (id: string) => rememberDowntimeFolder(orgId.value, id);
 
-  return { folderId, ready, remember };
+  /**
+   * The folder to file in, after the permitted list answered. A preset mute runs with no
+   * dialog, so it must not guess "default" while the list is still loading.
+   */
+  const resolve = async (): Promise<string> => {
+    let listed = folders.data.value;
+    if (listed === undefined && !folders.isError.value) {
+      try {
+        listed = await queryClient.ensureQueryData(
+          permittedFoldersQuery(orgId.value, "downtimes"),
+        );
+      } catch {
+        listed = undefined;
+      }
+    }
+    return preferredDowntimeFolder(
+      listed?.map((f) => f.folderId),
+      rememberLast ? readLastDowntimeFolder(orgId.value) : null,
+    );
+  };
+
+  return { folderId, ready, remember, resolve };
 }

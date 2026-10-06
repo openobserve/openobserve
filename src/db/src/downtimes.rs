@@ -101,14 +101,26 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     coordinator::watch_events(on_put, on_delete).await
 }
 
-/// Writes the folder ownership tuple of every cached row; rows created before the RBAC fix lack
-/// it, and OpenFGA ignores a tuple that already exists, so a rerun writes nothing new.
-pub async fn backfill_ownership() -> usize {
+/// Writes the folder ownership tuple of every cached row in one batched write; rows created
+/// before the RBAC fix lack it, and OpenFGA ignores a tuple that already exists, so a rerun
+/// writes nothing new. The error of the write is returned, so the caller sets its done flag
+/// only after every tuple landed.
+#[cfg(feature = "enterprise")]
+pub async fn backfill_ownership() -> Result<usize, anyhow::Error> {
     let tuples = ownership_backfill(&all_cached());
-    for (org, authz) in &tuples {
-        crate::authz::set_ownership(org, "downtimes", authz.clone()).await;
+    let writes: Vec<_> = tuples
+        .iter()
+        .flat_map(|(org, authz)| crate::authz::ownership_tuples(org, "downtimes", authz))
+        .collect();
+    if !writes.is_empty() {
+        o2_openfga::authorizer::authz::update_tuples(writes, vec![]).await?;
     }
-    tuples.len()
+    Ok(tuples.len())
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn backfill_ownership() -> Result<usize, anyhow::Error> {
+    Ok(ownership_backfill(&all_cached()).len())
 }
 
 /// The cached rows of an org; cheap to clone, never partial.

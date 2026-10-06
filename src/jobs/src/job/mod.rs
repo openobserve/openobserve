@@ -255,7 +255,27 @@ async fn backfill_downtime_ownership() {
     {
         return;
     }
-    let rows = db::downtimes::backfill_ownership().await;
+    // One node writes; the others find the flag on their next start. A single node is the leader.
+    let is_leader = infra::cluster::get_cached_online_nodes()
+        .await
+        .and_then(|mut nodes| {
+            nodes.sort_by_key(|n| n.id);
+            nodes.into_iter().next()
+        })
+        .map(|first| first.id == LOCAL_NODE.id)
+        .unwrap_or(true);
+    if !is_leader {
+        log::debug!("[DOWNTIMES] ownership backfill: not the lowest-id node, skipping");
+        return;
+    }
+    // The flag is set only after the write succeeded; a failed write is retried on the next start.
+    let rows = match db::downtimes::backfill_ownership().await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[DOWNTIMES] ownership backfill failed, will retry on the next start: {e}");
+            return;
+        }
+    };
     if let Err(e) =
         openobserve_core::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
     {
