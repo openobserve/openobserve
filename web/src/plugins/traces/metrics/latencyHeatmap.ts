@@ -40,8 +40,6 @@ export interface LatencyHeatmapGrid {
   rangeEndUs: number;
   rows: number[];
   cells: [number, number, number, number][];
-  colorMin: number;
-  colorMax: number;
 }
 
 export interface LatencyHeatmapSelection {
@@ -114,34 +112,30 @@ export function buildHeatmapGrid(
   const rows: number[] = [];
   for (let k = minBucket; k <= maxBucket; k++) rows.push(k);
 
-  const cells = kept.map(({ col, bucket, count }): [number, number, number, number] => [
+  const ranks = rankFractions(kept.map((k) => k.count));
+  const cells = kept.map(({ col, bucket, count }, i): [number, number, number, number] => [
     col,
     bucket - minBucket,
-    Math.log1p(count),
+    ranks[i],
     count,
   ]);
-  const { colorMin, colorMax } = colorDomain(cells.map((c) => c[2]));
 
-  return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells, colorMin, colorMax };
+  return { colStartUs, intervalUs, rangeStartUs, rangeEndUs, rows, cells };
 }
 
-const percentile = (sorted: number[], q: number) => {
-  const pos = (sorted.length - 1) * q;
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  return sorted[lo] + (pos - lo) * (sorted[hi] - sorted[lo]);
-};
-
-// Every cell has a count of at least 1, so a domain from 0 would light most cells; spread it over the observed values.
-function colorDomain(values: number[]): { colorMin: number; colorMax: number } {
-  const sorted = [...values].sort((a, b) => a - b);
-  const min = sorted[0];
-  const max = sorted[sorted.length - 1];
-  if (min === max) return { colorMin: 0, colorMax: max };
-  const p5 = percentile(sorted, 0.05);
-  const p99 = percentile(sorted, 0.99);
-  if (new Set(sorted).size < 3 || p5 >= p99) return { colorMin: min, colorMax: max };
-  return { colorMin: p5, colorMax: p99 };
+// Rank-based colour (histogram equalisation): any value scale crowds the dense rows into one band, so colour by rank.
+function rankFractions(counts: number[]): number[] {
+  const order = counts.map((count, i) => ({ count, i })).sort((a, b) => a.count - b.count);
+  const ranks = new Array<number>(counts.length);
+  for (let start = 0; start < order.length;) {
+    let end = start;
+    while (end + 1 < order.length && order[end + 1].count === order[start].count) end++;
+    const averageRank = (start + end) / 2;
+    for (let k = start; k <= end; k++) ranks[order[k].i] = averageRank;
+    start = end + 1;
+  }
+  const top = Math.max(...ranks);
+  return ranks.map((r) => (top === 0 ? 1 : r / top));
 }
 
 const clampIndex = (i: number, length: number) => Math.min(Math.max(i, 0), length - 1);

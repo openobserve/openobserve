@@ -120,7 +120,7 @@ describe("buildHeatmapGrid", () => {
     const grid = buildHeatmapGrid([hit(20, 5, 3)], 10, T0 + 5 * S, T0 + 60 * S)!;
     expect(grid.intervalUs).toBe(10 * S);
     expect(grid.colStartUs).toEqual([0, 10, 20, 30, 40, 50].map((s) => T0 + s * S));
-    expect(grid.cells).toEqual([[2, 0, Math.log1p(3), 3]]);
+    expect(grid.cells).toEqual([[2, 0, 1, 3]]);
   });
 
   it("keeps empty duration rows between two modes", () => {
@@ -131,7 +131,7 @@ describe("buildHeatmapGrid", () => {
   it("keeps bucket 0", () => {
     const grid = buildHeatmapGrid([hit(0, 0, 2), hit(0, 2, 1)], 10, T0, T0 + 10 * S)!;
     expect(grid.rows).toEqual([0, 1, 2]);
-    expect(grid.cells).toContainEqual([0, 0, Math.log1p(2), 2]);
+    expect(grid.cells).toContainEqual([0, 0, 1, 2]);
   });
 
   it("builds rows only from hits that land inside the columns", () => {
@@ -142,41 +142,36 @@ describe("buildHeatmapGrid", () => {
       T0 + 30 * S,
     )!;
     expect(grid.rows).toEqual([5]);
-    expect(grid.cells).toEqual([[1, 0, Math.log1p(1), 1]]);
+    expect(grid.cells).toEqual([[1, 0, 1, 1]]);
   });
 
   it("returns null when no hit lands inside the columns", () => {
     expect(buildHeatmapGrid([hit(-600, 4, 3), hit(900, 6, 3)], 10, T0, T0 + 30 * S)).toBeNull();
   });
 
-  it("puts log1p(count) at index 2 and the raw count at index 3", () => {
+  it("puts the colour rank at index 2 and the raw count at index 3", () => {
     const grid = buildHeatmapGrid([hit(10, 4, 99)], 10, T0, T0 + 30 * S)!;
-    expect(grid.cells[0]).toEqual([1, 0, Math.log1p(99), 99]);
+    expect(grid.cells[0]).toEqual([1, 0, 1, 99]);
   });
 
-  it("spans the colour domain over the 5th to 99th percentile of log1p(count)", () => {
-    // Counts 1..21 in 21 columns: p5 is the 2nd value, p99 sits 80% between the 20th and 21st.
-    const hits = Array.from({ length: 21 }, (_, i) => hit(i * 10, 5, i + 1));
-    const grid = buildHeatmapGrid(hits, 10, T0, T0 + 210 * S)!;
-    expect(grid.colorMin).toBeCloseTo(Math.log1p(2), 12);
-    expect(grid.colorMax).toBeCloseTo(Math.log1p(20) + 0.8 * (Math.log1p(21) - Math.log1p(20)), 12);
+  it("colours each cell by its percentile rank among all counts, ties sharing the average rank", () => {
+    // Sorted counts 1, 3, 5, 5, 9 take ranks 0, 1, 2.5, 2.5, 4 out of 4.
+    const counts = [5, 1, 5, 9, 3];
+    const hits = counts.map((count, i) => hit(i * 10, 5, count));
+    const grid = buildHeatmapGrid(hits, 10, T0, T0 + 50 * S)!;
+    expect(grid.cells.map((c) => [c[3], c[2]])).toEqual([
+      [5, 0.625],
+      [1, 0],
+      [5, 0.625],
+      [9, 1],
+      [3, 0.25],
+    ]);
   });
 
-  it("falls back to the full spread when there are fewer than three distinct values", () => {
-    const grid = buildHeatmapGrid(
-      [hit(0, 5, 3), hit(10, 5, 40), hit(20, 5, 3)],
-      10,
-      T0,
-      T0 + 30 * S,
-    )!;
-    expect([grid.colorMin, grid.colorMax]).toEqual([Math.log1p(3), Math.log1p(40)]);
-  });
-
-  it("keeps an equal-count grid, even a single cell, at full colour with min < max", () => {
+  it("puts every cell at 1 for a single cell or equal counts", () => {
     for (const hits of [[hit(0, 5, 7)], [hit(0, 5, 7), hit(10, 6, 7), hit(20, 7, 7)]]) {
       const grid = buildHeatmapGrid(hits, 10, T0, T0 + 30 * S)!;
-      expect(grid.colorMin).toBeLessThan(grid.colorMax);
-      expect(grid.colorMax).toBe(Math.log1p(7));
+      expect(grid.cells.map((c) => c[2])).toEqual(hits.map(() => 1));
     }
   });
 });

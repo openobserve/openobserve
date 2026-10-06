@@ -102,6 +102,10 @@ const mountHeatmap = async (props: Record<string, unknown> = { request: request(
 const options = (wrapper: any) =>
   wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
 
+// The series cell itself, so the tooltip is fed what ECharts would pass, colour rank included.
+const cellWithCount = (wrapper: any, count: number) =>
+  options(wrapper).series[0].data.find((c: number[]) => c[3] === count);
+
 let wrapper: any = null;
 
 beforeAll(async () => {
@@ -247,8 +251,8 @@ describe("TracesLatencyHeatmap", () => {
       expect(o.toolbox.feature.dataZoom.yAxisIndex).toBe(0);
       expect(o.visualMap.show).toBe(false);
       expect(o.visualMap.dimension).toBe(2);
-      expect(o.visualMap.min).toBe(Math.log1p(3));
-      expect(o.visualMap.max).toBe(Math.log1p(40));
+      expect(o.visualMap.min).toBe(0);
+      expect(o.visualMap.max).toBe(1);
       expect(o.series[0].type).toBe("heatmap");
     });
 
@@ -286,14 +290,14 @@ describe("TracesLatencyHeatmap", () => {
     it("escapes the tooltip text", async () => {
       labelOverride.value = "<b>10:00</b>";
       wrapper = await mountHeatmap();
-      const html: string = options(wrapper).tooltip.formatter({ data: [1, 0, Math.log1p(40), 40] });
+      const html: string = options(wrapper).tooltip.formatter({ data: cellWithCount(wrapper, 40) });
       expect(html).toContain("&lt;b&gt;10:00&lt;/b&gt;");
       expect(html).not.toContain("<b>");
     });
 
     it("formats the tooltip with the time, range and span count", async () => {
       wrapper = await mountHeatmap();
-      const html: string = options(wrapper).tooltip.formatter({ data: [1, 0, Math.log1p(40), 40] });
+      const html: string = options(wrapper).tooltip.formatter({ data: cellWithCount(wrapper, 40) });
       expect(html).toContain("10:00:10");
       expect(html).toContain("100ms – 200ms");
       expect(html).toContain(
@@ -307,7 +311,7 @@ describe("TracesLatencyHeatmap", () => {
         histogram_interval: 10,
       });
       wrapper = await mountHeatmap();
-      const html: string = options(wrapper).tooltip.formatter({ data: [1, 0, Math.log1p(1), 1] });
+      const html: string = options(wrapper).tooltip.formatter({ data: cellWithCount(wrapper, 1) });
       expect(html).toContain("≥ 1000s");
     });
   });
