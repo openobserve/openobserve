@@ -603,9 +603,31 @@ export function useChatHistory(
     return updateLocalTitle(chatId, newTitle);
   };
 
+  /**
+   * Cache a server chat this browser has not listed yet (a fork) and return
+   * its entry id, so `loadChat` can open it straight away.
+   */
+  const adoptServerChat = async (sessionId: string, title: string): Promise<number> => {
+    const id = idFromSessionId(sessionId);
+    const existing = await loadLocalChat(id);
+    if (existing) return id;
+    // No cachedLastSeq, so the first open fetches the turns from the server.
+    await putRecord({
+      id,
+      timestamp: new Date().toISOString(),
+      title: raw(title || t("common.newChat")),
+      messages: [],
+      sessionId,
+      userOrgKey: await getUserOrgKey(),
+      serverBacked: true,
+    });
+    return id;
+  };
+
   return {
     saveToHistory,
     loadHistory,
+    adoptServerChat,
     loadChat,
     deleteChatById,
     clearAllHistory,

@@ -31,6 +31,8 @@ const props = defineProps<{
   currentAnalyzingMessage: string;
   expandedToolCalls: Set<string>;
   expandedLogEntries: Set<string>;
+  /** Shared-chat view: no retry, feedback or navigation actions. */
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -93,6 +95,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
             :message-index="index"
             :block-index="blockIndex"
             :expanded-keys="expandedToolCalls"
+            :readonly="readonly"
             @toggle="emit('toggle-tool-call', blockIndex)"
             @navigate="(action: NavigationAction) => emit('navigate', action)"
           />
@@ -160,7 +163,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
           </div>
           <!-- Navigation block - standalone navigation button -->
           <div
-            v-else-if="block.type === 'navigation' && block.navigationAction"
+            v-else-if="block.type === 'navigation' && block.navigationAction && !readonly"
             class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
           >
             <OButton
@@ -208,7 +211,10 @@ const isLogEntryExpanded = (blockIndex: number) =>
                     v-html="textBlock.highlightedContent"
                   ></code>
                 </span>
-                <div class="code-block-footer flex w-full items-center justify-between px-2 py-1">
+                <div
+                  v-if="!readonly"
+                  class="code-block-footer flex w-full items-center justify-between px-2 py-1"
+                >
                   <OButton
                     variant="ghost"
                     size="xs"
@@ -286,7 +292,12 @@ const isLogEntryExpanded = (blockIndex: number) =>
         </template>
         <!-- Feedback buttons for assistant messages -->
         <div
-          v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''"
+          v-if="
+            !readonly &&
+            message.role === 'assistant' &&
+            message.content &&
+            message.content.trim() !== ''
+          "
           class="feedback-buttons mt-1 flex items-center gap-0.5 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
           :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
         >

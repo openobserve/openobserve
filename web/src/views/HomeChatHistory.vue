@@ -8,6 +8,11 @@ import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
+import AiChatSharedByMe from "@/components/ai-assistant/share/AiChatSharedByMe.vue";
+import { isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
 
 const emit = defineEmits<{
   (e: "load-chat", id: number): void;
@@ -80,6 +85,20 @@ async function clearAll() {
   }
 }
 
+const persistenceEnabled = computed(() => isChatPersistenceEnabled(store.state.zoConfig));
+const shareTarget = ref<ChatHistoryEntry | null>(null);
+const shareDialogOpen = ref(false);
+const sharedByMeOpen = ref(false);
+
+const canShare = (chat: ChatHistoryEntry) =>
+  persistenceEnabled.value && !!chat.serverBacked && !!chat.sessionId;
+
+function openShare(e: MouseEvent, chat: ChatHistoryEntry) {
+  e.stopPropagation();
+  shareTarget.value = chat;
+  shareDialogOpen.value = true;
+}
+
 function formatTime(ts: string): string {
   const d = new Date(Number(ts));
   if (isNaN(d.getTime())) return "";
@@ -100,21 +119,38 @@ function formatTime(ts: string): string {
     <!-- Header -->
     <div class="flex shrink-0 items-center justify-between px-3 pt-[0.625em] pb-[0.375em]">
       <span class="text-[0.8125em] font-semibold opacity-70">{{ t("chatHistory.title") }}</span>
-      <OButton variant="ghost-muted" size="icon" :title="t('chatHistory.newChat')" @click="newChat">
-        <svg
-          width="1em"
-          height="1em"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+      <span class="flex items-center gap-0.5">
+        <OButton
+          v-if="persistenceEnabled"
+          variant="ghost-muted"
+          size="icon"
+          data-test="home-chat-history-shared-by-me"
+          @click="sharedByMeOpen = true"
         >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </OButton>
+          <OIcon name="link" size="sm" />
+          <OTooltip :content="t('aiChatShare.sharedByMe')" />
+        </OButton>
+        <OButton
+          variant="ghost-muted"
+          size="icon"
+          :title="t('chatHistory.newChat')"
+          @click="newChat"
+        >
+          <svg
+            width="1em"
+            height="1em"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </OButton>
+      </span>
     </div>
 
     <!-- Search -->
@@ -184,6 +220,16 @@ function formatTime(ts: string): string {
           class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 max-md:opacity-100"
         >
           <OButton
+            v-if="canShare(chat)"
+            variant="ghost-muted"
+            size="icon"
+            :data-test="`home-chat-history-share-${chat.id}`"
+            @click="openShare($event, chat)"
+          >
+            <OIcon name="share" size="sm" />
+            <OTooltip :content="t('aiChatShare.share')" />
+          </OButton>
+          <OButton
             variant="ghost-destructive"
             size="icon"
             :title="t('chatHistory.delete')"
@@ -239,5 +285,12 @@ function formatTime(ts: string): string {
         {{ t("chatHistory.clearAll") }}
       </OButton>
     </div>
+    <AiChatShareDialog
+      v-if="shareTarget"
+      v-model:open="shareDialogOpen"
+      :session-id="shareTarget.sessionId"
+      :chat-title="shareTarget.title"
+    />
+    <AiChatSharedByMe v-if="persistenceEnabled" v-model:open="sharedByMeOpen" />
   </div>
 </template>
