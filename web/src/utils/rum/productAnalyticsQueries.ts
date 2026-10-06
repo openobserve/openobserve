@@ -1077,9 +1077,19 @@ const pathCtes = (
   if (def.cohort) return cohortPathCtes(scope, id, def, def.cohort, opts, attrs);
   const anchor = def.anchor;
   if (!anchor) throw new Error("Paths need an anchor or a funnel cohort");
-  const types = attrs
+  const include = attrs
     ? `(${pathsIncludeExpr(scope, def.include)} OR type = 'error')`
     : pathsIncludeExpr(scope, def.include);
+  // "all" already covers both kinds, and a "pages"/"clicks" filter already covers a same-kind
+  // anchor. Otherwise (e.g. a page anchor under "Clicks") the anchor's own event must be let
+  // through regardless, or it can never be found as "reached" downstream.
+  const anchorKindCovered =
+    def.include === "all" ||
+    (anchor.kind === "p" && def.include === "pages") ||
+    (anchor.kind === "c" && def.include === "clicks");
+  const types = anchorKindCovered
+    ? include
+    : `(${include} OR ${stepPredicateRaw(anchor, scope, opts.events)})`;
   const cols = [
     "session_id AS sid",
     "type AS ty",

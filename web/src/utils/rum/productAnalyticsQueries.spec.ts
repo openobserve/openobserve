@@ -888,8 +888,19 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
       `WHERE ${scopeClause(s)} AND type = 'view' GROUP BY`,
     );
     expect(pathsSql(s, null, { ...def, include: "clicks" }, opts)).toContain(
-      `WHERE ${scopeClause(s)} AND (type = 'action' AND action_target_name <> '') GROUP BY`,
+      `WHERE ${scopeClause(s)} AND ((type = 'action' AND action_target_name <> '') OR ${stepPredicateRaw(def.anchor, s, opts.events)}) GROUP BY`,
     );
+  });
+
+  it("a page anchor survives a mismatched Clicks filter, so its own reach is never lost (P0 o2#15*)", () => {
+    const sql = pathsSql(s, null, { ...def, include: "clicks" }, opts);
+    expect(sql).toContain(
+      `AND ((type = 'action' AND action_target_name <> '') OR (type = 'view' AND (strpos(view_url, '${def.anchor.key}') > 0) AND ${pageKeyExpr("view_url", s.schema)} = '${def.anchor.key}')) GROUP BY`,
+    );
+    expect(sql).toContain(
+      "MIN(CASE WHEN key = 'p:/web/logs' THEN n END) OVER (PARTITION BY sid) AS n0",
+    );
+    expect(() => assertJoinFree(sql)).not.toThrow();
   });
 
   it("a named-event anchor marks rows by the event's rules", () => {
@@ -1016,7 +1027,9 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     expect(pages).not.toContain("action_target_name");
     const clicks = pathsSql(noClicks, null, { ...def, include: "clicks" }, opts);
     expect(clicks).not.toContain("action_target_name");
-    expect(clicks).toContain(`WHERE ${scopeClause(noClicks)} AND FALSE GROUP BY`);
+    expect(clicks).toContain(
+      `WHERE ${scopeClause(noClicks)} AND (FALSE OR ${stepPredicateRaw(def.anchor, noClicks, opts.events)}) GROUP BY`,
+    );
     expect(() => assertJoinFree(all)).not.toThrow();
     expect(() => assertJoinFree(clicks)).not.toThrow();
   });

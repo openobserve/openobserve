@@ -484,6 +484,20 @@ const onDateChange = (value: AnalyticsDateTime) => {
   void reload();
 };
 
+// The picker only reads its v-model on mount, so a programmatic scope change that
+// doesn't come from the picker itself (widenRange's "show the past 30 days" fallback,
+// initFromRoute's URL restore, a sub-tab switch that carries a new range) never reaches
+// its displayed label unless pushed in here.
+watch(
+  () => [
+    state.datetime.valueType,
+    state.datetime.relativeTimePeriod,
+    state.datetime.startTime,
+    state.datetime.endTime,
+  ],
+  () => dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime)),
+);
+
 const toggleIncludeAll = () => {
   identityOpen.value = false;
   pa.setScope({ includeAllIdentities: !state.includeAllIdentities });
@@ -520,9 +534,6 @@ const resumesScope = () =>
 const enter = async () => {
   if (!resumesScope()) {
     pa.initFromRoute(route.query, { keepFunnel: route.name === PA_ROUTES.funnels });
-    // The picker reads its range only on mount, so a reload or a shared link (both land here
-    // after it has already mounted with the default range) must move the mounted picker too.
-    dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime));
   }
   enteredOrg = org.value;
   invalidDismissed.value = false;
