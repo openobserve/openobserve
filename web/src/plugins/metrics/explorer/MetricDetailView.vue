@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchable="false"
               size="sm"
               width="sm"
-              class="min-w-0"
+              class="min-w-0 max-md:hidden"
               data-test="metrics-detail-forecast-horizon"
               @update:model-value="onForecastHorizonChange"
             />
@@ -785,15 +785,17 @@ export default defineComponent({
       if (!ahead) return null;
       const { end_time: T } = props.timeRange;
       const step = props.stepSeconds;
-      const fits = await Promise.all(
-        exprs.map((expr) =>
-          Promise.all(
-            buildForecastQueries(expr, ahead.method, rangeSeconds.value, step, ahead.horizon).map(
-              (query) => props.runQuery(query, signal, undefined, { instantAt: T }),
-            ),
+      // Settled, not raced: a rejected fit must not leave its siblings running past the view's cancel.
+      const settled = await Promise.allSettled(
+        exprs.flatMap((expr) =>
+          buildForecastQueries(expr, ahead.method, rangeSeconds.value, step, ahead.horizon).map(
+            (query) => props.runQuery(query, signal, undefined, { instantAt: T }),
           ),
         ),
       );
+      if (settled.some((outcome) => outcome.status === "rejected")) return null;
+      const values = settled.map((outcome) => (outcome as PromiseFulfilledResult<any>).value);
+      const fits = exprs.map((_, i) => [values[2 * i], values[2 * i + 1]]);
       return {
         until: T + ahead.horizon * 1e6,
         label: t("metrics.explorer.detail.forecast.suffix"),
@@ -872,21 +874,20 @@ export default defineComponent({
           start: timeRange.start_time - compare.gapMs * 1000,
           end: timeRange.end_time - compare.gapMs * 1000,
         };
-        // The forecast is extra and slower: a failure must not cost the chart, nor may the chart wait for it.
-        const pendingForecast = loadForecast(exprs, signal).catch(() => null);
-        const [results, past] = await Promise.all([
+        const current = Promise.all([
           Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
           window
             ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, undefined, { window })))
             : [],
         ]);
+        // Queued after the chart's own queries, and never waited on by it: the fits are slower and optional.
+        const pendingForecast = loadForecast(exprs, signal).catch(() => null);
+        const [results, past] = await current;
         if (mine !== generation) return;
         overviewRefreshing.value = false;
         const shifted = compare
           ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
           : [];
-        // A kept chart keeps its forecast until the new one lands, rather than flickering it off.
-        const previous = keep && activeForecast.value ? overviewState.value.forecast : null;
         overviewState.value = {
           status: "done",
           results,
@@ -894,12 +895,12 @@ export default defineComponent({
           error: "",
           timeRange,
           stepSeconds,
-          forecast: previous ?? null,
+          forecast: null,
         };
         const forecast = await pendingForecast;
         if (mine !== generation) return;
         active = null;
-        if (forecast || previous) overviewState.value = { ...overviewState.value, forecast };
+        if (forecast) overviewState.value = { ...overviewState.value, forecast };
       } catch (error: any) {
         if (mine !== generation) return;
         cancelActive();

@@ -467,6 +467,31 @@ describe("MetricDetailView", () => {
       expect(chart().props("forecast").entries).toHaveLength(2);
     });
 
+    it("queues its fits after the chart's own queries, and still cancels the rest after one fails", async () => {
+      const order: string[] = [];
+      const fits: Array<{ signal: AbortSignal; fail: () => void }> = [];
+      runQuery.mockImplementation((_expr: string, signal: AbortSignal, _c: any, opts: any) => {
+        order.push(opts?.instantAt ? "fit" : "primary");
+        if (!opts?.instantAt) return Promise.resolve(SERIES);
+        return new Promise((_resolve, reject) =>
+          fits.push({ signal, fail: () => reject(new Error("timeout")) }),
+        );
+      });
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "linear",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      expect(order.slice(0, 2)).toEqual(["primary", "primary"]);
+
+      fits[0].fail();
+      await flushPromises();
+      wrapper.unmount();
+      expect(fits.slice(1).every((f) => f.signal.aborted)).toBe(true);
+    });
+
     it("queries no forecast while it is off", async () => {
       wrapper = mountView({ overview: LINE, timeRange: WINDOW, stepSeconds: 30 });
       await flushPromises();

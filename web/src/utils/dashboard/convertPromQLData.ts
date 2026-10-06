@@ -149,7 +149,8 @@ export const alignShiftedPromQLResults = (
     const result = entry.result
       .map((m: any) => {
         const primary = primaryByLabels.get(keyOf(m?.metric));
-        if (primarySeries.length && !primary) return null;
+        // A forecast continues a drawn series; a past period may stand alone when the current one is empty.
+        if ((primarySeries.length || seriesRoles[i] === "forecast") && !primary) return null;
         return {
           ...m,
           metric: primary?.metric ?? m.metric,

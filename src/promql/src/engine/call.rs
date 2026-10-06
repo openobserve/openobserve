@@ -953,7 +953,6 @@ mod tests {
         assert_eq!(values.len(), 1, "{values:?}");
         assert!(values[0].1.is_finite(), "{values:?}");
 
-        // On a noiseless line both methods land within 1% of the line's value at T + H.
         let line = format!("(vector(10 + 0.5 * (time() - {BASE})))");
         let expected = 10.0 + 0.5 * 900.0;
         for input in [

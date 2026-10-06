@@ -89,6 +89,11 @@ describe("forecast entries", () => {
     expect(data[1].result[0].values.map((v: any) => v[0])).toEqual(times);
   });
 
+  it("are dropped when the primary has no series to continue", () => {
+    const { data } = alignShiftedPromQLResults([matrix(), ahead("api-1")], metadata, stepMeta);
+    expect(data[1].result).toEqual([]);
+  });
+
   it("match primaries that keep their metric name, which predict_linear drops", () => {
     const named = matrix({
       metric: { __name__: "rpc_latency", quantile: "0.99" },
