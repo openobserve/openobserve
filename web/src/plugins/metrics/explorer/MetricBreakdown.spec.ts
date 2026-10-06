@@ -92,6 +92,7 @@ const MetricCardChartStub = {
     color: String,
     timeRange: Object,
     legend: Boolean,
+    allowAlertCreation: Boolean,
   },
   template: `<div data-test="breakdown-chart-stub"><div data-test="chart-renderer" /></div>`,
 };
@@ -616,6 +617,22 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
         "Rate by method",
       );
+    });
+
+    it("offers the right-click alert on the focused chart, on the metric's own stream", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("allowAlertCreation")).toBe(true);
+      expect(chart.props("queries")[0].stream).toBe(CARD.name);
+    });
+
+    it("keeps the right-click alert off the small label tiles", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const charts = wrapper.findAllComponents({ name: "MetricCardChart" });
+      expect(charts.length).toBeGreaterThan(0);
+      charts.forEach((chart) => expect(chart.props("allowAlertCreation")).toBe(false));
     });
 
     it("charts the selected window with a legend, like the overview above it", async () => {

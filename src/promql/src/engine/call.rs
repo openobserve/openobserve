@@ -945,6 +945,59 @@ mod tests {
         }
     }
 
+    /// The alert form's forecast query (web/src/utils/alerts/forecastAlert.ts) with `W` = 2d.
+    fn forecast_days(u: &str, threshold: f64, rises: bool) -> String {
+        let (crossed, towards) = if rises { (">=", ">") } else { ("<=", "<") };
+        format!(
+            "(({u}) {crossed} {threshold}) * 0 or clamp_min(ceil(({threshold} - ({u})) / (deriv(({u})[2d:15m]) {towards} 0) / 8640) / 10, 0) or (({u}) * 0 + 36500)"
+        )
+    }
+
+    #[tokio::test]
+    #[ignore = "spec §1 defect: ceil of a float quotient reads 5 days as 5.1; awaiting a decision"]
+    async fn test_forecast_alert_query_gives_days_until_the_threshold() {
+        let gauge = |at_t: f64, per_day: f64| {
+            format!("vector({at_t} + {per_day} * (time() - {BASE}) / 86400)")
+        };
+        let cases = [
+            (gauge(0.85, 0.01), 5.0),
+            (gauge(0.9 - 0.0704, 0.01), 7.1),
+            (gauge(0.9 - 0.0696, 0.01), 7.0),
+            (gauge(0.95, 0.01), 0.0),
+            (gauge(0.95, 0.0), 0.0),
+            (gauge(0.5, 0.0), 36500.0),
+            (gauge(0.5, -0.01), 36500.0),
+            (
+                format!("(vector(0.5) and on () (vector(time()) == {BASE}))"),
+                36500.0,
+            ),
+        ];
+        let instant = EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into());
+        let mut wrong = Vec::new();
+        for (u, expected) in cases {
+            let query = forecast_days(&u, 0.9, true);
+            let values = step_values(eval_at(&query, instant.clone()).await);
+            if values != vec![(BASE * SECOND, expected)] {
+                wrong.push(format!("{u}: {values:?}, expected {expected}"));
+            }
+        }
+
+        let falling = forecast_days(&gauge(0.15, -0.01), 0.1, false);
+        let values = step_values(eval_at(&falling, instant.clone()).await);
+        if values != vec![(BASE * SECOND, 5.0)] {
+            wrong.push(format!("falls to: {values:?}, expected 5"));
+        }
+
+        let zero_size = forecast_days("vector(1) / vector(0)", 0.9, true);
+        let values = step_values(eval_at(&zero_size, instant).await);
+        if values.iter().any(|(_, value)| value.is_finite()) {
+            wrong.push(format!(
+                "zero-size filesystem: {values:?}, expected no finite value"
+            ));
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
     /// A parameter that differs at every step answers each step as that step's constant would.
     #[tokio::test]
     async fn test_per_step_parameters_match_the_constant_at_each_step() {

@@ -333,6 +333,7 @@ export const isPrefillBlocked = (prefill: AlertPrefill): boolean =>
  *     when the page found no patterns, so an empty set skips it too);
  *   • more than one stream — alerts are single-stream, and silently taking the
  *     first is exactly the trap this whole flow exists to avoid;
+ *   • more than one query — alerts hold one query, and only the user knows which;
  *   • a blocking warning — the user needs to be told why, not dropped into a
  *     form that cannot work.
  *
@@ -342,6 +343,7 @@ export const isPrefillBlocked = (prefill: AlertPrefill): boolean =>
 export const needsConfirmation = (prefill: AlertPrefill): boolean => {
   if (isPrefillBlocked(prefill)) return true;
   if ((prefill.streamCandidates?.length ?? 0) > 1) return true;
+  if ((prefill.queryChoices?.length ?? 0) > 1) return true;
 
   const patterns = prefill.patternFilter;
   return !!patterns && patterns.visibleCount > 0;

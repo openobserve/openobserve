@@ -78,6 +78,11 @@ export class MetricsExplorerPage {
         this.detailClose = '[data-test="metrics-detail-close"]';
         this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
         this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
+        this.detailOverview = '[data-test="metrics-detail-overview"]';
+        this.detailMore = '[data-test="metrics-detail-more"]';
+        this.detailCreateAlert = '[data-test="metrics-detail-create-alert"]';
+        this.alertContextMenuAbove = '[data-test="alert-context-menu-above"]';
+        this.alertStreamName = '[data-test="add-alert-stream-name-select-dropdown"]';
         this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
         this.breakdownBack = '[data-test="metrics-breakdown-back"]';
         this.labelChipPrefix = 'metrics-explorer-label-chip-';
@@ -466,6 +471,24 @@ export class MetricsExplorerPage {
      */
     cardChart(metric) {
         return this.cardRoot(metric).locator(this.cardChartCanvas).first();
+    }
+
+    /** Right-click a drawn chart, then "Alert when above"; the alert form opens on a panel prefill. */
+    async createAlertAboveFromChart(chart) {
+        await chart.click({ button: 'right' });
+        await this.page.locator(this.alertContextMenuAbove).click();
+        await this.page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
+    }
+
+    /** The detail header's overflow menu → Create alert; the alert form opens on a panel prefill. */
+    async createAlertFromDetailMenu() {
+        await this.page.locator(this.detailMore).click();
+        await this.page.locator(this.detailCreateAlert).click();
+        await this.page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
+    }
+
+    async expectAlertFormStream(metric) {
+        await expect(this.page.locator(this.alertStreamName)).toContainText(metric, { timeout: 30000 });
     }
 
     async expectCardNoData(metric, timeout = 60000) {

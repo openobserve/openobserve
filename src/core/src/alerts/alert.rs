@@ -7097,6 +7097,124 @@ mod tests {
         assert_eq!(out[0].as_str().unwrap(), "Stream: default Type: metrics");
     }
 
+    /// A forecast alert as the web form saves it: per series, `value` is days until 0.9.
+    fn forecast_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "disk-full".into();
+        alert.org_id = "default".into();
+        alert.stream_name = "node_filesystem_avail_bytes".into();
+        alert.stream_type = config::meta::stream::StreamType::Metrics;
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_condition = Some(config::meta::alerts::Condition {
+            column: "value".into(),
+            operator: config::meta::alerts::Operator::LessThanEquals,
+            value: json!(7),
+            ignore_case: false,
+        });
+        alert.query_condition.promql_multi_alert = true;
+        alert.row_template = "reaches 0.9 in {value} days".into();
+        alert
+    }
+
+    fn forecast_row(device: &str, days: f64) -> Map<String, Value> {
+        let mut row = Map::new();
+        row.insert("device".to_string(), json!(device));
+        row.insert("_timestamp".to_string(), json!(1_700_000_000_000_000_i64));
+        row.insert("value".to_string(), json!(days));
+        row
+    }
+
+    fn firing_devices(rows: &[Map<String, Value>]) -> Vec<String> {
+        let classification = config::meta::alerts::grouping::classify_promql_series(
+            rows,
+            config::meta::alerts::Operator::LessThanEquals,
+            7.0,
+            None,
+            100,
+        );
+        let mut firing: Vec<String> = classification
+            .groups
+            .into_iter()
+            .filter(|group| group.level.is_some())
+            .map(|group| group.labels["device"].clone())
+            .collect();
+        firing.sort();
+        firing
+    }
+
+    #[tokio::test]
+    async fn a_forecast_alert_fires_per_series_and_says_when_it_crosses() {
+        let alert = forecast_alert_fixture();
+        // Rising, 6.96 days out, already past 0.9, and moving away.
+        let rows = vec![
+            forecast_row("a", 5.0),
+            forecast_row("b", 7.0),
+            forecast_row("c", 0.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&rows), ["a", "b", "c"]);
+
+        // Next evaluation: a's trend reversed and c stopped reporting.
+        let next = vec![
+            forecast_row("a", 36500.0),
+            forecast_row("b", 7.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&next), ["b"]);
+
+        let fired = &rows[..3];
+        let rows_tpl = process_row_template(
+            "default",
+            &alert.row_template,
+            &alert,
+            RowTemplateType::String,
+            fired,
+        );
+        let lines = [
+            "reaches 0.9 in 5 days",
+            "reaches 0.9 in 7 days",
+            "reaches 0.9 in 0 days",
+        ];
+        assert_eq!(rows_tpl, lines.map(|line| Value::String(line.into())));
+
+        let custom = process_dest_template(
+            "default",
+            "{rows}",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        for line in lines {
+            assert!(custom.contains(line), "{custom}");
+        }
+
+        let ctx = build_notification_context(
+            "default",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            None,
+        )
+        .await;
+        let spec = crate::alerts::notifications::default_template::compiled_default_content();
+        let content = resolve_content(&spec, &ctx, ChannelFormat::Webhook.channel_family());
+        let Ok(RenderedMessage::Http { body }) = render(ChannelFormat::Webhook, &content, &ctx)
+        else {
+            panic!("expected a webhook body");
+        };
+        for (device, days) in [("a", "5"), ("b", "7"), ("c", "0")] {
+            assert!(
+                body.contains(&format!("\"{device}\"")) && body.contains(days),
+                "{body}"
+            );
+        }
+    }
+
     // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────
 
     use config::meta::slo::{condition::SloClassification, coverage::UnobservedReason};

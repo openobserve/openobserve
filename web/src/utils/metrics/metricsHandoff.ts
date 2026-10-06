@@ -94,6 +94,14 @@ function legendFor(template: string | undefined, stream: string): string {
   return template;
 }
 
+/** Each query with the stream it reads, which an alert built from its chart needs. */
+export function withSourceStreams<Q extends HandoffVariant["queries"][number]>(
+  queries: Q[],
+  cardName: string,
+): Array<Q & { stream: string }> {
+  return queries.map((query) => ({ ...query, stream: query.builder?.metric ?? cardName }));
+}
+
 /**
  * Maps a card's effective variant onto a panel-schema `data` object — the exact
  * shape `applyMetricsBlob` writes into `dashboardPanelData.data`.

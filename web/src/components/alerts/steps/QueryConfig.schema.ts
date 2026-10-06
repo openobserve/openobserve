@@ -22,6 +22,11 @@
 import { z } from "zod";
 
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import {
+  FORECAST_MAX_DAYS,
+  FORECAST_MIN_DAYS,
+  isForecastHorizonValid,
+} from "@/utils/alerts/forecastAlert";
 
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Every user-facing validation message resolves through this against the
@@ -218,6 +223,23 @@ const isBelowOne = (v: unknown): boolean => {
   if (isBlank(v)) return true;
   const n = Number(v);
   return Number.isNaN(n) || n < 1;
+};
+
+/** Forecast mode's own fields: the PromQL is generated from them, so they are what the user fixes. */
+const refineForecast = (ctx: z.RefinementCtx, forecast: any, t: Translator): void => {
+  if (!forecast) return;
+  const issue = (field: string, message: string) =>
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["_ui", "forecast", field], message });
+  if (!String(forecast.U ?? "").trim()) issue("U", t("alerts.validation.fieldRequired"));
+  if (isBlank(forecast.T) || !Number.isFinite(Number(forecast.T))) {
+    issue("T", t("alerts.validation.fieldRequired"));
+  }
+  if (isBlank(forecast.H) || !isForecastHorizonValid(Number(forecast.H))) {
+    issue(
+      "H",
+      t("alerts.forecast.horizonRange", { min: FORECAST_MIN_DAYS, max: FORECAST_MAX_DAYS }),
+    );
+  }
 };
 
 /**
@@ -448,6 +470,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
             message: t("alerts.validation.fieldRequired"),
           });
         }
+        refineForecast(ctx, (val._ui as Record<string, any> | undefined)?.forecast, t);
       }
 
       // ── Custom + measure aggregation ─────────────────────────────────────────

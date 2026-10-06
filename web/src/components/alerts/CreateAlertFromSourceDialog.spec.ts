@@ -44,6 +44,12 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<div><slot /></div>`,
   },
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options"],
+    emits: ["update:modelValue"],
+    template: `<div data-test="query-select-stub" />`,
+  },
   OToggleGroupItem: {
     name: "OToggleGroupItem",
     props: ["value"],
@@ -230,6 +236,47 @@ describe("CreateAlertFromSourceDialog", () => {
         .vm.$emit("update:modelValue", "exclude");
 
       expect(wrapper.emitted("rebuild")).toBeUndefined();
+    });
+  });
+
+  describe("query choice", () => {
+    const twoQueries = (queryIndex = 0) =>
+      prefill({
+        source: "panel",
+        queryType: "promql",
+        sql: undefined,
+        promql: queryIndex ? "sum(rate(io_ops[1m]))" : "avg(disk_used)",
+        queryIndex,
+        queryChoices: [
+          { index: 0, query: "avg(disk_used)" },
+          { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+        ],
+      });
+
+    it("offers a query select when the panel has two queries", () => {
+      wrapper = mountDialog(twoQueries());
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.exists()).toBe(true);
+      expect(select.props("modelValue")).toBe(0);
+      expect(select.props("options").map((o: any) => [o.value, String(o.label)])).toEqual([
+        [0, "Query 1"],
+        [1, "IO"],
+      ]);
+    });
+
+    it("rebuilds the prefill for the chosen query", async () => {
+      wrapper = mountDialog(twoQueries());
+      await wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", 1);
+
+      expect(wrapper.emitted("rebuild")![0][0]).toEqual({ queryIndex: 1 });
+
+      await wrapper.setProps({ prefill: twoQueries(1) });
+      expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe(1);
+    });
+
+    it("has no query select for a single query", () => {
+      wrapper = mountDialog(prefill());
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(false);
     });
   });
 

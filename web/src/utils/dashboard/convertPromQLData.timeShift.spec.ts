@@ -263,6 +263,46 @@ describe("convertPromQLData with time-shifted results", () => {
     expect(tagged.map((s: any) => s.name)).toEqual(["api-1", "api-2"]);
   });
 
+  it("tags every series with its panel query and role, leaving _queryIndex as it was", async () => {
+    const result = await convert(
+      panel("line", [{ config: {} }, { config: {} }]),
+      [twoPods(), twoPods(DAY_S)],
+      meta([{ panelQueryIndex: 1 }, { panelQueryIndex: 1, gapMs: DAY_MS, period: "1 day ago" }]),
+      stepMeta(2, 60),
+    );
+
+    expect(
+      result.options.series
+        .filter((s: any) => s.name)
+        .map((s: any) => [s.name, s._panelQueryIndex, s._seriesRole, s._queryIndex]),
+    ).toEqual([
+      ["api-1", 1, "primary", 0],
+      ["api-2", 1, "primary", 0],
+      ["api-1 (1 day ago)", 1, "shifted", undefined],
+      ["api-2 (1 day ago)", 1, "shifted", undefined],
+    ]);
+  });
+
+  it("tags stacked series with their panel query and role", async () => {
+    const result = await convert(
+      panel("stacked", [{ config: {} }, { config: {} }]),
+      [twoPods(), twoPods(DAY_S)],
+      meta([{ panelQueryIndex: 1 }, { panelQueryIndex: 1, gapMs: DAY_MS, period: "1 day ago" }]),
+      stepMeta(2, 60),
+    );
+
+    expect(
+      result.options.series
+        .filter((s: any) => s.name)
+        .map((s: any) => [s.name, s._panelQueryIndex, s._seriesRole]),
+    ).toEqual([
+      ["api-1", 1, "primary"],
+      ["api-2", 1, "primary"],
+      ["api-1 (1 day ago)", 1, "shifted"],
+      ["api-2 (1 day ago)", 1, "shifted"],
+    ]);
+  });
+
   it("renders when only a shifted result has data", async () => {
     const result = await convert(
       panel("line"),

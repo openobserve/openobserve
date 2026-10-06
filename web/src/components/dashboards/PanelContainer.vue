@@ -507,7 +507,12 @@ import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
-import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import {
+  buildPrefillFromPanel,
+  executedPanelQuery,
+  panelQueryChoices,
+} from "@/utils/alerts/prefill/fromPanel";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
 import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
@@ -1197,13 +1202,19 @@ export default defineComponent({
      * AlertPrefill out. Everything downstream — the confirm dialog, the
      * transport, the form — is shared with every other surface.
      */
-    buildPanelAlertPrefill() {
+    buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
+      const queries = this.props.data.queries || [];
+      const queryIndex = options.queryIndex ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
         panelId: this.props.data.id,
         panelType: this.props.data.type,
-        queries: this.props.data.queries || [],
+        queries,
         queryType: this.props.data.queryType,
+        queryIndex,
+        queryChoices:
+          queries.length > 1 ? panelQueryChoices(queries, this.metaData?.queries) : undefined,
+        executedQuery: executedPanelQuery(this.metaData?.queries, queryIndex),
         timeRange: this.props.selectedTimeDate,
       });
     },

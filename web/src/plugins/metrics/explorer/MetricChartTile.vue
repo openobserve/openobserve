@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :color="color"
           :time-range="state.timeRange"
           :legend="legend"
+          :allow-alert-creation="allowAlertCreation"
           @error="onRenderError"
         />
       </slot>
@@ -112,6 +113,8 @@ import { hasSamples } from "@/composables/metrics/useMetricsExplorerGrid";
 export interface TileQuery {
   expr: string;
   legendTemplate?: string;
+  /** The stream the query reads, for an alert created from the chart. */
+  stream?: string;
 }
 
 interface TileState {
@@ -134,11 +137,13 @@ const props = withDefaults(
     color: string;
     timeRange: { start_time: number; end_time: number };
     legend?: boolean;
+    /** Offer the chart's right-click "Create alert" menu. */
+    allowAlertCreation?: boolean;
     /** A signal, not a cancel by expr, so two tiles on one query never cancel each other. */
     runQuery: (expr: string, signal: AbortSignal) => Promise<any>;
     dataTest: string;
   }>(),
-  { chartType: "line", unit: null, bucketUnit: null, legend: false },
+  { chartType: "line", unit: null, bucketUnit: null, legend: false, allowAlertCreation: false },
 );
 
 const emit = defineEmits<{

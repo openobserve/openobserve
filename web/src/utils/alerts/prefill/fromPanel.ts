@@ -26,6 +26,7 @@
 import {
   ALERT_PREFILL_VERSION,
   type AlertPrefill,
+  type AlertPrefillQueryChoice,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { sanitizeAlertNamePart, periodMinutesFromRange, warn } from "../alertPrefill";
@@ -39,7 +40,11 @@ export interface PanelPrefillInput {
   panelType?: string;
   queries?: any[];
   queryType?: string;
-  /** Query with dashboard variables already substituted — preferred over queries[0].query. */
+  /** The panel query to alert on; the first when absent. */
+  queryIndex?: number;
+  /** Offered in the confirm dialog when the user has to pick the query. */
+  queryChoices?: AlertPrefillQueryChoice[];
+  /** The chosen query with dashboard variables already substituted — preferred over its raw text. */
   executedQuery?: string;
   timeRange?: {
     value_type?: string;
@@ -47,6 +52,9 @@ export interface PanelPrefillInput {
     relative_period?: string;
     startTime?: number;
     endTime?: number;
+    /** A rendered panel's window. */
+    start_time?: Date | null;
+    end_time?: Date | null;
   };
   /** Threshold picked off the chart (context-menu flow). */
   threshold?: number;
@@ -56,9 +64,26 @@ export interface PanelPrefillInput {
   timezone?: string;
 }
 
+/** Microseconds since the epoch exceed this; milliseconds do not until the year 5138. */
+const MIN_EPOCH_MICROS = 1e14;
+
+// Dashboards build these Dates from µs epochs, the Explorer from ms.
+const dateToMicros = (date: Date): number => {
+  const value = date.getTime();
+  return value > MIN_EPOCH_MICROS ? value : value * 1000;
+};
+
 /** The dashboard time range uses its own vocabulary; map it onto the shared one. */
 const toPrefillRange = (timeRange: PanelPrefillInput["timeRange"]) => {
   if (!timeRange) return null;
+
+  if (timeRange.start_time instanceof Date && timeRange.end_time instanceof Date) {
+    return {
+      type: "absolute" as const,
+      startTime: dateToMicros(timeRange.start_time),
+      endTime: dateToMicros(timeRange.end_time),
+    };
+  }
 
   if (timeRange.value_type === "relative") {
     const value = timeRange.relative_value || 15;
@@ -145,12 +170,37 @@ const conditionsFromFilters = (fields: any, makeId: () => string) => {
   };
 };
 
+/** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
+export const executedPanelQuery = (
+  metadataQueries: any[] | undefined,
+  panelQueryIndex: number,
+): string | undefined => {
+  const primary = metadataQueries?.find(
+    (entry: any) =>
+      entry?.panelQueryIndex === panelQueryIndex && !Number(entry?.timeRangeGap?.seconds),
+  );
+  return (primary ?? metadataQueries?.[panelQueryIndex])?.query || undefined;
+};
+
+/** The confirm dialog's choice of query, one per visible panel query. */
+export const panelQueryChoices = (
+  queries: any[],
+  metadataQueries: any[] | undefined,
+  visibleIndexes: number[] = queries.map((_, index) => index),
+): AlertPrefillQueryChoice[] =>
+  visibleIndexes.map((index) => ({
+    index,
+    tabName: queries[index]?.tabName,
+    query: executedPanelQuery(metadataQueries, index) ?? queries[index]?.query ?? "",
+  }));
+
 export const buildPrefillFromPanel = (
   input: PanelPrefillInput,
   makeId: () => string = () => Math.random().toString(36).slice(2),
 ): AlertPrefill => {
   const warnings: AlertPrefillWarning[] = [];
-  const query = input.queries?.[0];
+  const queryIndex = input.queryIndex ?? 0;
+  const query = input.queries?.[queryIndex];
 
   if (input.panelType && UNSUPPORTED_PANEL_TYPES.includes(input.panelType)) {
     warnings.push(warn("unsupportedPanelType", "warning", { type: input.panelType }));
@@ -200,6 +250,7 @@ export const buildPrefillFromPanel = (
       panelId: input.panelId,
       panelType: input.panelType,
     },
+    ...(input.queryChoices ? { queryChoices: input.queryChoices, queryIndex } : {}),
   };
 
   if (isPromql) {

@@ -855,6 +855,54 @@ describe("PanelContainer", () => {
       expect(prefill.name).toBe("Alert_from_My_Panel");
     });
 
+    it("uses the executed query, and lets the user pick between two queries", async () => {
+      const twoQueries = {
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: 'avg(disk_used{host=~"$host"})',
+            fields: { stream: "disk_used", stream_type: "metrics" },
+          },
+          {
+            query: "sum(rate(io_ops[$__rate_interval]))",
+            tabName: "IO",
+            fields: { stream: "io_ops", stream_type: "metrics" },
+          },
+        ],
+      };
+      const metaData = {
+        queries: [
+          { query: 'avg(disk_used{host=~"a"})', panelQueryIndex: 0 },
+          { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1 },
+        ],
+      };
+      wrapper = createWrapper({ data: twoQueries });
+      await wrapper.vm.metaDataValue(metaData);
+
+      const first = wrapper.vm.buildPanelAlertPrefill();
+      expect(first.promql).toBe('avg(disk_used{host=~"a"})');
+      expect(first.queryChoices.map((c: any) => c.query)).toEqual([
+        'avg(disk_used{host=~"a"})',
+        "sum(rate(io_ops[1m]))",
+      ]);
+
+      const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
+      expect(second.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(second.streamName).toBe("io_ops");
+      expect(second.queryIndex).toBe(1);
+    });
+
+    it("offers no query choice for a single-query panel", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
+        },
+      });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+    });
+
     it("disables the action when the panel has no queries", async () => {
       wrapper = createWrapper({ data: { ...mockPanelData, queries: [] } });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();

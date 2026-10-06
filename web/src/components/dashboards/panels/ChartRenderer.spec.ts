@@ -565,6 +565,34 @@ describe("ChartRenderer", () => {
       }
     });
 
+    it("carries the clicked series' index on domcontextmenu, for the alert's query", async () => {
+      const echarts = await import("echarts/core");
+      const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+      vi.mocked(mockChart.getOption).mockReturnValue({ series: [{ type: "line" }] });
+      const contextMenuHandler = vi
+        .mocked(mockChart.on)
+        .mock.calls.find((call) => call[0] === "contextmenu")?.[1];
+      expect(contextMenuHandler).toBeDefined();
+
+      contextMenuHandler!({
+        seriesName: "b",
+        dataIndex: 3,
+        seriesIndex: 2,
+        value: [1609459200000, 7],
+        event: {
+          event: { clientX: 1, clientY: 2, preventDefault: vi.fn(), stopPropagation: vi.fn() },
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.emitted("domcontextmenu")?.[0][0]).toEqual({
+        x: 1,
+        y: 2,
+        value: 7,
+        seriesIndex: 2,
+      });
+    });
+
     it("should not emit domcontextmenu for non-bar/line chart types", async () => {
       const echarts = await import("echarts/core");
       const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;

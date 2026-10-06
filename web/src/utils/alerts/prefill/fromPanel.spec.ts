@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildPrefillFromPanel, type PanelPrefillInput } from "./fromPanel";
-import { normalizePrefill, isPrefillBlocked } from "../alertPrefill";
+import {
+  buildPrefillFromPanel,
+  executedPanelQuery,
+  panelQueryChoices,
+  type PanelPrefillInput,
+} from "./fromPanel";
+import { normalizePrefill, isPrefillBlocked, needsConfirmation } from "../alertPrefill";
 
 let idCounter = 0;
 const makeId = () => `id-${idCounter++}`;
@@ -299,5 +304,123 @@ describe("buildPrefillFromPanel", () => {
     expect(isPrefillBlocked(p)).toBe(false);
     expect(p.streamName).toBeTruthy();
     expect(p.periodMinutes).toBeGreaterThan(0);
+  });
+});
+
+const promqlPanel = (overrides: Partial<PanelPrefillInput> = {}): PanelPrefillInput => ({
+  panelTitle: "Disk",
+  panelType: "line",
+  queryType: "promql",
+  queries: [
+    { query: "avg(disk_used)", fields: { stream: "disk_used", stream_type: "metrics" } },
+    {
+      query: "sum(rate(io_ops[$__rate_interval]))",
+      tabName: "IO",
+      fields: { stream: "io_ops", stream_type: "metrics" },
+    },
+  ],
+  ...overrides,
+});
+
+describe("buildPrefillFromPanel — the query the user points at", () => {
+  it("alerts on the panel query at queryIndex, not always the first", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({ queryIndex: 1, executedQuery: "sum(rate(io_ops[1m]))" }),
+      makeId,
+    );
+    expect(p.streamName).toBe("io_ops");
+    expect(p.promql).toBe("sum(rate(io_ops[1m]))");
+  });
+
+  it("keeps the first query when no index is given", () => {
+    const p = buildPrefillFromPanel(promqlPanel(), makeId);
+    expect(p.streamName).toBe("disk_used");
+    expect(p.promql).toBe("avg(disk_used)");
+  });
+
+  it("carries the query choices and the chosen index, which makes the dialog necessary", () => {
+    const choices = [
+      { index: 0, query: "avg(disk_used)" },
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ];
+    const p = normalizePrefill(
+      buildPrefillFromPanel(promqlPanel({ queryIndex: 1, queryChoices: choices }), makeId),
+    );
+    expect(p.queryChoices).toEqual(choices);
+    expect(p.queryIndex).toBe(1);
+    expect(needsConfirmation(p)).toBe(true);
+  });
+
+  it("does not ask for a dialog when there is only one choice", () => {
+    const p = normalizePrefill(
+      buildPrefillFromPanel(
+        promqlPanel({ queryChoices: [{ index: 0, query: "avg(disk_used)" }] }),
+        makeId,
+      ),
+    );
+    expect(needsConfirmation(p)).toBe(false);
+  });
+});
+
+describe("buildPrefillFromPanel — the Date pair a rendered panel holds", () => {
+  const TWO_HOURS_US = 2 * 3_600_000_000;
+  const START_US = 1_700_000_000_000_000;
+
+  it("reads a dashboard's Dates, built from microsecond epochs, as the period", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        timeRange: { start_time: new Date(START_US), end_time: new Date(START_US + TWO_HOURS_US) },
+      }),
+      makeId,
+    );
+    expect(p.periodMinutes).toBe(120);
+  });
+
+  it("reads the Explorer's Dates, built from millisecond epochs, as the same period", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        timeRange: {
+          start_time: new Date(START_US / 1000),
+          end_time: new Date((START_US + TWO_HOURS_US) / 1000),
+        },
+      }),
+      makeId,
+    );
+    expect(p.periodMinutes).toBe(120);
+  });
+});
+
+describe("executedPanelQuery", () => {
+  const metadata = [
+    { query: "avg(disk_used)", panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+    { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+    { query: "avg(disk_used)", panelQueryIndex: 0, timeRangeGap: { seconds: 86_400_000 } },
+  ];
+
+  it("returns the primary window's executed text for a panel query", () => {
+    expect(executedPanelQuery(metadata, 1)).toBe("sum(rate(io_ops[1m]))");
+    expect(executedPanelQuery([metadata[2], metadata[0]], 0)).toBe("avg(disk_used)");
+  });
+
+  it("falls back to the positional entry when the metadata carries no panel index", () => {
+    expect(executedPanelQuery([{ query: "a" }, { query: "b" }], 1)).toBe("b");
+    expect(executedPanelQuery(undefined, 0)).toBeUndefined();
+  });
+});
+
+describe("panelQueryChoices", () => {
+  it("lists each visible query with its tab name and executed text", () => {
+    const queries = promqlPanel().queries!;
+    const metadata = [
+      { query: "avg(disk_used)", panelQueryIndex: 0 },
+      { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1 },
+    ];
+    expect(panelQueryChoices(queries, metadata)).toEqual([
+      { index: 0, tabName: undefined, query: "avg(disk_used)" },
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ]);
+    expect(panelQueryChoices(queries, metadata, [1])).toEqual([
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ]);
   });
 });

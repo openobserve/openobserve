@@ -41,6 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div v-if="prefill" class="flex flex-col gap-5">
+      <!-- Query picker — only when the surface had several queries and could not tell which. -->
+      <OSelect
+        v-if="queryOptions.length > 1"
+        :model-value="prefill.queryIndex"
+        :options="queryOptions"
+        :label="t('alerts.prefill.dialog.queryChoiceLabel')"
+        :searchable="false"
+        data-test="create-alert-query-picker"
+        @update:model-value="onQueryChange"
+      />
+
       <!-- Stream picker — only when the surface offered a choice. Alerts are
            single-stream; silently taking the first one is a trap. -->
       <div v-if="hasStreamChoice" class="flex flex-col gap-2">
@@ -170,6 +181,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -219,6 +231,20 @@ const patternMode = computed<AlertPatternMode>(() => props.prefill?.patternFilte
 const onPatternModeChange = (value: unknown) => {
   if (!value || value === patternMode.value) return;
   emit("rebuild", { patternMode: value as AlertPatternMode });
+};
+
+const queryOptions = computed(() =>
+  (props.prefill?.queryChoices ?? []).map((choice) => ({
+    value: choice.index,
+    label: choice.tabName
+      ? raw(choice.tabName)
+      : t("common.queryNumber", { index: choice.index + 1 }),
+  })),
+);
+
+const onQueryChange = (value: unknown) => {
+  if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
+  emit("rebuild", { queryIndex: value });
 };
 
 const showQuery = computed(() => {

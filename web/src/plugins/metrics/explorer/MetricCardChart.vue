@@ -54,6 +54,7 @@ export default defineComponent({
   props: {
     /** One PromQL query_range response per query in the effective variant. */
     results: { type: Array as PropType<any[]>, required: true },
+    /** `{expr, legendTemplate?, stream?}`; `stream` is what a right-click alert reads. */
     queries: { type: Array as PropType<any[]>, required: true },
     chartType: { type: String, default: "line" },
     unit: { type: String, default: null },
@@ -136,7 +137,7 @@ export default defineComponent({
       queries: (props.queries ?? []).map((q: any) => ({
         query: q.expr,
         customQuery: true,
-        fields: { stream_type: "metrics" },
+        fields: { ...(q.stream ? { stream: q.stream } : {}), stream_type: "metrics" },
         config: { promql_legend: q.legendTemplate ?? "" },
       })),
       config: {

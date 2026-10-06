@@ -24,7 +24,16 @@ import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectio
 
 const MetricCardChartStub = {
   name: "MetricCardChart",
-  props: ["results", "queries", "chartType", "unit", "color", "timeRange", "legend"],
+  props: [
+    "results",
+    "queries",
+    "chartType",
+    "unit",
+    "color",
+    "timeRange",
+    "legend",
+    "allowAlertCreation",
+  ],
   template: `<div data-test="tile-chart-stub" />`,
 };
 
@@ -72,6 +81,21 @@ describe("MetricChartTile", () => {
     expect(wrapper.find('[data-test="tile-header"]').exists()).toBe(true);
     expect(runQuery).toHaveBeenCalledWith("sum(rate(x[4m]))", expect.any(AbortSignal));
     expect(wrapper.findComponent({ name: "MetricCardChart" }).props("results")).toEqual([SERIES]);
+  });
+
+  it("offers the chart's right-click alert only when asked to", async () => {
+    wrapper = mountTile();
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "MetricCardChart" }).props("allowAlertCreation")).toBe(
+      false,
+    );
+    wrapper.unmount();
+
+    wrapper = mountTile({ allowAlertCreation: true });
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "MetricCardChart" }).props("allowAlertCreation")).toBe(
+      true,
+    );
   });
 
   it("shows a skeleton while the query is not yet known, and runs nothing", async () => {

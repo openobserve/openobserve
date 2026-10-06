@@ -374,6 +374,7 @@ export default defineComponent({
           x: event.clientX,
           y: event.clientY,
           value: Number(dataPointValue),
+          seriesIndex: params.seriesIndex,
         });
       }
     };

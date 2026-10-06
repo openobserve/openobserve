@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :time-range="timeRange"
         :run-query="heatmap ? runHeatmapQuery : runQuery"
         legend
+        allow-alert-creation
         data-test="metrics-breakdown-chart"
         @results="focused = $event"
       >
@@ -417,7 +418,8 @@ import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
 interface BreakdownVariant {
-  queries: TileQuery[];
+  /** `builder` names the stream a query reads when it is not the card's own. */
+  queries: Array<TileQuery & { builder?: { metric: string } }>;
   chartType: string;
   unit: string;
   bucketUnit?: string | null;
@@ -771,7 +773,9 @@ export default defineComponent({
             label,
             topk,
           );
-      return expr ? [{ expr, legendTemplate: `{${label}}` }] : [];
+      const stream =
+        (follows.value && props.variant!.queries[0]?.builder?.metric) || props.card.name;
+      return expr ? [{ expr, legendTemplate: `{${label}}`, stream }] : [];
     };
 
     /** `null` until the label's counts answer: only they know whether to cap at top 10. */

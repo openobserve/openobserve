@@ -18,13 +18,15 @@ import { gt } from "@/types/i18n";
 import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import {
+  alertCreationDialog,
+  closeAlertCreationDialog,
+  rebuildAlertPrefill,
+} from "@/composables/alerts/useAlertCreation";
 
 vi.mock("@/utils/dom", () => ({
   downloadFile: vi.fn(),
 }));
-
-const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 describe("usePanelActions", () => {
   beforeEach(() => {
@@ -143,7 +145,7 @@ describe("usePanelActions", () => {
       });
     });
 
-    it("explains itself instead of no-oping when the panel has no stream", () => {
+    it("explains itself in the confirm dialog instead of no-oping when the panel has no stream", () => {
       const args = makeBase();
       args.panelSchema.value.queries[0].fields = {
         y: [{ column: "errors", alias: "errors" }],
@@ -153,7 +155,8 @@ describe("usePanelActions", () => {
       api.handleCreateAlert({ condition: "above", threshold: 10 });
 
       expect(args.router.push).not.toHaveBeenCalled();
-      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(alertCreationDialog.value?.open).toBe(true);
+      expect(alertCreationDialog.value?.prefill.warnings.map((w) => w.key)).toContain("noStream");
     });
 
     it("does nothing when query is missing", () => {
@@ -164,6 +167,116 @@ describe("usePanelActions", () => {
       api.handleCreateAlert({ condition: ">", threshold: 1 });
 
       expect(args.router.push).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("usePanelAlertCreation picks the query from the clicked series", () => {
+    const makePromql = () => ({
+      panelSchema: {
+        value: {
+          id: "panel-2",
+          title: "Disk and IO",
+          queryType: "promql",
+          queries: [
+            { query: "avg(disk_used)", fields: { stream: "disk_used", stream_type: "metrics" } },
+            {
+              query: "sum(rate(io_ops[$__rate_interval]))",
+              fields: { stream: "io_ops", stream_type: "metrics" },
+            },
+          ],
+        },
+      },
+      allowAlertCreation: { value: true },
+      metadata: {
+        value: {
+          queries: [
+            { query: "avg(disk_used)", panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+            {
+              query: "sum(rate(io_ops[1m]))",
+              panelQueryIndex: 1,
+              timeRangeGap: { seconds: 0 },
+            },
+            {
+              query: "sum(rate(io_ops[1m]))",
+              panelQueryIndex: 1,
+              timeRangeGap: { seconds: 86_400_000 },
+            },
+          ],
+        },
+      },
+      selectedTimeObj: { value: { start_time: 1, end_time: 2 } },
+      contextMenuData: { value: null as any },
+      store: { state: { selectedOrganization: { identifier: "org-1" } } },
+      router: { push: vi.fn() },
+      emit: vi.fn(),
+    });
+
+    beforeEach(() => closeAlertCreationDialog());
+
+    it("prefills the clicked series' query with its executed text", () => {
+      const args = makePromql();
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({
+        condition: "above",
+        threshold: 5,
+        panelQueryIndex: 1,
+        seriesRole: "primary",
+      });
+
+      expect(args.router.push).toHaveBeenCalledTimes(1);
+      const stored = readAlertPrefill();
+      expect(stored?.streamName).toBe("io_ops");
+      expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(stored?.promqlCondition).toEqual({ column: "value", operator: ">=", value: 5 });
+    });
+
+    it("alerts a shifted series on its parent's current-period query", () => {
+      const args = makePromql();
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({
+        condition: "below",
+        threshold: 2,
+        panelQueryIndex: 1,
+        seriesRole: "shifted",
+      });
+
+      const stored = readAlertPrefill();
+      expect(stored?.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(stored?.promqlCondition?.operator).toBe("<=");
+    });
+
+    it("asks which query when the click hit no series and the panel has several", () => {
+      const args = makePromql();
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 7 });
+
+      expect(args.router.push).not.toHaveBeenCalled();
+      const dialog = alertCreationDialog.value;
+      expect(dialog?.open).toBe(true);
+      expect(dialog?.prefill.queryChoices?.map((c) => c.query)).toEqual([
+        "avg(disk_used)",
+        "sum(rate(io_ops[1m]))",
+      ]);
+
+      rebuildAlertPrefill({ queryIndex: 1 });
+
+      expect(alertCreationDialog.value?.prefill.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(alertCreationDialog.value?.prefill.streamName).toBe("io_ops");
+      expect(alertCreationDialog.value?.prefill.queryIndex).toBe(1);
+      expect(alertCreationDialog.value?.prefill.promqlCondition?.value).toBe(7);
+    });
+
+    it("offers only the visible queries, and skips the dialog when one is left", () => {
+      const args = { ...makePromql(), visibleQueryIndexes: { value: [1] } };
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({ condition: "above", threshold: 7 });
+
+      expect(alertCreationDialog.value).toBeNull();
+      expect(readAlertPrefill()?.promql).toBe("sum(rate(io_ops[1m]))");
     });
   });
 

@@ -26,7 +26,7 @@ import {
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, debounce } from "lodash-es";
+import { cloneDeep, debounce, set } from "lodash-es";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
@@ -95,7 +95,12 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import type { AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import {
+  forecastModeFields,
+  parseForecastAlertPromql,
+  type ForecastAlert,
+} from "@/utils/alerts/forecastAlert";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -338,6 +343,30 @@ export const defaultAnomalyConfig = () => ({
   tags: [] as string[],
 });
 
+/** A saved alert's forecast fields, when its PromQL is a generated forecast query. */
+export const formForecastOf = (alert: any): ForecastAlert | null =>
+  alert?.query_condition?.type === "promql"
+    ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
+    : null;
+
+/** Seeds a form value from a PromQL prefill; a generated forecast query opens Forecast mode. */
+export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
+  data.query_condition.type = "promql";
+  data.query_condition.promql = prefill.promql ?? "";
+  if (prefill.promqlCondition) {
+    data.query_condition.promql_condition = { ...prefill.promqlCondition };
+  }
+  if (prefill.promqlMultiAlert !== undefined) {
+    data.query_condition.promql_multi_alert = prefill.promqlMultiAlert;
+  }
+  const forecast = formForecastOf(data);
+  data._ui = { ...data._ui, forecast };
+  if (forecast) {
+    Object.entries(forecastModeFields(forecast)).forEach(([path, value]) => set(data, path, value));
+  }
+  return data;
+};
+
 // ─── Composable ─────────────────────────────────────────────────────────────
 
 export interface AlertFormProps {
@@ -456,6 +485,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
+        forecast: formForecastOf(obj),
       },
       _meta:
         obj?._meta ??
@@ -1761,11 +1791,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
 
       if (prefill.queryType === "promql") {
-        data.query_condition.type = "promql";
-        data.query_condition.promql = prefill.promql ?? "";
-        if (prefill.promqlCondition) {
-          data.query_condition.promql_condition = { ...prefill.promqlCondition };
-        }
+        applyPromqlPrefill(data, prefill);
       } else if (prefill.queryType === "custom" && prefill.conditions) {
         data.query_condition.type = "custom";
         data.query_condition.conditions = cloneDeep(prefill.conditions);

@@ -170,6 +170,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="max-md:hidden">{{ t("metrics.explorer.detail.openInVisualize") }}</span>
             <OTooltip :content="t('metrics.explorer.detail.openInVisualize')" />
           </OButton>
+          <ODropdown align="end">
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="icon-toolbar"
+                icon-left="more-horiz"
+                :aria-label="t('metrics.explorer.detail.moreActions')"
+                data-test="metrics-detail-more"
+              >
+                <OTooltip :content="t('metrics.explorer.detail.moreActions')" />
+              </OButton>
+            </template>
+            <CreateAlertAction
+              source="panel"
+              :build="buildOverviewAlertPrefill"
+              :disabled-reason="
+                overview.queries.length ? null : t('metrics.explorer.detail.noPreview')
+              "
+              data-test="metrics-detail-create-alert"
+            />
+          </ODropdown>
           <OButton
             variant="ghost"
             size="icon-toolbar"
@@ -248,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <MetricCardChart
               v-else-if="overviewState.status === 'done'"
               :results="overviewState.results"
-              :queries="overview.queries"
+              :queries="overviewQueries"
               :chart-type="overview.chartType"
               :unit="overviewUnit.unit"
               :unit-custom="overviewUnit.unitCustom ?? undefined"
@@ -257,6 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :color="color"
               :time-range="overviewState.timeRange"
               :injected-exemplars="exemplarsOn ? exemplars : undefined"
+              :allow-alert-creation="true"
               @error="onOverviewRenderError"
             />
             <OSkeleton v-else class="h-full" animation="wave" />
@@ -389,6 +411,10 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { parseSearchError } from "@/utils/query/searchError";
 import { supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
 import { UNIT_LABELS } from "@/utils/metrics/metricPalette";
@@ -398,6 +424,7 @@ import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { hasSamples, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
 const RELATED_LIMIT = 12;
 
@@ -449,6 +476,8 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OBanner,
+    ODropdown,
+    CreateAlertAction,
   },
   props: {
     /** `null` while loading, or when the URL names a metric that does not exist. */
@@ -595,6 +624,31 @@ export default defineComponent({
     });
 
     const overviewState = ref<OverviewState>(IDLE);
+    const overviewQueries = computed(() =>
+      props.card ? withSourceStreams(props.overview.queries, props.card.name) : [],
+    );
+    /** The overview's queries as a panel's, with no threshold: the form defaults to `>= 1`. */
+    const buildOverviewAlertPrefill = (options: AlertBuildOptions = {}) => {
+      const queries = overviewQueries.value.map((query) => ({
+        query: query.expr,
+        fields: { stream: query.stream, stream_type: "metrics" },
+      }));
+      return buildPrefillFromPanel({
+        panelTitle: props.card?.name,
+        queries,
+        queryType: "promql",
+        queryIndex: options.queryIndex,
+        queryChoices:
+          queries.length > 1
+            ? queries.map((query, index) => ({ index, query: query.query }))
+            : undefined,
+        timeRange: {
+          value_type: "absolute",
+          startTime: props.timeRange.start_time,
+          endTime: props.timeRange.end_time,
+        },
+      });
+    };
     const overviewHasSamples = computed(() => overviewState.value.results.some(hasSamples));
     const overviewUnit = computed(() => toO2Unit(props.overview.unit));
     const overviewBucketUnit = computed(() =>
@@ -717,6 +771,8 @@ export default defineComponent({
       breakdownSupported,
       activeTab,
       overviewState,
+      overviewQueries,
+      buildOverviewAlertPrefill,
       overviewHasSamples,
       overviewUnit,
       overviewBucketUnit,

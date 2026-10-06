@@ -34,6 +34,11 @@ const USAGE = {
   pipelines: [{ id: "p1", name: "Pipe", match: "text" }],
   unparsed: 1,
 };
+const { openAlertCreation } = vi.hoisted(() => ({ openAlertCreation: vi.fn(() => true) }));
+vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/alerts/useAlertCreation")>()),
+  useAlertCreation: () => ({ openAlertCreation }),
+}));
 
 const card = (name: string, over: Record<string, any> = {}): any => ({
   name,
@@ -141,6 +146,7 @@ const mountView = (
             "unit",
             "timeRange",
             "injectedExemplars",
+            "allowAlertCreation",
           ],
           template: "<div />",
         },
@@ -238,6 +244,47 @@ describe("MetricDetailView", () => {
       await flushPromises();
       expect(chart().props("results")).toEqual([NEXT]);
       expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 3 });
+    });
+  });
+
+  describe("create alert", () => {
+    const HOUR_US = 3_600_000_000;
+    const dropdownStubs = {
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: "<div v-bind='$attrs' @click=\"$emit('select')\"><slot /></div>",
+      },
+    };
+
+    it("offers the overview chart's right-click alert, on the metric's own stream", async () => {
+      wrapper = mountView();
+      await flushPromises();
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("allowAlertCreation")).toBe(true);
+      expect(chart.props("queries")[0].stream).toBe(SELECTED.name);
+    });
+
+    it("opens the alert form on the overview query from the header's overflow menu", async () => {
+      wrapper = mountView(
+        { timeRange: { start_time: 10 * HOUR_US, end_time: 11 * HOUR_US } },
+        { stubs: dropdownStubs },
+      );
+      await flushPromises();
+      await wrapper.find('[data-test="metrics-detail-create-alert"]').trigger("click");
+
+      expect(openAlertCreation).toHaveBeenCalledTimes(1);
+      const prefill = (openAlertCreation.mock.calls[0] as any[])[0];
+      expect(prefill).toMatchObject({
+        source: "panel",
+        queryType: "promql",
+        streamName: SELECTED.name,
+        streamType: "metrics",
+        promql: "sum by (le) (rate(x[4m]))",
+        periodMinutes: 60,
+      });
+      expect(prefill.promqlCondition).toBeUndefined();
     });
   });
 

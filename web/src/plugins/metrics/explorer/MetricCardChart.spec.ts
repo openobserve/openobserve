@@ -21,6 +21,7 @@ import i18n from "@/locales";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 import MetricCardChart from "./MetricCardChart.vue";
+import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 
 const RESULTS = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
 
@@ -120,6 +121,36 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     await nextTick();
 
     expect(panelProp(wrapper, "panelSchema").queries[0].query).toBe("sum(rate(up[5m]))");
+  });
+
+  it("gives each query the stream it reads, so an alert from the chart has one", () => {
+    const queries = withSourceStreams(
+      [
+        {
+          expr: "histogram_quantile(0.9, sum by (le) (rate(req_bucket[5m])))",
+          builder: { metric: "req_bucket", labels: [], operations: [] },
+        },
+        {
+          expr: "sum(rate(req_count[5m]))",
+          builder: { metric: "req_count", labels: [], operations: [] },
+        },
+        { expr: "avg(req_bucket)" },
+      ] as any[],
+      "req_bucket",
+    );
+    const schemaQueries = panelProp(mountChart({ queries }), "panelSchema").queries;
+
+    expect(schemaQueries.map((q: any) => q.fields)).toEqual([
+      { stream: "req_bucket", stream_type: "metrics" },
+      { stream: "req_count", stream_type: "metrics" },
+      { stream: "req_bucket", stream_type: "metrics" },
+    ]);
+  });
+
+  it("leaves the stream out when a query does not name one", () => {
+    expect(panelProp(mountChart(), "panelSchema").queries[0].fields).toEqual({
+      stream_type: "metrics",
+    });
   });
 
   it("pins the x-axis to the queried range (injected, non-streaming data)", () => {

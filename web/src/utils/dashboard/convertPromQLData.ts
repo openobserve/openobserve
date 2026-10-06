@@ -808,6 +808,8 @@ export const convertPromQLData = async (
                 // Position among the rendered queries; exemplar markers take the colour of their query's first series.
                 // A shifted series is never a query's first series.
                 ...(nameSuffixes[index] ? {} : { _queryIndex: index }),
+                _panelQueryIndex: parentQueryIndex[index],
+                _seriesRole: nameSuffixes[index] ? "shifted" : "primary",
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",
@@ -897,6 +899,8 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                _panelQueryIndex: parentQueryIndex[index],
+                _seriesRole: nameSuffixes[index] ? "shifted" : "primary",
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",

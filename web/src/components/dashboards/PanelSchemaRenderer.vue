@@ -252,6 +252,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :x="contextMenuPosition.x"
         :y="contextMenuPosition.y"
         :value="contextMenuValue"
+        :panel-query-index="contextMenuData?.panelQueryIndex"
+        :series-role="contextMenuData?.seriesRole"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />
@@ -1129,7 +1131,7 @@ export default defineComponent({
       contextMenuPosition,
       contextMenuValue,
       onChartContextMenu,
-      onChartDomContextMenu,
+      onChartDomContextMenu: openAlertContextMenu,
       hideContextMenu,
       handleCreateAlert,
     } = usePanelAlertCreation({
@@ -1141,7 +1143,20 @@ export default defineComponent({
       store,
       router,
       emit,
+      visibleQueryIndexes,
     });
+    // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
+    const onChartDomContextMenu = (event: any) => {
+      const series =
+        typeof event?.seriesIndex === "number"
+          ? panelData.value?.options?.series?.[event.seriesIndex]
+          : undefined;
+      openAlertContextMenu({
+        ...event,
+        panelQueryIndex: series?._panelQueryIndex,
+        seriesRole: series?._seriesRole,
+      });
+    };
 
     // hovered series state
     // used to show tooltip axis for all charts

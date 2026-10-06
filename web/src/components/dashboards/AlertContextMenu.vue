@@ -75,6 +75,15 @@ export default defineComponent({
       type: [Number, String],
       required: true,
     },
+    /** The clicked series' panel query; absent when the click hit no series. */
+    panelQueryIndex: {
+      type: Number,
+      default: undefined,
+    },
+    seriesRole: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
@@ -99,6 +108,8 @@ export default defineComponent({
       emit("select", {
         condition,
         threshold: props.value,
+        panelQueryIndex: props.panelQueryIndex,
+        seriesRole: props.seriesRole,
       });
     };
 

@@ -154,6 +154,18 @@ describe("AlertContextMenu Component", () => {
       });
     });
 
+    it("passes the clicked series' panel query and role through", () => {
+      wrapper = createWrapper({ value: 3, panelQueryIndex: 1, seriesRole: "shifted" });
+      wrapper.vm.handleMenuItemClick("above");
+
+      expect(wrapper.emitted("select")[0][0]).toEqual({
+        condition: "above",
+        threshold: 3,
+        panelQueryIndex: 1,
+        seriesRole: "shifted",
+      });
+    });
+
     it("should emit select with the current value as threshold", () => {
       wrapper = createWrapper({ value: 999 });
       wrapper.vm.handleMenuItemClick("above");

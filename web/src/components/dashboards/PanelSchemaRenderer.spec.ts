@@ -2017,6 +2017,29 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuValue).toBe(75);
     });
 
+    it("resolves the clicked series to its panel query and role", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary" },
+            { name: "b (1 day ago)", _panelQueryIndex: 1, _seriesRole: "shifted" },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+
+      expect(wrapper.vm.contextMenuData).toMatchObject({
+        value: 3,
+        panelQueryIndex: 1,
+        seriesRole: "shifted",
+      });
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
+    });
+
     it("should hide context menu", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 
