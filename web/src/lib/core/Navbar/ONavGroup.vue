@@ -104,26 +104,13 @@ const flyoutStyle = ref<Record<string, string>>({});
 // group is worth collapsing into at all.
 const gateContext = useNavGateContext();
 
-// A child shows only when (a) its route is registered in this build and (b)
-// custom_hide_menus does not name it — exactly as the target page would
-// decide. Its `gate` (if any) then decides WHETHER it's locked, not whether
-// it shows: when the gate is a registered enterprise/cloud FeatureKey, a
-// failing gate keeps the child (dimmed, inert, with a message) rather than
-// dropping it, so the feature stays discoverable in a build that doesn't
-// unlock it — UNLESS `checkFeatureAccess` itself says the feature isn't
-// `visible` at all (a self-hosted-only feature on a pure-Cloud build has no
-// "upgrade" story, so it's dropped like before, not shown locked). A `gate`
-// that ISN'T a FeatureKey (e.g. a plain on/off section flag) keeps the old
-// hide-on-fail behavior — and even for a FeatureKey gate, that SAME
-// non-FeatureKey check still runs once the edition allows it, so a child
-// whose gate happens to ALSO be a runtime on/off flag (On-Call's `oncall`,
-// gated on the backend flag in GATE_PREDICATES as well as edition here)
-// still hides when the admin has turned it off, rather than rendering
-// unlocked-but-broken.
-//
-// The custom_hide_menus check is by route NAME so a child with no top-level
-// rail entry of its own is hideable at all: `requires` only tracks the parent,
-// and MainLayout's filter only ever sees top-level links.
+// A child shows when its route is registered and custom_hide_menus doesn't
+// name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
+// show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
+// all); a non-FeatureKey gate (plain on/off flag) keeps the old hide-on-fail
+// behavior, which also still applies on top once a FeatureKey's edition
+// check passes (e.g. On-Call hides when the admin flag is off, not just the
+// edition).
 const visibleChildren = computed<SubnavChild[]>(() =>
   props.children
     .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
@@ -133,9 +120,6 @@ const visibleChildren = computed<SubnavChild[]>(() =>
         const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
         if (!access.visible) return [];
         if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
-        // Edition allows it — the gate might ALSO name a runtime on/off flag
-        // (not every FeatureKey does); defer to that before calling it fully
-        // unlocked.
         return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
       }
       return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
@@ -577,15 +561,15 @@ function onChildMouseenter(event: MouseEvent) {
             {{ t(block.labelKey) }}
           </div>
           <template v-for="child in block.children" :key="childKey(child)">
-            <!-- `div` when locked, never `router-link`: RouterLink's own click
-                 handler runs BEFORE onChildClick's preventDefault (it's merged
-                 first in the fallthrough listener array), so it navigates
-                 regardless — only not rendering a RouterLink at all stops it. -->
+            <!-- `div` when locked, never `router-link`: RouterLink's click
+                 handler runs before onChildClick's preventDefault, so only
+                 not rendering it at all stops navigation. -->
             <component
               :is="child.locked ? 'div' : 'router-link'"
               :data-test="child.locked ? `${childDataTest(child)}-locked` : childDataTest(child)"
               role="menuitem"
               :to="child.locked ? undefined : childTo(child)"
+              :tabindex="child.locked ? 0 : undefined"
               class="nav-group-item rounded-default flex items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
@@ -602,17 +586,9 @@ function onChildMouseenter(event: MouseEvent) {
               }}</span>
               <BetaBadge v-if="child.beta" size="xs" />
             </component>
-            <!-- Sibling, NOT nested inside the link above: child-mode OTooltip
-                 anchors to the element immediately before it, so nesting it
-                 would shrink the hoverable region to whatever element happens
-                 to precede it inside the link (the label span) instead of the
-                 whole tile — the pointer would leave that tiny region well
-                 before reaching the bubble and the tooltip would snap shut.
-                 mouseenter/leave reuse the flyout's own close-timer handlers
-                 so hovering the tooltip (teleported outside the flyout's own
-                 DOM) doesn't let the flyout's close timer run out from under
-                 it — without this, moving onto the tooltip's Upgrade link
-                 closed the whole flyout (and the tooltip with it). -->
+            <!-- Sibling, not nested — see MenuLink.vue for why. mouseenter/leave
+                 reuse the flyout's own close-timer handlers so hovering the
+                 teleported tooltip doesn't let the flyout close from under it. -->
             <LockedFeatureTooltip
               v-if="child.locked && child.lockedMessage"
               :message="child.lockedMessage"
@@ -632,6 +608,7 @@ function onChildMouseenter(event: MouseEvent) {
             "
             role="menuitem"
             :to="block.child.locked ? undefined : childTo(block.child)"
+            :tabindex="block.child.locked ? 0 : undefined"
             class="nav-group-item rounded-default flex items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
             :class="[
               flyoutTextClass,
@@ -715,6 +692,7 @@ function onChildMouseenter(event: MouseEvent) {
                 :data-test="child.locked ? `${childDataTest(child)}-locked` : childDataTest(child)"
                 role="menuitem"
                 :to="child.locked ? undefined : childTo(child)"
+                :tabindex="child.locked ? 0 : undefined"
                 class="nav-group-item rounded-default focus-visible:ring-accent flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                 :class="[
                   flyoutTextClass,
@@ -761,6 +739,7 @@ function onChildMouseenter(event: MouseEvent) {
               "
               role="menuitem"
               :to="block.child.locked ? undefined : childTo(block.child)"
+              :tabindex="block.child.locked ? 0 : undefined"
               class="nav-group-item rounded-default focus-visible:ring-accent flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
               :class="[
                 flyoutTextClass,

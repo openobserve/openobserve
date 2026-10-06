@@ -200,9 +200,9 @@ export const NAV_GROUPS: NavGroupDef[] = [
       // same workflow tile rather than as its own rail entry. Pages, Teams and
       // Routing share the "On-Call" category header so the flyout reads as one
       // module with three destinations, not three unrelated reliability
-      // entries. `gate: "oncall"` is the single place the O2_ONCALL_ENABLED
-      // flag is read for navigation, and `router.hasRoute` already limits this
-      // to the enterprise/cloud build.
+      // entries. `gate: "oncall"` is a FeatureKey, so it resolves via
+      // checkFeatureAccess (edition only) — the on-call routes are always
+      // registered and separately redirect home on the oncall_enabled flag.
       {
         titleKey: "oncall.pagesNav",
         icon: "notifications-active",

@@ -1,37 +1,8 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import {
-  checkFeatureAccess,
-  buildFeatureGateContext,
-  type FeatureKey,
-} from "@/utils/enterpriseFeatures";
+import { withFeatureGate } from "@/utils/enterpriseFeatures";
 
 const Settings = () => import("@/components/settings/index.vue");
-
-/**
- * Wraps a route guard so navigation redirects to the shared locked-feature
- * page instead of proceeding, when the edition doesn't unlock `key`.
- *
- * This has to be a GUARD, not a choice of `component:` — vue-router
- * permanently overwrites a route record's resolved component with whatever
- * its lazy loader first resolves to (see `extractComponentsGuards` in its
- * source: `record.components[name] = resolvedComponent`), so a key decided
- * by picking between two components freezes at whichever one resolved on the
- * FIRST navigation, for the rest of the session. A guard has no such cache —
- * it re-runs on every navigation — so it's the only place this can safely
- * depend on state that might still be loading (not an issue for the
- * build-time-only keys below, but the same helper is shared with
- * useEnterpriseRoutes.ts, where "rbac" does depend on such state).
- */
-const withFeatureGate =
-  (key: FeatureKey, guard: (to: any, from: any, next: any) => void) =>
-  (to: any, from: any, next: any) => {
-    if (!checkFeatureAccess(key, buildFeatureGateContext()).allowed) {
-      next({ name: "enterpriseFeatureLocked", query: { feature: key } });
-      return;
-    }
-    guard(to, from, next);
-  };
 
 const useManagementRoutes = () => {
   const routes: any = [

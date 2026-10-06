@@ -17,15 +17,10 @@ import config from "@/aws-exports";
 import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 
 /**
- * The ONE registry of enterprise/cloud-only features in the app. Every
- * surface that needs to know "is this feature available in this build, and
- * what do I tell the user if not" calls {@link checkFeatureAccess} with a key
- * from here — never re-derives its own `config.isEnterprise == "true"` check.
- *
- * This is also the single place a future backend feature-flag endpoint plugs
- * in: swap a predicate's body to read a server-provided flag instead of
- * `config.isEnterprise`/`isCloud` (e.g. `ctx.remoteFlags?.[key]`) and every
- * caller of `checkFeatureAccess` keeps working unchanged.
+ * The ONE registry of enterprise/cloud-only features in the app — every
+ * surface calls {@link checkFeatureAccess} with a key from here instead of
+ * re-deriving its own `config.isEnterprise == "true"` check. A future backend
+ * flag endpoint only has to change a predicate's body here.
  */
 export type FeatureKey =
   | "enterprise"
@@ -49,33 +44,29 @@ export type FeatureKey =
   | "oncall";
 
 /**
- * The flags every predicate below reads — deliberately EDITION-only (plus the
- * one feature, RBAC, whose backend flag gates it independently of edition).
- *
- * Meta-org restrictions, admin-configured runtime toggles (`*_enabled` from
- * `/config`) and similar are a DIFFERENT, orthogonal concern: they decide
- * whether a section applies at all (e.g. a non-meta org has no cluster-level
- * Nodes page to upgrade into), not whether upgrading the edition would unlock
- * it. Callers keep applying those as a separate `visible`/hide condition, same
- * as before this registry existed — only the edition check moves here.
+ * The flags every predicate below reads — EDITION-only, plus RBAC's own
+ * backend toggle. Meta-org restrictions and other runtime `*_enabled` flags
+ * are a separate, orthogonal `visible`/hide condition callers apply on top —
+ * only the edition (+ RBAC toggle) check lives here.
  */
 export interface FeatureGateContext {
   isEnterprise: boolean;
   isCloud: boolean;
+  /**
+   * `rbac_enabled` defaults OPEN (`!== false`, not `!!`) so a cold load with
+   * `zoConfig` still `{}` doesn't lock out a real Enterprise/Cloud user with
+   * RBAC on — same `=== false` convention the other runtime-flag route
+   * guards in this codebase already use (see useEnterpriseRoutes.ts).
+   */
   rbac: boolean;
 }
 
 /**
- * Builds the context from `config` (build-time, always available) plus
- * whatever `zoConfig`-shaped object the caller already has — their own
- * `store.state.zoConfig` (component) or the raw store singleton's (route
- * table; see useEnterpriseRoutes.ts for the existing precedent of importing
- * it directly there).
- *
- * Deliberately NOT importing the store singleton here: this module needs to
- * stay free of a `@/stores` dependency so it can be imported by any
- * component without pulling the whole store module (and its own
- * `@/utils/zincutils` calls) into unit tests that mock that neighbor.
+ * Builds the context from `config` (build-time) plus whatever
+ * `zoConfig`-shaped object the caller has — their own `store.state.zoConfig`
+ * or the route table's store singleton. Not importing the store singleton
+ * here directly keeps this module `@/stores`-free for callers whose tests
+ * mock that neighbor.
  */
 export function buildFeatureGateContext(
   zoConfig?: { rbac_enabled?: boolean } | null,
@@ -83,7 +74,7 @@ export function buildFeatureGateContext(
   return {
     isEnterprise: config.isEnterprise == "true",
     isCloud: config.isCloud == "true",
-    rbac: !!zoConfig?.rbac_enabled,
+    rbac: zoConfig?.rbac_enabled !== false,
   };
 }
 
@@ -91,24 +82,13 @@ interface FeatureGateDefinition {
   predicate: (ctx: FeatureGateContext) => boolean;
   /** An EXISTING menu/settings label key, interpolated into the generic locked message. */
   labelKey: I18nKey;
-  /**
-   * A full-sentence, benefit-led locked message that REPLACES the generic
-   * "{feature} is an Enterprise feature…" one. Reserved for the handful of
-   * features people actually discover by browsing the nav (where the point
-   * is to make them want to upgrade, not just explain why a click did
-   * nothing) — the Settings/IAM admin pages stay on the plain generic copy.
-   */
+  /** A full-sentence, benefit-led message that replaces the generic one — for features discovered by browsing the nav. */
   pitchKey?: I18nKey;
   /**
-   * False for a feature Cloud never offers at all — self-hosted-only things
-   * like cipher keys or node management, which a Cloud customer can't
-   * "upgrade" into the way a self-hosted admin can. On a pure-Cloud build
-   * (isCloud, not isEnterprise) `checkFeatureAccess` reports it as NOT
-   * VISIBLE rather than locked, so callers hide it entirely instead of
-   * showing a false upsell. Omit (defaults to visible-when-locked) for a
-   * feature whose predicate already includes `isCloud` — there, failing the
-   * predicate already implies a pure-cloud-without-enterprise build has
-   * nothing to offer, so there's nothing extra to hide.
+   * False for a feature Cloud never offers at all (self-hosted-only, e.g.
+   * cipher keys). A pure-Cloud build then reports `visible: false` instead of
+   * locked, so callers hide it rather than showing a false upsell. Omit for a
+   * predicate that already includes `isCloud` — nothing extra to hide there.
    */
   cloudOffers?: false;
 }
@@ -217,35 +197,75 @@ export function isFeatureKey(key: string): key is FeatureKey {
 
 export interface FeatureAccess {
   allowed: boolean;
-  /**
-   * False means hide this feature ENTIRELY — not locked, not shown at all
-   * (a self-hosted-only feature on a pure-Cloud build; see `cloudOffers`).
-   * Always true when `allowed` is true.
-   */
+  /** False means hide this feature ENTIRELY — not locked, not shown at all. Always true when `allowed` is true. */
   visible: boolean;
   /** Empty when `allowed` (or not `visible`) — nothing to tell the user. */
   message: I18nText;
+  /**
+   * False only for the one case where upgrading wouldn't help: an edition
+   * that already supports the feature, but an admin-configured flag (RBAC)
+   * is off. Callers that render an "Upgrade" CTA next to `message` should
+   * suppress it when this is false. Always true otherwise.
+   */
+  ctaRelevant: boolean;
 }
 
 /**
  * The one function every surface calls with a feature key to find out
- * whether it's available in this build — and, when it isn't, whether to show
- * it locked (with a message) or hide it entirely.
- *
- * `context` is required rather than defaulted so every call site is explicit
- * about where its build/runtime state comes from — see
- * {@link buildFeatureGateContext}.
+ * whether it's available in this build, and what to tell the user if not.
+ * `context` is required (not defaulted) so every call site is explicit about
+ * where its state comes from — see {@link buildFeatureGateContext}.
  */
 export function checkFeatureAccess(key: FeatureKey, context: FeatureGateContext): FeatureAccess {
   const gate = FEATURE_GATES[key];
   const allowed = gate.predicate(context);
-  if (allowed) return { allowed: true, visible: true, message: raw("") };
+  if (allowed) return { allowed: true, visible: true, message: raw(""), ctaRelevant: true };
   const pureCloud = context.isCloud && !context.isEnterprise;
   if (gate.cloudOffers === false && pureCloud) {
-    return { allowed: false, visible: false, message: raw("") };
+    return { allowed: false, visible: false, message: raw(""), ctaRelevant: true };
+  }
+  // RBAC alone depends on an admin toggle, not just edition — an edition
+  // that already supports it just needs the toggle on, so "upgrade" is a
+  // false, confusing CTA here.
+  if (key === "rbac" && (context.isEnterprise || context.isCloud) && !context.rbac) {
+    return {
+      allowed: false,
+      visible: true,
+      message: gt("enterpriseFeature.rbacDisabled"),
+      ctaRelevant: false,
+    };
   }
   const message = gate.pitchKey
     ? gt(gate.pitchKey)
     : gt("enterpriseFeature.locked", { feature: gt(gate.labelKey) });
-  return { allowed: false, visible: true, message };
+  return { allowed: false, visible: true, message, ctaRelevant: true };
+}
+
+/**
+ * Wraps a route guard so navigation redirects to the shared locked-feature
+ * page instead of proceeding, when `key` isn't unlocked. Must be a GUARD, not
+ * a choice of `component:` — vue-router permanently caches a route's first-
+ * resolved lazy component (`extractComponentsGuards`:
+ * `record.components[name] = resolvedComponent`), so picking between two
+ * components would freeze at whichever resolved first. A guard re-runs every
+ * navigation, so it can safely depend on state that's still loading.
+ *
+ * `getContext` defaults to the edition-only context (no `rbac` dependency);
+ * pass one that reads `store.state.zoConfig` for a route whose key needs it.
+ */
+export function withFeatureGate(
+  key: FeatureKey,
+  guard: (to: any, from: any, next: any) => void,
+  getContext: () => FeatureGateContext = () => buildFeatureGateContext(),
+) {
+  return (to: any, from: any, next: any) => {
+    if (!checkFeatureAccess(key, getContext()).allowed) {
+      next({
+        name: "enterpriseFeatureLocked",
+        query: { feature: key, org_identifier: to.query?.org_identifier, redirect: to.fullPath },
+      });
+      return;
+    }
+    guard(to, from, next);
+  };
 }

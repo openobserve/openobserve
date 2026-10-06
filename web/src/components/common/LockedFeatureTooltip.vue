@@ -32,11 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #content>
       <div class="flex flex-col items-start gap-1">
         <span>{{ message }}</span>
-        <!-- Same label as the header's own upgrade button (Header.vue
-             `enterpriseButtonText`'s OSS branch) — this tooltip only ever
-             renders in a build where that branch is the one showing, so the
-             two always agree without replicating the edition check here. -->
+        <!-- Same label as the header's own upgrade button. Hidden when
+             upgrading wouldn't help (e.g. RBAC off on an edition that
+             already supports it) — see `showUpgradeCta`. -->
         <OButton
+          v-if="showUpgradeCta"
           variant="ghost-primary"
           size="xs"
           class="h-auto! p-0! underline"
@@ -56,10 +56,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
-defineProps<{
-  message: I18nText;
-  align?: "start" | "center" | "end";
-}>();
+withDefaults(
+  defineProps<{
+    message: I18nText;
+    align?: "start" | "center" | "end";
+    showUpgradeCta?: boolean;
+  }>(),
+  { showUpgradeCta: true },
+);
 
 const { t } = useI18nTyped();
 const { open } = useEnterpriseUpgradeDialog();

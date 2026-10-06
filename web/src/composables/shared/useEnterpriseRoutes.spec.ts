@@ -603,6 +603,40 @@ describe("useEnterpriseRoutes.ts", () => {
       quotaRoute.beforeEnter(mockTo, mockFrom, mockNext);
       expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
+
+    // N1 regression: on a cold load/refresh, zoConfig is still {} — rbac_enabled
+    // hasn't arrived yet. That must NOT redirect a real Enterprise/Cloud user to
+    // the locked page; it must reach routeGuard like any other visit.
+    it("still calls routeGuard for groups when rbac_enabled hasn't loaded yet", async () => {
+      store.state.zoConfig = {};
+      const { routeGuard } = await import("@/utils/zincutils");
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+
+      const mockTo = { query: {} };
+      const mockFrom = {};
+      const mockNext = vi.fn();
+
+      groupsRoute.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("redirects to the locked page when rbac_enabled is explicitly false", async () => {
+      store.state.zoConfig = { ...store.state.zoConfig, rbac_enabled: false };
+      const routes = useEnterpriseRoutes();
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const groupsRoute = iamRoute.children.find((child: any) => child.name === "groups");
+
+      const mockTo = { query: {}, fullPath: "/iam/groups" };
+      const mockFrom = {};
+      const mockNext = vi.fn();
+
+      groupsRoute.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+    });
   });
 
   describe("Route Structure Validation", () => {

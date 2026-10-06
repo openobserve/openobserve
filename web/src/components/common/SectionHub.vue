@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'hover:border-border-default hover:bg-surface-panel cursor-not-allowed opacity-60'
                   : ''
               "
-              :disabled="item.locked"
               :aria-disabled="item.locked || undefined"
               :data-test="item.dataTest || `section-hub-card-${item.key}`"
               @click="!item.locked && router.push(item.to)"
@@ -95,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <LockedFeatureTooltip
               v-if="item.locked && item.lockedMessage"
               :message="item.lockedMessage"
+              :show-upgrade-cta="item.lockedShowUpgradeCta !== false"
             />
           </template>
         </div>
@@ -128,6 +128,8 @@ export interface SectionHubItem {
    */
   locked?: boolean;
   lockedMessage?: I18nText;
+  /** False suppresses the tooltip's "Upgrade" CTA — set when upgrading wouldn't actually unlock it (e.g. RBAC off, not unavailable). Defaults true. */
+  lockedShowUpgradeCta?: boolean;
   dataTest?: string;
 }
 

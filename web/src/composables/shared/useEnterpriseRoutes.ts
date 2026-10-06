@@ -17,36 +17,12 @@ import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
-import {
-  checkFeatureAccess,
-  buildFeatureGateContext,
-  type FeatureKey,
-} from "@/utils/enterpriseFeatures";
+import { withFeatureGate as withFeatureGateBase, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
-/**
- * Wraps a route guard so navigation redirects to the shared locked-feature
- * page instead of proceeding, when the edition doesn't unlock `key`.
- *
- * This has to be a GUARD, not a choice of `component:` — vue-router
- * permanently overwrites a route record's resolved component with whatever
- * its lazy loader first resolves to (see `extractComponentsGuards` in its
- * source: `record.components[name] = resolvedComponent`), so picking a
- * component based on current state freezes at whichever one resolved on the
- * FIRST navigation, for the rest of the session. That's a real problem for
- * "rbac": it depends on the async-loaded `rbac_enabled` flag, which can still
- * be unset on a cold-load first visit — a guard has no such cache, since it
- * re-runs on every navigation, so it's the only place this can safely depend
- * on state that might still be loading.
- */
-const withFeatureGate =
-  (key: FeatureKey, guard: (to: any, from: any, next: any) => void) =>
-  (to: any, from: any, next: any) => {
-    if (!checkFeatureAccess(key, buildFeatureGateContext(store.state.zoConfig)).allowed) {
-      next({ name: "enterpriseFeatureLocked", query: { feature: key } });
-      return;
-    }
-    guard(to, from, next);
-  };
+// "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
+// carries — every other key here is edition-only and could use the default.
+const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
+  withFeatureGateBase(key, guard, getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)));
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL

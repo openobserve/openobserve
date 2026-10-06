@@ -72,12 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="chevron-right" size="xs" class="max-md:size-4.5!" />
     </span>
   </component>
-  <!-- Sibling, NOT nested inside the tile above: child-mode OTooltip anchors to
-       the element immediately before it, so nesting this would shrink the
-       hoverable region to whatever happened to precede it (the chevron span,
-       or the label div) instead of the whole tile — the pointer would leave
-       that tiny region well before reaching the bubble and the tooltip would
-       snap shut before it could be clicked. -->
+  <!-- Sibling, NOT nested: child-mode OTooltip anchors to the element right
+       before it, so nesting would shrink the hoverable region to whatever
+       precedes it instead of the whole tile. -->
   <LockedFeatureTooltip v-if="locked && lockedMessage" :message="lockedMessage" />
 </template>
 
@@ -93,12 +90,8 @@ import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
-  // The template now has two root-level nodes (the tile + the sibling locked
-  // tooltip), so Vue's automatic $attrs/listener inheritance is disabled
-  // UNCONDITIONALLY for a fragment-rooted component — flag or not, it only
-  // ever applies to a single root. `inheritAttrs: false` just silences the
-  // dev warning for what's already true; the real fix is binding `$attrs`
-  // explicitly onto the tile below, which is the only place it can land.
+  // Two root-level nodes (tile + sibling tooltip) disable Vue's automatic
+  // $attrs/listener inheritance unconditionally; bind $attrs explicitly below.
   inheritAttrs: false,
   components: { OIcon, LockedFeatureTooltip },
   props: {
@@ -260,14 +253,11 @@ export default defineComponent({
       return !!c && (typeof c === "function" || Object.keys(c).length > 0);
     });
 
-    // Resolve the root element/component for the current mode. Locked wins
-    // over everything else: rendering a REAL `RouterLink` and relying on
-    // `onRootClick`'s preventDefault to stop it does NOT work — RouterLink's
-    // own click handler is merged onto the root BEFORE the parent's `@click`
-    // fallthrough listener (confirmed in vue-router's source: the two land in
-    // a listener array, RouterLink's own `navigate` first), so by the time
-    // our handler calls preventDefault, `router.push()` has already run. A
-    // plain, non-navigating `div` is the only way to guarantee no navigation.
+    // Locked wins over everything else. A real `RouterLink` can't be made
+    // inert via `onRootClick`'s preventDefault — RouterLink's own click
+    // handler runs before the parent's `@click` fallthrough listener (vue-
+    // router merges its `navigate` first) — so a plain `div` is the only way
+    // to guarantee no navigation.
     const rootComponent = computed(() =>
       props.locked ? "div" : props.external ? "a" : props.asTrigger ? "button" : RouterLink,
     );
@@ -283,7 +273,9 @@ export default defineComponent({
         "aria-disabled": props.locked || undefined,
       };
       if (props.locked) {
-        return { ...common, role: "link" };
+        // A plain `div` carries no native tabindex — add one so keyboard
+        // users can still reach it (and its tooltip) by Tab.
+        return { ...common, role: "link", tabindex: 0 };
       }
       if (props.external) {
         return {
