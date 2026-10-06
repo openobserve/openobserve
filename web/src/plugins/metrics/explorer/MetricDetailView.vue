@@ -586,7 +586,6 @@ export default defineComponent({
     );
     onBeforeUnmount(() => usageRequest?.abort());
 
-    // The tab label is counted from the same lookup the tab lists.
     const usedInLabel = computed(() => {
       const found = usage.value;
       if (!found) return t("metrics.explorer.detail.tabUsedIn");

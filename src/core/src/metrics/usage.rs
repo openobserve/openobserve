@@ -26,7 +26,7 @@ use config::meta::{
     folder::Folder,
     pipeline::{Pipeline, components::PipelineSource},
     slo::{CountSource, QueryLanguage, SliConfig, Slo},
-    sql::resolve_stream_names,
+    sql::resolve_stream_names_with_type,
     stream::StreamType,
 };
 use promql::{ast::visitor::walk_expr, utils::metric_name};
@@ -565,9 +565,12 @@ fn promql_outcome(metric: &str, query: Option<&str>) -> Outcome {
     }
 }
 
-fn sql_outcome(metric: &str, sql: &str) -> Outcome {
-    match resolve_stream_names(sql) {
-        Ok(streams) => outcome_of(streams.iter().any(|stream| stream == metric)),
+/// A `"logs".name` qualifier overrides `default_type`, as it does when the query runs.
+fn sql_outcome(metric: &str, sql: &str, default_type: &str) -> Outcome {
+    match resolve_stream_names_with_type(sql) {
+        Ok(tables) => outcome_of(tables.iter().any(|table| {
+            table.table() == metric && table.schema().unwrap_or(default_type) == "metrics"
+        })),
         Err(_) => Outcome::Unparsed {
             text: mentions(sql, metric),
         },
@@ -637,10 +640,9 @@ fn dashboard_query_outcome(metric: &str, query: &Value, promql: bool) -> Outcome
         Outcome::NoMatch
     } else if promql {
         promql_outcome(metric, Some(text))
-    } else if query["fields"]["stream_type"].as_str() == Some("metrics") {
-        sql_outcome(metric, text)
     } else {
-        Outcome::NoMatch
+        let default_type = query["fields"]["stream_type"].as_str().unwrap_or_default();
+        sql_outcome(metric, text, default_type)
     }
 }
 
@@ -680,7 +682,7 @@ fn pipeline_outcome(metric: &str, pipeline: &Pipeline) -> Outcome {
         return promql_outcome(metric, condition.promql.as_deref());
     }
     match condition.sql.as_deref() {
-        Some(sql) if derived.stream_type == StreamType::Metrics => sql_outcome(metric, sql),
+        Some(sql) => sql_outcome(metric, sql, derived.stream_type.as_str()),
         _ => Outcome::NoMatch,
     }
 }
@@ -926,6 +928,15 @@ mod tests {
         assert_eq!(hits_of(&literal), (None, 0));
         let mut logs = custom(r#"SELECT * FROM "http_requests_total""#);
         logs["fields"]["stream_type"] = json!("logs");
+        assert_eq!(hits_of(&dashboard("sql", vec![logs])), (None, 0));
+    }
+
+    #[test]
+    fn an_explicit_stream_type_in_custom_sql_wins_over_the_panel_type() {
+        let mut qualified = custom(r#"SELECT * FROM "metrics"."http_requests_total""#);
+        qualified["fields"]["stream_type"] = json!("logs");
+        assert_eq!(hits_of(&dashboard("sql", vec![qualified])), (Some(None), 0));
+        let logs = custom(r#"SELECT * FROM "logs"."http_requests_total""#);
         assert_eq!(hits_of(&dashboard("sql", vec![logs])), (None, 0));
     }
 
