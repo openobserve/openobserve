@@ -206,6 +206,7 @@ const namespaceOf = (row: any): string =>
     :row-height="32"
     sticky-header
     virtual-scroll
+    :overscan="10"
     pagination="none"
     sorting="client"
     :sort-by="sortBy"

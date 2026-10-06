@@ -100,6 +100,7 @@ describe("K8sListView", () => {
       dense: true,
       rowHeight: 32,
       virtualScroll: true,
+      overscan: 10,
       pagination: "none",
       sorting: "client",
       sortBy: "cpu",
