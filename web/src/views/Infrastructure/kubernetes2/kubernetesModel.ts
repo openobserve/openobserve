@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { utilizationTint } from "../useHostsList";
@@ -35,8 +36,10 @@ export type Phase = "Failed" | "Pending" | "Unknown" | "Running" | "Succeeded";
 
 export type Readiness = "true" | "false" | "unknown";
 
+// Kubernetes-provided phases and reasons stay raw `text`; labels this page synthesizes are i18n `key`s.
 export interface StatusChip {
-  text: string;
+  text?: string;
+  key?: I18nKey;
   variant: BadgeVariant;
 }
 
@@ -259,11 +262,16 @@ function selectUids(results: QueryResults): Map<string, string | null> {
       current.set(key, [...set][0]);
       continue;
     }
+    // An unsampled uid could be the newest, so a partial set of creation times decides nothing.
     let best: string | null = null;
     let bestCreated = -Infinity;
     for (const uid of set) {
       const at = created.get(`${key}|${uid}`);
-      if (at != null && at > bestCreated) {
+      if (at == null) {
+        best = null;
+        break;
+      }
+      if (at > bestCreated) {
         best = uid;
         bestCreated = at;
       }
@@ -364,7 +372,7 @@ function podStatus(
   if (phase === "Unknown") return { text: phase, variant: "amber-soft" };
   if (phase === "Running") {
     if (ready === "true") return { text: phase, variant: "success-soft" };
-    if (ready) return { text: "Running · NotReady", variant: "warning-soft" };
+    if (ready) return { key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" };
   }
   return { text: phase, variant: "default-soft" };
 }
@@ -507,9 +515,9 @@ const sumByNode = (series: Series[] | undefined) => {
 };
 
 const NODE_STATUS: Record<Readiness, StatusChip> = {
-  true: { text: "Ready", variant: "success-soft" },
-  false: { text: "NotReady", variant: "error-soft" },
-  unknown: { text: "Unknown", variant: "amber-soft" },
+  true: { key: "infra.k8s2.nodeReady", variant: "success-soft" },
+  false: { key: "infra.k8s2.nodeNotReady", variant: "error-soft" },
+  unknown: { key: "infra.k8s2.nodeUnknown", variant: "amber-soft" },
 };
 
 function buildNodes(results: QueryResults, pods: PodRow[]): NodeRow[] {
@@ -736,3 +744,6 @@ export const usageBarVariant = (pctValue: number | null): ProgressBarVariant => 
   const tint = utilizationTint(pctValue);
   return tint === "critical" ? "danger" : tint === "warn" ? "warning" : "default";
 };
+
+export const chipLabel = (chip: StatusChip, t: TranslateFn): I18nText =>
+  chip.key ? t(chip.key) : raw(chip.text ?? "");

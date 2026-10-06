@@ -43,6 +43,7 @@ import {
   type ContainerRow,
   type PodRow,
   type SeriesMatcher,
+  chipLabel,
 } from "./kubernetesModel";
 import { resolvePodLogs } from "./podLogsLink";
 
@@ -298,7 +299,7 @@ const viewLogs = async () => {
     <div v-else class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-2">
         <OTag v-if="pod?.status" :variant="pod.status.variant" size="sm">{{
-          raw(pod.status.text)
+          chipLabel(pod.status, t)
         }}</OTag>
         <span v-else>{{ dash }}</span>
         <OText variant="meta" data-test="k8s2-drawer-range">{{ rangeText }}</OText>

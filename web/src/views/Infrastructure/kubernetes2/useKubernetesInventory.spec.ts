@@ -264,6 +264,22 @@ describe("useKubernetesInventory", () => {
   });
 
   describe("degradation", () => {
+    it("hides the not-running tile without readiness, absent or failed", async () => {
+      const pending = { P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Pending" })] };
+      respond(pending);
+      const absent = await setup(ALL_STREAMS.filter((s) => s !== "kube_pod_status_ready"));
+      await refresh(absent.inventory);
+      expect(absent.inventory.counts.value.podsNotRunning).toBeNull();
+      respond(pending, ["P11"]);
+      const failing = await setup(ALL_STREAMS);
+      await refresh(failing.inventory);
+      expect(failing.inventory.counts.value.podsNotRunning).toBeNull();
+      respond(pending);
+      const healthy = await setup(ALL_STREAMS);
+      await refresh(healthy.inventory);
+      expect(healthy.inventory.counts.value.podsNotRunning).toBe(1);
+    });
+
     it("hides every pod tile without the pod anchor", async () => {
       const { inventory } = await setup(KUBELET);
       await refresh(inventory);
@@ -369,10 +385,10 @@ describe("useKubernetesInventory", () => {
       const { inventory, state } = await setup(ALL_STREAMS);
       await refresh(inventory);
       expect(inventory.clusters.value).toEqual(["beta", "prod"]);
-      expect(inventory.scopeCluster.value).toBe("beta");
+      expect(inventory.effectiveCluster.value).toBe("beta");
       expect(inventory.rows.value.map((r) => r.name).sort()).toEqual(["b", "c"]);
       state.value = parseListState({ cluster: "*" });
-      expect(inventory.scopeCluster.value).toBeNull();
+      expect(inventory.effectiveCluster.value).toBeNull();
       expect(inventory.rows.value).toHaveLength(3);
     });
 
@@ -380,8 +396,24 @@ describe("useKubernetesInventory", () => {
       respond({ P1: [ksm({ namespace: "shop", pod: "a", uid: "a", phase: "Running" })] });
       const { inventory } = await setup(ALL_STREAMS);
       await refresh(inventory);
-      expect(inventory.scopeCluster.value).toBe("prod");
+      expect(inventory.effectiveCluster.value).toBe("prod");
       expect(inventory.rows.value).toHaveLength(1);
+    });
+
+    it("leaves unlabelled rows out when the lone labelled cluster is the scope", async () => {
+      respond({
+        P1: [ksm({ namespace: "shop", pod: "web", uid: "u", phase: "Running" })],
+        K2: [{ metric: { k8s_namespace_name: "shop", k8s_pod_name: "orphan" }, value: 1 }],
+      });
+      const { inventory, state } = await setup(ALL_STREAMS);
+      await refresh(inventory);
+      expect(inventory.effectiveCluster.value).toBe("prod");
+      expect(inventory.rows.value.map((r) => r.name)).toEqual(["web"]);
+      expect(inventory.banners.value.find((b) => b.id === "no-cluster-kubeletstats")?.key).toBe(
+        "infra.k8s2.noClusterLabelScoped",
+      );
+      state.value = parseListState({ cluster: "*" });
+      expect(inventory.rows.value.map((r) => r.name).sort()).toEqual(["orphan", "web"]);
     });
 
     it("counts tiles over the scope facets only", async () => {

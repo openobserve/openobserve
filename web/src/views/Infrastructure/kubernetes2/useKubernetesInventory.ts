@@ -85,7 +85,7 @@ const SORT_VALUES: Record<K8sKind, Record<string, SortValue>> = {
     name: (r: PodRow) => r.name,
     namespace: (r: PodRow) => r.namespace,
     cluster: (r: PodRow) => r.cluster,
-    status: (r: PodRow) => r.status?.text ?? null,
+    status: (r: PodRow) => r.status?.text ?? r.status?.key ?? null,
     owner: (r: PodRow) => (r.owner ? `${r.owner.kind}/${r.owner.name}` : null),
     node: (r: PodRow) => r.node,
     restarts: (r: PodRow) => r.restarts,
@@ -95,7 +95,7 @@ const SORT_VALUES: Record<K8sKind, Record<string, SortValue>> = {
   nodes: {
     name: (r: NodeRow) => r.name,
     cluster: (r: NodeRow) => r.cluster,
-    status: (r: NodeRow) => r.status?.text ?? null,
+    status: (r: NodeRow) => r.status?.text ?? r.status?.key ?? null,
     pods: (r: NodeRow) => r.pods,
     cpu: (r: NodeRow) => r.cpuPct,
     memory: (r: NodeRow) => r.memoryPct,
@@ -231,15 +231,9 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     const param = listState().cluster;
     if (param === "*") return null;
     if (param) return param;
-    return clusters.value.length > 1 ? clusters.value[0] : null;
+    // A lone cluster is still a single-cluster scope, so the chip's name and the rows agree.
+    return clusters.value[0] ?? null;
   });
-
-  // What the header chip names: a lone cluster is still a single-cluster scope.
-  const scopeCluster = computed(
-    () =>
-      effectiveCluster.value ??
-      (listState().cluster !== "*" && clusters.value.length === 1 ? clusters.value[0] : null),
-  );
 
   const scope = computed(() => ({
     cluster: effectiveCluster.value,
@@ -358,7 +352,6 @@ export function useKubernetesInventory(listState: () => K8sListState) {
     inventory,
     clusters,
     effectiveCluster,
-    scopeCluster,
     scopedCount,
     counts,
     clusterFacet,

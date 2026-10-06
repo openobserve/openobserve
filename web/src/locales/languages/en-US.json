@@ -18411,6 +18411,10 @@
       "trendSummary": "Current {current} · peak {peak}",
       "viewLogs": "View logs",
       "podNotFound": "Pod not found",
+      "podRunningNotReady": "Running · NotReady",
+      "nodeReady": "Ready",
+      "nodeNotReady": "NotReady",
+      "nodeUnknown": "Unknown",
       "logsNoStream": "No log stream carries this pod's name and namespace fields.",
       "logsNoClusterField": "This log stream has no cluster field; logs from same-named pods in other clusters may be included"
     }

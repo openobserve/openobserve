@@ -190,8 +190,8 @@ k8s.loadStreams();
 const retryStreams = () => k8s.loadStreams({ force: true });
 
 const scopeChip = computed(() =>
-  k8s.scopeCluster.value
-    ? t("infra.k8s2.scopeCluster", { name: raw(k8s.scopeCluster.value) })
+  k8s.effectiveCluster.value
+    ? t("infra.k8s2.scopeCluster", { name: raw(k8s.effectiveCluster.value) })
     : t("infra.k8s2.scopeAllClusters"),
 );
 
@@ -230,7 +230,7 @@ const onName = (name: string) => {
   if (name !== state.value.name) writeState(withFilter(state.value, { name }));
 };
 
-const clusterChoice = computed(() => k8s.scopeCluster.value ?? "*");
+const clusterChoice = computed(() => k8s.effectiveCluster.value ?? "*");
 
 const showRail = computed(() => detection.value === "detected" && !pageError.value);
 const onCluster = (value: string | number | boolean) =>
@@ -272,7 +272,7 @@ const drawerPod = computed(() =>
 );
 
 const multiCluster = computed(
-  () => k8s.scopeCluster.value == null && k8s.clusters.value.length > 1,
+  () => k8s.effectiveCluster.value == null && k8s.clusters.value.length > 1,
 );
 
 const tableProps = computed(() => ({

@@ -30,6 +30,7 @@ import {
   formatPct,
   usageBarVariant,
   type PodRow,
+  chipLabel,
 } from "./kubernetesModel";
 
 defineProps<{
@@ -162,7 +163,7 @@ const cpuDetail = (row: PodRow) => {
           }}</span>
         </OTooltip>
         <OTag v-else-if="row.status" :variant="row.status.variant" size="xs">{{
-          raw(row.status.text)
+          chipLabel(row.status, t)
         }}</OTag>
         <span v-else>{{ raw("—") }}</span>
         <OText v-if="row.lastTerminatedReason" variant="meta" class="text-2xs">{{

@@ -137,6 +137,13 @@ describe("buildInventory — pods", () => {
       expect(row.series.memory?.uid).toBeNull();
     });
 
+    it("marks the pod ambiguous when only some uids have a creation time", () => {
+      const data = fixture({ P12: [ksm(A, 100)] });
+      const row = buildInventory(results(data)).pods[0];
+      expect(row.ambiguous).toBe(true);
+      expect(row.uid).toBeNull();
+    });
+
     it("marks the pod ambiguous when several uids exist and P12 is unavailable", () => {
       const data = fixture();
       delete data.P12;
@@ -197,7 +204,7 @@ describe("buildInventory — pods", () => {
 
     it("Running and not ready is a warning counted as not running", () => {
       const row = onlyPod(running("false"));
-      expect(row.status).toEqual({ text: "Running · NotReady", variant: "warning-soft" });
+      expect(row.status).toEqual({ key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" });
       expect(row.issues).toContain("podsNotRunning");
     });
 
@@ -539,12 +546,12 @@ describe("buildInventory — nodes", () => {
   const n1 = (node: string, condition: string, status: string) => ksm({ node, condition, status });
 
   it.each([
-    ["true", "Ready", "success-soft"],
-    ["false", "NotReady", "error-soft"],
-    ["unknown", "Unknown", "amber-soft"],
-  ])("Ready=%s is %s", (status, text, variant) => {
+    ["true", "infra.k8s2.nodeReady", "success-soft"],
+    ["false", "infra.k8s2.nodeNotReady", "error-soft"],
+    ["unknown", "infra.k8s2.nodeUnknown", "amber-soft"],
+  ])("Ready=%s is %s", (status, key, variant) => {
     const inventory = buildInventory(results({ N1: [n1("n1", "Ready", status)] }));
-    expect(inventory.nodes[0].status).toEqual({ text, variant });
+    expect(inventory.nodes[0].status).toEqual({ key, variant });
   });
 
   it("counts NotReady and Unknown only, and pressure separately", () => {

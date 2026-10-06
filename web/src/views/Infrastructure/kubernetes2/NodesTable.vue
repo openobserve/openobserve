@@ -22,7 +22,7 @@ import type { OTableColumnDef, OTableSortParams } from "@/lib/core/Table/OTable.
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import { formatPct, usageBarVariant, type NodeRow } from "./kubernetesModel";
+import { formatPct, usageBarVariant, type NodeRow, chipLabel } from "./kubernetesModel";
 
 defineProps<{
   rows: NodeRow[];
@@ -114,7 +114,7 @@ const onSort = (params: OTableSortParams) => emit("sort", params.column, params.
     <template #cell-status="{ row }">
       <div class="flex flex-wrap items-center gap-1" :data-test="`k8s2-node-status-${row.key}`">
         <OTag v-if="row.status" :variant="row.status.variant" size="xs">{{
-          raw(row.status.text)
+          chipLabel(row.status, t)
         }}</OTag>
         <span v-else>{{ raw("—") }}</span>
         <OTag v-for="pressure in row.pressures" :key="pressure" variant="warning-soft" size="xs">{{

@@ -186,7 +186,7 @@ export const ISSUE_KIND: Record<IssueKey, K8sKind> = {
 
 // A tile is hidden, never a false 0, while any query it counts over is unavailable.
 export const ISSUE_INPUTS: Record<IssueKey, readonly QueryId[]> = {
-  podsNotRunning: ["P1"],
+  podsNotRunning: ["P1", "P11"],
   podsContainerErrors: ["P1", "P2"],
   podsOomKilled: ["P1", "P3", "P7"],
   podsRestarting: ["P1", "P7"],
