@@ -1861,7 +1861,7 @@ describe("useRoutes (router.ts)", () => {
       expect(route.name).toBe("infraKubernetes2");
       expect(route.meta?.titleKey).toBe("menu.kubernetes2");
       expect(route.props).toBeUndefined();
-      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesExplorerPage\.vue/);
+      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
