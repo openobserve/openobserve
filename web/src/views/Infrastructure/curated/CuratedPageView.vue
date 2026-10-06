@@ -287,15 +287,6 @@ const dormantGroups = computed(() =>
     }),
 );
 
-// Each source keeps its stream list to one line until that row is opened, so the screen's one action stays in view.
-const expandedDormantRows = ref(new Set<string>());
-const toggleDormantRow = (groupId: string) => {
-  const next = new Set(expandedDormantRows.value);
-  if (next.has(groupId)) next.delete(groupId);
-  else next.add(groupId);
-  expandedDormantRows.value = next;
-};
-
 const expandedSetupSlug = ref<string | null>(null);
 const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"]) => {
   if (group.setup.kind === "route") {
@@ -720,34 +711,38 @@ watch(
             <li
               v-for="hidden in dormantGroups"
               :key="hidden.group.id"
-              class="flex flex-col gap-1 px-4 py-2"
+              class="px-2 py-1"
               data-test="curated-dormant-stream"
             >
-              <div class="flex flex-wrap items-baseline justify-between gap-x-3">
-                <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
-                <OText variant="meta" as="span">{{ hidden.stoppedAgo }}</OText>
-              </div>
-              <button
-                type="button"
-                class="rounded-default focus-visible:ring-focus-ring-accent flex w-full min-w-0 items-start gap-1 text-start outline-none focus-visible:ring-2"
-                :aria-expanded="expandedDormantRows.has(hidden.group.id)"
-                data-test="curated-dormant-stream-detail"
-                @click="toggleDormantRow(hidden.group.id)"
-              >
-                <span
-                  :class="[
-                    'min-w-0 flex-1 leading-5',
-                    expandedDormantRows.has(hidden.group.id) ? 'break-words' : 'truncate',
-                  ]"
-                >
-                  <OText variant="meta">{{ hidden.detail }}</OText>
-                </span>
-                <OIcon
-                  :name="expandedDormantRows.has(hidden.group.id) ? 'expand-less' : 'expand-more'"
-                  size="sm"
-                  class="text-text-secondary shrink-0"
-                />
-              </button>
+              <!-- One line of streams per source until its row is opened, so the screen's one action stays in view. -->
+              <OCollapsible>
+                <template #trigger="{ open }">
+                  <span class="flex min-w-0 flex-1 flex-col gap-1">
+                    <span class="flex flex-wrap items-baseline justify-between gap-x-3">
+                      <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
+                      <OText variant="meta" as="span">{{ hidden.stoppedAgo }}</OText>
+                    </span>
+                    <OText
+                      v-if="!open"
+                      variant="meta"
+                      truncate
+                      data-test="curated-dormant-stream-detail"
+                      >{{ hidden.detail }}</OText
+                    >
+                  </span>
+                  <OIcon
+                    name="expand-more"
+                    size="sm"
+                    class="text-text-secondary shrink-0 transition-transform duration-200"
+                    :class="open ? 'rotate-180' : 'rotate-0'"
+                  />
+                </template>
+                <p class="px-2 pb-2 leading-5 break-words">
+                  <OText variant="meta" data-test="curated-dormant-stream-detail-full">{{
+                    hidden.detail
+                  }}</OText>
+                </p>
+              </OCollapsible>
             </li>
           </ul>
         </template>

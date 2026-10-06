@@ -2093,14 +2093,16 @@ describe("CuratedPageView", () => {
       expect(wrapper.find('[data-test="curated-setup-route-cta"]').exists()).toBe(false);
       // It names what stopped and when, with its streams on one line that the row opens in full.
       const row = () => wrapper.find('[data-test="curated-dormant-stream"]');
-      const detail = () => row().find('[data-test="curated-dormant-stream-detail"]');
+      const oneLine = () => row().find('[data-test="curated-dormant-stream-detail"]');
+      const full = () => row().find('[data-test="curated-dormant-stream-detail-full"]');
       expect(row().text()).toMatch(/stopped .+ ago/);
-      expect(detail().text()).toContain("k8s_node_cpu_usage");
-      expect(detail().attributes("aria-expanded")).toBe("false");
-      expect(detail().find(".truncate").exists()).toBe(true);
-      await detail().trigger("click");
-      expect(detail().attributes("aria-expanded")).toBe("true");
-      expect(detail().find(".truncate").exists()).toBe(false);
+      expect(oneLine().text()).toContain("k8s_node_cpu_usage");
+      expect(oneLine().classes()).toContain("truncate");
+      expect(full().exists()).toBe(false);
+      await row().find("button").trigger("click");
+      await flushPromises();
+      expect(oneLine().exists()).toBe(false);
+      expect(full().text()).toContain("k8s_node_cpu_usage");
     });
 
     it("offers ONE click to the last window every source was still reporting", async () => {
