@@ -363,6 +363,33 @@ describe("KubernetesPage", () => {
       await flushPromises();
       expect(objects()).toEqual({ state: "ok" });
     });
+
+    // The Pods list's O:pod has no labels, so it must not count as the map's.
+    const holdMapObjects = () =>
+      search.mockImplementation(((args: any) =>
+        args.query.query.sql.includes(POD_OBJECTS) && args.query.query.sql.includes("AS labels")
+          ? new Promise(() => {})
+          : Promise.resolve({ data: { hits: [] } })) as any);
+
+    it("is loading, not ok, while the map loads after the Pods list", async () => {
+      await mountPage({ view: "pods", cluster: "alpha" });
+      holdMapObjects();
+      await router.push({ query: { view: "map", cluster: "alpha" } });
+      await flushPromises();
+      expect(objects()).toEqual({ state: "loading" });
+    });
+
+    it("is loading when coming back to a filtered map from the Pods list", async () => {
+      await mountPage({ view: "map", cluster: "alpha", filter: "app:web" });
+      expect(objects()).toEqual({ state: "ok" });
+      await router.push({ query: { view: "pods", cluster: "alpha" } });
+      await flushPromises();
+      queryClient.clear();
+      holdMapObjects();
+      await router.push({ query: { view: "map", cluster: "alpha", filter: "app:web" } });
+      await flushPromises();
+      expect(objects()).toEqual({ state: "loading" });
+    });
   });
 
   describe("cluster", () => {

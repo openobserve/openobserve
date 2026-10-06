@@ -67,6 +67,7 @@ import {
   filterOptions,
   groupLabelOptions,
   labelIndex,
+  NOT_A_TERM,
   splitTerm,
   type MapObjects,
 } from "./mapFilter";
@@ -93,9 +94,6 @@ const emit = defineEmits<{
 const MAX_GROUP_LINKS = 50;
 
 const MAX_GROUP_MEMBERS = 50;
-
-// "=" can never be a label term, so the disabled row is never emitted as a filter value.
-const STATE_ROW = "=";
 
 const GROUP_LABEL: Record<BuiltinGroup, I18nKey> = {
   node: "infra.k8s2.mapGroupNode",
@@ -194,13 +192,13 @@ const labelsHeader = computed(() => {
 const labelsState = computed<I18nText | null>(() => {
   const o = props.objects;
   if (o.state !== "ok") return t(NOT_OK_TEXT[o.reason ?? o.state]);
-  if (index.value.observed > 0) return null;
+  if (index.value.keys.length > 0) return null;
   return isPods.value
     ? t("infra.k8s2.mapLabelsNoneSeenPods")
     : t("infra.k8s2.mapLabelsNoneSeenNodes");
 });
 
-const stateRow = (label: I18nText): SelectOption => ({ label, value: STATE_ROW, disabled: true });
+const stateRow = (label: I18nText): SelectOption => ({ label, value: NOT_A_TERM, disabled: true });
 
 const pickerOptions = computed<SelectOption[]>(() =>
   labelsState.value
@@ -247,7 +245,7 @@ const legend = computed(() => {
 });
 
 const shortNames = computed(() => {
-  const shortenable = props.state.group === "node" || labelKey.value != null;
+  const shortenable = props.state.group === "node";
   const regular = groups.value.filter((g) => !g.special);
   const names = regular.map((g) => g.name);
   const short = shortenable ? shortGroupNames(names) : names;
@@ -314,7 +312,9 @@ function fullTitle(g: RowGroup): string {
   if (g.special === "unscheduled") return t("infra.k8s2.mapUnscheduled");
   if (g.special === "noOwner") return t("infra.k8s2.mapNoOwner");
   if (g.special === "noLabel") return t("infra.k8s2.mapNoLabel", { key: labelKey.value ?? "" });
-  if (g.special === "other") return t("infra.k8s2.mapOtherGroups", { count: g.merged ?? 0 });
+  if (g.special === "other") {
+    return t("infra.k8s2.mapOtherGroups", { count: (g.merged ?? 0).toLocaleString() });
+  }
   return g.name;
 }
 
@@ -371,7 +371,7 @@ function onHeader(i: number) {
 }
 
 function onFilter(value: unknown) {
-  const terms = (Array.isArray(value) ? value : []).map(String).filter((v) => v !== STATE_ROW);
+  const terms = (Array.isArray(value) ? value : []).map(String).filter((v) => v !== NOT_A_TERM);
   emit("update", { filter: terms });
 }
 
@@ -409,7 +409,10 @@ function linkText(g: RowGroup): I18nText {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col gap-2 p-3" data-test="k8s2-map-view">
+  <div
+    class="flex h-full min-h-0 flex-col gap-2 p-3 max-md:overflow-y-auto"
+    data-test="k8s2-map-view"
+  >
     <K8sListHeader
       :title="t('infra.k8s2.mapTitle')"
       :count="rows.length"
@@ -634,7 +637,7 @@ function linkText(g: RowGroup): I18nText {
             data-test="k8s2-map-show-all"
             @click="showList"
           >
-            {{ t("infra.k8s2.mapShowAll", { count: grouped.totalGroups }) }}
+            {{ t("infra.k8s2.mapShowAll", { count: grouped.totalGroups.toLocaleString() }) }}
           </OButton>
         </nav>
       </div>

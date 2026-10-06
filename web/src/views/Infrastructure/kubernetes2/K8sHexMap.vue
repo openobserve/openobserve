@@ -21,11 +21,13 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useTheme from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
-import { hexLayout, middleTruncate, type HexLayout } from "./hexLayout";
+import { LABEL_BAND, hexLayout, middleTruncate, type HexLayout } from "./hexLayout";
 import {
   MAX_ZOOM,
+  PAD_SHARE,
   WHEEL_FACTOR,
   axisRanges,
   fit,
@@ -37,7 +39,7 @@ import {
 } from "./hexViewport";
 import { nodeCard, podCard, tooltipStyle } from "./hoverCard";
 import type { MapEntity, MapGroup } from "./kubernetesQueries";
-import type { MapFill } from "./kubernetesUrlState";
+import { isLabelGroup, type MapFill } from "./kubernetesUrlState";
 import {
   fillClass,
   type FillClass,
@@ -118,11 +120,35 @@ const TITLE_CHARS = 18;
 
 const SAMPLE_TEXT = "abcdefghijklmnopqrstuvwxyz-0123456789";
 
+// Both header lines show at this scale.
+const TALL_SCALE = LINE_TWO_MIN_PX / LABEL_BAND;
+
+// Literal classes, so Tailwind emits them; a tall canvas takes the first that fits its content.
+const TALL_HEIGHTS = [
+  { rem: 24, cls: "h-96" },
+  { rem: 32, cls: "h-128" },
+  { rem: 48, cls: "h-192" },
+  { rem: 64, cls: "h-256" },
+  { rem: 80, cls: "h-320" },
+  { rem: 96, cls: "h-384" },
+  { rem: 112, cls: "h-448" },
+  { rem: 128, cls: "h-512" },
+  { rem: 144, cls: "h-576" },
+  { rem: 160, cls: "h-640" },
+  { rem: 176, cls: "h-704" },
+  { rem: 192, cls: "h-768" },
+  { rem: 208, cls: "h-832" },
+  { rem: 224, cls: "h-896" },
+  { rem: 240, cls: "h-960" },
+  { rem: 256, cls: "h-1024" },
+];
+
 // 16px is the CSS default root size when no stylesheet sets one.
 const DEFAULT_REM_PX = 16;
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
+const { isMobile } = useBreakpoint();
 
 const canvasRef = ref<HTMLElement | null>(null);
 const legendRef = ref<HTMLElement | null>(null);
@@ -142,6 +168,13 @@ let suppressClick = false;
 
 const rows = computed(() => markRaw(props.groups.flatMap((g) => g.rows)));
 
+// Below md, titled groupings grow the canvas downwards instead of squeezing every card into one screen.
+const tall = computed(
+  () =>
+    isMobile.value &&
+    (props.group === "workload" || props.group === "namespace" || isLabelGroup(props.group)),
+);
+
 const layout = computed<HexLayout | null>(() =>
   size.value.width > 0 && size.value.height > 0
     ? hexLayout({
@@ -151,17 +184,40 @@ const layout = computed<HexLayout | null>(() =>
         width: size.value.width,
         height: size.value.height,
         bottomInset: bottomInset.value,
-        minFramePx: props.group === "workload" ? workloadCardPx() : 0,
+        minFramePx: tall.value
+          ? twoColumnCardPx()
+          : props.group === "workload"
+            ? workloadCardPx()
+            : 0,
         minBandPx: LINE_ONE_MIN_PX,
+        fixedScale: tall.value ? TALL_SCALE : undefined,
       })
     : null,
 );
 
-const fitState = computed(() =>
-  layout.value
-    ? fit(layout.value.bounds, size.value.width, size.value.height, bottomInset.value)
-    : null,
-);
+const tallHeightClass = computed(() => {
+  const l = layout.value;
+  if (!tall.value || !l) return null;
+  const rem = remPx();
+  const needed =
+    (l.bounds.maxY - l.bounds.minY) * TALL_SCALE +
+    2 * PAD_SHARE * size.value.width +
+    bottomInset.value;
+  return (
+    TALL_HEIGHTS.find((h) => h.rem * rem >= needed)?.cls ??
+    TALL_HEIGHTS[TALL_HEIGHTS.length - 1].cls
+  );
+});
+
+// A tall canvas is a whole step high, so its map starts at the top rather than mid-slack.
+const fitState = computed(() => {
+  const l = layout.value;
+  if (!l) return null;
+  const state = fit(l.bounds, size.value.width, size.value.height, bottomInset.value);
+  if (!tallHeightClass.value) return state;
+  const pad = PAD_SHARE * size.value.width;
+  return { ...state, cy: l.bounds.maxY + (pad - size.value.height / 2) / state.scale };
+});
 
 const hexData = computed(() => {
   const l = layout.value;
@@ -193,15 +249,6 @@ const frameData = computed(() =>
     ]),
   ),
 );
-
-const tips = computed(() => {
-  const endUs = Date.now() * 1000;
-  return markRaw(
-    rows.value.map((row) =>
-      row.kind === "pod" ? podCard(row, props.fill, t, endUs) : nodeCard(row, t),
-    ),
-  );
-});
 
 const atFit = computed(
   () => !!view.value && !!fitState.value && view.value.scale <= fitState.value.scale * (1 + 1e-9),
@@ -241,7 +288,7 @@ function measure() {
   if (!el) return;
   const next = { width: el.clientWidth, height: el.clientHeight };
   if (next.width !== size.value.width || next.height !== size.value.height) size.value = next;
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || DEFAULT_REM_PX;
+  const rem = remPx();
   const overlay = Math.max(legendRef.value?.offsetHeight ?? 0, zoomRef.value?.offsetHeight ?? 0);
   bottomInset.value = overlay + rem;
 }
@@ -256,9 +303,24 @@ function requestRender() {
 }
 
 // Workload names are long and line 1 must always show one, so these cards get ~18 average chars.
+// Two cards and the one-unit gap between them fill the canvas width at TALL_SCALE.
+function twoColumnCardPx() {
+  return (size.value.width * (1 - 2 * PAD_SHARE) - TALL_SCALE) / 2;
+}
+
+function remPx() {
+  return parseFloat(getComputedStyle(document.documentElement).fontSize) || DEFAULT_REM_PX;
+}
+
 function workloadCardPx() {
   const perChar = textWidth(SAMPLE_TEXT, TITLE_FONT) / SAMPLE_TEXT.length;
   return TITLE_CHARS * perChar + textWidth("99", COUNT_FONT) + 3 * HEADER_PAD_PX;
+}
+
+// Built on hover, so a search over thousands of pods does not rebuild every card.
+function rowTip(row: MapRow | undefined, fill: MapFill) {
+  if (!row) return "";
+  return row.kind === "pod" ? podCard(row, fill, t, Date.now() * 1000) : nodeCard(row, t);
 }
 
 function textWidth(text: string, font: string) {
@@ -357,7 +419,8 @@ function buildOptions() {
     ok: chartColor(CLASS_TOKEN.ok),
   };
   const headers = props.headers;
-  const tipList = tips.value;
+  const rowList = rows.value;
+  const fill = props.fill;
   const range = axisRanges(state, width, height);
   return {
     animation: false,
@@ -369,7 +432,8 @@ function buildOptions() {
       confine: true,
       ...tooltipStyle(),
       formatter: (p: { seriesIndex: number; dataIndex: number }) =>
-        (p.seriesIndex === 0 ? tipList[p.dataIndex] : headers[p.dataIndex]?.tip) ?? "",
+        (p.seriesIndex === 0 ? rowTip(rowList[p.dataIndex], fill) : headers[p.dataIndex]?.tip) ??
+        "",
     },
     series: [
       {
@@ -527,10 +591,16 @@ function resetZoom() {
 </script>
 
 <template>
-  <div class="relative min-h-0 flex-1" data-test="k8s2-map">
+  <div
+    class="relative"
+    :class="tallHeightClass ? ['w-full', 'shrink-0', tallHeightClass] : ['min-h-0', 'flex-1']"
+    data-test="k8s2-map"
+  >
+    <!-- On a tall canvas a vertical swipe has to scroll the page, not pan the map. -->
     <div
       ref="canvasRef"
-      class="absolute inset-0 touch-none"
+      class="absolute inset-0"
+      :class="tallHeightClass ? 'touch-pan-y' : 'touch-none'"
       role="img"
       :aria-label="label"
       data-test="k8s2-map-canvas"

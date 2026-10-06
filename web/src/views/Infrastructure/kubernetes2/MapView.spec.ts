@@ -776,7 +776,9 @@ describe("MapView group headers and nav (AC 85)", () => {
     }));
     await mountView(mapState({ group: "label.build" }), { ...inv, pods } as any);
     expect(hexMap().props("groups")).toHaveLength(100);
-    expect(wrapper.find('[data-test="k8s2-map-show-all"]').text()).toBe("Show all 2000 in list");
+    expect(wrapper.find('[data-test="k8s2-map-show-all"]').text()).toBe("Show all 2,000 in list");
+    const headers = hexMap().props("headers");
+    expect(headers[headers.length - 1].tip).toContain("Other (1,901 groups)");
   });
 
   it("renders no nav entries while ungrouped", async () => {
@@ -863,6 +865,36 @@ describe("MapView selection (AC 88)", () => {
     wrapper.unmount();
     await mountView();
     expect(hexMap().props("selectedKey")).toBeNull();
+  });
+});
+
+describe("MapView review fixes", () => {
+  it("keeps label values whole: dotted suffixes are stripped from node names only", async () => {
+    const inv = labelledInventory();
+    inv.pods.forEach((p, i) => (p.object = observed({ version: i % 2 ? "1.5" : "2.5" })));
+    await mountView(mapState({ group: "label.version" }), inv);
+    expect(
+      hexMap()
+        .props("headers")
+        .map((h: any) => h.title)
+        .sort(),
+    ).toEqual(["1.5", "2.5"]);
+  });
+
+  it("says no labels were seen when every observed key is noise or empty", async () => {
+    const inv = labelledInventory();
+    inv.pods.forEach((p) => (p.object = observed({ "pod-template-hash": "abc", tier: "" })));
+    await mountView(mapState(), inv);
+    expect(filterOptions()).toEqual([
+      expect.objectContaining({ label: "No pod labels seen in the last 24 hours", disabled: true }),
+    ]);
+  });
+
+  it("lets the map view scroll on phones, where titled groupings grow taller than the screen", async () => {
+    await mountView();
+    expect(wrapper.find('[data-test="k8s2-map-view"]').classes()).toContain(
+      "max-md:overflow-y-auto",
+    );
   });
 });
 

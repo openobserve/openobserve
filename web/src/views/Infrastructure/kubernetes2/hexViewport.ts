@@ -36,7 +36,7 @@ export const WHEEL_FACTOR = 1.2;
 
 const CLICK_SLOP = 4;
 
-const PAD_SHARE = 0.04;
+export const PAD_SHARE = 0.04;
 
 // Uncapped, so callers comparing packings can tell them apart.
 export function fitScale(

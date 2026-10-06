@@ -31,6 +31,12 @@ import type { MapGroup } from "./kubernetesQueries";
 import { groupRows, statusCounts, type GroupHeader, type RowGroup } from "./mapFill";
 
 const palette = vi.hoisted(() => ({ dark: false }));
+const viewport = vi.hoisted(() => ({ mobile: false }));
+
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return { default: () => ({ isMobile: computed(() => viewport.mobile) }) };
+});
 
 // jsdom has no canvas to measure text, so every character is 7px wide here.
 vi.mock("echarts/core", async (importOriginal) => {
@@ -493,6 +499,57 @@ describe("K8sHexMap zoom cluster (AC 89)", () => {
     expect(ranges()).toEqual(fitRanges);
     expect(wrapper.find('[data-test="k8s2-map-reset"]').exists()).toBe(false);
     expect(iconRegistry["fit-screen"]).toBeTruthy();
+  });
+});
+
+describe("K8sHexMap on a phone (below md)", () => {
+  const workloads = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ...pod(`p${i}`, "n1", 10),
+      workload: { kind: "Deployment", name: `service-${i}` },
+    })) as PodRow[];
+  const root = () => wrapper.find('[data-test="k8s2-map"]');
+
+  beforeEach(() => {
+    viewport.mobile = true;
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get: () => 343,
+    });
+  });
+  afterEach(() => {
+    viewport.mobile = false;
+  });
+
+  it("grows a titled grouping's canvas to its content, two readable cards per row", async () => {
+    // A canvas taller than the content, as a whole height step usually is.
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get: () => 3000,
+    });
+    await mountMap(workloads(27), { group: "workload" });
+    const classes = root().classes();
+    const step = classes.find((c) => /^h-\d+$/.test(c));
+    expect(step).toBeDefined();
+    expect(classes).toEqual(expect.arrayContaining(["shrink-0", "w-full"]));
+    expect(classes).not.toContain("flex-1");
+    expect(wrapper.find('[data-test="k8s2-map-canvas"]').classes()).toContain("touch-pan-y");
+    const frames = options().series[1].data as number[][];
+    const perRow = new Map<number, number>();
+    for (const f of frames) perRow.set(f[1], (perRow.get(f[1]) ?? 0) + 1);
+    expect(Math.max(...perRow.values())).toBe(2);
+    const units = Math.max(...frames.map((f) => -f[3]));
+    const neededPx = units * 17 + 2 * 0.04 * 343 + wrapper.vm.bottomInset;
+    expect(Number(step!.slice(2)) * 4).toBeGreaterThanOrEqual(neededPx);
+    const { y } = ranges();
+    const scale = 3000 / (y[1] - y[0]);
+    expect((y[1] - 0) * scale).toBeCloseTo(0.04 * 343, 6);
+  });
+
+  it("keeps node grouping on one screen", async () => {
+    await mountMap(ROWS, { group: "node" });
+    expect(root().classes()).toContain("flex-1");
+    expect(wrapper.find('[data-test="k8s2-map-canvas"]').classes()).toContain("touch-none");
   });
 });
 

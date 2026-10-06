@@ -225,6 +225,22 @@ describe("mapFill groups (AC 44, 45)", () => {
     expect(groups[0].owner).toEqual({ kind: "Deployment", name: "api" });
   });
 
+  it("adds the short kind when two same-named workloads share a namespace too", () => {
+    const { groups } = groupRows(
+      [
+        pod({ name: "a", workload: { kind: "Deployment", name: "api" } }),
+        pod({ name: "b", workload: { kind: "StatefulSet", name: "api" } }),
+        pod({ name: "c", namespace: "other", workload: { kind: "Deployment", name: "api" } }),
+      ],
+      "workload",
+    );
+    expect(groups.map((g) => g.name).sort()).toEqual([
+      "ns/api (deploy)",
+      "ns/api (sts)",
+      "other/api",
+    ]);
+  });
+
   it("orders by size, then name; none is one block", () => {
     expect(bucketRanges("restarts")).toEqual(["0", "1", "2–5", "6–20", "> 20"]);
     expect(bucketRanges("cpuLim")[4]).toBe("≥ 100%");

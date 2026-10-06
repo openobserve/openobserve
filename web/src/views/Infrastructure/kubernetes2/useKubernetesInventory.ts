@@ -38,6 +38,7 @@ import {
   queryText,
   type ClusterMatchers,
   type DetailKind,
+  type MapEntity,
   type QueryId,
   type View,
 } from "./kubernetesQueries";
@@ -144,6 +145,8 @@ export function useKubernetesInventory(
     end: number;
     details: DetailsRef | null;
     viewKey: string;
+    view: View;
+    entity: MapEntity;
   } | null>(null);
 
   // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
@@ -339,10 +342,9 @@ export function useKubernetesInventory(
         size: W_SIZE,
       });
     };
-    const objects = (kind: DetailKind, columns?: Record<string, string>) => {
-      if (columns || LIST_OBJECT_KINDS.includes(kind)) {
-        const sql = objectListSql(kind, cluster, s.namespaces, columns);
-        out.push({ name: `O:${kind}`, sql, ...day });
+    const objects = (kind: DetailKind) => {
+      if (LIST_OBJECT_KINDS.includes(kind)) {
+        out.push({ name: `O:${kind}`, sql: objectListSql(kind, cluster, s.namespaces), ...day });
       }
     };
     const viewKind = LIST_VIEW_KIND[s.view];
@@ -351,7 +353,8 @@ export function useKubernetesInventory(
       if (s.view === "map") {
         const kind = s.entity === "nodes" ? "node" : "pod";
         warn(kind);
-        objects(kind, MAP_COLUMNS[kind]);
+        const sql = objectListSql(kind, cluster, s.namespaces, MAP_COLUMNS[kind]);
+        out.push({ name: `O:${kind}`, sql, ...day });
       }
       if (viewKind) {
         warn(viewKind);
@@ -494,7 +497,14 @@ export function useKubernetesInventory(
     results.value = main.results;
     sql.value = main.sql;
     failed.value = main.failed;
-    loadedFor.value = { cluster, end: t.end, details: s.details, viewKey: viewKeyOf(s) };
+    loadedFor.value = {
+      cluster,
+      end: t.end,
+      details: s.details,
+      viewKey: viewKeyOf(s),
+      view: s.view,
+      entity: s.entity,
+    };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
     loaded.value = true;
@@ -552,6 +562,11 @@ export function useKubernetesInventory(
     const hits = sql.value.get("DE");
     return hits && detailCurrent.value ? parseEvents(hits) : null;
   });
+
+  // Unlike viewStale, a group change keeps this: it says only which view and entity the data is for.
+  const loadedView = computed(() =>
+    loadedFor.value ? { view: loadedFor.value.view, entity: loadedFor.value.entity } : null,
+  );
 
   // Rows on screen belong to another view or scope until the current one commits.
   const viewStale = computed(() => loadedFor.value?.viewKey !== viewKeyOf(state()));
@@ -652,6 +667,7 @@ export function useKubernetesInventory(
     detailEventsFailed,
     detailObserved,
     viewStale,
+    loadedView,
     namespaceOptions,
     banners,
     has,

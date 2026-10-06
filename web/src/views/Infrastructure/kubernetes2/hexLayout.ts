@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { MAX_FIT_SCALE, fitScale } from "./hexViewport";
+import { MAX_FIT_SCALE, PAD_SHARE, fitScale } from "./hexViewport";
 import type { MapEntity, MapGroup } from "./kubernetesQueries";
 
 export interface LayoutParams {
@@ -25,6 +25,8 @@ export interface LayoutParams {
   bottomInset: number;
   minFramePx?: number;
   minBandPx?: number;
+  // Packs at this many px per unit, one canvas width wide, instead of fitting the height.
+  fixedScale?: number;
 }
 
 export interface HexBounds {
@@ -63,7 +65,7 @@ export const HEX_HALF_WIDTH = Math.sqrt(3) / 2;
 
 export const HEX_HALF_HEIGHT = 1;
 
-const LABEL_BAND = 2;
+export const LABEL_BAND = 2;
 
 const HEX_WIDTH = 2 * HEX_HALF_WIDTH;
 
@@ -78,6 +80,9 @@ const MIN_FRAME_WIDTH = 8;
 
 // Bounds the shelf search to 200 packings however many groups there are.
 const MAX_SHELF_CANDIDATES = 200;
+
+// Past this many run sums, listing them all costs more than sampling them.
+const MAX_LISTED_RUN_SUMS = 2000;
 
 // Widening lowers the fit scale, which needs more width again; this converges in a few rounds.
 const MAX_WIDEN_ROUNDS = 8;
@@ -94,12 +99,10 @@ export function hexLayout(params: LayoutParams): HexLayout {
   return layout;
 }
 
-export function packedSpan(params: LayoutParams, shelfWidth: number) {
-  return pack(blocksOf(params), shelfWidth);
-}
-
 // Only a shelf width equal to a contiguous run of blocks can change a greedy packing.
 export function shelfCandidates(widths: readonly number[]): number[] {
+  const n = widths.length;
+  if ((n * (n + 1)) / 2 > MAX_LISTED_RUN_SUMS) return sampledRunSums(widths);
   const widest = Math.max(0, ...widths);
   const sums = new Map<number, number>();
   for (let i = 0; i < widths.length; i++) {
@@ -113,6 +116,27 @@ export function shelfCandidates(widths: readonly number[]): number[] {
   if (sorted.length <= MAX_SHELF_CANDIDATES) return sorted;
   const step = (sorted.length - 1) / (MAX_SHELF_CANDIDATES - 1);
   return Array.from({ length: MAX_SHELF_CANDIDATES }, (_, k) => sorted[Math.round(k * step)]);
+}
+
+// The smallest run sum at or above each of 200 evenly spaced targets, in O(200 · B).
+function sampledRunSums(widths: readonly number[]): number[] {
+  const n = widths.length;
+  const prefix = new Float64Array(n + 1);
+  for (let k = 0; k < n; k++) prefix[k + 1] = prefix[k] + widths[k] + GAP;
+  const widest = widths.reduce((max, w) => Math.max(max, w), 0);
+  const total = prefix[n] - GAP;
+  const step = (total - widest) / (MAX_SHELF_CANDIDATES - 1);
+  return Array.from({ length: MAX_SHELF_CANDIDATES }, (_, k) => {
+    const target = widest + k * step - EPSILON;
+    let best = total;
+    for (let i = 0, j = 0; i < n; i++) {
+      j = Math.max(j, i + 1);
+      while (j <= n && prefix[j] - prefix[i] - GAP < target) j++;
+      if (j > n) break;
+      best = Math.min(best, prefix[j] - prefix[i] - GAP);
+    }
+    return best;
+  });
 }
 
 // Strips a shared ".domain" suffix, e.g. EKS's ".ec2.internal"; never a prefix.
@@ -147,6 +171,7 @@ function sameParams(a: LayoutParams, b: LayoutParams) {
   if (a.width !== b.width || a.height !== b.height || a.bottomInset !== b.bottomInset) return false;
   if ((a.minFramePx ?? 0) !== (b.minFramePx ?? 0)) return false;
   if ((a.minBandPx ?? 0) !== (b.minBandPx ?? 0)) return false;
+  if ((a.fixedScale ?? 0) !== (b.fixedScale ?? 0)) return false;
   if (a.groups.length !== b.groups.length) return false;
   for (let g = 0; g < a.groups.length; g++) {
     const [ka, kb] = [a.groups[g], b.groups[g]];
@@ -208,31 +233,43 @@ function bestShelf(blocks: Block[], params: LayoutParams) {
 // A pixel minimum depends on the fit scale, which depends on the widths, so widen until it holds.
 function blocksWithMinPx(params: LayoutParams) {
   const plain = blocksOf(params);
+  const plainShelf = bestShelf(plain, params);
   let blocks = plain;
+  let shelf = plainShelf;
   let minWidth = MIN_FRAME_WIDTH;
   for (let round = 0; ; round++) {
-    const { spanX, spanY } = pack(blocks, bestShelf(blocks, params));
+    const { spanX, spanY } = pack(blocks, shelf);
     const scale = Math.min(
       fitScale(spanX, spanY, params.width, params.height, params.bottomInset),
       MAX_FIT_SCALE,
     );
     // Wider cards are only worth it while the header band can still show a title.
     if (round > 0 && scale * LABEL_BAND < (params.minBandPx ?? 0)) {
-      pack(plain, bestShelf(plain, params));
+      pack(plain, plainShelf);
       return plain;
     }
     const needed = (params.minFramePx ?? 0) / scale;
     if (needed <= minWidth + EPSILON || round === MAX_WIDEN_ROUNDS) return blocks;
     minWidth = needed;
     blocks = blocksOf(params, minWidth);
+    shelf = bestShelf(blocks, params);
   }
+}
+
+function blocksAtScale(params: LayoutParams, scale: number) {
+  const pad = PAD_SHARE * params.width;
+  const blocks = blocksOf(params, Math.max(MIN_FRAME_WIDTH, (params.minFramePx ?? 0) / scale));
+  pack(blocks, (params.width - 2 * pad) / scale);
+  return blocks;
 }
 
 function computeLayout(params: LayoutParams): HexLayout {
   const framed = isFramed(params);
   const pad = framed ? PAD : 0;
   const band = framed ? LABEL_BAND : 0;
-  const blocks = blocksWithMinPx(params);
+  const blocks = params.fixedScale
+    ? blocksAtScale(params, params.fixedScale)
+    : blocksWithMinPx(params);
   const total = blocks.reduce((sum, b) => sum + b.n, 0);
   const x = new Float64Array(total);
   const y = new Float64Array(total);

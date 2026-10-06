@@ -44,8 +44,8 @@ const NOISE_LABEL_KEYS: readonly string[] = [
 
 const NOISE_NAME_PARTS: readonly string[] = ["controller-uid", "job-name"];
 
-// "=" never appears in a label key, so no expandable row's value can collide with a term.
-const KEY_ROW = "=";
+// "=" never appears in a label key, so a value starting with it can never be a filter term.
+export const NOT_A_TERM = "=";
 
 export const isNoiseKey = (key: string) =>
   NOISE_LABEL_KEYS.includes(key) || NOISE_NAME_PARTS.includes(key.slice(key.lastIndexOf("/") + 1));
@@ -102,12 +102,12 @@ export function labelIndex(rows: readonly MapRow[]): LabelIndex {
 export function filterOptions(index: LabelIndex, header: I18nText): SelectOption[] {
   const out: SelectOption[] = [{ label: header, header: true }];
   for (const { key, values } of index.keys) {
-    out.push({ label: raw(key), value: `${KEY_ROW}${key}`, expandable: true });
+    out.push({ label: raw(key), value: `${NOT_A_TERM}${key}`, expandable: true });
     for (const { value, count } of values) {
       out.push({
         label: raw(`${key}: ${value} · ${count}`),
         value: `${key}:${value}`,
-        parentValue: `${KEY_ROW}${key}`,
+        parentValue: `${NOT_A_TERM}${key}`,
       });
     }
   }

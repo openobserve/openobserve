@@ -192,6 +192,11 @@ const mapObjects = computed<MapObjects>(() => {
   if (!k8s.hasEvents.value) return { state: "skipped", reason: "noStream" };
   if (!k8s.eventsScoped.value) return { state: "skipped", reason: "unscoped" };
   if (mapAnchor.value) return { state: "skipped", reason: "anchor" };
+  const loaded = k8s.loadedView.value;
+  // Another view's O:pod (the Pods list's has no labels) must not read as the map's.
+  if (k8s.loading.value && (loaded?.view !== "map" || loaded.entity !== state.value.entity)) {
+    return { state: "loading" };
+  }
   if (k8s.failed.value.has(name)) return { state: "failed" };
   return k8s.sql.value.has(name) ? { state: "ok" } : { state: "loading" };
 });

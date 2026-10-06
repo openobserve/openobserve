@@ -46,9 +46,9 @@ const LIST_COLUMNS: Partial<Record<DetailKind, Record<string, string>>> = {
 };
 
 // The map variant reads only what the map filters or groups on.
-export const MAP_COLUMNS: Record<"pod" | "node", Record<string, string> | undefined> = {
+export const MAP_COLUMNS: Record<"pod" | "node", Record<string, string>> = {
   pod: { ...LIST_COLUMNS.pod, labels: "json_get_json(body_object_metadata,'labels')" },
-  node: LIST_COLUMNS.node,
+  node: { ...LIST_COLUMNS.node },
 };
 
 const CREATED = "json_get_str(body_object_metadata,'creationTimestamp')";

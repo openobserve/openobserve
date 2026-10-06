@@ -20,7 +20,6 @@ import {
   HEX_HALF_WIDTH,
   hexLayout,
   middleTruncate,
-  packedSpan,
   shelfCandidates,
   shortGroupNames,
   type LayoutParams,
@@ -145,8 +144,21 @@ const INSET = 56;
 const scaleOf = (span: { spanX: number; spanY: number }, width: number, height: number) =>
   fit({ minX: 0, maxX: span.spanX, minY: -span.spanY, maxY: 0 }, width, height, INSET).scale;
 
+// The spec's own greedy shelf packer, so the brute force does not share the code under test.
+function packAt(frames: { w: number; h: number }[], shelf: number) {
+  let [x, y, row, spanX] = [0, 0, 0, 0];
+  for (const f of frames) {
+    if (x > 0 && x + f.w > shelf + 1e-9) [x, y, row] = [0, y + row + 1, 0];
+    spanX = Math.max(spanX, x + f.w);
+    row = Math.max(row, f.h);
+    x += f.w + 1;
+  }
+  return { spanX, spanY: y + row };
+}
+
 function bruteForce(p: LayoutParams) {
-  const widths = hexLayout(p).frames.map((f) => f.right - f.left);
+  const frames = hexLayout(p).frames.map((f) => ({ w: f.right - f.left, h: f.top - f.bottom }));
+  const widths = frames.map((f) => f.w);
   const widest = Math.max(...widths);
   const sums = new Set<number>();
   let best = 0;
@@ -156,7 +168,7 @@ function bruteForce(p: LayoutParams) {
       sum += widths[j] + 1;
       if (sum < widest - 1e-9) continue;
       sums.add(Math.round(sum * 1e6));
-      best = Math.max(best, scaleOf(packedSpan(p, sum), p.width, p.height));
+      best = Math.max(best, scaleOf(packAt(frames, sum), p.width, p.height));
     }
   }
   return { best, candidates: sums.size };
@@ -192,18 +204,27 @@ describe("hexLayout fills the canvas (AC 82)", () => {
   it("beats a prefix-only search on blocks of 65, 15 and 14 at 343×500", () => {
     const p = params([65, 15, 14], { width: 343, height: 500 });
     expect(fit(hexLayout(p).bounds, 343, 500).scale).toBeGreaterThanOrEqual(16.9);
-    const widths = hexLayout(p).frames.map((f) => f.right - f.left);
-    const prefix = fit(
-      {
-        minX: 0,
-        maxX: packedSpan(p, widths[0]).spanX,
-        minY: -packedSpan(p, widths[0]).spanY,
-        maxY: 0,
-      },
-      343,
-      500,
-    ).scale;
+    const frames = hexLayout(p).frames.map((f) => ({ w: f.right - f.left, h: f.top - f.bottom }));
+    const first = packAt(frames, frames[0].w);
+    const prefix = fit({ minX: 0, maxX: first.spanX, minY: -first.spanY, maxY: 0 }, 343, 500).scale;
     expect(prefix).toBeLessThan(12.5);
+  });
+
+  it("samples 200 run sums for 1,500 groups without listing all of them", () => {
+    const widths = Array.from({ length: 1500 }, (_, i) => 8 + ((i * 7) % 13) * 0.5);
+    const widest = Math.max(...widths);
+    const total = widths.reduce((a, b) => a + b, 0) + widths.length - 1;
+    let smallest = Infinity;
+    for (let i = 0; i < widths.length; i++) {
+      let sum = -1;
+      for (let j = i; j < widths.length && sum < widest; j++) sum += widths[j] + 1;
+      if (sum >= widest) smallest = Math.min(smallest, sum);
+    }
+    const picked = shelfCandidates(widths);
+    expect(picked).toHaveLength(200);
+    expect(picked[0]).toBeCloseTo(smallest, 9);
+    expect(picked[199]).toBeCloseTo(total, 6);
+    for (let k = 1; k < 200; k++) expect(picked[k]).toBeGreaterThanOrEqual(picked[k - 1]);
   });
 
   it("samples exactly 200 run sums, keeping the smallest and largest", () => {
@@ -269,6 +290,28 @@ describe("hexLayout minimum card width in pixels", () => {
   });
 });
 
+describe("hexLayout at a fixed scale (narrow canvas)", () => {
+  it("packs at the given scale, two cards per row, each at least the requested pixels", () => {
+    const sizes = Array.from({ length: 27 }, (_, i) => (i < 5 ? 3 : 1));
+    const layout = hexLayout(
+      params(sizes, {
+        group: "workload",
+        width: 343,
+        height: 400,
+        fixedScale: 17,
+        minFramePx: 145,
+      }),
+    );
+    const pad = 0.04 * 343;
+    expect(layout.bounds.maxX * 17).toBeLessThanOrEqual(343 - 2 * pad + 1e-6);
+    for (const f of layout.frames)
+      expect((f.right - f.left) * 17).toBeGreaterThanOrEqual(145 - 1e-6);
+    const rows = new Map<number, number>();
+    for (const f of layout.frames) rows.set(f.top, (rows.get(f.top) ?? 0) + 1);
+    expect(Math.max(...rows.values())).toBe(2);
+  });
+});
+
 describe("hexLayout at high cardinality (AC 99)", () => {
   const pod = (i: number, labels: Record<string, string>, workload: number): PodRow =>
     ({
@@ -294,10 +337,11 @@ describe("hexLayout at high cardinality (AC 99)", () => {
       i % 300,
     ),
   );
-  const timed = (group: "label.build" | "workload") => {
+  // minFramePx/minBandPx as K8sHexMap passes them for workload grouping.
+  const timed = (group: "label.build" | "workload", pods = PODS) => {
     hexLayout(params([3, 4]));
     const start = performance.now();
-    const { groups } = groupRows(PODS, group);
+    const { groups } = groupRows(pods, group);
     const layout = hexLayout({
       entity: "pods",
       group,
@@ -305,9 +349,20 @@ describe("hexLayout at high cardinality (AC 99)", () => {
       width: 1230,
       height: 600,
       bottomInset: INSET,
+      ...(group === "workload" ? { minFramePx: 175, minBandPx: 16 } : {}),
     });
     return { elapsed: performance.now() - start, layout };
   };
+
+  it("lays out 1,500 workload groups of 5,000 pods, widened, within 50 ms", () => {
+    const pods = PODS.map((p, i) => ({
+      ...p,
+      workload: { kind: "Deployment", name: `w-${i % 1500}` },
+    }));
+    const { elapsed, layout } = timed("workload", pods as PodRow[]);
+    expect(layout.frames).toHaveLength(1500);
+    expect(elapsed).toBeLessThanOrEqual(50);
+  });
 
   it("lays out a 2,000-value label group as 100 cards within 50 ms", () => {
     const { elapsed, layout } = timed("label.build");

@@ -234,12 +234,18 @@ function labelGroupOf(row: MapRow, key: string): Omit<RowGroup, "rows"> {
     : { ...blank, id: "noLabel", name: "", special: "noLabel" };
 }
 
-// The same kind and name in two namespaces would otherwise draw two identical titles.
+// Workloads sharing a name would draw identical titles; the namespace, then the kind, tells them apart.
 function disambiguateWorkloads(groups: RowGroup[]) {
-  const seen = new Map<string, number>();
-  for (const g of groups) if (!g.special) seen.set(g.name, (seen.get(g.name) ?? 0) + 1);
-  for (const g of groups)
-    if (!g.special && seen.get(g.name)! > 1) g.name = `${g.namespace}/${g.name}`;
+  const byName = new Map<string, RowGroup[]>();
+  for (const g of groups) if (!g.special) byName.set(g.name, [...(byName.get(g.name) ?? []), g]);
+  for (const [name, same] of byName) {
+    if (same.length < 2) continue;
+    for (const g of same) {
+      const sharesNamespace = same.some((o) => o !== g && o.namespace === g.namespace);
+      const kind = g.owner ? (SHORT_KIND[g.owner.kind] ?? g.owner.kind.toLowerCase()) : "";
+      g.name = `${g.namespace}/${name}${sharesNamespace ? ` (${kind})` : ""}`;
+    }
+  }
 }
 
 function capLabelGroups(sorted: RowGroup[]): RowGroup[] {
