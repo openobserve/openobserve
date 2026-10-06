@@ -93,6 +93,8 @@ const selectedWindow = ref<CuratedWindow>({
 });
 
 const range = ref(materialize(selectedWindow.value));
+
+const compactHeaderOnTablet = computed(() => selectedWindow.value.kind === "absolute");
 const checkedAtUs = ref<number | null>(null);
 
 // RelativeTime reads a ms epoch; handing it the µs value dates the refresh to the year 57000.
@@ -573,6 +575,7 @@ watch(
         <span
           v-if="checkedAtMs !== null"
           class="text-text-secondary flex items-center gap-1 max-md:hidden"
+          :class="{ 'max-lg:hidden': compactHeaderOnTablet }"
           data-test="curated-last-refreshed"
         >
           <OIcon name="schedule" size="xs" />
@@ -595,10 +598,13 @@ watch(
           size="sm-action"
           icon-left="refresh"
           class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
+          :class="{ 'max-lg:min-w-0 max-lg:ps-2 max-lg:pe-2': compactHeaderOnTablet }"
           data-test="curated-refresh"
           @click="runRefresh(true)"
         >
-          <span class="max-md:sr-only">{{ t("infra.curated.refresh") }}</span>
+          <span class="max-md:sr-only" :class="{ 'max-lg:sr-only': compactHeaderOnTablet }">{{
+            t("infra.curated.refresh")
+          }}</span>
         </OButton>
       </div>
     </template>
