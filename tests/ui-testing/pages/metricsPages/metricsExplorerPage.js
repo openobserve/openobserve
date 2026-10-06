@@ -478,7 +478,8 @@ export class MetricsExplorerPage {
 
     /** Right-click a drawn chart, then "Alert when above"; the alert form opens on a panel prefill. */
     async createAlertAboveFromChart(chart) {
-        await chart.click({ button: 'right' });
+        // zrender stacks a hover canvas over the drawn one, so click their shared root instead.
+        await chart.locator('xpath=..').click({ button: 'right' });
         await this.page.locator(this.alertContextMenuAbove).click();
         await this.page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
     }
