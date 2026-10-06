@@ -36,7 +36,7 @@ use super::{
     },
     writer::{
         LABEL_TRACE_STREAM, M_AGENT_INSTANCES, M_CLIENT_SECONDS, M_REQUEST_FAILED_TOTAL,
-        M_REQUEST_TOTAL, M_SERVER_SECONDS, M_UNRESOLVED_TOTAL,
+        M_REQUEST_TOTAL, M_SERVER_FAILED_TOTAL, M_SERVER_SECONDS, M_UNRESOLVED_TOTAL,
     },
 };
 
@@ -52,14 +52,15 @@ const IDX_FAILED: usize = 1;
 const IDX_CLIENT_Q: usize = 2;
 const IDX_SERVER_Q: usize = 5;
 const IDX_SERVER_COUNT: usize = 8;
-const IDX_UNRESOLVED: usize = 9;
-const IDX_PROCESSED: usize = 10;
-const IDX_INSTANCES: usize = 11;
-const IDX_BASELINE_Q: usize = 12;
-const IDX_ORG_INBOUND: usize = 15;
-const IDX_ORG_SERVER_COUNT: usize = 16;
-const PLAN_LEN_UNFILTERED: usize = 15;
-const PLAN_LEN_FILTERED: usize = 17;
+const IDX_SERVER_FAILED: usize = 9;
+const IDX_UNRESOLVED: usize = 10;
+const IDX_PROCESSED: usize = 11;
+const IDX_INSTANCES: usize = 12;
+const IDX_BASELINE_Q: usize = 13;
+const IDX_ORG_INBOUND: usize = 16;
+const IDX_ORG_SERVER_COUNT: usize = 17;
+const PLAN_LEN_UNFILTERED: usize = 16;
+const PLAN_LEN_FILTERED: usize = 18;
 const PLAN_NAMES: [&str; PLAN_LEN_FILTERED] = [
     "requests",
     "failed",
@@ -70,6 +71,7 @@ const PLAN_NAMES: [&str; PLAN_LEN_FILTERED] = [
     "server_p95",
     "server_p99",
     "server_count",
+    "server_failed",
     "unresolved",
     "processed",
     "instances",
@@ -226,7 +228,10 @@ where
     let range_secs = ((end - start) / 1_000_000).max(1) + 1;
     let plan = plan_queries(filter, range_secs, start, end).map_err(anyhow::Error::msg)?;
     let (results, degraded) = settle_plan(run_plan(&plan, run).await)?;
-    let (input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
+    let (mut input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
+    if degraded.iter().any(|d| d == PLAN_NAMES[IDX_SERVER_FAILED]) {
+        input.nodes.iter_mut().for_each(|n| n.errors_server = None);
+    }
     meta.degraded = degraded;
     Ok((input, meta))
 }
@@ -282,6 +287,7 @@ fn plan_queries(
     plan.extend(QUANTILES.map(|q| (q_client_quantile(q, e, by_env, range_secs), end)));
     plan.extend(QUANTILES.map(|q| (q_server_quantile(q, n, range_secs), end)));
     plan.push((q_server_count(n, range_secs), end));
+    plan.push((q_server_failed(n, range_secs), end));
     plan.push((q_unresolved(n, range_secs), end));
     plan.push((q_processed(n), end));
     plan.push((q_instances(e, by_env, range_secs), end));
@@ -405,6 +411,13 @@ fn q_server_count(node_matcher: &str, range_secs: i64) -> String {
     format!(
         "sum by (server, {LABEL_TRACE_STREAM}) (increase({}[{range_secs}s]))",
         selector(&format!("{M_SERVER_SECONDS}_count"), node_matcher)
+    )
+}
+
+fn q_server_failed(node_matcher: &str, range_secs: i64) -> String {
+    format!(
+        "sum by (server) (increase({}[{range_secs}s]))",
+        selector(M_SERVER_FAILED_TOTAL, node_matcher)
     )
 }
 
@@ -613,9 +626,20 @@ fn assemble_edges(results: &[Vec<InstantValue>]) -> (Vec<MetricEdge>, u64) {
 fn assemble_nodes(results: &[Vec<InstantValue>]) -> Vec<MetricNode> {
     let mut nodes: BTreeMap<String, MetricNode> = BTreeMap::new();
     for (server, stream, v) in server_stream_rows(&results[IDX_SERVER_COUNT]) {
-        let n = nodes.entry(server).or_default();
+        let n = nodes.entry(server).or_insert_with(|| MetricNode {
+            errors_server: Some(0.0),
+            ..Default::default()
+        });
         n.requests_server += count(v);
         add_stream(&mut n.streams, stream, count(v));
+    }
+    for (server, v) in label_rows(&results[IDX_SERVER_FAILED], "server") {
+        if let Some(e) = nodes
+            .get_mut(&server)
+            .and_then(|n| n.errors_server.as_mut())
+        {
+            *e += count(v);
+        }
     }
     for (i, pick) in NODE_QUANTILE_SLOTS.into_iter().enumerate() {
         for (server, v) in label_rows(&results[IDX_SERVER_Q + i], "server") {
@@ -1175,6 +1199,11 @@ mod tests {
         assert_eq!(plan.len(), PLAN_LEN_FILTERED);
         assert_eq!(plan[IDX_SERVER_Q].0, q_server_quantile(0.5, M, 60));
         assert_eq!(plan[IDX_SERVER_COUNT].0, q_server_count(M, 60));
+        assert_eq!(plan[IDX_SERVER_FAILED].0, q_server_failed(M, 60));
+        assert_eq!(
+            q_server_failed("", 60),
+            "sum by (server) (increase(traces_service_graph_request_server_failed_total[60s]))"
+        );
         assert_eq!(plan[IDX_UNRESOLVED].0, q_unresolved(M, 60));
         assert_eq!(plan[IDX_INSTANCES].0, q_instances(BOTH, true, 60));
         assert_eq!(
@@ -1204,9 +1233,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_issues_15_unfiltered_and_17_filtered() {
+    async fn test_fetch_issues_16_unfiltered_and_18_filtered() {
         let (queries, input) = issued(&ReadFilter::default()).await;
-        assert_eq!(queries.len(), 15);
+        assert_eq!(queries.len(), 16);
         assert!(input.node_only_services);
         assert!(queries.iter().all(|(q, _)| !q.contains('{')));
         assert!(queries.iter().all(|(q, _)| !q.contains("[60s]")));
@@ -1220,13 +1249,13 @@ mod tests {
         assert!(queries.contains(&(q_requests("", false, 61), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), None)).await;
-        assert_eq!(queries.len(), 17);
+        assert_eq!(queries.len(), 18);
         assert!(input.node_only_services);
         assert!(queries.contains(&(q_server_count(M, 61), 1_060_000_000)));
         assert!(queries.contains(&(q_org_server_count(61), 1_060_000_000)));
 
         let (queries, input) = issued(&filter(None, Some("prod"))).await;
-        assert_eq!(queries.len(), 17);
+        assert_eq!(queries.len(), 18);
         assert!(!input.node_only_services);
         assert!(queries.contains(&(q_requests(ENV, true, 61), 1_060_000_000)));
         assert!(queries.contains(&(q_server_count("", 61), 1_060_000_000)));
@@ -1234,7 +1263,7 @@ mod tests {
         assert!(queries.contains(&(q_client_quantile(0.5, ENV, true, 61), 1_000_000_000)));
 
         let (queries, input) = issued(&filter(Some("default"), Some("prod"))).await;
-        assert_eq!(queries.len(), 17);
+        assert_eq!(queries.len(), 18);
         assert!(!input.node_only_services);
         assert!(queries.contains(&(q_instances(BOTH, true, 61), 1_060_000_000)));
         assert!(queries.contains(&(q_processed(M), 1_060_000_000)));
@@ -1250,15 +1279,15 @@ mod tests {
 
     #[test]
     fn test_assemble_rejects_wrong_length() {
-        assert!(assemble(empty_results(14), None).is_err());
-        assert!(assemble(empty_results(16), None).is_err());
-        let (input, meta) = assemble(empty_results(15), Some("prod")).unwrap();
+        assert!(assemble(empty_results(15), None).is_err());
+        assert!(assemble(empty_results(17), None).is_err());
+        let (input, meta) = assemble(empty_results(16), Some("prod")).unwrap();
         assert_eq!(input, TopologyInput::default());
         assert_eq!(meta.source, "v4");
         assert_eq!(meta.processed_up_to, None);
         assert_eq!(meta.unresolved, UnresolvedCounts::default());
         assert!(
-            assemble(empty_results(17), None)
+            assemble(empty_results(18), None)
                 .unwrap()
                 .0
                 .node_only_services
@@ -1267,7 +1296,7 @@ mod tests {
 
     #[test]
     fn test_assemble_edges_nodes_and_meta() {
-        let mut r = empty_results(15);
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
         r[IDX_REQUESTS] = vec![
             edge("a", "b", "", 100.0),
             edge("b", "db1", "database", 40.0),
@@ -1289,6 +1318,10 @@ mod tests {
             row(&[("server", "nope")], 1.0),
         ];
         r[IDX_SERVER_Q + 2] = vec![row(&[("server", "b")], f64::NAN)];
+        r[IDX_SERVER_FAILED] = vec![
+            row(&[("server", "b")], 4.0),
+            row(&[("server", "nope")], 1.0),
+        ];
         r[IDX_UNRESOLVED] = vec![
             row(&[("reason", "no_peer")], 3.4),
             row(&[("reason", "ip_only")], 1.0),
@@ -1342,7 +1375,9 @@ mod tests {
         assert_eq!(input.nodes[0].p50_ns, Some(2_000_000));
         assert_eq!(input.nodes[0].p95_ns, None);
         assert_eq!(input.nodes[0].p99_ns, None);
+        assert_eq!(input.nodes[0].errors_server, Some(4.0));
         assert_eq!(input.nodes[1].server, "lonely");
+        assert_eq!(input.nodes[1].errors_server, Some(0.0));
 
         let key = (
             "a".to_string(),
@@ -1464,7 +1499,7 @@ mod tests {
 
     #[test]
     fn test_assemble_sums_per_stream_split_into_one_identity() {
-        let mut r = empty_results(15);
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
         r[IDX_REQUESTS] = vec![
             edge_in("a", "b", "zeta", 30.0),
             edge_in("a", "b", "alpha", 70.0),
@@ -1497,7 +1532,7 @@ mod tests {
 
     #[test]
     fn test_assemble_cross_stream_case_unfiltered() {
-        let mut r = empty_results(15);
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
         r[IDX_REQUESTS] = vec![edge_in("A", "B", "X", 100.0)];
         r[IDX_SERVER_COUNT] = vec![row(&[("server", "B"), ("trace_stream", "Y")], 100.0)];
         let (input, _) = assemble(r, None).unwrap();
@@ -1511,7 +1546,7 @@ mod tests {
             row(&[("server", "B")], 100.0),
             row(&[("server", "B"), ("connection_type", "database")], 30.0),
         ];
-        let mut r = empty_results(17);
+        let mut r = empty_results(PLAN_LEN_FILTERED);
         r[IDX_REQUESTS] = vec![edge_in("A", "B", "X", 100.0)];
         r[IDX_ORG_INBOUND] = org_inbound.clone();
         r[IDX_ORG_SERVER_COUNT] = vec![row(&[("server", "B")], 100.0)];
@@ -1521,7 +1556,7 @@ mod tests {
         assert_eq!(input.org_inbound["B"], 100.0);
         assert_eq!(input.org_requests_server["B"] - input.org_inbound["B"], 0.0);
 
-        let mut r = empty_results(17);
+        let mut r = empty_results(PLAN_LEN_FILTERED);
         r[IDX_SERVER_COUNT] = vec![row(&[("server", "B"), ("trace_stream", "Y")], 100.0)];
         r[IDX_ORG_INBOUND] = org_inbound;
         r[IDX_ORG_SERVER_COUNT] = vec![row(&[("server", "B")], 100.0)];
@@ -1554,6 +1589,30 @@ mod tests {
         let ok = run_plan(&plan, |_, _| async move { Ok(vec![row(&[], 1.0)]) }).await;
         assert_eq!(ok.len(), 4);
         assert_eq!(ok[3].as_ref().unwrap()[0].sample.value, 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_a_failed_server_error_query_leaves_node_errors_unknown() {
+        let read = |fail: bool| async move {
+            fetch_topology_with(&ReadFilter::default(), 0, 60_000_000, |q, _| async move {
+                if q.contains(M_SERVER_FAILED_TOTAL) && fail {
+                    return Err(anyhow::anyhow!("boom"));
+                }
+                if q.starts_with("sum by (server, trace_stream)") {
+                    return Ok(vec![row(&[("server", "b"), ("trace_stream", "t")], 10.0)]);
+                }
+                Ok(vec![])
+            })
+            .await
+            .unwrap()
+        };
+        let (input, meta) = read(true).await;
+        assert_eq!(meta.degraded, vec!["server_failed"]);
+        assert_eq!(input.nodes[0].requests_server, 10.0);
+        assert_eq!(input.nodes[0].errors_server, None);
+        let (input, meta) = read(false).await;
+        assert!(meta.degraded.is_empty());
+        assert_eq!(input.nodes[0].errors_server, Some(0.0));
     }
 
     #[test]

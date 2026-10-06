@@ -719,12 +719,15 @@ fn time_range(start: i64, end: i64) -> String {
     format!("_timestamp >= {start} AND _timestamp < {end}")
 }
 
-/// Without `reference_parent_span_id` there is no root, so the INTERNAL-root branch is dropped.
+/// Roots of any kind count, as in the Services Catalog; without the parent column there are none.
 fn kind_pred(cols: &Columns, kinds: &str) -> String {
-    if cols.reference_parent_span_id {
+    if cols.reference_parent_span_id && cols.infer_service_name {
+        // The catalog files a root that names an inferred dependency under that dependency.
         format!(
-            "CAST(span_kind AS VARCHAR) IN {kinds} OR (CAST(span_kind AS VARCHAR) = '1' AND {ROOT_PRED})"
+            "CAST(span_kind AS VARCHAR) IN {kinds} OR ({ROOT_PRED} AND NULLIF(infer_service_name, '') IS NULL)"
         )
+    } else if cols.reference_parent_span_id {
+        format!("CAST(span_kind AS VARCHAR) IN {kinds} OR {ROOT_PRED}")
     } else {
         format!("CAST(span_kind AS VARCHAR) IN {kinds}")
     }
@@ -1028,7 +1031,24 @@ mod tests {
     fn test_q1_with_and_without_parent_column() {
         let with = build_q1(&Columns::all(), "t", 1, 2);
         assert!(with.contains("AS root_requests"));
-        assert!(with.contains("IN ('2','5') OR (CAST(span_kind AS VARCHAR) = '1'"));
+        // A root naming an inferred dependency counts for it, as in the Services Catalog.
+        assert!(with.contains(
+            "IN ('2','5') OR ((reference_parent_span_id IS NULL OR reference_parent_span_id = '') AND NULLIF(infer_service_name, '') IS NULL)"
+        ));
+        assert!(!with.contains("= '1' AND"));
+        let no_infer = build_q1(
+            &Columns {
+                infer_service_name: false,
+                ..Columns::all()
+            },
+            "t",
+            1,
+            2,
+        );
+        assert!(no_infer.contains(
+            "IN ('2','5') OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))"
+        ));
+        assert!(!no_infer.contains("infer_service_name"));
         assert!(with.contains("_timestamp >= 1 AND _timestamp < 2"));
         assert!(with.contains("FROM \"t\""));
         let cols = Columns {
@@ -1060,7 +1080,9 @@ mod tests {
         assert!(bare.contains("CAST(NULL AS VARCHAR) AS infer_self_key"));
         assert!(bare.contains("CAST(NULL AS BIGINT) AS infer_self_port"));
         assert!(bare.contains("IN ('2','3','4','5'))"));
-        assert!(full.contains("IN ('2','3','4','5') OR (CAST(span_kind AS VARCHAR) = '1'"));
+        assert!(full.contains(
+            "IN ('2','3','4','5') OR ((reference_parent_span_id IS NULL OR reference_parent_span_id = '') AND NULLIF(infer_service_name, '') IS NULL)"
+        ));
     }
 
     #[test]

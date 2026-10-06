@@ -1082,7 +1082,6 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
   }
 }
 
-// Same request definition as red_insights.rs request_predicate; the service graph counts only internal roots.
 function requestPredicate(hasParentColumn: boolean): string {
   const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
   if (!hasParentColumn) return `(${kinds})`;
