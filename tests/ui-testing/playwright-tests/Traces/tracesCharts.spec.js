@@ -519,8 +519,16 @@ test.describe("Traces Charts testcases", () => {
     };
   };
 
-  for (const live of [false, true]) {
-    test(`P1: A heatmap box filters the table and Drill down compares it to the pre-box filter (live mode ${live ? 'on' : 'off'})`, {
+  // The empty-editor run guards the Baseline against inheriting the band when there was no pre-box filter.
+  const TRIAGE_RUNS = [
+    { live: false, userFilter: USER_DURATION_FILTER },
+    { live: true, userFilter: USER_DURATION_FILTER },
+    { live: false, userFilter: '' },
+  ];
+
+  for (const { live, userFilter } of TRIAGE_RUNS) {
+    const start = userFilter ? 'the pre-box filter' : 'an empty pre-box editor';
+    test(`P1: A heatmap box filters the table and Drill down compares it to ${start} (live mode ${live ? 'on' : 'off'})`, {
       tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
     }, async ({ page }) => {
       test.setTimeout(180000);
@@ -529,7 +537,7 @@ test.describe("Traces Charts testcases", () => {
       const liveModeSet = await pm.tracesPage.setLiveMode(live);
       test.skip(!liveModeSet, 'auto_query_enabled is off on this environment, so live mode cannot be turned on');
 
-      expect(await pm.tracesPage.typeTraceQuery(USER_DURATION_FILTER), 'User filter must land').toBeTruthy();
+      expect(await pm.tracesPage.typeTraceQuery(userFilter), 'User filter must land').toBeTruthy();
       await pm.tracesPage.runTraceSearch();
       await pm.tracesPage.waitForTraceSearchResults();
       expect((await pm.tracesPage.waitForMetricsPanels()).includes('Duration'), 'Heatmap must render').toBeTruthy();
@@ -540,8 +548,8 @@ test.describe("Traces Charts testcases", () => {
 
       // Editor: the user condition is kept, grouped, and intersected with the band.
       const editor = (await pm.tracesPage.getQueryEditorContent()).trim();
-      testLogger.info('Query editor after the heatmap box', { editor, live });
-      const prefix = `(${USER_DURATION_FILTER}) and `;
+      testLogger.info('Query editor after the heatmap box', { editor, live, userFilter });
+      const prefix = userFilter ? `(${userFilter}) and ` : '';
       expect(editor.startsWith(prefix), `Editor must keep the user filter: ${editor}`).toBeTruthy();
       const band = editor.slice(prefix.length);
       expect(band).toMatch(HEATMAP_BAND_PATTERN);
@@ -550,7 +558,7 @@ test.describe("Traces Charts testcases", () => {
       // Table: both the user condition and the band reach the search, decoded to µs.
       const tableFilter = tableFilterOf(await tableRequest);
       testLogger.info('Table search filter after the box', { tableFilter });
-      expect(tableFilter).toMatch(/duration >= 1000\b/);
+      if (userFilter) expect(tableFilter).toMatch(/duration >= 1000\b/);
       if (lo) expect(tableFilter).toMatch(new RegExp(`duration >= ${lo}\\b`));
       if (hi !== null) expect(tableFilter).toMatch(new RegExp(`duration < ${hi}\\b`));
       await pm.tracesPage.waitForTraceSearchResults();
@@ -569,11 +577,16 @@ test.describe("Traces Charts testcases", () => {
       const selected = sql.split(/\bUNION\b/).find((p) => p.includes("'Selected' AS series"));
       const baseline = sql.split(/\bUNION\b/).find((p) => p.includes("'Baseline' AS series"));
       const selectedBand = `duration >= ${lo} AND duration < ${hi ?? Number.MAX_SAFE_INTEGER}`;
-      expect(selected).toContain(selectedBand);
-      expect(selected).toMatch(/duration >= 1000\b/);
+      expect(selected.split(selectedBand), 'Selected must carry the band exactly once').toHaveLength(2);
       expect(selected).toContain('_timestamp < ');
-      expect(baseline).toMatch(/duration >= 1000\b/);
       expect(baseline).not.toContain(selectedBand);
+      if (userFilter) {
+        expect(selected).toMatch(/duration >= 1000\b/);
+        expect(baseline).toMatch(/duration >= 1000\b/);
+      } else {
+        // approx_percentile_cont(duration, …) is the only duration reference an unfiltered Baseline has.
+        expect(baseline, 'Baseline must carry no duration condition').not.toMatch(/\bduration\s*(>=|<)/);
+      }
       if (hi !== null) expect(baseline).not.toMatch(new RegExp(`duration < ${hi}\\b`));
 
       const responseText = await (await comparisonResponse).text();

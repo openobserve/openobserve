@@ -81,6 +81,25 @@ describe("useLatencyInsightsDashboard — buildComparisonQuery", () => {
       expect(sql).not.toContain("service_name = 'api'");
     });
 
+    it("adds no scope filter for an empty pre-box editor, even when baseFilter holds the band", () => {
+      const band = "duration >= 100 AND duration < 500";
+      const sql = sqlOf(config({ baselineFilter: "", baseFilter: band }));
+      const selected = part(sql, "Selected");
+      const baseline = part(sql, "Baseline");
+      expect(selected.split(band)).toHaveLength(2);
+      expect(baseline).not.toMatch(/\bduration\b(?!,)/);
+      expect(baseline).toContain(
+        `WHERE _timestamp >= ${BASE.startTime} AND _timestamp <= ${BASE.endTime} AND COALESCE(`,
+      );
+    });
+
+    it("treats a whitespace-only pre-box editor as empty", () => {
+      const band = "duration >= 100 AND duration < 500";
+      const baseline = part(sqlOf(config({ baselineFilter: "   ", baseFilter: band })), "Baseline");
+      expect(baseline).not.toContain(band);
+      expect(baseline).not.toContain("()");
+    });
+
     it("keeps baseFilter when no baselineFilter is given", () => {
       const sql = sqlOf(config());
       expect(part(sql, "Selected")).toContain("service_name = 'api'");

@@ -392,10 +392,10 @@ export function useLatencyInsightsDashboard(t: TranslateFn) {
       }
 
       const valueExpr = `COALESCE(CAST(${dimensionName} AS VARCHAR), '(no value)')`;
-      // A heatmap box carries the editor text from before the box, so both sides share it, grouped.
-      const scopeFilter = config.baselineFilter?.trim()
-        ? `(${config.baselineFilter.trim()})`
-        : baseFilters;
+      // A heatmap box carries the editor text from before the box; an empty one means no filter, never the banded baseFilter.
+      const preBoxFilter = config.baselineFilter?.trim();
+      const scopeFilter =
+        config.baselineFilter === undefined ? baseFilters : preBoxFilter ? `(${preBoxFilter})` : "";
       const toWhere = (parts: string[]) => {
         const kept = parts.filter((f) => f);
         return kept.length ? `WHERE ${kept.join(" AND ")}` : "";

@@ -804,6 +804,23 @@ describe("TracesMetricsDashboard", () => {
       expect(analysis().attributes("baselinefilter")).toBe(decoded);
     });
 
+    it("passes an empty baselineFilter, not undefined, for a box drawn from an empty editor", async () => {
+      mockSearchObj.data.editorValue = "";
+      await wrapper.vm.onHeatmapSelect({
+        timeStartUs: 1_000_000,
+        timeEndUs: 2_000_000,
+        durationLoUs: 100,
+        durationHiUs: 500,
+      });
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+
+      wrapper.vm.openUnifiedAnalysisDashboard();
+      await flushPromises();
+
+      expect(wrapper.vm.analysisBaselineFilter).toBe("");
+      expect(analysis().attributes("baselinefilter")).toBe("");
+    });
+
     it("passes no baselineFilter for a Rate selection", async () => {
       mockMetricsRangeFilters.set("rate", {
         panelTitle: "Rate",
