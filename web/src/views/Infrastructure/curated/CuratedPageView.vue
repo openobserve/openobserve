@@ -23,16 +23,16 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -95,6 +95,7 @@ const selectedWindow = ref<CuratedWindow>({
 const range = ref(materialize(selectedWindow.value));
 
 const compactHeaderOnTablet = computed(() => selectedWindow.value.kind === "absolute");
+const { lgUp } = useBreakpoint();
 const checkedAtUs = ref<number | null>(null);
 
 // RelativeTime reads a ms epoch; handing it the µs value dates the refresh to the year 57000.
@@ -124,13 +125,20 @@ function materialize(window: CuratedWindow): { from: number; to: number } {
   return { from: now - window.widthUs, to: now };
 }
 
+const refreshing = ref(false);
+
 const runRefresh = async (force = false) => {
   // An unregistered workload resolves nothing, so it must also fetch nothing.
   if (!hasPack.value) return;
   // Re-anchored per refresh: a relative window frozen at page load empties every range-plotted panel as the clock advances.
   range.value = materialize(selectedWindow.value);
-  await refresh({ orgId: orgId.value, start: range.value.from, end: range.value.to, force });
-  checkedAtUs.value = Date.now() * 1000;
+  refreshing.value = true;
+  try {
+    await refresh({ orgId: orgId.value, start: range.value.from, end: range.value.to, force });
+    checkedAtUs.value = Date.now() * 1000;
+  } finally {
+    refreshing.value = false;
+  }
 };
 
 // ── Faces ───────────────────────────────────────────────────────────────────
@@ -269,13 +277,17 @@ const dormantGroups = computed(() =>
         group: hidden.group,
         streams: stale.map((entry) => entry.name).join(", "),
         lastSeenUs,
-        lastSeen: t("infra.curated.staleBadge", {
-          duration: humanDuration(lastSeenUs),
+        stoppedAgo: t("infra.curated.stoppedAgo", { duration: humanDuration(lastSeenUs) }),
+        detail: t("infra.curated.streamsStale", {
+          list: raw(stale.map((entry) => entry.name).join(", ")),
           date: formatUs(lastSeenUs),
         }),
       };
     }),
 );
+
+// Stream names and exact dates are for whoever restarts the collector, so the list leads with one line per source.
+const showDormantDetails = ref(false);
 
 const expandedSetupSlug = ref<string | null>(null);
 const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"]) => {
@@ -285,6 +297,8 @@ const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"])
   }
   expandedSetupSlug.value = expandedSetupSlug.value === group.setup.slug ? null : group.setup.slug;
 };
+
+const noteOpen = ref(false);
 
 /** A caveat about the active section's panels as a SET (§6.3) — never per tile. */
 const sectionNoteKey = computed(
@@ -299,17 +313,39 @@ const staleDurations = computed(() =>
   staleGroups.value.map((stale) => {
     // A listed stream whose stats never flushed serializes doc_time_max: 0, which formats as the Unix epoch.
     const noDataYet = stale.noDataYet === true || !stale.lastSeenUs;
+    // The label, not the capability sentence: "... are unavailable stopped 3 hours ago" does not parse.
+    const capability = t(stale.group.labelKey);
     return {
       id: stale.group.id,
       noDataYet,
-      key: noDataYet ? "infra.curated.staleNoDataBanner" : "infra.curated.staleBanner",
-      // The label, not the capability sentence: "... are unavailable stopped 3 hours ago" does not parse.
-      capability: t(stale.group.labelKey),
+      capability,
       duration: noDataYet ? "" : humanDuration(stale.lastSeenUs),
-      date: noDataYet ? "" : formatUs(stale.lastSeenUs),
+      setupHintKey: stale.group.setupHintKey,
+      detail: noDataYet
+        ? t("infra.curated.staleNoDataBannerShort", { capability })
+        : t("infra.curated.streamsStale", { list: capability, date: formatUs(stale.lastSeenUs) }),
     };
   }),
 );
+
+// The banner names the outage in one line; exact times and the fix live in the hidden-panels strip below it.
+const staleBannerText = computed(() => {
+  const [first, ...rest] = staleDurations.value;
+  if (!first) return raw("");
+  if (rest.length > 0) {
+    return t(
+      "infra.curated.staleBannerMany",
+      { first: first.capability, count: rest.length },
+      rest.length,
+    );
+  }
+  return first.noDataYet
+    ? t("infra.curated.staleNoDataBannerShort", { capability: first.capability })
+    : t("infra.curated.staleBannerShort", {
+        capability: first.capability,
+        duration: first.duration,
+      });
+});
 
 function humanDuration(sinceUs: number): string {
   // Measured against the later of window-end and wall clock, so a trailing range never reports a negative age.
@@ -571,41 +607,15 @@ watch(
           data-test-name="curated-date-time"
           @on:date-change="onDateChange"
         />
-        <!-- The SAME indicator the dashboard panel bar carries — one staleness vocabulary app-wide. -->
-        <span
-          v-if="checkedAtMs !== null"
-          class="text-text-secondary flex items-center gap-1 max-md:hidden"
-          :class="{ 'max-lg:hidden': compactHeaderOnTablet }"
-          data-test="curated-last-refreshed"
-        >
-          <OIcon name="schedule" size="xs" />
-          <OText variant="meta" as="span">
-            <RelativeTime
-              :timestamp="checkedAtMs"
-              :full-time-prefix="t('dashboard.panelErrorButtons.lastRefreshedAt')"
-            />
-          </OText>
-          <OTooltip side="bottom" align="end">
-            <template #content>
-              {{ t("dashboard.panelErrorButtons.lastRefreshed")
-              }}<RelativeTime :timestamp="checkedAtMs" />
-            </template>
-          </OTooltip>
-        </span>
-        <!-- Icon-only on phones so the actions share the title row; sr-only keeps the button named. -->
-        <OButton
+        <!-- Below lg an absolute range label leaves no room for the age, so the button drops to icon-only. -->
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="sm-action"
-          icon-left="refresh"
-          class="max-md:min-w-0 max-md:ps-2 max-md:pe-2"
-          :class="{ 'max-lg:min-w-0 max-lg:ps-2 max-lg:pe-2': compactHeaderOnTablet }"
+          :loading="refreshing"
+          :last-run-at="compactHeaderOnTablet && !lgUp ? null : checkedAtMs"
           data-test="curated-refresh"
           @click="runRefresh(true)"
-        >
-          <span class="max-md:sr-only" :class="{ 'max-lg:sr-only': compactHeaderOnTablet }">{{
-            t("infra.curated.refresh")
-          }}</span>
-        </OButton>
+        />
       </div>
     </template>
 
@@ -679,8 +689,10 @@ watch(
       class="flex min-h-0 flex-1 flex-col justify-center-safe overflow-y-auto"
       data-test="curated-dormant-state"
     >
+      <!-- shrink-0: an overflow-hidden flex child shrinks to the pane and clips its own content. -->
       <OEmptyState
         illustration="hourglass"
+        class="shrink-0"
         :title="t('infra.curated.dormantHeadline', { workload: t(manifest.titleKey) })"
         :description="t('infra.curated.dormantBody')"
       >
@@ -695,24 +707,41 @@ watch(
           />
         </template>
         <template #extra>
-          <ul
-            class="border-border-default divide-border-default rounded-surface flex w-full max-w-xl flex-col divide-y border text-start"
-          >
-            <li
-              v-for="hidden in dormantGroups"
-              :key="hidden.group.id"
-              class="flex flex-col gap-1.5 px-4 py-3"
-              data-test="curated-dormant-stream"
+          <div class="flex w-full max-w-xl flex-col items-center gap-1">
+            <ul
+              class="border-border-default divide-border-default rounded-surface flex w-full flex-col divide-y border text-start"
             >
-              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
-                <OText variant="meta">{{ hidden.lastSeen }}</OText>
-              </div>
-              <p class="leading-5">
-                <OText variant="mono">{{ raw(hidden.streams) }}</OText>
-              </p>
-            </li>
-          </ul>
+              <li
+                v-for="hidden in dormantGroups"
+                :key="hidden.group.id"
+                class="flex flex-col gap-1 px-4 py-2"
+                data-test="curated-dormant-stream"
+              >
+                <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <OText variant="body-strong" as="span">{{ t(hidden.group.labelKey) }}</OText>
+                  <OText variant="meta" as="span">{{ hidden.stoppedAgo }}</OText>
+                </div>
+                <p
+                  v-if="showDormantDetails"
+                  class="leading-5 break-words"
+                  data-test="curated-dormant-stream-detail"
+                >
+                  <OText variant="meta">{{ hidden.detail }}</OText>
+                </p>
+              </li>
+            </ul>
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              :aria-expanded="showDormantDetails"
+              data-test="curated-dormant-details-toggle"
+              @click="showDormantDetails = !showDormantDetails"
+            >
+              {{
+                showDormantDetails ? t("infra.curated.hideDetails") : t("infra.curated.showDetails")
+              }}
+            </OButton>
+          </div>
         </template>
       </OEmptyState>
     </div>
@@ -744,34 +773,7 @@ watch(
               inline-actions
               data-test="curated-stale-banner"
             >
-              <template v-if="staleDurations.length === 1">{{
-                t(staleDurations[0].key as never, {
-                  capability: staleDurations[0].capability,
-                  duration: staleDurations[0].duration,
-                  date: staleDurations[0].date,
-                })
-              }}</template>
-              <div v-else class="flex flex-col gap-1">
-                <span>{{ t("infra.curated.staleSummary") }}</span>
-                <ul class="flex flex-col gap-0.5">
-                  <li
-                    v-for="stale in staleDurations"
-                    :key="stale.id"
-                    class="flex flex-wrap gap-x-2"
-                    data-test="curated-stale-banner-row"
-                  >
-                    <span class="font-medium">{{ stale.capability }}</span>
-                    <span>{{
-                      stale.noDataYet
-                        ? t("infra.curated.staleNoDataBadge")
-                        : t("infra.curated.staleBadge", {
-                            duration: stale.duration,
-                            date: stale.date,
-                          })
-                    }}</span>
-                  </li>
-                </ul>
-              </div>
+              {{ staleBannerText }}
               <!-- Always passed: OBanner reads its slots once, so a slot that appears later never renders. -->
               <template #actions>
                 <OButton
@@ -810,145 +812,173 @@ watch(
               :content="t('infra.curated.warnBanner.stats')"
             />
 
-            <OCollapsible
-              v-if="hasStrip"
-              v-model="stripExpanded"
-              class="border-border-default rounded-surface border p-3"
-              data-test="curated-strip"
-              :label="collapsedCapabilities"
-            >
-              <div class="flex flex-col gap-3 pt-3" data-test="curated-strip-expanded">
-                <div
-                  v-for="hidden in hiddenGroups"
-                  :key="hidden.group.id"
-                  class="flex flex-col gap-1"
-                  :data-test="`curated-strip-group-${hidden.group.id}`"
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <OText>{{ t(hidden.group.capabilityKey) }}</OText>
-                    <!-- A PRESENT group's collector already works; only a field is missing, so no "Set up". -->
-                    <OButton
-                      v-if="!presentGroupIds.includes(hidden.group.id)"
-                      variant="outline"
-                      size="sm-action"
-                      data-test="curated-strip-setup"
-                      @click="onStripSetup(hidden.group)"
+            <div v-if="hasStrip || sectionNoteKey" class="flex items-start gap-2">
+              <OCollapsible
+                v-if="hasStrip"
+                v-model="stripExpanded"
+                class="border-border-default rounded-surface min-w-0 flex-1 border px-2 py-1"
+                trigger-class="py-1"
+                data-test="curated-strip"
+                :label="collapsedCapabilities"
+              >
+                <div class="flex flex-col gap-3 px-2 pt-2 pb-2" data-test="curated-strip-expanded">
+                  <div
+                    v-for="hidden in hiddenGroups"
+                    :key="hidden.group.id"
+                    class="flex flex-col gap-1"
+                    :data-test="`curated-strip-group-${hidden.group.id}`"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <OText>{{ t(hidden.group.capabilityKey) }}</OText>
+                      <!-- A PRESENT group's collector already works; only a field is missing, so no "Set up". -->
+                      <OButton
+                        v-if="!presentGroupIds.includes(hidden.group.id)"
+                        variant="outline"
+                        size="sm-action"
+                        data-test="curated-strip-setup"
+                        @click="onStripSetup(hidden.group)"
+                      >
+                        {{ t("infra.curated.setUp") }}
+                      </OButton>
+                    </div>
+                    <OText variant="meta" data-test="curated-strip-hint">{{
+                      t(hidden.group.setupHintKey)
+                    }}</OText>
+                    <OText
+                      v-if="absentStreams(hidden).length"
+                      variant="meta"
+                      data-test="curated-strip-streams-missing"
+                      >{{
+                        t(
+                          "infra.curated.streamsMissing",
+                          {
+                            count: absentStreams(hidden).length,
+                            list: raw(
+                              absentStreams(hidden)
+                                .map((s) => s.name)
+                                .join(", "),
+                            ),
+                          },
+                          absentStreams(hidden).length,
+                        )
+                      }}</OText
                     >
-                      {{ t("infra.curated.setUp") }}
-                    </OButton>
-                  </div>
-                  <OText variant="meta" data-test="curated-strip-hint">{{
-                    t(hidden.group.setupHintKey)
-                  }}</OText>
-                  <OText
-                    v-if="absentStreams(hidden).length"
-                    variant="meta"
-                    data-test="curated-strip-streams-missing"
-                    >{{
-                      t(
-                        "infra.curated.streamsMissing",
-                        {
-                          count: absentStreams(hidden).length,
+                    <OText
+                      v-if="staleStreams(hidden).length"
+                      variant="meta"
+                      data-test="curated-strip-streams-stale"
+                      >{{
+                        t("infra.curated.streamsStale", {
                           list: raw(
-                            absentStreams(hidden)
+                            staleStreams(hidden)
                               .map((s) => s.name)
                               .join(", "),
                           ),
-                        },
-                        absentStreams(hidden).length,
+                          date: formatUs(staleStreams(hidden)[0].lastSeenUs),
+                        })
+                      }}</OText
+                    >
+                    <OText
+                      v-for="concept in hidden.unresolvedConcepts ?? []"
+                      :key="concept.groupId"
+                      variant="meta"
+                      >{{
+                        t("infra.curated.fieldUnresolved", {
+                          display: raw(concept.display),
+                          stream: raw(hidden.group.anchorStream ?? ""),
+                        })
+                      }}</OText
+                    >
+                    <OText v-if="hidden.missingFields?.length" variant="meta">{{
+                      t("infra.curated.probeFieldsMissing", {
+                        stream: raw(hidden.probeStream ?? ""),
+                        list: raw(hidden.missingFields.join(", ")),
+                      })
+                    }}</OText>
+                    <OText variant="meta">{{
+                      t(
+                        "infra.curated.hiddenPanelCount",
+                        { count: hidden.panelCount },
+                        hidden.panelCount,
                       )
-                    }}</OText
+                    }}</OText>
+                    <DataSourceSetupCard
+                      v-if="
+                        hidden.group.setup.kind === 'card' &&
+                        expandedSetupSlug === hidden.group.setup.slug
+                      "
+                      :slug="hidden.group.setup.slug"
+                      @detected="runRefresh(true)"
+                    />
+                  </div>
+
+                  <div
+                    v-for="partial in partialGroups"
+                    :key="`partial-${partial.group.id}`"
+                    class="flex flex-col gap-1"
                   >
+                    <OText>{{ t(partial.group.labelKey) }}</OText>
+                    <OText variant="meta">{{
+                      t(
+                        "infra.curated.streamsMissing",
+                        {
+                          count: partial.missingStreams.length,
+                          list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
+                        },
+                        partial.missingStreams.length,
+                      )
+                    }}</OText>
+                  </div>
+
+                  <div
+                    v-for="stale in staleDurations"
+                    :key="`stale-${stale.id}`"
+                    class="flex flex-col gap-1"
+                    data-test="curated-strip-stale"
+                  >
+                    <OText>{{ stale.detail }}</OText>
+                    <OText variant="meta" data-test="curated-strip-hint">{{
+                      t(stale.setupHintKey)
+                    }}</OText>
+                  </div>
+
                   <OText
-                    v-if="staleStreams(hidden).length"
                     variant="meta"
-                    data-test="curated-strip-streams-stale"
-                    >{{
-                      t("infra.curated.streamsStale", {
-                        list: raw(
-                          staleStreams(hidden)
-                            .map((s) => s.name)
-                            .join(", "),
-                        ),
-                        date: formatUs(staleStreams(hidden)[0].lastSeenUs),
-                      })
-                    }}</OText
+                    data-test="curated-strip-hedge"
+                    data-copy-key="infra.curated.hiddenFootnote"
+                    >{{ t("infra.curated.hiddenFootnote") }}</OText
                   >
-                  <OText
-                    v-for="concept in hidden.unresolvedConcepts ?? []"
-                    :key="concept.groupId"
-                    variant="meta"
-                    >{{
-                      t("infra.curated.fieldUnresolved", {
-                        display: raw(concept.display),
-                        stream: raw(hidden.group.anchorStream ?? ""),
-                      })
-                    }}</OText
+                </div>
+              </OCollapsible>
+
+              <!-- The caveats are reference, not news: one line opens them instead of a paragraph above every panel. -->
+              <div v-if="sectionNoteKey" class="ms-auto shrink-0 py-2">
+                <OPopover
+                  v-model:open="noteOpen"
+                  side="bottom"
+                  align="end"
+                  :aria-label="t('infra.curated.aboutNumbers')"
+                >
+                  <template #trigger>
+                    <!-- Icon-only on phones so the hidden-panels strip keeps the row; sr-only keeps the button named. -->
+                    <OButton
+                      variant="ghost"
+                      size="xs"
+                      icon-left="info-outline"
+                      data-test="curated-section-note-trigger"
+                    >
+                      <span class="max-md:sr-only">{{ t("infra.curated.aboutNumbers") }}</span>
+                    </OButton>
+                  </template>
+                  <p
+                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                    data-test="curated-section-note"
                   >
-                  <OText v-if="hidden.missingFields?.length" variant="meta">{{
-                    t("infra.curated.probeFieldsMissing", {
-                      stream: raw(hidden.probeStream ?? ""),
-                      list: raw(hidden.missingFields.join(", ")),
-                    })
-                  }}</OText>
-                  <OText variant="meta">{{
-                    t(
-                      "infra.curated.hiddenPanelCount",
-                      { count: hidden.panelCount },
-                      hidden.panelCount,
-                    )
-                  }}</OText>
-                  <DataSourceSetupCard
-                    v-if="
-                      hidden.group.setup.kind === 'card' &&
-                      expandedSetupSlug === hidden.group.setup.slug
-                    "
-                    :slug="hidden.group.setup.slug"
-                    @detected="runRefresh(true)"
-                  />
-                </div>
-
-                <div
-                  v-for="partial in partialGroups"
-                  :key="`partial-${partial.group.id}`"
-                  class="flex flex-col gap-1"
-                >
-                  <OText>{{ t(partial.group.labelKey) }}</OText>
-                  <OText variant="meta">{{
-                    t(
-                      "infra.curated.streamsMissing",
-                      {
-                        count: partial.missingStreams.length,
-                        list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
-                      },
-                      partial.missingStreams.length,
-                    )
-                  }}</OText>
-                </div>
-
-                <div
-                  v-for="stale in staleGroups"
-                  :key="`stale-${stale.group.id}`"
-                  class="flex flex-col gap-1"
-                >
-                  <OText variant="meta" data-test="curated-strip-hint">{{
-                    t(stale.group.setupHintKey)
-                  }}</OText>
-                </div>
-
-                <OText
-                  variant="meta"
-                  data-test="curated-strip-hedge"
-                  data-copy-key="infra.curated.hiddenFootnote"
-                  >{{ t("infra.curated.hiddenFootnote") }}</OText
-                >
+                    <OText variant="meta">{{ t(sectionNoteKey) }}</OText>
+                  </p>
+                </OPopover>
               </div>
-            </OCollapsible>
-
-            <!-- Last, so the note sits directly above the grid it qualifies. -->
-            <OText v-if="sectionNoteKey" variant="meta" data-test="curated-section-note">{{
-              t(sectionNoteKey)
-            }}</OText>
+            </div>
           </div>
         </template>
       </RenderDashboardCharts>

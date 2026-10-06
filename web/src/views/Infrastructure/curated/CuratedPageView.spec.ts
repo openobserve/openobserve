@@ -24,7 +24,6 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, ref, isRef, inject, watchEffect, type Ref } from "vue";
 import CuratedPageView from "./CuratedPageView.vue";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { kubernetesPage, FLEET_DRILLDOWN_EVENT } from "./packs/kubernetes.page";
@@ -537,31 +536,22 @@ describe("CuratedPageView", () => {
       vi.setSystemTime(new Date(NOW_US / 1000));
       wrapper = await mountView();
 
-      const stamp = wrapper.find('[data-test="curated-last-refreshed"]');
-      expect(stamp.exists()).toBe(true);
-      const relative = stamp.findComponent(RelativeTime);
-      expect(relative.props("timestamp")).toBe(NOW_US / 1000);
-      // The visible string, not just the prop: a µs value formats as a far-future year.
-      expect(stamp.text()).toContain("now");
+      const button = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(button.exists()).toBe(true);
+      expect(button.props("lastRunAt")).toBe(NOW_US / 1000);
     });
 
     it("a manual Refresh re-stamps the last-refreshed indicator", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(NOW_US / 1000));
       wrapper = await mountView();
-      const first = wrapper
-        .find('[data-test="curated-last-refreshed"]')
-        .findComponent(RelativeTime)
-        .props("timestamp");
+      const first = wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt");
 
       vi.setSystemTime(new Date((NOW_US + 11 * 60 * 1_000_000) / 1000));
       await wrapper.find('[data-test="curated-refresh"]').trigger("click");
       await flushPromises();
 
-      const after = wrapper
-        .find('[data-test="curated-last-refreshed"]')
-        .findComponent(RelativeTime)
-        .props("timestamp");
+      const after = wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt");
       expect(after).toBe((NOW_US + 11 * 60 * 1_000_000) / 1000);
       expect(after).toBeGreaterThan(first as number);
     });
@@ -570,7 +560,7 @@ describe("CuratedPageView", () => {
       // runRefresh bails before `refresh()` when there is no pack, so claiming a
       // refresh time there would date a request that never happened.
       wrapper = await mountView({ workload: "unregistered" as any });
-      expect(wrapper.find('[data-test="curated-last-refreshed"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt")).toBeNull();
     });
 
     it("window `focus` re-checks while the SETUP face shows", async () => {
@@ -1090,7 +1080,7 @@ describe("CuratedPageView", () => {
       expect(banner.text().toLowerCase()).toContain("no data yet");
     });
 
-    it("several stale sources render ONE banner that lists each of them", async () => {
+    it("several stale sources render ONE one-line banner; the strip lists each of them", async () => {
       const state = staleState();
       state.staleGroups.value.push({
         ...state.staleGroups.value[0],
@@ -1098,7 +1088,18 @@ describe("CuratedPageView", () => {
       });
       wrapper = await mountView({}, state);
       expect(wrapper.findAll('[data-test="curated-stale-banner"]')).toHaveLength(1);
-      expect(wrapper.findAll('[data-test="curated-stale-banner-row"]')).toHaveLength(2);
+      expect(wrapper.find('[data-test="curated-stale-banner"]').text()).toContain("1 more source");
+      (wrapper.vm as any).stripExpanded = true;
+      await flushPromises();
+      expect(wrapper.findAll('[data-test="curated-strip-stale"]')).toHaveLength(2);
+    });
+
+    it("the exact last-seen time sits in the strip, not in the banner", async () => {
+      wrapper = await mountView({}, staleState());
+      (wrapper.vm as any).stripExpanded = true;
+      await flushPromises();
+      expect(wrapper.find('[data-test="curated-stale-banner"]').text()).not.toContain("last data");
+      expect(wrapper.find('[data-test="curated-strip-stale"]').text()).toContain("last data");
     });
 
     it("the banner offers the jump only once the window runs past the last data", async () => {
@@ -1133,19 +1134,17 @@ describe("CuratedPageView", () => {
           dashboard: ref(withNoteOnFirstTab(dashboardFixture())),
         },
       );
-      const note = wrapper.find('[data-test="curated-section-note"]');
-      expect(note.exists()).toBe(true);
-      expect(note.text()).toContain("Succeeded");
-      // In the slot, so it scrolls WITH the tiles it qualifies — a note the user
-      // has to scroll away from the tiles to find is not a disclosure.
-      expect(wrapper.find(".render-stub").find('[data-test="curated-section-note"]').exists()).toBe(
-        true,
-      );
+      // In the slot, so it scrolls WITH the tiles it qualifies; the caveats themselves open on demand.
+      const trigger = wrapper
+        .find(".render-stub")
+        .find('[data-test="curated-section-note-trigger"]');
+      expect(trigger.exists()).toBe(true);
+      expect((wrapper.vm as any).sectionNoteKey).toBe("infra.k8s.section.inventoryNote");
     });
 
     it("renders NO note for a section that declares none", async () => {
       wrapper = await mountView();
-      expect(wrapper.find('[data-test="curated-section-note"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-section-note-trigger"]').exists()).toBe(false);
     });
 
     it("never renders a freshness line — the panels carry their own timestamps", async () => {
@@ -2092,10 +2091,14 @@ describe("CuratedPageView", () => {
       // ...and offers NO setup CTA, since installing is not the fix.
       expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="curated-setup-route-cta"]').exists()).toBe(false);
-      // It names what stopped and when.
-      const text = wrapper.find('[data-test="curated-dormant-stream"]').text();
-      expect(text).toContain("k8s_node_cpu_usage");
-      expect(text).toContain("no data for");
+      // It names what stopped and when; the stream names wait behind "Show details".
+      const row = () => wrapper.find('[data-test="curated-dormant-stream"]');
+      expect(row().text()).toMatch(/stopped .+ ago/);
+      expect(row().text()).not.toContain("k8s_node_cpu_usage");
+      await wrapper.find('[data-test="curated-dormant-details-toggle"]').trigger("click");
+      expect(row().find('[data-test="curated-dormant-stream-detail"]').text()).toContain(
+        "k8s_node_cpu_usage",
+      );
     });
 
     it("offers ONE click to the last window every source was still reporting", async () => {
