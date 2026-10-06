@@ -396,6 +396,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ];
         for func_name in func_cases {
             let func: Arc<dyn RangeFunc> =

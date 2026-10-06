@@ -37,7 +37,7 @@ const LABEL_DROPPING_AGGS: [u8; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 58] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 64] = [
     "rate",
     "irate",
     "increase",
@@ -96,6 +96,12 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 58] = [
     "atanh",
     "deg",
     "rad",
+    "first_over_time",
+    "mad_over_time",
+    "ts_of_min_over_time",
+    "ts_of_max_over_time",
+    "ts_of_last_over_time",
+    "ts_of_first_over_time",
 ];
 
 /// Returns true when the query's root aggregation discards all labels and the
@@ -198,6 +204,7 @@ mod tests {
             ("(sum(rate(metric[5m])))", true),
             ("sum(clamp(rate(metric[5m]), 0, 100))", true),
             ("sum(deg(atan(metric)))", true),
+            ("max(ts_of_max_over_time(metric[5m]))", true),
             // grouping keeps labels
             ("sum by (region) (rate(metric[5m]))", false),
             ("sum without (le) (rate(metric[5m]))", false),

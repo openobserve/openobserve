@@ -350,6 +350,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ];
         let modifiers = [
             None,
@@ -640,7 +646,7 @@ mod tests {
     /// Series without the metric name, as the range function output the generic path folds.
     fn streamed_input(matrix: Vec<RangeValue>, func_name: &str) -> Vec<RangeValue> {
         let mut matrix = matrix;
-        if func_name != functions::KEEP_METRIC_NAME_FUNC {
+        if !functions::keeps_metric_name(func_name) {
             for series in &mut matrix {
                 series.labels.retain(|label| label.name != "__name__");
             }

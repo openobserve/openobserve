@@ -77,7 +77,7 @@ struct InstantSelectorFunc {
 impl functions::RangeFunc for InstantSelectorFunc {
     fn name(&self) -> &'static str {
         if self.output.keep_metric_name() {
-            functions::KEEP_METRIC_NAME_FUNC
+            "last_over_time"
         } else {
             "timestamp"
         }
