@@ -18,6 +18,7 @@ import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
 import { formatExactDuration } from "@/utils/formatters";
+import { getPath } from "@/utils/zincutils";
 import { rangeKey, todayIn } from "./PublicLinkForm.schema";
 
 export interface ExpiryNote {
@@ -71,8 +72,10 @@ export function refreshLabel(secs: number, t: TranslateFn): I18nText {
   return secs === 2592000 ? t("dashboard.publicDashboard.refreshMonth") : formatExactDuration(secs);
 }
 
+// Under the router's base, so a server with ZO_BASE_URI (e.g. /o2/web/) gets a working link.
 export function publicLinkUrl(link: PublicLink): string {
-  return `${window.location.origin}/web/public/dashboards/${link.slug}`;
+  return new URL(`public/dashboards/${link.slug}`, window.location.origin + (getPath() || "/"))
+    .href;
 }
 
 // Whole calendar days in the viewer's timezone, so "today" flips at their midnight.

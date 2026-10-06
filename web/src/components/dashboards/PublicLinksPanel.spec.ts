@@ -159,6 +159,7 @@ describe("PublicLinksPanel", () => {
   });
 
   it("opens on the create form when the dashboard has no links, and shows the new link", async () => {
+    window.history.replaceState(null, "", "/web/dashboards");
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
     vi.mocked(admin.create).mockResolvedValue({ data: link({ slug: "new-slug" }) } as never);
     const w = build();

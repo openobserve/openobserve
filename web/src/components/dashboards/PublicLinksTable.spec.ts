@@ -234,6 +234,7 @@ describe("PublicLinksTable", () => {
   });
 
   it("copies the public URL and opens the public page", async () => {
+    window.history.replaceState(null, "", "/web/dashboards");
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     const w = build();
     await flushPromises();
