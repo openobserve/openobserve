@@ -195,13 +195,14 @@
                   }
                 "
               >
-                <div class="font-medium">{{ op.name }}</div>
-                <div class="text-text-secondary mt-0.5 text-xs">{{ op.documentation }}</div>
+                <!-- First child, so the tooltip anchors to the whole item rather than a sibling. -->
                 <OTooltip
                   v-if="isBlocked(op)"
                   :content="t('metrics.operationsList.rangeOnlyFirst')"
                   side="top"
                 />
+                <div class="font-medium">{{ op.name }}</div>
+                <div class="text-text-secondary mt-0.5 text-xs">{{ op.documentation }}</div>
               </div>
             </div>
           </OCollapsible>

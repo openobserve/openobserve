@@ -170,8 +170,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="functions"
         >
           <span class="max-md:hidden">{{ t("dashboard.addFormula") }}</span>
-          <OTooltip :content="t('dashboard.addFormula')" :disabled="!isMobile" />
         </OButton>
+        <OTooltip v-if="promqlMode" :content="t('dashboard.addFormula')" :disabled="!isMobile" />
         <!-- Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
              height-aligned (h-8) with the toolbar's size="sm" buttons. -->
@@ -639,17 +639,16 @@ export default defineComponent({
 
     const currentQueryText = computed(() => queryTextOf(currentQuery.value));
 
+    const numberAmongKind = (tab: any, index: number) =>
+      dashboardPanelData.data.queries
+        .slice(0, index + 1)
+        .filter((query: any) => isFormulaQuery(query) === isFormulaQuery(tab)).length;
+
     const tabLabel = (tab: any, index: number) => {
       if (isFormulaQuery(tab)) {
-        const formulaNumber = dashboardPanelData.data.queries
-          .slice(0, index + 1)
-          .filter(isFormulaQuery).length;
-        return tab.tabName || t("dashboard.formulaNumber", { index: formulaNumber });
+        return tab.tabName || t("dashboard.formulaNumber", { index: numberAmongKind(tab, index) });
       }
-      const queryNumber = dashboardPanelData.data.queries
-        .slice(0, index + 1)
-        .filter((query: any) => !isFormulaQuery(query)).length;
-      const name = tab.tabName || t("common.queryNumber", { index: queryNumber });
+      const name = tab.tabName || t("common.queryNumber", { index: numberAmongKind(tab, index) });
       return promqlMode.value && tab.config?.ref
         ? t("dashboard.queryTabWithRef", { ref: raw(tab.config.ref), name })
         : name;
@@ -1072,7 +1071,9 @@ export default defineComponent({
       // writes this straight into `queries[].tabName`, which is persisted in the
       // dashboard document and read by everyone in the org. The tab LABEL at the
       // top of this file is translated; only the stored value stays English.
-      editingQueryName.value = tab.tabName || raw(`Query ${index + 1}`);
+      editingQueryName.value =
+        tab.tabName ||
+        raw(`${isFormulaQuery(tab) ? "Formula" : "Query"} ${numberAmongKind(tab, index)}`);
       // Caret at the end, not select-all: the first keystroke must not wipe
       // the whole name.
       nextTick(() => {

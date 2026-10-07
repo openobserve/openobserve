@@ -9703,7 +9703,7 @@
         "at": "an {'@'} modifier",
         "orMatchers": "an or between label matchers",
         "subquery": "a subquery",
-        "vectorMatching": "on (…) or ignoring (…) vector matching",
+        "vectorMatching": "vector matching with on (…) or ignoring (…)",
         "bool": "a bool comparison",
         "unaryMinus": "a negated expression",
         "string": "a string argument",

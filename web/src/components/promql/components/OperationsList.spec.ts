@@ -560,6 +560,17 @@ describe("OperationsList", () => {
       );
     });
 
+    it("explains a blocked range function when its name is hovered", async () => {
+      wrapper = createWrapper({ operations: [{ id: PromqlStepId.Sum, params: [[]] }] });
+      await open();
+      rateOption().element.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 800));
+      await wrapper.vm.$nextTick();
+      expect(document.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+        "A range function can only be the first step",
+      );
+    });
+
     it("says nothing extra while a range function can still be added", async () => {
       wrapper = createWrapper({ operations: [] });
       await open();

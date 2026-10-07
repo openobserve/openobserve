@@ -144,7 +144,7 @@ describe("treeToBuilder", () => {
     expect(said("@")).toBe("The builder cannot show an @ modifier");
     expect(said("or matchers")).toBe("The builder cannot show an or between label matchers");
     expect(said("vector matching")).toBe(
-      "The builder cannot show on (…) or ignoring (…) vector matching",
+      "The builder cannot show vector matching with on (…) or ignoring (…)",
     );
     expect(said("bool")).toBe("The builder cannot show a bool comparison");
     expect(said("unary minus")).toBe("The builder cannot show a negated expression");

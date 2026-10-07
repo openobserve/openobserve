@@ -36,6 +36,20 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
+const mockViewport = vi.hoisted(() => ({ mdUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => mockViewport.mdUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.mdUp),
+    }),
+  };
+});
+
 // Mock functions service to prevent MSW warnings
 vi.mock("@/services/function_template", () => ({
   default: {
@@ -944,6 +958,7 @@ describe("formula letters and the saved hide flag", () => {
       const data = mountWith([q({ ref: "A" }), q({ ref: "B" })]);
       await wrapper.vm.$nextTick();
       await eye(1).trigger("keydown", { key: "Enter" });
+      expect(data.layout.currentQueryIndex).toBe(0);
       await eye(1).trigger("click");
       await wrapper.vm.$nextTick();
       expect(data.layout.currentQueryIndex).toBe(0);
@@ -968,6 +983,32 @@ describe("formula letters and the saved hide flag", () => {
         expect(phoneHidden(`[data-test="dashboard-panel-query-tab-${control}-1"]`)).toBe(true);
       }
     });
+  });
+
+  it("seeds a rename with the tab's own default name", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A" }, ""), q({ ref: "B" })]);
+    await wrapper.vm.$nextTick();
+    wrapper.vm.startEditQueryName(1, wrapper.vm.dashboardPanelData.data.queries[1]);
+    expect(wrapper.vm.editingQueryName).toBe("Formula 1");
+    wrapper.vm.startEditQueryName(2, wrapper.vm.dashboardPanelData.data.queries[2]);
+    expect(wrapper.vm.editingQueryName).toBe("Query 2");
+  });
+
+  it("shows the Add formula tooltip when the phone icon is hovered", async () => {
+    mockViewport.mdUp = false;
+    try {
+      mountWith([q({ ref: "A" })]);
+      await wrapper.vm.$nextTick();
+      const button = wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]').element;
+      button.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 800));
+      await wrapper.vm.$nextTick();
+      expect(document.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+        "Add formula",
+      );
+    } finally {
+      mockViewport.mdUp = true;
+    }
   });
 
   it("keeps Add formula reachable as a labelled icon on a phone", async () => {

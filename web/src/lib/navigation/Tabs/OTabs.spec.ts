@@ -346,6 +346,26 @@ describe("OTabs", () => {
       expect(scrollBy).toHaveBeenCalledWith({ left: 308, behavior: "auto" });
     });
 
+    it("scrolls far enough to show the active tab's trailing controls", async () => {
+      mockViewport.lgUp = false;
+      (HTMLElement.prototype as any).scrollBy = scrollBy;
+      HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+        if (this.hasAttribute("data-otab-trailing")) return { left: 290, right: 400 } as DOMRect;
+        return { left: 0, right: this.getAttribute("role") === "tab" ? 290 : 300 } as DOMRect;
+      };
+      mount(OTabs, {
+        props: { modelValue: "tab1" },
+        slots: {
+          default: `<OTab name="tab1" label="Tab 1"><template #trailing><button>x</button></template></OTab>`,
+        },
+        global: { components: { OTab } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+
+      expect(scrollBy).toHaveBeenCalledWith({ left: 108, behavior: "auto" });
+    });
+
     it("leaves the laptop strip where it is", async () => {
       stubGeometry();
       mountTabs({ modelValue: "tab3" });
