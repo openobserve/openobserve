@@ -560,6 +560,12 @@
       "description": "Une tâche distante est un service HTTP que vos expériences appellent pour produire des sorties. Publiez-la une fois, prouvez que la connexion fonctionne, et chaque expérience peut épingler la version exacte avec laquelle elle a été exécutée.",
       "action": "Nouvelle tâche",
       "actionDesc": "Pointez OpenObserve vers votre point de terminaison et testez la connexion."
+    },
+    "noDowntimes": {
+      "title": "Aucune indisponibilité pour l'instant",
+      "description": "Une indisponibilité laisse les alertes, les détections d'anomalies et les contrôles synthétiques s'exécuter et suspend leurs notifications pendant une plage que vous planifiez.",
+      "action": "Planifier une indisponibilité",
+      "actionDesc": "Ponctuelle, quotidienne ou hebdomadaire. Pour un silence rapide, utilisez Mettre en sourdine dans la liste des alertes."
     }
   },
   "common": {
@@ -1317,7 +1323,8 @@
     "kubernetes": "Kubernetes",
     "topQueries": "Requêtes principales",
     "profiles": "Profils",
-    "productAnalytics": "Analytique produit"
+    "productAnalytics": "Analytique produit",
+    "downtimes": "Indisponibilités"
   },
   "profiles": {
     "title": "Profils",
@@ -8753,7 +8760,370 @@
     "sloLongWindow": "Fenêtre longue",
     "sloShortWindow": "Fenêtre courte",
     "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
-    "seconds": "Secondes"
+    "seconds": "Secondes",
+    "downtimes": {
+      "newTitle": "Nouvelle indisponibilité",
+      "editTitle": "Modifier l'indisponibilité",
+      "detailTitle": "Indisponibilité",
+      "modules": {
+        "alerts": "Alertes",
+        "anomaly_detections": "Détections d'anomalies",
+        "synthetics": "Contrôles synthétiques",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "Alertes",
+        "anomaly_detections": "Anomalie",
+        "synthetics": "Synthétiques",
+        "slos": "SLO"
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}s",
+        "condition": "condition",
+        "allFolders": "tous les dossiers",
+        "oneFolder": "dossier {name}",
+        "nFolders": "{count} dossier | {count} dossiers",
+        "tags": "tag {tags}",
+        "nItems": "{count} élément | {count} éléments",
+        "asGood": "comme bon",
+        "chip": "{module} · {text}"
+      },
+      "duration": {
+        "days": "{count} j",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} à {end} {zone}",
+        "onceSentence": "Une fois · {start} à {end} · {zone}",
+        "dailySentence": "Tous les jours · {time} pendant {duration} · {zone}",
+        "weeklySentence": "Chaque semaine le {days} · {time} pendant {duration} · {zone}"
+      },
+      "validation": {
+        "conditionRequired": "Ajoutez une condition ou supprimez le bloc de conditions.",
+        "pairKey": "Choisissez une dimension pour chaque ligne.",
+        "pairOperator": "Utilisez = ou != dans une condition d'indisponibilité.",
+        "pairValue": "Saisissez une valeur pour chaque ligne.",
+        "loneStar": "Une valeur ne peut pas être un * seul.",
+        "innerStar": "Un * n'est autorisé qu'à la fin d'une valeur.",
+        "emptyGroup": "Un groupe de conditions ne peut pas être vide.",
+        "tooDeep": "Une condition peut imbriquer des groupes sur 3 niveaux au maximum.",
+        "tooManyPairs": "Une condition peut contenir au maximum 32 paires.",
+        "needsEq": "Ajoutez au moins une condition =. Une condition composée uniquement de lignes != réduirait tout le reste au silence.",
+        "modulesRequired": "Choisissez au moins un module.",
+        "foldersRequired": "Choisissez Tous les dossiers ou au moins un dossier.",
+        "tagsRequired": "Ajoutez un tag ou supprimez le bloc de tags.",
+        "idsRequired": "Sélectionnez un élément ou supprimez le bloc d'éléments spécifiques.",
+        "idOutsideFolders": "Certains éléments sélectionnés ne se trouvent pas dans les dossiers choisis.",
+        "nameTooLong": "Un nom peut contenir au maximum 256 caractères.",
+        "timezoneRequired": "Choisissez un fuseau horaire.",
+        "startRequired": "Saisissez une date et une heure de début.",
+        "endRequired": "Saisissez une date et une heure de fin.",
+        "endAfterStart": "La fin doit être postérieure au début.",
+        "windowTooLong": "Une fenêtre peut durer au maximum 7 jours.",
+        "windowTooShort": "Une fenêtre doit durer au moins 1 minute.",
+        "startTimeRequired": "Saisissez une heure de début au format HH:MM.",
+        "durationInvalid": "Saisissez une durée telle que 90m ou 1h 30m.",
+        "weekdaysRequired": "Choisissez au moins un jour.",
+        "untilAfterStart": "« Répéter jusqu'au » doit être au premier jour ou après."
+      },
+      "title": "Plages de maintenance",
+      "subtitle": "Fenêtres planifiées qui laissent s'exécuter les alertes, les détections d'anomalies et les contrôles synthétiques, mais suspendent leurs notifications",
+      "newDowntime": "Nouvelle plage de maintenance",
+      "filterAll": "Toutes",
+      "filterOnce": "Ponctuelle",
+      "filterRecurring": "Récurrente",
+      "search": "Rechercher par nom, dimension ou créateur",
+      "searchAcross": "Rechercher dans tous les dossiers",
+      "thisFolder": "Ce dossier",
+      "allFolders": "Tous les dossiers",
+      "thisFolderTooltip": "Rechercher dans le dossier sélectionné",
+      "allFoldersTooltip": "Rechercher dans tous les dossiers",
+      "stats": {
+        "active": "Actives",
+        "scheduled": "Planifiées",
+        "recurring": "Récurrentes",
+        "ended": "Terminées",
+        "cancelled": "Annulées",
+        "total": "Total"
+      },
+      "columns": {
+        "name": "Nom",
+        "status": "Statut",
+        "targets": "Cibles",
+        "schedule": "Planification",
+        "when": "Fin / prochaine",
+        "matched": "Correspondances",
+        "createdBy": "Créé par",
+        "folder": "Dossier"
+      },
+      "oneTime": "Ponctuelle",
+      "recurring": "Récurrente",
+      "bannerOn": "Une bannière s'affiche pour tous les membres de l'organisation tant que cette plage de maintenance est active",
+      "endsLabel": "fin",
+      "nextLabel": "prochaine",
+      "matched": {
+        "alerts": "{count} alerte | {count} alertes",
+        "anomalies": "{count} anomalie | {count} anomalies",
+        "synthetics": "{count} contrôle | {count} contrôles",
+        "slos": "{count} SLO | {count} SLO"
+      },
+      "actions": {
+        "endNow": "Terminer maintenant",
+        "edit": "Modifier",
+        "duplicate": "Dupliquer",
+        "moveToFolder": "Déplacer vers un dossier",
+        "cancel": "Annuler la plage de maintenance",
+        "delete": "Supprimer",
+        "more": "Plus d'actions",
+        "muteForHour": "Mettre en sourdine maintenant pour 1 h"
+      },
+      "confirmCancel": {
+        "title": "Annuler l'indisponibilité",
+        "message": "Les notifications reprennent immédiatement. L'indisponibilité reste dans la liste pour l'historique.",
+        "bulkMessage": "Annuler {count} indisponibilité ? Les notifications reprennent immédiatement. | Annuler {count} indisponibilités ? Les notifications reprennent immédiatement."
+      },
+      "confirmDelete": {
+        "title": "Supprimer l'indisponibilité",
+        "message": "L'indisponibilité et son historique sont supprimés. Cette action est irréversible."
+      },
+      "copyOf": "Copie de {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} alerte correspond | {count} alertes correspondent",
+          "anomaly_detections": "{count} détection correspond | {count} détections correspondent",
+          "synthetics": "{count} contrôle correspond | {count} contrôles correspondent",
+          "slos": "{count} SLO correspond | {count} SLO correspondent"
+        },
+        "alertFolders": "Dossiers d'alertes",
+        "syntheticsFolders": "Dossiers de Synthétiques",
+        "noAlertFolderAccess": "Vous n'avez pas accès aux dossiers d'alertes.",
+        "noSyntheticsFolderAccess": "Vous n'avez pas accès aux dossiers de Synthétiques.",
+        "tags": "Étiquettes",
+        "tagPlaceholder": "clé:valeur",
+        "tagsHint": "Chaque étiquette doit être présente sur le contrôle.",
+        "removeBlock": "Supprimer ce bloc",
+        "specificItems": "Éléments spécifiques",
+        "itemsHint": "Seuls les éléments des dossiers choisis sont proposés.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Ajouter des étiquettes",
+        "addItems": "Ajouter des éléments spécifiques",
+        "sloMode": "Score SLO dans la fenêtre",
+        "sloExclude": "Exclure la fenêtre",
+        "sloCountAsGood": "Compter la fenêtre comme bonne",
+        "sloExcludeCaption": "Le temps dans la fenêtre ne compte ni comme bon ni comme mauvais. Les alertes de burn rate sur ces SLO ne se déclenchent pas pour cette période.",
+        "sloCountAsGoodCaption": "Le temps dans la fenêtre compte comme entièrement bon. N'utilisez cette option que si votre contrat SLO stipule que la maintenance planifiée compte comme de la disponibilité.",
+        "cardCaption": "D'abord les dossiers, puis les blocs facultatifs restreignent davantage. La condition de dimension ci-dessus s'applique aussi à ce module.",
+        "noConditionForChecks": "La condition de dimension ci-dessus ne s'applique pas aux contrôles.",
+        "appliesTo": "S'applique à",
+        "tabTargets": "Cibles",
+        "tabSchedule": "Planification",
+        "tabAdvanced": "Avancé",
+        "modeInFolder": "{mode} dans",
+        "newMode": "Nouvelle indisponibilité",
+        "editMode": "Modifier l'indisponibilité",
+        "namePlaceholder": "Nom de l'indisponibilité",
+        "nameLabel": "Nom de l'indisponibilité",
+        "renameHint": "Cliquez pour renommer",
+        "reason": "Motif",
+        "reasonHelp": "Facultatif. Affiché dans la liste, sur la page de détail et dans l'infobulle « En sourdine ».",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "activeBanner": "Cette indisponibilité est active. Une modification prend effet à la prochaine évaluation, et un changement du mode SLO recalcule les fenêtres déjà commencées.",
+        "noModule": "Choisissez un module dans S'applique à."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alertes",
+          "anomaly_detections": "détections d'anomalies",
+          "synthetics": "contrôles synthétiques",
+          "slos": "SLO"
+        },
+        "whenOnce": "Une fois, de {start} à {end} {zone}",
+        "whenDaily": "Chaque jour à {time} {zone}, pendant {duration}",
+        "whenWeekly": "Chaque {days} à {time} {zone}, pendant {duration}",
+        "inFolders": "dans le dossier {names} | dans les dossiers {names}",
+        "withCondition": "avec {condition}",
+        "tagged": "étiqueté {tags}",
+        "named": "limité à {count} élément nommé | limité à {count} éléments nommés",
+        "stopNotifying": "{when} : {targets} cessent de notifier.",
+        "nothingMuted": "{when} : aucune alerte ni vérification n'est mise en sourdine.",
+        "sloUnchanged": "Les scores SLO ne sont pas modifiés.",
+        "sloExcluded": "{slos} excluent la fenêtre de leur score.",
+        "sloAsGood": "{slos} comptabilisent la fenêtre comme du temps conforme."
+      },
+      "autoName": {
+        "once": "une fois",
+        "onceOn": "une fois {date}",
+        "daily": "quotidien",
+        "weekly": "hebdomadaire"
+      },
+      "condition": {
+        "none": "Aucune condition de dimension",
+        "add": "Ajouter",
+        "title": "Condition de dimension",
+        "onePer": "Une par indisponibilité",
+        "remove": "Supprimer la condition de dimension",
+        "caption": "S'applique aux alertes, aux détections d'anomalies et aux SLO. Les vérifications Synthetics n'ont pas de dimensions et utilisent des étiquettes. Toutes les paires doivent correspondre. Utilisez un groupe OU pour les alternatives. Une valeur peut se terminer par *."
+      },
+      "resources": {
+        "refineBy": "Affiner par ressource",
+        "load": "Charger les ressources",
+        "needsEq": "Ajoutez au moins une condition = avant d'affiner par ressource.",
+        "tooMany": "{count} valeurs co-occurrent avec cette condition. Restreignez la condition pour sélectionner des ressources.",
+        "lastSeen": "Vu pour la dernière fois",
+        "streams": "Flux",
+        "footer": "{selected} sur {total} sélectionnés · {source}",
+        "fromRegistry": "depuis le registre des services",
+        "fromSearch": "à partir des données des dernières 24 heures",
+        "apply": "Appliquer",
+        "loadFailed": "Impossible de charger les ressources"
+      },
+      "scheduleForm": {
+        "once": "Une fois",
+        "daily": "Quotidien",
+        "weekly": "Hebdomadaire",
+        "startDate": "Date de début",
+        "startTime": "Heure de début",
+        "endDate": "Date de fin",
+        "endTime": "Heure de fin",
+        "days": "Jours",
+        "startsAt": "Débute à",
+        "duration": "Durée",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Jusqu'à 7 jours, par exemple 90m ou 1h 30m.",
+        "until": "Répéter jusqu'au",
+        "untilPlaceholder": "Pas de date de fin",
+        "timezone": "Fuseau horaire",
+        "noWindow": "Aucune fenêtre ne débute dans les 8 prochains jours.",
+        "nextWindow": "Prochaine fenêtre : {window}. Une fenêtre peut passer minuit.",
+        "nextWindowWithUtc": "Prochaine fenêtre : {window} ({utc}). Une fenêtre peut passer minuit."
+      },
+      "preview": {
+        "title": "Aperçu",
+        "failed": "L'aperçu n'a pas pu être chargé.",
+        "andMore": "et {count} de plus",
+        "noMatch": "Rien ne correspond actuellement",
+        "fireTime": "{count} alerte résout son identité au moment du déclenchement | {count} alertes résolvent leur identité au moment du déclenchement",
+        "undecidable": "Impossible de les distinguer par {key}",
+        "showAll": "Afficher la liste complète",
+        "showLess": "Afficher moins"
+      },
+      "muteAllDialog": {
+        "title": "Mettre en sourdine des modules entiers ?",
+        "intro": "Aucun dossier, élément, tag ou condition ne restreint ces modules, donc cette indisponibilité met en sourdine :",
+        "every": {
+          "alerts": "Toutes les alertes de cette organisation",
+          "anomaly_detections": "Toutes les détections d'anomalies de cette organisation",
+          "synthetics": "Toutes les vérifications synthétiques de cette organisation",
+          "slos": "Tous les SLO de cette organisation"
+        },
+        "matchedNow": "{matched} aujourd'hui",
+        "outro": "Les notifications, les pages d'astreinte et les workflows s'arrêtent pour tous pendant la fenêtre.",
+        "cancel": "Annuler",
+        "confirm": "Tout mettre en sourdine"
+      },
+      "summaryPane": {
+        "title": "Résumé",
+        "filedIn": "Classé dans",
+        "window": "Fenêtre",
+        "nextWindow": "Prochaine fenêtre",
+        "inUtc": "En UTC",
+        "largeMatch": "{modules} : l'indisponibilité correspond à plus de la moitié des éléments. La majorité de cette organisation ne notifiera pas pendant la fenêtre.",
+        "whatHappens": "Ce qui se passe",
+        "keepRunning": "Les évaluations et les vérifications continuent de s'exécuter et conservent leur historique.",
+        "noNotifications": "Les notifications, les pages d'astreinte et les workflows s'arrêtent.",
+        "mutedIncidents": "Les incidents s'ouvrent en sourdine et notifient après la fenêtre."
+      },
+      "band": {
+        "now": "maintenant",
+        "none": "Aucune fenêtre ne s'est encore exécutée et aucune n'est planifiée.",
+        "active": "Active",
+        "next": "Prochaine",
+        "past": "Exécutée",
+        "track": "Fenêtres",
+        "aria": "{kind} : de {start} à {end}"
+      },
+      "detail": {
+        "overview": "Vue d'ensemble",
+        "affected": "Affectés · {count}",
+        "suppressed": "Supprimés · {count}",
+        "details": "Détails",
+        "condition": "Condition",
+        "noTarget": "Aucune cible",
+        "banner": "Bannière",
+        "bannerOn": "Affichée à l'organisation lorsqu'elle est active",
+        "bannerOff": "Aucune bannière",
+        "occurrences": "Occurrences",
+        "nextWindow": "Prochaine fenêtre : {window}. Votre heure : {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Correspondance par",
+        "matchedBy": {
+          "query": "Requête",
+          "source_alert": "Alerte source",
+          "tag": "Étiquette",
+          "id": "Nommé",
+          "folder": "Dossier",
+          "org": "Toute l'organisation"
+        },
+        "source": "Source",
+        "wouldHaveNotified": "Aurait notifié",
+        "noSuppressed": "Rien n'a encore été supprimé",
+        "muteHourName": "{name} · sourdine 1 h"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Mettre {count} alerte en sourdine | Mettre {count} alertes en sourdine",
+          "anomaly_detections": "Mettre {count} détection d'anomalie en sourdine | Mettre {count} détections d'anomalie en sourdine",
+          "synthetics": "Mettre {count} vérification en sourdine | Mettre {count} vérifications en sourdine",
+          "slos": "Mettre {count} SLO en sourdine | Mettre {count} SLO en sourdine",
+          "items": "Mettre {count} élément en sourdine | Mettre {count} éléments en sourdine"
+        },
+        "subtitle": "Ils continuent de s'exécuter et conservent leur historique. Les notifications, les appels d'astreinte et les workflows s'arrêtent jusqu'à la fin de la fenêtre.",
+        "muteFor": "Mettre en sourdine pendant",
+        "fileIn": "Classer dans",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Personnalisé"
+        },
+        "endsAt": "Se termine le",
+        "endsIn": "Dans {duration}.",
+        "confirm": "Mettre en sourdine",
+        "confirmUntil": "Mettre en sourdine jusqu'à {time}",
+        "menu": "Mettre les notifications en sourdine",
+        "until": "Jusqu'à…",
+        "bulk": "Mettre en sourdine",
+        "muted": "En sourdine · se termine dans {duration}",
+        "mutedTooltip": "Mis en sourdine par {name} jusqu'à {end}",
+        "exclude": "Exclure une fenêtre…"
+      },
+      "corrected": "Corrigé",
+      "correctedBy": "Score corrigé par {names}",
+      "incident": {
+        "mutedBy": "En sourdine · {name}",
+        "banner": "Mis en sourdine par {name}. Personne n'a été appelé par astreinte. Le premier déclenchement après la fenêtre envoie la notification d'ouverture différée.",
+        "bannerUntil": "Mis en sourdine par {name} jusqu'à {end}. Personne n'a été appelé par astreinte. Le premier déclenchement après la fenêtre envoie la notification d'ouverture différée."
+      },
+      "banner": {
+        "ended": "terminé",
+        "endsInUnderMinute": "se termine dans moins d'une minute",
+        "endsInMinutes": "se termine dans {count} minute | se termine dans {count} minutes",
+        "endsIn": "se termine dans {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Afficher une bannière à tous les membres de l'organisation pendant que cette période de silence est active",
+        "showBannerCaption": "La bannière affiche le nom, les décomptes concernés et le temps restant. Elle ne mentionne jamais une alerte.",
+        "preview": "Aperçu",
+        "previewMessage": "{name} est actif.",
+        "tooLong": "Une bannière n'est disponible que pour des fenêtres de 7 jours maximum."
+      },
+      "sloCorrections": {
+        "title": "Corrections de statut :",
+        "item": "{name} ({status})"
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -16488,7 +16858,8 @@
       "sourceMaps": "RUM — Cartes des sources",
       "oncall": "Astreinte",
       "oncallDetail": "Page d'astreinte",
-      "syntheticsJourney": "Parcours synthétique"
+      "syntheticsJourney": "Parcours synthétique",
+      "downtimes": "Indisponibilités"
     },
     "actions": {
       "openCheatsheet": "Ouvrir un aide-mémoire sur les raccourcis clavier",
@@ -16597,6 +16968,8 @@
       "oncallEscalate": "Escalader",
       "oncallSnooze": "Reporter",
       "oncallResolve": "Résoudre",
+      "downtimesCreate": "Nouvelle indisponibilité",
+      "downtimesRefresh": "Actualiser les indisponibilités",
       "functionsImport": "Importer une fonction"
     }
   },
@@ -17030,6 +17403,12 @@
         "belowTopN": "en dessous du top-N",
         "truncated": "tronqué",
         "gap": "écart"
+      },
+      "downtimeStatus": {
+        "scheduled": "Planifié",
+        "active": "Actif",
+        "ended": "Terminé",
+        "cancelled": "Annulé"
       }
     }
   },
@@ -17426,6 +17805,20 @@
     },
     "iam": {
       "userSaveFailed": "Impossible d'enregistrer l'utilisateur"
+    },
+    "downtimes": {
+      "cancelled": "Indisponibilité annulée",
+      "cancelledMany": "{count} indisponibilité annulée | {count} indisponibilités annulées",
+      "cancelFailed": "Impossible d'annuler l'indisponibilité",
+      "deleted": "Indisponibilité supprimée",
+      "deleteFailed": "Impossible de supprimer l'indisponibilité",
+      "created": "Indisponibilité créée",
+      "updated": "Indisponibilité enregistrée",
+      "saveFailed": "Impossible d'enregistrer l'indisponibilité",
+      "muted": "Mise en sourdine de {count} élément jusqu'à {time}. Classé dans {folder}. | Mise en sourdine de {count} éléments jusqu'à {time}. Classés dans {folder}.",
+      "muteFailed": "Impossible de créer la sourdine",
+      "viewDowntime": "Voir l'indisponibilité",
+      "itemsDropped": "{count} élément choisi est en dehors des dossiers choisis et a été supprimé. | {count} éléments choisis sont en dehors des dossiers choisis et ont été supprimés."
     }
   },
   "cipherKeys": {
@@ -17716,7 +18109,9 @@
       "budgetNote": "Le dernier point correspond à la tuile Budget restant ci-dessus. La ligne pointillée à 0% est l'épuisement ; en dessous, le SLO a dépensé plus d'erreurs que ne le permet l'objectif. Les lacunes sont des compartiments sans mesure, ce qui n'est pas la même chose que zéro.",
       "burnExplain": "Vitesse à laquelle le budget se consume dans chaque intervalle, en multiple du taux neutre du budget.",
       "burnFormula": "taux de combustion = (100% − SLI) ÷ (100% − objectif)\nSLI = 100 × bon ÷ total, pour ce compartiment uniquement\n\naxe de droite (la même ligne lue comme SLI) :\nSLI = 100% − taux de combustion × (100% − objectif)",
-      "burnNote": "×1 dépense le budget exactement à la fin de la fenêtre, ×2 dans la moitié du temps ; sous ×1, le budget est mis de côté. Comme c'est par intervalle et non cumulatif, un pic reste visible ici au lieu d'être lissé. L'axe droit descend : plus haut dans le graphique signifie plus de combustion, donc un SLI plus bas."
+      "burnNote": "×1 dépense le budget exactement à la fin de la fenêtre, ×2 dans la moitié du temps ; sous ×1, le budget est mis de côté. Comme c'est par intervalle et non cumulatif, un pic reste visible ici au lieu d'être lissé. L'axe droit descend : plus haut dans le graphique signifie plus de combustion, donc un SLI plus bas.",
+      "corrected": "Corrigé par une indisponibilité",
+      "correctedTooltip": "Corrigé par une indisponibilité : exclu, donc la ligne de budget reste plate"
     },
     "alerts": {
       "title": "Alertes",

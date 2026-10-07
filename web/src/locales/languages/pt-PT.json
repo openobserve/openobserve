@@ -560,6 +560,12 @@
       "description": "Uma tarefa remota é um serviço HTTP que seus experimentos chamam para produzir saídas. Publique-a uma vez, comprove que a conexão funciona e todo experimento poderá fixar a versão exata com a qual foi executado.",
       "action": "Nova tarefa",
       "actionDesc": "Aponte o OpenObserve para seu endpoint e teste a conexão."
+    },
+    "noDowntimes": {
+      "title": "Nenhuma janela de manutenção ainda",
+      "description": "Uma janela de manutenção mantém os alertas, as detecções de anomalias e as verificações sintéticas em execução e interrompe as notificações deles durante uma janela que você agendar.",
+      "action": "Agendar janela de manutenção",
+      "actionDesc": "Uma vez, diariamente ou semanalmente. Para um silenciamento rápido, use Silenciar na lista de alertas."
     }
   },
   "common": {
@@ -1317,7 +1323,8 @@
     "kubernetes": "Kubernetes",
     "topQueries": "Principais consultas",
     "profiles": "Perfis",
-    "productAnalytics": "Análise de produto"
+    "productAnalytics": "Análise de produto",
+    "downtimes": "Janelas de manutenção"
   },
   "profiles": {
     "title": "Perfis",
@@ -8753,7 +8760,370 @@
     "sloLongWindow": "Janela longa",
     "sloShortWindow": "Janela curta",
     "sloCloneDisabled": "Os alertas de SLO são criados em sua página de SLO, portanto não podem ser clonados daqui.",
-    "seconds": "Segundos"
+    "seconds": "Segundos",
+    "downtimes": {
+      "newTitle": "Nova janela de manutenção",
+      "editTitle": "Editar janela de manutenção",
+      "detailTitle": "Janela de manutenção",
+      "modules": {
+        "alerts": "Alertas",
+        "anomaly_detections": "Detecções de anomalias",
+        "synthetics": "Verificações sintéticas",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "Alertas",
+        "anomaly_detections": "Anomalia",
+        "synthetics": "Sintéticos",
+        "slos": "SLOs"
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}s",
+        "condition": "condição",
+        "allFolders": "todas as pastas",
+        "oneFolder": "pasta {name}",
+        "nFolders": "{count} pasta | {count} pastas",
+        "tags": "tag {tags}",
+        "nItems": "{count} item | {count} itens",
+        "asGood": "como bom",
+        "chip": "{module} · {text}"
+      },
+      "duration": {
+        "days": "{count} d",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} a {end} {zone}",
+        "onceSentence": "Uma vez · {start} a {end} · {zone}",
+        "dailySentence": "Diariamente · {time} por {duration} · {zone}",
+        "weeklySentence": "Semanalmente em {days} · {time} por {duration} · {zone}"
+      },
+      "validation": {
+        "conditionRequired": "Adicione uma condição ou remova o bloco de condição.",
+        "pairKey": "Escolha uma dimensão para cada linha.",
+        "pairOperator": "Use = ou != em uma condição de janela de manutenção.",
+        "pairValue": "Insira um valor para cada linha.",
+        "loneStar": "Um valor não pode ser um * isolado.",
+        "innerStar": "O * é permitido apenas no final de um valor.",
+        "emptyGroup": "Um grupo de condições não pode ficar vazio.",
+        "tooDeep": "Uma condição pode aninhar grupos no máximo até 3 níveis de profundidade.",
+        "tooManyPairs": "Uma condição pode conter no máximo 32 pares.",
+        "needsEq": "Adicione ao menos uma condição =. Uma condição formada apenas por linhas != silenciaria todo o resto.",
+        "modulesRequired": "Escolha ao menos um módulo.",
+        "foldersRequired": "Escolha Todas as pastas ou ao menos uma pasta.",
+        "tagsRequired": "Adicione uma tag ou remova o bloco de tags.",
+        "idsRequired": "Selecione um item ou remova o bloco de itens específicos.",
+        "idOutsideFolders": "Alguns itens escolhidos não estão nas pastas escolhidas.",
+        "nameTooLong": "Um nome pode ter no máximo 256 caracteres.",
+        "timezoneRequired": "Escolha um fuso horário.",
+        "startRequired": "Insira uma data e hora de início.",
+        "endRequired": "Insira uma data e hora de término.",
+        "endAfterStart": "O término deve ser posterior ao início.",
+        "windowTooLong": "Uma janela pode durar no máximo 7 dias.",
+        "windowTooShort": "Uma janela deve durar pelo menos 1 minuto.",
+        "startTimeRequired": "Insira um horário de início no formato HH:MM.",
+        "durationInvalid": "Insira uma duração como 90m ou 1h 30m.",
+        "weekdaysRequired": "Escolha pelo menos um dia.",
+        "untilAfterStart": "Repetir até deve ser no primeiro dia ou depois dele."
+      },
+      "title": "Inatividades",
+      "subtitle": "Janelas agendadas que mantêm alertas, detecções de anomalias e verificações sintéticas em execução, mas interrompem suas notificações",
+      "newDowntime": "Nova inatividade",
+      "filterAll": "Todas",
+      "filterOnce": "Pontuais",
+      "filterRecurring": "Recorrentes",
+      "search": "Pesquisar por nome, dimensão ou criador",
+      "searchAcross": "Pesquisar em todas as pastas",
+      "thisFolder": "Esta pasta",
+      "allFolders": "Todas as pastas",
+      "thisFolderTooltip": "Pesquisar na pasta selecionada",
+      "allFoldersTooltip": "Pesquisar em todas as pastas",
+      "stats": {
+        "active": "Ativas",
+        "scheduled": "Agendadas",
+        "recurring": "Recorrentes",
+        "ended": "Encerradas",
+        "cancelled": "Canceladas",
+        "total": "Total"
+      },
+      "columns": {
+        "name": "Nome",
+        "status": "Status",
+        "targets": "Alvos",
+        "schedule": "Agendamento",
+        "when": "Término / próxima",
+        "matched": "Correspondências",
+        "createdBy": "Criado por",
+        "folder": "Pasta"
+      },
+      "oneTime": "Pontual",
+      "recurring": "Recorrente",
+      "bannerOn": "Um banner é exibido para todos na organização enquanto esta inatividade estiver ativa",
+      "endsLabel": "termina",
+      "nextLabel": "próxima",
+      "matched": {
+        "alerts": "{count} alerta | {count} alertas",
+        "anomalies": "{count} anomalia | {count} anomalias",
+        "synthetics": "{count} verificação | {count} verificações",
+        "slos": "{count} SLO | {count} SLOs"
+      },
+      "actions": {
+        "endNow": "Encerrar agora",
+        "edit": "Editar",
+        "duplicate": "Duplicar",
+        "moveToFolder": "Mover para pasta",
+        "cancel": "Cancelar inatividade",
+        "delete": "Excluir",
+        "more": "Mais ações",
+        "muteForHour": "Silenciar agora por 1 h"
+      },
+      "confirmCancel": {
+        "title": "Cancelar downtime",
+        "message": "As notificações são retomadas imediatamente. O downtime permanece na lista para histórico.",
+        "bulkMessage": "Cancelar {count} downtime? As notificações são retomadas imediatamente. | Cancelar {count} downtimes? As notificações são retomadas imediatamente."
+      },
+      "confirmDelete": {
+        "title": "Excluir downtime",
+        "message": "O downtime e seu histórico são removidos. Isso não pode ser desfeito."
+      },
+      "copyOf": "Cópia de {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} alerta correspondente | {count} alertas correspondentes",
+          "anomaly_detections": "{count} detecção de anomalia correspondente | {count} detecções de anomalia correspondentes",
+          "synthetics": "{count} verificação correspondente | {count} verificações correspondentes",
+          "slos": "{count} SLO correspondente | {count} SLOs correspondentes"
+        },
+        "alertFolders": "Pastas de alertas",
+        "syntheticsFolders": "Pastas de sintéticos",
+        "noAlertFolderAccess": "Você não tem acesso às pastas de alertas.",
+        "noSyntheticsFolderAccess": "Você não tem acesso às pastas de sintéticos.",
+        "tags": "Tags",
+        "tagPlaceholder": "chave:valor",
+        "tagsHint": "Toda tag deve estar na verificação.",
+        "removeBlock": "Remover este bloco",
+        "specificItems": "Itens específicos",
+        "itemsHint": "Apenas os itens das pastas escolhidas são oferecidos.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Adicionar tags",
+        "addItems": "Adicionar itens específicos",
+        "sloMode": "Pontuação do SLO dentro da janela",
+        "sloExclude": "Excluir a janela",
+        "sloCountAsGood": "Contar a janela como boa",
+        "sloExcludeCaption": "O tempo dentro da janela não conta como bom nem como ruim. Alertas de burn-rate nesses SLOs não disparam para ele.",
+        "sloCountAsGoodCaption": "O tempo na janela conta como totalmente bom. Use isto apenas quando o contrato do seu SLO definir que manutenção planejada é disponibilidade.",
+        "cardCaption": "Pastas primeiro, depois os blocos opcionais restringem ainda mais. A condição de dimensão acima também se aplica a este módulo.",
+        "noConditionForChecks": "A condição de dimensão acima não se aplica a verificações.",
+        "appliesTo": "Aplica-se a",
+        "tabTargets": "Alvos",
+        "tabSchedule": "Agendamento",
+        "tabAdvanced": "Avançado",
+        "modeInFolder": "{mode} em",
+        "newMode": "Novo downtime",
+        "editMode": "Editar downtime",
+        "namePlaceholder": "Nome do downtime",
+        "nameLabel": "Nome do downtime",
+        "renameHint": "Clique para renomear",
+        "reason": "Motivo",
+        "reasonHelp": "Opcional. Exibido na lista, na página de detalhes e no tooltip Silenciado.",
+        "cancel": "Cancelar",
+        "save": "Salvar",
+        "activeBanner": "Este downtime está ativo. Uma edição entra em vigor na próxima avaliação, e uma alteração no modo do SLO faz uma nova medição das janelas que já começaram.",
+        "noModule": "Escolha um módulo em Aplica-se a."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alertas",
+          "anomaly_detections": "detecções de anomalia",
+          "synthetics": "verificações de sintéticos",
+          "slos": "SLOs"
+        },
+        "whenOnce": "Uma vez, de {start} até {end} {zone}",
+        "whenDaily": "Todos os dias às {time} {zone}, por {duration}",
+        "whenWeekly": "Toda {days} às {time} {zone}, por {duration}",
+        "inFolders": "na pasta {names} | nas pastas {names}",
+        "withCondition": "com {condition}",
+        "tagged": "com as tags {tags}",
+        "named": "limitado a {count} item nomeado | limitado a {count} itens nomeados",
+        "stopNotifying": "{when}: {targets} param de notificar.",
+        "nothingMuted": "{when}: nenhum alerta ou verificação está silenciado.",
+        "sloUnchanged": "As pontuações de SLO não são alteradas.",
+        "sloExcluded": "{slos} excluem a janela da sua pontuação.",
+        "sloAsGood": "{slos} contam a janela como tempo bom."
+      },
+      "autoName": {
+        "once": "uma vez",
+        "onceOn": "uma vez em {date}",
+        "daily": "diariamente",
+        "weekly": "semanalmente"
+      },
+      "condition": {
+        "none": "Nenhuma condição de dimensão",
+        "add": "Adicionar",
+        "title": "Condição de dimensão",
+        "onePer": "Uma por inatividade",
+        "remove": "Remover a condição de dimensão",
+        "caption": "Aplica-se a alertas, detecções de anomalia e SLOs. As verificações de Sintéticos não têm dimensões e usam tags. Todos os pares devem corresponder. Use um grupo OR para alternativas. Um valor pode terminar em *."
+      },
+      "resources": {
+        "refineBy": "Refinar por recurso",
+        "load": "Carregar recursos",
+        "needsEq": "Adicione pelo menos uma condição = antes de refinar por recurso.",
+        "tooMany": "{count} valores coocorrem com esta condição. Restrinja a condição para escolher recursos.",
+        "lastSeen": "Última vez visto",
+        "streams": "Streams",
+        "footer": "{selected} de {total} selecionados · {source}",
+        "fromRegistry": "do registro de serviços",
+        "fromSearch": "das últimas 24 horas de dados",
+        "apply": "Aplicar",
+        "loadFailed": "Não foi possível carregar os recursos"
+      },
+      "scheduleForm": {
+        "once": "Uma vez",
+        "daily": "Diariamente",
+        "weekly": "Semanalmente",
+        "startDate": "Data de início",
+        "startTime": "Hora de início",
+        "endDate": "Data de término",
+        "endTime": "Hora de término",
+        "days": "Dias",
+        "startsAt": "Começa em",
+        "duration": "Duração",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Até 7 dias, por exemplo 90m ou 1h 30m.",
+        "until": "Repetir até",
+        "untilPlaceholder": "Sem data de término",
+        "timezone": "Fuso horário",
+        "noWindow": "Nenhuma janela começa nos próximos 8 dias.",
+        "nextWindow": "Próxima janela: {window}. Uma janela pode atravessar a meia-noite.",
+        "nextWindowWithUtc": "Próxima janela: {window} ({utc}). Uma janela pode atravessar a meia-noite."
+      },
+      "preview": {
+        "title": "Pré-visualização",
+        "failed": "Não foi possível carregar a pré-visualização.",
+        "andMore": "e mais {count}",
+        "noMatch": "Nada corresponde agora",
+        "fireTime": "{count} alerta resolve sua identidade no momento do disparo | {count} alertas resolvem sua identidade no momento do disparo",
+        "undecidable": "Não é possível diferenciá-los por {key}",
+        "showAll": "Mostrar a lista completa",
+        "showLess": "Mostrar menos"
+      },
+      "muteAllDialog": {
+        "title": "Silenciar módulos inteiros?",
+        "intro": "Nenhuma pasta, item, tag ou condição restringe estes módulos, portanto esta inatividade silencia:",
+        "every": {
+          "alerts": "Todos os alertas desta organização",
+          "anomaly_detections": "Todas as detecções de anomalia desta organização",
+          "synthetics": "Todas as verificações de sintéticos desta organização",
+          "slos": "Todos os SLOs desta organização"
+        },
+        "matchedNow": "{matched} hoje",
+        "outro": "Notificações, acionamentos de plantão e fluxos de trabalho param para todos eles dentro da janela.",
+        "cancel": "Cancelar",
+        "confirm": "Silenciar tudo"
+      },
+      "summaryPane": {
+        "title": "Resumo",
+        "filedIn": "Registrado em",
+        "window": "Janela",
+        "nextWindow": "Próxima janela",
+        "inUtc": "Em UTC",
+        "largeMatch": "{modules}: a inatividade corresponde a mais da metade dos itens. A maior parte desta organização não notificará dentro da janela.",
+        "whatHappens": "O que acontece",
+        "keepRunning": "As avaliações e verificações continuam em execução e mantêm seu histórico.",
+        "noNotifications": "Notificações, acionamentos de plantão e fluxos de trabalho param.",
+        "mutedIncidents": "Os incidentes são abertos silenciados e notificam após a janela."
+      },
+      "band": {
+        "now": "agora",
+        "none": "Nenhuma janela foi executada ainda e nenhuma está planejada.",
+        "active": "Ativa",
+        "next": "Próxima",
+        "past": "Executada",
+        "track": "Janelas",
+        "aria": "{kind}: {start} a {end}"
+      },
+      "detail": {
+        "overview": "Visão geral",
+        "affected": "Afetados · {count}",
+        "suppressed": "Suprimidos · {count}",
+        "details": "Detalhes",
+        "condition": "Condição",
+        "noTarget": "Nenhum alvo",
+        "banner": "Banner",
+        "bannerOn": "Exibido para a organização enquanto ativo",
+        "bannerOff": "Sem banner",
+        "occurrences": "Ocorrências",
+        "nextWindow": "Próxima janela: {window}. Seu horário: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Correspondido por",
+        "matchedBy": {
+          "query": "Consulta",
+          "source_alert": "Alerta de origem",
+          "tag": "Tag",
+          "id": "Nomeado",
+          "folder": "Pasta",
+          "org": "Organização inteira"
+        },
+        "source": "Origem",
+        "wouldHaveNotified": "Teria notificado",
+        "noSuppressed": "Nada foi suprimido ainda",
+        "muteHourName": "{name} · silenciar 1 h"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Silenciar {count} alerta | Silenciar {count} alertas",
+          "anomaly_detections": "Silenciar {count} detecção de anomalia | Silenciar {count} detecções de anomalia",
+          "synthetics": "Silenciar {count} verificação | Silenciar {count} verificações",
+          "slos": "Silenciar {count} SLO | Silenciar {count} SLOs",
+          "items": "Silenciar {count} item | Silenciar {count} itens"
+        },
+        "subtitle": "Eles continuam em execução e mantêm seu histórico. Notificações, acionamentos e fluxos de trabalho param até a janela terminar.",
+        "muteFor": "Silenciar por",
+        "fileIn": "Arquivar em",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Personalizado"
+        },
+        "endsAt": "Termina em",
+        "endsIn": "Em {duration}.",
+        "confirm": "Silenciar",
+        "confirmUntil": "Silenciar até {time}",
+        "menu": "Silenciar notificações",
+        "until": "Até…",
+        "bulk": "Silenciar",
+        "muted": "Silenciado · termina em {duration}",
+        "mutedTooltip": "Silenciado por {name} até {end}",
+        "exclude": "Excluir uma janela…"
+      },
+      "corrected": "Corrigido",
+      "correctedBy": "Pontuação corrigida por {names}",
+      "incident": {
+        "mutedBy": "Silenciado · {name}",
+        "banner": "Silenciado por {name}. Ninguém foi acionado. O primeiro disparo após a janela envia a notificação de abertura atrasada.",
+        "bannerUntil": "Silenciado por {name} até {end}. Ninguém foi acionado. O primeiro disparo após a janela envia a notificação de abertura atrasada."
+      },
+      "banner": {
+        "ended": "encerrado",
+        "endsInUnderMinute": "termina em menos de um minuto",
+        "endsInMinutes": "termina em {count} minuto | termina em {count} minutos",
+        "endsIn": "termina em {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Mostrar um banner para todos na organização enquanto esta inatividade estiver ativa",
+        "showBannerCaption": "O banner mostra o nome, as contagens afetadas e o tempo restante. Ele nunca nomeia um alerta.",
+        "preview": "Pré-visualizar",
+        "previewMessage": "{name} está ativo.",
+        "tooLong": "Um banner só está disponível para janelas de até 7 dias."
+      },
+      "sloCorrections": {
+        "title": "Correções de status:",
+        "item": "{name} ({status})"
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -16488,7 +16858,8 @@
       "sourceMaps": "RUM — Mapas de origem",
       "oncall": "Plantão",
       "oncallDetail": "Página de Plantão",
-      "syntheticsJourney": "Jornada de Sintéticos"
+      "syntheticsJourney": "Jornada de Sintéticos",
+      "downtimes": "Indisponibilidades"
     },
     "actions": {
       "openCheatsheet": "Abra a folha de dicas de atalhos de teclado",
@@ -16597,6 +16968,8 @@
       "oncallEscalate": "Escalar",
       "oncallSnooze": "Adiar",
       "oncallResolve": "Resolver",
+      "downtimesCreate": "Nova indisponibilidade",
+      "downtimesRefresh": "Atualizar indisponibilidades",
       "functionsImport": "Importar função"
     }
   },
@@ -17030,6 +17403,12 @@
         "belowTopN": "abaixo do top-N",
         "truncated": "truncado",
         "gap": "lacuna"
+      },
+      "downtimeStatus": {
+        "scheduled": "Agendada",
+        "active": "Ativa",
+        "ended": "Encerrada",
+        "cancelled": "Cancelada"
       }
     }
   },
@@ -17426,6 +17805,20 @@
     },
     "iam": {
       "userSaveFailed": "Não foi possível salvar o usuário"
+    },
+    "downtimes": {
+      "cancelled": "Indisponibilidade cancelada",
+      "cancelledMany": "{count} indisponibilidade cancelada | {count} indisponibilidades canceladas",
+      "cancelFailed": "Não foi possível cancelar a indisponibilidade",
+      "deleted": "Indisponibilidade excluída",
+      "deleteFailed": "Não foi possível excluir a indisponibilidade",
+      "created": "Indisponibilidade criada",
+      "updated": "Indisponibilidade salva",
+      "saveFailed": "Não foi possível salvar a indisponibilidade",
+      "muted": "Silenciado {count} item até {time}. Arquivado em {folder}. | Silenciados {count} itens até {time}. Arquivados em {folder}.",
+      "muteFailed": "Não foi possível criar o silenciamento",
+      "viewDowntime": "Ver indisponibilidade",
+      "itemsDropped": "{count} item selecionado está fora das pastas escolhidas e foi removido. | {count} itens selecionados estão fora das pastas escolhidas e foram removidos."
     }
   },
   "cipherKeys": {
@@ -17716,7 +18109,9 @@
       "budgetNote": "O último ponto é igual ao bloco de orçamento restante acima. A linha tracejada em 0% é o esgotamento; abaixo dela, o SLO gastou mais erros do que a meta permite. Lacunas são buckets sem nada medido, o que não é o mesmo que zero.",
       "burnExplain": "A velocidade com que o orçamento está sendo consumido em cada intervalo individualmente, como um múltiplo da taxa neutra para o orçamento.",
       "burnFormula": "taxa de consumo = (100% − SLI) ÷ (100% − meta)\nSLI = 100 × bom ÷ total, somente para esse bucket\n\neixo direito (a mesma linha lida como SLI):\nSLI = 100% − taxa de consumo × (100% − meta)",
-      "burnNote": "×1 gasta o orçamento exatamente no final da janela, ×2 na metade dela; abaixo de ×1, o orçamento está sendo poupado. Como é por intervalo e não cumulativo, um pico aqui permanece visível em vez de ser diluído pela média. O eixo direito conta para baixo: subir no gráfico é mais queima, o que significa um SLI mais baixo."
+      "burnNote": "×1 gasta o orçamento exatamente no final da janela, ×2 na metade dela; abaixo de ×1, o orçamento está sendo poupado. Como é por intervalo e não cumulativo, um pico aqui permanece visível em vez de ser diluído pela média. O eixo direito conta para baixo: subir no gráfico é mais queima, o que significa um SLI mais baixo.",
+      "corrected": "Corrigido por uma indisponibilidade",
+      "correctedTooltip": "Corrigido por uma indisponibilidade: excluído, então a linha de orçamento fica plana"
     },
     "alerts": {
       "title": "Alertas",

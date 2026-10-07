@@ -560,6 +560,12 @@
       "description": "Ein Remote-Task ist ein HTTP-Dienst, den Ihre Experimente aufrufen, um Ausgaben zu erzeugen. Veröffentlichen Sie ihn einmal, verifizieren Sie, dass die Verbindung funktioniert, und jedes Experiment kann die exakte Version festlegen, gegen die es ausgeführt wurde.",
       "action": "Neuer Task",
       "actionDesc": "Richten Sie OpenObserve auf Ihren Endpunkt und testen Sie die Verbindung."
+    },
+    "noDowntimes": {
+      "title": "Noch keine Wartungsfenster",
+      "description": "Ein Wartungsfenster hält Warnmeldungen, Anomalieerkennungen und Synthetics-Prüfungen aktiv und stoppt ihre Benachrichtigungen für einen von Ihnen geplanten Zeitraum.",
+      "action": "Wartungsfenster planen",
+      "actionDesc": "Einmalig, täglich oder wöchentlich. Zum schnellen Stummschalten verwenden Sie „Stummschalten“ in der Warnmeldungsliste."
     }
   },
   "common": {
@@ -1317,7 +1323,8 @@
     "kubernetes": "Kubernetes",
     "topQueries": "Top-Abfragen",
     "profiles": "Profile",
-    "productAnalytics": "Produktanalyse"
+    "productAnalytics": "Produktanalyse",
+    "downtimes": "Wartungsfenster"
   },
   "profiles": {
     "title": "Profile",
@@ -8753,7 +8760,370 @@
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
     "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
-    "seconds": "Sekunden"
+    "seconds": "Sekunden",
+    "downtimes": {
+      "newTitle": "Neues Wartungsfenster",
+      "editTitle": "Wartungsfenster bearbeiten",
+      "detailTitle": "Wartungsfenster",
+      "modules": {
+        "alerts": "Warnmeldungen",
+        "anomaly_detections": "Anomalieerkennungen",
+        "synthetics": "Synthetics-Prüfungen",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "Warnmeldungen",
+        "anomaly_detections": "Anomalie",
+        "synthetics": "Synthetics",
+        "slos": "SLOs"
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "Bedingung",
+        "allFolders": "alle Ordner",
+        "oneFolder": "{name}-Ordner",
+        "nFolders": "{count} Ordner | {count} Ordner",
+        "tags": "Tag {tags}",
+        "nItems": "{count} Element | {count} Elemente",
+        "asGood": "als gut",
+        "chip": "{module} · {text}"
+      },
+      "duration": {
+        "days": "{count} T",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} bis {end} {zone}",
+        "onceSentence": "Einmalig · {start} bis {end} · {zone}",
+        "dailySentence": "Täglich · {time} für {duration} · {zone}",
+        "weeklySentence": "Wöchentlich am {days} · {time} für {duration} · {zone}"
+      },
+      "validation": {
+        "conditionRequired": "Fügen Sie eine Bedingung hinzu oder entfernen Sie den Bedingungsblock.",
+        "pairKey": "Wählen Sie für jede Zeile eine Dimension.",
+        "pairOperator": "Verwenden Sie = oder != in einer Wartungsfenster-Bedingung.",
+        "pairValue": "Geben Sie für jede Zeile einen Wert ein.",
+        "loneStar": "Ein Wert darf nicht nur aus einem * bestehen.",
+        "innerStar": "Ein * ist nur am Ende eines Werts erlaubt.",
+        "emptyGroup": "Eine Bedingungsgruppe darf nicht leer sein.",
+        "tooDeep": "Eine Bedingung kann Gruppen höchstens 3 Ebenen tief verschachteln.",
+        "tooManyPairs": "Eine Bedingung kann höchstens 32 Paare enthalten.",
+        "needsEq": "Fügen Sie mindestens eine =-Bedingung hinzu. Eine Bedingung, die nur aus !=-Zeilen besteht, würde alles andere stummschalten.",
+        "modulesRequired": "Wählen Sie mindestens ein Modul.",
+        "foldersRequired": "Wählen Sie Alle Ordner oder mindestens einen Ordner.",
+        "tagsRequired": "Fügen Sie ein Tag hinzu oder entfernen Sie den Tag-Block.",
+        "idsRequired": "Wählen Sie ein Element aus oder entfernen Sie den Block für bestimmte Elemente.",
+        "idOutsideFolders": "Einige ausgewählte Elemente befinden sich nicht in den ausgewählten Ordnern.",
+        "nameTooLong": "Ein Name darf höchstens 256 Zeichen lang sein.",
+        "timezoneRequired": "Wählen Sie eine Zeitzone.",
+        "startRequired": "Geben Sie ein Startdatum und eine Uhrzeit ein.",
+        "endRequired": "Enddatum und Uhrzeit eingeben.",
+        "endAfterStart": "Das Ende muss nach dem Start liegen.",
+        "windowTooLong": "Ein Wartungsfenster kann höchstens 7 Tage dauern.",
+        "windowTooShort": "Ein Wartungsfenster muss mindestens 1 Minute dauern.",
+        "startTimeRequired": "Geben Sie eine Startzeit im Format HH:MM ein.",
+        "durationInvalid": "Geben Sie eine Dauer wie 90m oder 1h 30m ein.",
+        "weekdaysRequired": "Wählen Sie mindestens einen Tag.",
+        "untilAfterStart": "Wiederholen bis muss am oder nach dem ersten Tag liegen."
+      },
+      "title": "Wartungsfenster",
+      "subtitle": "Geplante Zeitfenster, in denen Warnmeldungen, Anomalieerkennungen und Synthetics-Prüfungen weiterlaufen, aber keine Benachrichtigungen senden",
+      "newDowntime": "Neues Wartungsfenster",
+      "filterAll": "Alle",
+      "filterOnce": "Einmalig",
+      "filterRecurring": "Wiederkehrend",
+      "search": "Nach Name, Dimension oder Ersteller suchen",
+      "searchAcross": "Alle Ordner durchsuchen",
+      "thisFolder": "Dieser Ordner",
+      "allFolders": "Alle Ordner",
+      "thisFolderTooltip": "Im ausgewählten Ordner suchen",
+      "allFoldersTooltip": "In jedem Ordner suchen",
+      "stats": {
+        "active": "Aktiv",
+        "scheduled": "Geplant",
+        "recurring": "Wiederkehrend",
+        "ended": "Beendet",
+        "cancelled": "Abgebrochen",
+        "total": "Gesamt"
+      },
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "targets": "Ziele",
+        "schedule": "Zeitplan",
+        "when": "Endet / Nächstes",
+        "matched": "Zugeordnet",
+        "createdBy": "Erstellt von",
+        "folder": "Ordner"
+      },
+      "oneTime": "Einmalig",
+      "recurring": "Wiederkehrend",
+      "bannerOn": "Solange dieses Wartungsfenster aktiv ist, wird allen in der Organisation ein Banner angezeigt",
+      "endsLabel": "endet",
+      "nextLabel": "nächste",
+      "matched": {
+        "alerts": "{count} Warnmeldung | {count} Warnmeldungen",
+        "anomalies": "{count} Anomalie | {count} Anomalien",
+        "synthetics": "{count} Prüfung | {count} Prüfungen",
+        "slos": "{count} SLO | {count} SLOs"
+      },
+      "actions": {
+        "endNow": "Jetzt beenden",
+        "edit": "Bearbeiten",
+        "duplicate": "Duplizieren",
+        "moveToFolder": "In Ordner verschieben",
+        "cancel": "Wartungsfenster abbrechen",
+        "delete": "Löschen",
+        "more": "Weitere Aktionen",
+        "muteForHour": "Jetzt für 1 Std. stummschalten"
+      },
+      "confirmCancel": {
+        "title": "Wartungsfenster abbrechen",
+        "message": "Benachrichtigungen werden sofort wieder aufgenommen. Das Wartungsfenster bleibt für den Verlauf in der Liste.",
+        "bulkMessage": "{count} Wartungsfenster abbrechen? Benachrichtigungen werden sofort wieder aufgenommen. | {count} Wartungsfenster abbrechen? Benachrichtigungen werden sofort wieder aufgenommen."
+      },
+      "confirmDelete": {
+        "title": "Wartungsfenster löschen",
+        "message": "Das Wartungsfenster und sein Verlauf werden entfernt. Dies kann nicht rückgängig gemacht werden."
+      },
+      "copyOf": "Kopie von {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} Warnmeldung stimmt überein | {count} Warnmeldungen stimmen überein",
+          "anomaly_detections": "{count} Erkennung stimmt überein | {count} Erkennungen stimmen überein",
+          "synthetics": "{count} Prüfung stimmt überein | {count} Prüfungen stimmen überein",
+          "slos": "{count} SLO stimmt überein | {count} SLOs stimmen überein"
+        },
+        "alertFolders": "Warnmeldungsordner",
+        "syntheticsFolders": "Synthetics-Ordner",
+        "noAlertFolderAccess": "Sie haben keinen Zugriff auf Warnmeldungsordner.",
+        "noSyntheticsFolderAccess": "Sie haben keinen Zugriff auf Synthetics-Ordner.",
+        "tags": "Tags",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Jedes Tag muss an der Prüfung vorhanden sein.",
+        "removeBlock": "Diesen Block entfernen",
+        "specificItems": "Bestimmte Elemente",
+        "itemsHint": "Nur Elemente in den ausgewählten Ordnern werden angeboten.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Tags hinzufügen",
+        "addItems": "Bestimmte Elemente hinzufügen",
+        "sloMode": "SLO-Score innerhalb des Fensters",
+        "sloExclude": "Das Fenster ausschließen",
+        "sloCountAsGood": "Das Fenster als gut zählen",
+        "sloExcludeCaption": "Zeit innerhalb des Fensters zählt weder als gut noch als schlecht. Burn-Rate-Warnmeldungen für diese SLOs werden dafür nicht ausgelöst.",
+        "sloCountAsGoodCaption": "Zeit im Fenster zählt als vollständig gut. Verwenden Sie dies nur, wenn Ihr SLO-Vertrag geplante Wartung als Uptime zählt.",
+        "cardCaption": "Zuerst die Ordner, dann schränken die optionalen Blöcke weiter ein. Die Dimensionsbedingung oben gilt auch für dieses Modul.",
+        "noConditionForChecks": "Die Dimensionsbedingung oben gilt nicht für Prüfungen.",
+        "appliesTo": "Gilt für",
+        "tabTargets": "Ziele",
+        "tabSchedule": "Zeitplan",
+        "tabAdvanced": "Erweitert",
+        "modeInFolder": "{mode} in",
+        "newMode": "Neues Wartungsfenster",
+        "editMode": "Wartungsfenster bearbeiten",
+        "namePlaceholder": "Name des Wartungsfensters",
+        "nameLabel": "Name des Wartungsfensters",
+        "renameHint": "Zum Umbenennen klicken",
+        "reason": "Grund",
+        "reasonHelp": "Optional. Wird in der Liste, auf der Detailseite und im Tooltip „Stummgeschaltet“ angezeigt.",
+        "cancel": "Abbrechen",
+        "save": "Speichern",
+        "activeBanner": "Dieses Wartungsfenster ist aktiv. Eine Bearbeitung wird bei der nächsten Auswertung wirksam, und eine Änderung des SLO-Modus bewertet die bereits begonnenen Fenster neu.",
+        "noModule": "Wählen Sie ein Modul unter „Gilt für“."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "Warnmeldungen",
+          "anomaly_detections": "Anomalieerkennungen",
+          "synthetics": "Synthetics-Prüfungen",
+          "slos": "SLOs"
+        },
+        "whenOnce": "Einmalig, von {start} bis {end} {zone}",
+        "whenDaily": "Täglich um {time} {zone}, für {duration}",
+        "whenWeekly": "Jeden {days} um {time} {zone}, für {duration}",
+        "inFolders": "im Ordner {names} | in den Ordnern {names}",
+        "withCondition": "mit {condition}",
+        "tagged": "mit Tags {tags}",
+        "named": "auf {count} benanntes Element beschränkt | auf {count} benannte Elemente beschränkt",
+        "stopNotifying": "{when}: {targets} benachrichtigen nicht mehr.",
+        "nothingMuted": "{when}: keine Warnmeldung und keine Prüfung ist stummgeschaltet.",
+        "sloUnchanged": "SLO-Bewertungen werden nicht geändert.",
+        "sloExcluded": "{slos} schließen das Zeitfenster aus ihrer Bewertung aus.",
+        "sloAsGood": "{slos} zählen das Zeitfenster als gute Zeit."
+      },
+      "autoName": {
+        "once": "einmalig",
+        "onceOn": "einmalig {date}",
+        "daily": "täglich",
+        "weekly": "wöchentlich"
+      },
+      "condition": {
+        "none": "Keine Dimensionsbedingung",
+        "add": "Hinzufügen",
+        "title": "Dimensionsbedingung",
+        "onePer": "Eine pro Ausfallzeit",
+        "remove": "Dimensionsbedingung entfernen",
+        "caption": "Gilt für Warnmeldungen, Anomalieerkennungen und SLOs. Synthetics-Prüfungen haben keine Dimensionen und verwenden Tags. Alle Paare müssen übereinstimmen. Verwenden Sie eine OR-Gruppe für Alternativen. Ein Wert kann auf * enden."
+      },
+      "resources": {
+        "refineBy": "Nach Ressource eingrenzen",
+        "load": "Ressourcen laden",
+        "needsEq": "Fügen Sie mindestens eine =-Bedingung hinzu, bevor Sie nach Ressource eingrenzen.",
+        "tooMany": "{count} Werte treten gemeinsam mit dieser Bedingung auf. Grenzen Sie die Bedingung ein, um Ressourcen auszuwählen.",
+        "lastSeen": "Zuletzt gesehen",
+        "streams": "Streams",
+        "footer": "{selected} von {total} ausgewählt · {source}",
+        "fromRegistry": "aus der Dienstregistrierung",
+        "fromSearch": "aus den Daten der letzten 24 Stunden",
+        "apply": "Übernehmen",
+        "loadFailed": "Die Ressourcen konnten nicht geladen werden"
+      },
+      "scheduleForm": {
+        "once": "Einmalig",
+        "daily": "Täglich",
+        "weekly": "Wöchentlich",
+        "startDate": "Startdatum",
+        "startTime": "Startzeit",
+        "endDate": "Enddatum",
+        "endTime": "Endzeit",
+        "days": "Tage",
+        "startsAt": "Beginnt um",
+        "duration": "Dauer",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Bis zu 7 Tage, zum Beispiel 90m oder 1h 30m.",
+        "until": "Wiederholen bis",
+        "untilPlaceholder": "Kein Enddatum",
+        "timezone": "Zeitzone",
+        "noWindow": "In den nächsten 8 Tagen beginnt kein Zeitfenster.",
+        "nextWindow": "Nächstes Fenster: {window}. Ein Fenster kann über Mitternacht hinausgehen.",
+        "nextWindowWithUtc": "Nächstes Fenster: {window} ({utc}). Ein Fenster kann über Mitternacht hinausgehen."
+      },
+      "preview": {
+        "title": "Vorschau",
+        "failed": "Die Vorschau konnte nicht geladen werden.",
+        "andMore": "und {count} weitere",
+        "noMatch": "Derzeit stimmt nichts überein",
+        "fireTime": "{count} Warnmeldung ermittelt ihre Identität zum Auslösezeitpunkt | {count} Warnmeldungen ermitteln ihre Identität zum Auslösezeitpunkt",
+        "undecidable": "Kann nicht anhand von {key} unterschieden werden",
+        "showAll": "Vollständige Liste anzeigen",
+        "showLess": "Weniger anzeigen"
+      },
+      "muteAllDialog": {
+        "title": "Ganze Module stummschalten?",
+        "intro": "Kein Ordner, Element, Tag und keine Bedingung schränkt diese Module ein, daher schaltet diese Ausfallzeit stumm:",
+        "every": {
+          "alerts": "Jede Warnmeldung in dieser Organisation",
+          "anomaly_detections": "Jede Anomalieerkennung in dieser Organisation",
+          "synthetics": "Jede Synthetics-Prüfung in dieser Organisation",
+          "slos": "Jeder SLO in dieser Organisation"
+        },
+        "matchedNow": "{matched} heute",
+        "outro": "Benachrichtigungen, On-Call-Alarmierungen und Workflows stoppen für alle von ihnen innerhalb des Fensters.",
+        "cancel": "Abbrechen",
+        "confirm": "Alle stummschalten"
+      },
+      "summaryPane": {
+        "title": "Zusammenfassung",
+        "filedIn": "Abgelegt in",
+        "window": "Fenster",
+        "nextWindow": "Nächstes Fenster",
+        "inUtc": "In UTC",
+        "largeMatch": "{modules}: Die Ausfallzeit trifft auf mehr als die Hälfte der Elemente zu. Der Großteil dieser Organisation wird innerhalb des Fensters nicht benachrichtigen.",
+        "whatHappens": "Was passiert",
+        "keepRunning": "Auswertungen und Prüfungen laufen weiter und behalten ihren Verlauf.",
+        "noNotifications": "Benachrichtigungen, On-Call-Alarmierungen und Workflows stoppen.",
+        "mutedIncidents": "Vorfälle werden stumm eröffnet und benachrichtigen erst nach dem Fenster."
+      },
+      "band": {
+        "now": "jetzt",
+        "none": "Es wurde noch kein Fenster ausgeführt und keines ist geplant.",
+        "active": "Aktiv",
+        "next": "Nächstes",
+        "past": "Ausgeführt",
+        "track": "Fenster",
+        "aria": "{kind}: {start} bis {end}"
+      },
+      "detail": {
+        "overview": "Übersicht",
+        "affected": "Betroffen · {count}",
+        "suppressed": "Unterdrückt · {count}",
+        "details": "Details",
+        "condition": "Bedingung",
+        "noTarget": "Kein Ziel",
+        "banner": "Banner",
+        "bannerOn": "Wird der Organisation angezeigt, solange aktiv",
+        "bannerOff": "Kein Banner",
+        "occurrences": "Vorkommen",
+        "nextWindow": "Nächstes Fenster: {window}. Ihre Zeit: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Abgeglichen durch",
+        "matchedBy": {
+          "query": "Abfrage",
+          "source_alert": "Quell-Warnmeldung",
+          "tag": "Tag",
+          "id": "Benannt",
+          "folder": "Ordner",
+          "org": "Gesamte Organisation"
+        },
+        "source": "Quelle",
+        "wouldHaveNotified": "Hätte benachrichtigt",
+        "noSuppressed": "Bisher wurde nichts unterdrückt",
+        "muteHourName": "{name} · 1 h stumm"
+      },
+      "mute": {
+        "title": {
+          "alerts": "{count} Warnmeldung stummschalten | {count} Warnmeldungen stummschalten",
+          "anomaly_detections": "{count} Anomalieerkennung stummschalten | {count} Anomalieerkennungen stummschalten",
+          "synthetics": "{count} Prüfung stummschalten | {count} Prüfungen stummschalten",
+          "slos": "{count} SLO stummschalten | {count} SLOs stummschalten",
+          "items": "{count} Element stummschalten | {count} Elemente stummschalten"
+        },
+        "subtitle": "Sie laufen weiter und behalten ihren Verlauf. Benachrichtigungen, Alarmierungen und Workflows werden bis zum Ende des Zeitfensters gestoppt.",
+        "muteFor": "Stummschalten für",
+        "fileIn": "Ablegen in",
+        "presets": {
+          "30m": "30 Min.",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Benutzerdefiniert"
+        },
+        "endsAt": "Endet am",
+        "endsIn": "In {duration}.",
+        "confirm": "Stummschalten",
+        "confirmUntil": "Stummschalten bis {time}",
+        "menu": "Benachrichtigungen stummschalten",
+        "until": "Bis…",
+        "bulk": "Stummschalten",
+        "muted": "Stummgeschaltet · endet in {duration}",
+        "mutedTooltip": "Stummgeschaltet von {name} bis {end}",
+        "exclude": "Zeitfenster ausschließen…"
+      },
+      "corrected": "Korrigiert",
+      "correctedBy": "Bewertung korrigiert durch {names}",
+      "incident": {
+        "mutedBy": "Stummgeschaltet · {name}",
+        "banner": "Stummgeschaltet von {name}. Niemand wurde alarmiert. Die erste Auslösung nach dem Zeitfenster sendet die verzögerte Benachrichtigung über den geöffneten Vorfall.",
+        "bannerUntil": "Stummgeschaltet von {name} bis {end}. Niemand wurde alarmiert. Die erste Auslösung nach dem Zeitfenster sendet die verzögerte Benachrichtigung über den geöffneten Vorfall."
+      },
+      "banner": {
+        "ended": "beendet",
+        "endsInUnderMinute": "endet in weniger als einer Minute",
+        "endsInMinutes": "endet in {count} Minute | endet in {count} Minuten",
+        "endsIn": "endet in {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Allen in der Organisation ein Banner anzeigen, solange diese Ausfallzeit aktiv ist",
+        "showBannerCaption": "Das Banner zeigt den Namen, die betroffenen Anzahlen und die verbleibende Zeit. Es nennt nie eine Warnmeldung.",
+        "preview": "Vorschau",
+        "previewMessage": "{name} ist aktiv.",
+        "tooLong": "Ein Banner ist nur für Zeitfenster von bis zu 7 Tagen verfügbar."
+      },
+      "sloCorrections": {
+        "title": "Statuskorrekturen:",
+        "item": "{name} ({status})"
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -16488,7 +16858,8 @@
       "sourceMaps": "RUM — Quellkarten",
       "oncall": "On-Call",
       "oncallDetail": "On-Call-Seite",
-      "syntheticsJourney": "Synthetics-Journey"
+      "syntheticsJourney": "Synthetics-Journey",
+      "downtimes": "Ausfallzeiten"
     },
     "actions": {
       "openCheatsheet": "Cheatsheet mit Tastenkombinationen öffnen",
@@ -16597,6 +16968,8 @@
       "oncallEscalate": "Eskalieren",
       "oncallSnooze": "Schlummern",
       "oncallResolve": "Lösen",
+      "downtimesCreate": "Neue Ausfallzeit",
+      "downtimesRefresh": "Ausfallzeiten aktualisieren",
       "functionsImport": "Funktion importieren"
     }
   },
@@ -17030,6 +17403,12 @@
         "belowTopN": "unterhalb der top-N",
         "truncated": "abgeschnitten",
         "gap": "Lücke"
+      },
+      "downtimeStatus": {
+        "scheduled": "Geplant",
+        "active": "Aktiv",
+        "ended": "Beendet",
+        "cancelled": "Storniert"
       }
     }
   },
@@ -17426,6 +17805,20 @@
     },
     "iam": {
       "userSaveFailed": "Der Benutzer konnte nicht gespeichert werden"
+    },
+    "downtimes": {
+      "cancelled": "Ausfallzeit storniert",
+      "cancelledMany": "{count} Ausfallzeit storniert | {count} Ausfallzeiten storniert",
+      "cancelFailed": "Die Ausfallzeit konnte nicht storniert werden",
+      "deleted": "Ausfallzeit gelöscht",
+      "deleteFailed": "Die Ausfallzeit konnte nicht gelöscht werden",
+      "created": "Ausfallzeit erstellt",
+      "updated": "Ausfallzeit gespeichert",
+      "saveFailed": "Die Ausfallzeit konnte nicht gespeichert werden",
+      "muted": "{count} Element bis {time} stummgeschaltet. Abgelegt in {folder}. | {count} Elemente bis {time} stummgeschaltet. Abgelegt in {folder}.",
+      "muteFailed": "Die Stummschaltung konnte nicht erstellt werden",
+      "viewDowntime": "Ausfallzeit anzeigen",
+      "itemsDropped": "{count} ausgewähltes Element liegt außerhalb der ausgewählten Ordner und wurde entfernt. | {count} ausgewählte Elemente liegen außerhalb der ausgewählten Ordner und wurden entfernt."
     }
   },
   "cipherKeys": {
@@ -17716,7 +18109,9 @@
       "budgetNote": "Der letzte Punkt entspricht der Kachel „Verbleibendes Budget“ oben. Die gestrichelte Linie bei 0% bedeutet Erschöpfung; darunter hat das SLO mehr Fehler verbraucht, als das Ziel erlaubt. Lücken sind Buckets ohne Messwerte, was nicht dasselbe wie Null ist.",
       "burnExplain": "Wie schnell das Budget in jedem einzelnen Bucket verbraucht wird, als Vielfaches der budgetneutralen Rate.",
       "burnFormula": "Verbrennungsrate = (100% − SLI) ÷ (100% − Ziel)\nSLI = 100 × gut ÷ gesamt, nur für diesen Bucket\n\nrechte Achse (dieselbe Linie als SLI gelesen):\nSLI = 100% − Verbrennungsrate × (100% − Ziel)",
-      "burnNote": "×1 verbraucht das Budget genau am Ende des Zeitfensters, ×2 zur Hälfte; unter ×1 wird das Budget angespart. Da es pro Bucket und nicht kumulativ ist, bleibt eine Spitze hier sichtbar, anstatt weggemittelt zu werden. Die rechte Achse zählt abwärts: weiter oben im Diagramm bedeutet mehr Verbrauch, was einem niedrigeren SLI entspricht."
+      "burnNote": "×1 verbraucht das Budget genau am Ende des Zeitfensters, ×2 zur Hälfte; unter ×1 wird das Budget angespart. Da es pro Bucket und nicht kumulativ ist, bleibt eine Spitze hier sichtbar, anstatt weggemittelt zu werden. Die rechte Achse zählt abwärts: weiter oben im Diagramm bedeutet mehr Verbrauch, was einem niedrigeren SLI entspricht.",
+      "corrected": "Durch eine Ausfallzeit korrigiert",
+      "correctedTooltip": "Durch eine Ausfallzeit korrigiert: ausgeschlossen, daher bleibt die Budgetlinie flach"
     },
     "alerts": {
       "title": "Alarme",

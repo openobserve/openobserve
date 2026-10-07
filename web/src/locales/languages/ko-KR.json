@@ -560,6 +560,12 @@
       "description": "원격 태스크는 실험이 출력을 생성하기 위해 호출하는 HTTP 서비스입니다. 한 번 게시하고 연결이 작동하는지 확인하면 모든 실험이 실행한 정확한 버전을 고정할 수 있습니다.",
       "action": "새 태스크",
       "actionDesc": "OpenObserve를 엔드포인트에 연결하고 연결을 테스트하세요."
+    },
+    "noDowntimes": {
+      "title": "아직 다운타임이 없습니다",
+      "description": "다운타임은 알림, 이상 탐지, Synthetics 검사가 계속 실행되도록 유지하면서 예약한 시간 동안 해당 알림 전송을 중지합니다.",
+      "action": "다운타임 예약",
+      "actionDesc": "일회성, 매일 또는 매주. 빠르게 음소거하려면 알림 목록에서 음소거를 사용하세요."
     }
   },
   "common": {
@@ -1317,7 +1323,8 @@
     "kubernetes": "쿠버네티스",
     "topQueries": "상위 쿼리",
     "profiles": "프로파일",
-    "productAnalytics": "제품 분석"
+    "productAnalytics": "제품 분석",
+    "downtimes": "다운타임"
   },
   "profiles": {
     "title": "프로파일",
@@ -8753,7 +8760,370 @@
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
     "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
-    "seconds": "초"
+    "seconds": "초",
+    "downtimes": {
+      "newTitle": "새 다운타임",
+      "editTitle": "다운타임 편집",
+      "detailTitle": "다운타임",
+      "modules": {
+        "alerts": "알림",
+        "anomaly_detections": "이상 탐지",
+        "synthetics": "Synthetics 검사",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "알림",
+        "anomaly_detections": "이상",
+        "synthetics": "Synthetics",
+        "slos": "SLO"
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "조건",
+        "allFolders": "모든 폴더",
+        "oneFolder": "{name} 폴더",
+        "nFolders": "{count} 폴더 | {count} 폴더",
+        "tags": "태그 {tags}",
+        "nItems": "{count} 항목 | {count} 항목",
+        "asGood": "정상으로 처리",
+        "chip": "{module} · {text}"
+      },
+      "duration": {
+        "days": "{count}일",
+        "hours": "{count}시간",
+        "minutes": "{count}분"
+      },
+      "schedule": {
+        "windowRange": "{start} ~ {end} {zone}",
+        "onceSentence": "1회 · {start} ~ {end} · {zone}",
+        "dailySentence": "매일 · {time}, {duration} 동안 · {zone}",
+        "weeklySentence": "매주 {days} · {time}, {duration} 동안 · {zone}"
+      },
+      "validation": {
+        "conditionRequired": "조건을 추가하거나 조건 블록을 제거하세요.",
+        "pairKey": "모든 행에 대해 차원을 선택하세요.",
+        "pairOperator": "다운타임 조건에는 = 또는 != 를 사용하세요.",
+        "pairValue": "모든 행에 값을 입력하세요.",
+        "loneStar": "값은 * 단독으로 사용할 수 없습니다.",
+        "innerStar": "* 는 값의 끝에만 사용할 수 있습니다.",
+        "emptyGroup": "조건 그룹은 비워둘 수 없습니다.",
+        "tooDeep": "조건은 그룹을 최대 3단계까지 중첩할 수 있습니다.",
+        "tooManyPairs": "조건은 최대 32개의 쌍을 포함할 수 있습니다.",
+        "needsEq": "최소 하나의 = 조건을 추가하세요. != 행으로만 구성된 조건은 나머지 모든 항목을 음소거합니다.",
+        "modulesRequired": "하나 이상의 모듈을 선택하세요.",
+        "foldersRequired": "모든 폴더 또는 하나 이상의 폴더를 선택하세요.",
+        "tagsRequired": "태그를 추가하거나 태그 블록을 제거하세요.",
+        "idsRequired": "항목을 선택하거나 특정 항목 블록을 제거하세요.",
+        "idOutsideFolders": "선택한 항목 중 일부가 선택한 폴더에 없습니다.",
+        "nameTooLong": "이름은 최대 256자까지 가능합니다.",
+        "timezoneRequired": "시간대를 선택하세요.",
+        "startRequired": "시작 날짜와 시간을 입력하세요.",
+        "endRequired": "종료 날짜와 시간을 입력하세요.",
+        "endAfterStart": "종료는 시작 이후여야 합니다.",
+        "windowTooLong": "기간은 최대 7일까지 가능합니다.",
+        "windowTooShort": "기간은 최소 1분 이상이어야 합니다.",
+        "startTimeRequired": "시작 시간을 HH:MM 형식으로 입력하세요.",
+        "durationInvalid": "90m 또는 1h 30m과 같은 기간을 입력하세요.",
+        "weekdaysRequired": "요일을 하나 이상 선택하세요.",
+        "untilAfterStart": "반복 종료일은 첫 날짜 이후여야 합니다."
+      },
+      "title": "다운타임",
+      "subtitle": "알림, 이상 탐지, Synthetics 검사는 계속 실행하되 알림 전송을 중지하는 예약된 기간",
+      "newDowntime": "새 다운타임",
+      "filterAll": "전체",
+      "filterOnce": "일회성",
+      "filterRecurring": "반복",
+      "search": "이름, 차원 또는 생성자로 검색",
+      "searchAcross": "모든 폴더 검색",
+      "thisFolder": "이 폴더",
+      "allFolders": "모든 폴더",
+      "thisFolderTooltip": "선택한 폴더에서 검색",
+      "allFoldersTooltip": "모든 폴더에서 검색",
+      "stats": {
+        "active": "활성",
+        "scheduled": "예약됨",
+        "recurring": "반복",
+        "ended": "종료됨",
+        "cancelled": "취소됨",
+        "total": "전체"
+      },
+      "columns": {
+        "name": "이름",
+        "status": "상태",
+        "targets": "대상",
+        "schedule": "일정",
+        "when": "종료 / 다음",
+        "matched": "일치",
+        "createdBy": "생성자",
+        "folder": "폴더"
+      },
+      "oneTime": "일회성",
+      "recurring": "반복",
+      "bannerOn": "이 다운타임이 활성 상태인 동안 조직의 모든 사용자에게 배너가 표시됩니다",
+      "endsLabel": "종료",
+      "nextLabel": "다음",
+      "matched": {
+        "alerts": "{count}개 알림 | {count}개 알림",
+        "anomalies": "{count}개 이상 탐지 | {count}개 이상 탐지",
+        "synthetics": "{count}개 검사 | {count}개 검사",
+        "slos": "{count}개 SLO | {count}개 SLO"
+      },
+      "actions": {
+        "endNow": "지금 종료",
+        "edit": "편집",
+        "duplicate": "복제",
+        "moveToFolder": "폴더로 이동",
+        "cancel": "다운타임 취소",
+        "delete": "삭제",
+        "more": "추가 작업",
+        "muteForHour": "지금 1시간 음소거"
+      },
+      "confirmCancel": {
+        "title": "다운타임 취소",
+        "message": "알림이 즉시 재개됩니다. 다운타임은 이력용으로 목록에 남습니다.",
+        "bulkMessage": "{count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다. | {count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다."
+      },
+      "confirmDelete": {
+        "title": "다운타임 삭제",
+        "message": "다운타임과 이력이 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+      },
+      "copyOf": "{name}의 사본",
+      "form": {
+        "matches": {
+          "alerts": "{count}개 알림 일치 | {count}개 알림 일치",
+          "anomaly_detections": "{count}개 탐지 일치 | {count}개 탐지 일치",
+          "synthetics": "{count}개 검사 일치 | {count}개 검사 일치",
+          "slos": "{count}개 SLO 일치 | {count}개 SLO 일치"
+        },
+        "alertFolders": "알림 폴더",
+        "syntheticsFolders": "Synthetics 폴더",
+        "noAlertFolderAccess": "알림 폴더에 대한 접근 권한이 없습니다.",
+        "noSyntheticsFolderAccess": "Synthetics 폴더에 대한 접근 권한이 없습니다.",
+        "tags": "태그",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "모든 태그가 검사에 있어야 합니다.",
+        "removeBlock": "이 블록 제거",
+        "specificItems": "특정 항목",
+        "itemsHint": "선택한 폴더의 항목만 제공됩니다.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "태그 추가",
+        "addItems": "특정 항목 추가",
+        "sloMode": "기간 내 SLO 점수",
+        "sloExclude": "기간 제외",
+        "sloCountAsGood": "기간을 정상으로 계산",
+        "sloExcludeCaption": "기간 내 시간은 정상으로도 비정상으로도 계산되지 않습니다. 이 SLO의 소진율 알림은 해당 시간에 대해 발생하지 않습니다.",
+        "sloCountAsGoodCaption": "기간 내 시간을 완전히 정상으로 계산합니다. SLO 계약에서 계획된 유지보수를 가동 시간으로 간주하는 경우에만 사용하세요.",
+        "cardCaption": "폴더가 먼저 적용되고, 선택적 블록이 범위를 더 좁힙니다. 위의 차원 조건은 이 모듈에도 적용됩니다.",
+        "noConditionForChecks": "위의 차원 조건은 검사에 적용되지 않습니다.",
+        "appliesTo": "적용 대상",
+        "tabTargets": "대상",
+        "tabSchedule": "일정",
+        "tabAdvanced": "고급",
+        "modeInFolder": "{mode} 내",
+        "newMode": "새 다운타임",
+        "editMode": "다운타임 편집",
+        "namePlaceholder": "다운타임 이름",
+        "nameLabel": "다운타임 이름",
+        "renameHint": "클릭하여 이름 변경",
+        "reason": "사유",
+        "reasonHelp": "선택 사항입니다. 목록, 상세 페이지, 음소거 툴팁에 표시됩니다.",
+        "cancel": "취소",
+        "save": "저장",
+        "activeBanner": "이 다운타임은 활성 상태입니다. 편집은 다음 평가 시 적용되며, SLO 모드를 변경하면 이미 시작된 기간이 다시 측정됩니다.",
+        "noModule": "'적용 대상'에서 모듈을 선택하세요."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "알림",
+          "anomaly_detections": "이상 탐지",
+          "synthetics": "Synthetics 검사",
+          "slos": "SLO"
+        },
+        "whenOnce": "1회, {start}부터 {end} {zone}까지",
+        "whenDaily": "매일 {time} {zone}에, {duration} 동안",
+        "whenWeekly": "매주 {days} {time} {zone}에, {duration} 동안",
+        "inFolders": "폴더 {names}에 | 폴더 {names}에",
+        "withCondition": "{condition} 조건으로",
+        "tagged": "태그 {tags}",
+        "named": "{count}개 항목으로 제한 | {count}개 항목으로 제한",
+        "stopNotifying": "{when}: {targets} 알림이 중지됩니다.",
+        "nothingMuted": "{when}: 음소거된 알림이나 검사가 없습니다.",
+        "sloUnchanged": "SLO 점수는 변경되지 않습니다.",
+        "sloExcluded": "{slos}는 해당 기간을 점수에서 제외합니다.",
+        "sloAsGood": "{slos}는 해당 기간을 정상 시간으로 계산합니다."
+      },
+      "autoName": {
+        "once": "1회",
+        "onceOn": "{date}에 1회",
+        "daily": "매일",
+        "weekly": "매주"
+      },
+      "condition": {
+        "none": "차원 조건 없음",
+        "add": "추가",
+        "title": "차원 조건",
+        "onePer": "다운타임당 하나",
+        "remove": "차원 조건 제거",
+        "caption": "알림, 이상 탐지, SLO에 적용됩니다. Synthetics 검사에는 차원이 없으며 태그를 사용합니다. 모든 쌍이 일치해야 합니다. 대안에는 OR 그룹을 사용하세요. 값은 *로 끝날 수 있습니다."
+      },
+      "resources": {
+        "refineBy": "리소스로 세분화",
+        "load": "리소스 불러오기",
+        "needsEq": "리소스로 세분화하기 전에 = 조건을 하나 이상 추가하세요.",
+        "tooMany": "이 조건과 함께 발생하는 값이 {count}개입니다. 리소스를 선택하려면 조건을 좁히세요.",
+        "lastSeen": "마지막 확인",
+        "streams": "스트림",
+        "footer": "{total}개 중 {selected}개 선택됨 · {source}",
+        "fromRegistry": "서비스 레지스트리에서",
+        "fromSearch": "최근 24시간 데이터에서",
+        "apply": "적용",
+        "loadFailed": "리소스를 불러오지 못했습니다"
+      },
+      "scheduleForm": {
+        "once": "1회",
+        "daily": "매일",
+        "weekly": "매주",
+        "startDate": "시작 날짜",
+        "startTime": "시작 시간",
+        "endDate": "종료 날짜",
+        "endTime": "종료 시간",
+        "days": "요일",
+        "startsAt": "시작 시각",
+        "duration": "기간",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "최대 7일, 예: 90m 또는 1h 30m.",
+        "until": "반복 종료",
+        "untilPlaceholder": "종료 날짜 없음",
+        "timezone": "시간대",
+        "noWindow": "앞으로 8일 내에 시작되는 기간이 없습니다.",
+        "nextWindow": "다음 기간: {window}. 기간은 자정을 넘을 수 있습니다.",
+        "nextWindowWithUtc": "다음 기간: {window} ({utc}). 기간은 자정을 넘을 수 있습니다."
+      },
+      "preview": {
+        "title": "미리보기",
+        "failed": "미리보기를 불러올 수 없습니다.",
+        "andMore": "외 {count}개",
+        "noMatch": "현재 일치하는 항목이 없습니다",
+        "fireTime": "{count}개 알림이 발생 시점에 ID를 결정합니다 | {count}개 알림이 발생 시점에 ID를 결정합니다",
+        "undecidable": "{key}(으)로 구분할 수 없습니다",
+        "showAll": "전체 목록 보기",
+        "showLess": "간단히 보기"
+      },
+      "muteAllDialog": {
+        "title": "모듈 전체를 음소거할까요?",
+        "intro": "폴더, 항목, 태그 또는 조건이 이 모듈의 범위를 좁히지 않으므로 이 다운타임은 다음을 음소거합니다:",
+        "every": {
+          "alerts": "이 조직의 모든 알림",
+          "anomaly_detections": "이 조직의 모든 이상 탐지",
+          "synthetics": "이 조직의 모든 Synthetics 검사",
+          "slos": "이 조직의 모든 SLO"
+        },
+        "matchedNow": "오늘 {matched}",
+        "outro": "기간 내에 이들 모두에 대한 알림, 온콜 호출 및 워크플로우가 중지됩니다.",
+        "cancel": "취소",
+        "confirm": "모두 음소거"
+      },
+      "summaryPane": {
+        "title": "요약",
+        "filedIn": "등록 위치",
+        "window": "기간",
+        "nextWindow": "다음 기간",
+        "inUtc": "UTC 기준",
+        "largeMatch": "{modules}: 이 다운타임이 항목의 절반 이상과 일치합니다. 이 조직의 대부분은 기간 내에 알림을 보내지 않습니다.",
+        "whatHappens": "발생하는 일",
+        "keepRunning": "평가와 검사는 계속 실행되고 기록을 유지합니다.",
+        "noNotifications": "알림, 온콜 호출 및 워크플로우가 중지됩니다.",
+        "mutedIncidents": "인시던트는 음소거된 상태로 열리고 기간 이후에 알림을 보냅니다."
+      },
+      "band": {
+        "now": "현재",
+        "none": "아직 실행된 기간이 없고 예정된 기간도 없습니다.",
+        "active": "활성",
+        "next": "다음",
+        "past": "실행됨",
+        "track": "기간",
+        "aria": "{kind}: {start} ~ {end}"
+      },
+      "detail": {
+        "overview": "개요",
+        "affected": "영향받음 · {count}",
+        "suppressed": "억제됨 · {count}",
+        "details": "세부 정보",
+        "condition": "조건",
+        "noTarget": "대상 없음",
+        "banner": "배너",
+        "bannerOn": "활성 상태 동안 조직에 표시됨",
+        "bannerOff": "배너 없음",
+        "occurrences": "발생 횟수",
+        "nextWindow": "다음 기간: {window}. 현지 시간: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "일치 기준",
+        "matchedBy": {
+          "query": "쿼리",
+          "source_alert": "소스 알림",
+          "tag": "태그",
+          "id": "이름 지정",
+          "folder": "폴더",
+          "org": "전체 조직"
+        },
+        "source": "소스",
+        "wouldHaveNotified": "알림이 전송되었을 항목",
+        "noSuppressed": "아직 억제된 항목이 없습니다",
+        "muteHourName": "{name} · 1시간 음소거"
+      },
+      "mute": {
+        "title": {
+          "alerts": "알림 {count}개 음소거 | 알림 {count}개 음소거",
+          "anomaly_detections": "이상 감지 {count}개 음소거 | 이상 감지 {count}개 음소거",
+          "synthetics": "검사 {count}개 음소거 | 검사 {count}개 음소거",
+          "slos": "SLO {count}개 음소거 | SLO {count}개 음소거",
+          "items": "항목 {count}개 음소거 | 항목 {count}개 음소거"
+        },
+        "subtitle": "계속 실행되며 기록도 유지됩니다. 알림, 호출, 워크플로우는 기간이 끝날 때까지 중단됩니다.",
+        "muteFor": "음소거 기간",
+        "fileIn": "저장 위치",
+        "presets": {
+          "30m": "30분",
+          "1h": "1시간",
+          "2h": "2시간",
+          "4h": "4시간",
+          "custom": "사용자 지정"
+        },
+        "endsAt": "종료 시각",
+        "endsIn": "{duration} 후.",
+        "confirm": "음소거",
+        "confirmUntil": "{time}까지 음소거",
+        "menu": "알림 음소거",
+        "until": "까지…",
+        "bulk": "음소거",
+        "muted": "음소거됨 · {duration} 후 종료",
+        "mutedTooltip": "{name}이(가) {end}까지 음소거함",
+        "exclude": "제외할 기간…"
+      },
+      "corrected": "수정됨",
+      "correctedBy": "{names}이(가) 점수 수정",
+      "incident": {
+        "mutedBy": "음소거됨 · {name}",
+        "banner": "{name}이(가) 음소거했습니다. 아무도 호출되지 않았습니다. 기간이 끝난 후 첫 발화 시 지연된 열림 알림이 전송됩니다.",
+        "bannerUntil": "{name}이(가) {end}까지 음소거했습니다. 아무도 호출되지 않았습니다. 기간이 끝난 후 첫 발화 시 지연된 열림 알림이 전송됩니다."
+      },
+      "banner": {
+        "ended": "종료됨",
+        "endsInUnderMinute": "1분 이내에 종료",
+        "endsInMinutes": "{count}분 후 종료 | {count}분 후 종료",
+        "endsIn": "{duration} 후 종료",
+        "count": "{module} {count}",
+        "showBanner": "이 다운타임이 활성 상태인 동안 조직의 모든 사용자에게 배너 표시",
+        "showBannerCaption": "배너에는 이름, 영향받은 개수, 남은 시간이 표시됩니다. 알림 이름은 표시되지 않습니다.",
+        "preview": "미리보기",
+        "previewMessage": "{name}이(가) 활성 상태입니다.",
+        "tooLong": "배너는 최대 7일까지의 기간에만 사용할 수 있습니다."
+      },
+      "sloCorrections": {
+        "title": "상태 수정:",
+        "item": "{name} ({status})"
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -16488,7 +16858,8 @@
       "sourceMaps": "RUM — 소스 맵",
       "oncall": "온콜",
       "oncallDetail": "온콜 페이지",
-      "syntheticsJourney": "Synthetics 여정"
+      "syntheticsJourney": "Synthetics 여정",
+      "downtimes": "다운타임"
     },
     "actions": {
       "openCheatsheet": "키보드 단축키 치트시트 열기",
@@ -16597,6 +16968,8 @@
       "oncallEscalate": "에스컬레이션",
       "oncallSnooze": "스누즈",
       "oncallResolve": "해결",
+      "downtimesCreate": "새 다운타임",
+      "downtimesRefresh": "다운타임 새로고침",
       "functionsImport": "함수 가져오기"
     }
   },
@@ -17030,6 +17403,12 @@
         "belowTopN": "상위 N개 아래",
         "truncated": "잘림",
         "gap": "갭"
+      },
+      "downtimeStatus": {
+        "scheduled": "예약됨",
+        "active": "활성",
+        "ended": "종료됨",
+        "cancelled": "취소됨"
       }
     }
   },
@@ -17426,6 +17805,20 @@
     },
     "iam": {
       "userSaveFailed": "사용자를 저장할 수 없습니다"
+    },
+    "downtimes": {
+      "cancelled": "다운타임이 취소되었습니다",
+      "cancelledMany": "{count}개의 다운타임이 취소되었습니다 | {count}개의 다운타임이 취소되었습니다",
+      "cancelFailed": "다운타임을 취소할 수 없습니다",
+      "deleted": "다운타임이 삭제되었습니다",
+      "deleteFailed": "다운타임을 삭제할 수 없습니다",
+      "created": "다운타임이 생성되었습니다",
+      "updated": "다운타임이 저장되었습니다",
+      "saveFailed": "다운타임을 저장할 수 없습니다",
+      "muted": "{time}까지 {count}개 항목을 음소거했습니다. {folder}에 저장되었습니다. | {time}까지 {count}개 항목을 음소거했습니다. {folder}에 저장되었습니다.",
+      "muteFailed": "음소거를 생성할 수 없습니다",
+      "viewDowntime": "다운타임 보기",
+      "itemsDropped": "선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다. | 선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다."
     }
   },
   "cipherKeys": {
@@ -17716,7 +18109,9 @@
       "budgetNote": "마지막 지점은 위의 예산 잔여 타일과 같습니다. 0%의 점선은 소진을 의미하며, 그 아래에서는 SLO가 목표가 허용하는 것보다 더 많은 오류를 소비했습니다. 공백은 측정된 것이 없는 버킷으로, 0과 동일하지 않습니다.",
       "burnExplain": "각 버킷에서 예산이 소진되는 속도를 예산 중립 비율의 배수로 표시합니다.",
       "burnFormula": "소진율 = (100% − SLI) ÷ (100% − 목표)\nSLI = 100 × 좋음 ÷ 전체, 해당 버킷에 대해서만\n\n오른쪽 축 (같은 선을 SLI로 읽음):\nSLI = 100% − 소진율 × (100% − 목표)",
-      "burnNote": "×1은 창이 끝날 때 정확히 예산을 소진하고, ×2는 절반 시점에 소진합니다. ×1 미만이면 예산이 축적됩니다. 버킷별이며 누적이 아니므로 여기의 급증은 평균으로 사라지지 않고 계속 표시됩니다. 오른쪽 축은 아래로 갈수록 값이 커집니다: 차트 위로 갈수록 더 많은 소진을 의미하며, 이는 더 낮은 SLI를 뜻합니다."
+      "burnNote": "×1은 창이 끝날 때 정확히 예산을 소진하고, ×2는 절반 시점에 소진합니다. ×1 미만이면 예산이 축적됩니다. 버킷별이며 누적이 아니므로 여기의 급증은 평균으로 사라지지 않고 계속 표시됩니다. 오른쪽 축은 아래로 갈수록 값이 커집니다: 차트 위로 갈수록 더 많은 소진을 의미하며, 이는 더 낮은 SLI를 뜻합니다.",
+      "corrected": "다운타임으로 보정됨",
+      "correctedTooltip": "다운타임으로 보정됨: 제외되었으므로 예산 라인이 평탄합니다"
     },
     "alerts": {
       "title": "알림",
