@@ -87,6 +87,11 @@ test.describe('Traces triage loop', () => {
     await pm.tracesPage.page.waitForTimeout(2000);
   }
 
+  // A baseline switch is under way only once its count is sent; until then the old state is still on screen.
+  async function switchedBaseline(since) {
+    await expect.poll(() => queries.slice(since).filter(isCount).length, { timeout: 30000 }).toBe(1);
+  }
+
   for (const live of [true, false]) {
     test(`P1: box → Drill down → filter, then box again (live mode ${live ? 'on' : 'off'})`, {
       tag: ['@tracesTriageLoop', '@traces', '@functional', '@P1', '@all'],
@@ -137,15 +142,28 @@ test.describe('Traces triage loop', () => {
       expect(cards.length).toBeGreaterThan(0);
       for (const card of cards) expect(cards[0].score).toBeGreaterThanOrEqual(card.score);
 
-      // Step 5: the "just before" baseline refetches only its own count and sample.
+      // Step 5: the "just before" baseline refetches only its own count, then its sample if it has spans.
       const beforeToggle = queries.length;
       await page.locator(pm.tracesPage.comparisonBaselineBefore).click();
-      await expect(page.locator(pm.tracesPage.comparisonPage)).toBeVisible({ timeout: 120000 });
+      await switchedBaseline(beforeToggle);
+      const beforeState = await pm.tracesPage.waitForComparisonState();
       await page.waitForTimeout(1000);
       const toggled = queries.slice(beforeToggle).filter(isComparison);
-      expect(toggled).toHaveLength(2);
       expect(toggled.filter(isCount)).toHaveLength(1);
-      expect(toggled.find((q) => !isCount(q)).end).toBe(selection.start);
+      expect(toggled.find(isCount).end, 'The baseline ends where the selection starts').toBe(selection.start);
+      if (beforeState === pm.tracesPage.comparisonEmptyBaseline) {
+        // A box that starts at the earliest span leaves nothing just before it, so no sample is fetched.
+        testLogger.info('Just-before baseline is empty; switching back to Outside the selection');
+        expect(toggled).toHaveLength(1);
+        const beforeOutside = queries.length;
+        await page.locator(pm.tracesPage.comparisonBaselineOutside).click();
+        await switchedBaseline(beforeOutside);
+        expect(await pm.tracesPage.waitForComparisonState()).toBe(pm.tracesPage.comparisonPage);
+      } else {
+        expect(beforeState).toBe(pm.tracesPage.comparisonPage);
+        expect(toggled).toHaveLength(2);
+        expect(toggled.find((q) => !isCount(q)).end).toBe(selection.start);
+      }
 
       // Step 6: filter to the top value — closes the page, restores the range, searches (manual mode too).
       const beforeApply = queries.length;
@@ -172,23 +190,31 @@ test.describe('Traces triage loop', () => {
     });
   }
 
-  // The box sits late in the range, where the generator's data is, and more than 3 h from either end.
+  // Seeded spans are stamped now, so the box sits at the end of the range, far more than 3 h from its start.
   test('P2: the outside baseline is capped to 3 h either side of a box in a 24 h range', {
     tag: ['@tracesTriageLoop', '@traces', '@functional', '@P2', '@all'],
   }, async ({ page }) => {
     test.setTimeout(300000);
     await searchWith('', '24h');
+    const range = queries.filter(isTableSearch).at(-1);
     expect(
-      await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.8, endRatio: 0.84, yStartRatio: 0.15, yEndRatio: 0.85 }),
+      await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.85, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.85 }),
     ).toBeTruthy();
     await page.waitForTimeout(2000);
     const beforeOpen = queries.length;
-    expect(await pm.tracesPage.openComparison()).toBe(pm.tracesPage.comparisonPage);
-    const samples = queries.slice(beforeOpen).filter((q) => isComparison(q) && !isCount(q));
-    const selection = samples.find((q) => !q.sql.includes('NOT ('));
-    const baseline = samples.find((q) => q.sql.includes('NOT ('));
-    expect(baseline.end - baseline.start).toBeLessThanOrEqual(6 * HOUR_US + (selection.end - selection.start));
-    await expect(page.locator(pm.tracesPage.comparisonSampleNote)).toContainText('up to 3 h either side');
+    const state = await pm.tracesPage.openComparison();
+    testLogger.info('Capped-baseline comparison state', { state });
+    // When every span falls inside the box the capped baseline is empty, and its note still states the cap.
+    expect([pm.tracesPage.comparisonPage, pm.tracesPage.comparisonEmptyBaseline]).toContain(state);
+    const counts = queries.slice(beforeOpen).filter(isCount);
+    const selection = counts.find((q) => !q.sql.includes('NOT ('));
+    const baseline = counts.find((q) => q.sql.includes('NOT ('));
+    expect(selection, 'The selection is counted').toBeTruthy();
+    expect(baseline, 'The outside baseline is counted').toBeTruthy();
+    expect(baseline.start, 'The baseline starts 3 h before the box').toBe(selection.start - 3 * HOUR_US);
+    expect(baseline.start, 'The baseline does not reach the range start').toBeGreaterThan(range.start);
+    expect(baseline.end).toBeLessThanOrEqual(selection.end + 3 * HOUR_US);
+    await expect(page.locator(state)).toContainText('up to 3 h either side');
   });
 
   test('P1: an Errors brush compares error spans with the rest of its window', {

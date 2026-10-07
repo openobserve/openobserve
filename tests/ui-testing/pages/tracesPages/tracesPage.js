@@ -129,9 +129,12 @@ export class TracesPage {
     this.comparisonPage = '[data-test="traces-comparison"]';
     this.comparisonNoSelection = '[data-test="traces-comparison-no-selection"]';
     this.comparisonError = '[data-test="traces-comparison-error"]';
+    this.comparisonEmptySelection = '[data-test="traces-comparison-empty-selection"]';
+    this.comparisonEmptyBaseline = '[data-test="traces-comparison-empty-baseline"]';
     this.comparisonSummary = '[data-test="traces-comparison-summary"]';
     this.comparisonSampleNote = '[data-test="traces-comparison-sample-note"]';
     this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
+    this.comparisonBaselineOutside = '[data-test="traces-comparison-baseline-toggle-outside"]';
     this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
     this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
 
@@ -2005,7 +2008,21 @@ export class TracesPage {
    */
   async openComparison() {
     await this.page.locator(this.insightsButton).click();
-    const states = [this.comparisonPage, this.comparisonNoSelection, this.comparisonError];
+    return await this.waitForComparisonState();
+  }
+
+  /**
+   * Wait for the comparison page to settle on a terminal state, loaded or empty.
+   * @returns {Promise<string>} the data-test of the state it settled on
+   */
+  async waitForComparisonState() {
+    const states = [
+      this.comparisonPage,
+      this.comparisonNoSelection,
+      this.comparisonError,
+      this.comparisonEmptySelection,
+      this.comparisonEmptyBaseline,
+    ];
     await this.page.locator(states.join(', ')).first().waitFor({ state: 'visible', timeout: 120000 });
     for (const state of states) {
       if (await this.page.locator(state).isVisible().catch(() => false)) return state;
