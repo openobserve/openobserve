@@ -233,6 +233,8 @@
   --color-map-seq-3: #a57c04;
   --color-map-seq-4: #bd6100;
   --color-map-seq-5: #d72601;
+  /* Map group card header band: 1.2:1 or more against surface-base, so it reads as a header. */
+  --color-map-card-header: var(--color-grey-200);
 
   --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
 

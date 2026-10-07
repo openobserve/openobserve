@@ -27,6 +27,8 @@ export interface LayoutParams {
   minBandPx?: number;
   // Packs at this many px per unit, one canvas width wide, instead of fitting the height.
   fixedScale?: number;
+  // The header band's screen height; without it the band is LABEL_BAND units.
+  bandPx?: number;
 }
 
 export interface HexBounds {
@@ -52,6 +54,12 @@ export interface HexLayout {
   bounds: HexBounds;
 }
 
+interface Sizing {
+  minWidth: number;
+  maxWidth: number;
+  band: number;
+}
+
 interface Block {
   n: number;
   cols: number;
@@ -65,7 +73,7 @@ export const HEX_HALF_WIDTH = Math.sqrt(3) / 2;
 
 export const HEX_HALF_HEIGHT = 1;
 
-export const LABEL_BAND = 2;
+const LABEL_BAND = 2;
 
 const HEX_WIDTH = 2 * HEX_HALF_WIDTH;
 
@@ -84,8 +92,9 @@ const MAX_SHELF_CANDIDATES = 200;
 // Past this many run sums, listing them all costs more than sampling them.
 const MAX_LISTED_RUN_SUMS = 2000;
 
-// Widening lowers the fit scale, which needs more width again; this converges in a few rounds.
-const MAX_WIDEN_ROUNDS = 8;
+const MAX_SETTLE_ROUNDS = 12;
+
+const SETTLED_PX = 0.25;
 
 // Run sums equal a cursor position exactly, but float addition order differs.
 const EPSILON = 1e-9;
@@ -186,6 +195,7 @@ function sameParams(a: LayoutParams, b: LayoutParams) {
   if ((a.minFramePx ?? 0) !== (b.minFramePx ?? 0)) return false;
   if ((a.minBandPx ?? 0) !== (b.minBandPx ?? 0)) return false;
   if ((a.fixedScale ?? 0) !== (b.fixedScale ?? 0)) return false;
+  if ((a.bandPx ?? 0) !== (b.bandPx ?? 0)) return false;
   if (a.groups.length !== b.groups.length) return false;
   for (let g = 0; g < a.groups.length; g++) {
     const [ka, kb] = [a.groups[g], b.groups[g]];
@@ -199,19 +209,19 @@ function isFramed(params: LayoutParams) {
   return params.group !== "none";
 }
 
-function blocksOf(params: LayoutParams, minWidth = MIN_FRAME_WIDTH, maxWidth = Infinity): Block[] {
+function blocksOf(params: LayoutParams, sizing: Sizing): Block[] {
   const framed = isFramed(params);
   const pad = framed ? PAD : 0;
-  const band = framed ? LABEL_BAND : 0;
+  const band = framed ? sizing.band : 0;
   return params.groups.map((keys) => {
     const n = keys.length;
-    const fitCols = Math.floor((maxWidth - 2 * pad - HEX_HALF_WIDTH) / HEX_WIDTH);
+    const fitCols = Math.floor((sizing.maxWidth - 2 * pad - HEX_HALF_WIDTH) / HEX_WIDTH);
     const square = Math.ceil(Math.sqrt((n * ROW_STEP) / HEX_WIDTH));
     const cols = Math.max(1, Math.min(n, square, fitCols));
     const rows = Math.ceil(n / cols);
     const contentWidth = cols * HEX_WIDTH + (rows > 1 ? HEX_HALF_WIDTH : 0);
     const contentHeight = (rows - 1) * ROW_STEP + 2 * HEX_HALF_HEIGHT;
-    const width = Math.max(contentWidth + 2 * pad, framed ? minWidth : 0);
+    const width = Math.max(contentWidth + 2 * pad, framed ? sizing.minWidth : 0);
     return { n, cols, width, height: contentHeight + 2 * pad + band, left: 0, top: 0 };
   });
 }
@@ -246,47 +256,49 @@ function bestShelf(blocks: Block[], params: LayoutParams) {
   return best.width;
 }
 
-// A pixel minimum depends on the fit scale, which depends on the widths, so widen until it holds.
-function blocksWithMinPx(params: LayoutParams) {
-  const plain = blocksOf(params);
-  const plainShelf = bestShelf(plain, params);
-  let blocks = plain;
-  let shelf = plainShelf;
-  let minWidth = MIN_FRAME_WIDTH;
+// Pixel sizes depend on the fit scale, which depends on the sizes, so iterate until they hold.
+function settled(params: LayoutParams): { blocks: Block[]; sizing: Sizing } {
+  const sizing: Sizing = { minWidth: MIN_FRAME_WIDTH, maxWidth: Infinity, band: LABEL_BAND };
+  let minFramePx = params.minFramePx ?? 0;
   for (let round = 0; ; round++) {
-    const { spanX, spanY } = pack(blocks, shelf);
+    const blocks = blocksOf(params, sizing);
+    const { spanX, spanY } = pack(blocks, bestShelf(blocks, params));
     const scale = Math.min(
       fitScale(spanX, spanY, params.width, params.height, params.bottomInset),
       MAX_FIT_SCALE,
     );
-    // Wider cards are only worth it while the header band can still show a title.
-    if (round > 0 && scale * LABEL_BAND < (params.minBandPx ?? 0)) {
-      pack(plain, plainShelf);
-      return plain;
+    // Cards widened for titles are not worth hexes too small to read.
+    if (sizing.minWidth > MIN_FRAME_WIDTH && scale * LABEL_BAND < (params.minBandPx ?? 0)) {
+      minFramePx = 0;
+      sizing.minWidth = MIN_FRAME_WIDTH;
+      continue;
     }
-    const needed = (params.minFramePx ?? 0) / scale;
-    if (needed <= minWidth + EPSILON || round === MAX_WIDEN_ROUNDS) return blocks;
-    minWidth = needed;
-    blocks = blocksOf(params, minWidth);
-    shelf = bestShelf(blocks, params);
+    const band = params.bandPx ? params.bandPx / scale : LABEL_BAND;
+    const minWidth = Math.max(sizing.minWidth, minFramePx / scale);
+    const stable =
+      Math.abs(band - sizing.band) * scale < SETTLED_PX && minWidth <= sizing.minWidth + EPSILON;
+    if (stable || round >= MAX_SETTLE_ROUNDS) return { blocks, sizing };
+    Object.assign(sizing, { band, minWidth });
   }
 }
 
-function blocksAtScale(params: LayoutParams, scale: number) {
+function atScale(params: LayoutParams, scale: number): { blocks: Block[]; sizing: Sizing } {
   const pad = PAD_SHARE * params.width;
   const card = Math.max(MIN_FRAME_WIDTH, (params.minFramePx ?? 0) / scale);
-  const blocks = blocksOf(params, card, card);
+  const band = params.bandPx ? params.bandPx / scale : LABEL_BAND;
+  const sizing = { minWidth: card, maxWidth: card, band };
+  const blocks = blocksOf(params, sizing);
   pack(blocks, (params.width - 2 * pad) / scale);
-  return blocks;
+  return { blocks, sizing };
 }
 
 function computeLayout(params: LayoutParams): HexLayout {
   const framed = isFramed(params);
   const pad = framed ? PAD : 0;
-  const band = framed ? LABEL_BAND : 0;
-  const blocks = params.fixedScale
-    ? blocksAtScale(params, params.fixedScale)
-    : blocksWithMinPx(params);
+  const { blocks, sizing } = params.fixedScale
+    ? atScale(params, params.fixedScale)
+    : settled(params);
+  const band = framed ? sizing.band : 0;
   const total = blocks.reduce((sum, b) => sum + b.n, 0);
   const x = new Float64Array(total);
   const y = new Float64Array(total);
@@ -299,14 +311,14 @@ function computeLayout(params: LayoutParams): HexLayout {
       const col = i % block.cols;
       x[index] =
         block.left + pad + HEX_HALF_WIDTH + col * HEX_WIDTH + (row % 2 ? HEX_HALF_WIDTH : 0);
-      y[index] = -(block.top + pad + band + HEX_HALF_HEIGHT + row * ROW_STEP);
+      y[index] = -(block.top + band + pad + HEX_HALF_HEIGHT + row * ROW_STEP);
     }
     const frame = {
       left: block.left,
       right: block.left + block.width,
       top: -block.top,
       bottom: -(block.top + block.height),
-      headerBottom: -(block.top + pad + band),
+      headerBottom: -(block.top + band),
     };
     if (framed) frames.push(frame);
     bounds.maxX = Math.max(bounds.maxX, frame.right);

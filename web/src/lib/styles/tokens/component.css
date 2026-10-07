@@ -2121,6 +2121,7 @@
   --color-map-seq-3: var(--color-map-seq-3);
   --color-map-seq-4: var(--color-map-seq-4);
   --color-map-seq-5: var(--color-map-seq-5);
+  --color-map-card-header: var(--color-map-card-header);
   --color-severity-error-color: var(--color-severity-error-color);
   --color-severity-warning-color: var(--color-severity-warning-color);
   --color-status-error-bg: var(--color-status-error-bg);

@@ -24,7 +24,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useTheme from "@/composables/useTheme";
 import { chartColor } from "@/utils/chartTheme";
-import { LABEL_BAND, hexLayout, middleTruncate, type HexLayout } from "./hexLayout";
+import { hexLayout, middleTruncate, type HexLayout } from "./hexLayout";
 import {
   MAX_ZOOM,
   PAD_SHARE,
@@ -105,14 +105,17 @@ const COUNT_FONT = "400 12px sans-serif";
 // eslint-disable-next-line local/no-hardcoded-px -- canvas geometry
 const SUMMARY_FONT = "400 11px sans-serif";
 
-// Header text is fixed-size while the band scales, so each line needs a minimum band height.
-const LINE_ONE_MIN_PX = 16;
+// The header is a fixed screen height: two lines at the fit, never growing with zoom.
+const HEADER_REM = 2.75;
 
-const LINE_TWO_MIN_PX = 34;
+const ONE_LINE_REM = 1.75;
+
+// Widened cards must keep a two-unit band of at least this many px, i.e. readable hexes.
+const MIN_UNIT_BAND_PX = 16;
 
 const HEADER_PAD_PX = 8;
 
-const LINE_OFFSET_PX = 8;
+const LINE_HEIGHT_PX = 16;
 
 const CARD_RADIUS_PX = 12;
 
@@ -120,7 +123,7 @@ const TITLE_CHARS = 18;
 
 const SAMPLE_TEXT = "abcdefghijklmnopqrstuvwxyz-0123456789";
 
-const TALL_SCALE = LINE_TWO_MIN_PX / LABEL_BAND;
+const TALL_SCALE = 17;
 
 // Literal classes, so Tailwind emits them; a tall canvas takes the first that fits its content.
 const TALL_HEIGHTS = [
@@ -187,7 +190,8 @@ const layout = computed<HexLayout | null>(() =>
           : props.group === "workload"
             ? workloadCardPx()
             : 0,
-        minBandPx: LINE_ONE_MIN_PX,
+        minBandPx: MIN_UNIT_BAND_PX,
+        bandPx: HEADER_REM * remPx(),
         fixedScale: tall.value ? TALL_SCALE : undefined,
       })
     : null,
@@ -348,9 +352,10 @@ function headerTexts(
   colors: Record<string, string>,
 ) {
   const [x0, x1, y0, band] = box;
-  if (!header || band < LINE_ONE_MIN_PX) return [];
-  const twoLines = band >= LINE_TWO_MIN_PX;
-  const lineOne = twoLines ? y0 + band / 2 - LINE_OFFSET_PX : y0 + band / 2;
+  const rem = remPx();
+  if (!header || band < ONE_LINE_REM * rem * 0.95) return [];
+  const twoLines = band >= HEADER_REM * rem * 0.95;
+  const lineOne = y0 + HEADER_PAD_PX;
   const countWidth = textWidth(header.count, COUNT_FONT);
   const titleWidth = x1 - x0 - 3 * HEADER_PAD_PX - countWidth;
   const base = { type: "text", silent: true };
@@ -363,7 +368,7 @@ function headerTexts(
         text: middleTruncate(header.title, titleWidth, (s) => textWidth(s, TITLE_FONT)),
         fill: colors.heading,
         font: TITLE_FONT,
-        verticalAlign: "middle",
+        verticalAlign: "top",
       },
     },
     {
@@ -372,10 +377,10 @@ function headerTexts(
       y: lineOne,
       style: {
         text: header.count,
-        fill: colors.secondary,
+        fill: colors.body,
         font: COUNT_FONT,
         align: "right",
-        verticalAlign: "middle",
+        verticalAlign: "top",
       },
     },
   ];
@@ -389,13 +394,13 @@ function headerTexts(
     out.push({
       ...base,
       x: x0 + HEADER_PAD_PX,
-      y: y0 + band / 2 + LINE_OFFSET_PX,
+      y: lineOne + LINE_HEIGHT_PX,
       style: {
         text: summaryText(header),
         rich,
-        fill: colors.secondary,
+        fill: colors.body,
         font: SUMMARY_FONT,
-        verticalAlign: "middle",
+        verticalAlign: "top",
         width: Math.max(0, x1 - x0 - 2 * HEADER_PAD_PX),
         overflow: "truncate",
       },
@@ -413,19 +418,21 @@ function buildOptions() {
   const border = chartColor("--color-border-default");
   const card = {
     fill: chartColor("--color-surface-base"),
-    band: chartColor("--color-surface-panel"),
-    stroke: chartColor("--color-border-subtle"),
+    band: chartColor("--color-map-card-header"),
+    stroke: chartColor("--color-border-default"),
+    rule: chartColor("--color-border-subtle"),
     hover: chartColor("--color-border-strong"),
   };
   const colors: Record<string, string> = {
     heading: chartColor("--color-text-heading"),
-    secondary: chartColor("--color-text-secondary"),
-    neutral: chartColor("--color-text-secondary"),
+    body: chartColor("--color-text-body"),
+    neutral: chartColor("--color-text-body"),
     error: chartColor(CLASS_TOKEN.error),
     warning: chartColor(CLASS_TOKEN.warning),
     ok: chartColor(CLASS_TOKEN.ok),
   };
   const headers = props.headers;
+  const headerPx = HEADER_REM * remPx();
   const rowList = rows.value;
   const fill = props.fill;
   const range = axisRanges(state, width, height);
@@ -482,6 +489,7 @@ function buildOptions() {
           const [, yb] = api.coord([api.value(0), api.value(4)]);
           const header = headers[api.value(5)];
           const r = Math.min(CARD_RADIUS_PX, 0.15 * (y1 - y0));
+          const band = Math.min(yb - y0, headerPx);
           return {
             type: "group",
             children: [
@@ -499,13 +507,19 @@ function buildOptions() {
                   x: x0 + 1,
                   y: y0 + 1,
                   width: x1 - x0 - 2,
-                  height: yb - y0 - 1,
+                  height: band - 1,
                   r: [r, r, 0, 0],
                 },
                 style: { fill: card.band },
                 emphasis: { style: { fill: card.band } },
               },
-              ...headerTexts(header, [x0, x1, y0, yb - y0], colors),
+              {
+                type: "line",
+                silent: true,
+                shape: { x1: x0, y1: y0 + band, x2: x1, y2: y0 + band },
+                style: { stroke: card.rule, lineWidth: 1 },
+              },
+              ...headerTexts(header, [x0, x1, y0, band], colors),
             ],
           };
         },

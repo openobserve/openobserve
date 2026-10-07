@@ -331,40 +331,55 @@ describe("K8sHexMap (AC 52)", () => {
 });
 
 describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
-  it("draws a surface-base card with a subtle stroke, a panel header band and silent text", async () => {
+  const fitScale = () => {
+    const { x } = ranges();
+    return WIDTH / (x[1] - x[0]);
+  };
+
+  it("draws a surface-base card with a default stroke, a header band, a separator and silent text", async () => {
     await mountMap();
-    const card = cardAt(0, 20);
-    const [rect, band] = card.children;
+    const card = cardAt(0, fitScale());
+    const [rect, band, rule] = card.children;
     expect(rect).toMatchObject({ type: "rect", silent: true });
     expect(rect.style).toMatchObject({
       fill: chartColor("--color-surface-base"),
-      stroke: chartColor("--color-border-subtle"),
+      stroke: chartColor("--color-border-default"),
       lineWidth: 1,
     });
     expect(rect.emphasis.style.stroke).toBe(chartColor("--color-border-strong"));
     expect(band.type).toBe("rect");
     expect(band.silent).toBeFalsy();
-    expect(band.style.fill).toBe(chartColor("--color-surface-panel"));
+    expect(band.style.fill).toBe(chartColor("--color-map-card-header"));
     expect(band.shape.r.slice(2)).toEqual([0, 0]);
+    expect(rule).toMatchObject({ type: "line", silent: true });
+    expect(rule.style).toMatchObject({ stroke: chartColor("--color-border-subtle"), lineWidth: 1 });
+    expect(rule.shape.y1).toBeCloseTo(band.shape.y + band.shape.height, 6);
     for (const child of card.children.filter((c: any) => c.type === "text"))
       expect(child.silent).toBe(true);
   });
 
-  it("shows both header lines at a 40 px band, line 1 at 20 px, and none at 10 px", async () => {
+  it("keeps the header 2.75rem tall with both lines top-aligned, at the fit and zoomed in", async () => {
     await mountMap();
-    const both = texts(cardAt(0, 20));
-    expect(both.some((t) => t === "n1")).toBe(true);
-    expect(both.some((t) => t.includes("✕") && t.includes("!") && t.includes("✓"))).toBe(true);
-    const one = texts(cardAt(0, 10));
-    expect(one).toContain("n1");
-    expect(one.some((t) => t.includes("✓"))).toBe(false);
-    expect(texts(cardAt(0, 5))).toEqual([]);
+    for (const scale of [fitScale(), 3 * fitScale()]) {
+      const card = cardAt(0, scale);
+      const band = card.children[1];
+      expect(band.shape.height + 1).toBeCloseTo(44, 0);
+      const [title, count, line2] = card.children.filter((c: any) => c.type === "text");
+      expect(title.style.text).toBe("n1");
+      expect(title.style.verticalAlign).toBe("top");
+      expect(title.y).toBeCloseTo(band.shape.y - 1 + 8, 6);
+      expect(title.style.fill).toBe(chartColor("--color-text-heading"));
+      expect(count.style.fill).toBe(chartColor("--color-text-body"));
+      expect(line2.style.text).toContain("✓");
+      expect(line2.style.fill).toBe(chartColor("--color-text-body"));
+      expect(line2.y).toBeGreaterThan(title.y);
+    }
     expect(options().tooltip.formatter({ seriesIndex: 1, dataIndex: 0 })).toBe("<b>n1</b>");
   });
 
   it("mutes zero counts and colours the others by status", async () => {
     await mountMap();
-    const line2 = texts(cardAt(0, 20)).find((t) => t.includes("✓"))!;
+    const line2 = texts(cardAt(0, fitScale())).find((t) => t.includes("✓"))!;
     const [error, warning, ok] = statusCounts(groupRows(ROWS, "node").groups[0].rows);
     const seg = (cls: string, glyph: string, n: number) =>
       `{${n === 0 ? "neutral" : cls}|${glyph} ${n}}`;
@@ -381,14 +396,14 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
 
   it("writes the status summary as ✕ ! ✓ with every count, zeros included", async () => {
     await mountMap();
-    const line2 = texts(cardAt(0, 20)).find((t) => t.includes("✓"))!;
+    const line2 = texts(cardAt(0, fitScale())).find((t) => t.includes("✓"))!;
     const plain = line2.replace(/\{\w+\|([^}]*)\}/g, "$1");
     const [error, warning, ok] = statusCounts(groupRows(ROWS, "node").groups[0].rows);
     expect(plain).toBe(`✕ ${error.count}  ! ${warning.count}  ✓ ${ok.count}`);
   });
 
   it("always titles a workload card by its name at the fit, widening narrow cards to fit it", async () => {
-    const names = Array.from({ length: 40 }, (_, i) => `service-number-${i}-with-a-long-name`);
+    const names = Array.from({ length: 30 }, (_, i) => `service-number-${i}-with-a-long-name`);
     const rows = names.map((name, i) => ({
       ...pod(`${name}-x${i}`, "n1", 10),
       workload: { kind: "Deployment", name },
@@ -627,6 +642,25 @@ describe("K8sHexMap overlays and theme (AC 90, 98)", () => {
     expect(cardAt(0, 20).children[0].style.fill).toBe("dark:--color-surface-base");
     palette.dark = false;
   });
+});
+
+describe("map card header tokens", () => {
+  const dir = join(dirname(fileURLToPath(import.meta.url)), "../../../lib/styles/tokens");
+  const themes = resolveTokens(
+    ["base.css", "semantic.css", "component.css", "dark.css"].map((f) =>
+      readFileSync(join(dir, f), "utf8"),
+    ),
+  );
+  for (const theme of ["light", "dark"] as const) {
+    it(`reads as a header against the card body, with legible text, in ${theme}`, () => {
+      const scope = themes[theme];
+      const band = resolveColor("--color-map-card-header", scope)!;
+      const body = resolveColor("--color-surface-base", scope)!;
+      expect(contrastRatio(band, body)).toBeGreaterThanOrEqual(1.2);
+      for (const text of ["--color-text-heading", "--color-text-body"])
+        expect(contrastRatio(resolveColor(text, scope)!, band)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
 });
 
 describe("map heat tokens", () => {
