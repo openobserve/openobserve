@@ -620,9 +620,13 @@ pub fn redact(projected: &mut Value) {
     }
 }
 
-/// K6: keep assistant text and tool names; drop tool arguments, results and navigation targets.
+/// K6: keep assistant text and tool names; drop tool data, navigation and provider error text.
 pub fn redact_turns(turns: &mut [Value]) {
     for turn in turns {
+        keep_inline_images(turn);
+        if let Some(error) = turn.get_mut("error").filter(|e| !e.is_null()) {
+            *error = Value::String(DEFAULT_TURN_ERROR.into());
+        }
         let Some(Value::Array(frames)) = turn.get_mut("frames") else {
             continue;
         };
@@ -633,11 +637,31 @@ pub fn redact_turns(turns: &mut [Value]) {
     }
 }
 
+/// Clears user image urls that are not inline `data:image/` urls, so a viewer fetches nothing.
+pub fn keep_inline_images(turn: &mut Value) {
+    let Some(Value::Array(images)) = turn.get_mut("user").and_then(|u| u.get_mut("images")) else {
+        return;
+    };
+    for image in images.iter_mut().filter_map(Value::as_object_mut) {
+        let inline = image
+            .get("url")
+            .and_then(Value::as_str)
+            .is_some_and(|url| url.starts_with("data:image/"));
+        if !inline {
+            image.insert("url".into(), Value::Null);
+        }
+    }
+}
+
 fn redact_frame(frame: &mut Value) {
     let Some(map) = frame.as_object_mut() else {
         return;
     };
     let kind = map.get("type").and_then(Value::as_str).unwrap_or_default();
+    if kind == "error" {
+        map.insert("error".into(), Value::String(DEFAULT_TURN_ERROR.into()));
+        return;
+    }
     if kind != "tool_call" && kind != "tool_result" {
         return;
     }
@@ -1507,6 +1531,39 @@ mod tests {
         let mut turns = full["turns"].clone();
         redact(&mut turns);
         assert_eq!(turns, projected["turns"]);
+    }
+
+    #[test]
+    fn redaction_hides_provider_errors_and_remote_images() {
+        let mut turns = json!([{
+            "user": {"text": "hi", "images": [
+                {"filename": "a.png", "url": "data:image/png;base64,AAAA"},
+                {"filename": "b.png", "url": "https://tracker.example/b.png"},
+                {"filename": "c.png", "url": "data:text/html,<script>"},
+            ]},
+            "frames": [{"type": "error", "error": "provider key sk-123 rejected", "recoverable": false}],
+            "error": "provider key sk-123 rejected",
+        }]);
+        redact(&mut turns);
+        let dumped = turns.to_string();
+        assert!(
+            !dumped.contains("sk-123") && !dumped.contains("tracker"),
+            "{dumped}"
+        );
+        assert_eq!(turns[0]["frames"][0]["error"], DEFAULT_TURN_ERROR);
+        assert_eq!(turns[0]["frames"][0]["recoverable"], false);
+        assert_eq!(turns[0]["error"], DEFAULT_TURN_ERROR);
+        let urls: Vec<&Value> = turns[0]["user"]["images"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| &i["url"])
+            .collect();
+        assert_eq!(urls[0], "data:image/png;base64,AAAA");
+        assert_eq!((urls[1], urls[2]), (&Value::Null, &Value::Null));
+        let mut clean = json!([{"user": null, "frames": [], "error": null}]);
+        redact(&mut clean);
+        assert_eq!(clean[0]["error"], Value::Null);
     }
 
     #[test]

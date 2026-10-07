@@ -1060,6 +1060,14 @@ pub async fn remove_user_from_org(
                 if initiating_user.email == email_id {
                     return Ok(MetaHttpResponse::forbidden("Not Allowed"));
                 }
+                // Resolved now: the users row may be gone by the time shares are revoked.
+                let user_id = match infra::table::users::get_id_by_email(email_id).await {
+                    Ok(id) => id,
+                    Err(e) => {
+                        log::error!("error resolving the id of {email_id}: {e}");
+                        None
+                    }
+                };
 
                 if user
                     .organizations
@@ -1092,6 +1100,9 @@ pub async fn remove_user_from_org(
                         if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
                             return Ok(MetaHttpResponse::forbidden("Not Allowed"));
                         }
+                        // The user row goes with the last org; their chats must not outlive it.
+                        #[cfg(feature = "enterprise")]
+                        delete_ai_chats(&[org_id.to_string()], email_id).await;
                         if let Err(e) = db::user::delete(email_id).await {
                             log::error!("error deleting user from db : {e}");
                             return Ok(MetaHttpResponse::internal_error(e.to_string()));
@@ -1168,28 +1179,8 @@ pub async fn remove_user_from_org(
                             }
                         }
                     }
-                    // G6. Until this call existed, removing somebody from an
-                    // org touched their invites, their user row and their
-                    // openfga tuples — and no on-call table at all. The leaver
-                    // stayed on every rotation, kept resolving as
-                    // `on_call_now`, and kept being paged; worse, the emailed
-                    // acknowledgement token is signed and session-free, so they
-                    // could still take a page belonging to whoever replaced
-                    // them. `service::ack_claims` refuses the token half; this
-                    // removes the data half.
-                    //
-                    // **After** the org membership is gone, not before: on-call
-                    // membership is derived from org membership, and clearing
-                    // the rotations first leaves a window in which anything
-                    // that syncs a team's roster could legitimately put them
-                    // back. The token check covers that window, which is why
-                    // this ordering is safe to choose on other grounds.
-                    //
-                    // Non-fatal. The user is out of the org whatever happens
-                    // here, and failing the request now would tell the caller
-                    // the removal did not happen when most of it did — so the
-                    // failure is logged loudly instead, because it means
-                    // somebody who has left is still on a rotation.
+                    // After the membership is gone: on-call rosters derive from it, so earlier is
+                    // racy.
                     #[cfg(feature = "enterprise")]
                     {
                         use o2_enterprise::enterprise::oncall::service as oncall_service;
@@ -1216,7 +1207,7 @@ pub async fn remove_user_from_org(
                     {
                         log::error!("error deleting query history of {email_id} in {org_id}: {e}");
                     }
-                    revoke_ai_chat_shares(org_id, email_id).await;
+                    revoke_ai_chat_shares(org_id, email_id, user_id.as_deref()).await;
                     Ok(MetaHttpResponse::ok("User removed from organization"))
                 } else {
                     Ok(MetaHttpResponse::not_found(
@@ -1234,6 +1225,18 @@ pub async fn remove_user_from_org(
 }
 
 pub async fn delete_user(email_id: &str) -> Result<Response, Error> {
+    if let Ok(Some(user_id)) = infra::table::users::get_id_by_email(email_id).await {
+        let now = config::utils::time::now_micros();
+        if let Err(e) = infra::table::ai_chat_shares::revoke_for_creator(None, &user_id, now).await
+        {
+            log::error!("error revoking AI chat shares of {email_id}: {e}");
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    if let Ok(user) = db::user::get_db_user(email_id).await {
+        let orgs: Vec<String> = user.organizations.iter().map(|o| o.name.clone()).collect();
+        delete_ai_chats(&orgs, email_id).await;
+    }
     let result = db::user::delete(email_id).await;
     match result {
         Ok(_) => {
@@ -1441,13 +1444,36 @@ async fn update_cache(user_email: &str, roles: Vec<String>) {
 }
 
 /// A member who left an org no longer vouches for the chats they shared there.
-async fn revoke_ai_chat_shares(org_id: &str, email_id: &str) {
+async fn revoke_ai_chat_shares(org_id: &str, email_id: &str, user_id: Option<&str>) {
+    let Some(user_id) = user_id else {
+        return;
+    };
     let now = config::utils::time::now_micros();
-    match infra::table::ai_chat_shares::revoke_for_owner(org_id, email_id, now).await {
+    match infra::table::ai_chat_shares::revoke_for_creator(Some(org_id), user_id, now).await {
         Ok(0) => {}
         Ok(n) => log::info!("revoked {n} AI chat shares of {email_id}, who left {org_id}"),
         // Reads re-check membership, so a missed revoke never serves a leaver's share.
         Err(e) => log::error!("error revoking AI chat shares of {email_id} in {org_id}: {e}"),
+    }
+}
+
+/// Deletes the user's chats in `orgs` while their `users.id` still resolves (replicas: the sweep).
+#[cfg(feature = "enterprise")]
+async fn delete_ai_chats(orgs: &[String], email_id: &str) {
+    let user_id = match infra::table::users::get_id_by_email(email_id).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return,
+        Err(e) => {
+            log::error!("error resolving {email_id} to delete their AI chats: {e}");
+            return;
+        }
+    };
+    for org_id in orgs {
+        match crate::ai_chat::delete_all_for_user(org_id, &user_id).await {
+            Ok(ids) if ids.is_empty() => {}
+            Ok(ids) => log::info!("deleted {} AI chats of {email_id} in {org_id}", ids.len()),
+            Err(e) => log::error!("error deleting AI chats of {email_id} in {org_id}: {e}"),
+        }
     }
 }
 

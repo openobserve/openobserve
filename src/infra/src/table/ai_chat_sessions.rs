@@ -13,18 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Service layer for the `ai_chat_sessions` index (server-side chat persistence).
-//!
-//! The table is a small index over the protected `_o2_ai_chat_events` stream:
-//! ownership, timestamps and the committed watermark. Every function has a
-//! `_with` twin taking a connection so the logic is testable on an in-memory
-//! SQLite.
-//!
-//! A chat is bound to ONE opencode session for its whole life. Its durable
-//! events (sequence numbers included) continue across o2-ai replicas because
-//! a replica that lost the session restores it from the stream instead of
-//! starting a new one. `session_epoch` counts those ownership changes and
-//! fences writers: a writer holding an older epoch cannot move the watermark.
+//! The `ai_chat_sessions` index over `_o2_ai_chat_events`: ownership, watermark, epoch fencing.
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
@@ -39,8 +28,7 @@ use crate::{
     errors,
 };
 
-/// Where a chat's title came from; a later source only replaces an earlier
-/// one in this order, and a title the user chose is never replaced.
+/// Where a chat's title came from; a later source replaces an earlier one, never the user's.
 pub const TITLE_FROM_PROMPT: &str = "prompt";
 pub const TITLE_GENERATED: &str = "generated";
 pub const TITLE_FROM_USER: &str = "user";
@@ -50,16 +38,12 @@ pub const STATUS_DELETED: &str = "deleted";
 /// "No durable event committed": opencode's `seq` is 0-based.
 pub const NO_SEQ: i64 = -1;
 
-/// Outcome of binding a chat to the opencode session producing its events
-/// (see [`bind_opencode_session`]).
+/// Outcome of [`bind_opencode_session`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Binding {
     /// The chat is (now) bound to this opencode session.
     Bound { epoch: i64, last_committed_seq: i64 },
-    /// The chat has committed history under ANOTHER opencode session. The
-    /// caller must not store these events: appending them would splice two
-    /// unrelated event logs into one conversation. Restoring the replica from
-    /// the stream is the fix.
+    /// History of another opencode session is committed; restore instead of splicing two logs.
     Forked { bound_opencode_session_id: String },
 }
 
@@ -83,9 +67,7 @@ pub struct NewFork<'a> {
     pub seed_seq: i64,
 }
 
-/// `column` moved forward to `value`, never back (NULL counts as unset). The
-/// reader's time window ends at `last_event_at`, so it must never shrink
-/// under events already written (a history refresh and a turn can race).
+/// `column` moved forward to `value`, never back (NULL is unset): the read window never shrinks.
 fn not_before(column: Column, value: i64) -> sea_orm::sea_query::SimpleExpr {
     sea_orm::sea_query::CaseStatement::new()
         .case(
@@ -115,12 +97,7 @@ pub async fn get_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
-/// Insert the index row for a chat if it does not exist yet, and return it.
-///
-/// Ownership is NOT checked here: the caller compares `user_id` on the
-/// returned row so a session id replayed by another user is refused rather
-/// than silently re-owned. Two first turns racing on the same id both end up
-/// with the same row (unique violation → re-read).
+/// The chat's index row, inserted if missing; the caller checks `user_id` (ownership is not).
 pub async fn get_or_create(
     org_id: &str,
     session_id: &str,
@@ -247,10 +224,7 @@ pub async fn get_many_with<C: ConnectionTrait>(
     Ok(rows)
 }
 
-/// Record the turn about to run. Returns `false` when `turn_id` is the turn
-/// already recorded — a retried request that must not start a second model
-/// run. Callers hold the session's turn lease, so this never races a
-/// concurrent turn of the same chat.
+/// Record the turn about to run under the lease; `false` when `turn_id` is already recorded.
 pub async fn begin_turn(
     org_id: &str,
     session_id: &str,
@@ -284,12 +258,7 @@ pub async fn begin_turn_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// Record which opencode session produces this chat's events.
-///
-/// The first binding sets it; the same session again is a no-op. A DIFFERENT
-/// session is accepted only while nothing is committed (the earlier session
-/// never produced stored history, so there is nothing to continue). Otherwise
-/// the result is [`Binding::Forked`] and the row is left untouched.
+/// Binds the opencode session (another only while nothing is committed); epoch returned as is.
 pub async fn bind_opencode_session(
     org_id: &str,
     session_id: &str,
@@ -322,8 +291,7 @@ pub async fn bind_opencode_session_with<C: ConnectionTrait>(
             last_committed_seq: row.last_committed_seq,
         });
     }
-    // Conditional on the watermark still being empty, so a concurrent commit
-    // under the old binding cannot be orphaned by this re-bind.
+    // Conditional on an empty watermark so a concurrent commit under the old binding survives.
     let result = Entity::update_many()
         .col_expr(
             Column::OpencodeSessionId,
@@ -350,9 +318,7 @@ pub async fn bind_opencode_session_with<C: ConnectionTrait>(
     })
 }
 
-/// Start a new ownership epoch (a replica was just restored from the stream).
-/// Compare-and-set on `expected_epoch`: returns the new epoch, or `None` when
-/// another restore got there first.
+/// Starts a new epoch (each turn and restore) by CAS on `expected_epoch`; `None` if it moved.
 pub async fn bump_epoch(
     org_id: &str,
     session_id: &str,
@@ -382,19 +348,14 @@ pub async fn bump_epoch_with<C: ConnectionTrait>(
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::SessionEpoch.eq(expected_epoch))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
         .exec(conn)
         .await
         .map_err(db_err)?;
     Ok((result.rows_affected == 1).then_some(expected_epoch + 1))
 }
 
-/// Advance the committed watermark to `new_seq` — only if the row still
-/// carries `epoch` and its watermark is exactly `expected_prev_seq`.
-///
-/// Returns `false` when the update was fenced (another epoch or another
-/// writer moved the watermark); the caller must then stop persisting this
-/// turn. The watermark is never set from an observed maximum: it only ever
-/// moves to the end of a contiguous, acknowledged batch.
+/// Moves the watermark from exactly `expected_prev_seq` to `new_seq` at `epoch`; `false`: fenced.
 #[allow(clippy::too_many_arguments)]
 pub async fn advance_watermark(
     org_id: &str,
@@ -458,8 +419,7 @@ pub async fn advance_watermark_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// A provisional title from the chat's first prompt, so a new chat is never
-/// listed untitled. Only while the chat has no title at all.
+/// A provisional title from the first prompt, only while the chat has none.
 pub async fn set_prompt_title(
     org_id: &str,
     session_id: &str,
@@ -492,8 +452,7 @@ pub async fn set_prompt_title_with<C: ConnectionTrait>(
     Ok(())
 }
 
-/// The title opencode generated. Replaces a provisional one; never a title
-/// the user chose ([`rename`]).
+/// The title opencode generated; replaces a provisional one, never the user's ([`rename`]).
 pub async fn set_auto_title(
     org_id: &str,
     session_id: &str,
@@ -527,8 +486,7 @@ pub async fn set_auto_title_with<C: ConnectionTrait>(
     Ok(())
 }
 
-/// The user renamed the chat. Returns `false` when there is no active chat
-/// with that id owned by `user_id`. Leaves `updated_at`: a rename is not activity.
+/// The user's title; `false` without an active chat of `user_id`. A rename is not activity.
 pub async fn rename(
     org_id: &str,
     session_id: &str,
@@ -568,9 +526,7 @@ pub async fn rename_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// Tombstone a chat: every read and write stops at once; the stream rows are
-/// removed by retention. Returns `false` when there is no active chat with
-/// that id owned by `user_id`.
+/// Tombstone a chat so every read and write stops; `false` without an active chat of `user_id`.
 pub async fn mark_deleted(
     org_id: &str,
     session_id: &str,
@@ -600,8 +556,7 @@ pub async fn mark_deleted_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
-/// Tombstone every active chat `user_id` owns in `org_id`; returns their
-/// session ids (so the caller can drop the replicas' working copies too).
+/// Tombstone every active chat `user_id` owns in `org_id`; returns their session ids.
 pub async fn mark_all_deleted(
     org_id: &str,
     user_id: &str,
@@ -627,8 +582,7 @@ pub async fn mark_all_deleted_with<C: ConnectionTrait>(
         .await
         .map_err(db_err)?;
     let mut deleted = Vec::with_capacity(session_ids.len());
-    // Bounded statements: a user with thousands of chats must not produce
-    // one unbounded IN list.
+    // Bounded statements: thousands of chats must not become one unbounded IN list.
     for chunk in session_ids.chunks(500) {
         Entity::update_many()
             .col_expr(Column::Status, Expr::value(STATUS_DELETED.to_string()))
@@ -670,25 +624,19 @@ pub async fn active_ids_for_user_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
-/// Chats deleted since `deleted_since` whose o2-ai copies are not yet confirmed gone, oldest first.
-pub async fn due_for_replica_purge(
-    org_id: &str,
-    deleted_since: i64,
-    limit: u64,
-) -> Result<Vec<Model>, errors::Error> {
-    due_for_replica_purge_with(get_orm_client_ro().await, org_id, deleted_since, limit).await
+/// Deleted chats whose o2-ai copies are not yet confirmed gone, least recently tried first.
+pub async fn due_for_replica_purge(org_id: &str, limit: u64) -> Result<Vec<Model>, errors::Error> {
+    due_for_replica_purge_with(get_orm_client_ro().await, org_id, limit).await
 }
 
 pub async fn due_for_replica_purge_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
-    deleted_since: i64,
     limit: u64,
 ) -> Result<Vec<Model>, errors::Error> {
     Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Status.eq(STATUS_DELETED))
-        .filter(Column::UpdatedAt.gte(deleted_since))
         .filter(Column::ReplicaPurgedAt.is_null())
         .order_by_asc(Column::UpdatedAt)
         .limit(limit)
@@ -723,6 +671,33 @@ pub async fn mark_replica_purged_with<C: ConnectionTrait>(
     Ok(())
 }
 
+/// A replica purge attempt failed: the chat goes to the back of the queue.
+pub async fn defer_replica_purge(
+    org_id: &str,
+    session_id: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    defer_replica_purge_with(get_orm_client_rw().await, org_id, session_id, now).await
+}
+
+pub async fn defer_replica_purge_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    now: i64,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::ReplicaPurgedAt.is_null())
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
 /// Orgs that have chat index rows (for the retention sweep).
 pub async fn orgs_with_chats() -> Result<Vec<String>, errors::Error> {
     orgs_with_chats_with(get_orm_client_ro().await).await
@@ -741,13 +716,7 @@ pub async fn orgs_with_chats_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
-/// Remove the index rows of `org_id` whose oldest stored events have aged out
-/// of the chat-events stream (`first_event_at` before `cutoff`, micros),
-/// active or tombstoned alike: an active row would claim history that no
-/// longer reads back, and a tombstone is only needed while its events still
-/// exist (it keeps a deleted chat from being continued). Chats in use are kept
-/// clear of this by [`refresh candidates`](due_for_refresh) being rewritten.
-/// Returns how many rows were removed.
+/// Removes rows (active or tombstoned) whose oldest events predate `cutoff`; returns how many.
 pub async fn purge_expired(org_id: &str, cutoff: i64) -> Result<u64, errors::Error> {
     purge_expired_with(get_orm_client_rw().await, org_id, cutoff).await
 }
@@ -775,10 +744,7 @@ pub async fn purge_expired_with<C: ConnectionTrait>(
     Ok(result.rows_affected)
 }
 
-/// Active chats of `org_id` in use since `active_since` whose oldest stored
-/// events predate `stale_before`: their committed history is rewritten with
-/// fresh timestamps so it never ages out while the chat is in use. At most
-/// `limit` rows, oldest first.
+/// Active chats used since `active_since` with events before `stale_before`, oldest first.
 pub async fn due_for_refresh(
     org_id: &str,
     stale_before: i64,
@@ -814,16 +780,23 @@ pub async fn due_for_refresh_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
-/// After a chat's history was rewritten between `first` and `last` (micros):
-/// the read window starts at the rewritten copies (the old ones may age out)
-/// and reaches at least their end.
+/// Moves the read window onto a rewrite through `copied_seq`; `false` if more was committed.
 pub async fn set_refreshed_range(
     org_id: &str,
     session_id: &str,
     first: i64,
     last: i64,
-) -> Result<(), errors::Error> {
-    set_refreshed_range_with(get_orm_client_rw().await, org_id, session_id, first, last).await
+    copied_seq: i64,
+) -> Result<bool, errors::Error> {
+    set_refreshed_range_with(
+        get_orm_client_rw().await,
+        org_id,
+        session_id,
+        first,
+        last,
+        copied_seq,
+    )
+    .await
 }
 
 pub async fn set_refreshed_range_with<C: ConnectionTrait>(
@@ -832,8 +805,9 @@ pub async fn set_refreshed_range_with<C: ConnectionTrait>(
     session_id: &str,
     first: i64,
     last: i64,
-) -> Result<(), errors::Error> {
-    Entity::update_many()
+    copied_seq: i64,
+) -> Result<bool, errors::Error> {
+    let result = Entity::update_many()
         .col_expr(
             Column::FirstEventAt,
             not_before(Column::FirstEventAt, first),
@@ -841,15 +815,15 @@ pub async fn set_refreshed_range_with<C: ConnectionTrait>(
         .col_expr(Column::LastEventAt, not_before(Column::LastEventAt, last))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
+        .filter(Column::LastCommittedSeq.eq(copied_seq))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
         .exec(conn)
         .await
         .map_err(db_err)?;
-    Ok(())
+    Ok(result.rows_affected == 1)
 }
 
-/// One page of a user's active chats, most recently active first, keyset
-/// paginated on `(updated_at, session_id)` (see the `user_list` index).
-/// A chat with nothing stored is listed only while a turn is running in it (or it is a fork).
+/// A page of a user's active chats, newest first; an empty chat only while a turn runs.
 pub async fn list_for_user(
     org_id: &str,
     user_id: &str,
@@ -954,8 +928,7 @@ mod tests {
         assert_eq!(created.status, STATUS_ACTIVE);
         assert!(created.opencode_session_id.is_none());
 
-        // A second caller (even another user) gets the existing row back; the
-        // ownership decision belongs to the caller.
+        // Another caller (even another user) gets the existing row; ownership is the caller's call.
         let again = chat(&db, SID, BOB, 20).await;
         assert_eq!(again.user_id, ALICE);
         assert_eq!(again.created_at, 10);
@@ -1255,11 +1228,26 @@ mod tests {
             vec!["in-use"]
         );
 
-        // The rewrite moves the window forward; a turn committing meanwhile
-        // with an earlier timestamp never pulls its end back.
-        set_refreshed_range_with(&db, ORG, "in-use", 1000, 1010)
-            .await
-            .unwrap();
+        // A rewrite of fewer events than are committed now leaves the window alone.
+        assert!(
+            !set_refreshed_range_with(&db, ORG, "in-use", 1000, 1010, 2)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            get_with(&db, ORG, "in-use")
+                .await
+                .unwrap()
+                .unwrap()
+                .first_event_at,
+            Some(50)
+        );
+        // The rewrite moves the window forward; a later commit never pulls its end back.
+        assert!(
+            set_refreshed_range_with(&db, ORG, "in-use", 1000, 1010, 3)
+                .await
+                .unwrap()
+        );
         assert!(
             advance_watermark_with(&db, ORG, "in-use", 1, 3, 5, 950, 950, 950)
                 .await
@@ -1396,7 +1384,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn recently_deleted_chats_are_purged_from_replicas_until_confirmed() {
+    async fn deleted_chats_are_purged_from_replicas_until_confirmed() {
         let db = db().await;
         for sid in ["old", "recent", "confirmed", "active"] {
             used_chat(&db, sid, ALICE, 10).await;
@@ -1419,11 +1407,23 @@ mod tests {
         mark_replica_purged_with(&db, ORG, "active", 220)
             .await
             .unwrap();
-        let due = due_for_replica_purge_with(&db, ORG, 100, 10).await.unwrap();
+        let due_ids =
+            |due: Vec<Model>| -> Vec<String> { due.into_iter().map(|r| r.session_id).collect() };
+        // However long ago it was deleted, an unconfirmed purge is retried.
         assert_eq!(
-            due.iter()
-                .map(|r| r.session_id.as_str())
-                .collect::<Vec<_>>(),
+            due_ids(due_for_replica_purge_with(&db, ORG, 10).await.unwrap()),
+            vec!["old", "recent"]
+        );
+        assert_eq!(
+            due_ids(due_for_replica_purge_with(&db, ORG, 1).await.unwrap()),
+            vec!["old"]
+        );
+        // A failed attempt moves it behind the others, so one stuck chat never starves the rest.
+        defer_replica_purge_with(&db, ORG, "old", 300)
+            .await
+            .unwrap();
+        assert_eq!(
+            due_ids(due_for_replica_purge_with(&db, ORG, 1).await.unwrap()),
             vec!["recent"]
         );
         let active = get_with(&db, ORG, "active").await.unwrap().unwrap();

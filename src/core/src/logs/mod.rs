@@ -415,15 +415,19 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::ingestion::get_stream_alerts(
-        &[StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: stream_name.to_owned().into(),
-            stream_type: StreamType::Logs,
-        }],
-        &mut stream_alerts_map,
-    )
-    .await;
+    // Chat history never reaches a realtime alert, even one stored before alerts there were
+    // refused.
+    if !config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(stream_name) {
+        crate::ingestion::get_stream_alerts(
+            &[StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: stream_name.to_owned().into(),
+                stream_type: StreamType::Logs,
+            }],
+            &mut stream_alerts_map,
+        )
+        .await;
+    }
     let cur_stream_alerts =
         stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
     let mut triggers: TriggerAlertData =

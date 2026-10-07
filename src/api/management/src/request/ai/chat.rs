@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! AI Chat handlers that redirect to o2-sre-agent.
-//!
-//! These endpoints accept the legacy PromptRequest format for backward compatibility
-//! but internally forward all requests to the o2-sre-agent service, which handles
-//! the actual AI processing with MCP tool integration.
+//! AI chat handlers: legacy `PromptRequest`s forwarded to the o2-ai agent service.
 
 #[cfg(feature = "enterprise")]
 use audit::report_http as report_to_audit;
@@ -183,13 +179,29 @@ fn select_chat_agent(
     (RCA_AGENT_TYPE, rca_context)
 }
 
-/// Whether `val` is a well-formed session id: the id is client-supplied and ends
-/// up in outbound URLs and, under HA, as the routing key.
-///
-/// The length check pins it to the hyphenated form — `Uuid::try_parse` also
-/// accepts the braced, URN and simple forms, and a URN carries `:` into the URL.
+/// A hyphenated UUID only: the id lands in outbound URLs and routing keys (a URN would carry `:`).
 fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
+}
+
+/// Cross-site forms cannot send JSON without a CORS preflight, so every state change requires it.
+fn require_json(headers: &axum::http::HeaderMap) -> Result<(), Response> {
+    let is_json = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .is_some_and(|mime| mime.trim().eq_ignore_ascii_case("application/json"));
+    if is_json {
+        return Ok(());
+    }
+    Err((
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        Json(MetaHttpResponse::error(
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "Content-Type must be application/json",
+        )),
+    )
+        .into_response())
 }
 
 #[cfg(feature = "cloud")]
@@ -296,8 +308,7 @@ async fn check_chat_owner(
     }
 }
 
-/// Asks o2-ai to abort first so the partial reply is still stored, stopping the turn on this node
-/// when o2-ai cannot.
+/// Asks o2-ai to abort first so the partial reply is still stored, else stops the turn here.
 #[cfg(feature = "enterprise")]
 async fn cancel_turn(org_id: String, session_id: String, auth: String) -> Response {
     use o2_enterprise::enterprise::ai::chat::registry::{self, CancelReason};
@@ -370,9 +381,7 @@ fn schedule_cancel_fallback(org_id: String, session_id: String) {
     };
     tokio::spawn(async move {
         tokio::time::sleep(CANCEL_GRACE).await;
-        if registry::get(&org_id, &session_id).is_some_and(|t| t.turn_id == turn.turn_id) {
-            registry::cancel(&org_id, &session_id, CancelReason::User);
-        }
+        registry::cancel_if(&org_id, &session_id, &turn.turn_id, CancelReason::User);
     });
 }
 
@@ -386,8 +395,7 @@ async fn relay_response(resp: reqwest::Response) -> Response {
     (status, axum::Json(json)).into_response()
 }
 
-/// Extract headers from the request that match the configured passthrough patterns.
-/// Supports exact matches and prefix wildcards (e.g., "x-forwarded-*").
+/// Request headers matching the passthrough patterns (exact names or `prefix*`).
 fn extract_passthrough_headers(
     headers: &axum::http::HeaderMap,
     passthrough_config: &str,
@@ -470,8 +478,10 @@ fn extract_passthrough_headers(
     )
 )]
 pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
-    // Extract headers manually to avoid conflict with body extraction
     let (mut parts, body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
 
     // Extract TraceInfo from headers
     let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
@@ -510,8 +520,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             return MetaHttpResponse::bad_request("AI agent URL is not set");
         }
 
-        // Check quota and billing without consuming a credit. Metering happens
-        // only after the upstream request succeeds.
+        // Quota is checked here, but a credit is only consumed once the upstream succeeds.
         #[cfg(feature = "cloud")]
         let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
             user_email: user_id.to_string(),
@@ -546,14 +555,9 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             }
         };
 
-        // Extract headers to pass through to the agent
-        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
-        // For now, use empty string (no passthrough) until config is updated
         let passthrough_config = ""; // TODO: Replace with config.ai.passthrough_headers once field is added
         let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
 
-        // Transform PromptRequest -> QueryRequest
-        // Extract the last user message as the query
         let last_user_message = prompt_body
             .messages
             .iter()
@@ -630,20 +634,25 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             } else {
                 Some(tool_skills)
             },
-            // Set by the persistence admission below when this turn is being
-            // stored; absent otherwise, so o2-ai streams exactly as before.
+            // Set by persistence admission below; absent, o2-ai streams as before.
             turn_id: None,
             known_seq: None,
             known_opencode_session_id: None,
             session_epoch: None,
         };
 
-        // Forward the session id: without it every call load-balances to an
-        // arbitrary replica, which finds no session and starts a new one.
+        // Without it every call lands on an arbitrary replica, which starts a new session.
         let mut forward_headers = std::collections::HashMap::new();
         if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
             && let Ok(val) = session_id.to_str()
         {
+            // A persisted chat is only continued through admission (owner check, epoch fence).
+            if o2_enterprise::enterprise::ai::chat::is_enabled() {
+                return MetaHttpResponse::bad_request(
+                    "Use /ai/chat_stream to continue a conversation while chat persistence is \
+                     enabled",
+                );
+            }
             if is_valid_session_id(val) {
                 forward_headers.insert(
                     X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
@@ -654,8 +663,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             }
         }
 
-        // No otel span is opened here, so pass the caller's traceparent through
-        // unchanged and the agent's spans still join the request's trace.
+        // No span here, so the caller's traceparent joins the agent's spans to its trace.
         if let Some(traceparent) = &auth_data.traceparent
             && !traceparent.is_empty()
         {
@@ -668,8 +676,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             forward_headers.insert("user-agent".to_string(), val.to_string());
         }
 
-        // Merged last and never overriding, so a passthrough pattern matching
-        // one of the above cannot displace it — as on the stream path.
+        // Merged last and never overriding the headers set above.
         for (key, value) in passthrough_headers {
             forward_headers.entry(key).or_insert(value);
         }
@@ -798,8 +805,10 @@ impl TraceInfo {
 )]
 #[axum::debug_handler]
 pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
-    // Extract headers manually to avoid conflict with body extraction
     let (mut parts, body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
 
     // Extract TraceInfo from headers
     let auth_data = match Headers::<TraceInfo>::from_request_parts(&mut parts, &()).await {
@@ -810,10 +819,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     let trace_id = auth_data.get_trace_id();
     let user_id = auth_data.user_id.clone();
 
-    // Create OTel span for AI tracing using the OpenTelemetry API directly.
-    // We avoid the tracing-opentelemetry bridge here because it has issues with
-    // span lifecycle management in async generators (spans created via tracing::info_span!
-    // don't get properly exported when held inside async_stream::stream!).
+    // OTel API directly: tracing-opentelemetry spans in async_stream! are not exported.
     #[cfg(feature = "enterprise")]
     let otel_chat_span = {
         if get_o2_config().ai.tracing_enabled {
@@ -857,8 +863,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
     let mut forward_headers = std::collections::HashMap::new();
 
-    // Server-side chat persistence: the browser's id for this turn, so a
-    // retried request does not start a second model run (see `chats`).
+    // The browser's id for this turn, so a retried request does not run the model twice.
     let persist_turn_id = parts
         .headers
         .get(super::chats::X_O2_ASSISTANT_TURN_ID)
@@ -876,15 +881,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 val.to_ascii_lowercase(),
             );
         } else {
-            // Rejected, not dropped: dropping it would land the turn on an
-            // arbitrary replica, which reads as the assistant forgetting.
+            // Rejected, not dropped: an arbitrary replica would read as the assistant forgetting.
             log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
             return MetaHttpResponse::bad_request("Invalid session id");
         }
     }
 
-    // Generate a new traceparent from the ai.chat_stream span's context.
-    // This ensures the agent sees ai.chat_stream as its parent (not the frontend span).
+    // A traceparent from the ai.chat_stream span, so the agent's parent is this span.
     if let Some(ref span_cx) = otel_chat_span {
         let mut injected_headers = std::collections::HashMap::new();
         opentelemetry::global::get_text_map_propagator(|propagator| {
@@ -914,12 +917,9 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     // Extract and merge passthrough headers from config
     #[cfg(feature = "enterprise")]
     {
-        // Note: passthrough_headers config field needs to be added to o2_enterprise Ai config
-        // For now, use empty string (no passthrough) until config is updated
         let passthrough_config = ""; // TODO: Replace with _config.ai.passthrough_headers once field is added
         let passthrough_headers = extract_passthrough_headers(&parts.headers, passthrough_config);
-        // Merge passthrough headers, but don't override already-set headers (like session_id,
-        // traceparent)
+        // Never overrides a header already set (session id, traceparent).
         for (key, value) in passthrough_headers {
             forward_headers.entry(key).or_insert(value);
         }
@@ -976,8 +976,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             return MetaHttpResponse::bad_request("AI is not enabled");
         }
 
-        // Check quota and billing without consuming a credit. The final
-        // deduction occurs only after the upstream accepts the stream.
+        // Quota is checked here; the credit is deducted only after the upstream accepts the stream.
         #[cfg(feature = "cloud")]
         let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
             user_email: user_id.clone(),
@@ -1020,8 +1019,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             }
         };
 
-        // Extract user token from cookie/header for per-user MCP auth
-        // Unwrap Session:: wrapper if present, otherwise use token as-is
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         // Auth header is passed directly to agent - no need to extract user_token
 
@@ -1101,8 +1098,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             } else {
                 Some(tool_skills)
             },
-            // Set by the persistence admission below when this turn is being
-            // stored; absent otherwise, so o2-ai streams exactly as before.
+            // Set by persistence admission below; absent, o2-ai streams as before.
             turn_id: None,
             known_seq: None,
             known_opencode_session_id: None,
@@ -1115,13 +1111,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             Some(forward_headers)
         };
 
-        // ---- Server-side chat persistence -------------------------------
-        //
-        // With persistence on, the turn is owned by a background task rather
-        // than by this response: it holds the o2-ai connection, stores
-        // opencode's durable events in the org's protected chat-events
-        // stream, and feeds the browser through a bounded channel. Closing
-        // the tab drops only that channel.
+        // With persistence on, a background task owns the turn; a closed tab drops only its feed.
         if o2_enterprise::enterprise::ai::chat::is_enabled() {
             let session_id = headers_to_forward
                 .as_ref()
@@ -1173,6 +1163,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 owner,
                 turn_id,
                 lease,
+                registration,
             } = admitted;
             report_to_audit(
                 user_id.clone(),
@@ -1188,9 +1179,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             .await;
             let session_id = row.session_id.clone();
 
-            // Tell o2-ai to forward opencode's durable events, and how far our
-            // copy of them already reaches: it forwards only what is missing,
-            // and refuses (restore_required) when it holds less than that.
+            // o2-ai forwards only events past `known_seq` (restore_required when it holds fewer).
             let mut query_req = query_req;
             query_req.turn_id = Some(turn_id.clone());
             query_req.known_seq = Some(row.last_committed_seq);
@@ -1229,8 +1218,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                     client,
                     store,
                     lease,
-                    // The span outlives this response now, so it is ended by
-                    // the task rather than at the end of the relay below.
+                    registration,
+                    // The span outlives this response, so the task ends it.
                     on_end: Some(Box::new(move || {
                         if let Some(span_cx) = span_for_task {
                             use opentelemetry::trace::TraceContextExt;
@@ -1258,8 +1247,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 .unwrap_or_else(|_| Response::new(Body::empty()));
         }
 
-        // Establish the upstream response before returning browser headers or
-        // recording usage. Startup errors retain meaningful HTTP statuses.
+        // The upstream accepts before headers or usage go out, so startup errors keep statuses.
         let response = match client
             .query_stream_with_headers(
                 agent_type,
@@ -1341,8 +1329,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let s = async_stream::stream! {
             let mut agent_stream = response.bytes_stream();
 
-            // Poll the stream with proper instrumentation
-            // Each chunk is traced within the context of ai.chat_stream
             while let Some(chunk_result) = agent_stream.next().await {
                 match chunk_result {
                     Ok(bytes) => {
@@ -1366,9 +1352,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                  Agent stream ended"
             );
-            // Explicitly end the OTel span when the stream completes.
-            // This is critical: the span must be ended before it can be exported
-            // by the BatchSpanProcessor.
+            // The BatchSpanProcessor exports a span only once it has ended.
             if let Some(span_cx) = otel_chat_span {
                 use opentelemetry::trace::TraceContextExt;
                 span_cx.span().end();
@@ -1398,12 +1382,12 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
     }
 }
 
-/// Submit user feedback for an AI response.
-///
-/// Proxies feedback (thumbs up/down, rating) to the o2-sre-agent's /feedback endpoint.
-/// The agent stores this and emits it as OTEL spans for OpenObserve ingestion.
+/// Forwards feedback on an AI response to o2-ai, which records it.
 pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request) -> Response {
     let (parts, body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
 
     // Extract trace info from headers (user_id may not be present for feedback)
     let traceparent = parts
@@ -1419,8 +1403,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
 
     let mut forward_headers = std::collections::HashMap::new();
 
-    // Rejected rather than dropped, as on the stream path: feedback is recorded
-    // on the owning replica, so an unroutable id files it against the wrong chat.
+    // Rejected rather than dropped: feedback is recorded on the owning replica.
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
     {
@@ -1461,6 +1444,11 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
                 return MetaHttpResponse::bad_request("Agent service not configured");
             }
         };
+        if let Some(session_id) = forward_headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
+            && let Err(resp) = check_chat_owner(&parts.headers, &org_id, session_id).await
+        {
+            return resp;
+        }
 
         // Extract user auth from headers to pass to the agent
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
@@ -1535,6 +1523,9 @@ pub async fn confirm_action(
     in_req: axum::extract::Request,
 ) -> Response {
     let (parts, body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
 
     // Parse JSON body
     let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
@@ -1558,8 +1549,7 @@ pub async fn confirm_action(
             }
         };
 
-        // Validate before the id reaches an outbound URL: this path interpolates
-        // a caller-supplied path segment straight in.
+        // Validated before this caller-supplied segment is interpolated into an outbound URL.
         if !is_valid_session_id(&session_id) {
             return MetaHttpResponse::bad_request("Invalid session id");
         }
@@ -1574,8 +1564,7 @@ pub async fn confirm_action(
         // Agent uses Authorization header directly - no need to inject user_token into body
         let forward_bytes = body_bytes;
 
-        // The client builds and routes the confirm URL itself: it must reach the
-        // replica holding the paused turn, not whichever one the LB picks.
+        // The client routes the confirm to the replica holding the paused turn.
         match client
             .confirm_action(&session_id, forward_bytes.to_vec(), &auth_str)
             .await
@@ -1645,6 +1634,7 @@ pub async fn confirm_action(
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID or AI agent not configured", body = Object),
         (status = StatusCode::FORBIDDEN, description = "The conversation belongs to another user", body = Object),
         (status = StatusCode::NOT_FOUND, description = "Unknown conversation", body = Object),
+        (status = StatusCode::UNSUPPORTED_MEDIA_TYPE, description = "The body is not JSON (send {})", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
     extensions(
@@ -1656,6 +1646,9 @@ pub async fn cancel(
     in_req: axum::extract::Request,
 ) -> Response {
     let (parts, _body) = in_req.into_parts();
+    if let Err(resp) = require_json(&parts.headers) {
+        return resp;
+    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -1743,6 +1736,26 @@ mod tests {
     }
 
     #[test]
+    fn only_json_bodies_change_state() {
+        let headers = |ct: &str| {
+            let mut h = axum::http::HeaderMap::new();
+            h.insert(axum::http::header::CONTENT_TYPE, ct.parse().unwrap());
+            h
+        };
+        assert!(require_json(&headers("application/json")).is_ok());
+        assert!(require_json(&headers("Application/JSON; charset=utf-8")).is_ok());
+        for ct in [
+            "text/plain",
+            "application/x-www-form-urlencoded",
+            "multipart/form-data",
+        ] {
+            let resp = require_json(&headers(ct)).unwrap_err();
+            assert_eq!(resp.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE, "{ct}");
+        }
+        assert!(require_json(&axum::http::HeaderMap::new()).is_err());
+    }
+
+    #[test]
     fn test_valid_session_ids_are_accepted() {
         assert!(is_valid_session_id("01234567-89ab-cdef-0123-456789abcdef"));
         // UUID v7 as minted by the frontend, and case-insensitive hex.
@@ -1761,8 +1774,7 @@ mod tests {
 
     #[test]
     fn test_non_hyphenated_uuid_forms_are_rejected() {
-        // `Uuid::try_parse` accepts all of these; the length check keeps them
-        // out. The URN form would carry a `:` into the confirm URL.
+        // `Uuid::try_parse` accepts all of these; a URN would carry `:` into the confirm URL.
         assert!(!is_valid_session_id(
             "urn:uuid:01234567-89ab-cdef-0123-456789abcdef"
         ));

@@ -2510,7 +2510,7 @@ pub static AI_CHAT_TURN_RESULT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "ai_chat_turn_result_total",
-            "Persisted AI chat turns by outcome (result=persisted|persistence_failed|cancelled|error|busy|turn_limit|timeout|interrupted)",
+            "Persisted AI chat turns by outcome (result=persisted|persistence_failed|cancelled|deleted|error|busy|turn_limit|timeout|interrupted)",
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),

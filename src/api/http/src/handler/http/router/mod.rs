@@ -584,7 +584,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
                     http_method: method,
-                    http_path: path,
+                    http_path: config::axum::middlewares::mask_share_tokens(&path),
                     http_body: body,
                     http_query_params: query_params,
                     http_response_code: response.status().as_u16(),

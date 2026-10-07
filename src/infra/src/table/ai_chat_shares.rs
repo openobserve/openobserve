@@ -129,8 +129,9 @@ pub async fn insert_with<C: ConnectionTrait>(
         .ok_or_else(|| errors::Error::Message("ai_chat_shares row vanished after insert".into()))
 }
 
+/// Read from the primary, so a revoke or update is seen at once.
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Model>, errors::Error> {
-    get_with(get_orm_client_ro().await, org_id, id).await
+    get_with(get_orm_client_rw().await, org_id, id).await
 }
 
 pub async fn get_with<C: ConnectionTrait>(
@@ -145,9 +146,9 @@ pub async fn get_with<C: ConnectionTrait>(
         .map_err(db_err)
 }
 
-/// The share holding `token`, in any org and state; the caller decides whether to serve it.
+/// The share holding `token`, in any org and state, read from the primary so a revoke is immediate.
 pub async fn get_by_token(token: &str) -> Result<Option<Model>, errors::Error> {
-    get_by_token_with(get_orm_client_ro().await, token).await
+    get_by_token_with(get_orm_client_rw().await, token).await
 }
 
 pub async fn get_by_token_with<C: ConnectionTrait>(
@@ -347,6 +348,33 @@ pub async fn revoke_for_owner_with<C: ConnectionTrait>(
         .exec(conn)
         .await
         .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
+/// Revoke the shares user id `created_by` made in `org_id`, or in every org; returns how many.
+pub async fn revoke_for_creator(
+    org_id: Option<&str>,
+    created_by: &str,
+    now: i64,
+) -> Result<u64, errors::Error> {
+    revoke_for_creator_with(get_orm_client_rw().await, org_id, created_by, now).await
+}
+
+pub async fn revoke_for_creator_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: Option<&str>,
+    created_by: &str,
+    now: i64,
+) -> Result<u64, errors::Error> {
+    let mut update = Entity::update_many()
+        .col_expr(Column::RevokedAt, Expr::value(Some(now)))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::CreatedBy.eq(created_by))
+        .filter(Column::RevokedAt.is_null());
+    if let Some(org_id) = org_id {
+        update = update.filter(Column::OrgId.eq(org_id));
+    }
+    let result = update.exec(conn).await.map_err(db_err)?;
     Ok(result.rows_affected)
 }
 
@@ -641,5 +669,45 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[tokio::test]
+    async fn revoking_by_creator_id_spans_orgs_unless_one_is_named() {
+        let db = db().await;
+        let here = insert_with(&db, &new_share(MODE_LIVE, None), 10)
+            .await
+            .unwrap();
+        let mut elsewhere = new_share(MODE_LIVE, None);
+        elsewhere.org_id = "other-org";
+        let elsewhere = insert_with(&db, &elsewhere, 11).await.unwrap();
+        let mut bob = new_share(MODE_LIVE, None);
+        bob.created_by = "bob";
+        let bob = insert_with(&db, &bob, 12).await.unwrap();
+
+        assert_eq!(
+            revoke_for_creator_with(&db, Some(ORG), ALICE, 20)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(
+            get_with(&db, "other-org", &elsewhere.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .revoked_at
+                .is_none()
+        );
+        assert_eq!(
+            revoke_for_creator_with(&db, None, ALICE, 21).await.unwrap(),
+            1
+        );
+        let revoked_at = |org: &'static str, id: String| {
+            let db = &db;
+            async move { get_with(db, org, &id).await.unwrap().unwrap().revoked_at }
+        };
+        assert_eq!(revoked_at(ORG, here.id).await, Some(20));
+        assert_eq!(revoked_at("other-org", elsewhere.id).await, Some(21));
+        assert_eq!(revoked_at(ORG, bob.id).await, None);
     }
 }
