@@ -10493,6 +10493,67 @@
     "searchTypeOthers": "その他"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "所要時間",
+      "tooltipSpans": "{count} スパン | {count} スパン",
+      "tooltipErrors": "{count} エラー ({share}) | {count} エラー ({share})",
+      "colorBy": {
+        "label": "色分け",
+        "spans": "スパン",
+        "errors": "エラー"
+      },
+      "noData": "データなし",
+      "unavailable": "この検索ではレイテンシヒートマップを利用できません",
+      "loadFailed": "レイテンシヒートマップの読み込みに失敗しました"
+    },
+    "comparison": {
+      "title": "選択範囲を比較",
+      "baselineOutside": "選択範囲外",
+      "baselineBefore": "直前",
+      "sampleNote": "選択範囲: {selection} · ベースライン: {baseline}",
+      "sampleNoteAll": "全 {count} スパン | 全 {count} スパン",
+      "sampleCapped": "{total} スパンのうち {sampled} をサンプリング",
+      "noiseNote": "{pts} pts 未満の差異はサンプリングノイズの範囲内です",
+      "loading": "スパンをサンプリング中…",
+      "loadFailed": "選択範囲を比較できませんでした",
+      "sampleOverflow": "サンプルがスパン数と一致しません。たとえば遅延データが到着した場合などです。再試行して再カウントしてください。",
+      "baselineCapped": "ベースラインは {range} に制限され、選択範囲の前後最大 3 時間です",
+      "baselineLimited": "このストリームの {hours} 時間のクエリ制限により、ベースラインは {range} に制限されます",
+      "rangeClamped": "サーバーが時間範囲を短縮したため、比較が不完全になります",
+      "rangeTooLong": "選択範囲がこのストリームの {hours} 時間のクエリ制限を超えています",
+      "retry": "再試行",
+      "noSelectionTitle": "比較するスパンを選択",
+      "noSelectionBody": "所要時間ヒートマップ上でボックスを描くか、エラーまたはレートのチャートをブラッシュし、ドリルダウンを開きます。",
+      "emptySelection": "選択範囲にスパンがありません",
+      "emptyBaseline": "ベースラインのスパンがありません",
+      "emptyBaselineHint": "このベースラインに一致するものはありませんでした。代わりに {mode} をお試しください。",
+      "scorePts": "Δ {pts} pts",
+      "presentIn": "選択範囲の {pct} に存在",
+      "filterTo": "この値で絞り込む",
+      "exclude": "この値を除外",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "選択範囲 {pct}",
+      "baselineShare": "ベースライン {pct}",
+      "noValue": "(値なし)",
+      "emptyValue": "(空)",
+      "otherValues": "その他 ({count} 値) | その他 ({count} 値)",
+      "showMore": "さらに {count} フィールドを表示 | さらに {count} フィールドを表示",
+      "mostlyEmpty": "選択範囲でほぼ空 ({count})",
+      "highCardinality": "高カーディナリティのフィールド ({count})",
+      "distinctInSample": "サンプル内の {count} 個の異なる値 | サンプル内の {count} 個の異なる値",
+      "constantFields": "{count} 個のフィールドがどこでも単一の値を持ちます | {count} 個のフィールドがどこでも単一の値を持ちます",
+      "excludedFields": "比較対象外: {fields}",
+      "summaryErrors": "エラー · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "結果",
+    "metrics": {
+      "perSecond": {
+        "traces": "トレース/秒",
+        "spans": "スパン/秒"
+      }
+    },
     "errLabel": "ERR",
     "agentDefaultVariant": "デフォルト",
     "agentNoEnv": "(環境なし)",
@@ -11062,7 +11123,11 @@
       "unknownOperation": "不明な操作",
       "unknownService": "不明なサービス",
       "traceIdCopied": "トレース ID をクリップボードにコピーしました",
-      "sessionIdCopied": "セッションIDをクリップボードにコピーしました"
+      "sessionIdCopied": "セッションIDをクリップボードにコピーしました",
+      "partial": "このトレースの一部のスパンを読み取れませんでした。ウォーターフォールが不完全な可能性があります。",
+      "truncated": "このトレースの最初のスパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。 | このトレースの最初の {count} スパンを開始時刻順に表示しています。以降のスパンはまだ読み込まれていません。",
+      "loadMore": "次のスパンを読み込む | 次の {size} スパンを読み込む",
+      "loadMoreFailed": "このトレースのスパンをこれ以上読み込めませんでした"
     },
     "traceTree": {
       "clickToExpand": "クリックして展開",

@@ -10493,6 +10493,67 @@
     "searchTypeOthers": "Inne"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Czas trwania",
+      "tooltipSpans": "{count} span | {count} spanów",
+      "tooltipErrors": "{count} błąd ({share}) | {count} błędów ({share})",
+      "colorBy": {
+        "label": "Koloruj według",
+        "spans": "Spany",
+        "errors": "Błędy"
+      },
+      "noData": "Brak danych",
+      "unavailable": "Mapa cieplna opóźnień nie jest dostępna dla tego wyszukiwania",
+      "loadFailed": "Nie udało się wczytać mapy cieplnej opóźnień"
+    },
+    "comparison": {
+      "title": "Porównaj wybór",
+      "baselineOutside": "Poza wyborem",
+      "baselineBefore": "Tuż przed",
+      "sampleNote": "Wybór: {selection} · Punkt odniesienia: {baseline}",
+      "sampleNoteAll": "wszystkie {count} spany | wszystkie {count} spanów",
+      "sampleCapped": "Próbkowano {sampled} z {total} spanów",
+      "noiseNote": "Różnice poniżej {pts} pkt mieszczą się w szumie próbkowania",
+      "loading": "Próbkowanie spanów…",
+      "loadFailed": "Nie udało się porównać wyboru",
+      "sampleOverflow": "Próbka nie zgadza się z liczbą spanów, na przykład z powodu danych, które dotarły z opóźnieniem. Ponów, aby przeliczyć.",
+      "baselineCapped": "Punkt odniesienia ograniczony do {range}, do 3 godz. po każdej stronie wyboru",
+      "baselineLimited": "Punkt odniesienia ograniczony do {range} przez {hours}-godzinny limit zapytań tego strumienia",
+      "rangeClamped": "Serwer skrócił zakres czasu, więc porównanie byłoby niekompletne",
+      "rangeTooLong": "Wybór jest dłuższy niż {hours}-godzinny limit zapytań tego strumienia",
+      "retry": "Ponów",
+      "noSelectionTitle": "Wybierz spany do porównania",
+      "noSelectionBody": "Narysuj prostokąt na mapie cieplnej czasu trwania lub zaznacz obszar na wykresie błędów albo tempa, a następnie otwórz Przejdź do szczegółów.",
+      "emptySelection": "Brak spanów w wyborze",
+      "emptyBaseline": "Brak spanów punktu odniesienia",
+      "emptyBaselineHint": "Nic nie pasuje do tego punktu odniesienia. Spróbuj zamiast tego {mode}.",
+      "scorePts": "Δ {pts} pkt",
+      "presentIn": "obecne w {pct} wyboru",
+      "filterTo": "Filtruj do tej wartości",
+      "exclude": "Wyklucz tę wartość",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Wybór {pct}",
+      "baselineShare": "Punkt odniesienia {pct}",
+      "noValue": "(brak wartości)",
+      "emptyValue": "(puste)",
+      "otherValues": "Inne ({count} wartość) | Inne ({count} wartości)",
+      "showMore": "Pokaż jeszcze {count} pole | Pokaż jeszcze {count} pól",
+      "mostlyEmpty": "W większości puste w wyborze ({count})",
+      "highCardinality": "Pola o wysokiej liczności ({count})",
+      "distinctInSample": "{count} unikalna wartość w próbce | {count} unikalnych wartości w próbce",
+      "constantFields": "{count} pole ma wszędzie jedną wartość | {count} pól ma wszędzie jedną wartość",
+      "excludedFields": "Nie porównano: {fields}",
+      "summaryErrors": "Błędy · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "wyniki",
+    "metrics": {
+      "perSecond": {
+        "traces": "trace/s",
+        "spans": "splany/s"
+      }
+    },
     "errLabel": "BŁĄD",
     "agentDefaultVariant": "domyślne",
     "agentNoEnv": "(Brak środowiska)",
@@ -11062,7 +11123,11 @@
       "unknownOperation": "Nieznana operacja",
       "unknownService": "Nieznana usługa",
       "traceIdCopied": "Skopiowano ID śladu do schowka",
-      "sessionIdCopied": "ID sesji skopiowane do schowka"
+      "sessionIdCopied": "ID sesji skopiowane do schowka",
+      "partial": "Niektóre spany tego trace'a nie mogły zostać odczytane. Znak wodospadu może być niekompletny.",
+      "truncated": "Wyświetlany jest pierwszy span tego trace'a, w kolejności czasu rozpoczęcia. Późniejsze spany nie zostały jeszcze wczytane. | Wyświetlanych jest pierwszych {count} spanów tego trace'a, w kolejności czasu rozpoczęcia. Późniejsze spany nie zostały jeszcze wczytane.",
+      "loadMore": "Wczytaj następny span | Wczytaj następne {size} spanów",
+      "loadMoreFailed": "Nie udało się wczytać kolejnych spanów tego trace'a"
     },
     "traceTree": {
       "clickToExpand": "Kliknij, aby rozwinąć",
