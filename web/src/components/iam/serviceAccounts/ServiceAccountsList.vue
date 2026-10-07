@@ -123,13 +123,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>{{ row.first_name }}</template>
           </template>
 
-          <template v-if="showRolesColumn" #cell-roles="{ row }">
+          <template #cell-roles="{ row }">
             <span
               :data-test="`service-accounts-roles-${row.email}`"
-              class="text-text-secondary truncate text-xs"
-              :title="serviceAccountRolesText(row.email)"
-              >{{ serviceAccountRolesText(row.email) }}</span
-            >
+              class="inline-flex min-w-0 items-center gap-1 truncate text-xs"
+              :class="rbacAccess.allowed ? 'text-text-secondary' : 'text-text-disabled'"
+              :title="rbacAccess.allowed ? serviceAccountRolesText(row.email) : rbacAccess.message"
+              >{{ serviceAccountRolesText(row.email) }}
+              <OIcon v-if="!rbacAccess.allowed" name="lock" size="xs" class="shrink-0" />
+            </span>
+            <LockedFeatureTooltip
+              v-if="!rbacAccess.allowed"
+              :message="rbacAccess.message"
+              :show-upgrade-cta="rbacAccess.ctaRelevant"
+              icon="shield"
+              :title="t('iam.roles')"
+            />
           </template>
 
           <template #cell-token="{ row }">
@@ -457,44 +466,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-else class="mt-4">
             <div data-test="service-accounts-list-token-next-step" class="flex items-start gap-2">
-              <OIcon
-                v-if="showGroupLink"
-                name="warning"
-                size="sm"
-                class="text-status-warning-text mt-0.5"
-              />
+              <OIcon name="warning" size="sm" class="text-status-warning-text mt-0.5" />
               <span class="text-text-secondary text-xs">{{ tokenNextStepHint }}</span>
             </div>
 
-            <div v-if="showGroupLink" class="mt-3 flex flex-wrap items-center justify-center gap-3">
+            <!-- Always rendered — locked (not hidden) when rbac isn't allowed:
+                 inert links, lock icon instead of the arrow, tooltip explains
+                 why. See rbacAccess / onQuickLinkClick. -->
+            <div class="mt-3 flex flex-wrap items-center justify-center gap-3">
               <router-link
                 data-test="service-accounts-list-token-add-to-role"
                 :to="roleLinkTarget"
                 class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
-                @click="isShowToken = false"
+                :class="{ 'cursor-not-allowed opacity-60 hover:border-border-default hover:bg-transparent': !rbacAccess.allowed }"
+                @click="onQuickLinkClick"
               >
                 <OIcon name="shield" size="sm" class="text-primary shrink-0" />
                 <span class="font-medium">{{ t("serviceAccounts.tokenReveal.addToRole") }}</span>
                 <OIcon
-                  name="arrow-right"
+                  :name="rbacAccess.allowed ? 'arrow-right' : 'lock'"
                   size="sm"
                   class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
+              <LockedFeatureTooltip
+                v-if="!rbacAccess.allowed"
+                :message="rbacAccess.message"
+                :show-upgrade-cta="rbacAccess.ctaRelevant"
+                icon="shield"
+                :title="t('iam.roles')"
+              />
               <router-link
                 data-test="service-accounts-list-token-add-to-group"
                 :to="groupLinkTarget"
                 class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
-                @click="isShowToken = false"
+                :class="{ 'cursor-not-allowed opacity-60 hover:border-border-default hover:bg-transparent': !rbacAccess.allowed }"
+                @click="onQuickLinkClick"
               >
                 <OIcon name="group" size="sm" class="text-primary shrink-0" />
                 <span class="font-medium">{{ t("serviceAccounts.tokenReveal.addToGroup") }}</span>
                 <OIcon
-                  name="arrow-right"
+                  :name="rbacAccess.allowed ? 'arrow-right' : 'lock'"
                   size="sm"
                   class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
+              <LockedFeatureTooltip
+                v-if="!rbacAccess.allowed"
+                :message="rbacAccess.message"
+                :show-upgrade-cta="rbacAccess.ctaRelevant"
+                icon="group"
+                :title="t('iam.groups')"
+              />
             </div>
           </div>
 
@@ -540,6 +563,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import {
   isSyntheticServiceAccountEmail,
@@ -596,6 +621,7 @@ export default defineComponent({
     OTabPanels,
     OTabPanel,
     OSpinner,
+    LockedFeatureTooltip,
   },
   emits: [],
   setup() {
@@ -685,19 +711,28 @@ export default defineComponent({
       return `OPENOBSERVE_AUTH="Basic ${tokenBasicCredential.value}"\nOPENOBSERVE_ORG_ID=${orgId}`;
     });
 
-    // Enterprise/Cloud builds have a Groups UI, so a freshly created account
-    // can be granted permissions in one click. OSS has no Groups page, so it
-    // only gets the plain usage hint.
-    const showGroupLink = computed(
-      () => config.isEnterprise === "true" || config.isCloud === "true",
-    );
+    // Same rbac gate AddServiceAccount.vue / IdentityAccessManagement.vue use
+    // for the Groups/Roles rail — reused here so the quick-add links and the
+    // Roles column lock instead of vanish when rbac isn't allowed.
+    const rbacAccess = useLockedAffordance("rbac");
 
-    // Step 2 framing: enterprise/cloud nudges toward the Groups page (with a
-    // link below); OSS has no Groups UI, so it points to Roles & Groups in copy.
+    // Step 2 framing: unlocked nudges toward the Groups page (with a link
+    // below); locked still shows the links (disabled, with the lock tooltip)
+    // and points to Roles & Groups in copy instead.
     const tokenNextStepHint = computed(() => {
-      if (showGroupLink.value) return t("serviceAccounts.tokenReveal.nextStepGrant");
+      if (rbacAccess.value.allowed) return t("serviceAccounts.tokenReveal.nextStepGrant");
       return t("serviceAccounts.tokenReveal.nextStepOss");
     });
+
+    // Quick-add links stay visible but inert when locked — matches the rail's
+    // locked-nav-item convention (disabled, no navigation, tooltip explains why).
+    const onQuickLinkClick = (e: Event) => {
+      if (!rbacAccess.value.allowed) {
+        e.preventDefault();
+        return;
+      }
+      isShowToken.value = false;
+    };
 
     const groupLinkTarget = computed(() => ({
       name: "groups",
@@ -740,7 +775,7 @@ export default defineComponent({
     const serviceAccountRoles = ref<Record<string, string[]> | null>(null);
 
     const loadServiceAccountRoles = async (force = false) => {
-      if (!showRolesColumn) return;
+      if (!rbacAccess.value.allowed) return;
       try {
         const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
         if (force) {
@@ -783,10 +818,6 @@ export default defineComponent({
       }
     });
 
-    // Roles/Groups are an enterprise/cloud-only concept (OSS has no RBAC UI),
-    // so the column — and the lookup backing it — is skipped entirely there.
-    const showRolesColumn = config.isEnterprise === "true" || config.isCloud === "true";
-
     const columns: OTableColumnDef[] = [
       {
         id: "email",
@@ -809,21 +840,22 @@ export default defineComponent({
         minSize: 160,
         meta: { align: "left", flex: true },
       },
-      ...(showRolesColumn
-        ? [
-            {
-              id: "roles",
-              header: t("serviceAccounts.list.col.roles"),
-              accessorKey: "roles",
-              sortable: false,
-              resizable: true,
-              hideable: true,
-              size: 160,
-              minSize: 120,
-              meta: { align: "left" },
-            } satisfies OTableColumnDef,
-          ]
-        : []),
+      // Shown locked (not hidden) in builds/orgs where rbac isn't allowed —
+      // see rbacAccess; the cell itself renders the lock icon + tooltip.
+      {
+        id: "roles",
+        header: t("serviceAccounts.list.col.roles"),
+        accessorKey: "roles",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 160,
+        minSize: 120,
+        meta: {
+          align: "left",
+          headerTooltip: rbacAccess.value.allowed ? undefined : rbacAccess.value.message,
+        },
+      },
       {
         id: "token",
         header: t("serviceAccounts.list.col.token"),
@@ -1290,7 +1322,8 @@ export default defineComponent({
       tokenHeaderSnippet,
       tokenEnvSnippet,
       tokenNextStepHint,
-      showGroupLink,
+      rbacAccess,
+      onQuickLinkClick,
       groupLinkTarget,
       roleLinkTarget,
       confirmRefreshAction,
@@ -1319,7 +1352,6 @@ export default defineComponent({
       isSystemAccount,
       isRowSelectable,
       deleteUserEmailIdentifier,
-      showRolesColumn,
       serviceAccountRoles,
       serviceAccountRolesText,
     };
