@@ -1999,22 +1999,12 @@ export class TracesPage {
     return await this.page.locator(this.insightsButton).isVisible({ timeout: 5000 }).catch(() => false);
   }
 
-  /**
-   * Click the Drill down button to open the Analysis Dashboard
-   */
-  /**
-   * Open Drill down and wait for the comparison page to settle on a terminal state.
-   * @returns {Promise<string>} the data-test of the state it settled on
-   */
   async openComparison() {
     await this.page.locator(this.insightsButton).click();
     return await this.waitForComparisonState();
   }
 
-  /**
-   * Wait for the comparison page to settle on a terminal state, loaded or empty.
-   * @returns {Promise<string>} the data-test of the state it settled on
-   */
+  // Returns the data-test of the terminal state reached, loaded or empty, so callers branch instead of timing out.
   async waitForComparisonState() {
     const states = [
       this.comparisonPage,
