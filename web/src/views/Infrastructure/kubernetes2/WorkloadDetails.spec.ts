@@ -244,6 +244,45 @@ describe("WorkloadDetails: CronJob, Job, PVC, HPA, Namespace", () => {
     expect(value(wrapper, "conditions")).toContain("Failed");
   });
 
+  it("renders the Job and derived Deployment condition words in the active locale", () => {
+    const words = {
+      conditionComplete: "Done*",
+      conditionFailed: "Broke*",
+      conditionAvailable: "Up*",
+    };
+    i18n.global.mergeLocaleMessage("en-us", { infra: { k8s2: words } });
+    try {
+      expect(value(mountRow(find(inventory.jobs, "nightly-report-2")), "conditions")).toContain(
+        "Broke*",
+      );
+      expect(value(mountRow(find(inventory.jobs, "nightly-report-1")), "conditions")).toContain(
+        "Done*",
+      );
+      const derived = {
+        ...find(inventory.deployments, "web"),
+        conditionsDerived: true,
+        conditions: [
+          {
+            key: "infra.k8s2.conditionAvailable" as const,
+            text: "Available",
+            variant: "success-soft" as const,
+          },
+        ],
+      };
+      expect(value(mountRow(derived), "conditions")).toContain("Up*");
+    } finally {
+      i18n.global.mergeLocaleMessage("en-us", {
+        infra: {
+          k8s2: {
+            conditionComplete: "Complete",
+            conditionFailed: "Failed",
+            conditionAvailable: "Available",
+          },
+        },
+      });
+    }
+  });
+
   it("links a PVC's pods from K7", async () => {
     const wrapper = mountRow(find(inventory.pvcs, "data-db-0"));
     expect(value(wrapper, "storage-class")).toBe("gp3");

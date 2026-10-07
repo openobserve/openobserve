@@ -39,6 +39,26 @@ const colOf = (view: View, id: string) => cols(view).find((c) => c.id === id) as
 const value = (c: K8sColumn, row: unknown) => (c.accessorFn as (r: unknown) => unknown)(row);
 
 describe("kubernetesColumns", () => {
+  it("translates the condition words this page synthesizes and keeps Kubernetes ones raw", () => {
+    const words = (view: View, row: unknown) =>
+      (colOf(view, "conditions").meta as any).words(row).map((w: any) => w.text);
+    const job = { kind: "job", complete: true, failed: 1, failedReasons: [] };
+    expect(words("jobs", job)).toEqual([
+      "infra.k8s2.conditionComplete",
+      "infra.k8s2.conditionFailed",
+    ]);
+    expect(value(colOf("jobs", "conditions"), job)).toBe(
+      "infra.k8s2.conditionComplete infra.k8s2.conditionFailed",
+    );
+    const derived = { kind: "deployment", conditionsDerived: true, conditions: [] as unknown[] };
+    derived.conditions = [
+      { key: "infra.k8s2.conditionAvailable", text: "Available", variant: "success-soft" },
+    ];
+    expect(words("deployments", derived)).toEqual(["infra.k8s2.conditionAvailable"]);
+    const observed = { ...derived, conditions: [{ text: "Progressing", variant: "default-soft" }] };
+    expect(words("deployments", observed)).toEqual(["Progressing"]);
+  });
+
   it.each([
     [
       "pods",
@@ -242,8 +262,12 @@ describe("kubernetesColumns", () => {
     ).jobs;
     const c = colOf("jobs", "conditions");
     const byName = Object.fromEntries(jobs.map((j) => [j.name, j]));
-    expect(c.meta.words?.(byName.ok)).toEqual([{ text: "Complete", tone: "success" }]);
-    expect(c.meta.words?.(byName.bad)).toEqual([{ text: "Failed", tone: "error" }]);
+    expect(c.meta.words?.(byName.ok)).toEqual([
+      { text: "infra.k8s2.conditionComplete", tone: "success" },
+    ]);
+    expect(c.meta.words?.(byName.bad)).toEqual([
+      { text: "infra.k8s2.conditionFailed", tone: "error" },
+    ]);
     expect(c.meta.tip?.(byName.bad)).toBe("BackoffLimitExceeded");
   });
 

@@ -34,6 +34,7 @@ import { detailKindOf } from "./kubernetesEvents";
 import type { DetailsRef } from "./kubernetesUrlState";
 import {
   TONE_TEXT_CLASS,
+  chipLabel,
   formatAge,
   formatBytes,
   membersOf,
@@ -163,16 +164,22 @@ const podStatus = computed(() => {
 
 const jobConditions = (job: JobRow): Badge[] => {
   const out: Badge[] = [];
-  if (job.complete) out.push({ text: "Complete", variant: "success-soft" });
+  if (job.complete) out.push({ text: t("infra.k8s2.conditionComplete"), variant: "success-soft" });
   if ((job.failed ?? 0) > 0) {
-    out.push({ text: "Failed", variant: "error-soft", tip: job.failedReasons.join(", ") });
+    out.push({
+      text: t("infra.k8s2.conditionFailed"),
+      variant: "error-soft",
+      tip: job.failedReasons.join(", "),
+    });
   }
   return out;
 };
 
 const conditions = computed<Badge[]>(() => {
   const r = props.row;
-  if (r.kind === "deployment") return r.conditions.map((c) => ({ ...c }));
+  if (r.kind === "deployment") {
+    return r.conditions.map((c) => ({ text: chipLabel(c, t), variant: c.variant }));
+  }
   if (r.kind === "job") return jobConditions(r);
   if (r.kind === "hpa") {
     return r.conditions.map((c) => ({

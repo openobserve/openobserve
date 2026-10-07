@@ -179,7 +179,9 @@ export interface NodeRow extends RowBase {
 }
 
 export interface ConditionWord {
+  // A synthesized word keeps its raw text only as the search token; the key is what renders.
   text: string;
+  key?: I18nKey;
   variant: BadgeVariant;
 }
 
@@ -832,7 +834,7 @@ export function derivedDeploymentConditions(
   available: number | null,
 ): ConditionWord[] {
   return desired != null && available != null && available >= desired
-    ? [{ text: "Available", variant: "success-soft" }]
+    ? [{ key: "infra.k8s2.conditionAvailable", text: "Available", variant: "success-soft" }]
     : [];
 }
 

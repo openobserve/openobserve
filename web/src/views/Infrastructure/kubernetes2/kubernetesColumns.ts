@@ -551,11 +551,12 @@ function deploymentColumns(ctx: ColumnContext): K8sColumn[] {
       {
         render: "conditions",
         words: (r: DeploymentRow) =>
-          r.conditions.map((c) => ({ text: raw(c.text), tone: toneOf(c.variant) })),
+          r.conditions.map((c) => ({ text: chipLabel(c, t), tone: toneOf(c.variant) })),
         tip: (r: DeploymentRow) => (r.conditionsDerived ? t("infra.k8s2.derivedConditions") : null),
       },
       {
-        accessorFn: (r: DeploymentRow) => r.conditions.map((c) => c.text).join(" ") || undefined,
+        accessorFn: (r: DeploymentRow) =>
+          r.conditions.map((c) => chipLabel(c, t)).join(" ") || undefined,
         size: 180,
       },
     ),
@@ -649,10 +650,10 @@ function replicaSetColumns(ctx: ColumnContext): K8sColumn[] {
   ];
 }
 
-export function jobConditionWords(r: JobRow): CellWord[] {
+export function jobConditionWords(r: JobRow, t: TranslateFn): CellWord[] {
   const words: CellWord[] = [];
-  if (r.complete) words.push({ text: raw("Complete"), tone: "success" });
-  if ((r.failed ?? 0) > 0) words.push({ text: raw("Failed"), tone: "error" });
+  if (r.complete) words.push({ text: t("infra.k8s2.conditionComplete"), tone: "success" });
+  if ((r.failed ?? 0) > 0) words.push({ text: t("infra.k8s2.conditionFailed"), tone: "error" });
   return words;
 }
 
@@ -674,12 +675,12 @@ function jobColumns(ctx: ColumnContext): K8sColumn[] {
       t("infra.k8s2.columnConditions"),
       {
         render: "conditions",
-        words: (r: JobRow) => jobConditionWords(r),
+        words: (r: JobRow) => jobConditionWords(r, t),
         tip: (r: JobRow) => (r.failedReasons.length ? raw(r.failedReasons.join(", ")) : null),
       },
       {
         accessorFn: (r: JobRow) =>
-          jobConditionWords(r)
+          jobConditionWords(r, t)
             .map((w) => w.text)
             .join(" ") || undefined,
         size: 140,

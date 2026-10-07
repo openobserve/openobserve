@@ -18688,7 +18688,10 @@
       "mapLegendOf": "Legend: {fill}",
       "mapMoreUseSearch": "{count} more: use search",
       "mapLabelsNoCluster": "Labels unavailable: no cluster found",
-      "mapLabelsOnlySystem": "Only system labels seen, nothing to filter on"
+      "mapLabelsOnlySystem": "Only system labels seen, nothing to filter on",
+      "conditionComplete": "Complete",
+      "conditionFailed": "Failed",
+      "conditionAvailable": "Available"
     }
   },
   "dbm": {

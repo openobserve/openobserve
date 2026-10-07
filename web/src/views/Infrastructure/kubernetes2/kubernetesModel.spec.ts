@@ -968,7 +968,9 @@ describe("workload kinds", () => {
       available: 3,
       replicas: 4,
       createdAt: 1_000_000_000,
-      conditions: [{ text: "Available", variant: "success-soft" }],
+      conditions: [
+        { key: "infra.k8s2.conditionAvailable", text: "Available", variant: "success-soft" },
+      ],
       conditionsDerived: true,
       warnings: [],
     });
