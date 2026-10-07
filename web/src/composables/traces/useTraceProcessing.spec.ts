@@ -116,6 +116,23 @@ describe("useTraceProcessing", () => {
       expect(tree[0].children[1].span_id).toBe("child1");
     });
 
+    it("should build a tree from more spans than a function call can take as arguments", () => {
+      const spans = ref([]);
+      const { buildSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const count = 200_000;
+      const list = Array.from({ length: count }, (_, i) =>
+        makeSpan({
+          span_id: `s${i}`,
+          parent_span_id: i === 0 ? "" : "s0",
+          start_time: 1_000_000_000_000 + (count - i) * 1000,
+        }),
+      );
+      const tree = buildSpanTree(list);
+      expect(tree).toHaveLength(1);
+      expect(tree[0].children).toHaveLength(count - 1);
+      expect(tree[0].children[0].startOffsetMs).toBe(0);
+    });
+
     it("should compute durationMs from duration in microseconds", () => {
       const spans = ref([]);
       const { buildSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);

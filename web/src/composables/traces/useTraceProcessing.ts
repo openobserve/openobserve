@@ -112,8 +112,11 @@ export function useTraceProcessing(
     const spanMap = new Map<string, EnrichedSpan>();
     const rootSpans: EnrichedSpan[] = [];
 
-    // Calculate trace start time (minimum start_time across all spans)
-    const traceStartTime = Math.min(...spanList.map((s) => s.start_time));
+    // A loop, not Math.min(...spans): spreading a large trace overflows the argument limit.
+    let traceStartTime = Infinity;
+    for (const span of spanList) {
+      if (span.start_time < traceStartTime) traceStartTime = span.start_time;
+    }
 
     // First pass: convert to enriched spans
     spanList.forEach((span) => {

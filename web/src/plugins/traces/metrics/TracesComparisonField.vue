@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="bg-surface-base border-border-default rounded-surface flex min-w-0 flex-col gap-2 border p-3"
+  <OCard
+    variant="outlined"
+    class="min-w-0 gap-2 p-3"
     :data-test="`traces-comparison-field-${field.name}`"
     :data-score="field.score.toFixed(2)"
   >
@@ -115,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
       </div>
     </div>
-  </div>
+  </OCard>
 </template>
 
 <script lang="ts" setup>
@@ -125,6 +126,7 @@ import useTheme from "@/composables/useTheme";
 import { chartColor, chartTextColor, chartAxisLine } from "@/utils/chartTheme";
 import { escapeHtml } from "@/utils/html";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import EqualIcon from "@/components/icons/EqualIcon.vue";

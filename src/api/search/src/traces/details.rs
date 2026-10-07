@@ -114,16 +114,17 @@ fn start_key(hit: &serde_json::Value) -> Option<u64> {
 }
 
 /// Rows without a usable start_time sort last, where they end paging instead of a page's middle.
-fn order_key(hit: &serde_json::Value) -> (u64, Option<&str>) {
-    (start_key(hit).unwrap_or(u64::MAX), hit["span_id"].as_str())
+fn order_key(hit: &serde_json::Value) -> (u64, Option<String>) {
+    (
+        start_key(hit).unwrap_or(u64::MAX),
+        hit["span_id"].as_str().map(str::to_owned),
+    )
 }
 
 /// Drops the `size + 1` sentinel row; `total` is the fetched count, as total hits are untracked.
 fn split_page(mut response: SearchResponse, size: usize) -> TraceDetailsResponse {
     // The cache re-sorts hits through f64, so restore the exact (start_time, span_id) order first.
-    response
-        .hits
-        .sort_by(|a, b| order_key(a).cmp(&order_key(b)));
+    response.hits.sort_by_cached_key(order_key);
     let more = response.hits.len() > size;
     response.hits.truncate(size);
     response.size = response.hits.len() as i64;
@@ -193,7 +194,7 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
     context_path = "/api",
     tag = "Traces",
     operation_id = "GetTraceDetails",
-    summary = "Get all spans for a trace",
+    summary = "Get a page of spans for a trace",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -203,7 +204,7 @@ fn details_request(sql: String, size: usize, range: (i64, i64), timeout: i64) ->
         ("end_time" = Option<i64>, Query, description = "Caller range end in microseconds"),
         ("hint_ts" = Option<i64>, Query, description = "Optional time hint in microseconds"),
         ("timeout" = Option<i64>, Query, description = "Query timeout in seconds"),
-        ("size" = Option<usize>, Query, description = "Spans per page, 1 to 50000 (default 50000)"),
+        ("size" = Option<i64>, Query, description = "Spans per page (default 50000); values outside 1 to 50000 are clamped"),
         ("after_start_time" = Option<String>, Query, description = "Keyset cursor: start_time (ns, decimal) of the last span of the previous page; needs after_span_id"),
         ("after_span_id" = Option<String>, Query, description = "Keyset cursor: span_id of the last span of the previous page; needs after_start_time"),
     ),
