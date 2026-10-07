@@ -1002,7 +1002,7 @@ pub async fn process_domain_org_mapping(
     }
 
     for org in &allowed_orgs {
-        if mapped_via_sso_parser && existing_orgs.contains(org) && !parsed_orgs.contains_key(org) {
+        if existing_orgs.contains(org) && !parsed_orgs.contains_key(org) {
             remove_orgs.insert(org.clone());
         }
     }
@@ -1031,7 +1031,9 @@ pub async fn process_domain_org_mapping(
                 continue;
             }
             let roles: &mut Vec<String> = role_map.entry(org.to_string()).or_default();
-            roles.push(role.to_string());
+            if !matches!(role, "admin" | "editor" | "viewer" | "user") {
+                roles.push(role.to_string());
+            }
         }
     }
 
@@ -1069,7 +1071,7 @@ pub async fn process_domain_org_mapping(
                 user_email,
                 UserOrgRole {
                     base_role: role,
-                    custom_role: Some(roles),
+                    custom_role: if roles.is_empty() { None } else { Some(roles) },
                 },
                 &config.auth.root_user_email,
             )

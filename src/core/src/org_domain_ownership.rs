@@ -39,7 +39,7 @@ pub async fn init() {
         }
     };
     let mut lock = CACHE.write().await;
-    for (domain, org) in items {
+    for (org, domain) in items {
         lock.insert(domain, org);
     }
 }
