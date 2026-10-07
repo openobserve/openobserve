@@ -52,6 +52,10 @@ impl Writer {
             .truncate(true)
             .open(&path)
             .context(FileOpenSnafu { path: path.clone() })?;
+        // Held while this writer lives, so another process's replay never deletes a live file.
+        if let Err(e) = f.try_lock() {
+            log::warn!("wal file {} could not be locked: {e}", path.display());
+        }
 
         if init_size > 0 {
             f.set_len(init_size)

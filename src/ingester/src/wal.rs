@@ -160,6 +160,11 @@ pub(crate) async fn replay_wal_files(
             log::warn!("skip replay of wal file created by this process: {wal_file:?}");
             continue;
         }
+        // Another process sharing this data dir is still appending to it; deleting it loses data.
+        if wal::is_held_by_writer(wal_file) {
+            log::warn!("skip replay of wal file held by a live writer: {wal_file:?}");
+            continue;
+        }
         log::warn!("replay wal file: {wal_file:?} starting...");
         let file_str = wal_file
             .strip_prefix(&wal_dir)
