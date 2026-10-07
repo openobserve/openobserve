@@ -625,16 +625,22 @@ pub async fn active_ids_for_user_with<C: ConnectionTrait>(
 }
 
 /// Deleted chats whose o2-ai copies are not yet confirmed gone, least recently tried first.
-pub async fn due_for_replica_purge(org_id: &str, limit: u64) -> Result<Vec<Model>, errors::Error> {
-    due_for_replica_purge_with(get_orm_client_ro().await, org_id, limit).await
+pub async fn due_for_replica_purge(
+    org_id: &str,
+    limit: u64,
+    repurge_since: i64,
+) -> Result<Vec<Model>, errors::Error> {
+    due_for_replica_purge_with(get_orm_client_ro().await, org_id, limit, repurge_since).await
 }
 
+/// Deleted chats not yet purged everywhere first, then ones purged after `repurge_since`.
 pub async fn due_for_replica_purge_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     limit: u64,
+    repurge_since: i64,
 ) -> Result<Vec<Model>, errors::Error> {
-    Entity::find()
+    let mut rows = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Status.eq(STATUS_DELETED))
         .filter(Column::ReplicaPurgedAt.is_null())
@@ -642,7 +648,23 @@ pub async fn due_for_replica_purge_with<C: ConnectionTrait>(
         .limit(limit)
         .all(conn)
         .await
-        .map_err(db_err)
+        .map_err(db_err)?;
+    let left = limit.saturating_sub(rows.len() as u64);
+    if left > 0 {
+        // A replica that was down at delete time only gets the delete on a later pass.
+        rows.extend(
+            Entity::find()
+                .filter(Column::OrgId.eq(org_id))
+                .filter(Column::Status.eq(STATUS_DELETED))
+                .filter(Column::ReplicaPurgedAt.gt(repurge_since))
+                .order_by_asc(Column::ReplicaPurgedAt)
+                .limit(left)
+                .all(conn)
+                .await
+                .map_err(db_err)?,
+        );
+    }
+    Ok(rows)
 }
 
 /// Every live o2-ai replica confirmed it no longer holds this deleted chat.
@@ -665,6 +687,7 @@ pub async fn mark_replica_purged_with<C: ConnectionTrait>(
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::ReplicaPurgedAt.is_null())
         .exec(conn)
         .await
         .map_err(db_err)?;
@@ -1384,7 +1407,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn deleted_chats_are_purged_from_replicas_until_confirmed() {
+    async fn deleted_chats_are_purged_from_replicas_until_confirmed_and_for_a_window() {
         let db = db().await;
         for sid in ["old", "recent", "confirmed", "active"] {
             used_chat(&db, sid, ALICE, 10).await;
@@ -1411,19 +1434,34 @@ mod tests {
             |due: Vec<Model>| -> Vec<String> { due.into_iter().map(|r| r.session_id).collect() };
         // However long ago it was deleted, an unconfirmed purge is retried.
         assert_eq!(
-            due_ids(due_for_replica_purge_with(&db, ORG, 10).await.unwrap()),
+            due_ids(
+                due_for_replica_purge_with(&db, ORG, 10, 1000)
+                    .await
+                    .unwrap()
+            ),
             vec!["old", "recent"]
         );
         assert_eq!(
-            due_ids(due_for_replica_purge_with(&db, ORG, 1).await.unwrap()),
+            due_ids(due_for_replica_purge_with(&db, ORG, 1, 1000).await.unwrap()),
             vec!["old"]
         );
+        // A purge confirmed inside the window is re-sent after the unconfirmed ones.
+        assert_eq!(
+            due_ids(due_for_replica_purge_with(&db, ORG, 10, 100).await.unwrap()),
+            vec!["old", "recent", "confirmed"]
+        );
+        // Re-confirming keeps the first confirmation time, so the window ends.
+        mark_replica_purged_with(&db, ORG, "confirmed", 900)
+            .await
+            .unwrap();
+        let confirmed = get_with(&db, ORG, "confirmed").await.unwrap().unwrap();
+        assert_eq!(confirmed.replica_purged_at, Some(220));
         // A failed attempt moves it behind the others, so one stuck chat never starves the rest.
         defer_replica_purge_with(&db, ORG, "old", 300)
             .await
             .unwrap();
         assert_eq!(
-            due_ids(due_for_replica_purge_with(&db, ORG, 1).await.unwrap()),
+            due_ids(due_for_replica_purge_with(&db, ORG, 1, 1000).await.unwrap()),
             vec!["recent"]
         );
         let active = get_with(&db, ORG, "active").await.unwrap().unwrap();
