@@ -404,6 +404,91 @@ def test_the_direct_anomaly_api_clears_a_budget(
         f"the direct endpoint must clear it, got {cleared['alert_budget_per_day']!r}"
 
 
+# ─── A3b. Band width, and the budget→band escape hatch (ENT#2813) ─────────────
+#
+# `band_width` had no API coverage at all before this block, which is how
+# ENT#2813 stayed open: the web app renders Band and Budget as mutually
+# unreachable modes, and the one payload that moves a config between them is
+# the one payload the UI never sends. The tests below pin that payload from the
+# outside, so the server half stays correct while the UI half is fixed.
+
+
+def test_clearing_a_budget_in_the_same_call_puts_the_band_width_in_force(
+    client: OpenObserveClient, budget_config: str
+):
+    """The budget→band escape hatch: one call clears the budget AND sets the band.
+
+    `validated_band_settings` resolves the budget as
+    `req.alert_budget_per_day.unwrap_or(existing...)`, and the field is a
+    double-Option — so an explicit `null` reads as cleared and the band width
+    is accepted in the same request. This is the payload ENT#2813 proved the
+    UI cannot produce; asserting `band_width` is actually *in force* afterwards
+    is the part the pre-existing budget-clearing test does not cover.
+    """
+    resp = client.put(
+        f"anomaly_detection/{budget_config}",
+        json={"alert_budget_per_day": None, "band_width": 5},
+        raise_for_status=False,
+    )
+    assert resp.status_code == HTTPStatus.OK, resp.text
+
+    stored = client.get(f"anomaly_detection/{budget_config}").json()
+    stored = stored.get("data", stored)
+    assert stored["alert_budget_per_day"] is None, \
+        f"the budget must be cleared, got {stored['alert_budget_per_day']!r}"
+    assert stored["band_width"] == 5.0, \
+        f"the band width must be in force once the budget is gone, got {stored['band_width']!r}"
+
+
+def test_a_band_width_beside_a_live_budget_is_rejected_naming_the_repair(
+    client: OpenObserveClient, budget_config: str
+):
+    """Without the explicit null the stored budget still stands, so the band is refused.
+
+    This is the guard rail the UI works around by suppressing `band_width`
+    whenever a budget is present — which is why switching modes was a silent
+    no-op rather than an error.
+    """
+    resp = client.put(
+        f"anomaly_detection/{budget_config}",
+        json={"band_width": 5},
+        raise_for_status=False,
+    )
+    assert resp.status_code == HTTPStatus.BAD_REQUEST, \
+        f"expected 400, got {resp.status_code}: {resp.text}"
+    assert "alert_budget_per_day" in resp.text, \
+        f"the rejection must name the budget so the caller knows what to clear: {resp.text}"
+    assert "band_width" in resp.text, \
+        f"the rejection must name the field that was refused: {resp.text}"
+
+
+@pytest.mark.parametrize("band_width", [0.99, 0, -1, 10.01, 11])
+def test_a_band_width_outside_one_to_ten_is_rejected(
+    client: OpenObserveClient, band_width
+):
+    """`BAND_WIDTH_RANGE` is 1.0..=10.0. Pinned at the HTTP boundary — the Rust
+    unit test covers the function, not that the route reaches it."""
+    resp = _create(client, _config(band_width=band_width))
+    try:
+        assert resp.status_code == HTTPStatus.BAD_REQUEST, \
+            f"band_width={band_width} must be rejected, got {resp.status_code}: {resp.text}"
+        assert "band_width" in resp.text, f"the rejection must name the field: {resp.text}"
+    finally:
+        _cleanup(client, resp)
+
+
+def test_a_band_width_inside_the_range_round_trips(client: OpenObserveClient):
+    """A plain band-mode create keeps the width it was given."""
+    resp = _create(client, _config(band_width=3))
+    try:
+        assert resp.status_code == HTTPStatus.OK, resp.text
+        stored = client.get(f"anomaly_detection/{resp.json()['anomaly_id']}").json()
+        stored = stored.get("data", stored)
+        assert stored["band_width"] == 3.0, \
+            f"band_width must round-trip, got {stored['band_width']!r}"
+    finally:
+        _cleanup(client, resp)
+
 # ─── A4. The G4 denominator gate, over HTTP ───────────────────────────────────
 
 
