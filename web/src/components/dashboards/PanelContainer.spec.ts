@@ -1628,6 +1628,26 @@ describe("PanelContainer", () => {
       ).toBe(true);
     });
 
+    it("removes the panel immediately from the direct delete button, without a confirm", async () => {
+      wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: false });
+
+      await wrapper
+        .find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`)
+        .trigger("click");
+
+      expect(wrapper.emitted("onDeletePanel")?.[0]).toEqual([mockPanelData.id]);
+      expect(wrapper.vm.confirmDeletePanelDialog).toBe(false);
+    });
+
+    it("keeps the delete confirmation for regular dashboard panels", async () => {
+      wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
+
+      await wrapper.vm.onPanelModifyClick("DeletePanel");
+
+      expect(wrapper.vm.confirmDeletePanelDialog).toBe(true);
+      expect(wrapper.emitted("onDeletePanel")).toBeFalsy();
+    });
+
     it("should hide direct delete button when simplifiedPanelView is false", () => {
       wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
 

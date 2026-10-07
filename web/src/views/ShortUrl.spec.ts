@@ -227,10 +227,10 @@ describe("ShortUrl", () => {
     expect(mockReplace).toHaveBeenCalledWith("/org1/dashboard/logs");
   });
 
-  it("should handle complex URL with web", () => {
+  it("should strip the base path in front of web from a complex URL", () => {
     mockReplace.mockClear();
     wrapper.vm.handleOriginalUrl("https://example.com/app/web/dashboard/metrics/overview");
-    expect(mockReplace).toHaveBeenCalledWith("/web/dashboard/metrics/overview");
+    expect(mockReplace).toHaveBeenCalledWith("/dashboard/metrics/overview");
   });
 
   it("should handle URL with web but minimal path", () => {
@@ -243,6 +243,81 @@ describe("ShortUrl", () => {
     mockReplace.mockClear();
     wrapper.vm.handleOriginalUrl("http://localhost/web");
     expect(mockReplace).toHaveBeenCalledWith("/");
+  });
+
+  describe("handleOriginalUrl with a base path (ZO_BASE_URI)", () => {
+    it.each([
+      [
+        "a single-segment base",
+        "http://host:5080/openobserve/web/dashboards/view?org_identifier=default&dashboard=7512&folder=default",
+        "/dashboards/view?org_identifier=default&dashboard=7512&folder=default",
+      ],
+      [
+        "a multi-segment base",
+        "https://o2.example.com/o2/prod/web/logs?stream=default",
+        "/logs?stream=default",
+      ],
+      [
+        "a base whose name contains web",
+        "http://host:5080/webapp/web/traces/trace-details?trace_id=abc",
+        "/traces/trace-details?trace_id=abc",
+      ],
+      ["the base root without a trailing slash", "http://host:5080/openobserve/web", "/"],
+      ["the base root with a trailing slash", "http://host:5080/openobserve/web/", "/"],
+      [
+        "the base root with only a query",
+        "http://host:5080/openobserve/web?org_identifier=default",
+        "/?org_identifier=default",
+      ],
+    ])("should route to the path after web for %s", (_label, storedUrl, expectedRoute) => {
+      mockReplace.mockClear();
+      wrapper.vm.handleOriginalUrl(storedUrl);
+      expect(mockReplace).toHaveBeenCalledWith(expectedRoute);
+    });
+
+    it.each([
+      [
+        "a query value containing /web/",
+        "http://host:5080/web/logs?ref=http://x/web/y",
+        "/logs?ref=http://x/web/y",
+      ],
+      [
+        "a query value containing /web/ under a base path",
+        "http://host:5080/openobserve/web/logs?ref=http://x/web/y",
+        "/logs?ref=http://x/web/y",
+      ],
+      [
+        "a web segment in the query of a path without web",
+        "http://host:5080/logs?ref=http://x/web/y",
+        "/logs?ref=http://x/web/y",
+      ],
+      [
+        "a fragment",
+        "http://host:5080/openobserve/web/logs?stream=default#details",
+        "/logs?stream=default#details",
+      ],
+      [
+        "double-encoded and base64 query values",
+        "http://host:5080/openobserve/web/dashboards/view?var-Dynamic+filters=%255B%255D&query=U0VMRUNUICo+IDE=&print=true",
+        "/dashboards/view?var-Dynamic+filters=%255B%255D&query=U0VMRUNUICo+IDE=&print=true",
+      ],
+    ])("should keep %s unchanged", (_label, storedUrl, expectedRoute) => {
+      mockReplace.mockClear();
+      wrapper.vm.handleOriginalUrl(storedUrl);
+      expect(mockReplace).toHaveBeenCalledWith(expectedRoute);
+    });
+
+    it("should use the stored URL's base, not the current page's, for a link made on another host or base", () => {
+      mockReplace.mockClear();
+      wrapper.vm.handleOriginalUrl("http://internal:5080/old/web/logs?stream=default");
+      expect(mockReplace).toHaveBeenCalledWith("/logs?stream=default");
+    });
+
+    it("should resolve a stored path without a scheme or host", () => {
+      mockReplace.mockClear();
+      wrapper.vm.handleOriginalUrl("/openobserve/web/logs?stream=default");
+      expect(mockReplace).toHaveBeenCalledWith("/logs?stream=default");
+    });
   });
 
   // fetchAndRedirect Function Tests
@@ -337,6 +412,32 @@ describe("ShortUrl", () => {
       store.state.selectedOrganization.identifier,
       "test-id",
     );
+  });
+
+  it("should redirect to the shared route when the link was made under a base path", async () => {
+    mockReplace.mockClear();
+    mockShortURLGet.mockResolvedValue({
+      data: "http://host:5080/openobserve/web/dashboards/view?dashboard=7512&from=1&to=2",
+    });
+
+    await wrapper.vm.fetchAndRedirect();
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith("/dashboards/view?dashboard=7512&from=1&to=2");
+  });
+
+  it("should route home when the stored value is not a parseable URL", async () => {
+    mockReplace.mockClear();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockShortURLGet.mockResolvedValue({ data: "http://" });
+
+    await wrapper.vm.fetchAndRedirect();
+
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
+    expect(consoleSpy).toHaveBeenCalledWith("Error fetching short URL:", expect.any(TypeError));
+
+    consoleSpy.mockRestore();
   });
 
   // Integration Tests

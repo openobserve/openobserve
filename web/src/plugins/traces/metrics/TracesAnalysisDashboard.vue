@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <!-- `embedded` renders in place as a Logs mode; `fullPage` is the traces overlay page. -->
+  <component
+    :is="embedded ? AnalysisPage : fullPage ? TracesDrillDownPage : ODrawer"
     data-test="traces-analysis-dashboard-drawer"
-    bleed
+    v-bind="embedded || fullPage ? {} : { bleed: true, width: 80 }"
     v-model:open="isOpen"
-    :width="80"
-    :title="raw(drawerTitle)"
-    @update:open="(v) => !v && onClose()"
+    :title="fullPage ? t('traces.drillDown') : raw(drawerTitle)"
+    @update:open="(v: boolean) => !v && onClose()"
   >
     <template #header-left>
       <OIcon name="timeline" size="md" />
@@ -195,6 +196,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ dimension.label }}
                         </OTruncatedText>
                       </div>
+                      <span
+                        v-if="dimensionCounts[dimension.value] !== undefined"
+                        class="text-text-muted shrink-0 text-xs tabular-nums"
+                        :data-test="`dimension-count-${dimension.value}`"
+                      >
+                        {{ formatEventCount(dimensionCounts[dimension.value]) }}
+                      </span>
                     </li>
                   </ul>
 
@@ -268,6 +276,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
 
+                <!-- Every dimension removed (sidebar or panel X) -->
+                <OEmptyState
+                  v-else-if="selectedDimensions.length === 0"
+                  size="hero"
+                  icon="bar-chart"
+                  :title="t('latencyInsights.noDimensionsSelected')"
+                  data-test="traces-analysis-dashboard-no-dimensions"
+                />
+
                 <!-- Dashboard -->
                 <RenderDashboardCharts
                   v-else-if="dashboardData"
@@ -290,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSplitter>
       </div>
     </div>
-  </ODrawer>
+  </component>
 </template>
 
 <script lang="ts" setup>
@@ -299,8 +316,21 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
+import TracesDrillDownPage from "./TracesDrillDownPage.vue";
+import {
+  ref,
+  computed,
+  watch,
+  defineAsyncComponent,
+  nextTick,
+  h,
+  onBeforeUnmount,
+  type FunctionalComponent,
+} from "vue";
 import { useStore } from "vuex";
+import searchService from "@/services/search";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { formatEventCount } from "@/utils/formatters";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -317,6 +347,7 @@ import {
   selectTraceDimensions,
 } from "@/composables/useDimensionSelector";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -365,6 +396,8 @@ interface Props {
   availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
+  embedded?: boolean; // Render as a page in place instead of a drawer
+  fullPage?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -375,6 +408,34 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: "close"): void;
 }>();
+
+// Page shell for `embedded`: lays out the drawer's slots in place, without drawer-only attrs.
+const AnalysisPage: FunctionalComponent = (_, { slots, attrs }) =>
+  h(
+    "div",
+    { class: "flex h-full min-h-0 flex-col", "data-test": "traces-analysis-dashboard-page" },
+    [
+      h(
+        "div",
+        {
+          class: "border-card-glass-border px-page-edge flex shrink-0 items-center border-b py-1.5",
+        },
+        [
+          h(
+            "span",
+            {
+              class: "text-text-heading me-3 shrink-0 text-sm font-semibold",
+              "data-test": "traces-analysis-dashboard-page-title",
+            },
+            attrs.title as string,
+          ),
+          slots["header-left"]?.(),
+        ],
+      ),
+      slots.default?.(),
+    ],
+  );
+AnalysisPage.inheritAttrs = false;
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
@@ -508,6 +569,7 @@ const availableDimensions = computed(() => {
   const timestampField = store.state.zoConfig?.timestamp_column || "_timestamp";
 
   return (props.streamFields || [])
+    .filter((f: any) => f?.label !== true) // field-group headers (e.g. "AWS"), not fields
     .map((f: any) => ({
       label: f.name || f,
       value: f.name || f,
@@ -526,19 +588,68 @@ const filteredDimensions = computed(() => {
     dimensions = dimensions.filter((dim) => dim.label.toLowerCase().includes(searchLower));
   }
 
-  // Sort: selected dimensions first, then unselected
-  return dimensions.sort((a, b) => {
-    const aSelected = selectedDimensions.value.includes(a.value);
-    const bSelected = selectedDimensions.value.includes(b.value);
-
-    // If one is selected and other is not, selected comes first
-    if (aSelected && !bSelected) return -1;
-    if (!aSelected && bSelected) return 1;
-
-    // If both selected or both unselected, maintain original order (alphabetical)
+  // By count descending when counts exist, else selected first; ties are alphabetical.
+  const counts = dimensionCounts.value;
+  const hasCounts = Object.keys(counts).length > 0;
+  return [...dimensions].sort((a, b) => {
+    if (hasCounts) {
+      const countDiff = (counts[b.value] ?? -1) - (counts[a.value] ?? -1);
+      if (countDiff) return countDiff;
+    } else {
+      const aSelected = selectedDimensions.value.includes(a.value);
+      const bSelected = selectedDimensions.value.includes(b.value);
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+    }
     return a.label.localeCompare(b.label);
   });
 });
+
+// One count(field) query scans once; _values would GROUP BY per field and return only top values.
+const dimensionCounts = ref<Record<string, number>>({});
+let dimensionCountsAbort: AbortController | null = null;
+
+const loadDimensionCounts = async () => {
+  dimensionCountsAbort?.abort();
+  dimensionCountsAbort = null;
+  dimensionCounts.value = {};
+  const fields = availableDimensions.value.map((d) => d.value);
+  if (!props.embedded || !props.streamName || fields.length === 0) return;
+
+  const columns = fields.map((f, i) => `count("${f.replace(/"/g, '""')}") AS c${i}`).join(", ");
+  // Drill down is unavailable in SQL mode, so the base filter is a WHERE clause
+  const filter = props.baseFilter?.trim();
+  const where = filter ? ` WHERE ${filter}` : "";
+
+  // A histogram brush narrows the search; count the brushed window when present
+  const range = selectedTimeRangeDisplay.value ?? baselineTimeRange.value;
+
+  const controller = new AbortController();
+  dimensionCountsAbort = controller;
+  try {
+    const res: any = await searchService.search({
+      org_identifier: store.state.selectedOrganization.identifier,
+      query: {
+        query: {
+          sql: `SELECT ${columns} FROM ${quoteSqlIdentifierIfNeeded(props.streamName)}${where}`,
+          start_time: range.startTime,
+          end_time: range.endTime,
+          size: 1,
+        },
+      },
+      page_type: props.streamType || "logs",
+      signal: controller.signal,
+    });
+    const row = res?.data?.hits?.[0] ?? {};
+    if (controller.signal.aborted) return;
+    dimensionCounts.value = Object.fromEntries(
+      fields.map((f, i) => [f, Number(row[`c${i}`] ?? 0)]),
+    );
+  } catch {
+    // Counts are a sorting aid only; the list stays alphabetical without them
+  }
+};
+
+onBeforeUnmount(() => dimensionCountsAbort?.abort());
 
 const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
@@ -557,10 +668,6 @@ const currentTimeObj = computed(() => {
 const toggleDimension = (dimensionValue: string) => {
   const index = selectedDimensions.value.indexOf(dimensionValue);
   if (index > -1) {
-    // Prevent removing the last dimension - at least one must remain
-    if (selectedDimensions.value.length <= 1) {
-      return;
-    }
     // Remove dimension - create new array to trigger reactivity
     selectedDimensions.value = selectedDimensions.value.filter((d) => d !== dimensionValue);
   } else {
@@ -934,24 +1041,8 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       panel.id = `${panel.id}_${timestamp}`;
     });
 
-    // Create a new dashboard object to ensure Vue detects the change
-    // We need to increment the render key to force grid re-layout, but this will cause re-queries
-    // Unfortunately, without modifying RenderDashboardCharts to cache panel data, we can't avoid this
-    const updatedDashboard = {
-      ...dashboardData.value,
-      tabs: [
-        {
-          ...dashboardData.value.tabs[0],
-          panels: [...currentPanels, ...newPanels],
-        },
-        ...dashboardData.value.tabs.slice(1),
-      ],
-    };
-
-    dashboardData.value = updatedDashboard;
-
-    // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
-    // Since each panel has a unique ID (item.id + timestamp), Vue will only render the new panel
+    // Append in place: a new dashboard object would re-run every existing panel's query.
+    dashboardData.value.tabs[0].panels = [...currentPanels, ...newPanels];
 
     // Wait for DOM to update, then refresh GridStack to position new panels
     await nextTick();
@@ -964,12 +1055,24 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
   }
 };
 
+// In place, so the remaining panels are neither remounted nor re-queried.
+const removeDimensionPanels = async (removedDimensions: string[]) => {
+  const tab = dashboardData.value?.tabs?.[0];
+  if (!tab?.panels) return;
+  tab.panels = tab.panels.filter((p: any) => !removedDimensions.includes(p.title));
+
+  await nextTick();
+  if (dashboardChartsRef.value?.refreshGridStack) {
+    await dashboardChartsRef.value.refreshGridStack();
+  }
+};
+
 // Reload when selected dimensions change
 watch(
   selectedDimensions,
   (newDimensions, oldDimensions) => {
     // Skip if this is the initial load (already handled by isOpen watcher)
-    if (!oldDimensions || oldDimensions.length === 0) {
+    if (!oldDimensions) {
       return;
     }
 
@@ -985,15 +1088,12 @@ watch(
     const addedDimensions = newDimensions.filter((d) => !oldDimensions.includes(d));
     const removedDimensions = oldDimensions.filter((d) => !newDimensions.includes(d));
 
-    if (isOpen.value && newDimensions.length > 0) {
+    if (isOpen.value) {
       if (removedDimensions.length > 0) {
-        // If dimensions were removed, we need to regenerate to remove panels
-        dashboardData.value = null;
-        nextTick(() => {
-          loadAnalysis();
-        });
-      } else if (addedDimensions.length > 0) {
-        // If only added, append new panels without regenerating existing ones
+        removeDimensionPanels(removedDimensions);
+      }
+      if (addedDimensions.length > 0) {
+        // Append new panels without regenerating existing ones
         addDimensionPanels(addedDimensions);
       }
     }
@@ -1009,6 +1109,21 @@ watch(
       loadAnalysis();
     }
   },
+);
+
+watch(
+  () => [
+    props.embedded,
+    props.streamName,
+    props.baseFilter,
+    baselineTimeRange.value.startTime,
+    baselineTimeRange.value.endTime,
+    selectedTimeRangeDisplay.value?.startTime,
+    selectedTimeRangeDisplay.value?.endTime,
+    availableDimensions.value.map((d) => d.value).join(","),
+  ],
+  loadDimensionCounts,
+  { immediate: true },
 );
 
 // Watch for changes in props

@@ -334,34 +334,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at_raw"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
+                />
+              </template>
+
+              <template #cell-last_satisfied_at="{ row }">
                 <span class="inline-flex min-w-0 items-center gap-1.5">
                   <span
-                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_triggered_at_raw))"
+                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_satisfied_at_raw))"
                     class="h-1.5 w-1.5 shrink-0 rounded-full"
                     :class="
-                      recencyLevel(row.last_triggered_at_raw) === 'hot'
+                      recencyLevel(row.last_satisfied_at_raw) === 'hot'
                         ? 'bg-warning-500 motion-safe:animate-pulse'
                         : 'bg-text-muted'
                     "
                   />
                   <OTimeCell
-                    :value="row.last_triggered_at_raw"
-                    unit="us"
-                    mode="relative"
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
-              </template>
-
-              <template #cell-last_satisfied_at="{ row }">
-                <OTimeCell
-                  :value="row.last_satisfied_at"
-                  unit="iso"
-                  mode="absolute"
-                  :timezone="store.state.timezone"
-                  :empty-label="t('alerts.anomaly.retrainNever')"
-                />
               </template>
 
               <template #cell-status="{ row }">
@@ -1239,9 +1239,7 @@ export default defineComponent({
     const filteredResults: Ref<any[]> = ref([]);
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
-    // Recency of the last trigger, bucketed for the trigger-time dot + the
-    // recently-fired row highlight. Derived from the RAW microsecond timestamp
-    // (last_triggered_at_raw) so it stays correct regardless of display timezone.
+    // Keyed on firing time, not run time; raw µs keeps it timezone-independent.
     const RECENT_TRIGGER_MS = 15 * 60 * 1000; // "hot" — fired in the last 15 min
     const RECENT_TRIGGER_DAY_MS = 24 * 60 * 60 * 1000; // "warm" — within a day
     const triggerAgeMs = (rawMicros: unknown): number | null => {
@@ -1411,7 +1409,7 @@ export default defineComponent({
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
-        if (recencyLevel(r.last_triggered_at_raw) === "hot") recent += 1;
+        if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
       return { active, paused, failed, recent, total: rows.length };
     });
@@ -1490,7 +1488,7 @@ export default defineComponent({
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "recent")
-        return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
+        return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
         return rows.filter(
           (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
@@ -1806,9 +1804,8 @@ export default defineComponent({
       last_triggered_at: anomaly.last_triggered_at
         ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
-      // Raw microsecond epoch — drives the relative-time cell, recency dot and
-      // recently-fired row highlight (timezone-independent).
       last_triggered_at_raw: anomaly.last_triggered_at ?? null,
+      last_satisfied_at_raw: anomaly.last_satisfied_at ?? null,
       last_satisfied_at: anomaly.last_satisfied_at
         ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
@@ -1942,6 +1939,7 @@ export default defineComponent({
               is_real_time: "composite",
               last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
               last_triggered_at_raw: data.last_triggered_at ?? null,
+              last_satisfied_at_raw: data.last_satisfied_at ?? null,
               last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             };
           }
@@ -1969,9 +1967,8 @@ export default defineComponent({
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
             last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
-            // Raw microsecond epoch — drives the relative-time cell, recency dot
-            // and recently-fired row highlight (timezone-independent).
             last_triggered_at_raw: data.last_triggered_at ?? null,
+            last_satisfied_at_raw: data.last_satisfied_at ?? null,
             last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
@@ -3079,15 +3076,22 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        await alertsService.trigger_alert(
+        const res = await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
           row.folder_name?.id,
         );
-        toast({
-          variant: "success",
-          message: t("alerts.alertTriggeredSuccess"),
-        });
+        // A lost claim or an ineligible row means nothing ran, so success would mislead.
+        toast(
+          res?.data?.claim_lost === true
+            ? { variant: "warning", message: t("alerts.anomaly.detectionAlreadyRunning") }
+            : res?.data?.ineligible === true
+              ? {
+                  variant: "warning",
+                  message: res.data.message || t("alerts.messages.triggerAlertFailed"),
+                }
+              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+        );
         if (row.type === "anomaly") {
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }

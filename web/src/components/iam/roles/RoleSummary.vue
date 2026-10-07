@@ -185,5 +185,17 @@ const presetActions: EmptyStateAction[] = [
     titleKey: "iam.editRole.presetK8sTitle",
     descriptionKey: "iam.editRole.presetK8sDescription",
   },
+  {
+    id: "rum_viewer",
+    icon: "devices",
+    titleKey: "iam.editRole.presetRumViewerTitle",
+    descriptionKey: "iam.editRole.presetRumViewerDescription",
+  },
+  {
+    id: "rum_editor",
+    icon: "insights",
+    titleKey: "iam.editRole.presetRumEditorTitle",
+    descriptionKey: "iam.editRole.presetRumEditorDescription",
+  },
 ];
 </script>

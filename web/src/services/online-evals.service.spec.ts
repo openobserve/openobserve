@@ -145,6 +145,13 @@ describe("URL construction", () => {
     expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/sc-42/versions");
   });
 
+  it("scorers.versions unwraps the history from /api/{orgId}/scorers/{entityId}/versions", async () => {
+    mockGet.mockResolvedValue({ data: { versions: [{ id: "r2", version: 2 }] } });
+    const result = await onlineEvalsService.scorers.versions("acme", "sc-7");
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/scorers/sc-7/versions");
+    expect(result).toEqual([{ id: "r2", version: 2 }]);
+  });
+
   it("jobs.list appends a status query when one is provided", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.jobs.list("acme", "active");

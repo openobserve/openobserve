@@ -61,6 +61,19 @@ pub async fn publish_scan_unavailable_for_streams<'a, I>(
     }
 }
 
+/// Records hits a search served or refused because redaction could not run on them.
+pub fn publish_search_scan_unavailable(rows: Vec<RedactionEvidence>) {
+    for row in rows {
+        let scope = EvidenceScope {
+            org_id: row.org_id.clone(),
+            stream_name: row.stream_name.clone(),
+            stream_type: row.stream_type.clone(),
+            ..Default::default()
+        };
+        enqueue_rows(&scope, vec![row]);
+    }
+}
+
 /// Records a loss that happened outside the enqueue path, such as a failed persist.
 pub fn record_gap(scope: &EvidenceScope, reason: GapReason, dropped_rows: u64) {
     metrics::SDR_EVIDENCE_DROPPED_TOTAL

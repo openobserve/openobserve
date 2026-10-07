@@ -148,6 +148,7 @@ import loongcollectorUrl from "@/assets/images/ingestion/loongcollector.svg";
 import categrafUrl from "@/assets/images/ingestion/categraf.png";
 import nightingaleUrl from "@/assets/images/ingestion/nightingale.svg";
 import vmagentUrl from "@/assets/images/ingestion/vmagent.svg";
+import nvidiaUrl from "@/assets/images/ingestion/nvidia.svg";
 
 /** Prefix marking a stored icon value as a registry glyph rather than an emoji. */
 export const GLYPH_TOKEN_PREFIX = "o2:";
@@ -235,6 +236,7 @@ export const GLYPH_REGISTRY = {
   categraf: categrafUrl,
   nightingale: nightingaleUrl,
   vmagent: vmagentUrl,
+  nvidia: nvidiaUrl,
 
   // Languages & frameworks
   java: Java,

@@ -90,6 +90,20 @@ test.describe("Pre-Test Cleanup", () => {
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
+    // The logs coverage specs for #15086 each seed their own log stream, suffixed per run
+    // so parallel workers cannot collide — which also means nothing ever reuses them.
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream.
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^e2e_hl_filters_/,
+        /^e2e_svc_cols_/,
+        /^e2e_svc_none_/,
+        /^e2e_sa_one_/,
+        /^e2e_sa_two_/,
+      ],
+      ['default'],
+    );
+
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -162,7 +176,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
         /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
-        /^e2e_backfill_test_\d+$/       // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^e2e_backfill_test_\d+$/,      // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^fn_e2e_pl_/                   // functions-import-export.spec.js (pipeline holding an imported function)
       ]
     );
 
@@ -197,6 +212,17 @@ test.describe("Pre-Test Cleanup", () => {
       /^default_vrl_fn_/             // Default org VRL function tests
     ];
 
+    // Patterns from the function import/export specs
+    // (Functions/functions-import-export.spec.js and
+    //  RegressionSet/Pipelines/function-import-non-object-entry.spec.js)
+    const importExportFunctionPatterns = [
+      /^fn_e2e_/,                    // imported, round-tripped and renamed functions
+      /^fn_export_/,                 // single, bulk and narrow-viewport export fixtures
+      /^fn_clash_/,                  // seeded functions used to provoke a name clash
+      /^fn_regr_nonobj_/,            // non-object entry repaired by the inline fixers
+      /^fn_regr_reject_/,            // rejections that cannot be fixed inline (#15069)
+    ];
+
     // Patterns from Functions folder tests (row-expansion.spec.js)
     const rowExpansionPatterns = [
       /^vrl_row_expand_/,            // VRL row expansion tests
@@ -216,7 +242,8 @@ test.describe("Pre-Test Cleanup", () => {
     const defaultOrgPatterns = [
       ...sanityFunctionPatterns,
       ...jsFunctionPatterns,         // default_vrl_fn_* created in default org
-      ...rowExpansionPatterns        // vrl_* patterns created in default org
+      ...rowExpansionPatterns,       // vrl_* patterns created in default org
+      ...importExportFunctionPatterns // fn_* patterns from the import/export specs
     ];
     await pm.apiCleanup.cleanupFunctionsInOrg('default', defaultOrgPatterns);
 

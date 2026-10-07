@@ -105,6 +105,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
       />
     </template>
+    <OBanner
+      v-if="analyticsContext && !sessionNotFound"
+      variant="info"
+      dense
+      class="mx-page-edge my-1"
+      :content="
+        analyticsContext.step
+          ? t('rum.analytics.viewer.droppedAfter', {
+              step: analyticsContext.step,
+              label: raw(analyticsContext.label),
+            })
+          : t('rum.analytics.viewer.fromAnalytics', { label: raw(analyticsContext.label) })
+      "
+      data-test="session-viewer-analytics-context"
+    >
+      <template #actions>
+        <OButton
+          variant="ghost"
+          size="sm"
+          icon-left="arrow-back"
+          data-test="session-viewer-analytics-back-btn"
+          @click="router.back()"
+          >{{ t("rum.analytics.viewer.back") }}</OButton
+        >
+      </template>
+    </OBanner>
     <OEmptyState
       v-if="sessionNotFound"
       size="hero"
@@ -113,6 +139,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :description="t('rum.noReplayRecordedMessage', { id: sessionId })"
       data-test="session-viewer-no-replay"
     />
+    <div
+      v-else-if="eventsOnly"
+      class="bg-card-glass-bg flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+      data-test="session-viewer-events-only"
+    >
+      <OBanner
+        variant="warning"
+        dense
+        class="mx-page-edge my-1"
+        :content="t('rum.analytics.viewer.eventsOnly')"
+      />
+      <PlayerEventsSidebar
+        :events="segmentEvents"
+        :sessionDetails="sessionDetails"
+        :session-id="sessionId"
+        :current-time="currentTime"
+        :start-time="sessionState.data.selectedSession?.start_time || 0"
+        :end-time="sessionState.data.selectedSession?.end_time || 0"
+        :rum-window-us="eventsOnlyRumWindowUs"
+        :marked-timestamps="markedTimestamps"
+        @event-emitted="handleSidebarEvent"
+        class="min-h-0 flex-1"
+      />
+    </div>
     <div
       v-else
       class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden"
@@ -194,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :current-time="currentTime"
             :start-time="sessionState.data.selectedSession?.start_time || 0"
             :end-time="sessionState.data.selectedSession?.end_time || 0"
+            :marked-timestamps="markedTimestamps"
             @event-emitted="handleSidebarEvent"
             class="h-full"
           />
@@ -238,6 +289,10 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import useStreams from "@/composables/useStreams";
+import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyticsQueries";
+import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 import analytics from "@/services/product_analytics";
@@ -331,6 +386,7 @@ const WATCHDOG_MS = 2000;
 const EVENTS_PAGE_SIZE = 150;
 const RUM_EVENT_TYPES = ["action", "view", "error"];
 const MAX_EVENT_PAGES = 50;
+const SEARCH_STREAM_NOT_FOUND = 20002;
 const EMPTY_TIMELINE: MobileTimeline = Object.freeze({
   records: [],
   startTime: 0,
@@ -418,6 +474,8 @@ let lastLogsTs = 0;
 const rumEvents = new Map<string, any>();
 const logEvents = new Map<string, any>();
 const rumEventArrivals = new Map<string, number>();
+const eventsOnly = ref(false);
+const eventsOnlyRumWindowUs = ref<QueryWindow | null>(null);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -429,6 +487,25 @@ const videoPlayerRef = ref<any>(null);
 const mobilePlayerRef = ref<any>(null);
 const splitterSize = ref(600);
 const { performanceState } = usePerformance();
+const { getStream } = useStreams(t);
+
+const analyticsContext = computed<{ step: number | null; label: string; kind: StepKind } | null>(
+  () => {
+    const q = router.currentRoute.value.query;
+    if (q.from !== "analytics") return null;
+    const label = typeof q.af_label === "string" ? q.af_label : "";
+    const kind = q.af_kind;
+    if (!label || label.length > MAX_KEY_LENGTH || (kind !== "p" && kind !== "c" && kind !== "e"))
+      return null;
+    const step = Number(q.af_step);
+    return { step: Number.isInteger(step) && step > 0 ? step : null, label, kind };
+  },
+);
+
+const markedTimestamps = computed<number[]>(() => {
+  const at = Number(router.currentRoute.value.query.event_time);
+  return analyticsContext.value && Number.isFinite(at) && at > 0 ? [at] : [];
+});
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
 
@@ -594,13 +671,112 @@ onBeforeUnmount(() => {
   liveTraceIds.clear();
 });
 
-onBeforeMount(async () => {
-  sessionId.value = router.currentRoute.value.params.id as string;
-  await getSession();
-  if (sessionNotFound.value || sessionLoadFailed.value) return;
+type StreamLookup = "present" | "missing" | "failed";
+
+// Only a stream the org confirms it lacks means "no replay"; any other failure must surface with Retry.
+async function readStreamSchema(name: string): Promise<StreamLookup> {
+  try {
+    const stream = await getStream(name, "logs", true);
+    const schema: Record<string, unknown> = {};
+    (stream?.schema ?? []).forEach((field: { name: string }) => {
+      schema[field.name] = field;
+    });
+    performanceState.data.streams[name] = { name, schema };
+    return "present";
+  } catch (e) {
+    const missing = t("logStream.streamNotFoundForType", { stream: name, type: "logs" });
+    return (e as Error)?.message === missing ? "missing" : "failed";
+  }
+}
+
+// The replay schema is loaded by the RUM shell, which a deep link can outrun.
+async function ensureReplaySchema(): Promise<StreamLookup> {
+  if (performanceState.data.streams?._sessionreplay?.schema) return "present";
+  return readStreamSchema("_sessionreplay");
+}
+
+async function rumColumns(): Promise<Record<string, boolean>> {
+  if (!performanceState.data.streams?._rumdata?.schema) await readStreamSchema("_rumdata");
+  const fields = performanceState.data.streams?._rumdata?.schema ?? {};
+  return Object.fromEntries(Object.keys(fields).map((f) => [f, true]));
+}
+
+async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> {
+  const schema = await rumColumns();
+  const range = routeRangeUs();
+  isLoading.value.push(true);
+  try {
+    const res = await searchService.search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: {
+          query: {
+            sql: sessionEventsProbeSql(String(getSessionId.value), schema),
+            start_time: range.start,
+            end_time: range.end,
+            from: 0,
+            size: 1,
+          },
+        },
+        page_type: "logs",
+      },
+      "RUM",
+    );
+    const hit = res?.data?.hits?.[0];
+    if (!hit || hit.start_time === null || hit.start_time === undefined) return "missing";
+    sessionState.data.selectedSession = {
+      ...sessionState.data.selectedSession,
+      session_id: String(getSessionId.value),
+      start_time: Number(hit.start_time),
+      end_time: Number(hit.end_time),
+      user_email: hit.user_email,
+      source: hit.source,
+      replay_start: null,
+    };
+    getSessionDetails();
+    return "found";
+  } catch (e) {
+    const code = (e as { response?: { data?: { code?: number } } })?.response?.data?.code;
+    return code === SEARCH_STREAM_NOT_FOUND ? "missing" : "failed";
+  } finally {
+    isLoading.value.pop();
+  }
+}
+
+const failSessionLoad = () => {
+  sessionNotFound.value = false;
+  sessionLoadFailed.value = true;
+  segmentsLoading.value = false;
+  loadState.value = "error";
+};
+
+async function openSession(): Promise<void> {
+  const replay = await ensureReplaySchema();
+  if (replay === "failed") return failSessionLoad();
+  if (replay === "present") await getSession();
+  if (sessionLoadFailed.value) return;
+  if (replay === "missing" || sessionNotFound.value) {
+    const found = await loadEventsOnlySession();
+    if (found === "failed") return failSessionLoad();
+    segmentsLoading.value = false;
+    if (found === "missing") {
+      sessionNotFound.value = true;
+      return;
+    }
+    sessionNotFound.value = false;
+    eventsOnlyRumWindowUs.value = routeRangeUs();
+    eventsOnly.value = true;
+    getSessionEvents();
+    return;
+  }
   openEventSeek();
   getSessionSegments();
   getSessionEvents();
+}
+
+onBeforeMount(async () => {
+  sessionId.value = router.currentRoute.value.params.id as string;
+  await openSession();
 });
 
 const getSessionDetails = () => {
@@ -1107,9 +1283,10 @@ const handleRetry = async () => {
   if (sessionLoadFailed.value) {
     loadState.value = activeLoadState();
     segmentsLoading.value = true;
-    await getSession();
-    if (sessionNotFound.value || sessionLoadFailed.value) return;
-    getSessionEvents();
+    sessionLoadFailed.value = false;
+    pendingSeekMs.value = null;
+    await openSession();
+    return;
   }
   pendingSeekMs.value = null;
   openEventSeek();

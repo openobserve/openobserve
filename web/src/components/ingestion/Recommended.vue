@@ -141,6 +141,18 @@ export default defineComponent({
         contentClass: "tab_content",
       },
       {
+        name: "ingestFromGpu",
+        to: {
+          name: "ingestFromGpu",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "memory",
+        label: t("ingestion.gpu"),
+        contentClass: "tab_content",
+      },
+      {
         name: "AWSConfig",
         to: {
           name: "AWSConfig",

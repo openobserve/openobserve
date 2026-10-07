@@ -122,6 +122,27 @@ const SUPPORTED_FILTER_OPERATORS: [&str; 30] = [
     "re_not_match",
 ];
 
+/// The trainer fetches at least 21 days; 28 adds a spare week.
+const DEFAULT_TRAINING_WINDOW_DAYS: i32 = 28;
+
+/// Stored only because the `rcf_*` columns are NOT NULL; nothing reads them since the band model.
+const LEGACY_RCF_NUM_TREES: i32 = 100;
+const LEGACY_RCF_TREE_SIZE: i32 = 256;
+const LEGACY_RCF_SHINGLE_SIZE: i32 = 4;
+
+/// The manual band half-width bounds in sigmas, mirrored by the UI schema.
+const BAND_WIDTH_RANGE: std::ops::RangeInclusive<f64> = 1.0..=10.0;
+
+/// The values the delivery gate's `AlertDirection::from_column` names; NULL also means both.
+const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
+
+/// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
+const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
+
+/// Longest destination response body kept in the alert-history error column.
+#[cfg(feature = "enterprise")]
+const REJECTION_BODY_MAX_CHARS: usize = 512;
+
 #[cfg(feature = "enterprise")]
 type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
 
@@ -141,7 +162,7 @@ pub struct CreateAnomalyConfigRequest {
     pub detection_window_seconds: i64,
     pub training_window_days: Option<i32>,
     pub retrain_interval_days: Option<i32>,
-    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
     #[serde(
         default,
         alias = "threshold",
@@ -151,12 +172,31 @@ pub struct CreateAnomalyConfigRequest {
     /// Delivered-alert budget per day; mutually exclusive with `percentile` in one request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
-    /// Absent keeps the one-day default; the response echoes the stored value, not the clamp.
+    /// Accepted and stored, but ignored by the band model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(deprecated)]
     pub level_half_width_seconds: Option<i64>,
+    #[schema(deprecated)]
     pub rcf_num_trees: Option<i32>,
+    #[schema(deprecated)]
     pub rcf_tree_size: Option<i32>,
+    #[schema(deprecated)]
     pub rcf_shingle_size: Option<i32>,
+    /// Manual band half-width k in sigmas, 1 to 10; absent uses the trained k (3 to 6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_width: Option<f64>,
+    /// `both`, `above` or `below`; absent means both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_direction: Option<String>,
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; absent means 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_buckets: Option<i32>,
+    /// Percent of the window out of band that fires; absent means 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_fire_pct: Option<f64>,
+    /// Percent of the window out of band below which it recovers; absent means the fire percent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_window_recover_pct: Option<f64>,
     pub alert_enabled: Option<bool>,
     #[serde(default)]
     pub alert_destinations: Vec<String>,
@@ -204,7 +244,7 @@ pub struct UpdateAnomalyConfigRequest {
     pub schedule_interval: Option<String>,
     pub detection_window_seconds: Option<i64>,
     pub training_window_days: Option<i32>,
-    /// The GET response names this `threshold`, so a read-modify-write must round-trip.
+    /// Legacy, read back as `threshold` for read-modify-write; k trains at p99, within 3 to 6.
     #[serde(
         default,
         alias = "threshold",
@@ -212,7 +252,7 @@ pub struct UpdateAnomalyConfigRequest {
     )]
     pub percentile: Option<f64>,
     /// Double-option like `priority`: `None` leaves the stored budget, `Some(None)` clears it
-    /// (back to percentile mode), `Some(Some(b))` sets it. A plain Option could never clear.
+    /// (back to the trained k), `Some(Some(b))` sets it. A plain Option could never clear.
     #[serde(
         default,
         deserialize_with = "double_option",
@@ -220,14 +260,54 @@ pub struct UpdateAnomalyConfigRequest {
     )]
     #[schema(value_type = Option<f64>)]
     pub alert_budget_per_day: Option<Option<f64>>,
-    /// Double-option: `Some(None)` clears back to the default, which `Option` cannot express.
+    /// Accepted and stored, but ignored by the band model.
     #[serde(
         default,
         deserialize_with = "double_option",
         skip_serializing_if = "Option::is_none"
     )]
-    #[schema(value_type = Option<i64>)]
+    #[schema(value_type = Option<i64>, deprecated)]
     pub level_half_width_seconds: Option<Option<i64>>,
+    /// Double-option like the budget: `null` clears back to the trained k.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub band_width: Option<Option<f64>>,
+    /// `both`, `above` or `below`; `null` clears to both.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>)]
+    pub alert_direction: Option<Option<String>>,
+    /// Window-share length in buckets, at least 1 and at most 24h of buckets; `null` clears to 1.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<i32>)]
+    pub alert_window_buckets: Option<Option<i32>>,
+    /// Percent of the window out of band that fires; `null` clears to 100.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_window_fire_pct: Option<Option<f64>>,
+    /// Out-of-band percent below which the window recovers; `null` clears to the fire percent.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<f64>)]
+    pub alert_window_recover_pct: Option<Option<f64>>,
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
@@ -253,6 +333,16 @@ pub struct UpdateAnomalyConfigRequest {
     /// `None` leaves stored tags untouched; `Some(vec![])` clears them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+}
+
+/// The band and delivery settings as they stand after a request, so one rule set serves both paths.
+struct BandSettings<'a> {
+    band_width: Option<f64>,
+    alert_direction: Option<&'a str>,
+    alert_window_buckets: Option<i32>,
+    alert_window_fire_pct: Option<f64>,
+    alert_window_recover_pct: Option<f64>,
+    histogram_interval: &'a str,
 }
 
 /// Resolve a folder name (e.g. "default") to the PK stored in `folders.id`.
@@ -319,39 +409,8 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
             serde_json::Value::String(status_label(s as i32).to_string()),
         );
     }
-    add_effective_shingle_size(&mut val);
     add_notice_class(&mut val);
     val
-}
-
-/// Report the width the model is actually trained at alongside the requested one: the stored
-/// column is only the request, and the span derivation routinely overrides it (a sub-hourly
-/// config stores the default 4 and trains at 1), so reading it alone misleads.
-fn add_effective_shingle_size(val: &mut serde_json::Value) {
-    let Some(obj) = val.as_object_mut() else {
-        return;
-    };
-    let (Some(configured), Some(interval), Some(window_days), Some(tree_size)) = (
-        obj.get("rcf_shingle_size").and_then(|v| v.as_i64()),
-        obj.get("histogram_interval").and_then(|v| v.as_str()),
-        obj.get("training_window_days").and_then(|v| v.as_i64()),
-        obj.get("rcf_tree_size").and_then(|v| v.as_i64()),
-    ) else {
-        return;
-    };
-    if let Some(effective) =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
-            configured as i32,
-            interval,
-            window_days as i32,
-            tree_size as i32,
-        )
-    {
-        obj.insert(
-            "effective_rcf_shingle_size".to_string(),
-            serde_json::Value::from(effective),
-        );
-    }
 }
 
 /// §4.8: the UI keys on this class, never on the enterprise notice text riding `last_error`.
@@ -397,6 +456,31 @@ fn merge_trigger_run_state(obj: &mut serde_json::Map<String, serde_json::Value>,
             serde_json::Value::Number(at.into()),
         );
     }
+}
+
+/// The span the in-force model trained on, best-effort: the config row stores only its version.
+async fn training_data_span(
+    db: &sea_orm::DatabaseConnection,
+    config: &infra::table::entity::anomaly_detection_config::Model,
+) -> Option<(i64, i64)> {
+    if config.current_model_version <= 0 {
+        return None;
+    }
+    let rows = infra::table::anomaly_detection::models::list_by_anomaly_id_desc(
+        db,
+        &config.anomaly_id,
+    )
+    .await
+    .inspect_err(|e| {
+        log::warn!(
+            "[anomaly_detection {}] failed to read the model rows for the training span: {e}",
+            config.anomaly_id
+        )
+    })
+    .ok()?;
+    rows.into_iter()
+        .find(|row| row.version == config.current_model_version)
+        .map(|row| (row.training_start_time, row.training_end_time))
 }
 
 /// List all anomaly detection configurations for an organization.
@@ -529,9 +613,18 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
         None => Ok(None),
         Some(model) => {
             let name = pk_to_name(Some(&model.folder_id)).await;
+            let (training_start, training_end) = training_data_span(db, &model).await.unzip();
             let mut val = model_to_api_json(serde_json::to_value(model).unwrap_or_default());
             if let Some(obj) = val.as_object_mut() {
                 obj.insert("folder_id".to_string(), serde_json::Value::String(name));
+                obj.insert(
+                    "training_data_start_us".to_string(),
+                    serde_json::Value::from(training_start),
+                );
+                obj.insert(
+                    "training_data_end_us".to_string(),
+                    serde_json::Value::from(training_end),
+                );
             }
             Ok(Some(val))
         }
@@ -568,23 +661,6 @@ pub async fn create_config(
         .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
 
     let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
-    let resolved_tree_size = req.rcf_tree_size.unwrap_or(
-        o2_enterprise::enterprise::common::config::get_config()
-            .anomaly_detection
-            .rcf_tree_size as i32,
-    );
-    let resolved_training_window_days = resolved_training_window_days(
-        req.training_window_days,
-        &req.histogram_interval,
-        resolved_threshold as f64,
-        resolved_tree_size,
-    );
-    let starvation_warning = training_window_starvation_warning(
-        &req.histogram_interval,
-        resolved_training_window_days,
-        resolved_threshold as f64,
-        resolved_tree_size,
-    );
 
     use infra::table::entity::anomaly_detection_config::Model as ConfigModel;
     let new_config = ConfigModel {
@@ -605,7 +681,7 @@ pub async fn create_config(
         histogram_interval: req.histogram_interval.clone(),
         schedule_interval: req.schedule_interval.clone(),
         detection_window_seconds: req.detection_window_seconds,
-        training_window_days: resolved_training_window_days,
+        training_window_days: resolved_training_window_days(req.training_window_days),
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
         threshold: resolved_threshold,
         alert_budget_per_day: req.alert_budget_per_day,
@@ -615,20 +691,18 @@ pub async fn create_config(
         last_error: None,
         last_processed_timestamp: None,
         current_model_version: 0,
-        // Unclamped on purpose: clamping here would freeze today's bounds into the row.
         level_half_width_seconds: req.level_half_width_seconds,
-        rcf_num_trees: req.rcf_num_trees.unwrap_or(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_num_trees as i32,
-        ),
-        rcf_tree_size: resolved_tree_size,
-        // Buckets of context per score, so the span is this times histogram_interval.
-        rcf_shingle_size: req.rcf_shingle_size.unwrap_or(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_shingle_size as i32,
-        ),
+        band_width: req.band_width,
+        alert_direction: req.alert_direction.clone(),
+        alert_window_buckets: req.alert_window_buckets,
+        alert_window_fire_pct: req.alert_window_fire_pct,
+        alert_window_recover_pct: req.alert_window_recover_pct,
+        band_grouping: None,
+        band_k: None,
+        // NOT NULL but unread since the band model; absent values keep the legacy defaults.
+        rcf_num_trees: req.rcf_num_trees.unwrap_or(LEGACY_RCF_NUM_TREES),
+        rcf_tree_size: req.rcf_tree_size.unwrap_or(LEGACY_RCF_TREE_SIZE),
+        rcf_shingle_size: req.rcf_shingle_size.unwrap_or(LEGACY_RCF_SHINGLE_SIZE),
         alert_enabled: req.alert_enabled.unwrap_or(true),
         alert_destinations: Some(
             serde_json::to_value(&req.alert_destinations).unwrap_or(serde_json::json!([])),
@@ -650,9 +724,9 @@ pub async fn create_config(
         last_failed_at: None,
         last_alert_fired_at: None,
         last_recovery_notified_at: None,
+        detection_lease_us: None,
         last_updated: now_us,
-        // Seasonality is auto-determined at training time from training_window_days;
-        // initialise to "none" as a placeholder until the first training run.
+        // NOT NULL legacy column; `band_grouping` is what training reports now.
         seasonality: "none".to_string(),
         created_at: now_us,
         updated_at: now_us,
@@ -745,13 +819,6 @@ pub async fn create_config(
             "folder_id".to_string(),
             serde_json::Value::String(folder_name_owned),
         );
-        // Returned not refused, since starved shapes serve today — but NO surface reads this key.
-        if let Some(warning) = starvation_warning {
-            obj.insert(
-                "training_window_warning".to_string(),
-                serde_json::Value::String(warning),
-            );
-        }
     }
     Ok(val)
 }
@@ -777,9 +844,6 @@ pub async fn update_config(
     // so a request against a missing config still answers 404 rather than 400.
     req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
 
-    // Remember the pre-update threshold so we can detect an actual change below and, if so,
-    // recompute the trained model's cutoff in place without a retrain.
-    let previous_threshold = existing.threshold;
     let previous = existing.clone();
     // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
@@ -797,13 +861,10 @@ pub async fn update_config(
         existing.threshold,
     )
     .map_err(validation_error)?;
-    // `Some(None)` clears back to the default and needs no bound; only an explicit value does.
-    if let Some(Some(half_width)) = req.level_half_width_seconds {
-        validate_level_half_width(half_width).map_err(validation_error)?;
-    }
     if let Some(days) = req.retrain_interval_days {
         validate_retrain_interval_days(days).map_err(validation_error)?;
     }
+    validated_band_settings(&req, &existing).map_err(validation_error)?;
 
     let mut active_model = existing.into_active_model();
 
@@ -813,14 +874,6 @@ pub async fn update_config(
     // Track whether we need to reset (delete + push) an existing trigger after save.
     // Used when schedule_interval changes so next_run_at reflects the new cadence.
     let mut reset_trigger_after_save = false;
-    // Track whether the threshold (percentile) actually changed, so we recompute the trained
-    // model's baked cutoff in place after the DB save — no retrain required. Only read behind
-    // the enterprise cfg below; in an OSS build it is assigned but unused (no recompute path).
-    #[cfg_attr(
-        not(feature = "enterprise"),
-        allow(unused_assignments, unused_variables)
-    )]
-    let mut new_threshold: Option<i32> = None;
     if let Some(enabled) = req.enabled {
         active_model.enabled = Set(enabled);
 
@@ -906,11 +959,7 @@ pub async fn update_config(
         active_model.detection_window_seconds = Set(detection_window_seconds);
     }
     if let Some(percentile) = req.percentile {
-        let clamped = clamped_threshold(percentile);
-        active_model.threshold = Set(clamped);
-        if clamped != previous_threshold {
-            new_threshold = Some(clamped);
-        }
+        active_model.threshold = Set(clamped_threshold(percentile));
     }
     if let Some(budget) = req.alert_budget_per_day {
         active_model.alert_budget_per_day = Set(budget);
@@ -921,9 +970,23 @@ pub async fn update_config(
         active_model.training_window_days = Set(clamped);
     }
     if let Some(half_width) = req.level_half_width_seconds {
-        // Retryable: it changes the level the baseline is fitted with, so the model is stale.
-        retryable_change |= previous.level_half_width_seconds != half_width;
         active_model.level_half_width_seconds = Set(half_width);
+    }
+    // Read live by detection and delivery, so none of these needs a retrain or a recompute.
+    if let Some(band_width) = req.band_width {
+        active_model.band_width = Set(band_width);
+    }
+    if let Some(direction) = req.alert_direction {
+        active_model.alert_direction = Set(direction);
+    }
+    if let Some(buckets) = req.alert_window_buckets {
+        active_model.alert_window_buckets = Set(buckets);
+    }
+    if let Some(fire_pct) = req.alert_window_fire_pct {
+        active_model.alert_window_fire_pct = Set(fire_pct);
+    }
+    if let Some(recover_pct) = req.alert_window_recover_pct {
+        active_model.alert_window_recover_pct = Set(recover_pct);
     }
     if let Some(retrain_interval_days) = req.retrain_interval_days {
         active_model.retrain_interval_days = Set(retrain_interval_days);
@@ -980,61 +1043,6 @@ pub async fn update_config(
         .await;
     #[cfg(feature = "enterprise")]
     invalidate_value_column_cache(org_id, anomaly_id);
-
-    // If the threshold (percentile) changed on a trained config, recompute the model's baked
-    // cutoff in place from its persisted training-score distribution — no retrain needed. This
-    // runs AFTER invalidate_config so the fresh re-cache inside recompute wins. If the model is
-    // legacy (no sidecar) or recompute fails, fall back to forcing a one-time retrain so the
-    // change is never silently dropped. Training/detection (and thus the model + sidecar) live
-    // only on the scheduler node, so this recompute happens where the model is; other
-    // super-cluster regions hold no model and only sync the config row for API reads.
-    // Skip while a (re)train is in flight (status == Training): the running trainer already
-    // reads `config.threshold` live and will bake the new percentile into the model it is about
-    // to produce, so recomputing the outgoing model would be wasted work and the fallback would
-    // clobber the in-progress retrain.
-    #[cfg(feature = "enterprise")]
-    if let Some(threshold) = new_threshold
-        && updated.is_trained
-        && updated.current_model_version > 0
-        && updated.status
-            != o2_enterprise::enterprise::anomaly_detection::types::Status::Training.to_i32()
-    {
-        let recomputed =
-            o2_enterprise::enterprise::anomaly_detection::threshold::recompute_threshold(
-                org_id,
-                &updated.anomaly_id,
-                updated.current_model_version,
-                threshold as f64,
-            )
-            .await;
-        match recomputed {
-            Ok(true) => {
-                log::info!(
-                    "[anomaly_detection {}] threshold recomputed in place (no retrain)",
-                    updated.anomaly_id
-                );
-            }
-            Ok(false) | Err(_) => {
-                if let Err(e) = recomputed.as_ref() {
-                    log::warn!(
-                        "[anomaly_detection {}] threshold recompute failed ({e}); forcing retrain",
-                        updated.anomaly_id
-                    );
-                } else {
-                    log::info!(
-                        "[anomaly_detection {}] no training-score sidecar; forcing one-time retrain to apply new threshold",
-                        updated.anomaly_id
-                    );
-                }
-                if let Err(e) = force_retrain_for_threshold(org_id, &updated.anomaly_id).await {
-                    log::warn!(
-                        "[anomaly_detection {}] failed to force retrain after threshold change: {e}",
-                        updated.anomaly_id
-                    );
-                }
-            }
-        }
-    }
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -1241,6 +1249,14 @@ pub async fn clone_config(
         threshold: src.threshold,
         alert_budget_per_day: src.alert_budget_per_day,
         level_half_width_seconds: src.level_half_width_seconds,
+        band_width: src.band_width,
+        alert_direction: src.alert_direction.clone(),
+        alert_window_buckets: src.alert_window_buckets,
+        alert_window_fire_pct: src.alert_window_fire_pct,
+        alert_window_recover_pct: src.alert_window_recover_pct,
+        // Training output: the clone has no model until it trains.
+        band_grouping: None,
+        band_k: None,
         seasonality: src.seasonality.clone(),
         is_trained: false,
         training_started_at: None,
@@ -1265,6 +1281,7 @@ pub async fn clone_config(
         last_failed_at: None,
         last_alert_fired_at: None,
         last_recovery_notified_at: None,
+        detection_lease_us: None,
         last_updated: now_us,
         created_at: now_us,
         updated_at: now_us,
@@ -1327,51 +1344,6 @@ pub async fn clone_config(
     Ok(val)
 }
 
-/// Force a one-time retrain so a threshold change takes effect on a config whose model cannot
-/// be recomputed in place (legacy model with no training-score sidecar, or a recompute error).
-///
-/// Marks the config `Waiting` + `is_trained = false` — either condition makes the enterprise
-/// training scheduler pick it up on its next tick — and nudges the scheduler so it fires
-/// promptly. After that first retrain the training-score sidecar is persisted and all future
-/// threshold changes are recomputed in place with no retrain.
-#[cfg(feature = "enterprise")]
-async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = get_orm_client_rw().await;
-
-    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
-
-    // Precedes the queue-reset writes below: a disabled config must not be left mid-transition.
-    ensure_trainable(&config)?;
-
-    // Don't clobber an in-flight (re)train: a training run already bakes the latest
-    // `config.threshold`, so the new percentile will land in the model it produces. Resetting
-    // status/is_trained here would interrupt it for no benefit.
-    if config.status
-        == o2_enterprise::enterprise::anomaly_detection::types::Status::Training.to_i32()
-    {
-        log::info!(
-            "[anomaly_detection {anomaly_id}] retrain already in progress; new threshold will be applied by it"
-        );
-        return Ok(());
-    }
-
-    let mut active = config.into_active_model();
-    // Status 0 = Waiting; is_trained = false — both route the config into the retrain queue.
-    active.status = Set(0i32);
-    active.is_trained = Set(false);
-    active.updated_at = Set(Utc::now().timestamp_micros());
-    active.update(db).await?;
-
-    // Nudge the training scheduler so the retrain fires promptly rather than on its next
-    // periodic sweep.
-    o2_enterprise::enterprise::anomaly_detection::scheduler::trigger_training(anomaly_id).await?;
-
-    Ok(())
-}
-
 /// Cancel an in-progress training run.
 ///
 /// Resets the config status to `Waiting` and clears `training_started_at` so the
@@ -1428,175 +1400,86 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
     anyhow::bail!("Anomaly detection is an enterprise feature")
 }
 
-/// Run detection for a configuration
+/// Run detection now; `claim_lost` or `ineligible` in the reply means nothing was scored.
 pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     let db = get_orm_client_ro().await;
 
-    // Fetch config
+    // Fetched first so an unknown id answers 404 before any claim is attempted.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
-    // Check if trained
-    if !config.is_trained {
-        anyhow::bail!("Model must be trained before running detection");
-    }
-
+    // The scheduled job run now: scores past the cursor, writes rows, gates delivery itself.
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::anomaly_detection::{Detector, query_builder};
+        use config::meta::self_reporting::usage::RunOutcome;
 
-        // Convert to detection config
-        let anomaly_config = config_to_training_config(&config)?;
+        use crate::alerts::scheduler::handlers::{AnomalyRunRecord, anomaly_run_status};
 
-        // Build detection query
-        let detection_query = query_builder::build_detection_query(&anomaly_config)?;
-
-        // Detection window: always look back training_window_days from now.
-        // We do NOT use last_processed_timestamp here because this is the
-        // on-demand /detect endpoint — it should always score the full
-        // recent window so repeated calls are useful for testing.
-        // The scheduler's incremental detection uses last_processed_timestamp
-        // separately to avoid re-scoring already-processed data.
-        let end_time_us = Utc::now().timestamp_micros();
-        let lookback_us = anomaly_config.training_window_days as i64 * 86_400 * 1_000_000;
-        let start_time_us = end_time_us - lookback_us;
-
-        log::info!(
-            "[anomaly_detection {}] detection started: start_time_us={}, end_time_us={}, query={}",
-            anomaly_id,
-            start_time_us,
-            end_time_us,
-            detection_query
-        );
-
-        // Fetch detection data via OSS search service
-        let data_points = execute_anomaly_query(
-            org_id,
-            &detection_query,
-            start_time_us,
-            end_time_us,
-            anomaly_id,
-            &anomaly_config.stream_type.to_string(),
-        )
-        .await?;
-
-        log::info!(
-            "[anomaly_detection {}] fetched {} data points for detection",
-            anomaly_id,
-            data_points.len()
-        );
-
-        // Initialize detector
-        let detector = Detector::new(anomaly_config.clone()).await?;
-
-        // Run detection with fetched data
-        let start_time = std::time::Instant::now();
-        let result = detector.detect_with_data(&data_points, start_time).await?;
+        let start_us = now_micros();
+        let run =
+            o2_enterprise::enterprise::anomaly_detection::scheduler::run_detection_now(anomaly_id)
+                .await;
+        let end_us = now_micros();
+        let (result, outcome) = match run {
+            Ok(run) => run,
+            Err(e) => {
+                let record = AnomalyRunRecord {
+                    status: RunOutcome::Error,
+                    error: Some(e.to_string()),
+                    success_response: None,
+                    gate_passed: false,
+                    start_us,
+                    end_us,
+                };
+                record_manual_anomaly_run(org_id, &config.name, anomaly_id, &record).await;
+                return Err(e);
+            }
+        };
+        // A lost claim or an ineligible row never ran, so the history keeps the real last run.
+        if !outcome.claim_lost && !outcome.ineligible {
+            let record = AnomalyRunRecord {
+                status: anomaly_run_status(&outcome),
+                error: outcome.notify_error.clone(),
+                success_response: Some(
+                    serde_json::json!({ "anomalies_found": outcome.anomaly_count }).to_string(),
+                ),
+                gate_passed: outcome.gate_passed,
+                start_us,
+                end_us,
+            };
+            record_manual_anomaly_run(org_id, &config.name, anomaly_id, &record).await;
+        }
 
         log::info!(
-            "[anomaly_detection {}] detection complete: points_scored={}, anomalies_found={}",
+            "[anomaly_detection {}] manual detection complete: points_scored={}, anomalies_found={}",
             anomaly_id,
             result.data_points_processed,
             result.anomaly_count
         );
 
-        // Write all scored points to the _anomalies stream (not just anomalous ones).
-        // This gives the frontend a continuous score timeline so it can plot every bucket
-        // with its score and the threshold line, regardless of whether it was anomalous.
-        if !result.scored_points.is_empty() {
-            log::info!(
-                "[anomaly_detection {}] writing {} scored points ({} anomalies) to _anomalies stream",
-                anomaly_id,
-                result.scored_points.len(),
-                result.anomaly_count,
-            );
-            let records: Vec<serde_json::Value> = result
-                .scored_points
-                .iter()
-                .map(serde_json::to_value)
-                .collect::<Result<Vec<_>, _>>()?;
-
-            write_anomalies_to_stream(org_id, records).await?;
-        }
-
-        // Send alert if anomalies found and alert is configured
-        if dispatch_allowed(result.anomaly_count, config.alert_enabled) {
-            let destinations: Vec<String> = config
-                .alert_destinations
-                .as_ref()
-                .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
-                .unwrap_or_default();
-            if !destinations.is_empty() {
-                let window_start = result
-                    .scored_points
-                    .iter()
-                    .map(|p| p.timestamp)
-                    .min()
-                    .unwrap_or(start_time_us);
-                let window_end = result
-                    .scored_points
-                    .iter()
-                    .map(|p| p.timestamp)
-                    .max()
-                    .unwrap_or(end_time_us);
-                // The scheduler's builder, so the two dispatchers cannot disagree on kind.
-                let ctx = o2_enterprise::enterprise::anomaly_detection::types::build_alert_context(
-                    &result.scored_points,
-                    &o2_enterprise::enterprise::anomaly_detection::types::AlertContextIdent {
-                        org_id,
-                        config_name: &config.name,
-                        anomaly_id,
-                        anomaly_count: result.anomaly_count,
-                        stream_name: &config.stream_name,
-                        window_start_us: window_start,
-                        window_end_us: window_end,
-                    },
-                );
-
-                let mut outcomes = Vec::with_capacity(destinations.len());
-                for dest_id in destinations {
-                    let sent = send_anomaly_alert(dest_id.clone(), ctx.clone()).await;
-                    if let Err(e) = &sent {
-                        log::warn!(
-                            "[anomaly_detection {}] failed to send alert to '{}': {}",
-                            anomaly_id,
-                            dest_id,
-                            e
-                        );
-                    }
-                    outcomes.push(sent);
-                }
-                let delivered = any_alert_delivered(outcomes);
-
-                // Anchored on the alerting point's data time; an all-failed send arms nothing.
-                if delivered
-                    && let Some(fired_at_us) = leading_edge_anchor_us(
-                        result
-                            .scored_points
-                            .iter()
-                            .map(|p| (p.is_anomaly, p.timestamp)),
-                    )
-                {
-                    o2_enterprise::enterprise::anomaly_detection::scheduler::record_manual_alert_delivery(
-                        anomaly_id,
-                        fired_at_us,
-                    )
-                    .await;
-                }
-            }
-        }
-
-        // Return only the anomalous points in the API response to keep it concise.
         let anomaly_points: Vec<_> = result
             .scored_points
             .iter()
             .filter(|p| p.is_anomaly)
             .collect();
+        // Neither a lost claim nor an ineligible row is "no anomalies": nothing was judged.
+        let message = if outcome.claim_lost {
+            "Detection already running; try again shortly"
+        } else if outcome.ineligible {
+            result.model_loaded_from.as_str()
+        } else {
+            "Detection completed"
+        };
 
         Ok(serde_json::json!({
-            "message": "Detection completed",
+            "message": message,
+            "claim_lost": outcome.claim_lost,
+            "ineligible": outcome.ineligible,
+            "notify_failed": outcome.notify_failed,
+            "notify_error": outcome.notify_error,
             "anomaly_id": anomaly_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
@@ -1715,6 +1598,27 @@ pub async fn recover_detection_triggers_on_startup() {
     }
 }
 
+/// History row only: `scheduled_jobs` belongs to the scheduler, and a write here races its pull.
+#[cfg(feature = "enterprise")]
+async fn record_manual_anomaly_run(
+    org_id: &str,
+    config_name: &str,
+    anomaly_id: &str,
+    record: &crate::alerts::scheduler::handlers::AnomalyRunRecord,
+) {
+    match crate::db::scheduler::get(org_id, TriggerModule::AnomalyDetection, anomaly_id).await {
+        Ok(trigger) => crate::alerts::scheduler::handlers::publish_anomaly_run(
+            &trigger,
+            config_name,
+            record,
+            trigger.next_run_at,
+        ),
+        Err(e) => {
+            log::warn!("[anomaly_detection {anomaly_id}] no trigger to record the manual run: {e}")
+        }
+    }
+}
+
 /// Validate configuration request
 fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     // Validate query_mode
@@ -1733,9 +1637,17 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     }
 
     validated_budget_create(req.percentile, req.alert_budget_per_day)?;
-    if let Some(half_width) = req.level_half_width_seconds {
-        validate_level_half_width(half_width)?;
-    }
+    validate_band_settings(
+        &BandSettings {
+            band_width: req.band_width,
+            alert_direction: req.alert_direction.as_deref(),
+            alert_window_buckets: req.alert_window_buckets,
+            alert_window_fire_pct: req.alert_window_fire_pct,
+            alert_window_recover_pct: req.alert_window_recover_pct,
+            histogram_interval: &req.histogram_interval,
+        },
+        req.alert_budget_per_day,
+    )?;
     if let Some(days) = req.retrain_interval_days {
         validate_retrain_interval_days(days)?;
     }
@@ -1826,21 +1738,6 @@ fn validate_budget_value(budget: f64) -> Result<()> {
     Ok(())
 }
 
-/// Bounded at the API, not only clamped at fit time, so a typo cannot store an ignored value.
-fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
-    const ONE_YEAR_SECONDS: i64 = 365 * 86_400;
-    if half_width_seconds <= 0 {
-        anyhow::bail!("level_half_width_seconds must be greater than 0");
-    }
-    if half_width_seconds > ONE_YEAR_SECONDS {
-        anyhow::bail!(
-            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the \
-             level window must fit inside the training window"
-        );
-    }
-    Ok(())
-}
-
 /// `0` is "Never"; a negative value would put the due-time in the future and retrain on every tick.
 fn validate_retrain_interval_days(days: i32) -> Result<()> {
     const MAX_RETRAIN_INTERVAL_DAYS: i32 = 36_500;
@@ -1875,15 +1772,6 @@ fn clamped_threshold(percentile: f64) -> i32 {
     percentile.clamp(50.0, MAX_STORABLE_PERCENTILE) as i32
 }
 
-/// The derivation only ever WIDENS, so fine cadences keep the shipped default.
-const DERIVED_WINDOW_FLOOR_DAYS: i32 = 7;
-
-/// Past this the honest requirement stops being advice an operator can act on.
-const MAX_ADVISABLE_WINDOW_DAYS: usize = 365;
-
-/// Past a month, provisioning the honest requirement unasked would surprise more than it helps.
-const DERIVED_WINDOW_CEILING_DAYS: i32 = 30;
-
 /// The percentile a create request gets when it names none.
 const DEFAULT_PERCENTILE: f64 = 97.0;
 
@@ -1917,170 +1805,100 @@ fn validated_budget_update(
     Ok(())
 }
 
-/// An explicit value is ALWAYS honoured however starved; only an absent field derives.
-fn resolved_training_window_days(
-    requested: Option<i32>,
-    histogram_interval: &str,
-    percentile: f64,
-    tree_size: i32,
-) -> i32 {
-    match requested {
-        Some(explicit) => explicit.max(1),
-        None => derived_training_window_days(histogram_interval, percentile, tree_size),
-    }
+/// An explicit value is always honoured; only an absent one takes the default.
+fn resolved_training_window_days(requested: Option<i32>) -> i32 {
+    requested.map_or(DEFAULT_TRAINING_WINDOW_DAYS, |days| days.max(1))
 }
 
-/// Not `days * buckets_per_day`: the trailing partial bucket and `shingle - 1` never score.
-fn expected_training_windows(
-    histogram_interval: &str,
-    training_window_days: i32,
-    tree_size: i32,
-) -> Option<i64> {
-    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
-    let days = training_window_days.max(1) as i64;
-    let buckets = days.checked_mul(86_400)?.checked_div(histogram_secs)?;
-    let shingle =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
-            // The row does not exist yet, so an omitted shingle resolves to create's env default.
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_shingle_size as i32,
-            histogram_interval,
-            training_window_days.max(1),
-            tree_size.max(1),
-        )? as i64;
-    Some((buckets - 1 - (shingle - 1)).max(0))
-}
-
-/// The requirement spans 251x across the legal interval range, so one flat default cannot be right.
-fn derived_training_window_days(histogram_interval: &str, percentile: f64, tree_size: i32) -> i32 {
-    let Ok(histogram_secs) = parse_interval(histogram_interval) else {
-        return DERIVED_WINDOW_FLOOR_DAYS;
-    };
-    if histogram_secs <= 0 {
-        return DERIVED_WINDOW_FLOOR_DAYS;
+/// Shared by create and update; a band width beside a budget leaves the budget controller inert.
+fn validate_band_settings(
+    settings: &BandSettings<'_>,
+    alert_budget_per_day: Option<f64>,
+) -> Result<()> {
+    if let Some(band_width) = settings.band_width {
+        if !band_width.is_finite() || !BAND_WIDTH_RANGE.contains(&band_width) {
+            anyhow::bail!(
+                "band_width must be a finite value between {} and {}",
+                BAND_WIDTH_RANGE.start(),
+                BAND_WIDTH_RANGE.end()
+            );
+        }
+        if alert_budget_per_day.is_some() {
+            anyhow::bail!(
+                "band_width cannot be set while alert_budget_per_day is set: the budget sets the \
+                 band width; clear one of them"
+            );
+        }
     }
-    // Rounded UP: truncating a cadence understates wall-clock and lands short of the bar.
-    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
-    let needed =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
-            tree_size.max(1) as usize,
-            percentile,
+    if let Some(direction) = settings.alert_direction
+        && !ALERT_DIRECTIONS.contains(&direction)
+    {
+        anyhow::bail!(
+            "alert_direction must be one of {}, not '{direction}'",
+            ALERT_DIRECTIONS.join(", ")
         );
-    // Widened by one window to cover the trailing partial bucket the trainer drops.
-    let shingle =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_shingle_size as i32,
-            histogram_interval,
-            DERIVED_WINDOW_CEILING_DAYS,
-            tree_size.max(1),
-        )
-        .unwrap_or(1);
-    let Some(days) = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
-        needed.saturating_add(1),
-        interval_minutes,
-        shingle,
-    ) else {
-        return DERIVED_WINDOW_FLOOR_DAYS;
-    };
-    let proposal = (days.min(i32::MAX as usize) as i32)
-        .clamp(DERIVED_WINDOW_FLOOR_DAYS, DERIVED_WINDOW_CEILING_DAYS);
-    // A widening that does not cross the reservoir buys nothing: below `tree_size` nothing evicts.
-    let clears_reservoir = expected_training_windows(histogram_interval, proposal, tree_size)
-        .is_some_and(|w| w >= tree_size.max(1) as i64);
-    if clears_reservoir {
-        proposal
-    } else {
-        DERIVED_WINDOW_FLOOR_DAYS
     }
+    if let Some(buckets) = settings.alert_window_buckets
+        && buckets < 1
+    {
+        anyhow::bail!("alert_window_buckets must be at least 1");
+    }
+    // One bucket looks back nowhere, so it passes at any resolution.
+    if let Some(buckets) = settings.alert_window_buckets.filter(|n| *n > 1)
+        && let Ok(histogram_secs) = parse_interval(settings.histogram_interval)
+        && i64::from(buckets).saturating_mul(histogram_secs) > MAX_ALERT_WINDOW_SECONDS
+    {
+        anyhow::bail!(
+            "alert_window_buckets ({buckets}) times histogram_interval ({}) must span at most 24h",
+            settings.histogram_interval
+        );
+    }
+    let fire = settings.alert_window_fire_pct.unwrap_or(100.0);
+    let recover = settings.alert_window_recover_pct.unwrap_or(fire);
+    if !(fire.is_finite()
+        && recover.is_finite()
+        && 0.0 < recover
+        && recover <= fire
+        && fire <= 100.0)
+    {
+        anyhow::bail!(
+            "alert window percentages must satisfy 0 < alert_window_recover_pct <= \
+             alert_window_fire_pct <= 100"
+        );
+    }
+    Ok(())
 }
 
-/// `None` when the bar is calibrated or the interval will not parse; a warning, never an error.
-fn training_window_starvation_warning(
-    histogram_interval: &str,
-    training_window_days: i32,
-    percentile: f64,
-    tree_size: i32,
-) -> Option<String> {
-    let windows = expected_training_windows(histogram_interval, training_window_days, tree_size)?;
-    o2_enterprise::enterprise::anomaly_detection::rcf_model::bar_starvation(
-        windows.max(0) as usize,
-        tree_size.max(1) as usize,
-        percentile,
-    )?;
-    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
-    // Rounded up like the derivation: truncating lands the count short of the bar it must clear.
-    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
-    let shingle =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_shingle_size as i32,
-            histogram_interval,
-            training_window_days.max(1),
-            tree_size.max(1),
-        )
-        .unwrap_or(1);
-    // Sized on every bar, not the one that trips first, or the remedy leaves the config starved.
-    let needed =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
-            tree_size.max(1) as usize,
-            percentile,
-        );
-    let days = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
-        needed,
-        interval_minutes,
-        shingle,
-    );
-    let finer =
-        o2_enterprise::enterprise::anomaly_detection::rcf_model::interval_minutes_for_windows(
-            needed,
-            training_window_days.max(1) as usize,
-            shingle,
-        )
-        .filter(|m| *m < interval_minutes);
-    let days = days.filter(|d| *d <= MAX_ADVISABLE_WINDOW_DAYS);
-    let remedy = match (days, finer) {
-        (Some(d), Some(m)) => format!(
-            " Raise training_window_days to {d} at the current {histogram_interval}, or use a \
-             histogram_interval of {m}m or finer at the current {training_window_days} days, or \
-             lower the percentile."
-        ),
-        (Some(d), None) => format!(
-            " Raise training_window_days to {d} at the current {histogram_interval}, or lower \
-             the percentile."
-        ),
-        (None, Some(m)) => format!(
-            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days reaches the bar at a \
-             {histogram_interval} interval. Use a histogram_interval of {m}m or finer at the \
-             current {training_window_days} days, or lower the percentile."
-        ),
-        (None, None) => format!(
-            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days and no histogram_interval \
-             of a minute or coarser reaches the bar: this combination of interval and percentile \
-             cannot calibrate. Lower the percentile, or use a finer histogram_interval."
-        ),
+/// Merged with the stored row, since a partial update can break a cross-field rule.
+fn validated_band_settings(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let alert_direction = match &req.alert_direction {
+        Some(direction) => direction.as_deref(),
+        None => existing.alert_direction.as_deref(),
     };
-    // `0` is a config that can never train, not a thin window, so it is not a degree of that fault.
-    let severity = if windows == 0 {
-        " This config produces no training windows at all and will never train."
-    } else {
-        ""
-    };
-    Some(format!(
-        "p{} at a {} interval over {} days gives {} training windows, but {} are needed, so \
-         the bar will flag more often than the percentile names. The config is saved and will \
-         train.{}{}",
-        percentile as i64,
-        histogram_interval,
-        training_window_days,
-        windows,
-        needed,
-        severity,
-        remedy,
-    ))
+    validate_band_settings(
+        &BandSettings {
+            band_width: req.band_width.unwrap_or(existing.band_width),
+            alert_direction,
+            alert_window_buckets: req
+                .alert_window_buckets
+                .unwrap_or(existing.alert_window_buckets),
+            alert_window_fire_pct: req
+                .alert_window_fire_pct
+                .unwrap_or(existing.alert_window_fire_pct),
+            alert_window_recover_pct: req
+                .alert_window_recover_pct
+                .unwrap_or(existing.alert_window_recover_pct),
+            histogram_interval: req
+                .histogram_interval
+                .as_deref()
+                .unwrap_or(&existing.histogram_interval),
+        },
+        req.alert_budget_per_day
+            .unwrap_or(existing.alert_budget_per_day),
+    )
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
@@ -2101,26 +1919,6 @@ fn ensure_trainable(config: &infra::table::entity::anomaly_detection_config::Mod
         )));
     }
     Ok(())
-}
-
-/// The one place `alert_enabled` is allowed to decide anything: dispatch, never training.
-fn dispatch_allowed(anomaly_count: i32, alert_enabled: bool) -> bool {
-    anomaly_count > 0 && alert_enabled
-}
-
-/// Whether any destination actually received the alert: only `Ok(true)` counts, so a
-/// skipped destination (not found, non-HTTP) or a failed send can never arm the cooldown.
-fn any_alert_delivered(outcomes: impl IntoIterator<Item = anyhow::Result<bool>>) -> bool {
-    outcomes.into_iter().any(|o| matches!(o, Ok(true)))
-}
-
-/// Manual-run cooldown anchor, `min` not `first` since callers need not pass sorted points.
-fn leading_edge_anchor_us(points: impl IntoIterator<Item = (bool, i64)>) -> Option<i64> {
-    points
-        .into_iter()
-        .filter(|(is_anomaly, _)| *is_anomaly)
-        .map(|(_, timestamp)| timestamp)
-        .min()
 }
 
 /// Create-time training gate: the config's own `enabled`, not just the global kill-switch.
@@ -2831,71 +2629,6 @@ fn parse_interval(interval: &str) -> Result<i64> {
         .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
 }
 
-#[cfg(feature = "enterprise")]
-pub fn config_to_training_config(
-    config: &infra::table::entity::anomaly_detection_config::Model,
-) -> Result<o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig> {
-    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig;
-
-    let filters = o2_enterprise::enterprise::anomaly_detection::types::parse_filters(
-        config.filters.as_ref(),
-    )?;
-
-    Ok(AnomalyConfig {
-        anomaly_id: config.anomaly_id.clone(),
-        org_id: config.org_id.clone(),
-        stream_name: config.stream_name.clone(),
-        stream_type: serde_json::from_str(&format!("\"{}\"", config.stream_type))?,
-        enabled: config.enabled,
-        name: config.name.clone(),
-        description: config.description.clone(),
-        query_mode: serde_json::from_str(&format!("\"{}\"", config.query_mode))?,
-        filters,
-        custom_sql: config.custom_sql.clone(),
-        detection_function: {
-            use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
-            let (fn_name, _) = split_detection_function(&config.detection_function);
-            serde_json::from_str(&format!("\"{}\"", fn_name))?
-        },
-        detection_field: {
-            use o2_enterprise::enterprise::anomaly_detection::detector::split_detection_function;
-            let (_, field) = split_detection_function(&config.detection_function);
-            field
-        },
-        histogram_interval: config.histogram_interval.clone(),
-        schedule_interval: config.schedule_interval.clone(),
-        detection_window_seconds: config.detection_window_seconds,
-        training_window_days: config.training_window_days as usize,
-        retrain_interval_days: config.retrain_interval_days,
-        threshold: config.threshold,
-        alert_budget_per_day: config.alert_budget_per_day,
-        level_half_width_seconds: config.level_half_width_seconds,
-        seasonality: serde_json::from_str(&format!("\"{}\"", config.seasonality))
-            .unwrap_or_default(),
-        is_trained: config.is_trained,
-        training_started_at: config.training_started_at,
-        training_completed_at: config.training_completed_at,
-        last_processed_timestamp: config.last_processed_timestamp,
-        current_model_version: Some(config.current_model_version),
-        rcf_num_trees: config.rcf_num_trees as usize,
-        rcf_tree_size: config.rcf_tree_size as usize,
-        rcf_shingle_size: config.rcf_shingle_size as usize,
-        alert_enabled: config.alert_enabled,
-        alert_destinations: config
-            .alert_destinations
-            .as_ref()
-            .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
-            .unwrap_or_default(),
-        status: o2_enterprise::enterprise::anomaly_detection::types::Status::from_i32(
-            config.status,
-        ),
-        retries: config.retries,
-        last_updated: config.last_updated,
-        created_at: config.created_at,
-        updated_at: config.updated_at,
-    })
-}
-
 /// Execute a SQL query for anomaly detection and return time-series data points
 ///
 /// `start_time` and `end_time` are microseconds since epoch. The search service uses
@@ -3019,10 +2752,6 @@ fn declared_value_column(query_mode: &str, detection_function: &str) -> Option<S
 
 /// Parse search results into time-series data points.
 ///
-/// Extracts `timestamp`, `value`, and (when present) `hour` and `dow` from each hit.
-/// `hour` and `dow` are included by filter-based queries via `date_part()`; they are
-/// absent for custom SQL queries, in which case `QueryDataPoint` carries `None` and
-/// `build_feature_vector` falls back to Rust-side extraction from the timestamp.
 ///
 /// `value_column` is the config-declared column carrying the metric; `None` keeps the
 /// legacy name fallback.
@@ -3087,21 +2816,9 @@ fn parse_search_results_to_timeseries(
             }
         };
 
-        // Extract pre-computed temporal features (present for filter-based queries only).
-        let hour = hit
-            .get("hour")
-            .and_then(|v| v.as_f64())
-            .map(|h| h as f32 / 24.0);
-        let dow = hit
-            .get("dow")
-            .and_then(|v| v.as_f64())
-            .map(|d| d as f32 / 7.0);
-
         data_points.push(QueryDataPoint {
             timestamp_us,
             value,
-            hour,
-            dow,
         });
     }
 
@@ -3314,7 +3031,7 @@ fn anomaly_alert_message(
             match (ctx.max_deviation_percent, ctx.worst_expected) {
                 (Some(dev), Some(expected)) => format!(
                     "data volume dropped in window {window} | worst value: {worst:.2}, \
-                     {dev:.1}% below its hour-of-week median ~{expected:.2}"
+                     {dev:.1}% below its learned median ~{expected:.2}"
                 ),
                 _ => format!("data volume dropped in window {window} | worst value: {worst:.2}"),
             }
@@ -3408,8 +3125,10 @@ fn anomaly_alert_payload(
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook was actually
-/// sent; a skip returns `Ok(false)` so the caller never arms a cooldown on nothing.
+/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
+/// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
+/// error, so the caller never arms a cooldown, or records a run as delivered, on a send
+/// nobody actually received, and the history row can name the rejection.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
@@ -3481,6 +3200,26 @@ pub async fn send_anomaly_alert(
         .await?;
 
     let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        log::warn!(
+            "[anomaly_detection {}] destination '{}' rejected the alert: status={}, body={}",
+            anomaly_id,
+            destination_id,
+            status,
+            body
+        );
+        // The body lands in the alert-history error column, so a long HTML error page is cut.
+        let body = body.chars().take(REJECTION_BODY_MAX_CHARS).collect();
+        return Err(
+            o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
+                status: status.as_u16(),
+                body,
+            }
+            .into(),
+        );
+    }
+
     log::info!(
         "[anomaly_detection {}] alert sent to '{}': status={}",
         anomaly_id,
@@ -3660,6 +3399,11 @@ mod tests {
             rcf_num_trees: None,
             rcf_tree_size: None,
             rcf_shingle_size: None,
+            band_width: None,
+            alert_direction: None,
+            alert_window_buckets: None,
+            alert_window_fire_pct: None,
+            alert_window_recover_pct: None,
             alert_enabled: None,
             alert_destinations: vec![],
             enabled: None,
@@ -3996,30 +3740,6 @@ mod tests {
         let val = serde_json::json!("just a string");
         let result = model_to_api_json(val.clone());
         assert_eq!(result, val);
-    }
-
-    /// The API returned the stored `rcf_shingle_size` while the model trained at another
-    /// width, and only the log carried the truth. A 5m config stored at the default 4
-    /// trains at 1, so the response must carry that width beside the request.
-    #[test]
-    fn the_api_reports_the_width_the_model_trains_at() {
-        let val = serde_json::json!({
-            "rcf_shingle_size": 4i64,
-            "histogram_interval": "5m",
-            "training_window_days": 7i64,
-            "rcf_tree_size": 256i64,
-        });
-        let result = model_to_api_json(val);
-        assert_eq!(result["effective_rcf_shingle_size"], 1);
-        // The operator's request stays visible, so a 4 that became a 1 is legible as such.
-        assert_eq!(result["rcf_shingle_size"], 4);
-    }
-
-    /// A row without the shingle inputs must pass through rather than gain a fabricated width.
-    #[test]
-    fn a_row_without_the_shingle_inputs_gains_no_effective_width() {
-        let result = model_to_api_json(serde_json::json!({"name": "test"}));
-        assert!(result.get("effective_rcf_shingle_size").is_none());
     }
 
     // ── extract_timestamp_from_hit ──────────────────────────────────────────
@@ -4407,42 +4127,6 @@ mod tests {
     // ── P0.4: the interval rule as a shared pure seam ───────────────────────
 
     /// A value the create path rejects can never reach `SeasonalBaseline::fit`.
-    mod level_half_width_rule {
-        use super::*;
-
-        #[test]
-        fn a_non_null_half_width_inside_the_bound_is_accepted() {
-            for seconds in [1_i64, 3_600, 86_400, 365 * 86_400] {
-                assert!(
-                    validate_level_half_width(seconds).is_ok(),
-                    "{seconds}s is within one year and must be accepted"
-                );
-            }
-        }
-
-        #[test]
-        fn a_non_positive_half_width_is_rejected() {
-            for seconds in [0_i64, -1, -86_400] {
-                assert!(
-                    validate_level_half_width(seconds).is_err(),
-                    "{seconds}s cannot describe a level window"
-                );
-            }
-        }
-
-        #[test]
-        fn a_half_width_past_one_year_is_rejected() {
-            let err = validate_level_half_width(365 * 86_400 + 1)
-                .expect_err("one second past a year must not be stored");
-            let msg = err.to_string();
-            assert!(msg.contains("31536000"), "the bound must be stated: {msg}");
-            assert!(
-                !msg.contains("  "),
-                "the message must not carry a broken line continuation: {msg:?}"
-            );
-        }
-    }
-
     mod interval_pair_rule {
         use super::*;
 
@@ -4565,6 +4249,13 @@ mod tests {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
                 level_half_width_seconds: None,
+                band_width: None,
+                alert_direction: None,
+                alert_window_buckets: None,
+                alert_window_fire_pct: None,
+                alert_window_recover_pct: None,
+                band_grouping: None,
+                band_k: None,
                 stream_name: "logs".to_string(),
                 stream_type: "logs".to_string(),
                 enabled: true,
@@ -4602,6 +4293,7 @@ mod tests {
                 last_failed_at: None,
                 last_alert_fired_at: None,
                 last_recovery_notified_at: None,
+                detection_lease_us: None,
                 last_updated: 0,
                 created_at: 1000,
                 updated_at: 1000,
@@ -5254,6 +4946,13 @@ mod tests {
                 anomaly_id: "a1".to_string(),
                 org_id: "default".to_string(),
                 level_half_width_seconds: None,
+                band_width: None,
+                alert_direction: None,
+                alert_window_buckets: None,
+                alert_window_fire_pct: None,
+                alert_window_recover_pct: None,
+                band_grouping: None,
+                band_k: None,
                 stream_name: "logs".to_string(),
                 stream_type: "logs".to_string(),
                 enabled: true,
@@ -5291,6 +4990,7 @@ mod tests {
                 last_failed_at: None,
                 last_alert_fired_at: None,
                 last_recovery_notified_at: None,
+                detection_lease_us: None,
                 last_updated: 0,
                 created_at: 1000,
                 updated_at: 1000,
@@ -5340,59 +5040,6 @@ mod tests {
             assert!(ensure_trainable(&burning).is_ok());
         }
 
-        /// `alert_enabled=false` DOES suppress dispatch — the other half of the same policy.
-        /// Targets the predicate `detect_anomalies` calls, so the test cannot drift from it.
-        #[test]
-        fn alert_enabled_false_suppresses_dispatch() {
-            assert!(!dispatch_allowed(7, false));
-            assert!(dispatch_allowed(7, true));
-        }
-
-        /// Dispatch still needs anomalies: `alert_enabled` alone must not fire an empty run.
-        #[test]
-        fn dispatch_needs_both_anomalies_and_the_alert_flag() {
-            assert!(!dispatch_allowed(0, true));
-            assert!(!dispatch_allowed(0, false));
-        }
-
-        /// The manual `/detect` path delivered real webhooks while leaving
-        /// `last_alert_fired_at` NULL, so the cooldown never saw those alerts. The anchor it
-        /// records must be the leading edge, matching the scheduled path.
-        #[test]
-        fn the_manual_anchor_is_the_earliest_anomalous_point() {
-            let points = [(false, 10), (true, 30), (true, 20), (false, 5)];
-            assert_eq!(leading_edge_anchor_us(points), Some(20));
-        }
-
-        /// A run that scored nothing anomalous has no anchor to arm the cooldown with.
-        #[test]
-        fn a_run_without_anomalies_yields_no_manual_anchor() {
-            assert_eq!(leading_edge_anchor_us([(false, 10), (false, 20)]), None);
-            assert_eq!(leading_edge_anchor_us([]), None);
-        }
-
-        /// `send_anomaly_alert` returns Ok on its skip paths (destination missing,
-        /// non-HTTP); counting those as deliveries armed the cooldown with nothing sent.
-        #[test]
-        fn a_skipped_destination_does_not_count_as_delivered() {
-            assert!(!any_alert_delivered([Ok(false)]));
-            assert!(!any_alert_delivered([
-                Ok(false),
-                Err(anyhow::anyhow!("boom"))
-            ]));
-            assert!(!any_alert_delivered([]));
-        }
-
-        /// A single real delivery arms the cooldown even when other destinations skip.
-        #[test]
-        fn a_real_delivery_still_arms_the_cooldown() {
-            assert!(any_alert_delivered([Ok(false), Ok(true)]));
-            assert!(any_alert_delivered([
-                Err(anyhow::anyhow!("boom")),
-                Ok(true)
-            ]));
-        }
-
         /// `Status::Disabled` (4) is dead: nothing writes it, and the guard keys off
         /// `enabled`, so a row carrying it is still trainable. Documents current reality.
         #[test]
@@ -5422,10 +5069,6 @@ mod tests {
             assert!(!initial_training_allowed(true, true));
             assert!(!initial_training_allowed(false, true));
         }
-
-        // Wiring the guard into train_model / force_retrain_for_threshold / ENT
-        // trigger_training is a KNOWN GAP no unit test here can hold; the
-        // implementation-phase diff review owns it.
     }
 
     // ── G4: a denominator-free error count is not a detection target ─────────
@@ -6452,7 +6095,7 @@ mod tests {
             c.max_deviation_percent = Some(76.1);
             let msg = anomaly_alert_message(&c, LINK);
             assert!(
-                msg.contains("worst value: 43.00, 76.1% below its hour-of-week median ~180.00"),
+                msg.contains("worst value: 43.00, 76.1% below its learned median ~180.00"),
                 "{msg}"
             );
             assert!(
@@ -6609,116 +6252,202 @@ mod tests {
         }
     }
 
-    /// The whole change rests on this: a value the operator typed is never second-guessed.
     #[test]
-    fn an_explicit_training_window_is_always_honoured_and_only_an_omitted_one_is_derived() {
-        // A derived value exists for 1h, so a routing bug would return 30, not the explicit value.
+    fn an_explicit_training_window_is_honoured_and_only_an_omitted_one_takes_the_default() {
         for explicit in [1_i32, 3, 7, 30, 365, i32::MAX] {
-            assert_eq!(
-                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
-                explicit,
-                "an explicit {explicit} days must be stored as {explicit}"
-            );
+            assert_eq!(resolved_training_window_days(Some(explicit)), explicit);
         }
-        // Non-positive takes update's `.max(1)` rule rather than the derivation.
         for explicit in [0_i32, -1, i32::MIN] {
-            assert_eq!(
-                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
-                1,
-                "a non-positive window clamps to 1, never to a derivation"
-            );
+            assert_eq!(resolved_training_window_days(Some(explicit)), 1);
         }
-        // At 1h the derivation must actually move, or every assertion above passes vacuously.
-        assert_eq!(resolved_training_window_days(None, "1h", 97.0, 256), 30);
+        assert_eq!(resolved_training_window_days(None), 28);
     }
 
-    #[test]
-    fn the_derived_training_window_never_narrows_and_only_widens_when_it_buys_something() {
-        // The derivation may only ever widen; a narrowing would silently cut history.
-        for interval in [
-            "1s", "30s", "1m", "5m", "15m", "30m", "1h", "90m", "2h", "6h", "12h", "1d", "202s",
-        ] {
-            for percentile in [50.0, 80.0, 90.0, 97.0, 99.0] {
-                let derived = derived_training_window_days(interval, percentile, 256);
-                assert!(
-                    derived >= 7,
-                    "{interval} at p{percentile} derived {derived}, narrower than the shipped 7"
+    mod band_settings_rule {
+        use super::*;
+
+        fn defaults() -> BandSettings<'static> {
+            BandSettings {
+                band_width: None,
+                alert_direction: None,
+                alert_window_buckets: None,
+                alert_window_fire_pct: None,
+                alert_window_recover_pct: None,
+                histogram_interval: "5m",
+            }
+        }
+
+        #[test]
+        fn all_absent_is_valid() {
+            assert!(validate_band_settings(&defaults(), None).is_ok());
+            assert!(validate_band_settings(&defaults(), Some(2.0)).is_ok());
+        }
+
+        #[test]
+        fn band_width_is_bounded_and_finite() {
+            for ok in [1.0, 3.5, 10.0] {
+                let s = BandSettings {
+                    band_width: Some(ok),
+                    ..defaults()
+                };
+                assert!(validate_band_settings(&s, None).is_ok(), "{ok}");
+            }
+            for bad in [0.99, 10.01, -3.0, f64::NAN, f64::INFINITY] {
+                let s = BandSettings {
+                    band_width: Some(bad),
+                    ..defaults()
+                };
+                assert!(validate_band_settings(&s, None).is_err(), "{bad}");
+            }
+        }
+
+        #[test]
+        fn band_width_beside_a_budget_is_rejected() {
+            let s = BandSettings {
+                band_width: Some(4.0),
+                ..defaults()
+            };
+            let err = validate_band_settings(&s, Some(1.0))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("alert_budget_per_day"), "{err}");
+        }
+
+        #[test]
+        fn direction_must_be_a_known_value() {
+            for ok in ["both", "above", "below"] {
+                let s = BandSettings {
+                    alert_direction: Some(ok),
+                    ..defaults()
+                };
+                assert!(validate_band_settings(&s, None).is_ok(), "{ok}");
+            }
+            for bad in ["Above", "up", ""] {
+                let s = BandSettings {
+                    alert_direction: Some(bad),
+                    ..defaults()
+                };
+                assert!(validate_band_settings(&s, None).is_err(), "{bad:?}");
+            }
+        }
+
+        #[test]
+        fn window_buckets_are_at_least_one() {
+            for (n, ok) in [(0, false), (1, true), (288, true), (-1, false)] {
+                let s = BandSettings {
+                    alert_window_buckets: Some(n),
+                    ..defaults()
+                };
+                assert_eq!(validate_band_settings(&s, None).is_ok(), ok, "{n}");
+            }
+        }
+
+        #[test]
+        fn the_window_spans_at_most_a_day_of_histogram_buckets() {
+            for (interval, n, ok) in [
+                ("5m", 288, true),
+                ("5m", 289, false),
+                ("1m", 720, true),
+                ("1m", 1440, true),
+                ("1m", 1441, false),
+                ("1h", 24, true),
+                ("1h", 25, false),
+                ("1d", 1, true),
+                ("1d", 2, false),
+                ("13d", 1, true),
+                ("13d", 2, false),
+                ("junk", 288, true),
+            ] {
+                let s = BandSettings {
+                    alert_window_buckets: Some(n),
+                    histogram_interval: interval,
+                    ..defaults()
+                };
+                assert_eq!(
+                    validate_band_settings(&s, None).is_ok(),
+                    ok,
+                    "{n} x {interval}"
                 );
             }
         }
-        // The floor binds here, so the cadences the ledger measured at are untouched.
-        assert_eq!(derived_training_window_days("1m", 97.0, 256), 7);
-        assert_eq!(derived_training_window_days("5m", 97.0, 256), 7);
-        // Where it widens it must cross the reservoir, or it buys query span for no calibration.
-        for (interval, expected) in [("15m", 11), ("30m", 21), ("1h", 30), ("6h", 7), ("1d", 7)] {
-            assert_eq!(
-                derived_training_window_days(interval, 97.0, 256),
-                expected,
-                "{interval} must derive {expected}"
-            );
-            let derived = derived_training_window_days(interval, 97.0, 256);
-            if derived > 7 {
-                let windows = expected_training_windows(interval, derived, 256)
-                    .expect("a parseable interval has a window count");
-                assert!(
-                    windows >= 256,
-                    "{interval} widened to {derived} days for {windows} windows, still below \
-                     the reservoir — a cost with no benefit"
+
+        #[test]
+        fn recover_must_sit_in_zero_to_fire_and_fire_at_most_one_hundred() {
+            let cases = [
+                (Some(80.0), Some(60.0), true),
+                (Some(80.0), Some(80.0), true),
+                (Some(80.0), None, true),
+                (None, Some(50.0), true),
+                (Some(80.0), Some(90.0), false),
+                (None, Some(0.0), false),
+                (Some(0.0), None, false),
+                (Some(100.5), None, false),
+                (Some(f64::NAN), None, false),
+            ];
+            for (fire, recover, ok) in cases {
+                let s = BandSettings {
+                    alert_window_fire_pct: fire,
+                    alert_window_recover_pct: recover,
+                    ..defaults()
+                };
+                assert_eq!(
+                    validate_band_settings(&s, None).is_ok(),
+                    ok,
+                    "fire={fire:?} recover={recover:?}"
                 );
             }
         }
-    }
 
-    #[test]
-    fn the_starvation_warning_advice_clears_the_bar_in_one_move() {
-        // Sizing the remedy on the bar that trips first left it starved on the percentile's own.
-        let warning = training_window_starvation_warning("1h", 7, 97.0, 256)
-            .expect("7d/1h/p97 is starved at the shipped defaults");
-        assert!(
-            warning.contains("training_window_days to 42"),
-            "the advice must clear every bar at once: {warning}"
-        );
-        assert!(
-            !warning.contains("training_window_days to 11"),
-            "11 days clears only the reservoir: {warning}"
-        );
-        // And following it must genuinely work.
-        let after = expected_training_windows("1h", 42, 256).expect("parseable");
-        assert!(
-            after >= 1000,
-            "42 days at 1h gives {after} windows, short of 1000"
-        );
+        #[test]
+        fn an_update_is_judged_against_the_stored_row() {
+            let mut stored = super::update_interval_validation::stored_config();
+            stored.band_width = Some(4.0);
+            let budget_only = UpdateAnomalyConfigRequest {
+                alert_budget_per_day: Some(Some(1.0)),
+                ..Default::default()
+            };
+            assert!(validated_band_settings(&budget_only, &stored).is_err());
+            let budget_and_clear = UpdateAnomalyConfigRequest {
+                alert_budget_per_day: Some(Some(1.0)),
+                band_width: Some(None),
+                ..Default::default()
+            };
+            assert!(validated_band_settings(&budget_and_clear, &stored).is_ok());
+            stored.alert_window_fire_pct = Some(50.0);
+            let recover_above_stored_fire = UpdateAnomalyConfigRequest {
+                alert_window_recover_pct: Some(Some(60.0)),
+                ..Default::default()
+            };
+            assert!(validated_band_settings(&recover_above_stored_fire, &stored).is_err());
+            let four_hours_of_five_minute_buckets = UpdateAnomalyConfigRequest {
+                alert_window_buckets: Some(Some(48)),
+                ..Default::default()
+            };
+            assert!(validated_band_settings(&four_hours_of_five_minute_buckets, &stored).is_ok());
+            let hourly = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1h".to_string()),
+                ..Default::default()
+            };
+            stored.alert_window_buckets = Some(48);
+            assert!(validated_band_settings(&hourly, &stored).is_err());
+        }
 
-        // A calibrated config says nothing at all.
-        assert!(
-            training_window_starvation_warning("1m", 7, 97.0, 256).is_none(),
-            "1m/7d/p97 clears both bars and must not be warned about"
-        );
-        // An unparseable interval is the interval rules' business, not this one's.
-        assert!(training_window_starvation_warning("junk", 7, 97.0, 256).is_none());
-    }
-
-    #[test]
-    fn an_unusable_requirement_is_named_as_such_rather_than_printed_as_an_instruction() {
-        // `rcf_tree_size` has no range validation, so garbage must not become confident advice.
-        let absurd = training_window_starvation_warning("1h", 7, 97.0, 2_000_000_000)
-            .expect("an absurd tree size is starved");
-        assert!(
-            !absurd.contains("training_window_days to 83333334"),
-            "a day count nobody can act on must not be printed as advice: {absurd}"
-        );
-        assert!(
-            absurd.contains("cannot calibrate") || absurd.contains("No training window"),
-            "past the advisable bound the message must say so: {absurd}"
-        );
-
-        // A config that can never train at all is a different fault from a thin one.
-        let never = training_window_starvation_warning("30d", 7, 97.0, 256)
-            .expect("a 30d bucket over a 7d window yields nothing");
-        assert!(
-            never.contains("will never train"),
-            "zero training windows is not a degree of thinness: {never}"
-        );
+        #[test]
+        fn update_band_fields_keep_absent_and_null_apart() {
+            let absent: UpdateAnomalyConfigRequest = serde_json::from_str("{}").unwrap();
+            assert_eq!(absent.band_width, None);
+            assert_eq!(absent.alert_direction, None);
+            let null: UpdateAnomalyConfigRequest = serde_json::from_str(
+                r#"{"band_width":null,"alert_direction":null,"alert_window_buckets":null,
+                    "alert_window_fire_pct":null,"alert_window_recover_pct":null}"#,
+            )
+            .unwrap();
+            assert_eq!(null.band_width, Some(None));
+            assert_eq!(null.alert_direction, Some(None));
+            assert_eq!(null.alert_window_buckets, Some(None));
+            assert_eq!(null.alert_window_fire_pct, Some(None));
+            assert_eq!(null.alert_window_recover_pct, Some(None));
+        }
     }
 
     #[test]
@@ -6751,6 +6480,7 @@ mod tests {
             "stream_name": "s",
             "stream_type": "logs",
             "query_mode": "filters",
+            "detection_function": "count",
             "histogram_interval": "5m",
             "schedule_interval": "5m",
             "detection_window_seconds": 1200,
@@ -6780,5 +6510,61 @@ mod tests {
         );
         // An untagged request yields no role group at all, which is the bug this pins.
         assert_ne!(RoleGroup::from(SearchEventType::UI), RoleGroup::Background);
+    }
+
+    #[test]
+    fn red_insights_templates_pass_create_validation() {
+        use crate::traces::red_insights::{RedSignal, StreamColumns, template};
+
+        for has_parent in [true, false] {
+            let cols = StreamColumns {
+                has_parent,
+                has_status: true,
+                has_duration: true,
+            };
+            for (stream, service) in [
+                ("default", "checkout"),
+                ("a\"b", "o'brien"),
+                ("t/x", "api/v1"),
+            ] {
+                for signal in RedSignal::ALL {
+                    let req = template(stream, service, signal, &cols)
+                        .expect("every signal is eligible here")
+                        .into_request("default");
+                    validate_config_request(&req)
+                        .unwrap_or_else(|e| panic!("{signal:?} on {stream}/{service}: {e}"));
+                    config::meta::alerts::tags::normalize_tags(&req.tags).unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn red_insights_skips_exactly_the_rate_detectors_g4_rejects() {
+        use crate::traces::red_insights::{RedSignal, StreamColumns, template};
+
+        let cols = StreamColumns {
+            has_parent: true,
+            has_status: true,
+            has_duration: true,
+        };
+        for word in ERROR_VOCABULARY {
+            let stream = format!("app-{word}");
+            assert!(
+                template(&stream, "svc", RedSignal::Rate, &cols).is_none(),
+                "{stream}"
+            );
+            let mut req = template("default", "svc", RedSignal::Rate, &cols)
+                .unwrap()
+                .into_request("default");
+            req.stream_name = stream.clone();
+            assert!(validate_config_request(&req).is_err(), "{stream}");
+            for signal in [RedSignal::ErrorRatio, RedSignal::P95Latency] {
+                let req = template(&stream, "svc", signal, &cols)
+                    .unwrap()
+                    .into_request("default");
+                validate_config_request(&req).unwrap_or_else(|e| panic!("{signal:?}: {e}"));
+            }
+        }
     }
 }

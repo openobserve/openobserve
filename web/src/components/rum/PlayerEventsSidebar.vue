@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-time="currentTime"
         :start-time="startTime"
         :end-time="endTime"
+        :rum-window-us="rumWindowUs"
         @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
       />
     </KeepAlive>
@@ -111,6 +112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <OTruncatedText data-test="event-name">{{ filteredEvent.name }}</OTruncatedText>
+              <OTag
+                v-if="markedSet.has(filteredEvent.timestamp)"
+                :label="t('rum.analytics.viewer.stepMark')"
+                variant="primary-soft"
+                size="xs"
+                class="ms-2 shrink-0"
+                data-test="session-viewer-funnel-step-mark"
+              />
             </div>
           </div>
         </template>
@@ -120,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch, type PropType } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
@@ -160,7 +169,17 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
+  },
+  markedTimestamps: {
+    type: Array as PropType<number[]>,
+    default: () => [],
+  },
 });
+
+const markedSet = computed(() => new Set(props.markedTimestamps));
 
 const activeTab = ref<string>("breadcrumbs");
 const tabs: Array<{

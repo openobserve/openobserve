@@ -50,26 +50,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @close="hideContextMenu"
     />
 
-    <!-- Unified Analysis Dashboard with Tabs -->
-    <TracesAnalysisDashboard
-      v-if="showAnalysisDashboard"
-      :streamName="streamName"
-      streamType="traces"
-      :timeRange="originalTimeRangeBeforeSelection || effectiveTimeRange"
-      :rateFilter="analysisRateFilter"
-      :durationFilter="analysisDurationFilter"
-      :errorFilter="analysisErrorFilter"
-      :baseFilter="parsedEffectiveFilter"
-      :streamFields="streamFields"
-      :analysisType="defaultAnalysisTab"
-      :availableAnalysisTypes="['volume', 'error', 'duration']"
-      @close="showAnalysisDashboard = false"
-    />
+    <Teleport v-if="showAnalysisDashboard" defer to="#traces-drill-down-page">
+      <TracesAnalysisDashboard
+        full-page
+        :streamName="streamName"
+        streamType="traces"
+        :timeRange="originalTimeRangeBeforeSelection || effectiveTimeRange"
+        :rateFilter="analysisRateFilter"
+        :durationFilter="analysisDurationFilter"
+        :errorFilter="analysisErrorFilter"
+        :baseFilter="parsedEffectiveFilter"
+        :streamFields="streamFields"
+        :analysisType="defaultAnalysisTab"
+        :availableAnalysisTypes="['volume', 'error', 'duration']"
+        @close="showAnalysisDashboard = false"
+      />
+    </Teleport>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onBeforeUnmount, computed, defineAsyncComponent, nextTick } from "vue";
+import {
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -162,6 +171,13 @@ interface AnalysisFilter {
   timeEnd?: number;
 }
 const showAnalysisDashboard = ref(false);
+// The analysis is a snapshot of the search that opened it, so a new search closes it.
+watch(
+  () => searchObj.loading,
+  (loading, wasLoading) => {
+    if (loading && !wasLoading) showAnalysisDashboard.value = false;
+  },
+);
 const analysisDurationFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });

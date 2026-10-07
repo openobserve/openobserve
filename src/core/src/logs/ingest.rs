@@ -136,6 +136,10 @@ pub async fn ingest(
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
+    // Usage counts only from a server-side identity; a user credential cannot claim it.
+    #[cfg(feature = "vectorscan")]
+    let usage_request =
+        matches!(in_req, IngestionRequest::Usage(_)) && matches!(user, IngestUser::SystemJob(_));
     let log_ingestion_errors = ingestion_log_enabled().await;
     // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
@@ -160,6 +164,32 @@ pub async fn ingest(
     };
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
+    }
+    // Internal writers pass the same test as the rollup write guard below.
+    #[cfg(feature = "vectorscan")]
+    let platform_write = {
+        let internal_writer = is_derived || matches!(user, IngestUser::SystemJob(_));
+        let source = stream_name.clone();
+        move |stream: &str| {
+            config::meta::self_reporting::redaction::is_platform_write(
+                usage_request,
+                internal_writer,
+                &source,
+                stream,
+            )
+        }
+    };
+    // Refused here, before any pipeline runs: a remote-stream destination writes inside it.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        org_id,
+        StreamType::Logs,
+        &[(&stream_name, 0)],
+        &platform_write,
+    )
+    .await
+    {
+        return Err(Error::ResourceError(reason));
     }
     let dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&stream_name);
 
@@ -648,6 +678,25 @@ pub async fn ingest(
     drop(executable_pipelines);
     drop(original_options);
     drop(user_defined_schema_map);
+
+    // Pipeline destinations, which the check before the pipelines could not see.
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+            org_id,
+            StreamType::Logs,
+            &streams,
+            &platform_write,
+        )
+        .await
+        {
+            return Err(Error::ResourceError(reason));
+        }
+    }
 
     #[cfg(feature = "vectorscan")]
     if pattern_manager.is_none() {

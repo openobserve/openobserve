@@ -107,9 +107,13 @@ export default defineComponent({
             showTrialPeriodMsg.value = false;
           }
         }
-      } catch (e) {
-        // If fetch fails, keep the default behavior
-        console.error("Failed to fetch billing info:", e);
+      } catch (e: any) {
+        // If fetch fails, keep the default behavior. A 401 here is already
+        // handled globally (http.ts logs the user out and reloads) — logging
+        // it too just adds noise for an expected session-expiry race.
+        if (e?.response?.status !== 401) {
+          console.error("Failed to fetch billing info:", e);
+        }
       }
     });
 

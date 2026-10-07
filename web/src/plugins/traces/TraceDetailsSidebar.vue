@@ -99,6 +99,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-3xs text-text-body font-semibold">{{ getDuration }}</span>
           </OTag>
 
+          <span v-if="operationPercentile" class="me-[0.325rem] inline-flex shrink-0">
+            <OTag
+              :variant="operationPercentile.variant"
+              size="sm"
+              data-test="trace-details-sidebar-header-toolbar-operation-percentile"
+              >{{
+                t("traces.traceDetailsSidebar.operationPercentileBand", {
+                  band: operationPercentile.band,
+                  operation: span.operation_name,
+                })
+              }}</OTag
+            >
+            <OTooltip
+              :content="operationPercentile.tooltip"
+              max-width="none"
+              content-class="whitespace-nowrap"
+            />
+          </span>
+
           <!-- TTFT Badge -->
           <OTag
             v-if="getTTFT"
@@ -194,6 +213,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
+            <OButton
+              v-if="spanProfileMatch"
+              variant="outline"
+              size="xs"
+              class="ms-1 h-full text-xs!"
+              data-test="trace-details-sidebar-header-toolbar-view-profile-btn"
+              @click.stop="viewSpanProfile"
+            >
+              {{ t("traces.viewProfile") }}
+            </OButton>
           </span>
 
           <!-- LLM workflow actions — icon-only, matching the trace header. The
@@ -1040,9 +1069,54 @@ import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import llmPromptsService from "@/services/llm-prompts.service";
 import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
+import searchService from "@/services/search";
+import { quoteSqlIdentifier, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { queryClient } from "@/composables/query/queryClient";
+import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
+import { encodeProfileFilters } from "@/services/profiles";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
 const HUMAN_TZ_FORMAT = "MMM dd, yyyy HH:mm:ss.SSS ZZZ";
+const OPERATION_STATS_MIN_SAMPLES = 20;
+const OPERATION_STATS_FALLBACK_WINDOW_US = 3_600_000_000;
+const OPERATION_STATS_FALLBACK_BUCKET_US = 600_000_000;
+const PROFILE_LINK_PAD_US = 60_000_000;
+const PROFILE_LINK_CONCURRENCY = 3;
+
+interface OperationStats {
+  n: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  p99: number;
+}
+
+interface OperationStatsRequest {
+  key: string;
+  org: string;
+  stream: string;
+  service: string;
+  operation: string;
+  startTime: number;
+  endTime: number;
+}
+
+interface SpanProfileRequest {
+  key: string;
+  org: string;
+  traceId: string;
+  spanId: string;
+  startTime: number;
+  endTime: number;
+}
+
+interface SpanProfileMatch {
+  stream: string;
+  profileType: string;
+  profileUnit: string;
+  serviceName?: string;
+}
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1803,7 +1877,10 @@ export default defineComponent({
 
     const viewSpanLogs = async () => {
       if (config.isEnterprise === "true") {
+        const clickedSpan = spanKey(props.span);
         await loadCorrelation();
+        // The user moved to another span while this lookup ran: do nothing.
+        if (spanKey(props.span) !== clickedSpan) return;
         if (correlationProps.value?.logStreams?.length) {
           navigateToCorrelatedLogs(correlationProps.value);
         } else {
@@ -1830,6 +1907,240 @@ export default defineComponent({
 
     /** The trace stream this span was read from — the annotation API needs it. */
     const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
+
+    const operationStatsCache = ref<Record<string, OperationStats | null>>({});
+    const pendingOperationStats = new Set<string>();
+
+    const operationStatsRequest = computed((): OperationStatsRequest | null => {
+      const stream = spanSourceStream.value;
+      const service = props.span?.service_name;
+      const operation = props.span?.operation_name;
+      if (!stream || !service || !operation) return null;
+      const saved = searchObj.data?.queryPayload?.query;
+      // Re-resolving a relative range would move the window, so reuse the bounds the page searched.
+      const usePageBounds =
+        props.parentMode !== "embedded" &&
+        stream === searchObj.data?.stream?.selectedStream?.value &&
+        saved?.start_time &&
+        saved?.end_time;
+      let startTime: number;
+      let endTime: number;
+      if (usePageBounds) {
+        startTime = Number(saved.start_time);
+        endTime = Number(saved.end_time);
+      } else {
+        const spanStartUs = Math.floor(Number(props.span?.start_time) / 1_000);
+        if (!Number.isFinite(spanStartUs)) return null;
+        // Bucketing the span start lets nearby spans share one cached window that still contains each.
+        const bucketUs =
+          Math.floor(spanStartUs / OPERATION_STATS_FALLBACK_BUCKET_US) *
+          OPERATION_STATS_FALLBACK_BUCKET_US;
+        startTime = bucketUs - OPERATION_STATS_FALLBACK_WINDOW_US;
+        endTime =
+          bucketUs + OPERATION_STATS_FALLBACK_WINDOW_US + OPERATION_STATS_FALLBACK_BUCKET_US;
+      }
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      const key = JSON.stringify([org, stream, service, operation, startTime, endTime]);
+      return { key, org, stream, service, operation, startTime, endTime };
+    });
+
+    const fetchOperationStats = async (req: OperationStatsRequest) => {
+      if (req.key in operationStatsCache.value || pendingOperationStats.has(req.key)) return;
+      pendingOperationStats.add(req.key);
+      const sql =
+        "SELECT COUNT(*) AS n, " +
+        "approx_percentile_cont(duration, 0.5) AS p50, " +
+        "approx_percentile_cont(duration, 0.75) AS p75, " +
+        "approx_percentile_cont(duration, 0.9) AS p90, " +
+        "approx_percentile_cont(duration, 0.99) AS p99 " +
+        `FROM ${quoteSqlIdentifier(req.stream)} ` +
+        `WHERE service_name = ${quoteSqlLiteral(req.service)} ` +
+        `AND operation_name = ${quoteSqlLiteral(req.operation)}`;
+      try {
+        const res = await searchService.search({
+          org_identifier: req.org,
+          query: {
+            query: { sql, start_time: req.startTime, end_time: req.endTime, from: 0, size: 1 },
+          },
+          page_type: "traces",
+        });
+        const hit = res?.data?.hits?.[0];
+        operationStatsCache.value[req.key] = hit
+          ? {
+              n: Number(hit.n),
+              p50: Number(hit.p50),
+              p75: Number(hit.p75),
+              p90: Number(hit.p90),
+              p99: Number(hit.p99),
+            }
+          : null;
+      } catch {
+        operationStatsCache.value[req.key] = null;
+      } finally {
+        pendingOperationStats.delete(req.key);
+      }
+    };
+
+    watch(
+      operationStatsRequest,
+      (req) => {
+        if (req) fetchOperationStats(req);
+      },
+      { immediate: true },
+    );
+
+    const operationPercentile = computed(() => {
+      const req = operationStatsRequest.value;
+      const stats = req ? operationStatsCache.value[req.key] : null;
+      const duration = Number(props.span?.duration);
+      // approx_percentile_cont returns 0 when the column type is not inferred.
+      if (!stats || !(stats.n >= OPERATION_STATS_MIN_SAMPLES) || !(stats.p50 > 0)) return null;
+      if (!Number.isFinite(duration)) return null;
+      let band = t("traces.traceDetailsSidebar.operationBandAboveP99");
+      let variant: BadgeVariant = "error-soft";
+      if (duration < stats.p50) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandBelowP50"), "default-soft"];
+      } else if (duration < stats.p75) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP50ToP75"), "default-soft"];
+      } else if (duration < stats.p90) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP75ToP90"), "default-soft"];
+      } else if (duration <= stats.p99) {
+        [band, variant] = [t("traces.traceDetailsSidebar.operationBandP90ToP99"), "warning-soft"];
+      }
+      const tooltip = t("traces.traceDetailsSidebar.operationPercentilesTooltip", {
+        p50: formatTimeWithSuffix(stats.p50),
+        p75: formatTimeWithSuffix(stats.p75),
+        p90: formatTimeWithSuffix(stats.p90),
+        p99: formatTimeWithSuffix(stats.p99),
+        n: stats.n.toLocaleString(),
+      });
+      return { band, variant, tooltip };
+    });
+
+    const spanProfileCache = ref<Record<string, SpanProfileMatch | null>>({});
+    const pendingSpanProfiles = new Set<string>();
+
+    const spanProfileRequest = computed((): SpanProfileRequest | null => {
+      const traceId = String(props.span?.trace_id ?? "");
+      const spanId = String(props.span?.span_id ?? "");
+      if (props.parentMode !== "standalone" || !traceId || !spanId) return null;
+      const startUs = Math.floor(Number(props.span?.start_time) / 1_000);
+      const endUs = Math.ceil(Number(props.span?.end_time) / 1_000);
+      if (!Number.isFinite(startUs)) return null;
+      const org = String(store.state.selectedOrganization?.identifier ?? "");
+      return {
+        key: JSON.stringify([org, traceId, spanId]),
+        org,
+        traceId,
+        spanId,
+        startTime: startUs - PROFILE_LINK_PAD_US,
+        endTime: (Number.isFinite(endUs) ? endUs : startUs) + PROFILE_LINK_PAD_US,
+      };
+    });
+
+    const probeProfileStream = async (
+      req: SpanProfileRequest,
+      stream: string,
+    ): Promise<SpanProfileMatch | null> => {
+      try {
+        const schema = await queryClient.fetchQuery(streamSchemaQuery(req.org, stream, "profiles"));
+        const fields = new Set(
+          (schema?.schema || schema?.fields || []).map((f: { name: string }) => f.name),
+        );
+        if (!fields.has("trace_id") || !fields.has("span_id")) return null;
+        const hasService = fields.has("service_name");
+        const columns = hasService
+          ? "profile_type, profile_unit, service_name"
+          : "profile_type, profile_unit";
+        const sql =
+          `SELECT ${columns}, COUNT(*) AS c FROM ${quoteSqlIdentifier(stream)} ` +
+          `WHERE trace_id = ${quoteSqlLiteral(req.traceId)} ` +
+          `AND span_id = ${quoteSqlLiteral(req.spanId)} GROUP BY ${columns}`;
+        const res = await searchService.search({
+          org_identifier: req.org,
+          query: {
+            query: { sql, start_time: req.startTime, end_time: req.endTime, from: 0, size: 100 },
+          },
+          page_type: "profiles",
+        });
+        const hits: Record<string, unknown>[] = res?.data?.hits ?? [];
+        const hit = hits.find((h) => String(h.profile_type).toLowerCase() === "cpu") ?? hits[0];
+        if (!hit) return null;
+        return {
+          stream,
+          profileType: String(hit.profile_type ?? ""),
+          profileUnit: String(hit.profile_unit ?? ""),
+          serviceName: hasService && hit.service_name ? String(hit.service_name) : undefined,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const findSpanProfile = async (req: SpanProfileRequest) => {
+      const list = await queryClient.fetchQuery(streamNameListQuery(req.org, "profiles"));
+      const streams = list
+        .map((item: Record<string, unknown>) => String(item.name ?? item.stream_name ?? ""))
+        .filter(Boolean);
+      for (let i = 0; i < streams.length; i += PROFILE_LINK_CONCURRENCY) {
+        if (spanProfileRequest.value?.key !== req.key) return undefined;
+        const batch = streams.slice(i, i + PROFILE_LINK_CONCURRENCY);
+        const matches = await Promise.all(batch.map((s: string) => probeProfileStream(req, s)));
+        const match = matches.find(Boolean);
+        if (match) return match;
+      }
+      return null;
+    };
+
+    const detectSpanProfile = async (req: SpanProfileRequest) => {
+      if (req.key in spanProfileCache.value || pendingSpanProfiles.has(req.key)) return;
+      pendingSpanProfiles.add(req.key);
+      try {
+        const match = await findSpanProfile(req);
+        // An abandoned probe proved nothing, so it must not cache a miss.
+        if (match !== undefined) spanProfileCache.value[req.key] = match;
+      } catch {
+        spanProfileCache.value[req.key] = null;
+      } finally {
+        pendingSpanProfiles.delete(req.key);
+      }
+    };
+
+    watch(
+      spanProfileRequest,
+      (req) => {
+        if (req) detectSpanProfile(req);
+      },
+      { immediate: true },
+    );
+
+    const spanProfileMatch = computed(() => {
+      const req = spanProfileRequest.value;
+      return req ? (spanProfileCache.value[req.key] ?? null) : null;
+    });
+
+    const viewSpanProfile = () => {
+      const req = spanProfileRequest.value;
+      const match = spanProfileMatch.value;
+      if (!req || !match) return;
+      router.push({
+        name: "profiles",
+        query: {
+          org_identifier: req.org,
+          stream: match.stream,
+          from: String(req.startTime),
+          to: String(req.endTime),
+          ...(match.serviceName ? { service_name: match.serviceName } : {}),
+          profile_type: match.profileType,
+          profile_unit: match.profileUnit,
+          filters: encodeProfileFilters([
+            { key: "trace_id", op: "=", value: req.traceId },
+            { key: "span_id", op: "=", value: req.spanId },
+          ]),
+          view: "flame",
+        },
+      });
+    };
 
     /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
      *  so an inclusive lower-bound search can't exclude the span itself. A span
@@ -2059,12 +2370,31 @@ export default defineComponent({
       return normalizeSeverity(span.severity_text ?? span.severity);
     };
 
+    // Keyed by span so a mid-load View Logs awaits this span's lookup and never reuses another's.
+    let correlationRequest: { key: string; promise: Promise<void> } | null = null;
+    const spanKey = (span: any) => `${span?.trace_id ?? ""}/${span?.span_id ?? ""}`;
+
     /**
      * Load correlation data for this span (called when user clicks on correlation tabs)
      */
-    const loadCorrelation = async () => {
-      // Skip if already loaded or loading
-      if (correlationProps.value || correlationLoading.value) {
+    const loadCorrelation = (): Promise<void> => {
+      if (correlationProps.value) return Promise.resolve();
+      const key = spanKey(props.span);
+      if (correlationRequest?.key !== key) {
+        const promise: Promise<void> = fetchCorrelation(key).finally(() => {
+          if (correlationRequest?.promise === promise) correlationRequest = null;
+        });
+        correlationRequest = { key, promise };
+      }
+      return correlationRequest.promise;
+    };
+
+    const fetchCorrelation = async (key: string) => {
+      // A lookup whose span is no longer shown must not write its result.
+      const isStale = () => spanKey(props.span) !== key;
+
+      // Skip if already loaded
+      if (correlationProps.value) {
         return;
       }
 
@@ -2112,6 +2442,7 @@ export default defineComponent({
           5, // 5 minute time window
           props.streamName,
         );
+        if (isStale()) return;
 
         if (result && result.correlationData) {
           const correlationData = result.correlationData;
@@ -2120,6 +2451,8 @@ export default defineComponent({
           const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
           const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
           const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
+          // Microseconds, from the trace's own spans (TraceDetails).
+          const selectedTrace = searchObj.data?.traceDetails?.selectedTrace;
 
           // Build availableDimensions from raw span attributes (actual field names)
           // This is critical for log queries to use the correct field names (e.g., k8s_pod_name)
@@ -2193,16 +2526,28 @@ export default defineComponent({
               startTime: spanStartUs - bufferUs,
               endTime: spanEndUs + bufferUs,
             },
+            // Fallback window for when View Logs widens from the span to the trace.
+            traceTimeRange:
+              selectedTrace?.trace_start_time && selectedTrace?.trace_end_time
+                ? {
+                    startTime: selectedTrace.trace_start_time - bufferUs,
+                    endTime: selectedTrace.trace_end_time + bufferUs,
+                  }
+                : undefined,
           };
         } else {
           correlationError.value = t("correlation.noDataFound");
         }
       } catch (err: any) {
+        if (isStale()) return;
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value = err.message || t("correlation.failedToLoad");
         correlationFailed.value = true;
       } finally {
-        correlationLoading.value = false;
+        // A newer span's lookup owns the loading flag while it runs.
+        if (!correlationRequest || correlationRequest.key === key) {
+          correlationLoading.value = false;
+        }
       }
     };
 
@@ -2413,6 +2758,9 @@ export default defineComponent({
       spanHttpResendCount,
       navigateToError,
       getDuration,
+      operationPercentile,
+      spanProfileMatch,
+      viewSpanProfile,
       getTTFT,
       viewSpanLogs,
       evaluateSpan,

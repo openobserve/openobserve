@@ -33,16 +33,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ chip.description }}
     </p>
 
-    <div
-      v-if="chip.reasoning"
-      class="border-border-default rounded-default flex gap-1.5 border p-1.75"
-    >
+    <div class="border-border-default rounded-default flex gap-1.5 border p-1.75">
       <OIcon name="lightbulb-outline" size="xs" class="text-text-secondary mt-0.5 shrink-0" />
       <div class="min-w-0">
         <div class="text-text-secondary text-3xs mb-0.25 font-bold tracking-[0.05em]">
           {{ t("onlineEvals.traceScoreChip.reasoning") }}
         </div>
-        <p class="text-text-body text-3xs leading-relaxed">{{ chip.reasoning }}</p>
+        <p
+          v-if="chip.reasoning"
+          class="text-text-body text-3xs max-h-40 overflow-y-auto pe-1 leading-relaxed"
+          data-test="trace-score-detail-reasoning"
+        >
+          {{ chip.reasoning }}
+        </p>
+        <p
+          v-else
+          class="text-text-secondary text-3xs italic"
+          data-test="trace-score-detail-no-reasoning"
+        >
+          {{ t("onlineEvals.traceScoreChip.noReasoning") }}
+        </p>
       </div>
     </div>
 

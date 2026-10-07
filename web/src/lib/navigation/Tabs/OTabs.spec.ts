@@ -354,4 +354,36 @@ describe("OTabs", () => {
       expect(scrollBy).not.toHaveBeenCalled();
     });
   });
+
+  // --- Focusin with no target (bug: null-guard before getAttribute) ---
+
+  describe("focusin handling", () => {
+    // The real browser case this guards: focus moves away from a tab that was
+    // unmounted/removed from the DOM in the same tick, which can deliver a
+    // focusin event whose `target` is null by the time it reaches this
+    // listener. Vue binds native events via addEventListener directly on the
+    // DOM node, so there is no other way to reach that exact listener to
+    // reproduce it — intercepting addEventListener captures the real one.
+    it("does not throw when the focusin event has no target", () => {
+      let capturedHandler: ((event: FocusEvent) => void) | null = null;
+      const originalAddEventListener = HTMLElement.prototype.addEventListener;
+      const addEventListenerSpy = vi
+        .spyOn(HTMLElement.prototype, "addEventListener")
+        .mockImplementation(function (
+          this: HTMLElement,
+          type: string,
+          listener: EventListenerOrEventListenerObject,
+          options?: boolean | AddEventListenerOptions,
+        ) {
+          if (type === "focusin") capturedHandler = listener as (event: FocusEvent) => void;
+          return originalAddEventListener.call(this, type, listener, options);
+        });
+
+      mountTabs();
+      addEventListenerSpy.mockRestore();
+
+      expect(capturedHandler).not.toBeNull();
+      expect(() => capturedHandler!({ target: null } as unknown as FocusEvent)).not.toThrow();
+    });
+  });
 });

@@ -166,14 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
               {{ t("volumeInsights.searchInspectionsLabel") }}
             </ODropdownItem>
-            <ODropdownItem
-              v-if="showAnalyzeBtn"
-              data-test="logs-analyze-dimensions-button"
-              @select="openVolumeAnalysisDashboard"
-            >
-              <template #icon-left><OIcon name="timeline" size="sm" /></template>
-              {{ t("volumeInsights.analyzeTooltipLogs") }}
-            </ODropdownItem>
           </ODropdown>
 
           <!-- INLINE BUTTONS (wider container) -->
@@ -190,10 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <!-- Action buttons -->
-            <div
-              v-if="showInspectBtn || showAnalyzeBtn || showWrapBtn"
-              class="inline-flex items-center gap-0.5"
-            >
+            <div v-if="showInspectBtn || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="showInspectBtn"
                 variant="outline"
@@ -208,22 +197,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   v-if="!showActionLabels"
                   :content="t('volumeInsights.searchInspectionsLabel')"
-                />
-              </OButton>
-              <OButton
-                v-if="showAnalyzeBtn"
-                variant="outline"
-                :size="showActionLabels ? 'chip' : 'icon-chip'"
-                @click="openVolumeAnalysisDashboard"
-                data-test="logs-analyze-dimensions-button"
-              >
-                <OIcon name="timeline" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{
-                  t("volumeInsights.analyzeBtnLabel")
-                }}</span>
-                <OTooltip
-                  v-if="!showActionLabels"
-                  :content="t('volumeInsights.analyzeTooltipLogs')"
                 />
               </OButton>
               <OButton
@@ -771,25 +744,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add-to-search="addPatternToSearch"
         @create-alert="createAlertFromPattern"
       />
-
-      <!-- Volume Analysis Dashboard -->
-      <TracesAnalysisDashboard
-        v-if="showVolumeAnalysisDashboard"
-        :streamName="searchObj.data.stream.selectedStream[0]"
-        streamType="logs"
-        :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
-        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
-        :baseFilter="searchObj.data.editorValue"
-        :streamFields="
-          searchObj.data.stream.userDefinedSchema?.length > 0
-            ? searchObj.data.stream.userDefinedSchema
-            : searchObj.data.stream.selectedStreamFields
-        "
-        :logSamples="searchObj.data.queryResults.hits"
-        analysisType="volume"
-        :availableAnalysisTypes="['volume']"
-        @close="closeVolumeAnalysisDashboard"
-      />
     </div>
 
     <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
@@ -923,9 +877,6 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(() => import("./patterns/PatternList.vue")),
     PatternDetailsDialog: defineAsyncComponent(() => import("./patterns/PatternDetailsDialog.vue")),
-    TracesAnalysisDashboard: defineAsyncComponent(
-      () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
-    ),
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -1336,8 +1287,7 @@ export default defineComponent({
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
 
-    // Volume Analysis state
-    const showVolumeAnalysisDashboard = ref(false);
+    // Histogram brush selection, read by the Drill down page (Index.vue)
     const hasHistogramSelection = ref(false);
     const histogramSelectionRange = ref<{
       start: number;
@@ -2040,15 +1990,6 @@ export default defineComponent({
       correlationError.value = null;
     };
 
-    // Volume Analysis functions
-    const openVolumeAnalysisDashboard = () => {
-      showVolumeAnalysisDashboard.value = true;
-    };
-
-    const closeVolumeAnalysisDashboard = () => {
-      showVolumeAnalysisDashboard.value = false;
-    };
-
     // Search Job Inspector functions
     const openSearchJobInspector = () => {
       // Get the last search trace_id
@@ -2474,7 +2415,6 @@ export default defineComponent({
       hasHistogramSelection,
       histogramSelectionRange,
       originalTimeRangeBeforeSelection,
-      showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,
       patternNavTotal,
@@ -2484,8 +2424,6 @@ export default defineComponent({
       addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,
-      openVolumeAnalysisDashboard,
-      closeVolumeAnalysisDashboard,
       openSearchJobInspector,
       showCorrelation,
       correlationContext,
@@ -2538,9 +2476,6 @@ export default defineComponent({
         this.config.isCloud == "false" &&
         this.store.state.zoConfig.search_inspector_enabled
       );
-    },
-    showAnalyzeBtn() {
-      return this.searchObj.data?.queryResults?.hits?.length > 0 && !this.searchObj.meta.sqlMode;
     },
     showWrapBtn() {
       return (

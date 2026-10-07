@@ -90,7 +90,10 @@ export async function convertPromQLChartData(
 
   // Step 2: Preprocess data (common for all chart types)
   // This handles timestamp alignment, legend generation, and series limiting
-  const processedData = await processPromQLData(searchQueryData, panelSchema, store);
+  const processedData = await processPromQLData(searchQueryData, panelSchema, store, {
+    parentQueryIndex: context.parentQueryIndex,
+    nameSuffixes: context.nameSuffixes,
+  });
 
   // Step 3: Initialize extras object
   // This will be populated by converters with legends, hover state, etc.

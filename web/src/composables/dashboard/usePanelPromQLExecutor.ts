@@ -20,6 +20,23 @@ import { computeStepSeconds } from "@/utils/metrics/metricDefaults";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
+import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
+
+// Fixed-length units only (ms): a time shift moves both ends of the window by one delta.
+const FIXED_OFFSET_MS: Record<string, number> = {
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+  w: 604_800_000,
+};
+
+// `seconds` holds MILLISECONDS, matching the SQL executor's timeRangeGap shape.
+const fixedTimeRangeGap = (offSet: string, endTime: number) => {
+  const ms = (FIXED_OFFSET_MS[offSet?.slice(-1)] ?? 0) * parseInt(offSet?.slice(0, -1));
+  if (!(ms > 0)) return null;
+  return { seconds: ms, periodAsStr: convertOffsetToSeconds(offSet, endTime).periodAsStr };
+};
 
 export const usePanelPromQLExecutor = (ctx: {
   state: any;
@@ -94,7 +111,27 @@ export const usePanelPromQLExecutor = (ctx: {
       // Initialize result data and metadata arrays
       const queryResults: any[] = [];
       const queryMetadata: any[] = [];
-      const completedQueries = new Set<number>(); // Track completed queries
+      const completedQueries = new Set<number>(); // Track completed streams
+      // Merged across streams so a later stream cannot hide an earlier one's truncation.
+      const streamStats: {
+        totalMetricsReceived: number;
+        uniqueSeriesSeen: number;
+        metricsStored: number;
+      }[] = [];
+
+      // Shifted streams follow every primary, so index i < queries.length stays panel query i.
+      let nextShiftedIndex = panelSchema.value.queries.length;
+      const shiftsByQuery = panelSchema.value.queries.map((it: any) =>
+        (it.config?.query_type === "instant" ? [] : (it.config?.time_shift ?? []))
+          .map((shift: { offSet: string }) => fixedTimeRangeGap(shift?.offSet, endISOTimestamp))
+          .filter(Boolean)
+          .map((timeRangeGap: { seconds: number; periodAsStr: string }) => ({
+            index: nextShiftedIndex++,
+            timeRangeGap,
+          })),
+      );
+      const totalStreams = nextShiftedIndex;
+      const chunkProcessors: ReturnType<typeof createPromQLChunkProcessor>[] = [];
 
       // Process all queries in parallel using streaming
       await Promise.all(
@@ -105,7 +142,7 @@ export const usePanelPromQLExecutor = (ctx: {
               tabName?: string;
               config: { step_value?: string; query_type?: string };
             },
-            queryIndex: number,
+            panelQueryIndex: number,
           ) => {
             const { query: query1, metadata: metadata1 } = replaceQueryValue(
               it.query,
@@ -120,21 +157,6 @@ export const usePanelPromQLExecutor = (ctx: {
             );
 
             const query = query2;
-            const metadata = {
-              originalQuery: it.query,
-              query: query,
-              startTime: startISOTimestamp,
-              endTime: endISOTimestamp,
-              queryType: panelSchema.value.queryType,
-              variables: [...(metadata1 || []), ...(metadata2 || [])],
-              tabName: it.tabName,
-            };
-
-            queryMetadata[queryIndex] = metadata;
-            // Don't initialize queryResults[queryIndex] yet - let it be undefined
-            // This way we can detect the first chunk properly
-
-            const { traceId } = generateTraceContext();
 
             // "0" is not a step — it is the panel schema's way of saying "no step
             // set, let the server decide", and it is what a dashboard panel
@@ -168,34 +190,6 @@ export const usePanelPromQLExecutor = (ctx: {
                   )}s`
                 : undefined;
 
-            const payload = {
-              queryReq: {
-                query: query,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                step: queryStepValue
-                  ? queryStepValue
-                  : panelStepValue
-                    ? panelStepValue
-                    : (heatmapStepValue ?? "0"),
-                query_type: it.config.query_type || "range", // Add query_type from config (default: range)
-              },
-              type: "promql" as const,
-              traceId: traceId,
-              org_id: store.state.selectedOrganization.identifier,
-              meta: {
-                dashboard_id: dashboardId?.value,
-                dashboard_name: dashboardName?.value,
-                folder_id: folderId?.value,
-                folder_name: folderName?.value,
-                panel_id: panelSchema.value.id,
-                panel_name: panelSchema.value.title,
-                run_id: runId?.value,
-                tab_id: tabId?.value,
-                tab_name: tabName?.value,
-              },
-            };
-
             // if aborted, return
             if (abortControllerRef?.signal?.aborted) {
               // Set partial data flag on abort
@@ -205,134 +199,218 @@ export const usePanelPromQLExecutor = (ctx: {
               return;
             }
 
-            // Get series limit from config
-            const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+            // One query string for every stream, so a past window can hit the server's result cache.
+            const runStream = (
+              queryIndex: number,
+              timeRangeGap: { seconds: number; periodAsStr: string },
+            ) => {
+              // Panel times are µs; timeRangeGap.seconds is ms.
+              const streamStart = startISOTimestamp - timeRangeGap.seconds * 1000;
+              const streamEnd = endISOTimestamp - timeRangeGap.seconds * 1000;
 
-            // Create chunk processor for efficient metric merging
-            const chunkProcessor = createPromQLChunkProcessor({
-              maxSeries,
-              enableLogging: false,
-            });
-
-            // loadData() aborts the old run's controller but never cancels its stream, so a superseded run keeps delivering frames that would overwrite the newer run's results — an empty first partition then strands the panel on "No Data".
-            const isSuperseded = () => !!abortControllerRef?.signal?.aborted;
-
-            const handlePromQLResponse = (data: any, res: any) => {
-              if (isSuperseded()) return;
-              if (res.type === "event_progress") {
-                state.loadingProgressPercentage = res?.content?.percent ?? 0;
-                state.isPartialData = true;
-              }
-              if (res?.type === "promql_metadata") {
-                // Store PromQL metadata (step in µs, trace_id, etc.)
-                if (!state.resultMetaData[queryIndex]) {
-                  state.resultMetaData[queryIndex] = [];
-                }
-                state.resultMetaData[queryIndex][0] = {
-                  ...(state.resultMetaData[queryIndex]?.[0] ?? {}),
-                  ...res.content,
-                };
-              }
-              if (res?.type === "promql_response") {
-                const newData = res?.content?.results;
-
-                // Process chunk using extracted processor module
-                queryResults[queryIndex] = chunkProcessor.processChunk(
-                  queryResults[queryIndex],
-                  newData,
-                );
-
-                // Update state with accumulated results
-                state.data = markRaw([...queryResults]);
-                state.metadata = {
-                  queries: queryMetadata,
-                };
-
-                // Clear error on successful response
-                state.errorDetail = {
-                  message: "",
-                  code: "",
-                };
-              }
-            };
-
-            const handlePromQLError = (data: any, err: any) => {
-              if (isSuperseded()) {
-                removeTraceId(traceId);
-                return;
-              }
-              // Mark this query as completed (even with error)
-              completedQueries.add(queryIndex);
-
-              // parseSearchError unwraps the backend's internal error envelope
-              // ("Error during planning: ErrorCode# {...}") into a readable
-              // sentence; the raw `content.message` would show the envelope.
-              const parsed = parseSearchError(err, gt("search.unknownError"));
-
-              state.errorDetail = {
-                message: parsed.message,
-                code: parsed.code ?? "",
+              queryMetadata[queryIndex] = {
+                originalQuery: it.query,
+                query: query,
+                startTime: streamStart,
+                endTime: streamEnd,
+                queryType: panelSchema.value.queryType,
+                variables: [...(metadata1 || []), ...(metadata2 || [])],
+                tabName: it.tabName,
+                timeRangeGap,
+                panelQueryIndex,
               };
+              // Don't initialize queryResults[queryIndex] yet - let it be undefined
+              // This way we can detect the first chunk properly
 
-              removeTraceId(traceId);
+              const { traceId } = generateTraceContext();
 
-              // Only mark loading as complete when ALL queries are done
-              if (completedQueries.size === panelSchema.value.queries.length) {
-                state.loading = false;
-                state.isOperationCancelled = false;
-                state.isPartialData = false;
-              }
-            };
-
-            const handlePromQLComplete = () => {
-              if (isSuperseded()) {
-                removeTraceId(traceId);
-                return;
-              }
-              // Mark this query as completed
-              completedQueries.add(queryIndex);
-
-              // Get statistics from chunk processor
-              const stats = chunkProcessor.getStats();
-
-              // Final update with complete results
-              state.data = markRaw([...queryResults]);
-              state.metadata = {
-                queries: queryMetadata,
-                // Add series limiting information for warning message
-                seriesLimiting: {
-                  totalMetricsReceived: stats.totalMetricsReceived,
-                  uniqueSeriesSeen: stats.uniqueSeriesSeen,
-                  metricsStored: stats.metricsStored,
-                  maxSeries,
+              const payload = {
+                queryReq: {
+                  query: query,
+                  start_time: streamStart,
+                  end_time: streamEnd,
+                  step: queryStepValue
+                    ? queryStepValue
+                    : panelStepValue
+                      ? panelStepValue
+                      : (heatmapStepValue ?? "0"),
+                  query_type: it.config.query_type || "range", // Add query_type from config (default: range)
+                },
+                type: "promql" as const,
+                traceId: traceId,
+                org_id: store.state.selectedOrganization.identifier,
+                meta: {
+                  dashboard_id: dashboardId?.value,
+                  dashboard_name: dashboardName?.value,
+                  folder_id: folderId?.value,
+                  folder_name: folderName?.value,
+                  panel_id: panelSchema.value.id,
+                  panel_name: panelSchema.value.title,
+                  run_id: runId?.value,
+                  tab_id: tabId?.value,
+                  tab_name: tabName?.value,
                 },
               };
 
-              removeTraceId(traceId);
+              // Get series limit from config
+              const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
 
-              // Only mark loading as complete when ALL queries are done
-              if (completedQueries.size === panelSchema.value.queries.length) {
-                state.loading = false;
-                state.isOperationCancelled = false;
-                state.isPartialData = false;
+              const isShifted = queryIndex !== panelQueryIndex;
+              // Create chunk processor for efficient metric merging
+              const chunkProcessor = createPromQLChunkProcessor({
+                maxSeries,
+                enableLogging: false,
+                keepFirst: isShifted
+                  ? () => (queryResults[panelQueryIndex]?.result ?? []).map((m: any) => m?.metric)
+                  : undefined,
+              });
+              chunkProcessors[queryIndex] = chunkProcessor;
 
-                // Save to cache after all queries complete
-                saveCurrentStateToCache();
-              }
+              // loadData() aborts the old run's controller but never cancels its stream, so a superseded run keeps delivering frames that would overwrite the newer run's results — an empty first partition then strands the panel on "No Data".
+              const isSuperseded = () => !!abortControllerRef?.signal?.aborted;
+
+              const handlePromQLResponse = (data: any, res: any) => {
+                if (isSuperseded()) return;
+                if (res.type === "event_progress") {
+                  state.loadingProgressPercentage = res?.content?.percent ?? 0;
+                  state.isPartialData = true;
+                }
+                if (res?.type === "promql_metadata") {
+                  // Store PromQL metadata (step in µs, trace_id, etc.)
+                  if (!state.resultMetaData[queryIndex]) {
+                    state.resultMetaData[queryIndex] = [];
+                  }
+                  state.resultMetaData[queryIndex][0] = {
+                    ...(state.resultMetaData[queryIndex]?.[0] ?? {}),
+                    ...res.content,
+                  };
+                }
+                if (res?.type === "promql_response") {
+                  const newData = res?.content?.results;
+
+                  // Process chunk using extracted processor module
+                  queryResults[queryIndex] = chunkProcessor.processChunk(
+                    queryResults[queryIndex],
+                    newData,
+                  );
+
+                  // Update state with accumulated results
+                  state.data = markRaw([...queryResults]);
+                  state.metadata = {
+                    queries: queryMetadata,
+                  };
+
+                  // Clear error on successful response
+                  state.errorDetail = {
+                    message: "",
+                    code: "",
+                  };
+                }
+              };
+
+              const handlePromQLError = (data: any, err: any) => {
+                if (isSuperseded()) {
+                  removeTraceId(traceId);
+                  return;
+                }
+                // Mark this query as completed (even with error)
+                completedQueries.add(queryIndex);
+
+                // parseSearchError unwraps the backend's internal error envelope
+                // ("Error during planning: ErrorCode# {...}") into a readable
+                // sentence; the raw `content.message` would show the envelope.
+                const parsed = parseSearchError(err, gt("search.unknownError"));
+
+                state.errorDetail = {
+                  message: parsed.message,
+                  code: parsed.code ?? "",
+                };
+
+                removeTraceId(traceId);
+
+                // Only mark loading as complete when ALL streams are done
+                if (completedQueries.size === totalStreams) {
+                  state.loading = false;
+                  state.isOperationCancelled = false;
+                  state.isPartialData = false;
+                }
+              };
+
+              const handlePromQLComplete = () => {
+                if (isSuperseded()) {
+                  removeTraceId(traceId);
+                  return;
+                }
+                // Mark this query as completed
+                completedQueries.add(queryIndex);
+
+                // A shifted stream that finished first chose its cap before this primary's series were known.
+                if (!isShifted) {
+                  for (const shift of shiftsByQuery[panelQueryIndex]) {
+                    if (queryResults[shift.index]?.result) {
+                      queryResults[shift.index] = {
+                        ...queryResults[shift.index],
+                        result: chunkProcessors[shift.index].select(),
+                      };
+                    }
+                  }
+                }
+
+                // Get statistics from chunk processor
+                const stats = chunkProcessor.getStats();
+                streamStats[queryIndex] = {
+                  totalMetricsReceived: stats.totalMetricsReceived,
+                  uniqueSeriesSeen: stats.uniqueSeriesSeen ?? stats.metricsStored,
+                  metricsStored: stats.metricsStored,
+                };
+                // Summed, so a stream that dropped series keeps uniqueSeriesSeen above metricsStored.
+                const sumOf = (key: keyof (typeof streamStats)[number]) =>
+                  streamStats.reduce((total, s) => total + (s?.[key] ?? 0), 0);
+
+                // Final update with complete results
+                state.data = markRaw([...queryResults]);
+                state.metadata = {
+                  queries: queryMetadata,
+                  // Add series limiting information for warning message
+                  seriesLimiting: {
+                    totalMetricsReceived: sumOf("totalMetricsReceived"),
+                    uniqueSeriesSeen: sumOf("uniqueSeriesSeen"),
+                    metricsStored: sumOf("metricsStored"),
+                    maxSeries,
+                  },
+                };
+
+                removeTraceId(traceId);
+
+                // Only mark loading as complete when ALL streams are done
+                if (completedQueries.size === totalStreams) {
+                  state.loading = false;
+                  state.isOperationCancelled = false;
+                  state.isPartialData = false;
+
+                  // Save to cache after all queries complete
+                  saveCurrentStateToCache();
+                }
+              };
+
+              const handlePromQLReset = () => {
+                // Reset handling if needed
+              };
+
+              fetchQueryDataWithHttpStream(payload, {
+                data: handlePromQLResponse,
+                error: handlePromQLError,
+                complete: handlePromQLComplete,
+                reset: handlePromQLReset,
+              });
+
+              addTraceId(traceId);
             };
 
-            const handlePromQLReset = () => {
-              // Reset handling if needed
-            };
-
-            fetchQueryDataWithHttpStream(payload, {
-              data: handlePromQLResponse,
-              error: handlePromQLError,
-              complete: handlePromQLComplete,
-              reset: handlePromQLReset,
-            });
-
-            addTraceId(traceId);
+            runStream(panelQueryIndex, { seconds: 0, periodAsStr: "" });
+            for (const shift of shiftsByQuery[panelQueryIndex]) {
+              runStream(shift.index, shift.timeRangeGap);
+            }
           },
         ),
       );
