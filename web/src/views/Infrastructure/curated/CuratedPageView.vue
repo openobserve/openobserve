@@ -915,125 +915,135 @@ watch(
               :content="t('infra.curated.warnBanner.stats')"
             />
 
-            <div v-if="hasStrip || sectionNoteKey" class="flex items-start gap-2">
-              <OCollapsible
-                v-if="hasStrip"
-                v-model="stripExpanded"
-                class="min-w-0 flex-1"
-                trigger-class="border-border-default w-fit! border py-1!"
-                data-test="curated-strip"
-                :label="collapsedCapabilities"
-              >
-                <div
-                  class="border-border-default rounded-surface mt-1 flex max-w-3xl flex-col gap-1 border px-2 py-1"
-                  data-test="curated-strip-expanded"
+            <!-- data-test only with a strip: the note alone is not the hidden-panels strip. -->
+            <div
+              v-if="hasStrip || sectionNoteKey"
+              class="flex flex-col gap-1"
+              :data-test="hasStrip ? 'curated-strip' : undefined"
+            >
+              <div class="flex min-w-0 items-center gap-2">
+                <OButton
+                  v-if="hasStrip"
+                  variant="outline"
+                  size="sm"
+                  class="max-w-full min-w-0"
+                  :icon-right="stripExpanded ? 'expand-less' : 'expand-more'"
+                  :aria-expanded="stripExpanded"
+                  aria-controls="curated-strip-list"
+                  data-test="curated-strip-toggle"
+                  @click="stripExpanded = !stripExpanded"
                 >
-                  <ul class="divide-border-default flex flex-col divide-y">
-                    <li
-                      v-for="row in stripRows"
-                      :key="row.group.id"
-                      class="flex flex-col gap-1 py-1"
-                      :data-test="`curated-strip-group-${row.group.id}`"
-                    >
-                      <div class="flex items-start gap-2">
-                        <OCollapsible class="min-w-0 flex-1">
-                          <template #trigger="{ open }">
-                            <span class="flex min-w-0 flex-1 flex-col gap-1">
-                              <span class="flex items-baseline gap-x-3 max-md:flex-col">
-                                <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{
-                                  t(row.group.labelKey)
-                                }}</OText>
-                                <OText variant="meta" as="span" nowrap>{{ row.statusText }}</OText>
-                              </span>
-                              <OText
-                                v-if="!open && row.lines[0]"
-                                variant="meta"
-                                truncate
-                                :data-test="row.lines[0].dataTest"
-                                >{{ row.lines[0].text }}</OText
-                              >
-                            </span>
-                            <OIcon
-                              name="expand-more"
-                              size="sm"
-                              class="text-text-secondary shrink-0 transition-transform duration-200"
-                              :class="open ? 'rotate-180' : 'rotate-0'"
-                            />
-                          </template>
-                          <div class="flex flex-col gap-1 px-2 pb-2">
-                            <p
-                              v-for="(line, index) in row.lines"
-                              :key="index"
-                              class="leading-5 break-words"
-                            >
-                              <OText variant="meta" :data-test="line.dataTest">{{
-                                line.text
-                              }}</OText>
-                            </p>
-                            <p class="leading-5">
-                              <OText variant="meta" data-test="curated-strip-hint">{{
-                                t(row.group.setupHintKey)
-                              }}</OText>
-                            </p>
-                          </div>
-                        </OCollapsible>
-                        <OButton
-                          v-if="row.canSetUp"
-                          variant="outline"
-                          size="sm-action"
-                          class="mt-1.5 shrink-0"
-                          data-test="curated-strip-setup"
-                          @click="onStripSetup(row.group)"
-                        >
-                          {{ t("infra.curated.setUp") }}
-                        </OButton>
-                      </div>
-                      <DataSourceSetupCard
-                        v-if="
-                          row.group.setup.kind === 'card' &&
-                          expandedSetupSlug === row.group.setup.slug
-                        "
-                        :slug="row.group.setup.slug"
-                        @detected="runRefresh(true)"
-                      />
-                    </li>
-                  </ul>
-                  <OText
-                    variant="meta"
-                    class="px-2"
-                    data-test="curated-strip-hedge"
-                    data-copy-key="infra.curated.hiddenFootnote"
-                    >{{ t("infra.curated.hiddenFootnote") }}</OText
+                  <span class="truncate">{{ collapsedCapabilities }}</span>
+                </OButton>
+                <!-- The caveats are reference, not news: one line opens them instead of a paragraph above every panel. -->
+                <div v-if="sectionNoteKey" class="shrink-0">
+                  <OPopover
+                    v-model:open="noteOpen"
+                    side="bottom"
+                    align="start"
+                    :aria-label="t('infra.curated.aboutNumbers')"
                   >
+                    <template #trigger>
+                      <!-- Icon-only on phones so the hidden-panels strip keeps the row; sr-only keeps the button named. -->
+                      <OButton
+                        variant="ghost"
+                        size="xs"
+                        icon-left="info-outline"
+                        data-test="curated-section-note-trigger"
+                      >
+                        <span class="max-md:sr-only">{{ t("infra.curated.aboutNumbers") }}</span>
+                      </OButton>
+                    </template>
+                    <p
+                      class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                      data-test="curated-section-note"
+                    >
+                      <OText variant="meta">{{ t(sectionNoteKey) }}</OText>
+                    </p>
+                  </OPopover>
                 </div>
-              </OCollapsible>
-
-              <!-- The caveats are reference, not news: one line opens them instead of a paragraph above every panel. -->
-              <div v-if="sectionNoteKey" class="ms-auto shrink-0 py-0.5">
-                <OPopover
-                  v-model:open="noteOpen"
-                  side="bottom"
-                  align="end"
-                  :aria-label="t('infra.curated.aboutNumbers')"
-                >
-                  <template #trigger>
-                    <!-- Icon-only on phones so the hidden-panels strip keeps the row; sr-only keeps the button named. -->
-                    <OButton
-                      variant="ghost"
-                      size="xs"
-                      icon-left="info-outline"
-                      data-test="curated-section-note-trigger"
-                    >
-                      <span class="max-md:sr-only">{{ t("infra.curated.aboutNumbers") }}</span>
-                    </OButton>
-                  </template>
-                  <p
-                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-                    data-test="curated-section-note"
+              </div>
+              <div
+                v-if="hasStrip && stripExpanded"
+                id="curated-strip-list"
+                class="border-border-default rounded-surface flex max-w-3xl flex-col gap-1 border px-2 py-1"
+                data-test="curated-strip-expanded"
+              >
+                <ul class="divide-border-default flex flex-col divide-y">
+                  <li
+                    v-for="row in stripRows"
+                    :key="row.group.id"
+                    class="flex flex-col gap-1 py-1"
+                    :data-test="`curated-strip-group-${row.group.id}`"
                   >
-                    <OText variant="meta">{{ t(sectionNoteKey) }}</OText>
-                  </p>
-                </OPopover>
+                    <div class="flex items-start gap-2">
+                      <OCollapsible class="min-w-0 flex-1">
+                        <template #trigger="{ open }">
+                          <span class="flex min-w-0 flex-1 flex-col gap-1">
+                            <span class="flex items-baseline gap-x-3 max-md:flex-col">
+                              <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{
+                                t(row.group.labelKey)
+                              }}</OText>
+                              <OText variant="meta" as="span" nowrap>{{ row.statusText }}</OText>
+                            </span>
+                            <OText
+                              v-if="!open && row.lines[0]"
+                              variant="meta"
+                              truncate
+                              :data-test="row.lines[0].dataTest"
+                              >{{ row.lines[0].text }}</OText
+                            >
+                          </span>
+                          <OIcon
+                            name="expand-more"
+                            size="sm"
+                            class="text-text-secondary shrink-0 transition-transform duration-200"
+                            :class="open ? 'rotate-180' : 'rotate-0'"
+                          />
+                        </template>
+                        <div class="flex flex-col gap-1 px-2 pb-2">
+                          <p
+                            v-for="(line, index) in row.lines"
+                            :key="index"
+                            class="leading-5 break-words"
+                          >
+                            <OText variant="meta" :data-test="line.dataTest">{{ line.text }}</OText>
+                          </p>
+                          <p class="leading-5">
+                            <OText variant="meta" data-test="curated-strip-hint">{{
+                              t(row.group.setupHintKey)
+                            }}</OText>
+                          </p>
+                        </div>
+                      </OCollapsible>
+                      <OButton
+                        v-if="row.canSetUp"
+                        variant="outline"
+                        size="sm-action"
+                        class="mt-1.5 shrink-0"
+                        data-test="curated-strip-setup"
+                        @click="onStripSetup(row.group)"
+                      >
+                        {{ t("infra.curated.setUp") }}
+                      </OButton>
+                    </div>
+                    <DataSourceSetupCard
+                      v-if="
+                        row.group.setup.kind === 'card' &&
+                        expandedSetupSlug === row.group.setup.slug
+                      "
+                      :slug="row.group.setup.slug"
+                      @detected="runRefresh(true)"
+                    />
+                  </li>
+                </ul>
+                <OText
+                  variant="meta"
+                  class="px-2"
+                  data-test="curated-strip-hedge"
+                  data-copy-key="infra.curated.hiddenFootnote"
+                  >{{ t("infra.curated.hiddenFootnote") }}</OText
+                >
               </div>
             </div>
           </div>
