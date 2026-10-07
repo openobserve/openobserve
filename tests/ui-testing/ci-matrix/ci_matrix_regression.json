@@ -195,8 +195,12 @@
     "actual_folder": "RegressionSet/RUM",
     "browser": "chrome",
     "run_files": [
-      "rum-11749-session-trace-correlation.spec.js"
+      "rum-11749-session-trace-correlation.spec.js",
+      "rum-product-analytics-schema-states.spec.js"
     ],
-    "disabled": []
+    "disabled": [],
+    "ingest_allowed_upto": "1440",
+    "workers": 1,
+    "_comment": "RUM bug-fix regressions. rum-product-analytics-schema-states seeds _rumdata up to ~5 hours old, right on the workflow default ZO_INGEST_ALLOWED_UPTO of 5 hours, so the shard raises it to 1440 like RUM-Analytics; workers 1 for long analytics searches."
   }
 ]
