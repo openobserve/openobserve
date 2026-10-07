@@ -579,6 +579,8 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     id: "query",
     accessorKey: "queryText",
     header: t("dbm.samples.columns.query"),
+    // Unsized, it took an even share and truncated every statement inside its SELECT list.
+    size: 480,
     sortable: false,
   },
   {
@@ -660,6 +662,7 @@ const serverColumns = computed<OTableColumnDef<ServerSampleTableRow>[]>(() => [
     id: "query",
     accessorKey: "query",
     header: t("dbm.samples.serverList.columns.query"),
+    size: 480,
     sortable: false,
   },
   {
