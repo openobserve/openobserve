@@ -218,6 +218,7 @@ export default function nvidiaDcgmCard(subs: CardSubstitutions, t: TranslateFn):
 
   return {
     provider: {
+      id: "nvidiaDcgm",
       name: raw("NVIDIA GPU"),
       tagline: t("ingestion.setupCard.gpuTagline"),
       logo: getImageURL("images/ingestion/nvidia.svg"),
