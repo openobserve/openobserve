@@ -127,9 +127,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="() => loadAll(true)"
     />
 
+    <!-- Locked: no license to unlock Incidents, shown instead of omitted so
+         the capability is discoverable from a build that can't enable it. -->
+    <section v-else-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-incidents-locked">
+      <div class="mb-2 flex items-center justify-between ps-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.activeIncidents") }}
+        </div>
+      </div>
+      <div
+        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+      >
+        <OIcon name="lock" size="md" class="text-text-secondary shrink-0" />
+        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+      </div>
+      <LockedFeatureTooltip :message="incidentsAccess.message" :title="t('overview.activeIncidents')" />
+    </section>
+
     <!-- SERVICES (enterprise only — needs service graph data) -->
     <section
-      v-if="isEnterpriseOrCloud && services.length > 0"
+      v-if="incidentsAccess.allowed && services.length > 0"
       class="mb-5"
       data-test="overview-services-section"
     >
@@ -279,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </section>
     <OverviewSkeleton
-      v-else-if="isEnterpriseOrCloud && isSectionPending('services')"
+      v-else-if="incidentsAccess.allowed && isSectionPending('services')"
       section="services"
     />
     <OverviewSectionError
@@ -289,8 +306,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="() => loadAll(true)"
     />
 
+    <!-- Locked: Services shares the Incidents license gate — same bundle, no
+         separate upsell story of its own. -->
+    <section v-else-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-services-locked">
+      <div class="mb-2 flex items-center justify-between ps-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.services") }}
+        </div>
+      </div>
+      <div
+        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+      >
+        <OIcon name="lock" size="md" class="text-text-secondary shrink-0" />
+        <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
+      </div>
+      <LockedFeatureTooltip :message="incidentsAccess.message" :title="t('overview.services')" />
+    </section>
+
     <!-- Service node side panel (latency / RED charts) -->
-    <template v-if="isEnterpriseOrCloud && selectedService">
+    <template v-if="incidentsAccess.allowed && selectedService">
       <div
         v-if="servicePanelVisible"
         class="fixed inset-0 z-99 bg-transparent"
@@ -601,7 +635,6 @@ import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import anomalyService from "@/services/anomaly_detection";
-import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -616,6 +649,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -626,11 +661,11 @@ const store = useStore();
 const router = useRouter();
 
 // ── Feature flags ────────────────────────────────────────────────────────────
-const isEnterpriseOrCloud = computed(
-  () => config.isEnterprise === "true" || config.isCloud === "true",
-);
+// Services shares this same gate — it's the service-graph half of the same
+// enterprise/cloud bundle as Incidents, with no upsell story of its own.
+const incidentsAccess = useLockedAffordance("incidents");
 const isIncidentsEnabled = computed(
-  () => isEnterpriseOrCloud.value && store.state.zoConfig?.incidents_enabled === true,
+  () => incidentsAccess.value.allowed && store.state.zoConfig?.incidents_enabled === true,
 );
 const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
 // a deployment with anomaly detection off answers 403 by design, which is no load failure
@@ -758,7 +793,7 @@ const attemptedSections = computed<SectionKey[]>(() => {
   const keys: SectionKey[] = ["recentEvents"];
   if (anomalyEnabled.value) keys.push("anomalies");
   if (isIncidentsEnabled.value) keys.push("incidents");
-  if (isEnterpriseOrCloud.value) keys.push("services");
+  if (incidentsAccess.value.allowed) keys.push("services");
   return keys;
 });
 const isFailed = (key: SectionKey) =>
@@ -1121,7 +1156,7 @@ const loadIncidents = async (force = false) => {
 };
 
 const loadServiceGraph = async (force = false) => {
-  if (!isEnterpriseOrCloud.value) return;
+  if (!incidentsAccess.value.allowed) return;
   sectionFailure.services = null;
   try {
     graphStream.value = "all";
