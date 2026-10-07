@@ -184,14 +184,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="capitalize"
               data-test="service-graph-node-panel-tab-operations"
             />
-            <!-- Agent behavior (loops/failures) — only for agent nodes on
-                   enterprise builds. See Agent Signals design §4b. -->
+            <!-- Agent behavior (loops/failures) — only for agent nodes;
+                   locked without an Enterprise/Cloud edition. See Agent
+                   Signals design §4b. -->
             <OTab
-              v-if="showBehaviorTab"
+              v-if="isAgentBehaviorContext"
               name="behavior"
               :label="t('aiObservability.behavior.node.tabLabel')"
+              :disable="!agentBehaviorAccess.allowed"
+              :suffix-icon="!agentBehaviorAccess.allowed ? 'lock' : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-behavior"
+            />
+            <LockedFeatureTooltip
+              v-if="isAgentBehaviorContext && !agentBehaviorAccess.allowed"
+              :message="agentBehaviorAccess.message"
+              :title="t('aiObservability.behavior.node.tabLabel')"
             />
             <OTab
               v-for="cfg in activeResourceTabConfigs"
@@ -598,6 +606,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -638,7 +648,6 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
-import config from "@/aws-exports";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -909,6 +918,7 @@ export default defineComponent({
     ServiceCatalogBarCell,
     AgentNodeBehaviorTab,
     OAgentBadges,
+    LockedFeatureTooltip,
   },
   props: {
     selectedNode: {
@@ -1576,16 +1586,22 @@ export default defineComponent({
       () => props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id || "",
     );
 
-    // The Behavior tab (loop/failure signals) shows only for agent nodes on
-    // enterprise builds, and only when a concrete stream is selected (the
-    // signals stream is per-source-stream). The AgentNodeBehaviorTab itself
-    // degrades gracefully to a "feature off" hint if the rollup is disabled.
-    const showBehaviorTab = computed(
+    // The Behavior tab (loop/failure signals) is relevant only for agent
+    // nodes, and only when a concrete stream is selected (the signals stream
+    // is per-source-stream) — independent of edition, so it drives the tab's
+    // VISIBILITY. Actually unlocking it is a separate, edition-gated check.
+    const isAgentBehaviorContext = computed(
       () =>
-        config.isEnterprise === "true" &&
         props.selectedNode?.service_type === "agent" &&
         props.streamFilter !== "all" &&
         !!props.streamFilter,
+    );
+    const agentBehaviorAccess = useLockedAffordance("agentBehavior");
+    // The AgentNodeBehaviorTab itself degrades gracefully to a "feature off"
+    // hint if the rollup is disabled, so the panel only needs to mount once
+    // both the context is right AND the edition allows it.
+    const showBehaviorTab = computed(
+      () => isAgentBehaviorContext.value && agentBehaviorAccess.value.allowed,
     );
 
     // env/version for the clicked agent node. The graph topology doesn't carry
@@ -2541,6 +2557,8 @@ export default defineComponent({
       serviceHealth,
       isAllStreamsSelected,
       isInferred,
+      isAgentBehaviorContext,
+      agentBehaviorAccess,
       showBehaviorTab,
       behaviorAgentName,
       agentEnvVersion,

@@ -172,27 +172,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
             </OButton>
 
-            <TraceAnnotateMenu
-              v-if="canAnnotate"
-              ref-type="trace"
-              :ref-id="effectiveTraceId"
-              :ref-trace-start-time="traceEvaluationRange.startTime"
-              :source-stream="effectiveStreamName"
-              compact
-              data-test="trace-details-annotate-trace-btn"
-            />
+            <template v-if="canAnnotateContext">
+              <TraceAnnotateMenu
+                v-if="queuesAccess.allowed"
+                ref-type="trace"
+                :ref-id="effectiveTraceId"
+                :ref-trace-start-time="traceEvaluationRange.startTime"
+                :source-stream="effectiveStreamName"
+                compact
+                data-test="trace-details-annotate-trace-btn"
+              />
+              <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
+                   locked edition gets a disabled stand-in button instead. -->
+              <OButton
+                v-else
+                variant="outline"
+                size="icon-xs"
+                disabled
+                icon-right="lock"
+                :aria-label="t('aiObservability.traceActions.annotate.button')"
+                data-test="trace-details-annotate-trace-btn"
+              >
+                <OIcon name="fact-check" size="sm" />
+              </OButton>
+              <LockedFeatureTooltip
+                v-if="!queuesAccess.allowed"
+                :message="queuesAccess.message"
+                :title="t('aiObservability.traceActions.annotate.button')"
+              />
+            </template>
 
             <OButton
-              v-if="canAnnotate"
+              v-if="canAnnotateContext"
               data-test="trace-details-dataset-trace-btn"
               variant="outline"
               size="icon-xs"
+              :disabled="!queuesAccess.allowed"
+              :icon-right="!queuesAccess.allowed ? 'lock' : undefined"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               @click="openTraceDataset"
             >
               <OIcon name="table-chart" size="sm" />
-              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+              <OTooltip
+                v-if="queuesAccess.allowed"
+                side="bottom"
+                :content="t('aiObservability.traceActions.dataset.button')"
+              />
             </OButton>
+            <LockedFeatureTooltip
+              v-if="canAnnotateContext && !queuesAccess.allowed"
+              :message="queuesAccess.message"
+              :title="t('aiObservability.traceActions.dataset.button')"
+            />
 
             <!-- Share button -->
             <ShareButton
@@ -996,6 +1027,8 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
@@ -1254,6 +1287,7 @@ export default defineComponent({
     ManualEvaluationDialog,
     TraceAnnotateMenu,
     AddToDatasetDrawer,
+    LockedFeatureTooltip,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1797,13 +1831,14 @@ export default defineComponent({
     };
 
     // ── Annotate / Dataset (Phase 2.5 Annotate) ──
-    // Same enterprise gate as manual evaluation minus the online-eval flag:
-    // queuing a trace for human review does not require the eval engine.
-    const canAnnotate = computed(() => {
+    // The non-edition half of the old combined gate — same conditions minus
+    // the online-eval flag, since queuing a trace for human review doesn't
+    // require the eval engine. Drives the header buttons' VISIBILITY so a
+    // locked edition still shows them, just disabled.
+    const canAnnotateContext = computed(() => {
       const range = traceEvaluationRange.value;
       return (
         props.mode === "standalone" &&
-        (config.isEnterprise === "true" || config.isCloud === "true") &&
         Boolean(effectiveOrgIdentifier.value) &&
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
@@ -1811,6 +1846,13 @@ export default defineComponent({
         range.startTime > 0
       );
     });
+    // Annotating a trace is the same capability as queuing it into AI
+    // Observability's review Queues, so it shares that gate.
+    const queuesAccess = useLockedAffordance("queues");
+    // Fully resolved — used wherever the OLD hide-entirely boolean fed a
+    // downstream prop (e.g. the sidebar's own annotate buttons), which must
+    // stay hidden rather than render unlocked-looking controls it can't lock itself.
+    const canAnnotate = computed(() => canAnnotateContext.value && queuesAccess.value.allowed);
 
     const datasetOpen = ref(false);
     const datasetTarget = ref<DatasetTarget | null>(null);
@@ -3324,6 +3366,8 @@ export default defineComponent({
       manualEvaluationOpen,
       manualEvaluationTarget,
       canAnnotate,
+      canAnnotateContext,
+      queuesAccess,
       traceEvaluationRange,
       datasetOpen,
       datasetTarget,
