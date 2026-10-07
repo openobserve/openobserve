@@ -3575,6 +3575,86 @@ export class TracesPage {
     await this.page.getByRole('option', { name: String(size), exact: true }).click();
   }
 
+  // ----- Search windows, saved views and the shared error state (#15130) -----
+
+  // Records every traces search the page sends; `panel` is the RED chart name or 'results'.
+  captureSearchRequests() {
+    const requests = [];
+    const onRequest = (request) => {
+      if (!request.url().includes('/_search')) return;
+      let query = {};
+      try { query = JSON.parse(request.postData() || '{}').query || {}; } catch { /* non-JSON body */ }
+      const panel = (request.url().match(/panel_name=([^&]+)/) || [])[1]
+        || (request.url().includes('search_type=ui') ? 'results' : 'other');
+      // The results search sends its SQL base64-encoded; panels send it as plain text.
+      let sql = String(query.sql || '');
+      if (/^[A-Za-z0-9+/=_.-]+$/.test(sql)) sql = Buffer.from(sql, 'base64').toString();
+      requests.push({ panel, startTime: query.start_time, endTime: query.end_time, from: query.from, sql });
+    };
+    this.page.on('request', onRequest);
+    return { requests, stop: () => this.page.off('request', onRequest) };
+  }
+
+  async applySavedView(viewName) {
+    await this.page.locator('[data-test="traces-search-bar-saved-views-btn"]').click();
+    const view = this.page.locator('[data-test^="traces-saved-view-apply-"]').filter({ hasText: viewName }).first();
+    await view.waitFor({ state: 'visible', timeout: 10000 });
+    await view.click();
+  }
+
+  // enterTraceQuery appends to existing text, so clear first and confirm the editor holds only `query`.
+  async replaceTraceQuery(query) {
+    expect(await this.clearTraceQueryByKeyboard(), 'query editor must clear').toBe(true);
+    await this.enterTraceQuery(query);
+    await expect.poll(async () => (await this.getQueryEditorContent()).trim(), { timeout: 5000 }).toBe(query);
+  }
+
+  async clickResultColumnHeader(columnId) {
+    await this.page.locator(`${this.searchResultList} th[data-test="o2-table-th-${columnId}"]`).first().click();
+  }
+
+  async switchToTracesMode() {
+    await this.page.locator('[data-test="traces-search-mode-traces-btn"]').click();
+    await expect(this.page.locator('[data-test="traces-search-mode-traces-btn"]'))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  async expectGenericQueryError() {
+    const errorState = this.page.locator(this.errorMessage);
+    await expect(errorState).toBeVisible({ timeout: 15000 });
+    await expect(errorState).toContainText('An error occurred while processing your query.');
+  }
+
+  async toggleQueryErrorDetail() {
+    await this.page.locator(`${this.errorMessage} [data-test="error-detail-toggle-btn"]`).click();
+  }
+
+  // The raw DataFusion planner message, which must stay behind "Show details".
+  queryErrorPlannerText() {
+    return this.page.getByText('Error during planning');
+  }
+
+  async expectQueryErrorCleared() {
+    await expect(this.page.locator(this.errorMessage)).toBeHidden({ timeout: 15000 });
+  }
+
+  queryErrorDetailBody() {
+    return this.page.locator(`${this.errorMessage} [data-test="error-detail-body"]`);
+  }
+
+  servicesCatalogServiceLink(serviceName) {
+    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`);
+  }
+
+  async expectServicesCatalogServiceVisible(serviceName) {
+    await expect(this.servicesCatalogServiceLink(serviceName)).toBeVisible({ timeout: 30000 });
+  }
+
+  async clickServicesCatalogService(serviceName) {
+    await this.servicesCatalogServiceLink(serviceName).click();
+  }
+
+  async expectServiceSidePanelVisible() {
+    await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
+  }
 }
-
-
