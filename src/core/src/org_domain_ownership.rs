@@ -61,14 +61,14 @@ pub async fn add_domain_to_cache(domain: &str, org: &str) {
     lock.insert(domain.to_string(), org.to_string());
 }
 
-pub async fn get_org_for_domain(domain: &str) -> Result<Option<String>, anyhow::Error> {
+pub async fn get_verified_org_for_domain(domain: &str) -> Result<Option<String>, anyhow::Error> {
     let lock = CACHE.read().await;
     let org = lock.get(domain);
     if let Some(org) = org {
         return Ok(Some(org.to_owned()));
     }
     drop(lock);
-    infra::table::org_domain_ownership::get_org_for_domain(domain).await
+    infra::table::org_domain_ownership::get_verified_org_for_domain(domain).await
 }
 
 pub async fn save_org_domain_mapping(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
@@ -80,12 +80,25 @@ pub async fn save_org_domain_mapping(org_id: &str, domain: &str) -> Result<(), a
     infra::table::org_domain_ownership::save_org_domain_mapping(record).await
 }
 
-pub async fn delete_linked_domain(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
-    infra::table::org_domain_ownership::delete_linked_domain(org_id, domain).await?;
-    let mut lock = CACHE.write().await;
-    lock.remove(domain);
-    emit_sync_event(org_id, domain).await;
+pub async fn delete_linked_domain(record: Model) -> Result<(), anyhow::Error> {
+    infra::table::org_domain_ownership::delete_linked_domain(&record.org_id, &record.domain)
+        .await?;
+    // only sync cache for domain which is verified
+    // non verified domain is not going to be in cache
+    if record.verification_state == OwnershipState::Verfied as i32 {
+        let mut lock = CACHE.write().await;
+        lock.remove(domain);
+        emit_sync_event(org_id, domain).await;
+    }
     Ok(())
+}
+
+pub async fn get_domain_org_record(
+    org_id: &str,
+    domain: &str,
+) -> Result<Option<Model>, anyhow::Error> {
+    let res = infra::table::org_domain_ownership::get_domain_org_record(org_id, domain).await?;
+    Ok(res)
 }
 
 pub async fn verify(mut record: Model) -> Result<Model, anyhow::Error> {

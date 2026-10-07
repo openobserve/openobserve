@@ -53,21 +53,6 @@ pub async fn link_domain(
     {
         return MetaHttpResponse::bad_request("this domain is already mapped to this org");
     }
-
-    match org_domain_ownership::get_org_for_domain(&domain).await {
-        Ok(Some(_)) => {
-            return MetaHttpResponse::bad_request(
-                "This domain is already claimed by some other org",
-            );
-        }
-        Err(e) => {
-            return MetaHttpResponse::internal_error(format!(
-                "error getting domain mappings : {e}"
-            ));
-        }
-        _ => {}
-    }
-
     match org_domain_ownership::save_org_domain_mapping(&org_id, &domain).await {
         Ok(_) => {
             log::info!(
@@ -88,7 +73,7 @@ pub async fn delete_linked_domain(
     Headers(user): Headers<UserEmail>,
 ) -> Response {
     let domain = did.trim().to_lowercase();
-    let record = match org_domain_ownership::get_org_for_domain(&domain).await {
+    let record = match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
         Ok(v) => v,
         Err(e) => {
             return MetaHttpResponse::internal_error(format!(
@@ -97,17 +82,11 @@ pub async fn delete_linked_domain(
         }
     };
 
-    match record {
-        None => {
-            return MetaHttpResponse::bad_request("org domain link not found");
-        }
-        Some(org) if org != org_id => {
-            return MetaHttpResponse::bad_request("domain not linked to this org");
-        }
-        _ => {}
-    }
+    let Some(model) = record else {
+        return MetaHttpResponse::bad_request("org domain link not found");
+    };
 
-    match org_domain_ownership::delete_linked_domain(&org_id, &domain).await {
+    match org_domain_ownership::delete_linked_domain(model).await {
         Ok(_) => {
             log::info!(
                 "removed domain link of {domain} from org {org_id} by user {}",

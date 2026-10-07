@@ -220,14 +220,7 @@ pub async fn create(
                 }
             }
 
-            match org_domain_ownership::get_org_for_domain(&domain).await {
-                Ok(Some(org)) => {
-                    if org != org_id {
-                        return MetaHttpResponse::bad_request(
-                            "This domain is already claimed by some other org",
-                        );
-                    }
-                }
+            match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
                 Ok(None) => {
                     return MetaHttpResponse::bad_request("This domain is not linked yet");
                 }
@@ -236,6 +229,7 @@ pub async fn create(
                         "error getting domain mappings : {e}"
                     ));
                 }
+                _ => {}
             }
 
             mapping.domain = domain;

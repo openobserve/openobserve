@@ -48,12 +48,13 @@ pub async fn list_active_domain_org_map() -> Result<HashMap<String, String>, any
     Ok(records.into_iter().collect())
 }
 
-pub async fn get_org_for_domain(domain: &str) -> Result<Option<String>, anyhow::Error> {
+pub async fn get_verified_org_for_domain(domain: &str) -> Result<Option<String>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let record = OrgDomainOwnership::find()
         .select_only()
         .column(Column::OrgId)
         .filter(Column::Domain.eq(domain))
+        .filter(Column::VerificationState.eq(OwnershipState::Verfied as i32))
         .into_tuple::<(String,)>()
         .one(client)
         .await?;
