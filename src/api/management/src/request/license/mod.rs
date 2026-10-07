@@ -133,8 +133,7 @@ fn viewer_license_fields(
 pub async fn get_license_info(Headers(email): Headers<UserEmail>) -> Response {
     let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
 
-    // we want anyone to be able to see the license info, so we bypass
-    // all the permission checks here.
+    // Any authenticated user may call this; viewer_license_fields trims the response by role.
     let (key, license) = match get_license().await {
         Some((k, l)) => (Some(k), Some(l)),
         None => (None, None),

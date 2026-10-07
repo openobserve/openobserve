@@ -120,7 +120,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
 fn check_ext_auth_salt(fresh_install: bool, salt: &str) -> anyhow::Result<()> {
     if salt.len() > MAX_EXT_AUTH_SALT_LEN {
         return Err(anyhow::anyhow!(
-            "ZO_EXT_AUTH_SALT is {} bytes, but argon2 accepts at most {MAX_EXT_AUTH_SALT_LEN}; set it to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} characters (for example `openssl rand -hex 24`)",
+            "ZO_EXT_AUTH_SALT is {} bytes, but argon2 accepts at most {MAX_EXT_AUTH_SALT_LEN}; set it to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} bytes (for example `openssl rand -hex 24`)",
             salt.len()
         ));
     }
@@ -129,17 +129,17 @@ fn check_ext_auth_salt(fresh_install: bool, salt: &str) -> anyhow::Result<()> {
     }
     if fresh_install {
         return Err(anyhow::anyhow!(
-            "ZO_EXT_AUTH_SALT must be set to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} characters on a new install (for example `openssl rand -hex 24`), and kept the same on every node and restart"
+            "ZO_EXT_AUTH_SALT must be set to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} bytes on a new install (for example `openssl rand -hex 24`), and kept the same on every node and restart"
         ));
     }
     if salt.len() < MIN_ARGON2_SALT_LEN {
         return Err(anyhow::anyhow!(
-            "ZO_EXT_AUTH_SALT is {} bytes, but argon2 needs at least {MIN_ARGON2_SALT_LEN}; set it to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} characters (for example `openssl rand -hex 24`)",
+            "ZO_EXT_AUTH_SALT is {} bytes, but argon2 needs at least {MIN_ARGON2_SALT_LEN}; set it to a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} bytes (for example `openssl rand -hex 24`)",
             salt.len()
         ));
     }
     log::warn!(
-        "ZO_EXT_AUTH_SALT is the public default or shorter than {MIN_EXT_AUTH_SALT_LEN} characters; presigned and ext-token logins can be forged from a leaked database"
+        "ZO_EXT_AUTH_SALT is the public default or shorter than {MIN_EXT_AUTH_SALT_LEN} bytes; set a random secret of {MIN_EXT_AUTH_SALT_LEN} to {MAX_EXT_AUTH_SALT_LEN} bytes before the first presigned or ext-token login"
     );
     Ok(())
 }

@@ -51,7 +51,7 @@ spec:
               value: root@example.com
             - name: ZO_ROOT_USER_PASSWORD
               value: Complexpass#123
-            # required on a new install: 16 to 48 random characters, e.g. from `openssl rand -hex 24`
+            # required on a new install: 16 to 48 random bytes, e.g. from `openssl rand -hex 24`
             - name: ZO_EXT_AUTH_SALT
               value: ""
             - name: ZO_DATA_DIR
