@@ -444,13 +444,14 @@ function buildOptions() {
     warning: chartColor(CLASS_TOKEN.warning),
     ok: chartColor(CLASS_TOKEN.ok),
   };
+  // ECharts redraws an option on resize after the props moved on, so its closures read only this snapshot.
   const headers = props.headers;
+  const frames = frameData.value;
   const measureTitle = (t: string) => textWidth(t, TITLE_FONT);
   let titleScale = NaN;
   let titles: string[] = [];
   const titleAt = (index: number, scale: number) => {
     if (scale !== titleScale) {
-      const frames = frameData.value;
       const widths = frames.map((f, i) => titleWidthOf(headers[i], (f[2] - f[0]) * scale));
       titles = distinctTitles(
         frames.map((_, i) => headers[i]?.title ?? ""),
@@ -510,7 +511,7 @@ function buildOptions() {
         type: "custom",
         clip: true,
         z: 1,
-        data: frameData.value,
+        data: frames,
         encode: { x: 0, y: 1 },
         renderItem: (_params: unknown, api: any) => {
           const [x0, y0] = api.coord([api.value(0), api.value(1)]);

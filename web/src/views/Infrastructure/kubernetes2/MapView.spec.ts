@@ -41,14 +41,46 @@ import { parseUrlState, type K8sUrlState } from "./kubernetesUrlState";
 import { fillClass, fillValue, groupRows, listTarget, statusClass, type MapRow } from "./mapFill";
 import type { MapObjects } from "./mapFilter";
 
+const chartLog = vi.hoisted(() => ({ errors: [] as string[], applied: null as any }));
+
+// Like ChartRenderer: on new options it first redraws the current ones (resize), then applies them.
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", async () => {
-  const { defineComponent, h } = await import("vue");
+  const { defineComponent, h, watch } = await import("vue");
+  const drawAll = (option: any, scale: number) => {
+    for (const series of option?.series ?? []) {
+      (series.data ?? []).forEach((row: number[], dataIndex: number) =>
+        series.renderItem?.(
+          { dataIndex },
+          {
+            value: (dim: number) => row[dim],
+            coord: ([x, y]: number[]) => [x * scale, -y * scale],
+            size: () => [scale, scale],
+          },
+        ),
+      );
+    }
+  };
   return {
     default: defineComponent({
       name: "ChartRenderer",
       props: ["data"],
       emits: ["click"],
-      setup: () => () => h("div", { "data-test": "chart-stub" }),
+      setup: (props: any) => {
+        watch(
+          () => props.data?.options,
+          (next, prev) => {
+            try {
+              drawAll(prev, 21);
+              chartLog.applied = next;
+              drawAll(next, 20);
+            } catch (e) {
+              chartLog.errors.push(String(e));
+            }
+          },
+          { immediate: true },
+        );
+        return () => h("div", { "data-test": "chart-stub" });
+      },
     }),
   };
 });
@@ -902,6 +934,52 @@ describe("MapView review fixes", () => {
     expect(wrapper.find('[data-test="k8s2-map-view"]').classes()).toContain(
       "max-md:overflow-y-auto",
     );
+  });
+});
+
+describe("MapView switching groupings in place", () => {
+  it.each(["node", "namespace", "label.app.kubernetes.io/name"])(
+    "draws workload cards after switching from %s",
+    async (from) => {
+      chartLog.errors = [];
+      await mountView(mapState({ group: from }), labelledInventory());
+      await wrapper.setProps({ state: mapState({ group: "workload" }) });
+      await flushPromises();
+      expect(chartLog.errors).toEqual([]);
+      expect(chartLog.applied.series[1].data).toHaveLength(hexMap().props("groups").length);
+      expect(chartLog.applied.tooltip.formatter({ seriesIndex: 1, dataIndex: 0 })).toContain(
+        "fluent-bit",
+      );
+    },
+  );
+
+  it("redraws the cards on every switch among node, namespace, workload, none and a label", async () => {
+    chartLog.errors = [];
+    await mountView(mapState(), labelledInventory());
+    const sequence = [
+      "namespace",
+      "workload",
+      "node",
+      "label.app.kubernetes.io/name",
+      "namespace",
+      "label.app.kubernetes.io/name",
+      "workload",
+      "namespace",
+      "none",
+      "node",
+    ];
+    for (const group of sequence) {
+      await wrapper.setProps({ state: mapState({ group }) });
+      await flushPromises();
+      expect(chartLog.errors).toEqual([]);
+      const groups = hexMap().props("groups");
+      const frames = chartLog.applied.series[1].data;
+      expect(frames).toHaveLength(group === "none" ? 0 : groups.length);
+      if (group !== "none") {
+        const tip = chartLog.applied.tooltip.formatter({ seriesIndex: 1, dataIndex: 0 });
+        expect(tip).toBe(hexMap().props("headers")[0].tip);
+      }
+    }
   });
 });
 
