@@ -1015,6 +1015,38 @@ describe("QueryConfig.vue", () => {
       expect(await submit()).toBe(true);
     });
 
+    it("names the threshold and horizon inputs for assistive technology", () => {
+      for (const [dt, key] of [
+        ["alert-forecast-threshold", "alerts.forecast.threshold"],
+        ["alert-forecast-horizon", "alerts.forecast.horizonLabel"],
+      ]) {
+        const input = host.find(`[data-test="${dt}"] input`);
+        const id = input.attributes("id");
+        expect(id).toBeTruthy();
+        expect(host.find(`label[for="${id}"]`).text()).toBe(t(key));
+      }
+    });
+
+    it("shows an out-of-range horizon as soon as the field loses focus", async () => {
+      const input = host.find('[data-test="alert-forecast-horizon"] input');
+      await input.setValue("45");
+      await input.trigger("blur");
+      await flushPromises();
+      const error = host.find('[data-test="alert-forecast-horizon-error"]');
+      expect(error.exists()).toBe(true);
+      expect(error.text()).toBe(t("alerts.forecast.horizonRange", { min: 1, max: 30 }));
+      await input.setValue("12");
+      await input.trigger("blur");
+      await flushPromises();
+      expect(host.find('[data-test="alert-forecast-horizon-error"]').exists()).toBe(false);
+    });
+
+    it("keeps “within” together with the horizon input so it never wraps alone", () => {
+      const group = host.find('[data-test="alert-forecast-horizon-group"]');
+      expect(group.text()).toContain(t("alerts.forecast.within"));
+      expect(group.find('[data-test="alert-forecast-horizon"]').exists()).toBe(true);
+    });
+
     it("reopens its own generated query with the same fields, not as a nested expression", async () => {
       const generated = values().query_condition.promql;
       wrapper.vm.onPromqlModeChange("threshold");

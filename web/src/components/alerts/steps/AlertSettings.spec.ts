@@ -260,6 +260,16 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(trigger.silence).toBe(10);
   });
 
+  it("hides the period in Forecast mode, whose query reads its own history window", async () => {
+    const host = mountDescendant("false", {
+      _ui: { forecast: { U: "up", T: 1, direction: "rises", W: "2d", H: 7 } },
+    });
+    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(false);
+    hostForm(host).setFieldValue("_ui.forecast", null);
+    await flushPromises();
+    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
+  });
+
   it("preserves every data-test (scheduled branch)", () => {
     const host = mountDescendant("false");
     for (const dt of [

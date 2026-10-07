@@ -8630,15 +8630,24 @@
       "window1d": "1 day",
       "window2d": "2 days",
       "window7d": "7 days",
-      "help": "Each series fires on its own. Its trend is a straight line fitted to this much history, and its value is the days until it reaches the threshold.",
+      "help": "A straight trend line is drawn through this much history for each series. Each series whose line reaches the threshold in time alerts on its own.",
       "horizonRange": "Enter a whole number of days from {min} to {max}",
-      "rowTemplateHint": "A forecast alert's row reads \"reaches T in N days\". It appears only in a destination template that contains {'{'}rows{'}'}."
+      "horizonLabel": "Horizon in days",
+      "dayCount": "{n} day | {n} days",
+      "summaryRises": "Alert when it is forecast to rise to {threshold} within {horizon}",
+      "summaryFalls": "Alert when it is forecast to fall to {threshold} within {horizon}",
+      "triggerRises": "forecast to rise to {threshold} within {horizon}",
+      "triggerFalls": "forecast to fall to {threshold} within {horizon}",
+      "previewSeries": "days until {threshold}",
+      "previewReason": "{count} series forecast to reach {threshold} within {horizon}",
+      "rowTemplateHint": "Each series’ row reads like “reaches 90 in 3 days”. Rows show only in a destination template that includes {'{'}rows{'}'}."
     },
     "prefill": {
       "dialog": {
         "title": "Create alert",
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert on",
         "thresholdMatchingRows": "Matching rows",

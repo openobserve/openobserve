@@ -1148,6 +1148,18 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   const hasWarningBand = warning !== null;
 
   const criticalGate = evaluateCountGate(criticalCount);
+  const forecast = props.formData._ui?.forecast;
+  if (forecast) {
+    evaluationStatus.value = {
+      wouldTrigger: criticalGate.passes,
+      reason: t("alerts.forecast.previewReason", {
+        count: criticalCount,
+        threshold: forecast.T,
+        horizon: t("alerts.forecast.dayCount", { n: critical }, critical),
+      }),
+    };
+    return;
+  }
   if (criticalGate.passes) {
     setEvaluationStatus({
       count: criticalCount,
@@ -1300,8 +1312,10 @@ const refreshData = () => {
     // the legend renders as "{}". Name it after what the alert measures — the
     // same fallback AlertGroupChart uses. Consulted only when a series has no
     // name of its own to give: labels that identify it always win.
-    dashboardPanelData.data.queries[0].config.promql_legend_fallback =
-      props.formData.stream_name || t("alerts.preview");
+    const forecast = props.formData._ui?.forecast;
+    dashboardPanelData.data.queries[0].config.promql_legend_fallback = forecast
+      ? t("alerts.forecast.previewSeries", { threshold: forecast.T })
+      : props.formData.stream_name || t("alerts.preview");
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
