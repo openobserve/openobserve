@@ -15,11 +15,13 @@
 //
 // @vitest-environment jsdom
 //
-// This same page renders at both /ai/sessions (enterprise/cloud — the detail
-// route "aiSessionDetails" exists there) and /sessions (OSS — only the plain
-// "sessionDetails" route exists). detailRouteName must resolve to whichever
-// one the CURRENT build actually registered, or a session row would push to a
-// route name vue-router has never heard of.
+// `aiSessionDetails` is registered by every edition (see
+// useAIObservabilityExtraRoutes in composables/shared/useAIObservabilityRoutes.ts,
+// consumed by both the OSS and enterprise routers) — Sessions itself ships in
+// OSS, so detailRouteName is the same constant regardless of edition. It used
+// to fall back to the Traces module's plain "sessionDetails" route in OSS,
+// back when "aiSessionDetails" was enterprise/cloud-only; these tests guard
+// against that distinction reappearing.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
@@ -87,10 +89,12 @@ beforeEach(() => {
   mockIsCloud = "false";
 });
 
-describe("SessionsPage — detailRouteName resolves to the route the current build actually registers", () => {
-  it("resolves to sessionDetails on a true OSS build (isEnterprise and isCloud both false)", async () => {
+describe("SessionsPage — detailRouteName is aiSessionDetails on every edition", () => {
+  it("resolves to aiSessionDetails on a true OSS build (isEnterprise and isCloud both false)", async () => {
     const wrapper = await mountPage();
-    expect(wrapper.findComponent(SessionsListStub).props("detailRouteName")).toBe("sessionDetails");
+    expect(wrapper.findComponent(SessionsListStub).props("detailRouteName")).toBe(
+      "aiSessionDetails",
+    );
   });
 
   it("resolves to aiSessionDetails when isEnterprise is true", async () => {

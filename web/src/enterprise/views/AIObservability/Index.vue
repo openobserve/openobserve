@@ -50,6 +50,7 @@ import type { SectionHubGroup, SectionHubItem } from "@/components/common/Sectio
 import { navSection } from "./navSection";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
+import { AI_OBSERVABILITY_SECTIONS } from "@/composables/shared/useAIObservabilityRoutes";
 
 /** The same mark the primary nav uses for this module, so the collapsed rail
  *  still says which module it belongs to. */
@@ -88,186 +89,54 @@ const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 
-type EvalTab = "quality" | "jobs" | "scorers" | "scoreConfigs";
-
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,
 }));
 
-function evalLink(tab: EvalTab) {
-  return { name: "aiEvaluations", query: { ...orgQuery.value, tab } };
-}
-
 const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
 // Single source of truth for the rail items (groups) AND the breadcrumb
-// switcher. Order here is the order shown in the rail. Every section beyond
-// Monitor's LLM Insights + Sessions is enterprise/cloud-only — rather than
-// hiding those items in OSS, they stay visible but locked (lock icon +
-// pitch-card tooltip), matching the Settings/IAM rail pattern. The routes
-// they link to are still registered in OSS (see web/src/composables/router.ts)
-// and redirect to the shared locked-feature page via `withFeatureGate`.
+// switcher, derived from AI_OBSERVABILITY_SECTIONS — the SAME list the OSS
+// and enterprise routers build their /ai routes from (see
+// composables/shared/useAIObservabilityRoutes.ts), so a nav item's
+// `featureKey`/`routeName` can't drift from what actually gates/names its
+// route. Every section beyond Monitor's LLM Insights + Sessions is
+// enterprise/cloud-only — rather than hiding those items in OSS, they stay
+// visible but locked (lock icon + pitch-card tooltip), matching the
+// Settings/IAM rail pattern.
 const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
   const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
-  const agentGraphAccess = checkFeatureAccess("agentGraph", featureGateCtx);
-  const agentBehaviorAccess = checkFeatureAccess("agentBehavior", featureGateCtx);
-  const discoveryAccess = checkFeatureAccess("discovery", featureGateCtx);
-  const queuesAccess = checkFeatureAccess("queues", featureGateCtx);
-  const datasetsAccess = checkFeatureAccess("datasets", featureGateCtx);
-  const promptsAccess = checkFeatureAccess("prompts", featureGateCtx);
-  const playgroundAccess = checkFeatureAccess("playground", featureGateCtx);
-  const experimentsAccess = checkFeatureAccess("experiments", featureGateCtx);
-  const remoteTasksAccess = checkFeatureAccess("remoteTasks", featureGateCtx);
-  const evaluationsAccess = checkFeatureAccess("evaluations", featureGateCtx);
-
-  return [
-    {
-      key: "llmInsights",
-      label: t("aiObservability.nav.llmInsights"),
-      icon: "dashboard",
-      to: { name: "aiLLMInsights", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-llm-insights",
-      group: "Monitor",
-    },
-    {
-      key: "sessions",
-      label: t("aiObservability.nav.sessions"),
-      icon: "forum",
-      to: { name: "aiSessions", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-sessions",
-      group: "Monitor",
-    },
-    {
-      key: "agentGraph",
-      label: t("aiObservability.nav.agentGraph"),
-      icon: "hub",
-      to: { name: "aiAgentGraph", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-agent-graph",
-      group: "Monitor",
-      locked: !agentGraphAccess.allowed,
-      lockedMessage: agentGraphAccess.message,
-    },
-    {
-      key: "agentBehavior",
-      label: t("aiObservability.nav.agentBehavior"),
-      icon: "troubleshoot",
-      to: { name: "aiAgentBehavior", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-agent-behavior",
-      group: "Monitor",
-      locked: !agentBehaviorAccess.allowed,
-      lockedMessage: agentBehaviorAccess.message,
-    },
-    {
-      key: "discovery",
-      label: t("aiObservability.nav.discovery"),
-      icon: "saved-search",
-      to: { name: "aiDiscovery", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-discovery",
-      group: "Annotate",
-      locked: !discoveryAccess.allowed,
-      lockedMessage: discoveryAccess.message,
-    },
-    {
-      key: "queues",
-      label: t("aiObservability.nav.queues"),
-      icon: "fact-check",
-      to: { name: "aiQueues", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-queues",
-      group: "Annotate",
-      locked: !queuesAccess.allowed,
-      lockedMessage: queuesAccess.message,
-    },
-    {
-      key: "datasets",
-      label: t("aiObservability.nav.datasets"),
-      icon: "table-chart",
-      to: { name: "aiDatasets", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-datasets",
-      group: "Annotate",
-      locked: !datasetsAccess.allowed,
-      lockedMessage: datasetsAccess.message,
-    },
-    {
-      key: "prompts",
-      label: t("aiObservability.nav.prompts"),
-      icon: "edit",
-      to: { name: "aiPrompts", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-prompts",
-      group: "Experiment",
-      locked: !promptsAccess.allowed,
-      lockedMessage: promptsAccess.message,
-    },
-    {
-      key: "playground",
-      label: t("aiObservability.nav.playground"),
-      icon: "play-circle",
-      to: { name: "aiPlayground", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-playground",
-      group: "Experiment",
-      locked: !playgroundAccess.allowed,
-      lockedMessage: playgroundAccess.message,
-    },
-    {
-      key: "experiments",
-      label: t("aiObservability.nav.experiments"),
-      icon: "science",
-      to: { name: "aiExperiments", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-experiments",
-      group: "Experiment",
-      locked: !experimentsAccess.allowed,
-      lockedMessage: experimentsAccess.message,
-    },
-    {
-      key: "remoteTasks",
-      label: t("aiObservability.nav.remoteTasks"),
-      icon: "cloud-upload",
-      to: { name: "aiRemoteTasks", query: orgQuery.value },
-      dataTest: "ai-secondary-nav-remote-tasks",
-      group: "Experiment",
-      locked: !remoteTasksAccess.allowed,
-      lockedMessage: remoteTasksAccess.message,
-    },
-    {
-      key: "quality",
-      label: t("aiObservability.nav.quality"),
-      icon: "star-rate",
-      to: evalLink("quality"),
-      dataTest: "ai-secondary-nav-quality",
-      group: "Evaluate",
-      locked: !evaluationsAccess.allowed,
-      lockedMessage: evaluationsAccess.message,
-    },
-    {
-      key: "jobs",
-      label: t("aiObservability.nav.evalJobs"),
-      icon: "event",
-      to: evalLink("jobs"),
-      dataTest: "ai-secondary-nav-eval-jobs",
-      group: "Evaluate",
-      locked: !evaluationsAccess.allowed,
-      lockedMessage: evaluationsAccess.message,
-    },
-    {
-      key: "scorers",
-      label: t("aiObservability.nav.scorers"),
-      icon: "rule",
-      to: evalLink("scorers"),
-      dataTest: "ai-secondary-nav-scorers",
-      group: "Evaluate",
-      locked: !evaluationsAccess.allowed,
-      lockedMessage: evaluationsAccess.message,
-    },
-    {
-      key: "scoreConfigs",
-      label: t("aiObservability.nav.scoreConfigs"),
-      icon: "tune",
-      to: evalLink("scoreConfigs"),
-      dataTest: "ai-secondary-nav-score-configs",
-      group: "Evaluate",
-      locked: !evaluationsAccess.allowed,
-      lockedMessage: evaluationsAccess.message,
-    },
-  ];
+  // Memoized per featureKey, not per nav item — the four Evaluate entries
+  // share one key and would otherwise recompute the same access check 4x.
+  const accessByFeatureKey = new Map<string, ReturnType<typeof checkFeatureAccess>>();
+  return AI_OBSERVABILITY_SECTIONS.map((section) => {
+    let locked: boolean | undefined;
+    let lockedMessage: I18nText | undefined;
+    if (section.featureKey) {
+      let access = accessByFeatureKey.get(section.featureKey);
+      if (!access) {
+        access = checkFeatureAccess(section.featureKey, featureGateCtx);
+        accessByFeatureKey.set(section.featureKey, access);
+      }
+      locked = !access.allowed;
+      lockedMessage = access.message;
+    }
+    return {
+      key: section.key,
+      label: t(section.labelKey),
+      icon: section.icon,
+      to: {
+        name: section.routeName,
+        query: section.tabQuery
+          ? { ...orgQuery.value, tab: section.tabQuery }
+          : orgQuery.value,
+      },
+      dataTest: section.dataTest,
+      group: section.group,
+      locked,
+      lockedMessage,
+    };
+  });
 });
 
 const activeSectionItem = computed(() =>
