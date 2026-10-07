@@ -46,6 +46,8 @@ pub mod logs;
 pub mod mcp;
 pub mod metrics;
 pub mod organization;
+#[cfg(feature = "enterprise")]
+pub mod password_policy;
 pub mod patterns;
 pub mod pipeline;
 pub mod pipelines;

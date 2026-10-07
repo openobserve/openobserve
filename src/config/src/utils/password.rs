@@ -27,15 +27,14 @@ pub const MIN_PASSWORD_LEN: usize = 8;
 pub const MAX_PASSWORD_LEN: usize = 128;
 
 /// Human-readable description of the policy, used in error messages and UI.
-pub const PASSWORD_POLICY_HINT: &str =
-    "Password must be 8-128 characters and contain at least one lowercase letter, \
+pub const PASSWORD_POLICY_HINT: &str = "Password must be 8-128 characters and contain at least one lowercase letter, \
      one uppercase letter, one digit, and one special character.";
 
 /// Validate that a password meets the strength policy.
 /// Returns the policy hint on failure so callers can surface a uniform message.
 pub fn validate_password_strength(password: &str) -> Result<(), &'static str> {
     let len = password.chars().count();
-    if len < MIN_PASSWORD_LEN || len > MAX_PASSWORD_LEN {
+    if !(MIN_PASSWORD_LEN..=MAX_PASSWORD_LEN).contains(&len) {
         return Err(PASSWORD_POLICY_HINT);
     }
 

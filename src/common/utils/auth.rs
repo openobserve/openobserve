@@ -357,6 +357,19 @@ where
             });
         }
 
+        // A user the password-policy middleware blocked for a forced reset holds no settings grant
+        // anywhere, yet must still read what password will satisfy the policy.
+        if url_len == 2 && path_columns[1].eq("password_complexity") && method.eq("GET") {
+            return Ok(AuthExtractor {
+                auth: extract_auth_str_from_headers(&parts.headers).await,
+                method,
+                o2_type: "".to_string(),
+                org_id,
+                bypass_check: true,
+                parent_id: folder,
+            });
+        }
+
         // get ofga object type from the url
         // depends on the url path count
         let object_type = if url_len == 1 {
