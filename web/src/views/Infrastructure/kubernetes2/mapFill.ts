@@ -237,11 +237,18 @@ function labelGroupOf(row: MapRow, key: string): Omit<RowGroup, "rows"> {
 // Workloads sharing a name would draw identical titles; the namespace, then the kind, tells them apart.
 function disambiguateWorkloads(groups: RowGroup[]) {
   const byName = new Map<string, RowGroup[]>();
-  for (const g of groups) if (!g.special) byName.set(g.name, [...(byName.get(g.name) ?? []), g]);
+  for (const g of groups) {
+    if (g.special) continue;
+    const same = byName.get(g.name);
+    if (same) same.push(g);
+    else byName.set(g.name, [g]);
+  }
   for (const [name, same] of byName) {
     if (same.length < 2) continue;
+    const perNamespace = new Map<string, number>();
+    for (const g of same) perNamespace.set(g.namespace, (perNamespace.get(g.namespace) ?? 0) + 1);
     for (const g of same) {
-      const sharesNamespace = same.some((o) => o !== g && o.namespace === g.namespace);
+      const sharesNamespace = (perNamespace.get(g.namespace) ?? 0) > 1;
       const kind = g.owner ? (SHORT_KIND[g.owner.kind] ?? g.owner.kind.toLowerCase()) : "";
       g.name = `${g.namespace}/${name}${sharesNamespace ? ` (${kind})` : ""}`;
     }

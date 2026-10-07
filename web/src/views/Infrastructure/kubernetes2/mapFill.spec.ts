@@ -33,6 +33,9 @@ import {
   statusCounts,
 } from "./mapFill";
 
+// Catches a quadratic blow-up (seconds), not machine speed: CI runs this slower, under coverage.
+const TITLE_BUDGET_MS = 250;
+
 const pod = (over: Partial<PodRow> = {}): PodRow =>
   ({
     key: `c/ns/${over.name ?? "p"}`,
@@ -239,6 +242,21 @@ describe("mapFill groups (AC 44, 45)", () => {
       "ns/api (sts)",
       "other/api",
     ]);
+  });
+
+  it("titles thousands of same-named workloads without comparing every pair", () => {
+    const rows = Array.from({ length: 3000 }, (_, i) => [
+      pod({ name: `d${i}`, namespace: `ns${i}`, workload: { kind: "Deployment", name: "web" } }),
+      pod({ name: `s${i}`, namespace: `ns${i}`, workload: { kind: "StatefulSet", name: "web" } }),
+      pod({ name: `o${i}`, namespace: `solo${i}`, workload: { kind: "Deployment", name: "web" } }),
+    ]).flat();
+    const started = performance.now();
+    const { groups } = groupRows(rows, "workload");
+    expect(performance.now() - started).toBeLessThan(TITLE_BUDGET_MS);
+    const names = new Set(groups.map((g) => g.name));
+    expect(names.size).toBe(9000);
+    expect(names.has("ns7/web (deploy)") && names.has("ns7/web (sts)")).toBe(true);
+    expect(names.has("solo7/web")).toBe(true);
   });
 
   it("orders by size, then name; none is one block", () => {
