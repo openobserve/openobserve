@@ -35,7 +35,9 @@ description: >-
   to dropdowns (mobile-dropdown), secondary header actions go to #actions-overflow,
   side panels become drawers that open from their own row, row actions fold into a
   kebab, and popups fit the viewport. It also settles the recurring
-  structural decisions: use OTable for any tabular data, follow the
+  structural decisions: use OTable for any tabular data, cut text with
+  OTruncatedText (full text on hover only when cut; never for secrets or text
+  shown in full elsewhere; no title/OTooltip that repeats visible text), follow the
   TanStack Query layering for server data (a declared queryOptions() per read
   on its module's staleTime tier, mutationOptions() writes that invalidate,
   refresh buttons that force every read on the view, no Vuex copies), choose the
@@ -568,6 +570,7 @@ and each domain has its own reference below.
 | --- | --- | --- |
 | **Server data (fetch & cache)** | Every read is a declared `queryOptions()` in `services/<domain>.queries.ts` (reuse the existing one if the list is already declared), keyed with `orgKey`, on its **module's** `staleTime` tier from `cachePolicy.ts`; components `useQuery` it (rows as a `computed`) — never `http`/axios, never a Vuex copy of a server list. Writes are `mutationOptions()` with `meta.invalidates`. A user refresh forces **every** read on the view; mount, paging and search read the cache. | [data-fetching](references/data-fetching.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
+| **Cut text ("…")** | **`<OTruncatedText>` wherever you'd write `truncate` / `line-clamp-*`** — it shows the full text in a tooltip only while the text is actually cut. **`:tooltip="false"`** for secrets (tokens, keys, webhook/signed URLs) and for text the user can already read in full another way (printed below, expand, a side panel). In `OTable` cells plain text needs nothing — the table's shared tooltip handles it; turn it off per column (`meta.cellOverflowTooltip: false`) for secrets or per table (`:cell-overflow-tooltip="false"`) where Wrap / row expansion is the reveal. **Never repeat the visible text in a `title` or `OTooltip`.** | [core-display](references/core-display.md#otruncatedtext) · [core-controls-table](references/core-controls-table.md#cut-cell-text--the-shared-tooltip) |
 | **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
@@ -679,6 +682,12 @@ considering the UI done:
       from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns; server mode
       only for backend-paginated data.
+- [ ] **Cut text is `OTruncatedText`** — no bare `truncate` / `line-clamp-*`, and no
+      `title` / `OTooltip` that only repeats the visible text. `:tooltip="false"`
+      on secrets and on text readable another way (shown below, expand, side
+      panel). In tables: secret column → `meta.cellOverflowTooltip: false`, a
+      Wrap/expansion table → `:cell-overflow-tooltip="false"`, and a cell with
+      several tags/badges gives its own joined tooltip text.
 - [ ] **Every data chart goes through `PanelSchemaRenderer`** (panel schema) — no
       `echarts.init` / `<v-chart>` / ApexCharts / D3 / hand-rolled `<canvas>`/`<svg>`
       plot in a feature page. Low-level `panels/ChartRenderer.vue` only as the

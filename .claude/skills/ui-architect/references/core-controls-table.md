@@ -15,6 +15,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - [OFormToggleGroup](#oformtogglegroup)
 - [OTable](#otable)
 - [OTable cell renderers](#otable-cell-renderers)
+- [Cut cell text — the shared tooltip](#cut-cell-text--the-shared-tooltip)
 
 ---
 
@@ -334,6 +335,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   - `loading` (default false), `streaming` (default false — pulsing incremental indicator), `error` (`string|null`), `emptyMessage`
   - `dense` (default `true`), `bordered` (default `true`), `frame` (default `false` — outer frame border), `striped` (default false)
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
+  - `cellOverflowTooltip` (default `true`) — the shared full-text tooltip on cut body cells; pass `false` for a table whose reveal is Wrap / row expansion (logs, correlated logs). See [Cut cell text](#cut-cell-text--the-shared-tooltip)
   - `fillHeight` (default `true` — set false to shrink to content), `virtualScroll` (default false, `virtualScrollItemSize` default `48`), `maxHeight`, `width`
     - Empty state: fill-height tables let the empty state fill the available
       space; non-fill-height tables reserve a `min-h-75` floor so the empty
@@ -369,6 +371,7 @@ interface OTableColumnDef<TData = any> {
     cellClass?: string;
     isName?: boolean; // primary name column (weight 500)
     format?: (value: any, row: any) => any;
+    cellOverflowTooltip?: boolean; // false = this column never shows the cut-cell tooltip (secret columns)
     [key: string]: any;
   };
 }
@@ -553,9 +556,9 @@ const columns: OTableColumnDef[] = [
 Prebuilt cell components — pass as a column's `cell`. Import individually or from the barrel `@/lib/core/Table/cells`.
 
 - **OTimeCell** (`@/lib/core/Table/cells/OTimeCell.vue`) — the one timestamp renderer: relative ("2m ago") by default, `mode="absolute"` / `"date"` for full datetime; `unit` interprets numeric values (`auto`/`iso`/`s`/`ms`/`us`/`ns`); muted `empty-label` for zero/empty.
-- **OUserCell** (`@/lib/core/Table/cells/OUserCell.vue`) — person/owner/created-by column; renders email or explicit `name` as truncated plain text, dash when empty.
+- **OUserCell** (`@/lib/core/Table/cells/OUserCell.vue`) — person/owner/created-by column; renders email or explicit `name` as cut plain text (full identity on hover when cut), dash when empty.
 - **ONumberCell** (`@/lib/core/Table/cells/ONumberCell.vue`) — consistent numeric rendering (tabular-nums); `format` = `number`/`compact`/`bytesFromMB`/`durationSec`/`durationMs`/`durationUs`/`durationNs`/`percent`. Pair the column with `meta.align: "right"`.
-- **OCodeCell** (`@/lib/core/Table/cells/OCodeCell.vue`) — monospace identifiers / SQL / tokens, truncated with title tooltip and optional hover copy button (`copy`, default true).
+- **OCodeCell** (`@/lib/core/Table/cells/OCodeCell.vue`) — monospace identifiers / SQL / tokens, cut with "…" (full value on hover only when cut) and optional hover copy button (`copy`, default true). **`:tooltip="false"` for secrets** (tokens, credentials) — it also keeps the table's own tooltip off that cell.
 - **ODataBarCell** (`@/lib/core/Table/cells/ODataBarCell.vue`) — value with a proportional background bar (width = value/`max`, caller supplies the column max and pre-formatted `display`); `variant` `default`/`warning`/`danger` for threshold columns. ⚠️ **Client-paginated tables only:** the caller can only compute `max` over the rows it holds, so on a server-paginated table the bar means "biggest on this page" — the scale shifts as you page and the same row draws a different bar. There, drop the bars and let sortable numbers rank the rows.
 
 Also exported from the barrel: `statusVariant`, `humanizeStatus` helpers (+ `StatusTone`, `StatusVariantResult` types) for status badge styling.
@@ -590,3 +593,44 @@ For renders not covered by prebuilt cells, use a slot template `#cell-{id}`:
 ```
 
 **Important:** Access row data directly (`row.enabled`, `row.status`, `row.id`), not via `row.original`. The `row` object _is_ the data record with all properties accessible.
+
+### Cut cell text — the shared tooltip
+
+`OTable` shows **one shared tooltip per table**: when the mouse rests 0.7 s on a body cell whose text is cut with "…", it shows the full text. Cells that fit show nothing. It is measured only on hover, so cells carry no per-cell cost. **Plain cell text and simple `#cell-*` slots need nothing** — don't add `truncate`, a `title` or an `OTooltip` for this.
+
+**Switch it off where it must not show:**
+
+| Case | Do this |
+|---|---|
+| A column holds secrets (token, API key, webhook / signed URL, credential) | column `meta: { cellOverflowTooltip: false }` |
+| The whole table has its own reveal — a Wrap toggle or row expansion (logs, correlated logs, span events) | `<OTable :cell-overflow-tooltip="false">` |
+| One element inside a slot must stay silent | `<OTruncatedText :tooltip="false">` / `<OCodeCell :tooltip="false">` — they mark the element so the table skips it |
+
+A plain `<span class="truncate">` in a cell is **not** an opt-out — the table still shows its full text on hover.
+
+**It steps aside on its own** when the cut element (or a parent/child in the cell) already has its own tooltip that will show — an `OTruncatedText`, an `OTooltip`, a native `title` — so there are never two bubbles. It opens on the side away from a `#cell-hover-actions` toolbar.
+
+**Cells with several parts** (a row of tags, label pairs, a value plus a delta badge): the shared tooltip reads the cell's raw text, which has no separators — three tags `Trace 0` `Annotation 0` `Manual 1` read as `trace0annotation0manual1`. Give such a cell its own tooltip text:
+
+```vue
+<!-- a list of tags: one tooltip with commas -->
+<template #cell-tags="{ row }">
+  <OTruncatedText
+    as="div"
+    class="flex flex-nowrap items-center gap-1"
+    :tooltip="raw(row.tags.join(', '))"
+  >
+    <OTag v-for="tag in row.tags" :key="tag" class="shrink-0">{{ tag }}</OTag>
+  </OTruncatedText>
+</template>
+
+<!-- one long text + a small badge: cut the text only, keep the badge visible -->
+<template #cell-name="{ row }">
+  <div class="flex min-w-0 items-center">
+    <OTruncatedText>{{ row.name }}</OTruncatedText>
+    <OTag v-if="row.isPng" type="reportTag" value="png" class="ms-1 shrink-0" />
+  </div>
+</template>
+```
+
+Tables that never cut (`wrap`, or `horizontal-scroll` with content-sized columns) never show it, so they need no opt-out.
