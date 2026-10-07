@@ -160,6 +160,11 @@ describe("treeToBuilder", () => {
     );
   });
 
+  it("names an unsupported construct nested inside a binary's operand", () => {
+    const rateOfSubquery = call("rate", { type: "unsupported", kind: "subquery" });
+    expect(reason(bin("/", rateOfSubquery, sel("y")))).toBe("The builder cannot show a subquery");
+  });
+
   it("names an unsupported construct on either side of a binary", () => {
     expect(reason(bin("/", sel("x"), { type: "unsupported", kind: "offset" }))).toBe(
       "The builder cannot show an offset modifier",

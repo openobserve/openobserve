@@ -139,7 +139,7 @@ export const substituteFormula = (
   return { expr: expr + formula.slice(last) };
 };
 
-/** Name for a query's label-less series: a formula's text, or an input's letter in a panel with a formula. */
+/** Inputs get their letter only beside a formula, so formula-free panels keep today's legends. */
 export const legendFallbackOf = (queries: any[] | undefined, index: number): string | undefined => {
   const query = queries?.[index];
   if (query?.config?.promql_legend_fallback) return query.config.promql_legend_fallback;

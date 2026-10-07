@@ -957,12 +957,14 @@ describe("formula letters and the saved hide flag", () => {
     it("toggles from the keyboard without switching tabs", async () => {
       const data = mountWith([q({ ref: "A" }), q({ ref: "B" })]);
       await wrapper.vm.$nextTick();
+      // A native button turns Enter into a click; jsdom does not, so both events are sent.
       await eye(1).trigger("keydown", { key: "Enter" });
       expect(data.layout.currentQueryIndex).toBe(0);
       await eye(1).trigger("click");
       await wrapper.vm.$nextTick();
       expect(data.layout.currentQueryIndex).toBe(0);
       expect(data.data.queries[1].config.hide).toBe(true);
+      expect(eye(1).element.tagName).toBe("BUTTON");
     });
 
     it("mutes a hidden query's label only on inactive tabs", async () => {

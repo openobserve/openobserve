@@ -85,6 +85,18 @@ const hasMetric = (node: PromqlTree | undefined): boolean => {
   );
 };
 
+const findOpaque = (node: PromqlTree | undefined): PromqlTree | undefined => {
+  if (!node || typeof node !== "object") return undefined;
+  if (node.type === "unsupported") return node;
+  for (const value of Object.values(node)) {
+    const found = Array.isArray(value)
+      ? value.map(findOpaque).find(Boolean)
+      : findOpaque(value as PromqlTree);
+    if (found) return found;
+  }
+  return undefined;
+};
+
 const isTree = (value: unknown): value is PromqlTree =>
   !!value && typeof value === "object" && "type" in value && typeof value.type === "string";
 
@@ -176,8 +188,8 @@ const aggregateLayer = (node: PromqlTree): Layer => {
 };
 
 const binaryLayer = (node: PromqlTree): Layer => {
-  // A side the backend could not express hides its metric, so name what it is instead.
-  const opaque = [node.lhs, node.rhs].find((side) => side?.type === "unsupported");
+  // A construct the backend could not express hides its metric, so name it before judging the operands.
+  const opaque = findOpaque(node.lhs) ?? findOpaque(node.rhs);
   if (opaque) return { reason: cannotShowKind(opaque.kind) };
   const stepId = SCALAR_STEPS[node.op];
   if (stepId && isNumber(node.rhs)) {
