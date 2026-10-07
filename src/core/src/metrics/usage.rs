@@ -29,6 +29,8 @@ use config::meta::{
     sql::resolve_stream_names_with_type,
     stream::StreamType,
 };
+#[cfg(feature = "enterprise")]
+use futures::StreamExt;
 use promql::{ast::visitor::walk_expr, utils::metric_name};
 use promql_parser::{parser::Expr, util::ExprVisitor};
 use serde::Serialize;
@@ -44,6 +46,9 @@ use crate::{
 const RANGE_PLACEHOLDER: &str = "1m";
 const VALUE_PLACEHOLDER: &str = "__o2_var__";
 const SCALAR_PLACEHOLDER: &str = "1";
+/// Bounds the OpenFGA calls one request has outstanding, since an org can hold many folders.
+#[cfg(feature = "enterprise")]
+const FOLDER_CHECKS_IN_FLIGHT: usize = 16;
 
 /// How an object was matched when no query referencing the metric could be parsed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -52,6 +57,7 @@ pub enum MatchKind {
     Text,
 }
 
+/// A dashboard with a panel query or variable that reads the metric.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct DashboardUsage {
     pub id: String,
@@ -61,6 +67,7 @@ pub struct DashboardUsage {
     pub match_kind: Option<MatchKind>,
 }
 
+/// An alert whose query reads the metric.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct AlertUsage {
     pub id: String,
@@ -70,6 +77,7 @@ pub struct AlertUsage {
     pub match_kind: Option<MatchKind>,
 }
 
+/// An SLO or scheduled pipeline whose query reads the metric.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct ObjectUsage {
     pub id: String,
@@ -104,13 +112,16 @@ impl UsageSources {
             .collect()
     }
 
-    /// SLOs live in alert folders.
     fn alert_folders(&self) -> HashSet<String> {
         self.alerts
             .iter()
             .map(|(folder, _)| folder.folder_id.clone())
-            .chain(self.slos.iter().map(|slo| slo.folder_id.clone()))
             .collect()
+    }
+
+    /// SLOs live in alert folders, but are listed through their own route.
+    fn slo_folders(&self) -> HashSet<String> {
+        self.slos.iter().map(|slo| slo.folder_id.clone()).collect()
     }
 }
 
@@ -126,6 +137,8 @@ struct FolderAccess {
 struct Access {
     dashboard_folders: HashMap<String, FolderAccess>,
     alert_folders: HashMap<String, FolderAccess>,
+    /// The SLO list endpoint returns everything in a folder its route admits.
+    slo_folders: HashSet<String>,
     dashboards: Option<Vec<String>>,
     alerts: Option<Vec<String>>,
     pipelines_listable: bool,
@@ -251,6 +264,7 @@ async fn load_access(
     Ok(Access {
         dashboard_folders: open(sources.dashboard_folders()),
         alert_folders: open(sources.alert_folders()),
+        slo_folders: sources.slo_folders(),
         dashboards: None,
         alerts: None,
         pipelines_listable: true,
@@ -272,19 +286,35 @@ async fn load_access(
         _ => anyhow::bail!("user {user_id} not found in {org_id}"),
     };
     let model = |name: &str| OFGA_MODELS.get(name).map_or("", |m| m.key).to_string();
-    let mut dashboard_folders = HashMap::new();
-    for folder in sources.dashboard_folders() {
-        let list = route_allows(org_id, user_id, &role, &[org_id, "dashboards"], &folder).await;
-        let get = list && folder_get(org_id, user_id, &role, &model("folders"), &folder).await;
-        dashboard_folders.insert(folder, FolderAccess { list, get });
-    }
-    let mut alert_folders = HashMap::new();
-    for folder in sources.alert_folders() {
-        let list = route_allows(org_id, user_id, &role, &["v2", org_id, "alerts"], &folder).await;
-        let get =
-            list && folder_get(org_id, user_id, &role, &model("alert_folders"), &folder).await;
-        alert_folders.insert(folder, FolderAccess { list, get });
-    }
+    let role = &role;
+    let dashboard_folders = folder_access(
+        org_id,
+        user_id,
+        role,
+        &[org_id, "dashboards"],
+        &model("folders"),
+        sources.dashboard_folders(),
+    )
+    .await;
+    let alert_folders = folder_access(
+        org_id,
+        user_id,
+        role,
+        &["v2", org_id, "alerts"],
+        &model("alert_folders"),
+        sources.alert_folders(),
+    )
+    .await;
+    let slo_folders = futures::stream::iter(sources.slo_folders())
+        .map(|folder| async move {
+            route_allows(org_id, user_id, role, &[org_id, "slos"], &folder)
+                .await
+                .then_some(folder)
+        })
+        .buffer_unordered(FOLDER_CHECKS_IN_FLIGHT)
+        .filter_map(std::future::ready)
+        .collect()
+        .await;
     let individual = |permission: &'static str, object_type: String| async move {
         crate::authz::list_objects_for_user(org_id, user_id, permission, &object_type).await
     };
@@ -296,11 +326,33 @@ async fn load_access(
     Ok(Access {
         dashboard_folders,
         alert_folders,
+        slo_folders,
         dashboards: individual("GET_INDIVIDUAL_FROM_ROLE", "dashboard".to_string()).await?,
         alerts,
-        pipelines_listable: route_allows(org_id, user_id, &role, &[org_id, "pipelines"], "").await,
+        pipelines_listable: route_allows(org_id, user_id, role, &[org_id, "pipelines"], "").await,
         pipelines: individual("GET", model("pipelines")).await?,
     })
+}
+
+/// Each folder's LIST check on `route`, then its GET check as a `folder_type`.
+#[cfg(feature = "enterprise")]
+async fn folder_access(
+    org_id: &str,
+    user_id: &str,
+    role: &config::meta::user::UserRole,
+    route: &[&str],
+    folder_type: &str,
+    folders: HashSet<String>,
+) -> HashMap<String, FolderAccess> {
+    futures::stream::iter(folders)
+        .map(|folder| async move {
+            let list = route_allows(org_id, user_id, role, route, &folder).await;
+            let get = list && folder_get(org_id, user_id, role, folder_type, &folder).await;
+            (folder, FolderAccess { list, get })
+        })
+        .buffer_unordered(FOLDER_CHECKS_IN_FLIGHT)
+        .collect()
+        .await
 }
 
 /// The LIST check the auth middleware makes for a GET on `path`.
@@ -399,7 +451,7 @@ fn visible(org_id: &str, sources: UsageSources, access: &Access) -> UsageSources
         slos: sources
             .slos
             .into_iter()
-            .filter(|slo| access.alert_folder(&slo.folder_id).list)
+            .filter(|slo| access.slo_folders.contains(&slo.folder_id))
             .collect(),
         pipelines: sources
             .pipelines
@@ -1183,13 +1235,14 @@ mod tests {
     }
 
     #[test]
-    fn an_slo_in_a_folder_the_caller_cannot_list_is_not_listed() {
+    fn slos_follow_the_slo_route_not_the_alert_folder_grants() {
         let sources = UsageSources {
             slos: vec![promql_slo("hidden"), promql_slo("open")],
             ..Default::default()
         };
         let access = Access {
-            alert_folders: folders(&[("hidden", false, true), ("open", true, false)]),
+            alert_folders: folders(&[("hidden", true, true), ("open", false, false)]),
+            slo_folders: HashSet::from(["open".to_string()]),
             ..Default::default()
         };
         let slos = visible("org", sources, &access).slos;
