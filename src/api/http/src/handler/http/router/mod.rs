@@ -48,7 +48,6 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     audit::audit,
     axum::body::{Body, to_bytes},
-    base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
@@ -394,7 +393,7 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
 ///
 /// `audit_middleware` records request bodies verbatim. Remote Task secret
 /// writes and the Prompt webhook secret write must never reach that trail.
-#[cfg(feature = "enterprise")]
+#[cfg(any(feature = "enterprise", test))]
 fn is_secret_write(method: &Method, path: &str) -> bool {
     if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
         return false;
@@ -411,6 +410,93 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
+/// The request body as the audit trail may store it.
+#[cfg(any(feature = "enterprise", test))]
+fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec<u8>) -> String {
+    use base64::Engine as _;
+    if is_secret_write(method, path) {
+        return "[REDACTED: secret write]".to_string();
+    }
+    if path.ends_with("/settings/logo") {
+        return base64::engine::general_purpose::STANDARD.encode(&body);
+    }
+    if body.is_empty() {
+        return String::new();
+    }
+    if content_type.is_some_and(|ct| ct.starts_with("application/x-www-form-urlencoded")) {
+        return redact_form_fields(&body);
+    }
+    // Field names are the only signal a route-independent filter has, so unparsable bodies go.
+    match serde_json::from_slice::<serde_json::Value>(&body) {
+        Ok(mut value) => {
+            redact_secret_fields(&mut value);
+            value.to_string()
+        }
+        Err(_) => format!("[REDACTED: non-JSON body, {} bytes]", body.len()),
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn redact_secret_fields(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (name, field) in map.iter_mut() {
+                if field.is_boolean() || field.is_null() {
+                    continue;
+                }
+                if is_secret_field(name) {
+                    *field = serde_json::Value::String("[REDACTED]".to_string());
+                } else {
+                    redact_secret_fields(field);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(redact_secret_fields),
+        _ => {}
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn redact_form_fields(body: &[u8]) -> String {
+    let mut out = url::form_urlencoded::Serializer::new(String::new());
+    for (name, value) in url::form_urlencoded::parse(body) {
+        out.append_pair(
+            &name,
+            if is_secret_field(&name) {
+                "[REDACTED]"
+            } else {
+                &value
+            },
+        );
+    }
+    out.finish()
+}
+
+/// Whether a field holds a credential; `url`, `endpoint` and headers carry webhook secrets.
+#[cfg(any(feature = "enterprise", test))]
+fn is_secret_field(name: &str) -> bool {
+    const SECRET_KEYS: [&str; 8] = [
+        "apikey",
+        "accesskey",
+        "privatekey",
+        "routingkey",
+        "integrationkey",
+        "signingkey",
+        "accountkey",
+        "encryptionkey",
+    ];
+    let name = name.to_ascii_lowercase().replace(['-', '_'], "");
+    matches!(
+        name.as_str(),
+        "url" | "endpoint" | "auth" | "authorization" | "cookie" | "passcode"
+    ) || name.ends_with("headers")
+        || name.ends_with("token")
+        || SECRET_KEYS.iter().any(|key| name.ends_with(key))
+        || ["password", "secret", "credential"]
+            .iter()
+            .any(|word| name.contains(word))
 }
 
 #[cfg(feature = "enterprise")]
@@ -455,6 +541,12 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .unwrap_or("")
             .to_string();
 
+        let content_type = request
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
         // Extract body
         let (parts, body) = request.into_parts();
         let bytes = match to_bytes(body, usize::MAX).await {
@@ -481,13 +573,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         response.headers_mut().remove(ERROR_HEADER);
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if is_secret_write(&http_method, &path) {
-                "[REDACTED: secret write]".to_string()
-            } else if path.ends_with("/settings/logo") {
-                general_purpose::STANDARD.encode(&request_body)
-            } else {
-                String::from_utf8(request_body).unwrap_or_default()
-            };
+            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
 
             audit(AuditMessage {
                 user_email,
@@ -2257,6 +2343,133 @@ mod tests {
             &Method::GET,
             "api/org/prompts/settings/secret"
         ));
+    }
+
+    fn audited(method: Method, path: &str, body: &str) -> String {
+        audit_body(&method, path, None, body.as_bytes().to_vec())
+    }
+
+    #[test]
+    fn audit_body_drops_header_values_under_any_headers_field() {
+        let body = audited(
+            Method::POST,
+            "api/default/scorers",
+            r#"{"params":{"custom_headers":[{"key":"X-Api-Key","value":"hv-1"}]}}"#,
+        );
+        assert!(!body.contains("hv-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_drops_webhook_endpoints() {
+        let body = audited(
+            Method::PUT,
+            "api/default/prompts/settings",
+            r#"{"webhook":{"endpoint":"https://hooks.example.com/x?token=ep-1"}}"#,
+        );
+        assert!(!body.contains("ep-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_keeps_identifiers_that_merely_end_in_key() {
+        let body = audited(
+            Method::POST,
+            "api/default/settings/v2",
+            r#"{"setting_key":"theme","setting_value":"dark","group_key":"g-1","idempotency_key":"i-1"}"#,
+        );
+        for kept in ["theme", "dark", "g-1", "i-1"] {
+            assert!(body.contains(kept), "{kept} lost: {body}");
+        }
+    }
+
+    #[test]
+    fn audit_body_keeps_form_queries_but_drops_form_secrets() {
+        let body = audit_body(
+            &Method::POST,
+            "api/default/prometheus/api/v1/query_range",
+            Some("application/x-www-form-urlencoded"),
+            b"query=up%7Bjob%3D%22api%22%7D&start=1&password=pf-1".to_vec(),
+        );
+        assert!(
+            body.contains("up%7Bjob") || body.contains(r#"up{job="api"}"#),
+            "{body}"
+        );
+        assert!(body.contains("start=1"), "{body}");
+        assert!(!body.contains("pf-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_drops_user_passwords_but_keeps_who_was_changed() {
+        let created = audited(
+            Method::POST,
+            "api/default/users",
+            r#"{"email":"new@example.com","password":"Created#Pass1","role":"admin"}"#,
+        );
+        assert!(!created.contains("Created#Pass1"), "{created}");
+        assert!(
+            created.contains("new@example.com") && created.contains("admin"),
+            "{created}"
+        );
+
+        let changed = audited(
+            Method::PUT,
+            "api/default/users/new@example.com",
+            r#"{"change_password":true,"old_password":"Old#Pass1","new_password":"New#Pass2"}"#,
+        );
+        assert!(!changed.contains("Old#Pass1"), "{changed}");
+        assert!(!changed.contains("New#Pass2"), "{changed}");
+        assert!(changed.contains(r#""change_password":true"#), "{changed}");
+    }
+
+    #[test]
+    fn audit_body_drops_destination_urls_and_headers() {
+        let body = audited(
+            Method::POST,
+            "api/default/alerts/destinations",
+            r#"{"name":"oncall","url":"https://hooks.slack.com/services/T0/B0/XYZSECRET","method":"post","headers":{"Authorization":"Bearer tok-123","X-Routing-Key":"rk-9"}}"#,
+        );
+        for secret in ["XYZSECRET", "tok-123", "rk-9"] {
+            assert!(!body.contains(secret), "{secret} leaked: {body}");
+        }
+        assert!(body.contains("oncall"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_redacts_secret_fields_at_any_depth() {
+        let body = audited(
+            Method::PUT,
+            "api/default/settings",
+            r#"{"items":[{"api_key":"k-1"}],"config":{"client_secret":"s-1","access_token":"t-1","passcode":"p-1","name":"kept"},"max_tokens":5}"#,
+        );
+        for secret in ["k-1", "s-1", "t-1", "p-1"] {
+            assert!(!body.contains(secret), "{secret} leaked: {body}");
+        }
+        assert!(
+            body.contains(r#""max_tokens":5"#) && body.contains("kept"),
+            "{body}"
+        );
+    }
+
+    #[test]
+    fn audit_body_never_stores_a_body_it_cannot_parse() {
+        let body = audited(Method::POST, "api/default/users", "password=Form#Pass1");
+        assert!(!body.contains("Form#Pass1"), "{body}");
+        assert_eq!(audited(Method::POST, "api/default/users", ""), "");
+    }
+
+    #[test]
+    fn audit_body_keeps_the_route_level_rules() {
+        assert_eq!(
+            audited(
+                Method::PUT,
+                "api/org/prompts/settings/secret",
+                r#"{"secret":"x"}"#
+            ),
+            "[REDACTED: secret write]"
+        );
+        assert_eq!(
+            audited(Method::POST, "api/org/settings/logo", "png"),
+            "cG5n"
+        );
     }
 
     #[tokio::test]

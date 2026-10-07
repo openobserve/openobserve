@@ -315,6 +315,18 @@ mod tests {
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         infra::init().await.unwrap();
+        #[cfg(feature = "enterprise")]
+        let master_key = Some(
+            o2_enterprise::enterprise::common::config::get_config()
+                .encryption
+                .master_key
+                .clone(),
+        );
+        #[cfg(not(feature = "enterprise"))]
+        let master_key: Option<String> = None;
+        infra::table::cipher::boot(master_key.as_deref())
+            .await
+            .unwrap();
         openobserve_core::bootstrap::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();

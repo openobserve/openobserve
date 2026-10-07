@@ -1392,7 +1392,7 @@ async fn handle_anomaly_detection_triggers(
             {
                 Ok(run) => (
                     anomaly_run_status(&run),
-                    None,
+                    run.notify_error.clone(),
                     Some(serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string()),
                     run.gate_passed,
                 ),
@@ -2983,7 +2983,8 @@ async fn handle_alert_triggers(
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                     );
-                    if let Some(batch) = crate::alerts::grouping::get_ready_batch(&fingerprint)
+                    if let Some(batch) =
+                        crate::alerts::grouping::get_ready_batch(&new_trigger.org, &fingerprint)
                         && let Err(e) = crate::alerts::grouping::send_grouped_notification(
                             &scheduler_trace_id,
                             batch,
@@ -7465,6 +7466,7 @@ mod tests {
             anomaly_count: 0,
             gate_passed,
             notify_failed,
+            notify_error: None,
             claim_lost,
             ineligible,
         };
