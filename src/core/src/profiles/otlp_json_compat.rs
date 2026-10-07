@@ -125,6 +125,9 @@ fn take_attribute_values(
 ) -> Result<(), json::Error> {
     if let Some(attributes) = attributes.as_array_mut() {
         for attribute in attributes {
+            if attribute.get("key").is_none() {
+                ensure_common_key_value_defaults(attribute);
+            }
             let value = attribute.get_mut("value").map(json::Value::take);
             values.push(
                 value
@@ -138,6 +141,9 @@ fn take_attribute_values(
 }
 
 fn deserialize_any_value(mut value: json::Value) -> Result<AnyValue, json::Error> {
+    if value.as_object().is_some_and(json::Map::is_empty) {
+        return Ok(AnyValue::default());
+    }
     if let Some(index) = value.get_mut("stringValueStrindex") {
         return json::from_value(index.take()).map(|index| AnyValue {
             value: Some(Value::StringValueStrindex(index)),
@@ -809,6 +815,34 @@ mod tests {
         match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
             Some(Value::StringValueStrindex(index)) => assert_eq!(*index, 2),
             other => panic!("expected StringValueStrindex, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn collector_empty_any_value_json_sentinel_is_accepted() {
+        let mut payload = json::json!({
+            "dictionary": {"attributeTable": [{"value": {}}]},
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"values": [1]}]}]}]}]
+        });
+        normalize(&mut payload);
+        let request = deserialize(payload).unwrap();
+        assert_eq!(
+            request.dictionary.as_ref().unwrap().attribute_table[0].value,
+            Some(super::AnyValue::default())
+        );
+        super::super::validation::validate(&request).unwrap();
+    }
+
+    #[test]
+    fn nonempty_unknown_any_value_shapes_are_rejected() {
+        for value in [
+            json::json!({"unknownValue": 1}),
+            json::json!({"unknownValue": {}}),
+        ] {
+            let mut payload =
+                json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+            normalize(&mut payload);
+            assert!(deserialize(payload).is_err());
         }
     }
 

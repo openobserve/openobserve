@@ -18,7 +18,7 @@ use std::fmt::{self, Display};
 use opentelemetry_proto::tonic::{
     collector::profiles::v1development::ExportProfilesServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
-    profiles::v1development::{Profile, ProfilesDictionary, ValueType},
+    profiles::v1development::{KeyValueAndUnit, Profile, ProfilesDictionary, ValueType},
 };
 
 struct Path<'a> {
@@ -85,7 +85,7 @@ impl Validator<'_> {
         sentinel(&d.function_table, "function_table")?;
         sentinel(&d.link_table, "link_table")?;
         sentinel(&d.string_table, "string_table")?;
-        sentinel(&d.attribute_table, "attribute_table")?;
+        attribute_sentinel(&d.attribute_table)?;
         sentinel(&d.stack_table, "stack_table")?;
         let root = Path::root("dictionary");
         for (i, mapping) in d.mapping_table.iter().enumerate() {
@@ -239,6 +239,20 @@ pub(super) fn validate(request: &ExportProfilesServiceRequest) -> Result<(), Str
     Ok(())
 }
 
+fn attribute_sentinel(table: &[KeyValueAndUnit]) -> Result<(), String> {
+    if table.first().is_some_and(|attribute| {
+        attribute.key_strindex != 0
+            || attribute.unit_strindex != 0
+            || attribute
+                .value
+                .as_ref()
+                .is_some_and(|value| value.value.is_some())
+    }) {
+        return Err("dictionary.attribute_table[0] must be the zero value".into());
+    }
+    Ok(())
+}
+
 fn sentinel<T: Default + PartialEq>(table: &[T], name: &str) -> Result<(), String> {
     if table.first().is_some_and(|value| value != &T::default()) {
         return Err(format!("dictionary.{name}[0] must be the zero value"));
@@ -311,6 +325,62 @@ mod tests {
             validate(&request).unwrap_err(),
             "dictionary.attribute_table[1].value.array_value.values[0].kvlist_value.values[0].value.string_value_strindex: index 99 is outside dictionary table length 4"
         );
+    }
+
+    #[test]
+    fn collector_empty_any_value_wire_sentinel_is_accepted() {
+        let dictionary = ProfilesDictionary::decode(&[0x32, 0x02, 0x12, 0x00][..]).unwrap();
+        assert_eq!(
+            dictionary.attribute_table[0].value,
+            Some(AnyValue::default())
+        );
+        let mut request = valid_request();
+        request.dictionary.as_mut().unwrap().attribute_table[0] =
+            dictionary.attribute_table[0].clone();
+        let request =
+            ExportProfilesServiceRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        validate(&request).unwrap();
+    }
+
+    #[test]
+    fn attribute_sentinel_rejects_nonzero_keys_units_and_present_values() {
+        for value in [
+            Value::StringValue(String::new()),
+            Value::BoolValue(false),
+            Value::IntValue(0),
+            Value::DoubleValue(0.0),
+            Value::ArrayValue(ArrayValue::default()),
+            Value::KvlistValue(KeyValueList::default()),
+            Value::BytesValue(vec![]),
+            Value::StringValueStrindex(0),
+        ] {
+            let mut request = valid_request();
+            request.dictionary.as_mut().unwrap().attribute_table[0].value =
+                Some(AnyValue { value: Some(value) });
+            assert_eq!(
+                validate(&request).unwrap_err(),
+                "dictionary.attribute_table[0] must be the zero value"
+            );
+        }
+        for attribute in [
+            KeyValueAndUnit {
+                key_strindex: 1,
+                value: Some(AnyValue::default()),
+                ..Default::default()
+            },
+            KeyValueAndUnit {
+                unit_strindex: 1,
+                value: Some(AnyValue::default()),
+                ..Default::default()
+            },
+        ] {
+            let mut request = valid_request();
+            request.dictionary.as_mut().unwrap().attribute_table[0] = attribute;
+            assert_eq!(
+                validate(&request).unwrap_err(),
+                "dictionary.attribute_table[0] must be the zero value"
+            );
+        }
     }
 
     #[test]

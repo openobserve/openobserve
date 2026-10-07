@@ -25,6 +25,12 @@ pub(super) fn resolve_any_value_string(
     value: Option<&AnyValue>,
     dictionary: Option<&ProfilesDictionary>,
 ) -> Option<String> {
+    if let Some(Value::StringValueStrindex(index)) = value.and_then(|value| value.value.as_ref()) {
+        return lookup_string(
+            dictionary.map(|d| d.string_table.as_slice()).unwrap_or(&[]),
+            *index,
+        );
+    }
     let normalized = resolve_any_value(value, dictionary);
     let string_value = json::get_string_value(&normalized);
     (!string_value.is_empty()).then_some(string_value)
@@ -92,6 +98,48 @@ mod tests {
             json::json!({"kvlistValue": {"values": [{"key": "label", "value": {"stringValueStrindex": 2}}, {"key": "nested", "value": {"arrayValue": {"values": [{"stringValueStrindex": 2}]}}}]}}),
             r#"{"label":"worker-1","nested":["worker-1"]}"#,
         );
+    }
+
+    #[test]
+    fn nested_indexed_keys_survive_json_validation_and_extraction() {
+        assert_extracted(
+            json::json!({"kvlistValue": {"values": [{"keyStrindex": 1, "value": {"stringValueStrindex": 2}}]}}),
+            r#"{"context":"worker-1"}"#,
+        );
+        for index in [-1, 99] {
+            let mut payload = json::json!({
+                "dictionary": {
+                    "stringTable": ["", "context", "worker-1"],
+                    "attributeTable": [{"value": {}}, {"value": {"kvlistValue": {"values": [{"keyStrindex": index, "value": {"stringValueStrindex": 2}}]}}}]
+                }
+            });
+            otlp_json_compat::normalize(&mut payload);
+            let request = otlp_json_compat::deserialize(payload).unwrap();
+            assert_eq!(
+                validation::validate(&request).unwrap_err(),
+                format!(
+                    "dictionary.attribute_table[1].value.kvlist_value.values[0].key_strindex: index {index} is outside dictionary table length 3"
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn top_level_string_reference_fast_path_preserves_unset_behavior() {
+        let dictionary = ProfilesDictionary {
+            string_table: vec!["".into(), "worker-1".into()],
+            ..Default::default()
+        };
+        for (index, expected) in [(0, None), (1, Some("worker-1"))] {
+            let value = AnyValue {
+                value: Some(Value::StringValueStrindex(index)),
+            };
+            assert_eq!(
+                resolve_any_value_string(Some(&value), Some(&dictionary)).as_deref(),
+                expected
+            );
+        }
+        assert!(resolve_any_value_string(None, Some(&dictionary)).is_none());
     }
 
     #[test]

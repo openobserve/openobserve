@@ -127,7 +127,13 @@ fn map_otlp_handler_error(
         OtlpRequestType::HttpProtobuf => "protobuf",
         OtlpRequestType::Grpc => "grpc",
     };
-    log::error!(
+    let level = if matches!(&err, ProfilesExportError::InvalidArgument(_)) {
+        log::Level::Warn
+    } else {
+        log::Level::Error
+    };
+    log::log!(
+        level,
         "[PROFILES:OTLP] Error while handling {kind} request: org_id: {org_id}, error: {err}"
     );
     let (status, rpc_code, msg) = match err {
@@ -1874,13 +1880,62 @@ mod tests {
     }
 
     #[test]
+    fn collector_empty_attribute_wire_sentinel_survives_record_extraction() {
+        let mut dictionary = ProfilesDictionary::decode(&[0x32, 0x02, 0x12, 0x00][..]).unwrap();
+        dictionary.string_table = vec!["".into(), "context".into(), "worker-1".into()];
+        dictionary.attribute_table.push(KeyValueAndUnit {
+            key_strindex: 1,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(2)),
+            }),
+            ..Default::default()
+        });
+        let request = ExportProfilesServiceRequest {
+            dictionary: Some(dictionary),
+            resource_profiles: vec![ResourceProfiles {
+                scope_profiles: vec![ScopeProfiles {
+                    profiles: vec![Profile {
+                        samples: vec![Sample {
+                            attribute_indices: vec![1],
+                            values: vec![7],
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let request =
+            ExportProfilesServiceRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["context"], "worker-1");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
     fn nested_json_string_references_survive_record_extraction() {
         let mut payload = json::json!({
             "dictionary": {
-                "stringTable": ["", "sample.array", "sample.kv", "worker-1"],
-                "attributeTable": [{},
+                "stringTable": ["", "sample.array", "sample.kv", "worker-1", "label"],
+                "attributeTable": [{"value": {}},
                     {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}},
-                    {"keyStrindex": 2, "value": {"kvlistValue": {"values": [{"key": "label", "value": {"stringValueStrindex": 3}}]}}}
+                    {"keyStrindex": 2, "value": {"kvlistValue": {"values": [{"keyStrindex": 4, "value": {"stringValueStrindex": 3}}]}}}
                 ]
             },
             "resourceProfiles": [{
