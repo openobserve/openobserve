@@ -36,7 +36,14 @@ import WorkloadsOverview from "./WorkloadsOverview.vue";
 import K8sDetailsDrawer from "./K8sDetailsDrawer.vue";
 import { useKubernetesInventory, type K8sTime } from "./useKubernetesInventory";
 import { KIND_INFO, MAP_ANCHOR, groupsPodsByNode, type View } from "./kubernetesQueries";
-import { INVENTORY_KEY, findRow, rowKey, type AnyRow } from "./kubernetesModel";
+import {
+  INVENTORY_KEY,
+  findRow,
+  rowKey,
+  type AnyRow,
+  type NodeRow,
+  type PodRow,
+} from "./kubernetesModel";
 import type { MapObjects } from "./mapFilter";
 import {
   DEFAULT_GROUP,
@@ -158,6 +165,10 @@ const scopedRows = (rows: AnyRow[]) => {
   const cluster = k8s.effectiveCluster.value;
   return cluster == null ? rows : rows.filter((row) => row.cluster === cluster);
 };
+
+// Stable arrays, so a render that changes neither does not re-run the map over every pod.
+const mapPods = computed(() => scopedRows(k8s.inventory.value.pods) as PodRow[]);
+const mapNodes = computed(() => scopedRows(k8s.inventory.value.nodes) as NodeRow[]);
 
 const listRows = computed(() => {
   const view = state.value.view as ListView;
@@ -374,8 +385,8 @@ k8s.loadStreams();
         <MapView
           v-else-if="state.view === 'map'"
           :state="state"
-          :pods="scopedRows(k8s.inventory.value.pods) as any"
-          :nodes="scopedRows(k8s.inventory.value.nodes) as any"
+          :pods="mapPods"
+          :nodes="mapNodes"
           :namespace-options="k8s.namespaceOptions.value"
           :anchor-missing="mapAnchor"
           :objects="mapObjects"

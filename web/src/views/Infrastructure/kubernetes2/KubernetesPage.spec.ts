@@ -63,6 +63,8 @@ const recorder = (name: string, emits: string[] = []) =>
       anchorMissing: String,
       loading: Boolean,
       objects: Object,
+      pods: Array,
+      nodes: Array,
     },
     emits,
     setup(props) {
@@ -321,6 +323,20 @@ describe("KubernetesPage", () => {
       await flushPromises();
       expect(query().filter).toBe("app:web");
       expect(metricsQuery.mock.calls.length + search.mock.calls.length).toBe(sent);
+    });
+  });
+
+  describe("map rows", () => {
+    it("hands the map the same pods and nodes arrays across renders that do not change them", async () => {
+      await mountPage({ view: "map", cluster: "alpha" });
+      const map = () => wrapper.findComponent(MapStub);
+      const [pods, nodes] = [map().props("pods"), map().props("nodes")];
+      expect(pods).toBeDefined();
+      wrapper.findComponent(MapStub).vm.$emit("update", { search: "web" });
+      await flushPromises();
+      expect(query().search).toBe("web");
+      expect(map().props("pods")).toBe(pods);
+      expect(map().props("nodes")).toBe(nodes);
     });
   });
 
