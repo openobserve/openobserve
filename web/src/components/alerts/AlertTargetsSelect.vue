@@ -22,10 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (`dest:<name>` / `wf:<id>`) and split back apart on change — the payload wiring,
   validation, and backend contract are unchanged.
 
-  When `workflowsEnabled` is false — OSS, or an enterprise/cloud deployment with
-  the backend `/config` flag `workflows_enabled` off — no Workflows group is
-  built, no group headers are shown, and the control behaves exactly like the old
-  Destinations dropdown.
+  `workflowsEnabled` (interactive) and `workflowsLocked` (visible, disabled) are
+  two different reasons the Workflows group might not be pickable: an edition
+  that doesn't unlock workflows at all shows the group LOCKED (so it stays
+  discoverable); an entitled deployment with the backend `/config` flag
+  `workflows_enabled` off just HIDES it, same as before. Only when neither is
+  true does the control fall back to a plain Destinations dropdown.
   Only the control row lives here; the field label + inline required-error stay
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
@@ -77,6 +79,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("workflow.create") }}
     </OButton>
+    <!-- Locked (not hidden): the family supports workflow routing, but this
+         edition doesn't unlock it — kept as the discovery point since the
+         dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
+    <template v-else-if="workflowsLocked">
+      <OButton
+        data-test="create-workflow-btn"
+        variant="outline"
+        size="sm"
+        class="ms-2"
+        disabled
+        icon-left="lock"
+      >
+        {{ t("workflow.create") }}
+      </OButton>
+      <LockedFeatureTooltip
+        :message="workflowsLockMessage ?? raw('')"
+        icon="schema"
+        :title="t('menu.workflows')"
+      />
+    </template>
   </div>
 </template>
 
@@ -86,6 +108,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 
 interface Option {
   label: I18nText;
@@ -100,6 +123,9 @@ const props = defineProps<{
   destinationOptions: RawOption[];
   workflowOptions: RawOption[];
   workflowsEnabled: boolean;
+  /** Family supports workflows but this edition doesn't unlock them — show the group locked instead of hiding it. */
+  workflowsLocked?: boolean;
+  workflowsLockMessage?: I18nText;
   error?: boolean;
 }>();
 
@@ -188,14 +214,26 @@ const missingOptions = (
 const options = computed(() => {
   const dests = toTagged(props.destinationOptions, DEST);
   const missingDests = missingOptions(props.destinations, dests, DEST);
-  if (!props.workflowsEnabled) return [...dests, ...missingDests];
+  if (!props.workflowsEnabled && !props.workflowsLocked) return [...dests, ...missingDests];
+  const workflowsHeader = { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") };
+  if (!props.workflowsEnabled) {
+    // Locked: the header stays visible (so the capability is discoverable
+    // while browsing), but there's nothing selectable beneath it — this
+    // edition has no entitlement to produce real options for.
+    return [
+      { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
+      ...dests,
+      ...missingDests,
+      workflowsHeader,
+    ];
+  }
   const wfs = toTagged(props.workflowOptions, WF);
   const missingWfs = missingOptions(props.workflows, wfs, WF);
   return [
     { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
     ...dests,
     ...missingDests,
-    { header: true, label: t("alerts.alertSettings.targetsWorkflowsGroup") },
+    workflowsHeader,
     ...wfs,
     ...missingWfs,
   ];
