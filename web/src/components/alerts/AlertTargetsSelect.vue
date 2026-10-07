@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       multiple
       :error="error"
       :collapsible-groups="workflowsEnabled"
+      pin-selected-in-groups
       class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
