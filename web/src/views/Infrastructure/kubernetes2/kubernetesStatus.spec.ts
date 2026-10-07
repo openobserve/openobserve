@@ -15,7 +15,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { QueryId } from "./kubernetesQueries";
-import { buildInventory, type Inventory, type Series } from "./kubernetesModel";
+import {
+  buildInventory,
+  membersOf,
+  type AnyRow,
+  type Inventory,
+  type PodRow,
+  type Series,
+} from "./kubernetesModel";
 import {
   STATUS_VARIANT,
   controllerStatusOf,
@@ -23,6 +30,8 @@ import {
   jobStatusOf,
   podStatusOf,
   statusCounts,
+  statusOf,
+  type StatusRow,
   type WorkloadStatus,
 } from "./kubernetesStatus";
 
@@ -290,5 +299,213 @@ describe("statusCounts", () => {
 
   it("returns no rows for no objects", () => {
     expect(statusCounts("cronjob", [], [])).toEqual([]);
+  });
+});
+
+// Catches a quadratic blow-up (seconds), not machine speed: CI runs this slower, under coverage.
+const MEMBERSHIP_BUDGET_MS = 250;
+
+// The original full scan, kept verbatim so the indexed lookup is pinned to it.
+function referenceMembersOf(pods: PodRow[], row: AnyRow): PodRow[] {
+  const same = (p: PodRow) => p.cluster === row.cluster;
+  switch (row.kind) {
+    case "node":
+      return pods.filter((p) => same(p) && p.node === row.name);
+    case "namespace":
+      return pods.filter((p) => same(p) && p.namespace === row.name);
+    case "deployment":
+      return pods.filter(
+        (p) =>
+          same(p) &&
+          p.namespace === row.namespace &&
+          p.workload?.kind === "Deployment" &&
+          p.workload.name === row.name,
+      );
+    case "daemonset":
+    case "statefulset":
+    case "replicaset":
+    case "job": {
+      const kind = {
+        daemonset: "DaemonSet",
+        statefulset: "StatefulSet",
+        replicaset: "ReplicaSet",
+        job: "Job",
+      }[row.kind];
+      return pods.filter(
+        (p) =>
+          same(p) &&
+          p.namespace === row.namespace &&
+          p.controller?.kind === kind &&
+          p.controller.name === row.name,
+      );
+    }
+    default:
+      return [];
+  }
+}
+
+describe("pod membership, pinned against the original full scan", () => {
+  const at = (cluster: string, namespace: string, metric: Record<string, string>, value = 1) =>
+    ({ metric: { k8s_cluster: cluster, namespace, ...metric }, value }) as Series;
+  const podsAt = (
+    cluster: string,
+    namespace: string,
+    names: string[],
+    owner: [string, string],
+  ) => ({
+    P1: names.map((pod) =>
+      at(cluster, namespace, { pod, uid: `${cluster}-${namespace}-${pod}`, phase: "Running" }),
+    ),
+    P11: names.map((pod) =>
+      at(cluster, namespace, { pod, uid: `${cluster}-${namespace}-${pod}`, condition: "true" }),
+    ),
+    P4: names.map((pod) =>
+      at(cluster, namespace, {
+        pod,
+        uid: `${cluster}-${namespace}-${pod}`,
+        owner_kind: owner[0],
+        owner_name: owner[1],
+        owner_is_controller: "true",
+      }),
+    ),
+  });
+  const places: [string, string][] = [
+    ["prod", "shop"],
+    ["prod", "ops"],
+    ["stage", "shop"],
+  ];
+  const parts = places.flatMap(([c, ns]) => [
+    podsAt(c, ns, ["web-1", "web-2"], ["ReplicaSet", "web-abc"]),
+    podsAt(c, ns, ["nightly-1"], ["Job", "nightly-29"]),
+  ]);
+  const merged = (id: "P1" | "P11" | "P4") => parts.flatMap((part) => part[id]);
+  const inventory = inventoryOf({
+    P1: merged("P1"),
+    P11: merged("P11"),
+    P4: merged("P4"),
+    P5: places.map(([c, ns]) =>
+      at(c, ns, {
+        replicaset: "web-abc",
+        owner_kind: "Deployment",
+        owner_name: "web",
+        owner_is_controller: "true",
+      }),
+    ),
+    D1: places.map(([c, ns]) => at(c, ns, { deployment: "web" })),
+    RS2: places.map(([c, ns]) => at(c, ns, { replicaset: "web-abc" })),
+    J1: places.map(([c, ns]) => at(c, ns, { job_name: "nightly-29" })),
+    CJ1: places.map(([c, ns]) => at(c, ns, { cronjob: "nightly" })),
+  });
+  const uids = (pods: PodRow[]) => pods.map((p) => p.uid).sort();
+
+  it("joins Deployment through ReplicaSet, and Job pods, only within one cluster and namespace", () => {
+    for (const [cluster, namespace] of places) {
+      const find = <T extends AnyRow>(rows: T[]) =>
+        rows.find((r) => r.cluster === cluster && r.namespace === namespace)!;
+      const id = (pod: string) => `${cluster}-${namespace}-${pod}`;
+      expect(uids(membersOf(inventory.pods, find(inventory.deployments)))).toEqual([
+        id("web-1"),
+        id("web-2"),
+      ]);
+      expect(uids(membersOf(inventory.pods, find(inventory.replicasets)))).toEqual([
+        id("web-1"),
+        id("web-2"),
+      ]);
+      expect(uids(membersOf(inventory.pods, find(inventory.jobs)))).toEqual([id("nightly-1")]);
+      expect(membersOf(inventory.pods, find(inventory.cronjobs))).toEqual([]);
+    }
+    expect(inventory.deployments).toHaveLength(3);
+    expect(inventory.jobs).toHaveLength(3);
+  });
+
+  it("keeps the statuses those memberships give", () => {
+    for (const row of [...inventory.deployments, ...inventory.replicasets, ...inventory.jobs]) {
+      expect(statusOf(row as StatusRow, inventory.pods)).toEqual({
+        status: "running",
+        rule: false,
+      });
+    }
+    expect(statusCounts("deployment", inventory.deployments, inventory.pods)).toEqual([
+      { status: "running", count: 3, variant: "success", rule: false },
+    ]);
+  });
+
+  const KINDS = [
+    "node",
+    "namespace",
+    "deployment",
+    "daemonset",
+    "statefulset",
+    "replicaset",
+    "job",
+    "cronjob",
+  ] as const;
+  const OWNER_KINDS = ["Deployment", "DaemonSet", "StatefulSet", "ReplicaSet", "Job", "CronJob"];
+
+  it("matches the full scan for 200 random clusters", () => {
+    // mulberry32, so every random case is repeatable.
+    let seed = 7;
+    const random = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const pick = <T>(xs: readonly T[]) => xs[Math.floor(random() * xs.length)];
+    const owner = () =>
+      random() < 0.15 ? null : { kind: pick(OWNER_KINDS), name: pick(["a", "b", "c"]) };
+    for (let round = 0; round < 200; round++) {
+      const pods = Array.from({ length: 1 + Math.floor(random() * 40) }, (_, i) => ({
+        kind: "pod",
+        uid: `p${i}`,
+        cluster: pick(["x", "y"]),
+        namespace: pick(["a", "b", "c"]),
+        node: random() < 0.1 ? null : pick(["a", "b", "c"]),
+        controller: owner(),
+        workload: owner(),
+      })) as unknown as PodRow[];
+      for (const kind of KINDS) {
+        for (const cluster of ["x", "y"]) {
+          for (const namespace of ["a", "b", "c"]) {
+            for (const name of ["a", "b", "c"]) {
+              const row = { kind, cluster, namespace, name } as AnyRow;
+              expect(membersOf(pods, row)).toEqual(referenceMembersOf(pods, row));
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("counts 3,000 workloads over 5,000 pods without a scan per workload", () => {
+    const controllers = ["Deployment", "DaemonSet", "StatefulSet", "ReplicaSet", "Job"];
+    const pods = Array.from({ length: 5000 }, (_, i) => {
+      const owner = { kind: controllers[i % 5], name: `w${i % 600}` };
+      return {
+        kind: "pod",
+        cluster: "prod",
+        namespace: `ns${i % 7}`,
+        phase: "Running",
+        ready: "true",
+        statusReason: null,
+        object: null,
+        controller: owner,
+        workload: owner,
+      };
+    }) as unknown as PodRow[];
+    const rowsOf = (kind: string) =>
+      Array.from({ length: 600 }, (_, i) => ({
+        kind,
+        cluster: "prod",
+        namespace: `ns${i % 7}`,
+        name: `w${i}`,
+        desired: 1,
+        replicas: 1,
+      })) as unknown as StatusRow[];
+    const kinds = ["deployment", "daemonset", "statefulset", "replicaset", "job"] as const;
+    const started = performance.now();
+    const counts = kinds.map((kind) => statusCounts(kind, rowsOf(kind), pods));
+    expect(performance.now() - started).toBeLessThan(MEMBERSHIP_BUDGET_MS);
+    expect(counts.flat().reduce((sum, c) => sum + c.count, 0)).toBe(3000);
   });
 });

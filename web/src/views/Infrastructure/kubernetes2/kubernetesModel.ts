@@ -391,6 +391,9 @@ const DEPLOYMENT_CONDITION_VARIANT: Record<string, BadgeVariant> = {
   ReplicaFailure: "error-soft",
 };
 
+// One index per pods array (never mutated in place), so a page of rows reads members without a scan per row.
+const MEMBER_INDEXES = new WeakMap<readonly PodRow[], Map<string, PodRow[]>>();
+
 const clusterOf = (metric: Record<string, string>) =>
   metric.k8s_cluster || metric.k8s_cluster_name || "";
 
@@ -692,20 +695,14 @@ export function sortRows<T>(
 }
 
 export function membersOf(pods: PodRow[], row: AnyRow): PodRow[] {
-  const same = (p: PodRow) => p.cluster === row.cluster;
+  const index = memberIndex(pods);
+  const at = (...parts: string[]) => [...(index.get(encodeCompound(parts)) ?? [])];
   switch (row.kind) {
     case "node":
-      return pods.filter((p) => same(p) && p.node === row.name);
     case "namespace":
-      return pods.filter((p) => same(p) && p.namespace === row.name);
+      return at(row.kind, row.cluster, row.name);
     case "deployment":
-      return pods.filter(
-        (p) =>
-          same(p) &&
-          p.namespace === row.namespace &&
-          p.workload?.kind === "Deployment" &&
-          p.workload.name === row.name,
-      );
+      return at("workload", "Deployment", row.cluster, row.namespace, row.name);
     case "daemonset":
     case "statefulset":
     case "replicaset":
@@ -716,13 +713,7 @@ export function membersOf(pods: PodRow[], row: AnyRow): PodRow[] {
         replicaset: "ReplicaSet",
         job: "Job",
       }[row.kind];
-      return pods.filter(
-        (p) =>
-          same(p) &&
-          p.namespace === row.namespace &&
-          p.controller?.kind === kind &&
-          p.controller.name === row.name,
-      );
+      return at("controller", kind, row.cluster, row.namespace, row.name);
     }
     default:
       return [];
@@ -889,6 +880,28 @@ function selectUids(results: QueryResults): Map<string, string | null> {
     current.set(key, best);
   }
   return current;
+}
+
+function memberIndex(pods: PodRow[]): Map<string, PodRow[]> {
+  const cached = MEMBER_INDEXES.get(pods);
+  if (cached) return cached;
+  const index = new Map<string, PodRow[]>();
+  const add = (pod: PodRow, ...parts: string[]) => {
+    const key = encodeCompound(parts);
+    const list = index.get(key);
+    if (list) list.push(pod);
+    else index.set(key, [pod]);
+  };
+  for (const pod of pods) {
+    if (pod.node != null) add(pod, "node", pod.cluster, pod.node);
+    add(pod, "namespace", pod.cluster, pod.namespace);
+    if (pod.workload?.kind === "Deployment")
+      add(pod, "workload", "Deployment", pod.cluster, pod.namespace, pod.workload.name);
+    if (pod.controller)
+      add(pod, "controller", pod.controller.kind, pod.cluster, pod.namespace, pod.controller.name);
+  }
+  MEMBER_INDEXES.set(pods, index);
+  return index;
 }
 
 function accumulatePods(results: QueryResults, current: Map<string, string | null>) {
