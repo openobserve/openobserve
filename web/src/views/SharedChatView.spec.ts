@@ -42,6 +42,7 @@ const toast = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
 
 import SharedChatView from "./SharedChatView.vue";
+import { sharedChatPollInterval } from "@/services/ai_chat_share.queries";
 
 const sharedChat = {
   title: "Error spike",
@@ -81,6 +82,7 @@ describe("SharedChatView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryClient.clear();
+    service.listMine.mockResolvedValue({ data: { shares: [] } });
   });
 
   it("renders the shared transcript read-only with title, owner and mode", async () => {
@@ -168,6 +170,59 @@ describe("SharedChatView", () => {
     expect(wrapper.find('[data-test="shared-chat-view-not-found"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="o2-ai-chat-transcript"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="shared-chat-view-fork"]').exists()).toBe(false);
+  });
+
+  it("offers the owner their own chat instead of a fork", async () => {
+    service.getShared.mockResolvedValue({ data: sharedChat });
+    service.listMine.mockResolvedValue({
+      data: { shares: [{ id: "s1", token: "tok", session_id: "src-sess", title: "Error spike" }] },
+    });
+    adoptServerChat.mockResolvedValue(7);
+    const { wrapper, dispatch } = mountView({ token: "tok" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="shared-chat-view-fork"]').exists()).toBe(false);
+    await wrapper.find('[data-test="shared-chat-view-open-mine"]').trigger("click");
+    await flushPromises();
+    expect(adoptServerChat).toHaveBeenCalledWith("src-sess", "Error spike");
+    expect(dispatch).toHaveBeenCalledWith("setCurrentChatTimestamp", 7);
+    expect(service.fork).not.toHaveBeenCalled();
+  });
+
+  it("re-reads with the cached seq and version, keeping the turns when nothing changed", async () => {
+    service.getShared.mockResolvedValueOnce({ data: { ...sharedChat, state_version: "v1" } });
+    const { wrapper } = mountView({ token: "tok" });
+    await flushPromises();
+    service.getShared.mockResolvedValueOnce({
+      data: { ...sharedChat, state_version: "v1", turns: undefined, not_modified: true },
+    });
+    await wrapper.find('[data-test="shared-chat-view-refresh"]').trigger("click");
+    await flushPromises();
+    expect(service.getShared).toHaveBeenLastCalledWith("org1", "tok", { seq: 3, version: "v1" });
+    expect(wrapper.text()).toContain("Because of a deploy.");
+  });
+
+  it("tells a viewer a running turn updates on its own, and when it last did", async () => {
+    service.getShared.mockResolvedValue({
+      data: {
+        ...sharedChat,
+        mode: "live",
+        active_turn: true,
+        turns: [{ user: { text: "go" }, frames: [], status: "running" }],
+      },
+    });
+    const { wrapper } = mountView({ token: "tok" });
+    await flushPromises();
+    expect(wrapper.text()).toContain("Still generating. This page updates on its own.");
+    expect(wrapper.find('[data-test="o2-ai-chat-running-stop"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="shared-chat-view-updated"]').exists()).toBe(true);
+  });
+
+  it("polls fast while a turn runs, slowly for a live share, never for a snapshot", () => {
+    const base = { ...sharedChat, mode: "snapshot" as const };
+    expect(sharedChatPollInterval(undefined)).toBe(false);
+    expect(sharedChatPollInterval(base)).toBe(false);
+    expect(sharedChatPollInterval({ ...base, mode: "live" })).toBe(30_000);
+    expect(sharedChatPollInterval({ ...base, mode: "live", active_turn: true })).toBe(5_000);
   });
 
   it("shows a retryable error for other failures", async () => {

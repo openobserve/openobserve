@@ -22,7 +22,8 @@ import {
   defaultShareForm,
   expiryPresetsFor,
   isChatPersistenceEnabled,
-  isOrgAdmin,
+  isAdminInMembers,
+  orgAdminFlag,
   isPublicChatEnabled,
   otherMode,
   publicMaxExpirySecs,
@@ -118,12 +119,30 @@ describe("chatShare", () => {
     expect(publicMaxExpirySecs({ public_ai_chat_max_expiry_days: 0 })).toBe(MAX);
   });
 
-  it("treats root and org admins as admins", () => {
-    expect(isOrgAdmin({ userInfo: { role: "root" } })).toBe(true);
-    expect(isOrgAdmin({ userInfo: { role: "Admin" } })).toBe(true);
-    expect(isOrgAdmin({ currentuser: { role: "admin" } })).toBe(true);
-    expect(isOrgAdmin({ userInfo: { role: "editor" } })).toBe(false);
-    expect(isOrgAdmin({})).toBe(false);
+  it("reads the server's org admin flag first, then a root login, else unknown", () => {
+    expect(orgAdminFlag({ zoConfig: { is_org_admin: true } })).toBe(true);
+    expect(orgAdminFlag({ zoConfig: { is_org_admin: false }, userInfo: { role: "root" } })).toBe(
+      false,
+    );
+    expect(
+      orgAdminFlag({
+        selectedOrganization: { identifier: "o1" },
+        organizations: [{ identifier: "o1", is_org_admin: true }],
+      }),
+    ).toBe(true);
+    expect(orgAdminFlag({ userInfo: { role: "root" } })).toBe(true);
+    expect(orgAdminFlag({ userInfo: { role: "admin" } })).toBeUndefined();
+    expect(orgAdminFlag({})).toBeUndefined();
+  });
+
+  it("finds an admin role for the user in the org member list", () => {
+    const members = [
+      { email: "Ada@x.io", role: "Admin" },
+      { email: "bob@x.io", role: "editor" },
+    ];
+    expect(isAdminInMembers(members, "ada@x.io")).toBe(true);
+    expect(isAdminInMembers(members, "bob@x.io")).toBe(false);
+    expect(isAdminInMembers(undefined, "ada@x.io")).toBe(false);
   });
 
   it("offers the public option only when enabled", () => {

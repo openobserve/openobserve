@@ -24,18 +24,6 @@ const useAiChat = () => {
     contextHandler = null;
   };
 
-  /**
-   * Get structured context from the context registry
-   *
-   * Example usage:
-   * ```typescript
-   * const structuredContext = await getStructuredContext();
-   * if (structuredContext) {
-   *   console.log('Page:', structuredContext.pageType);
-   *   console.log('Data:', structuredContext.data);
-   * }
-   * ```
-   */
   const getStructuredContext = async () => {
     try {
       return await contextRegistry.getActiveContext();
@@ -45,27 +33,7 @@ const useAiChat = () => {
     }
   };
 
-  /**
-   * Fetches AI chat response with streaming support and optional request cancellation
-   *
-   * @param messages - Array of chat messages to send to the AI
-   * @param model - AI model to use (optional, defaults to server-side config)
-   * @param org_id - Organization identifier for API routing
-   * @param abortSignal - Optional AbortController signal for request cancellation
-   * @param explicitContext - Optional explicit context to use (takes precedence over registered context)
-   * @param sessionId - Optional UUID v7 session ID for tracking all API calls in a chat session
-   * @param images - Optional array of image attachments for multimodal queries
-   * @returns Promise<Response> - Fetch response object with streaming capabilities
-   *
-   * Example usage:
-   * ```typescript
-   * const abortController = new AbortController();
-   * const response = await fetchAiChat(messages, 'gpt-4', 'org123', abortController.signal);
-   *
-   * // To cancel the request:
-   * abortController.abort();
-   * ```
-   */
+  /** POST a chat turn and return the streaming response, or `{ cancelled: true }` once aborted. */
   const fetchAiChat = async (
     messages: any[],
     model: string,
@@ -74,6 +42,7 @@ const useAiChat = () => {
     explicitContext?: any,
     sessionId?: string,
     images?: ImageAttachment[],
+    turnId: string = getUUIDv7(),
   ) => {
     let url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
 
@@ -149,9 +118,8 @@ const useAiChat = () => {
       // Add session ID header if provided for linking API calls within a chat session
       if (sessionId) {
         headers["x-o2-assistant-session-id"] = sessionId;
-        // With server-side chat persistence the server recognizes a repeated
-        // turn id instead of running the model twice for one message.
-        headers["x-o2-assistant-turn-id"] = getUUIDv7();
+        // With server-side persistence a repeated turn id is recognized instead of running the model twice.
+        headers["x-o2-assistant-turn-id"] = turnId;
       }
 
       // Configure fetch options with abort signal for request cancellation
@@ -178,15 +146,7 @@ const useAiChat = () => {
     }
   };
 
-  /**
-   * Submit user feedback (thumbs up/down) for an AI response
-   *
-   * @param feedbackType - "thumbs_up" or "thumbs_down"
-   * @param org_id - Organization identifier
-   * @param sessionId - Session ID for linking feedback to conversation
-   * @param queryIndex - Index of the query in the session this feedback is for
-   * @param traceId - Trace ID from the workflow to link feedback to the same trace
-   */
+  /** Submit a thumbs up/down for an AI response; `traceId` links it to the workflow trace. */
   const submitFeedback = async (
     feedbackType: "thumbs_up" | "thumbs_down",
     org_id: string,
@@ -249,48 +209,27 @@ const useAiChat = () => {
     }
   };
 
-  /**
-   * Initialize default context provider as fallback
-   *
-   * @param router - Vue router instance
-   * @param store - Vuex store instance
-   *
-   * Example:
-   * ```typescript
-   * const { initializeDefaultContext } = useAiChat();
-   * initializeDefaultContext(router, store);
-   * ```
-   */
+  /** Register the default context provider as the registry's fallback. */
   const initializeDefaultContext = (router: any, storeInstance: any) => {
     const defaultProvider = createDefaultContextProvider(router, storeInstance);
     contextRegistry.register("default", defaultProvider);
   };
 
-  /**
-   * Ask the server to stop the turn running in a chat session.
-   *
-   * With server-side chat persistence the turn is owned by an OpenObserve
-   * background task rather than by the browser's request: aborting the fetch
-   * closes our view of the stream, but generation continues. This is what
-   * actually stops it. Whatever was produced up to that point stays saved.
-   *
-   * Fire-and-forget by design — the Stop button must not wait on the network.
-   */
+  // The persisted turn outlives the browser's request, so only this stops it; keepalive lets a closing tab still send it.
   const cancelAiChat = async (org_id: string, sessionId: string) => {
-    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats/${sessionId}/cancel`;
+    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats/${encodeURIComponent(sessionId)}/cancel`;
     return fetch(url, {
       method: "POST",
       credentials: "include",
-      // The tab may be closing right after this; keepalive lets the browser
-      // finish sending it anyway.
       keepalive: true,
+      // A JSON content type is what a cross-site form post cannot send, so the server requires it.
       headers: {
+        "Content-Type": "application/json",
         "x-o2-assistant-session-id": sessionId,
       },
+      body: "{}",
     });
   };
-
-  // --- Server-side chat history (`/api/{org}/ai/chats`) ---------------------
 
   const chatsUrl = (org_id: string, sessionId?: string) =>
     `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats` +
@@ -319,10 +258,19 @@ const useAiChat = () => {
     return chatsRequest(`${chatsUrl(org_id)}?${params}`);
   };
 
-  /** A stored conversation; `not_modified` when `knownSeq` is current, only newer turns when it is stale. */
-  const getServerChat = (org_id: string, sessionId: string, knownSeq?: number, limit?: number) => {
+  /** A stored conversation; `not_modified` when both `knownSeq` and `knownVersion` are current, only newer turns when stale. */
+  const getServerChat = (
+    org_id: string,
+    sessionId: string,
+    knownSeq?: number,
+    limit?: number,
+    knownVersion?: string,
+  ) => {
     const params = new URLSearchParams();
     if (knownSeq !== undefined) params.set("known_seq", String(knownSeq));
+    if (knownSeq !== undefined && knownVersion !== undefined) {
+      params.set("known_version", knownVersion);
+    }
     if (limit !== undefined) params.set("limit", String(limit));
     const query = params.toString();
     return chatsRequest(`${chatsUrl(org_id, sessionId)}${query ? `?${query}` : ""}`);
@@ -345,8 +293,13 @@ const useAiChat = () => {
     enabled: () =>
       !!store.state.zoConfig?.ai_enabled && !!store.state.zoConfig?.ai_chat_persistence_enabled,
     list: (orgId: string, limit: number) => listServerChats(orgId, limit),
-    get: (orgId: string, sessionId: string, knownSeq?: number, limit?: number) =>
-      getServerChat(orgId, sessionId, knownSeq, limit),
+    get: (
+      orgId: string,
+      sessionId: string,
+      knownSeq?: number,
+      limit?: number,
+      knownVersion?: string,
+    ) => getServerChat(orgId, sessionId, knownSeq, limit, knownVersion),
     rename: renameServerChat,
     remove: deleteServerChat,
     removeAll: deleteAllServerChats,

@@ -1,5 +1,6 @@
 ﻿<template>
   <div
+    ref="chatRoot"
     class="chat-container rounded-surface text-text-body bg-card-glass-solid shadow-hover-shadow flex h-full w-full flex-col overflow-hidden shadow-md"
     :class="[{ 'chat-open': isOpen }]"
   >
@@ -36,7 +37,7 @@
                 :chats="filteredChatHistory"
                 :share-enabled="chatPersistenceEnabled"
                 @select="loadChat"
-                @delete="deleteChat"
+                @delete="requestDeleteChat"
                 @share="shareHistoryChat"
                 @clear-all="clearAllConversations"
               />
@@ -44,11 +45,11 @@
           </div>
 
           <div class="chat-header-actions flex shrink-0 items-center gap-1">
-            <!-- Edit title button -->
             <OButton
               v-if="currentChatId"
               variant="ghost"
               size="icon-sm"
+              :aria-label="t('aiAssistant.editTitleTooltip')"
               @click.stop="openEditTitleDialog"
             >
               <OIcon name="edit" size="sm" />
@@ -59,18 +60,26 @@
               variant="ghost"
               size="icon-sm"
               data-test="o2-ai-chat-share-btn"
+              :aria-label="t('aiChatShare.share')"
               @click.stop="shareCurrentChat"
             >
               <OIcon name="share" size="sm" />
               <OTooltip :content="t('aiChatShare.share')" />
             </OButton>
-            <OButton variant="ghost" size="icon-sm" @click="addNewChat">
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              :aria-label="t('common.newChat')"
+              @click="addNewChat"
+            >
               <OIcon name="add" size="sm" />
+              <OTooltip :content="t('common.newChat')" />
             </OButton>
             <OButton
               variant="ghost"
               size="icon-sm"
               data-test="ai-chat-expand-btn"
+              :aria-label="store.state.isAiChatExpanded ? t('common.collapse') : t('common.expand')"
               @click="toggleExpand"
             >
               <OIcon
@@ -88,14 +97,18 @@
                 "
               />
             </OButton>
-            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              :aria-label="t('common.close')"
+              @click="$emit('close')"
+            >
               <OIcon name="close" size="sm" />
             </OButton>
           </div>
         </div>
       </div>
 
-      <!-- History Panel -->
       <ODrawer
         data-test="o2-ai-chat-history-drawer"
         bleed
@@ -122,7 +135,6 @@
         </ul>
       </ODrawer>
 
-      <!-- Edit Title Dialog -->
       <ODialog
         data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
@@ -146,18 +158,17 @@
         v-model:open="showShareDialog"
         :session-id="shareTarget.sessionId"
         :chat-title="shareTarget.title"
+        :history-unavailable="shareTarget.historyUnavailable"
       />
 
-      <!-- Delete Chat Confirmation Dialog -->
       <ConfirmDialog
         v-model="showDeleteChatConfirmDialog"
         :title="t('aiAssistant.deleteChat')"
-        :message="t('aiAssistant.deleteChatConfirmMessage')"
+        :message="deleteChatMessage"
         @update:ok="confirmDeleteChat"
         @update:cancel="showDeleteChatConfirmDialog = false"
       />
 
-      <!-- Clear All Conversations Confirmation Dialog -->
       <ConfirmDialog
         v-model="showClearAllConfirmDialog"
         :title="t('aiAssistant.clearAllConversationsTitle')"
@@ -166,7 +177,6 @@
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
-      <!-- Image Preview Dialog -->
       <ODialog
         data-test="o2-ai-chat-image-preview-dialog"
         v-model:open="showImagePreview"
@@ -192,13 +202,39 @@
           ref="messagesContainer"
           @scroll="checkIfShouldAutoScroll"
         >
+          <OBanner
+            v-if="forkedFromShare"
+            variant="info"
+            icon="fork-right"
+            dense
+            :content="t('aiChatShare.forkedFromShareBanner', { title: displayedTitle })"
+            data-test="o2-ai-chat-forked-banner"
+          />
+          <OBanner
+            v-if="historyUnavailable"
+            variant="warning"
+            icon="error"
+            dense
+            inline-actions
+            :content="t('aiAssistant.historyUnavailable')"
+            data-test="o2-ai-chat-history-unavailable"
+          >
+            <template #actions>
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="o2-ai-chat-history-unavailable-retry"
+                @click="reloadCurrentChat"
+              >
+                {{ t("common.retry") }}
+              </OButton>
+            </template>
+          </OBanner>
           <div
             v-if="chatMessages.length === 0"
             class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
           >
-            <!-- Home tab: rich V2 welcome -->
             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
-            <!-- Sidepanel: minimal logo + title -->
             <div v-else class="flex h-full w-full flex-col items-center justify-center">
               <div class="flex flex-col items-center gap-2">
                 <img :src="o2AiTitleLogo" />
@@ -206,20 +242,11 @@
                   <span class="text-sm font-[600]">{{
                     t("aiAssistant.welcome.taglineHighlight")
                   }}</span>
-                  <!-- Same shared Beta tag as the Workflows screens. -->
                   <BetaBadge />
                 </div>
               </div>
             </div>
           </div>
-          <OBanner
-            v-if="forkedFromShare && chatMessages.length > 0"
-            variant="info"
-            icon="fork-right"
-            dense
-            :content="t('aiChatShare.forkedFromShareBanner')"
-            data-test="o2-ai-chat-forked-banner"
-          />
           <O2AIChatMessage
             v-for="(message, index) in processedMessages"
             :key="index"
@@ -232,18 +259,17 @@
             @toggle-tool-call="(blockIndex: number) => toggleToolCallExpanded(index, blockIndex)"
             @toggle-log-entry="(blockIndex: number) => toggleLogEntryExpanded(index, blockIndex)"
             @navigate="handleNavigationAction"
-            @retry="retryGeneration"
+            @retry="retryGeneration(index)"
+            @stop-turn="stopRunningTurn"
             @like="likeCodeBlock(index)"
             @dislike="dislikeCodeBlock(index)"
             @preview-image="openImagePreview"
           />
-          <!-- Tool call indicator - shows outside message box -->
           <O2AIChatToolCallIndicator
             v-if="activeToolCall"
             :message="activeToolCall.message"
             :context="activeToolCall.context"
           />
-          <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div
             v-if="isLoading && !activeToolCall"
             class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
@@ -257,7 +283,6 @@
           </div>
         </div>
 
-        <!-- Scroll to bottom button -->
         <div
           v-show="showScrollToBottom"
           class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
@@ -266,6 +291,7 @@
             variant="ghost"
             size="icon-sm"
             class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
+            :aria-label="t('aiAssistant.scrollToBottom')"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -274,12 +300,10 @@
         </div>
       </div>
 
-      <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
         class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 shadow-sm [background:var(--color-chat-bubble-user)]"
       >
-        <!-- Show tool call if active -->
         <div
           v-if="activeToolCall"
           class="analyzing-content flex w-full max-w-225 items-center gap-3"
@@ -289,7 +313,6 @@
             activeToolCall.message
           }}</span>
         </div>
-        <!-- Show analyzing message if loading but no active tool call -->
         <div
           v-else-if="isLoading"
           class="analyzing-content flex w-full max-w-225 items-center gap-3"
@@ -302,7 +325,38 @@
       </div>
 
       <div class="chat-input-container relative mx-auto my-2 w-full max-w-225 shrink-0 px-2">
-        <!-- Confirmation dialog -->
+        <OBanner
+          v-if="turnLimitError"
+          variant="error-soft"
+          icon="error"
+          dense
+          inline-actions
+          class="mb-2"
+          :content="t('aiAssistant.turnLimitReached')"
+          data-test="o2-ai-chat-turn-limit"
+        >
+          <template #actions>
+            <div class="flex items-center gap-2">
+              <OButton
+                variant="outline"
+                size="sm"
+                data-test="o2-ai-chat-turn-limit-retry"
+                @click="sendMessage"
+              >
+                {{ t("common.retry") }}
+              </OButton>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                data-test="o2-ai-chat-turn-limit-dismiss"
+                :aria-label="t('common.close')"
+                @click="turnLimitError = false"
+              >
+                <OIcon name="close" size="sm" />
+              </OButton>
+            </div>
+          </template>
+        </OBanner>
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
           :confirmation="pendingConfirmation"
@@ -312,7 +366,6 @@
         />
         <O2AIPaidUsageConsent v-if="showPaidUsageConsent" />
 
-        <!-- Hidden file input for image upload -->
         <input
           ref="imageInputRef"
           type="file"
@@ -348,7 +401,17 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  nextTick,
+  watch,
+  computed,
+  onBeforeUnmount,
+  onUnmounted,
+} from "vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
@@ -372,7 +435,9 @@ import O2AIChatMessage from "@/components/ai-assistant/chat/O2AIChatMessage.vue"
 import O2AIChatToolCallIndicator from "@/components/ai-assistant/chat/O2AIChatToolCallIndicator.vue";
 import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
 import { canShareChat, isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
+import { activeShareCount } from "@/components/ai-assistant/share/useChatShareDialog";
 import { useChatHistory } from "@/composables/useChatHistory";
+import { recallChatSelection, rememberChatSelection } from "@/utils/chatSelection";
 import { useChatImages } from "@/composables/useChatImages";
 import { useChatHistoryList } from "@/composables/useChatHistoryList";
 import { usePromptHistory } from "@/composables/usePromptHistory";
@@ -412,7 +477,20 @@ import {
   truncateQuery,
 } from "@/components/O2AIChat.toolcall";
 
-const { submitFeedback, chatHistoryServer } = useAiChat();
+const { submitFeedback, chatHistoryServer, cancelAiChat } = useAiChat();
+
+// While another tab or a closed panel owns a running turn, the owner's open chat re-reads it at this pace.
+const RUNNING_TURN_POLL_MS = 4000;
+const RUNNING_TURN_POLL_LIMIT = 150;
+
+// An overlay of this panel (or the page) owns Escape while it is open; the panel closes only once none is.
+const OVERLAY_SELECTOR =
+  '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"], [role="listbox"]';
+
+const overlayOpenOutside = (root: HTMLElement | null): boolean =>
+  Array.from(document.querySelectorAll(OVERLAY_SELECTOR)).some(
+    (overlay) => !root || !overlay.contains(root),
+  );
 
 export default defineComponent({
   name: "O2AIChat",
@@ -479,6 +557,9 @@ export default defineComponent({
     const currentTextSegment = ref("");
     const currentChatId = ref<number | null>(null);
     const forkedFromShare = ref<string | null>(null);
+    const historyUnavailable = ref(false);
+    const turnLimitError = ref(false);
+    const chatRoot = ref<HTMLElement | null>(null);
     const store = useStore();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
@@ -534,6 +615,24 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    // A reload reopens the chat this tab had open; written only once the user+org key is known, so it never erases it first.
+    watch([currentChatId, userOrgKey], ([chatId, key], [, oldKey]) => {
+      if (!key) return;
+      if (key === oldKey) {
+        rememberChatSelection(key, chatId);
+        return;
+      }
+      const remembered = recallChatSelection(key);
+      if (
+        remembered !== null &&
+        currentChatId.value === null &&
+        store.state.currentChatTimestamp == null
+      ) {
+        store.dispatch("setCurrentChatTimestamp", remembered);
+        store.dispatch("setChatUpdated", true);
+      }
+    });
 
     const currentChatTimestamp = ref<string | null>(null);
     const {
@@ -818,6 +917,7 @@ export default defineComponent({
         // Escape must close the chat even while typing a message in its input.
         allowInInput: true,
         handler: () => {
+          if (overlayOpenOutside(chatRoot.value)) return;
           if (store.state.isAiChatEnabled) {
             store.dispatch("setIsAiChatEnabled", false);
             store.dispatch("setIsAiChatExpanded", false);
@@ -827,8 +927,14 @@ export default defineComponent({
       },
     ]);
 
+    // Bumped by every load and by a new chat, so a slower earlier load cannot overwrite a newer selection.
+    let loadSeq = 0;
+
     const addNewChat = () => {
+      loadSeq += 1;
       detachCurrentStream();
+      historyUnavailable.value = false;
+      turnLimitError.value = false;
 
       chatMessages.value = [];
       currentChatId.value = null;
@@ -853,21 +959,15 @@ export default defineComponent({
           return;
         }
 
+        const seq = ++loadSeq;
         detachCurrentStream();
 
         const chat = await dbLoadChat(chatId);
+        if (seq !== loadSeq) return;
 
         if (chat) {
           if (!tryReattach(chat, chatId)) {
-            const formattedMessages = chat.messages.map((msg: any) => ({
-              role: msg.role,
-              content: msg.content,
-              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
-              ...(msg.images ? { images: msg.images } : {}),
-              ...(msg.feedback ? { feedback: msg.feedback } : {}),
-            }));
-
-            chatMessages.value = formattedMessages;
+            chatMessages.value = toChatMessages(chat.messages);
             currentChatId.value = chatId;
             currentSessionId.value = chat.sessionId || null;
           }
@@ -875,6 +975,8 @@ export default defineComponent({
           showHistory.value = false;
           shouldAutoScroll.value = true;
           forkedFromShare.value = chat.forkedFromShare ?? null;
+          historyUnavailable.value = !!chat.historyUnavailable;
+          turnLimitError.value = false;
 
           displayedTitle.value = chat.title || "";
           aiGeneratedTitle.value = chat.title || null;
@@ -893,10 +995,104 @@ export default defineComponent({
       }
     };
 
+    const toChatMessages = (messages: ChatMessage[]): ChatMessage[] =>
+      messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+        ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+        ...(msg.images ? { images: msg.images } : {}),
+        ...(msg.feedback ? { feedback: msg.feedback } : {}),
+      }));
+
+    const reloadCurrentChat = () => {
+      if (currentChatId.value !== null) loadChat(currentChatId.value);
+    };
+
+    const hasRunningTurn = computed(() =>
+      chatMessages.value.some((msg) =>
+        msg.contentBlocks?.some(
+          (block) => block.type === "status" && block.turnStatus === "running",
+        ),
+      ),
+    );
+
+    // Re-reads the open chat in place, without the scroll and title resets of a full load.
+    const refreshRunningChat = async () => {
+      const chatId = currentChatId.value;
+      if (chatId === null || isLoading.value) return;
+      const seq = loadSeq;
+      const chat = await dbLoadChat(chatId);
+      if (seq !== loadSeq || currentChatId.value !== chatId || isLoading.value || !chat) return;
+      chatMessages.value = toChatMessages(chat.messages);
+      historyUnavailable.value = !!chat.historyUnavailable;
+    };
+
+    let runningPollTimer: ReturnType<typeof setTimeout> | null = null;
+    let runningPolls = 0;
+    const stopRunningPoll = () => {
+      if (runningPollTimer) clearTimeout(runningPollTimer);
+      runningPollTimer = null;
+    };
+    const scheduleRunningPoll = () => {
+      stopRunningPoll();
+      if (!hasRunningTurn.value || isLoading.value || runningPolls >= RUNNING_TURN_POLL_LIMIT) {
+        return;
+      }
+      runningPollTimer = setTimeout(async () => {
+        runningPolls += 1;
+        await refreshRunningChat();
+        scheduleRunningPoll();
+      }, RUNNING_TURN_POLL_MS);
+    };
+    watch([hasRunningTurn, isLoading, currentChatId], () => {
+      runningPolls = 0;
+      scheduleRunningPoll();
+    });
+
+    // The turn runs on the server, so Stop goes there; the marker swaps once the server records the stop.
+    const stopRunningTurn = async () => {
+      const sessionId = currentSessionId.value;
+      if (!sessionId || !chatPersistenceEnabled.value) return;
+      try {
+        await cancelAiChat(store.state.selectedOrganization.identifier, sessionId);
+      } catch (error) {
+        console.debug("AI chat cancel request failed", error);
+      }
+      await refreshRunningChat();
+      runningPolls = 0;
+      scheduleRunningPoll();
+    };
+
+    // The server refused the turn before storing anything, so the chat goes back to how it was and the prompt to the composer.
+    const undoRefusedTurn = async (
+      prompt: string,
+      images: typeof pendingImages.value,
+      wasEmpty: boolean,
+    ) => {
+      const last = chatMessages.value[chatMessages.value.length - 1];
+      if (last?.role === "user") chatMessages.value.pop();
+      inputMessage.value = prompt;
+      if (chatInput.value && typeof chatInput.value.setContent === "function") {
+        chatInput.value.setContent(prompt);
+      }
+      pendingImages.value = images;
+      turnLimitError.value = true;
+      if (wasEmpty && currentChatId.value !== null) {
+        const chatId = currentChatId.value;
+        currentChatId.value = null;
+        currentSessionId.value = null;
+        store.dispatch("setCurrentChatTimestamp", null);
+        await dbDeleteChatById(chatId);
+      } else {
+        await saveToHistory();
+      }
+    };
+
     const sendMessage = async () => {
       const hasText = inputMessage.value.trim().length > 0;
       const hasImages = pendingImages.value.length > 0;
       if ((!hasText && !hasImages) || isLoading.value) return;
+      turnLimitError.value = false;
 
       let backendMessage = inputMessage.value;
       if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
@@ -904,9 +1100,9 @@ export default defineComponent({
       }
 
       const userMessage = inputMessage.value;
-      const messagesToSend = [...pendingImages.value]; // Capture images before clearing
+      const messagesToSend = [...pendingImages.value];
+      const wasEmpty = chatMessages.value.length === 0;
 
-      // Add to query history before clearing input
       if (hasText) {
         addToHistory(userMessage);
       }
@@ -926,7 +1122,11 @@ export default defineComponent({
       await scrollToBottom();
       await saveToHistory();
 
-      await runTurn(hasImages, messagesToSend);
+      const turnMessages = chatMessages.value;
+      const outcome = await runTurn(hasImages, messagesToSend);
+      if (outcome === "turnLimit" && chatMessages.value === turnMessages) {
+        await undoRefusedTurn(userMessage, messagesToSend, wasEmpty);
+      }
     };
 
     const selectCapability = (capability: string) => {
@@ -1052,6 +1252,16 @@ export default defineComponent({
       window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
 
+    // Dialogs teleport out of this panel, so they are closed before it goes rather than left open without an owner.
+    onBeforeUnmount(() => {
+      showShareDialog.value = false;
+      showEditTitleDialog.value = false;
+      showDeleteChatConfirmDialog.value = false;
+      showClearAllConfirmDialog.value = false;
+      showImagePreview.value = false;
+      stopRunningPoll();
+    });
+
     onUnmounted(() => {
       window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
       // Mark unmounting FIRST so the chatUpdated watch fired by the dispatch below can't re-attach the detached stream here.
@@ -1104,7 +1314,11 @@ export default defineComponent({
     const processedMessages = computed(() => chatMessages.value.map(processChatMessage));
 
     const showShareDialog = ref(false);
-    const shareTarget = ref<{ sessionId: string; title: string } | null>(null);
+    const shareTarget = ref<{
+      sessionId: string;
+      title: string;
+      historyUnavailable?: boolean;
+    } | null>(null);
     const chatPersistenceEnabled = computed(() => isChatPersistenceEnabled(store.state.zoConfig));
     const canShareCurrentChat = computed(() =>
       canShareChat({
@@ -1115,33 +1329,64 @@ export default defineComponent({
       }),
     );
 
-    const openShareDialog = (sessionId: string | null | undefined, title: string) => {
+    const openShareDialog = (
+      sessionId: string | null | undefined,
+      title: string,
+      unavailable = false,
+    ) => {
       if (!sessionId) return;
-      shareTarget.value = { sessionId, title };
+      shareTarget.value = { sessionId, title, historyUnavailable: unavailable };
       showShareDialog.value = true;
     };
 
-    const shareCurrentChat = () => openShareDialog(currentSessionId.value, displayedTitle.value);
+    const shareCurrentChat = () =>
+      openShareDialog(currentSessionId.value, displayedTitle.value, historyUnavailable.value);
+
+    const deleteLinkCount = ref(0);
+    const deleteChatMessage = computed(() =>
+      deleteLinkCount.value > 0
+        ? t(
+            "aiAssistant.deleteChatWithLinksMessage",
+            { count: deleteLinkCount.value },
+            deleteLinkCount.value,
+          )
+        : t("aiAssistant.deleteChatConfirmMessage"),
+    );
+
+    // The confirmation opens at once; the link count fills in when the share list answers.
+    const requestDeleteChat = async (chatId: number) => {
+      deleteLinkCount.value = 0;
+      deleteChat(chatId);
+      const chat = chatHistory.value.find((c) => c.id === chatId);
+      if (!chatPersistenceEnabled.value || !chat?.serverBacked) return;
+      const count = await activeShareCount(
+        queryClient,
+        store.state.selectedOrganization?.identifier ?? "",
+        chat.sessionId,
+      );
+      if (chatToDelete.value === chatId) deleteLinkCount.value = count;
+    };
 
     const shareHistoryChat = (chatId: number) => {
       const chat = chatHistory.value.find((c) => c.id === chatId);
       if (chat) openShareDialog(chat.sessionId, chat.title);
     };
 
-    const retryGeneration = async (message: any) => {
-      if (!message || message.role !== "assistant") return;
+    const retryGeneration = async (target: ChatMessage | number) => {
+      const messageIndex =
+        typeof target === "number"
+          ? target
+          : chatMessages.value.indexOf(target) >= 0
+            ? chatMessages.value.indexOf(target)
+            : chatMessages.value.findIndex((m) => m.content === target?.content);
+      if (chatMessages.value[messageIndex]?.role !== "assistant") return;
 
-      const messageIndex = chatMessages.value.findIndex((m) => m.content === message.content);
-      if (messageIndex === -1) return;
-
-      let userMessageIndex = messageIndex - 1;
-      while (userMessageIndex >= 0) {
-        if (chatMessages.value[userMessageIndex].role === "user") {
-          inputMessage.value = chatMessages.value[userMessageIndex].content;
+      for (let userIndex = messageIndex - 1; userIndex >= 0; userIndex--) {
+        if (chatMessages.value[userIndex].role === "user") {
+          inputMessage.value = chatMessages.value[userIndex].content;
           await sendMessage();
-          break;
+          return;
         }
-        userMessageIndex--;
       }
     };
 
@@ -1253,6 +1498,13 @@ export default defineComponent({
       shareTarget,
       chatPersistenceEnabled,
       shareCurrentChat,
+      requestDeleteChat,
+      deleteChatMessage,
+      historyUnavailable,
+      turnLimitError,
+      chatRoot,
+      reloadCurrentChat,
+      stopRunningTurn,
       shareHistoryChat,
       forkedFromShare,
       addNewChat,

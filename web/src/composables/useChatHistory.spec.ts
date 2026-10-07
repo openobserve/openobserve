@@ -20,11 +20,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { gt } from "@/types/i18n";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 
-// ---------------------------------------------------------------------------
-// crypto.subtle mock — deterministic fake hash based on input bytes
-// Must be declared before the composable is imported so the module-level
-// computeUserOrgKey function sees the mock on first call.
-// ---------------------------------------------------------------------------
+// crypto.subtle mock — deterministic fake hash based on input bytes Must be declared before the composable is imported so the module-level computeUserOrgKey function sees the mock on first call.
 vi.stubGlobal("crypto", {
   subtle: {
     digest: vi.fn().mockImplementation(async (_algo: string, data: BufferSource) => {
@@ -41,17 +37,7 @@ vi.stubGlobal("crypto", {
   },
 });
 
-// ---------------------------------------------------------------------------
-// Minimal in-memory IndexedDB mock
-//
-// Implements only the IDB surface used by useChatHistory:
-//   open, objectStore, put, get, getAll, delete, openCursor,
-//   createIndex, transaction, IDBKeyRange.only
-//
-// All callbacks are invoked via microtask (queueMicrotask) so that the
-// composable's Promise chains resolve naturally when the test awaits the
-// returned promise — no setTimeout / sleep required.
-// ---------------------------------------------------------------------------
+// Minimal in-memory IndexedDB mock Implements only the IDB surface used by useChatHistory: open, objectStore, put, get, getAll, delete, openCursor, createIndex, transaction, IDBKeyRange.only All callbacks are invoked via microtask (queueMicrotask) so that the composable's Promise chains resolve naturally when the test awaits the returned promise — no setTimeout / sleep required.
 
 type RecordMap = Map<number, Record<string, unknown>>;
 
@@ -99,14 +85,10 @@ interface MockDB {
   _stores: Map<string, MockObjectStore>;
 }
 
-// In-memory database registry — persists across transactions within a test
-// Also tracks the version at which each DB was last upgraded so we don't
-// repeat the onupgradeneeded sequence on every open() call.
+// In-memory database registry — persists across transactions within a test Also tracks the version at which each DB was last upgraded so we don't repeat the onupgradeneeded sequence on every open() call.
 const dbRegistry = new Map<string, { db: MockDB; version: number }>();
 
-// Global auto-increment counter used by the put mock so that consecutive calls
-// to the composable's saveToHistory (which uses Date.now() as the chatId) never
-// collide even when multiple calls happen within the same millisecond.
+// Global auto-increment counter used by the put mock so that consecutive calls to the composable's saveToHistory (which uses Date.now() as the chatId) never collide even when multiple calls happen within the same millisecond.
 let _autoIdCounter = 1;
 
 function makeRequest(initialResult: unknown = undefined): MockRequest {
@@ -163,8 +145,7 @@ function makeIndex(store: MockObjectStore, indexName: string, keyPath: string): 
             advance: vi.fn(),
             continue: vi.fn().mockImplementation(() => {
               queueMicrotask(() => {
-                // Re-check after potential deletions
-                // rebuild matching keys from current store state
+                // Re-check after potential deletions rebuild matching keys from current store state
                 while (idx < matchingKeys.length && !store.records.has(matchingKeys[idx])) {
                   idx++;
                 }
@@ -268,8 +249,7 @@ function makeTransaction(db: MockDB): MockTransaction {
 
   const tx: MockTransaction = {
     _stores: new Map(),
-    // oncomplete fires via setTimeout(0) so that all pending microtasks
-    // (store.delete() calls) have drained before the transaction resolves.
+    // oncomplete fires via setTimeout(0) so that all pending microtasks (store.delete() calls) have drained before the transaction resolves.
     get oncomplete() {
       return _oncomplete;
     },
@@ -324,8 +304,7 @@ function makeDB(): MockDB {
   return db;
 }
 
-// Last DB handed to the composable — lets beforeEach fire onclose so
-// useChatHistory.ts drops its memoised connection between tests.
+// Last DB handed to the composable — lets beforeEach fire onclose so useChatHistory.ts drops its memoised connection between tests.
 let _lastOpenedDb: MockDB | null = null;
 
 // Replace global indexedDB with the in-memory mock
@@ -383,14 +362,10 @@ vi.stubGlobal("IDBKeyRange", {
   only: (value: unknown) => ({ value }),
 });
 
-// ---------------------------------------------------------------------------
 // Import composable AFTER mocks are set up
-// ---------------------------------------------------------------------------
 import { useChatHistory } from "./useChatHistory";
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeMessages(count = 1): ChatMessage[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -408,9 +383,7 @@ async function resolveKey(email: string, org: string): Promise<string> {
     .join("");
 }
 
-// ---------------------------------------------------------------------------
 // Tests
-// ---------------------------------------------------------------------------
 
 describe("useChatHistory", () => {
   const USER1 = "user1@example.com";
@@ -419,13 +392,10 @@ describe("useChatHistory", () => {
   const ORG2 = "org-beta";
 
   beforeEach(() => {
-    // Reset the DB registry and ID counter so every test starts with a fresh
-    // in-memory database. The composable caches _keyPromise per instance, and
-    // each test creates new instances, so no key cache leaks between tests.
+    // Reset the DB registry and ID counter so every test starts with a fresh in-memory database. The composable caches _keyPromise per instance, and each test creates new instances, so no key cache leaks between tests.
     dbRegistry.clear();
     _autoIdCounter = 1;
-    // Fire onclose so useChatHistory.ts drops its memoised connection to the
-    // now-cleared registry's database and reopens fresh.
+    // Fire onclose so useChatHistory.ts drops its memoised connection to the now-cleared registry's database and reopens fresh.
     (_lastOpenedDb as { onclose?: () => void } | null)?.onclose?.();
     _lastOpenedDb = null;
   });
@@ -434,11 +404,7 @@ describe("useChatHistory", () => {
     vi.clearAllMocks();
   });
 
-  /**
-   * Thin wrapper around composable.saveToHistory.
-   * The put mock automatically assigns a unique ID when Date.now() would
-   * collide, so no fake timers or manual ID management is needed here.
-   */
+  // Thin wrapper around composable.saveToHistory. The put mock automatically assigns a unique ID when Date.now() would collide, so no fake timers or manual ID management is needed here.
   async function saveUnique(
     composable: ReturnType<typeof useChatHistory>,
     messages: ChatMessage[],
@@ -449,7 +415,6 @@ describe("useChatHistory", () => {
     return composable.saveToHistory(messages, sessionId, title, existingChatId);
   }
 
-  // -------------------------------------------------------------------------
   describe("saveToHistory", () => {
     it("should return null when messages array is empty", async () => {
       const { saveToHistory } = useChatHistory(
@@ -579,7 +544,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("loadHistory", () => {
     it("should return an empty array when no history exists", async () => {
       const { loadHistory } = useChatHistory(
@@ -619,8 +583,7 @@ describe("useChatHistory", () => {
       );
       const { loadHistory } = composable;
 
-      // Each saveUnique advances the fake clock by 1 ms, giving distinct IDs
-      // and distinct ISO timestamps so the sort order is deterministic.
+      // Each saveUnique advances the fake clock by 1 ms, giving distinct IDs and distinct ISO timestamps so the sort order is deterministic.
       const id1 = await saveUnique(composable, makeMessages(1), "s1", "Oldest");
       const id2 = await saveUnique(composable, makeMessages(1), "s2", "Middle");
       const id3 = await saveUnique(composable, makeMessages(1), "s3", "Newest");
@@ -685,7 +648,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("loadChat", () => {
     it("should return the chat entry when ID and ownership match", async () => {
       const { saveToHistory, loadChat } = useChatHistory(
@@ -766,7 +728,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("deleteChatById", () => {
     it("should delete an owned record and return true", async () => {
       const { saveToHistory, deleteChatById, loadChat } = useChatHistory(
@@ -824,7 +785,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("clearAllHistory", () => {
     it("should return true and remove all records for the current user+org", async () => {
       const composable = useChatHistory(
@@ -888,7 +848,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("updateChatTitle", () => {
     it("should update the title and return true for an owned record", async () => {
       const { saveToHistory, updateChatTitle, loadChat } = useChatHistory(
@@ -948,7 +907,6 @@ describe("useChatHistory", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
   describe("user+org isolation", () => {
     it("should produce different userOrgKeys for different user+org combinations", async () => {
       const key1 = await resolveKey(USER1, ORG1);
@@ -1157,7 +1115,7 @@ describe("useChatHistory", () => {
       removeAll: vi.fn(),
     });
 
-    it("keeps a live save the server has not committed yet", async () => {
+    it("keeps a live save whose ended turn the server has not committed yet", async () => {
       const server = makeServer([storedTurn("first")], { forked_from_share: "share-1" });
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,
@@ -1166,12 +1124,89 @@ describe("useChatHistory", () => {
         server,
       );
       const local = makeMessages(4);
-      const chatId = await saveToHistory(local, SESSION, "Local");
+      const chatId = await saveToHistory(local, SESSION, "Local", null, "turn-2");
 
       const entry = await loadChat(chatId!);
       expect(entry!.messages.map((m) => m.content)).toEqual(local.map((m) => m.content));
       expect(entry!.cachedLastSeq).toBeUndefined();
       expect(entry!.forkedFromShare).toBe("share-1");
+    });
+
+    it("keeps a live save while the server still reports its turn as running", async () => {
+      const server = makeServer([{ ...storedTurn("first"), turn_id: "turn-1", status: "running" }]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const local = makeMessages(2);
+      const chatId = await saveToHistory(local, SESSION, "Local", null, "turn-1");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(local.map((m) => m.content));
+    });
+
+    // A turn refused before the agent ran never reaches the server, so a count comparison kept the local copy forever.
+    it("takes the server copy over a save that named no ended turn", async () => {
+      const server = makeServer([storedTurn("first")]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(4), SESSION, "Local");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(["first", "re first"]);
+    });
+
+    it("takes the server copy once it has the ended turn settled", async () => {
+      const server = makeServer([
+        { ...storedTurn("first"), turn_id: "turn-1", status: "completed" },
+      ]);
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(4), SESSION, "Local", null, "turn-1");
+
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages.map((m) => m.content)).toEqual(["first", "re first"]);
+    });
+
+    it("opens a chat the server cannot read, flagged, instead of doing nothing", async () => {
+      const server = makeServer([]);
+      server.get.mockRejectedValue(Object.assign(new Error("gap"), { status: 500 }));
+      server.list = vi.fn().mockResolvedValue({
+        chats: [
+          {
+            session_id: SESSION,
+            title: "Broken",
+            created_at: 1,
+            updated_at: 2,
+            last_committed_seq: 3,
+          },
+        ],
+      });
+      const { loadHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const [listed] = await loadHistory();
+
+      const entry = await loadChat(listed.id);
+      expect(entry).toMatchObject({
+        sessionId: SESSION,
+        title: "Broken",
+        historyUnavailable: true,
+      });
+      expect(entry!.messages).toEqual([]);
     });
 
     it("takes the server copy once it has caught up", async () => {
@@ -1207,6 +1242,27 @@ describe("useChatHistory", () => {
       ...extra,
     });
 
+    it("sends the cached state version with the seq, and keeps the cache on not_modified", async () => {
+      const server = makeServer([]);
+      server.get.mockResolvedValueOnce(
+        detail([seqTurn("first", 1, 3)], { last_committed_seq: 3, state_version: "v1" }),
+      );
+      const { loadChat, adoptServerChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await adoptServerChat(SESSION, "Server");
+      const first = await loadChat(chatId);
+      expect(first!.cachedStateVersion).toBe("v1");
+
+      server.get.mockResolvedValueOnce(detail([], { not_modified: true, last_committed_seq: 3 }));
+      const again = await loadChat(chatId);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, 3, 50, "v1");
+      expect(again!.messages.map((m) => m.content)).toEqual(["first", "re first"]);
+    });
+
     it("tops up a stale cache with only the newer turns, merged by first_seq", async () => {
       const server = makeServer([seqTurn("first", 1, 3), seqTurn("second", 4, 5)]);
       server.get.mockResolvedValueOnce(
@@ -1230,7 +1286,7 @@ describe("useChatHistory", () => {
         }),
       );
       const entry = await loadChat(chatId);
-      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, 5, 50);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, 5, 50, undefined);
       expect(entry!.messages.map((m) => m.content)).toEqual([
         "first",
         "re first",
@@ -1289,7 +1345,7 @@ describe("useChatHistory", () => {
         turnStatus: "running",
       });
       await loadChat(chatId);
-      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, undefined, undefined);
+      expect(server.get).toHaveBeenLastCalledWith(ORG1, SESSION, undefined, undefined, undefined);
     });
 
     it("carries forked_from_share from the server listing", async () => {
@@ -1347,7 +1403,7 @@ describe("useChatHistory", () => {
       const id = await adoptServerChat(SESSION, "Fork");
       expect(id).toBe(parseInt("0190a1b2c3d4", 16));
       const chat = await loadChat(id);
-      expect(server.get).toHaveBeenCalledWith(ORG1, SESSION, undefined, undefined);
+      expect(server.get).toHaveBeenCalledWith(ORG1, SESSION, undefined, undefined, undefined);
       expect(chat?.sessionId).toBe(SESSION);
       expect(chat?.title).toBe("Fork");
       expect(chat?.serverBacked).toBe(true);

@@ -63,8 +63,9 @@ const canShare = (chat: (typeof props.chats)[number]) =>
             v-if="canShare(chat)"
             variant="ghost"
             size="icon-xs-circle"
-            class="opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+            class="opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
             :data-test="`o2-ai-chat-history-menu-share-${chat.id}`"
+            :aria-label="t('aiChatShare.share')"
             @click.stop="emit('share', chat.id)"
           >
             <OIcon name="share" size="sm" />
@@ -73,7 +74,8 @@ const canShare = (chat: (typeof props.chats)[number]) =>
           <OButton
             variant="ghost"
             size="icon-xs-circle"
-            class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+            class="delete-history-btn opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+            :aria-label="t('aiAssistant.deleteChatTooltip')"
             @click.stop="emit('delete', chat.id)"
           >
             <OIcon name="delete" size="sm" />
@@ -86,7 +88,6 @@ const canShare = (chat: (typeof props.chats)[number]) =>
       </div>
     </div>
 
-    <!-- Clear all conversations button -->
     <div v-if="chats.length > 0" class="clear-all-container bg-surface-base shrink-0">
       <ODropdownSeparator />
       <OButton

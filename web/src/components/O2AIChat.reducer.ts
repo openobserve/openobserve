@@ -67,16 +67,7 @@ export type StreamEffect =
   | { kind: "syncSegments" }
   | { kind: "finalizeText" };
 
-/**
- * The o2-ai (opencode) backend emits streamed text as
- *   {"type":"message_delta","content":"<plain string>"}
- * and non-streamed notices as {"type":"message","content":"..."} — the text
- * is ALWAYS the plain-string `content` field. We also defensively accept the
- * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
- * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
- * agent/proxy variant doesn't silently render nothing. Returns the text, or
- * null when the event carries no assistant text.
- */
+/** Assistant text of a stream event: o2-ai sends plain `content`; RCA proxies may send OpenAI-style shapes instead. */
 export function extractStreamText(data: any): string | null {
   if (data == null || typeof data !== "object") return null;
 
@@ -286,23 +277,23 @@ function reduceComplete(state: StreamState, data: any, ctx: ReducerCtx): StreamE
 }
 
 // A stored turn the user stopped; the live panel marks its own Stop, as the aborted stream never sees this frame.
+/** The marker a turn the user stopped ends with. */
+export function stoppedMarker(t: TranslateFn): ContentBlock {
+  return { type: "status", turnStatus: "stopped", message: t("aiAssistant.responseStoppedByUser") };
+}
+
 function reduceCancelled(state: StreamState, ctx: ReducerCtx): StreamEffect[] {
   if (state.activeToolCall) {
     pushCompletedToolCall(state, completedBlockFrom(state.activeToolCall));
     if (ctx.isActive) state.activeToolCall = null;
   }
-  const note = `_[${ctx.t("aiAssistant.responseStoppedByUser")}]_`;
+  const marker = stoppedMarker(ctx.t);
   const lastMessage = lastMessageOf(state);
   if (lastMessage?.role === "assistant") {
-    lastMessage.content = raw(lastMessage.content ? `${lastMessage.content}\n\n${note}` : note);
     if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-    lastMessage.contentBlocks.push({ type: "text", text: note });
+    lastMessage.contentBlocks.push(marker);
   } else {
-    state.messages.push({
-      role: "assistant",
-      content: raw(note),
-      contentBlocks: [{ type: "text", text: note }],
-    });
+    state.messages.push({ role: "assistant", content: raw(""), contentBlocks: [marker] });
   }
   return [];
 }

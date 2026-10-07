@@ -66,10 +66,14 @@ describe("ai_chat_share service", () => {
 
   it("reads a shared chat, passing known_seq only when given", async () => {
     await aiChatShare.getShared("org1", "tok");
-    await aiChatShare.getShared("org1", "tok", 12);
+    await aiChatShare.getShared("org1", "tok", { seq: 12 });
+    await aiChatShare.getShared("org1", "tok", { seq: 12, version: "v3" });
     expect(api.get).toHaveBeenNthCalledWith(1, "/api/org1/ai/shared/tok", { params: undefined });
     expect(api.get).toHaveBeenNthCalledWith(2, "/api/org1/ai/shared/tok", {
       params: { known_seq: 12 },
+    });
+    expect(api.get).toHaveBeenNthCalledWith(3, "/api/org1/ai/shared/tok", {
+      params: { known_seq: 12, known_version: "v3" },
     });
   });
 
@@ -81,11 +85,11 @@ describe("ai_chat_share service", () => {
       {},
       { headers: { "Content-Type": "application/json" } },
     );
-    expect(api.get).toHaveBeenCalledWith("/api/public/ai_chats/tok");
+    expect(api.get).toHaveBeenCalledWith("/api/public/ai_chats/tok", { params: undefined });
   });
 
   it("encodes path segments", async () => {
     await aiChatShare.getPublic("a/b");
-    expect(api.get).toHaveBeenCalledWith("/api/public/ai_chats/a%2Fb");
+    expect(api.get).toHaveBeenCalledWith("/api/public/ai_chats/a%2Fb", { params: undefined });
   });
 });

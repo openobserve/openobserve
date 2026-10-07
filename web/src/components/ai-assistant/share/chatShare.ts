@@ -53,6 +53,8 @@ export const DEFAULT_PUBLIC_MAX_EXPIRY_DAYS = 90;
 
 const PREFERRED_PUBLIC_EXPIRY = 30 * DAY;
 
+const ADMIN_ROLES = ["root", "admin"];
+
 export const defaultShareForm = (): ShareForm => ({
   mode: "snapshot",
   visibility: "org",
@@ -103,10 +105,30 @@ export const isChatPersistenceEnabled = (zoConfig: any): boolean =>
 export const isPublicChatEnabled = (zoConfig: any): boolean =>
   isChatPersistenceEnabled(zoConfig) && !!zoConfig?.public_ai_chat_enabled;
 
-/** Org admins (and root) may list and revoke every share in the org; the server enforces it too. */
-export const isOrgAdmin = (state: any): boolean => {
-  const role = String(state?.userInfo?.role ?? state?.currentuser?.role ?? "").toLowerCase();
-  return role === "root" || role === "admin";
+/** Whether the user is an admin of the selected org, from the server's explicit flag or a root login; undefined when unknown. */
+export const orgAdminFlag = (state: any): boolean | undefined => {
+  const selected = state?.selectedOrganization?.identifier;
+  const org = (state?.organizations ?? []).find((o: any) => o?.identifier === selected);
+  const explicit = [
+    state?.zoConfig?.is_org_admin,
+    state?.selectedOrganization?.is_org_admin,
+    org?.is_org_admin,
+    state?.userInfo?.is_org_admin,
+  ].find((flag) => typeof flag === "boolean");
+  if (explicit !== undefined) return explicit;
+  const loginRole = String(state?.userInfo?.role ?? state?.currentuser?.role ?? "").toLowerCase();
+  return loginRole === "root" ? true : undefined;
+};
+
+/** Whether a member list (the IAM users page's source) gives `email` an admin role. */
+export const isAdminInMembers = (
+  members: any[] | undefined,
+  email: string | undefined,
+): boolean => {
+  const me = email?.toLowerCase();
+  if (!me || !members) return false;
+  const mine = members.find((member) => member?.email?.toLowerCase() === me);
+  return ADMIN_ROLES.includes(String(mine?.role ?? "").toLowerCase());
 };
 
 export const visibilityChoices = (publicEnabled: boolean): ShareVisibility[] =>
@@ -155,7 +177,9 @@ export const shareUrl = (
   return `${origin}${root}${relative}`;
 };
 
-export const shareLinkOf = (share: Pick<ShareView, "url_path">): string => shareUrl(share.url_path);
+/** Empty for a share listed without its link (the org-wide admin list). */
+export const shareLinkOf = (share: Pick<ShareView, "url_path">): string =>
+  share.url_path ? shareUrl(share.url_path) : "";
 
 export const statusOfError = (error: unknown): number | undefined => {
   const e = error as { status?: number; response?: { status?: number } } | null;

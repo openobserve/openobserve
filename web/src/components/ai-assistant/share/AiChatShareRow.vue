@@ -45,18 +45,30 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const confirmingRevoke = ref(false);
+type PendingConfirm = "revoke" | "showTools" | null;
+const confirming = ref<PendingConfirm>(null);
 
 watch(
   () => props.share.id,
   () => {
-    confirmingRevoke.value = false;
+    confirming.value = null;
   },
 );
 
-const confirmRevoke = () => {
-  confirmingRevoke.value = false;
-  emit("revoke");
+// Showing tool data on a public link exposes it to anyone holding the link, so it is confirmed first.
+const toggleRedaction = () => {
+  if (props.share.redact_tools && props.share.visibility === "public") {
+    confirming.value = "showTools";
+    return;
+  }
+  emit("toggle-redaction");
+};
+
+const confirmPending = () => {
+  const pending = confirming.value;
+  confirming.value = null;
+  if (pending === "revoke") emit("revoke");
+  else if (pending === "showTools") emit("toggle-redaction");
 };
 </script>
 
@@ -74,11 +86,11 @@ const confirmRevoke = () => {
         {{ raw(share.title) || t("aiChatShare.untitled") }}
       </div>
       <div
-        v-if="showOwner && (share.owner_name || share.created_by)"
+        v-if="showOwner && (share.owner_name || share.owner_email)"
         class="text-text-secondary truncate text-xs"
         data-test="ai-chat-share-row-owner"
       >
-        {{ t("aiChatShare.sharedBy", { name: share.owner_name || share.created_by || "" }) }}
+        {{ t("aiChatShare.sharedBy", { name: share.owner_name || share.owner_email || "" }) }}
       </div>
       <div class="flex flex-wrap items-center gap-1.5">
         <OBadge
@@ -109,6 +121,15 @@ const confirmRevoke = () => {
         >
           {{ t("aiChatShare.toolsRedactedBadge") }}
         </OBadge>
+        <OBadge
+          v-else-if="share.visibility === 'public'"
+          size="xs"
+          variant="warning-soft"
+          icon="visibility"
+          data-test="ai-chat-share-row-tools-visible"
+        >
+          {{ t("aiChatShare.toolsVisibleBadge") }}
+        </OBadge>
         <span class="text-text-secondary text-xs">
           {{
             share.expires_at
@@ -122,34 +143,46 @@ const confirmRevoke = () => {
       </div>
     </div>
     <div
-      v-if="confirmingRevoke"
-      class="flex shrink-0 items-center gap-2"
-      data-test="ai-chat-share-row-revoke-confirm"
+      v-if="confirming"
+      class="flex shrink-0 items-center gap-2 max-md:flex-wrap"
+      :data-test="
+        confirming === 'revoke'
+          ? 'ai-chat-share-row-revoke-confirm'
+          : 'ai-chat-share-row-show-tools-confirm'
+      "
     >
-      <span class="text-text-body text-xs">{{ t("aiChatShare.revokeConfirm") }}</span>
+      <span class="text-text-body text-xs">{{
+        confirming === "revoke" ? t("aiChatShare.revokeConfirm") : t("aiChatShare.showToolsConfirm")
+      }}</span>
       <OButton
         variant="outline"
         size="sm"
         data-test="ai-chat-share-row-revoke-cancel"
-        @click="confirmingRevoke = false"
+        @click="confirming = null"
       >
         {{ t("common.cancel") }}
       </OButton>
       <OButton
-        variant="destructive"
+        :variant="confirming === 'revoke' ? 'destructive' : 'primary'"
         size="sm"
         :disabled="busy"
-        data-test="ai-chat-share-row-revoke-confirm-btn"
-        @click="confirmRevoke"
+        :data-test="
+          confirming === 'revoke'
+            ? 'ai-chat-share-row-revoke-confirm-btn'
+            : 'ai-chat-share-row-show-tools-confirm-btn'
+        "
+        @click="confirmPending"
       >
-        {{ t("aiChatShare.revoke") }}
+        {{ confirming === "revoke" ? t("aiChatShare.revoke") : t("aiChatShare.showToolsAction") }}
       </OButton>
     </div>
     <div v-else class="flex shrink-0 items-center gap-0.5">
       <OButton
+        v-if="share.url_path"
         variant="ghost"
         size="icon-sm"
         data-test="ai-chat-share-row-copy"
+        :aria-label="t('aiChatShare.copyLink')"
         @click="emit('copy')"
       >
         <OIcon name="content-copy" size="sm" />
@@ -162,6 +195,7 @@ const confirmRevoke = () => {
           size="icon-sm"
           :disabled="busy"
           data-test="ai-chat-share-row-refresh"
+          :aria-label="t('aiChatShare.refreshSnapshot')"
           @click="emit('refresh-snapshot')"
         >
           <OIcon name="refresh" size="sm" />
@@ -172,6 +206,11 @@ const confirmRevoke = () => {
           size="icon-sm"
           :disabled="busy"
           data-test="ai-chat-share-row-switch-mode"
+          :aria-label="
+            share.mode === 'live'
+              ? t('aiChatShare.switchToSnapshot')
+              : t('aiChatShare.switchToLive')
+          "
           @click="emit('switch-mode')"
         >
           <OIcon :name="share.mode === 'live' ? 'photo-camera' : 'sync'" size="sm" />
@@ -188,7 +227,8 @@ const confirmRevoke = () => {
           size="icon-sm"
           :disabled="busy"
           data-test="ai-chat-share-row-toggle-redaction"
-          @click="emit('toggle-redaction')"
+          :aria-label="share.redact_tools ? t('aiChatShare.showTools') : t('aiChatShare.hideTools')"
+          @click="toggleRedaction"
         >
           <OIcon :name="share.redact_tools ? 'visibility' : 'visibility-off'" size="sm" />
           <OTooltip
@@ -201,7 +241,8 @@ const confirmRevoke = () => {
         size="icon-sm"
         :disabled="busy"
         data-test="ai-chat-share-row-revoke"
-        @click="confirmingRevoke = true"
+        :aria-label="t('aiChatShare.revoke')"
+        @click="confirming = 'revoke'"
       >
         <OIcon name="link-off" size="sm" />
         <OTooltip :content="t('aiChatShare.revoke')" />
