@@ -147,25 +147,44 @@
             </ODropdownItem>
           </template>
           <ODropdownItem
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            v-if="store.state.zoConfig.ai_enabled"
             data-test="send-to-ai-chat-btn"
+            :disabled="!aiAssistantAccess.allowed"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
+            <template v-if="!aiAssistantAccess.allowed" #icon-right>
+              <OIcon name="lock" size="xs" class="shrink-0" />
+            </template>
           </ODropdownItem>
+          <LockedFeatureTooltip
+            v-if="store.state.zoConfig.ai_enabled && !aiAssistantAccess.allowed"
+            :message="aiAssistantAccess.message"
+            icon="smart-toy"
+            :title="t('logs.jsonPreview.sendToAiChat')"
+          />
           <ODropdownItem
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             data-test="redirect-to-regex-pattern-btn"
+            :disabled="!regexPatternsAccess.allowed"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
               <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
+            <template v-if="!regexPatternsAccess.allowed" #icon-right>
+              <OIcon name="lock" size="xs" class="shrink-0" />
+            </template>
           </ODropdownItem>
+          <LockedFeatureTooltip
+            v-if="!regexPatternsAccess.allowed"
+            :message="regexPatternsAccess.message"
+            icon="pattern"
+            :title="t('regex_patterns.create_regex_pattern_field')"
+          />
         </ODropdown>
 
         <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
@@ -219,7 +238,7 @@
     </div>
     <ODialog
       data-test="json-preview-regex-pattern-dialog"
-      v-if="config.isEnterprise == 'true'"
+      v-if="regexPatternsAccess.allowed"
       v-model:open="typeOfRegexPattern"
       size="lg"
       :title="t('logs.jsonPreview.regexPatternTypeTitle')"
@@ -524,6 +543,15 @@ export default {
     // LockedFeatureTooltip's doc comment for the shared pattern.
     const correlationAccess = computed(() =>
       checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Same locked-visible treatment for the per-field "Send to AI Chat" and
+    // "Create regex pattern" menu items below — `ai_enabled` is a separate
+    // runtime toggle layered on top (hide, not lock) for the AI item only.
+    const aiAssistantAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const regexPatternsAccess = computed(() =>
+      checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
     );
 
     // Initialize service correlation composable
@@ -902,6 +930,8 @@ export default {
       showViewTraceBtn,
       showViewRelatedBtn,
       correlationAccess,
+      aiAssistantAccess,
+      regexPatternsAccess,
       queryEditorRef,
       previewId,
       loading,
