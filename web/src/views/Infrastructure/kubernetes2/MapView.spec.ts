@@ -420,6 +420,10 @@ describe("MapView on phones (§4.8)", () => {
     expect(wrapper.find('[data-test="k8s2-map-area"]').classes()).toContain("max-md:min-h-96");
     expect(wrapper.find('[data-test="k8s2-map-filter"]').classes()).toContain("max-md:w-full");
     expect(wrapper.find('[data-test="k8s2-map-scale"]').classes()).toContain("shrink-0");
+    for (const id of ["k8s2-map-fill", "k8s2-map-group"])
+      expect(wrapper.find(`[data-test="${id}"]`).classes()).toEqual(
+        expect.arrayContaining(["max-md:min-w-0", "max-md:flex-1"]),
+      );
   });
 });
 

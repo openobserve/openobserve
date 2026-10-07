@@ -46,6 +46,15 @@ describe("K8sListHeader count suffix and filtered flag (AC 80)", () => {
     expect(count()).toBe("41 pods · labels seen on 39 of 41");
   });
 
+  it("gives the title and count their own full row on phones", () => {
+    mountHeader({});
+    const heading = wrapper.find('[data-test="k8s2-list-heading"]');
+    expect(heading.classes()).toContain("max-md:w-full");
+    expect(heading.find('[data-test="k8s2-list-title"]').exists()).toBe(true);
+    expect(heading.find('[data-test="k8s2-list-count"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="k8s2-list-header"]').classes()).toContain("flex-wrap");
+  });
+
   it("shows no suffix and no Filtered by default", () => {
     mountHeader({});
     expect(count()).toBe("41 pods");

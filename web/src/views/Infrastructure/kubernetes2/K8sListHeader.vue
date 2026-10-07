@@ -78,43 +78,49 @@ const onNamespaces = (value: unknown) =>
 </script>
 
 <template>
-  <div ref="rowRef" class="flex w-full min-w-0 items-center gap-2" data-test="k8s2-list-header">
-    <OText
-      tag="h2"
-      class="min-w-0 shrink truncate text-lg font-semibold"
-      data-test="k8s2-list-title"
-    >
-      {{ title }}
-    </OText>
-    <span class="text-text-secondary min-w-0 shrink truncate text-xs" data-test="k8s2-list-count">
-      <template v-if="filtered">
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          data-test="k8s2-list-filtered-clear"
-          @click="emit('clear')"
-          >{{ t("infra.k8s2.filtered") }}</OButton
-        >{{ raw(` ${count} / ${total}`) }}
-        <span v-if="capped" data-test="k8s2-list-capped">
-          {{ t("infra.k8s2.limitMarker") }}
+  <div
+    ref="rowRef"
+    class="flex w-full min-w-0 flex-wrap items-center gap-2"
+    data-test="k8s2-list-header"
+  >
+    <div class="flex min-w-0 shrink items-center gap-2 max-md:w-full" data-test="k8s2-list-heading">
+      <OText
+        tag="h2"
+        class="min-w-0 shrink truncate text-lg font-semibold"
+        data-test="k8s2-list-title"
+      >
+        {{ title }}
+      </OText>
+      <span class="text-text-secondary min-w-0 shrink truncate text-xs" data-test="k8s2-list-count">
+        <template v-if="filtered">
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            data-test="k8s2-list-filtered-clear"
+            @click="emit('clear')"
+            >{{ t("infra.k8s2.filtered") }}</OButton
+          >{{ raw(` ${count} / ${total}`) }}
+          <span v-if="capped" data-test="k8s2-list-capped">
+            {{ t("infra.k8s2.limitMarker") }}
+            <OTooltip :content="t('infra.k8s2.itemsCappedTip')" />
+          </span>
+        </template>
+        <span v-else-if="capped" data-test="k8s2-list-capped">
+          {{ t("infra.k8s2.itemsCapped", { count }) }}
           <OTooltip :content="t('infra.k8s2.itemsCappedTip')" />
         </span>
-      </template>
-      <span v-else-if="capped" data-test="k8s2-list-capped">
-        {{ t("infra.k8s2.itemsCapped", { count }) }}
-        <OTooltip :content="t('infra.k8s2.itemsCappedTip')" />
+        <template v-else>{{ countLabel ?? t("infra.k8s2.items", { count }, count) }}</template>
+        <template v-if="countSuffix">{{ raw(" · ") }}{{ countSuffix }}</template>
       </span>
-      <template v-else>{{ countLabel ?? t("infra.k8s2.items", { count }, count) }}</template>
-      <template v-if="countSuffix">{{ raw(" · ") }}{{ countSuffix }}</template>
-    </span>
-    <OTag
-      v-if="chip"
-      size="xs"
-      variant="default-soft"
-      class="shrink-0"
-      data-test="k8s2-list-chip"
-      >{{ chip }}</OTag
-    >
+      <OTag
+        v-if="chip"
+        size="xs"
+        variant="default-soft"
+        class="shrink-0"
+        data-test="k8s2-list-chip"
+        >{{ chip }}</OTag
+      >
+    </div>
     <div class="ms-auto flex min-w-0 items-center gap-2">
       <OSelect
         v-if="namespaced"

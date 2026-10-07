@@ -29,6 +29,7 @@ export interface LayoutParams {
   fixedScale?: number;
   // The header band's screen height; without it the band is LABEL_BAND units.
   bandPx?: number;
+  minTitlePx?: number;
 }
 
 export interface HexBounds {
@@ -175,6 +176,25 @@ export function shortGroupNames(names: readonly string[]): string[] {
   return [...names];
 }
 
+// Truncates each title to its width; where two would then read alike, keeps the part that differs.
+export function distinctTitles(
+  titles: readonly string[],
+  widths: readonly number[],
+  measure: (s: string) => number,
+): string[] {
+  const out = titles.map((t, i) => middleTruncate(t, widths[i], measure));
+  const byText = new Map<string, number[]>();
+  out.forEach((t, i) => byText.set(t, [...(byText.get(t) ?? []), i]));
+  for (const same of byText.values()) {
+    if (same.length < 2) continue;
+    for (const i of same) {
+      const peers = same.filter((j) => j !== i && titles[j] !== titles[i]).map((j) => titles[j]);
+      if (peers.length) out[i] = aroundDifference(titles[i], peers, widths[i], measure);
+    }
+  }
+  return out;
+}
+
 // Keeps the head and the tail, where names differ, around an ellipsis.
 export function middleTruncate(text: string, maxPx: number, measure: (s: string) => number) {
   if (measure(text) <= maxPx) return text;
@@ -196,6 +216,7 @@ function sameParams(a: LayoutParams, b: LayoutParams) {
   if ((a.minBandPx ?? 0) !== (b.minBandPx ?? 0)) return false;
   if ((a.fixedScale ?? 0) !== (b.fixedScale ?? 0)) return false;
   if ((a.bandPx ?? 0) !== (b.bandPx ?? 0)) return false;
+  if ((a.minTitlePx ?? 0) !== (b.minTitlePx ?? 0)) return false;
   if (a.groups.length !== b.groups.length) return false;
   for (let g = 0; g < a.groups.length; g++) {
     const [ka, kb] = [a.groups[g], b.groups[g]];
@@ -260,6 +281,7 @@ function bestShelf(blocks: Block[], params: LayoutParams) {
 function settled(params: LayoutParams): { blocks: Block[]; sizing: Sizing } {
   const sizing: Sizing = { minWidth: MIN_FRAME_WIDTH, maxWidth: Infinity, band: LABEL_BAND };
   let minFramePx = params.minFramePx ?? 0;
+  let noBand = false;
   for (let round = 0; ; round++) {
     const blocks = blocksOf(params, sizing);
     const { spanX, spanY } = pack(blocks, bestShelf(blocks, params));
@@ -273,10 +295,17 @@ function settled(params: LayoutParams): { blocks: Block[]; sizing: Sizing } {
       sizing.minWidth = MIN_FRAME_WIDTH;
       continue;
     }
-    const band = params.bandPx ? params.bandPx / scale : LABEL_BAND;
+    const band = noBand ? 0 : params.bandPx ? params.bandPx / scale : LABEL_BAND;
     const minWidth = Math.max(sizing.minWidth, minFramePx / scale);
     const stable =
       Math.abs(band - sizing.band) * scale < SETTLED_PX && minWidth <= sizing.minWidth + EPSILON;
+    const narrowest = blocks.reduce((min, b) => Math.min(min, b.width), Infinity) * scale;
+    // A header too narrow for a readable title is no header: the tooltip and nav carry the name.
+    if (stable && params.bandPx && !noBand && narrowest < (params.minTitlePx ?? 0)) {
+      noBand = true;
+      sizing.band = 0;
+      continue;
+    }
     if (stable || round >= MAX_SETTLE_ROUNDS) return { blocks, sizing };
     Object.assign(sizing, { band, minWidth });
   }
@@ -325,4 +354,31 @@ function computeLayout(params: LayoutParams): HexLayout {
     bounds.minY = Math.min(bounds.minY, frame.bottom);
   }
   return { x, y, frames, bounds };
+}
+
+// The widest window of `text` that fits and covers where it first and last differs from its peers.
+function aroundDifference(
+  text: string,
+  peers: readonly string[],
+  maxPx: number,
+  measure: (s: string) => number,
+) {
+  const common = (a: string, b: string, step: (s: string, k: number) => string) => {
+    let k = 0;
+    while (k < Math.min(a.length, b.length) && step(a, k) === step(b, k)) k++;
+    return k;
+  };
+  const start = Math.min(...peers.map((p) => common(text, p, (s, k) => s[k])));
+  const tail = Math.min(...peers.map((p) => common(text, p, (s, k) => s[s.length - 1 - k])));
+  const end = Math.max(start, text.length - tail);
+  const show = (a: number, b: number) =>
+    `${a > 0 ? "…" : ""}${text.slice(a, b)}${b < text.length ? "…" : ""}`;
+  let [a, b] = [Math.min(start, Math.max(0, end - 1)), end];
+  if (measure(show(a, b)) > maxPx) return middleTruncate(text, maxPx, measure);
+  while (a > 0 || b < text.length) {
+    const grown = b < text.length && (a === 0 || b - end <= start - a) ? [a, b + 1] : [a - 1, b];
+    if (measure(show(grown[0], grown[1])) > maxPx) break;
+    [a, b] = grown;
+  }
+  return show(a, b);
 }

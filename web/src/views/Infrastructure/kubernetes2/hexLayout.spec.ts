@@ -19,6 +19,7 @@ import {
   HEX_HALF_HEIGHT,
   HEX_HALF_WIDTH,
   hexLayout,
+  distinctTitles,
   middleTruncate,
   shelfCandidates,
   shortGroupNames,
@@ -454,6 +455,17 @@ describe("group titles (AC 83)", () => {
     expect(shortGroupNames(["solo.ec2.internal"])).toEqual(["solo.ec2.internal"]);
     expect(shortGroupNames(["a.x", "b.y"])).toEqual(["a.x", "b.y"]);
     expect(shortGroupNames([".x", "a.x"])).toEqual([".x", "a.x"]);
+  });
+
+  it("keeps the differing part when two truncated titles would read the same", () => {
+    const titles = ["recommendation-service", "recommendation-service-v2", "auth-service"];
+    for (const px of [66, 84, 102]) {
+      const out = distinctTitles(titles, [px, px, px], sixPx);
+      expect(new Set(out.slice(0, 2)).size).toBe(2);
+      for (const t of out) expect(sixPx(t)).toBeLessThanOrEqual(px);
+      expect(out[1]).toMatch(/v2$/);
+      expect(out[2]).toBe(middleTruncate("auth-service", px, sixPx));
+    }
   });
 
   it("middle-truncates to fit, keeping the distinguishing tail", () => {

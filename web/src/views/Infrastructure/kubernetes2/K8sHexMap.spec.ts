@@ -336,6 +336,13 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
     return WIDTH / (x[1] - x[0]);
   };
 
+  it("paints the plot in surface-base and writes the status line at 12px", async () => {
+    await mountMap();
+    expect(options().backgroundColor).toBe(chartColor("--color-surface-base"));
+    const line2 = cardAt(0, fitScale()).children.filter((c: any) => c.type === "text")[2];
+    expect(line2.style.font).toContain("12px");
+  });
+
   it("draws a surface-base card with a default stroke, a header band, a separator and silent text", async () => {
     await mountMap();
     const card = cardAt(0, fitScale());
@@ -358,12 +365,33 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
       expect(child.silent).toBe(true);
   });
 
-  it("keeps the header 2.75rem tall with both lines top-aligned, at the fit and zoomed in", async () => {
+  it("draws the band over its whole reserve at every zoom, 2.75rem at the fit", async () => {
+    await mountMap();
+    const frames = options().series[1].data;
+    const hexes = options().series[0].data;
+    const gaps: number[] = [];
+    for (const zoom of [1, 3, 20]) {
+      const scale = zoom * fitScale();
+      const band = cardAt(0, scale).children[1];
+      const bandBottom = band.shape.y + band.shape.height;
+      expect(bandBottom).toBeCloseTo(-frames[0][4] * scale, 6);
+      const firstHex = hexAt(0, scale).shape.points.reduce(
+        (m: number, p: number[]) => Math.min(m, p[1]),
+        Infinity,
+      );
+      gaps.push((firstHex - bandBottom) / scale);
+      if (zoom === 1) expect(band.shape.height + 1).toBeCloseTo(44, 0);
+    }
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(1e-6);
+    expect(gaps[0]).toBeLessThan(1);
+    expect(hexes[0][1]).toBeLessThan(frames[0][4]);
+  });
+
+  it("keeps both header lines top-aligned at the fit and zoomed in", async () => {
     await mountMap();
     for (const scale of [fitScale(), 3 * fitScale()]) {
       const card = cardAt(0, scale);
       const band = card.children[1];
-      expect(band.shape.height + 1).toBeCloseTo(44, 0);
       const [title, count, line2] = card.children.filter((c: any) => c.type === "text");
       expect(title.style.text).toBe("n1");
       expect(title.style.verticalAlign).toBe("top");
@@ -461,6 +489,52 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
   });
 });
 
+describe("K8sHexMap dense groupings", () => {
+  const dense = (pods: number, groups: number) =>
+    Array.from({ length: pods }, (_, i) => ({
+      ...pod(`p${i}`, "n1", 10),
+      workload: { kind: "Deployment", name: `service-${i % groups}` },
+    })) as PodRow[];
+
+  it.each([
+    [5000, 300],
+    [5000, 1500],
+  ])(
+    "reserves no band and draws no text when %i pods in %i cards are too narrow for a title",
+    async (pods, groups) => {
+      await mountMap(dense(pods, groups), { group: "workload" });
+      const { x } = ranges();
+      const scale = WIDTH / (x[1] - x[0]);
+      const frames = options().series[1].data as number[][];
+      expect(frames).toHaveLength(groups);
+      for (const f of frames) expect(f[4]).toBe(f[1]);
+      for (let i = 0; i < frames.length; i += 37) {
+        const card = cardAt(i, scale);
+        expect(card.children.filter((c: any) => c.type === "text")).toEqual([]);
+        expect(card.children.filter((c: any) => c.type !== "rect" || !c.silent)).toEqual([]);
+      }
+    },
+  );
+
+  it("never draws header text wider than its card", async () => {
+    const rows = dense(120, 40);
+    await mountMap(rows, { group: "workload" });
+    const { x } = ranges();
+    const scale = WIDTH / (x[1] - x[0]);
+    const frames = options().series[1].data as number[][];
+    for (let i = 0; i < frames.length; i++) {
+      const [x0, x1] = [frames[i][0] * scale, frames[i][2] * scale];
+      for (const t of cardAt(i, scale).children.filter((c: any) => c.type === "text")) {
+        const width =
+          t.style.width ?? String(t.style.text).replace(/\{\w+\|([^}]*)\}/g, "$1").length * 7;
+        const left = t.style.align === "right" ? t.x - width : t.x;
+        expect(left).toBeGreaterThanOrEqual(x0);
+        expect(left + width).toBeLessThanOrEqual(x1);
+      }
+    }
+  });
+});
+
 describe("K8sHexMap highlight, selection and hover (AC 86, 88)", () => {
   it("dims hexes outside the highlighted classes without moving any", async () => {
     await mountMap();
@@ -490,7 +564,7 @@ describe("K8sHexMap highlight, selection and hover (AC 86, 88)", () => {
         expect(item.style).toMatchObject({ stroke: chartColor("--color-accent"), lineWidth: 2.5 });
         expect(item.z2).toBe(10);
       } else if (row.memoryPctOfLimit == null) {
-        expect(item.style.stroke).toBe(chartColor("--color-border-default"));
+        expect(item.style.stroke).toBe(chartColor("--color-border-control"));
       } else {
         expect(item.style.stroke).toBeUndefined();
       }
@@ -673,6 +747,8 @@ describe("map card header tokens", () => {
         "--color-status-negative",
       ])
         expect(contrastRatio(resolveColor(glyph, scope)!, band)).toBeGreaterThanOrEqual(3);
+      const noData = resolveColor("--color-border-control", scope)!;
+      expect(contrastRatio(noData, body)).toBeGreaterThanOrEqual(3);
     });
   }
 });

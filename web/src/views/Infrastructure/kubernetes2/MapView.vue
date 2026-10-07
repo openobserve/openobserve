@@ -463,6 +463,7 @@ function linkText(g: RowGroup): I18nText {
         </OToggleGroupItem>
       </OToggleGroup>
       <OSelect
+        class="max-md:min-w-0 max-md:flex-1"
         width="md"
         size="sm"
         label-position="inside"
@@ -473,6 +474,7 @@ function linkText(g: RowGroup): I18nText {
         @update:model-value="(v) => emit('update', { fill: v as MapFill })"
       />
       <OSelect
+        class="max-md:min-w-0 max-md:flex-1"
         width="sm"
         size="sm"
         searchable
