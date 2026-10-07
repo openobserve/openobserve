@@ -338,12 +338,18 @@ function textWidth(text: string, font: string) {
   return format.getTextRect(text, font).width;
 }
 
+// Status colours are under 4.5:1 on the band, so only glyphs carry them; words and numbers stay body text.
 function summaryText(header: GroupHeader) {
-  const word = header.word ? `{${header.word.tone ?? "neutral"}|${header.word.text}}  ` : "";
+  const word = header.word;
+  const lead = !word
+    ? ""
+    : word.tone
+      ? `{${word.tone}|●} {neutral|${word.text}}  `
+      : `{neutral|${word.text}}  `;
   const counts = header.summary.map(
-    (s) => `{${s.count === 0 ? "neutral" : s.cls}|${GLYPH[s.cls]} ${s.count}}`,
+    (s) => `{${s.count === 0 ? "neutral" : s.cls}|${GLYPH[s.cls]}} {neutral|${s.count}}`,
   );
-  return word + counts.join("  ");
+  return lead + counts.join("  ");
 }
 
 function headerTexts(

@@ -377,19 +377,27 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
     expect(options().tooltip.formatter({ seriesIndex: 1, dataIndex: 0 })).toBe("<b>n1</b>");
   });
 
-  it("mutes zero counts and colours the others by status", async () => {
+  it("colours only the glyphs: numbers and words stay body text, zero glyphs muted", async () => {
     await mountMap();
+    await wrapper.setProps({
+      headers: wrapper
+        .props("headers")
+        .map((h: GroupHeader) => ({ ...h, word: { text: "MemoryPressure", tone: "warning" } })),
+    });
     const line2 = texts(cardAt(0, fitScale())).find((t) => t.includes("✓"))!;
     const [error, warning, ok] = statusCounts(groupRows(ROWS, "node").groups[0].rows);
     const seg = (cls: string, glyph: string, n: number) =>
-      `{${n === 0 ? "neutral" : cls}|${glyph} ${n}}`;
+      `{${n === 0 ? "neutral" : cls}|${glyph}} {neutral|${n}}`;
     expect(line2).toBe(
-      [
-        seg("error", "✕", error.count),
-        seg("warning", "!", warning.count),
-        seg("ok", "✓", ok.count),
-      ].join("  "),
+      "{warning|●} {neutral|MemoryPressure}  " +
+        [
+          seg("error", "✕", error.count),
+          seg("warning", "!", warning.count),
+          seg("ok", "✓", ok.count),
+        ].join("  "),
     );
+    for (const [, key, run] of line2.matchAll(/\{(\w+)\|([^}]*)\}/g))
+      if (!["●", "✕", "!", "✓"].includes(run)) expect(key).toBe("neutral");
     expect(ok.count).toBeGreaterThan(0);
     expect(error.count).toBe(0);
   });
@@ -659,6 +667,12 @@ describe("map card header tokens", () => {
       expect(contrastRatio(band, body)).toBeGreaterThanOrEqual(1.2);
       for (const text of ["--color-text-heading", "--color-text-body"])
         expect(contrastRatio(resolveColor(text, scope)!, band)).toBeGreaterThanOrEqual(4.5);
+      for (const glyph of [
+        "--color-status-positive",
+        "--color-status-warning-text",
+        "--color-status-negative",
+      ])
+        expect(contrastRatio(resolveColor(glyph, scope)!, band)).toBeGreaterThanOrEqual(3);
     });
   }
 });
