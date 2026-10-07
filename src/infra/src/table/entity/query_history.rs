@@ -13,14 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { vi } from "vitest";
+use sea_orm::entity::prelude::*;
 
-vi.mock("@rudderstack/analytics-js", () => {
-  return {
-    RudderAnalytics: class {
-      ready = vi.fn();
-      load = vi.fn();
-      track = vi.fn();
-    },
-  };
-});
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[sea_orm(table_name = "query_history")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: String,
+    pub org_id: String,
+    pub user_email: String,
+    #[sea_orm(column_type = "Text")]
+    pub query: String,
+    pub context: Json,
+    pub starred: bool,
+    pub created_at: i64,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}

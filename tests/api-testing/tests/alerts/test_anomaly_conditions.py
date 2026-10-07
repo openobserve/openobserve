@@ -364,24 +364,34 @@ def test_a_percentile_that_clamps_to_the_stored_threshold_is_not_a_change(
         f"97.4 clamps to the stored 97: {resp.status_code} {resp.text}"
 
 
-def test_clearing_a_budget_requires_the_direct_anomaly_api(
-    client: OpenObserveClient, budget_config: str
-):
-    """The alerts path maps `Option<f64>.map(Some)`, which can never produce
-    `Some(None)` — so clearing is expressible only on the direct endpoint."""
-    via_alerts = client.put(
-        f"alerts/{budget_config}",
+def _budget_after_alerts_put(client: OpenObserveClient, anomaly_id: str, anomaly_config: dict):
+    resp = client.put(
+        f"alerts/{anomaly_id}",
         json={"name": unique_name("anomcond"), "alert_type": "anomaly_detection",
-              "anomaly_config": {"alert_budget_per_day": None}},
+              "anomaly_config": anomaly_config},
         prefix="api/v2/",
         raise_for_status=False,
     )
-    stored = client.get(f"anomaly_detection/{budget_config}").json()
-    stored = stored.get("data", stored)
-    assert stored["alert_budget_per_day"] is not None, \
-        f"the alerts path is set-only; the budget should survive it " \
-        f"(PUT answered {via_alerts.status_code})"
+    assert resp.status_code == HTTPStatus.OK, resp.text
+    stored = client.get(f"anomaly_detection/{anomaly_id}").json()
+    return stored.get("data", stored)["alert_budget_per_day"]
 
+
+def test_the_alerts_path_keeps_an_absent_budget_and_clears_a_null_one(
+    client: OpenObserveClient, budget_config: str
+):
+    """`UpdateAnomalyAlertFields` keeps absent and `null` apart: an unrelated
+    edit leaves the budget, an explicit `null` clears it."""
+    kept = _budget_after_alerts_put(client, budget_config, {"alert_enabled": False})
+    assert kept == 5, f"an absent budget must leave the stored one, got {kept!r}"
+
+    cleared = _budget_after_alerts_put(client, budget_config, {"alert_budget_per_day": None})
+    assert cleared is None, f"a null budget must clear it, got {cleared!r}"
+
+
+def test_the_direct_anomaly_api_clears_a_budget(
+    client: OpenObserveClient, budget_config: str
+):
     direct = client.put(
         f"anomaly_detection/{budget_config}",
         json={"alert_budget_per_day": None},

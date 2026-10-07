@@ -31,12 +31,12 @@ pub fn try_decode(
     inputs: &[Arc<dyn ExecutionPlan>],
     _registry: &dyn FunctionRegistry,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    Ok(Arc::new(AggregateTopkExec::new(
+    Ok(Arc::new(AggregateTopkExec::try_new(
         inputs[0].clone(),
         &node.sort_field,
         node.descending,
         node.limit,
-    )))
+    )?))
 }
 
 pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
@@ -105,12 +105,12 @@ mod tests {
             Arc::new(EmptyExec::new(Arc::clone(&schema))),
             Arc::clone(&schema),
         )?;
-        let plan: Arc<dyn ExecutionPlan> = Arc::new(AggregateTopkExec::new(
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(AggregateTopkExec::try_new(
             Arc::new(agg_plan) as Arc<dyn ExecutionPlan>,
             "COUNT(1)",
             false,
             10,
-        ));
+        )?);
 
         // encode
         let proto = super::super::get_physical_extension_codec();

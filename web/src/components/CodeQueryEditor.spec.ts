@@ -44,6 +44,7 @@ const mockEditorObj = {
   onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
+  onDidBlurEditorText: vi.fn(),
   dispose: vi.fn(),
   getValue: vi.fn(() => ""),
   setValue: vi.fn(),
@@ -633,6 +634,20 @@ describe("CodeQueryEditor", () => {
         stopPropagation: vi.fn(),
       });
       expect(wrapper.emitted("run-query")).toBeFalsy();
+    });
+
+    // Monaco reports a widget blur on a timer, after a fast click on Run has already read the query.
+    it("commits a pending edit as soon as the text loses focus", async () => {
+      const wrapper = await mountAndSetup();
+      const onChange = mockEditorObj.onDidChangeModelContent.mock.calls[0][0];
+      mockEditorObj.getValue.mockReturnValue("up");
+      onChange({});
+      expect(wrapper.emitted("update:query")).toBeFalsy();
+
+      mockEditorObj.onDidBlurEditorText.mock.calls[0][0]();
+
+      expect(wrapper.emitted("update:query")?.at(-1)?.[0]).toBe("up");
+      mockEditorObj.getValue.mockReturnValue("");
     });
   });
 

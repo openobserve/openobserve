@@ -114,6 +114,8 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   compareAgentVersions: (...args: any[]) => mockCompareAgentVersions(...args),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 // Version Compare is Agent-mode-only, enterprise-only — independent of
 // whatever a developer's local .env happens to set.
 vi.mock("@/aws-exports", () => ({
@@ -152,6 +154,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
 import { kpiCache } from "./llmInsightsCache";
+import analytics from "@/services/product_analytics";
 
 const AGENT_V15 = {
   name: "checkout-agent",
@@ -482,6 +485,50 @@ describe("LLMInsightsDashboard — per-variant KPI cache", () => {
       expect.any(Number),
       expect.any(Number),
       expect.objectContaining({ version: "1.4.0" }),
+    );
+  });
+});
+
+describe("LLMInsightsDashboard — product analytics", () => {
+  async function runCompare() {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+    await wrapper.find('[data-test="llm-insights-compare-entry"]').trigger("click");
+    await flushPromises();
+    await flushPromises();
+    vi.mocked(analytics.track).mockClear();
+    return wrapper;
+  }
+
+  it("tracks agent_version_compare_completed when the compare run succeeds", async () => {
+    const wrapper = await runCompare();
+    await wrapper
+      .findComponent({ name: "VersionCompareView" })
+      .vm.$emit("run", { a: AGENT_V15, b: AGENT_V14, align: "sinceRollout" });
+    await flushPromises();
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("agent_version_compare_completed", {
+      align: "sinceRollout",
+    });
+  });
+
+  it("does not track agent_version_compare_completed when an arm fetch fails", async () => {
+    const wrapper = await runCompare();
+    mockFetchAll.mockRejectedValueOnce(new Error("boom")).mockRejectedValueOnce(new Error("boom"));
+    await wrapper
+      .findComponent({ name: "VersionCompareView" })
+      .vm.$emit("run", { a: AGENT_V15, b: AGENT_V14, align: "sinceRollout" });
+    await flushPromises();
+    await flushPromises();
+
+    expect(mockError.value).toBe("boom");
+    expect(analytics.track).not.toHaveBeenCalledWith(
+      "agent_version_compare_completed",
+      expect.anything(),
     );
   });
 });

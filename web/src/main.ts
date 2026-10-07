@@ -35,6 +35,7 @@ import { contextRegistry, createDefaultContextProvider } from "./composables/con
 import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
+import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
@@ -163,7 +164,6 @@ const getConfig = async () => {
             // List of error patterns to ignore
             const ignoredErrorPatterns = [
               /ResizeObserver loop/i,
-              /RS SDK/i,
               /reo.dev/i,
               /Cannot set properties of null \(setting 'innerHTML'\)/,
             ];
@@ -173,7 +173,7 @@ const getConfig = async () => {
               (pattern) => pattern.test(errorMessage) || pattern.test(errorStack),
             );
 
-            if (shouldIgnore) {
+            if (shouldIgnore || isIgnoredNoise(errorMessage, errorStack)) {
               return false; // Don't send this error
             }
           }
@@ -203,7 +203,7 @@ const getConfig = async () => {
           // Check if log matches any ignored pattern
           const shouldIgnore = ignoredLogPatterns.some((pattern) => pattern.test(logMessage));
 
-          if (shouldIgnore) {
+          if (shouldIgnore || isIgnoredNoise(logMessage)) {
             return false; // Don't send this log
           }
 

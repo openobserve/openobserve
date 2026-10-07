@@ -60,6 +60,15 @@ describe("buildReadonlyPermissions", () => {
     expect(perms).toEqual([{ object: "settings:_all_default", permission: "AllowGet" }]);
   });
 
+  it("grants no reads on rum_analytics, whose OpenFGA type has no GET or LIST", () => {
+    const perms = buildReadonlyPermissions(
+      [{ key: "rum_analytics", visible: true }],
+      "default",
+      false,
+    );
+    expect(perms).toEqual([]);
+  });
+
   it("excludes the org resource outside the meta org (mirrors EditRole's setPermission guard)", () => {
     const resources = [
       { key: "org", visible: true },

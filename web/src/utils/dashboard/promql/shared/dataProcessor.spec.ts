@@ -209,6 +209,27 @@ describe("dataProcessor", () => {
       expect(processedResult[0].series).toHaveLength(50);
     });
 
+    it("keeps a shifted series only when its primary survives the series limit (stacked)", async () => {
+      // Shifted series re-use their primaries' metric objects, reordered and with one missing.
+      const metrics = ["a", "b", "c", "d", "e", "f", "g"].map((job) => ({ job }));
+      const primary = metrics.map((metric) => ({ metric, values: [[1000, "1"]] }));
+      const shifted = [6, 5, 4, 3, 2, 1].map((i) => ({
+        metric: metrics[i],
+        values: [[1000, "2"]],
+      }));
+      const searchQueryData: PromQLResponse[] = [{ result: primary }, { result: shifted }] as any;
+
+      const processed = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, type: "stacked", config: { promql_series_limit: 5 } },
+        mockStore,
+        { parentQueryIndex: [0, 0], nameSuffixes: ["", "1 day ago"] },
+      );
+
+      expect(processed[0].series.map((s: any) => s.metric.job)).toEqual(["a", "b", "c", "d", "e"]);
+      expect(processed[1].series.map((s: any) => s.metric.job)).toEqual(["e", "d", "c", "b"]);
+    });
+
     it("should use default series limit when not specified", async () => {
       const result = Array.from({ length: 150 }, (_, i) => ({
         metric: { job: `job-${i}` },

@@ -15,6 +15,7 @@
 
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
 import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -359,10 +360,19 @@ export const NAV_GROUPS: NavGroupDef[] = [
     icon: "devices",
     // RUM's route always exists; Synthetics is feature-gated, so land on RUM.
     parentLink: "/rum",
-    absorbs: ["rum", "synthetics"],
+    absorbs: ["rum", "synthetics", "productAnalytics"],
     children: [
       { titleKey: "menu.rum", title: "RUM", icon: "devices", name: "RUM", requires: "rum" },
       { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
+      // The event editors sit outside the shell route, so name every PA route rather than rely on the path prefix.
+      {
+        titleKey: "menu.productAnalytics",
+        icon: "insights",
+        name: PA_ROUTES.shell,
+        requires: PA_ROUTES.shell,
+        activeOnRoutes: Object.values(PA_ROUTES),
+        beta: true,
+      },
     ],
   },
 ];

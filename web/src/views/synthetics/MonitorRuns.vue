@@ -1151,6 +1151,7 @@ import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   rollUpStatus,
@@ -1414,6 +1415,7 @@ async function triggerRun() {
   });
   try {
     await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderId.value);
+    analytics.track("synthetic_test_run_triggered", { count: 1 });
     dismiss();
     // "Queued", not "Done": the API enqueues a job, and a browser run takes tens
     // of seconds to land in the results stream. The refresh below fires

@@ -4,7 +4,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -363,10 +363,10 @@ describe("IngestLogs Component", () => {
       });
     });
 
-    it("should track segment analytics on successful copy", async () => {
+    it("should track product analytics on successful copy", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "curl";
       await wrapper.vm.copyToClipboardFn({ innerText: "track this" });
@@ -374,7 +374,7 @@ describe("IngestLogs Component", () => {
       // Wait for the .then() callback to fire
       await flushPromises();
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "curl",
         user_org: store.state.selectedOrganization.identifier,
@@ -383,10 +383,10 @@ describe("IngestLogs Component", () => {
       });
     });
 
-    it("should not track segment analytics when copy fails (resolves false)", async () => {
+    it("should not track product analytics when copy fails (resolves false)", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(false);
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "fluentbit";
       await wrapper.vm.copyToClipboardFn({ innerText: "fail track" });
@@ -394,7 +394,7 @@ describe("IngestLogs Component", () => {
       // Wait for the .then() callback to fire
       await flushPromises();
 
-      expect(segment.default.track).not.toHaveBeenCalled();
+      expect(analytics.default.track).not.toHaveBeenCalled();
     });
 
     it("should handle empty innerText gracefully", async () => {

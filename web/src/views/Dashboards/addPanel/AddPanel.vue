@@ -238,6 +238,7 @@ import {
   exemplarOverrideKey,
 } from "@/composables/dashboard/useExemplarOverride";
 import { raw, useI18nTyped } from "@/types/i18n";
+import analytics from "@/services/product_analytics";
 import {
   addPanel,
   checkIfVariablesAreLoaded,
@@ -1399,6 +1400,10 @@ export default defineComponent({
             return;
           }
         }
+        analytics.track("dashboard_panel_saved", {
+          chart_type: dashboardPanelData.data.type,
+          is_new: !editMode.value,
+        });
 
         isUnsavedTrackingActive = false;
 

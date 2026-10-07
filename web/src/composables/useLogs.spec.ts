@@ -2781,4 +2781,41 @@ describe("resolveDefaultColumns", () => {
     const result = resolveDefaultColumns(streamFields, []);
     expect(result).toEqual([]);
   });
+
+  it("puts service_name before the fts column when the stream has it", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service_name", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service_name", "body"]);
+    expect(resolveDefaultColumns(streamFields, [])).toEqual(["service_name", "body"]);
+  });
+
+  it("prefers service over service_name", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service_name", ftsKey: false },
+      { name: "service", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service: "api", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service", "body"]);
+  });
+
+  it("skips a service field that has no values in the hits", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service", ftsKey: false },
+      { name: "service_name", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service: "", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service_name", "body"]);
+    expect(resolveDefaultColumns(streamFields, [], [{ body: "hello" }])).toEqual(["body"]);
+  });
+
+  it("adds no service column when there is no fts column", () => {
+    const streamFields = [{ name: "service_name", ftsKey: false }];
+    const hits = [{ service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual([]);
+  });
 });

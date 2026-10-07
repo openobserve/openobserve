@@ -1,13 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for MemberInvitation.vue (the inline invite row).
-//
-// `email` is required AND every address (split on `;`/`,`) must be a valid email.
-// `role` defaults to "admin". The component keeps the multi-email split/dedup in
-// its submit handler.
-//
-// Built via a factory so the invalid-email message stays i18n-driven (pass
-// useI18n's `t`).
+// Schema for InviteMembersDialog.vue; the dialog's submit handler owns the split/lowercase/dedupe.
 
 import { z } from "zod";
 import { validateEmail } from "@/utils/zincutils";
@@ -20,6 +13,14 @@ export const splitInviteEmails = (raw: string): string[] =>
     .map((email) => email.trim())
     .filter((email) => email.length > 0);
 
+/** Least-privileged usable default: `editor` when the org offers it, else the first option. */
+export const pickDefaultInviteRole = (
+  options: ReadonlyArray<{ value?: unknown }> | null | undefined,
+): string => {
+  const values = (options ?? []).map((option) => String(option?.value ?? "")).filter(Boolean);
+  return values.includes("editor") ? "editor" : (values[0] ?? "");
+};
+
 export const makeMemberInvitationSchema = (t: (_key: string) => string) =>
   z.object({
     email: z
@@ -29,13 +30,12 @@ export const makeMemberInvitationSchema = (t: (_key: string) => string) =>
         const emails = splitInviteEmails(val);
         return emails.length > 0 && emails.every((e) => validateEmail(e) === true);
       }, t("user.inviteEmailInvalid")),
-    role: z.string().default("admin"),
+    role: z.string().min(1, t("user.roleRequired")),
   });
 
 export type MemberInvitationForm = z.infer<ReturnType<typeof makeMemberInvitationSchema>>;
 
-// Static defaults — create / "add another" form: blank email + the default role.
-export const memberInvitationDefaults = (): MemberInvitationForm => ({
-  email: "",
-  role: "admin",
+export const memberInvitationDefaults = (email = "", role = ""): MemberInvitationForm => ({
+  email,
+  role,
 });

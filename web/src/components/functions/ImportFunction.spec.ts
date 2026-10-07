@@ -594,7 +594,7 @@ describe("ImportFunction", () => {
     // the VRL compiler — the body looks fine and the language is what is wrong.
     it("offers the body and the language after the server refuses an item", async () => {
       mockCreate.mockRejectedValueOnce({
-        response: { data: { message: "error[E203]: syntax error" } },
+        response: { status: 400, data: { message: "error[E203]: syntax error" } },
       });
       const wrapper = mountScreen();
       await flushPromises();
@@ -666,6 +666,30 @@ describe("ImportFunction", () => {
         name: "fn_a",
         function: ".a = 1",
         params: "row",
+      });
+    });
+
+    // An entry that is not an object is rejected like any other and offered the
+    // same controls, so those controls have to have somewhere to write. Writing
+    // into the entry itself threw on a primitive and did nothing at all on a
+    // null, so the typed name never reached the document and the item could not
+    // be fixed however long the user tried.
+    it.each([
+      ["a bare string", "just a string"],
+      ["a null", null],
+    ])("repairs %s entry rather than refusing to be fixed", async (_label, entry) => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, [entry]);
+
+      expect(() => wrapper.vm.updateFunctionName("fn_rescued", 0)).not.toThrow();
+      wrapper.vm.updateFunctionBody(".a = 1", 0);
+      await nextTick();
+
+      expect(JSON.parse(wrapper.vm.baseImportRef.jsonStr)[0]).toMatchObject({
+        name: "fn_rescued",
+        function: ".a = 1",
       });
     });
   });
@@ -802,5 +826,151 @@ describe("ImportFunction", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     expect(push).not.toHaveBeenCalled();
+  });
+  describe("a file that spells the language snake_case", () => {
+    // The server ignores `trans_type`, so without this the file imports as VRL.
+
+    it("sends a snake_case trans_type as the language it declares", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, {
+        name: "snake_js",
+        function: "function transform(row){ return row; }",
+        params: "row",
+        trans_type: 1,
+      });
+
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({ name: "snake_js", transType: 1 });
+    });
+
+    it("prefers camelCase when a file carries both", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, {
+        name: "both_spellings",
+        function: ".a = 1",
+        params: "row",
+        transType: 0,
+        trans_type: 1,
+      });
+
+      // camelCase is what the fix-up control writes and what is actually sent.
+      expect(mockCreate.mock.calls[0][1]).toMatchObject({ transType: 0 });
+    });
+
+    it("rejects an unusable snake_case language instead of sending VRL", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, {
+        name: "snake_bad",
+        function: ".a = 1",
+        params: "row",
+        trans_type: 7,
+      });
+
+      // Previously invisible to validation, so it went out as transType 0.
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(wrapper.vm.functionErrors.at(-1).map((e: any) => e.field)).toContain("trans_type");
+    });
+
+    it("opens the language control on the snake_case value it found", async () => {
+      const wrapper = mountScreen();
+      await flushPromises();
+      // The controls read the live document. Set it the way the screen hands it
+      // back to BaseImport, rather than pressing Import — a valid item would just
+      // be written and navigate away.
+      wrapper.vm.baseImportRef.jsonArrayOfObj = [
+        { name: "snake_pick", function: "function transform(row){ return row; }", trans_type: 1 },
+      ];
+      await nextTick();
+
+      expect(wrapper.vm.currentTransType(0)).toBe("1");
+      // And the body editor speaks that language rather than tokenising JS as VRL.
+      expect(wrapper.vm.bodyLanguage(0)).toBe("javascript");
+    });
+  });
+
+  describe("a failure the screen cannot offer a fix for", () => {
+    const item = { name: "fn_refused", function: ".a = 1", params: "row", transType: 0 };
+
+    // The controls are async components jsdom never mounts, so what is asserted
+    // is the pair of fields the output pane renders them from — the same way the
+    // rejection test above does it.
+    const offeredFields = (wrapper: any) =>
+      (wrapper.vm.functionErrors.at(-1) ?? []).map((e: any) => e.field);
+
+    it("offers the language and body controls for a 400", async () => {
+      // A 400 is the server judging this function — a compile error, or a body
+      // that trips the enterprise security patterns. Both are fixed here.
+      mockCreate.mockRejectedValueOnce({
+        response: { status: 400, data: { message: "error[E203]: syntax error" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, item);
+
+      expect(offeredFields(wrapper)).toEqual(["trans_type", "function_body"]);
+    });
+
+    it("offers nothing to retype for a 403", async () => {
+      // No create permission. Telling the user to set the language and retype the
+      // body asks them to do something that cannot work.
+      mockCreate.mockRejectedValueOnce({
+        response: { status: 403, data: { message: "Unauthorized Access" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, item);
+
+      expect(wrapper.vm.functionErrors).toEqual([]);
+      // The server's own words are what the user gets.
+      expect(wrapper.text()).toContain("Unauthorized Access");
+    });
+
+    it("offers nothing to retype for a 500", async () => {
+      mockCreate.mockRejectedValueOnce({
+        response: { status: 500, data: { message: "Internal Server Error" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, item);
+
+      expect(wrapper.vm.functionErrors).toEqual([]);
+      expect(wrapper.text()).toContain("Internal Server Error");
+    });
+
+    it("offers nothing to retype when the request never lands", async () => {
+      mockCreate.mockRejectedValueOnce(new Error("Network Error"));
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, item);
+
+      expect(wrapper.vm.functionErrors).toEqual([]);
+      expect(wrapper.text()).toContain("Network Error");
+    });
+
+    it("does not report a 403 run as a successful import", async () => {
+      // The failure contributes no control group, and a run judged by the groups
+      // alone would toast success and navigate away — the bug this screen has
+      // already had three times.
+      mockCreate.mockRejectedValue({
+        response: { status: 403, data: { message: "Unauthorized Access" } },
+      });
+      const wrapper = mountScreen();
+      await flushPromises();
+
+      await importJson(wrapper, item);
+
+      expect(wrapper.vm.$router.currentRoute.value.name).toBe("importFunction");
+      expect(wrapper.text()).toContain("Unauthorized Access");
+    });
   });
 });

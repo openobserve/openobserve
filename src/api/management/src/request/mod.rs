@@ -58,8 +58,10 @@ pub mod profiling;
 pub mod prompts;
 #[cfg(feature = "enterprise")]
 pub mod providers;
+pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
+pub mod rum_analytics;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;
 #[cfg(feature = "enterprise")]

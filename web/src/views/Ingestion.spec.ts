@@ -21,7 +21,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { queryClient } from "@/composables/query/queryClient";
 
 // Mock services with default resolved values
@@ -92,7 +92,7 @@ vi.mock("@/services/api_keys", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -282,7 +282,7 @@ describe("Ingestion", () => {
         message: "RUM Token generated successfully.",
         timeout: 5000,
       });
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Generate RUM Token",
         user_org: "default",
         user_id: "example@gmail.com",
@@ -388,7 +388,7 @@ describe("Ingestion", () => {
         message: "RUM Token updated successfully.",
         timeout: 5000,
       });
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Update RUM Token",
         user_org: "default",
         user_id: "example@gmail.com",
@@ -834,7 +834,7 @@ describe("Ingestion", () => {
         message: "Token reset successfully.",
         timeout: 5000,
       });
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Update Passcode",
         user_org: "default",
         user_id: "example@gmail.com",
@@ -1280,7 +1280,7 @@ describe("Ingestion", () => {
 
       await wrapper.vm.generateRUMToken();
 
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Generate RUM Token",
         user_org: "test-org",
         user_id: "test@example.com",
@@ -1306,7 +1306,7 @@ describe("Ingestion", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
       await flushPromises();
 
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "custom",
         user_org: "default",

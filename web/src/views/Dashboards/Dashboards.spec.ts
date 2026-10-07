@@ -17,6 +17,11 @@ vi.mock("@/services/dashboards", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+import dashboardService from "@/services/dashboards";
+import { deleteDashboardById } from "@/utils/commons";
+
 vi.mock("@/utils/commons", () => ({
   deleteDashboardById: vi.fn().mockResolvedValue({}),
   deleteFolderById: vi.fn().mockResolvedValue({}),
@@ -1209,6 +1214,75 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showMoveDashboardDialog).toBe(false);
+    });
+  });
+
+  describe("product analytics", () => {
+    const mountDashboards = async () => {
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+    };
+
+    it("tracks dashboard_created once a duplicate is created", async () => {
+      await mountDashboards();
+
+      await wrapper.vm.duplicateDashboard("d1", "default");
+
+      expect(dashboardService.create).toHaveBeenCalled();
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("does not track dashboard_created when the duplicate fails", async () => {
+      vi.mocked(dashboardService.create).mockRejectedValueOnce(new Error("boom"));
+      await mountDashboards();
+
+      await wrapper.vm.duplicateDashboard("d1", "default");
+
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("tracks dashboard_deleted once a single delete succeeds", async () => {
+      await mountDashboards();
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", folder_id: "default" } });
+
+      await wrapper.vm.deleteDashboard();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_deleted", { count: 1 });
+    });
+
+    it("does not track dashboard_deleted when a single delete fails", async () => {
+      vi.mocked(deleteDashboardById).mockRejectedValueOnce(new Error("boom"));
+      await mountDashboards();
+      wrapper.vm.showDeleteDialogFn({ row: { id: "d1", folder_id: "default" } });
+
+      await wrapper.vm.deleteDashboard();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
+    });
+
+    it("tracks dashboard_deleted with the server-confirmed bulk count", async () => {
+      vi.mocked(dashboardService.bulkDelete).mockResolvedValueOnce({
+        data: { successful: ["d1"], unsuccessful: ["d2"] },
+      } as any);
+      await mountDashboards();
+      wrapper.vm.selectedIds = ["d1", "d2"];
+
+      await wrapper.vm.bulkDeleteDashboards();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_deleted", { count: 1 });
+    });
+
+    it("does not track dashboard_deleted when the bulk delete removed nothing", async () => {
+      vi.mocked(dashboardService.bulkDelete).mockResolvedValueOnce({
+        data: { successful: [], unsuccessful: ["d1"] },
+      } as any);
+      await mountDashboards();
+      wrapper.vm.selectedIds = ["d1"];
+
+      await wrapper.vm.bulkDeleteDashboards();
+
+      expect(dashboardService.bulkDelete).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_deleted", expect.anything());
     });
   });
 });

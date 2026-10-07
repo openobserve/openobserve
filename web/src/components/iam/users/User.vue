@@ -19,14 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout :title="t('iam.basicUsers')" :subtitle="t('user.subtitle')" icon="person" bleed>
     <template #actions>
-      <MemberInvitation
-        v-if="config.isCloud == 'true'"
-        :key="currentUserRole"
-        v-model:currentrole="currentUserRole"
-        @invite-sent="handleInviteSent"
-      />
       <OButton
-        v-else
+        v-if="config.isCloud === 'true' && canInvite"
+        variant="primary"
+        size="sm"
+        icon-left="person-add"
+        data-test="invite-members-btn"
+        @click="openInviteDialog()"
+      >
+        {{ t("user.inviteMembers") }}
+      </OButton>
+      <OButton
+        v-else-if="config.isCloud !== 'true'"
         variant="primary"
         size="sm"
         @click="addRoutePush({})"
@@ -109,13 +113,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-users"
               :filtered="!!(filterQuery || roleFilter)"
-              @action="
-                (id) =>
-                  id === 'clear-filters'
-                    ? ((filterQuery = ''), (roleFilter = null))
-                    : addRoutePush({})
-              "
-            />
+              @action="(id) => (id === 'clear-filters' ? clearFilters() : openAddFlow())"
+            >
+              <template v-if="searchInviteEmail" #actions>
+                <EmptyStateActionCard
+                  icon="person-add"
+                  :label="t('user.inviteSearchedEmail', { email: searchInviteEmail })"
+                  :sublabel="t('user.inviteSearchedEmailDesc')"
+                  data-test="user-list-invite-searched-email"
+                  @click="openInviteDialog(searchInviteEmail)"
+                />
+                <EmptyStateActionCard
+                  icon="filter-list"
+                  :label="t('emptyState.filtered.action')"
+                  :sublabel="t('emptyState.filtered.actionDesc')"
+                  data-test="user-list-clear-filters"
+                  @click="clearFilters()"
+                />
+              </template>
+            </OEmptyState>
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
@@ -276,6 +292,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
+    <InviteMembersDialog
+      v-if="config.isCloud === 'true'"
+      v-model:open="showInviteDialog"
+      :initial-email="inviteInitialEmail"
+      @invite-sent="handleInviteSent"
+    />
+
     <ODialog
       data-test="user-delete-dialog"
       v-model:open="confirmDelete"
@@ -343,11 +366,13 @@ import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
-import segment from "@/services/segment_analytics";
-import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
-import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
+import analytics from "@/services/product_analytics";
+import InviteMembersDialog from "@/components/iam/users/InviteMembersDialog.vue";
+import { splitInviteEmails } from "@/components/iam/users/MemberInvitation.schema";
+import { getImageURL, verifyOrganizationStatus, maskText, validateEmail } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
@@ -364,7 +389,7 @@ export default defineComponent({
     OTable,
     UpdateUserRole,
     AddUser,
-    MemberInvitation,
+    InviteMembersDialog,
     OButton,
     ORefreshButton,
     ODropdown,
@@ -374,6 +399,7 @@ export default defineComponent({
     OIcon,
     ODialog,
     OEmptyState,
+    EmptyStateActionCard,
     OSearchInput,
   },
   emits: ["updated:fields", "deleted:fields", "updated:dates"],
@@ -1098,7 +1124,7 @@ export default defineComponent({
         // The row already stores the canonical role VALUE, so AddUser's role
         // select matches an option directly (see updateUser).
         selectedUser.value = { ...props.row };
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
@@ -1328,7 +1354,7 @@ export default defineComponent({
           await getOrgMembers(true);
           updateUserActions();
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Revoke Invite",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,
@@ -1348,6 +1374,40 @@ export default defineComponent({
       await getOrgMembers(true);
       updateUserActions();
     };
+
+    const showInviteDialog = ref(false);
+    const inviteInitialEmail = ref("");
+    const canInvite = computed(
+      () => currentUserRole.value === "admin" || currentUserRole.value === "root",
+    );
+
+    const openInviteDialog = (email = "") => {
+      inviteInitialEmail.value = email;
+      showInviteDialog.value = true;
+    };
+
+    // Cloud adds people by invitation, so its add entry points open the invite dialog.
+    const openAddFlow = () => {
+      if (config.isCloud === "true" && canInvite.value) openInviteDialog();
+      else addRoutePush({});
+    };
+
+    const clearFilters = () => {
+      filterQuery.value = "";
+      roleFilter.value = null;
+    };
+
+    // A search for one well-formed address that is not a member becomes an invite offer.
+    const searchInviteEmail = computed(() => {
+      if (config.isCloud !== "true" || !canInvite.value) return "";
+      const emails = splitInviteEmails(filterQuery.value);
+      if (emails.length !== 1 || validateEmail(emails[0]) !== true) return "";
+      const email = emails[0].toLowerCase();
+      const isMember = (rows.value || []).some(
+        (row: any) => String(row.rawEmail ?? row.email ?? "").toLowerCase() === email,
+      );
+      return isMember ? "" : email;
+    });
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -1440,7 +1500,7 @@ export default defineComponent({
           console.log(error);
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -1471,7 +1531,7 @@ export default defineComponent({
       {
         id: "iamUsersAdd",
         handler: () => {
-          if (!isInputFocused()) addRoutePush({});
+          if (!isInputFocused()) openAddFlow();
         },
       },
       {
@@ -1509,6 +1569,13 @@ export default defineComponent({
       revokeInviteEmail,
       confirmRevokeAction,
       handleInviteSent,
+      showInviteDialog,
+      inviteInitialEmail,
+      canInvite,
+      openInviteDialog,
+      openAddFlow,
+      clearFilters,
+      searchInviteEmail,
       getOrgMembers,
       refreshUsers,
       updateUser,

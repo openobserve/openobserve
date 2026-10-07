@@ -16,6 +16,7 @@
 import { generateTraceContext } from "@/utils/zincutils";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   OrgTraceTimeRangeResponse,
   TraceTimeRangeOptions,
@@ -506,7 +507,12 @@ const search = {
     const use_cache: boolean =
       (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     const url = `/api/${org_identifier}/search_jobs?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
-    return http({ headers: { traceparent } }).post(url, query);
+    return http({ headers: { traceparent } })
+      .post(url, query)
+      .then((res) => {
+        analytics.track("search_job_created", { stream_type: page_type });
+        return res;
+      });
   },
   cancel_scheduled_search: ({
     org_identifier,

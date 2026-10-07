@@ -110,20 +110,12 @@ export class TracesPage {
     this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-    // TracesMetricsDashboard.vue: data-test="insights-button"
     this.insightsButton = '[data-test="insights-button"]';
     // SearchResult.vue: error-count badge doubles as the error-only toggle
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
-    // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // TracesAnalysisDashboard.vue was migrated to ODrawer
-    // (data-test="traces-analysis-dashboard-drawer"). The legacy
-    // `analysis-dashboard-close` data-test and `.analysis-dashboard-card`
-    // template class were removed — `.analysis-dashboard-card` only survives
-    // in CSS rules now, no element actually carries the class. Scope all
-    // selectors via the ODrawer slug instead.
     this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
-    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
+    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-drill-down-back-btn"]';
     // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
     this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
     this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
@@ -471,7 +463,9 @@ export class TracesPage {
   }
 
   async toggleMetricsDashboard() {
+    await this.getMoreMenuButton().click();
     await this.page.locator(this.showMetricsToggle).click();
+    await this.page.keyboard.press('Escape');
   }
 
   async switchToServiceMaps() {
@@ -690,9 +684,7 @@ export class TracesPage {
   }
 
   async expectQueryError() {
-    const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('[data-test="traces-search-error-message"]').isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('[data-test="traces-search-error-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+    const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasError).toBeTruthy();
   }
 
@@ -1870,22 +1862,13 @@ export class TracesPage {
   }
 
   /**
-   * Get error message element text (if visible). Source: traces Index.vue
-   * exposes both `traces-search-error-message` and the legacy
-   * `logs-search-error-message` data-tests.
+   * Get the traces error state text (if visible).
    * @returns {Promise<string>}
    */
   async getVisibleErrorMessage() {
-    const candidates = [
-      this.errorMessage,
-      '[data-test="traces-search-error-message"]',
-      '[data-test="traces-search-error-text"]',
-    ];
-    for (const sel of candidates) {
-      const el = this.page.locator(sel).first();
-      if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
-        return (await el.textContent().catch(() => '')) || '';
-      }
+    const el = this.page.locator(this.errorMessage).first();
+    if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
+      return (await el.textContent().catch(() => '')) || '';
     }
     return '';
   }
@@ -2016,12 +1999,11 @@ export class TracesPage {
   // ===== ANALYZE DIMENSIONS POM METHODS =====
   // Selectors verified against actual Vue source code
 
-  // --- Insights Button (TracesMetricsDashboard.vue) ---
+  // --- Drill down button (Traces SearchBar.vue) ---
 
   /**
-   * Check if Insights button is visible.
-   * The Insights button is ALWAYS visible when metrics dashboard shows
-   * (does NOT require brush selection).
+   * Check if the Drill down button is visible.
+   * It shows in Spans/Traces mode once a search is applied without error.
    * @returns {Promise<boolean>}
    */
   async isInsightsButtonVisible() {
@@ -2029,7 +2011,7 @@ export class TracesPage {
   }
 
   /**
-   * Click Insights button to open the Analysis Dashboard
+   * Click the Drill down button to open the Analysis Dashboard
    */
   async clickInsightsButton() {
     await this.page.locator(this.insightsButton).click();
@@ -2047,7 +2029,7 @@ export class TracesPage {
   }
 
   /**
-   * Close Analysis Dashboard via close button
+   * Close the Drill down view via its Back button
    */
   async closeAnalysisDashboard() {
     const closeBtn = this.page.locator(this.analysisDashboardClose);
@@ -3557,9 +3539,7 @@ export class TracesPage {
     await expect(async () => {
       await this.runTraceSearch();
       if (await this.page.locator(this.errorMessage).isVisible()) {
-        const detailsBtn = this.page.locator('[data-test="traces-search-error-details-btn"]');
-        await detailsBtn.click({ timeout: 2000 }).catch(() => {});
-        const detail = await this.page.locator('[data-test="traces-search-detail-error-message"]').textContent({ timeout: 2000 }).catch(() => '');
+        const detail = await this.page.locator(this.errorMessage).textContent({ timeout: 2000 }).catch(() => '');
         testLogger.warn('Trace search returned an error; re-running', { detail: (detail || '').trim() });
       }
       await expect(firstRow).toBeVisible({ timeout: 5000 });

@@ -441,6 +441,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex items-center gap-2 space-x-2 pe-[0.325rem]">
+            <OSwitch
+              v-if="activeTab === 'waterfall'"
+              :model-value="showCriticalPath"
+              :label="t('traces.criticalPath')"
+              size="sm"
+              data-test="trace-details-critical-path-toggle"
+              @update:model-value="setShowCriticalPath"
+            />
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
@@ -612,6 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :selectedSpanId="selectedSpanId"
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
+                        :showCriticalPath="showCriticalPath"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
                         @select-span-event="onSelectSpanEvent"
@@ -634,6 +643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <TraceDetailsSidebar
+                  ref="treeSidebarRef"
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
@@ -819,6 +829,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Map View with Pattern/Span Toggle -->
             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
+              <div class="flex items-center gap-2 px-2.5 pt-2.5">
+                <OToggleGroup :model-value="traceGraphView" @update:model-value="setTraceGraphView">
+                  <OToggleGroupItem data-test="trace-graph-tree-view-btn" value="tree" size="sm">
+                    <template #icon-left>
+                      <OIcon name="git-branch" size="sm" />
+                    </template>
+                    <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
+                  </OToggleGroupItem>
+                  <OToggleGroupItem data-test="trace-graph-graph-view-btn" value="graph" size="sm">
+                    <template #icon-left
+                      ><OIcon name="share" size="sm" class="shrink-0"
+                    /></template>
+                    <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
+                  </OToggleGroupItem>
+                </OToggleGroup>
+                <OSearchInput
+                  v-model="traceGraphSearch"
+                  data-test="trace-graph-search-input"
+                  class="w-56! max-lg:w-40!"
+                  :placeholder="t('traces.serviceGraph.searchPlaceholder')"
+                  :debounce="300"
+                  clearable
+                />
+              </div>
               <!-- Chart Container -->
               <div class="min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
@@ -926,7 +960,17 @@ import {
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
-import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
+import {
+  MAX_NETWORK_NODE_SYMBOL_SIZE,
+  convertServiceGraphToNetwork,
+  convertTimelineData,
+  convertTraceServiceMapData,
+} from "@/utils/traces/convertTraceData";
+import {
+  buildTraceServiceGraph,
+  filterTraceServiceGraph,
+  filterTraceTree,
+} from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
@@ -950,12 +994,18 @@ import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
+import {
+  computeCriticalPathForRoots,
+  toCriticalPathNode,
+  type CriticalPathSection,
+} from "@/utils/traces/criticalPath";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -965,6 +1015,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -1037,6 +1088,10 @@ const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
+const LS_TRACE_CRITICAL_PATH_KEY = "o2_trace_critical_path";
+const LS_TRACE_GRAPH_VIEW_KEY = "o2_trace_graph_view";
+
+type TraceGraphView = "tree" | "graph";
 
 const isKnownTraceTab = (value: string): value is TraceTabValue =>
   TRACE_TAB_DEFS.some((tab) => tab.value === value);
@@ -1079,6 +1134,22 @@ function loadTraceActiveTab(): TraceTabValue {
     // Ignore — fall through to the default tab.
   }
   return DEFAULT_TRACE_TAB;
+}
+
+function loadTraceCriticalPath(): boolean {
+  try {
+    return localStorage.getItem(LS_TRACE_CRITICAL_PATH_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function loadTraceGraphView(): TraceGraphView {
+  try {
+    return localStorage.getItem(LS_TRACE_GRAPH_VIEW_KEY) === "graph" ? "graph" : "tree";
+  } catch {
+    return "tree";
+  }
 }
 
 export default defineComponent({
@@ -1179,6 +1250,7 @@ export default defineComponent({
     OTooltip,
     OSearchInput,
     OSelect,
+    OSwitch,
     ManualEvaluationDialog,
     TraceAnnotateMenu,
     AddToDatasetDrawer,
@@ -1194,6 +1266,9 @@ export default defineComponent({
     const spanMap: any = ref({});
     const activeTab = ref<string>(loadTraceActiveTab());
     const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
+    const showCriticalPath = ref(loadTraceCriticalPath());
+    const traceGraphView = ref<TraceGraphView>(loadTraceGraphView());
+    const traceGraphSearch = ref("");
     const sidebarActiveTab = ref("attributes");
 
     const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
@@ -1212,6 +1287,8 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    // The tree view's span sidebar; it owns the correlation lookup.
+    const treeSidebarRef = ref<any>(null);
 
     // Tooltip lifecycle management
     let tooltipCleanup: (() => void) | null = null;
@@ -1246,6 +1323,51 @@ export default defineComponent({
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
+      if (traceGraphView.value === "graph") {
+        const graph = filterTraceServiceGraph(
+          buildTraceServiceGraph(effectiveSpanList.value, t("traces.traceDetails.unknownService")),
+          traceGraphSearch.value,
+        );
+        if (!graph.nodes.length) return { options: {}, notMerge: true };
+        const chartWidth = chartRendererRef.value?.$el?.clientWidth || 1200;
+        const network = convertServiceGraphToNetwork(
+          graph,
+          "force",
+          new Map(),
+          isDarkMode.value,
+          undefined,
+          // computeForceLayout subtracts ~330×310 of padding; smaller sizes yield NaN positions.
+          Math.max(chartWidth, 800),
+          Math.max(chartRendererRef.value?.$el?.clientHeight || 700, 500),
+        );
+        // ECharts fits node centres, not symbols, into the series box; inset by the largest radius.
+        const inset = MAX_NETWORK_NODE_SYMBOL_SIZE / 2;
+        const labelWidth = 120;
+        // Label reserves are capped at a quarter of the width so narrow charts keep room for nodes.
+        const labelReserve = (wanted: number) => Math.max(inset, Math.min(wanted, chartWidth / 4));
+        const [graphSeries, ...otherSeries] = network.options.series;
+        return {
+          options: {
+            ...network.options,
+            series: [
+              {
+                ...graphSeries,
+                top: inset,
+                // A bottom label is centred on its node, so half its width plus the text stroke overhangs left.
+                left: labelReserve(labelWidth / 2 + 4),
+                // Edge nodes still get labels below or to their right, so reserve a text line and a label width.
+                bottom: inset + 24,
+                right: labelReserve(inset + labelWidth),
+                label: { ...graphSeries.label, width: labelWidth, overflow: "truncate" },
+                labelLayout: { hideOverlap: true },
+              },
+              ...otherSeries,
+            ],
+          },
+          notMerge: true,
+          lazyUpdate: true,
+        };
+      }
       // Pattern view - use new pattern-based visualization
       // Engine TreeNode makes errorRate/children optional while the pattern
       // callbacks (useTreeVisualization) require errorRate; adapt each call to
@@ -1259,9 +1381,12 @@ export default defineComponent({
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
       });
+      const treeData = filterTraceTree(patternTreeData.value, traceGraphSearch.value);
+      // ECharts' tree series throws on empty data and leaves the chart stuck until reload.
+      if (!treeData.length) return { options: {}, notMerge: true };
       const chartOptions = generateEChartsOptions(
         {
-          treeData: patternTreeData.value,
+          treeData,
           getNodeLabel: (node: EngineTreeNode) => getPatternNodeLabel(toPatternNode(node)),
           getNodeTooltip: (node: EngineTreeNode) => getPatternNodeTooltip(toPatternNode(node)),
           getNodeErrorRate: (node: EngineTreeNode) => getPatternNodeErrorRate(toPatternNode(node)),
@@ -1909,6 +2034,25 @@ export default defineComponent({
       },
     );
 
+    const setShowCriticalPath = (value: unknown) => {
+      showCriticalPath.value = value === true;
+      try {
+        localStorage.setItem(LS_TRACE_CRITICAL_PATH_KEY, String(showCriticalPath.value));
+      } catch {
+        // Storage unavailable — the toggle still applies for this session.
+      }
+    };
+
+    const setTraceGraphView = (value: boolean | AcceptableValue | AcceptableValue[]) => {
+      traceGraphView.value = value === "graph" ? "graph" : "tree";
+      try {
+        localStorage.setItem(LS_TRACE_GRAPH_VIEW_KEY, traceGraphView.value);
+      } catch {
+        // Storage unavailable — the view still applies for this session.
+      }
+      setupTooltips();
+    };
+
     const updateActiveTab = (value: boolean | AcceptableValue | AcceptableValue[]) => {
       const tab = String(value);
       activeTab.value = tab;
@@ -1934,11 +2078,15 @@ export default defineComponent({
         clearTimeout(pendingTooltipSetup);
         pendingTooltipSetup = null;
       }
+      // Graph View draws ECharts' own tooltips; the custom tree tooltip would overlay them.
+      if (traceGraphView.value !== "tree") return;
 
       await nextTick();
       // 300ms delay matches Service Graph tooltip setup timing
       pendingTooltipSetup = setTimeout(() => {
         pendingTooltipSetup = null;
+        // The view or tab may have changed during the delay.
+        if (traceGraphView.value !== "tree" || activeTab.value !== "map") return;
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
@@ -2239,6 +2387,7 @@ export default defineComponent({
         updateSelectedTrace(data.trace_id, spanList.value);
         updateServiceColors();
         buildTracesTree();
+        analytics.track("trace_details_loaded", { mode: props.mode });
       } catch (error) {
         console.error("Error fetching trace details:", error);
         showTraceDetailsError();
@@ -2397,6 +2546,8 @@ export default defineComponent({
       traceTree.value[0].lowestStartTime = convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
       traceTree.value[0].style.color = getOrSetServiceColor(traceTree.value[0].resolvedIdentity);
+
+      assignCriticalSections(Object.values(formattedSpanMap));
 
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
@@ -2610,6 +2761,18 @@ export default defineComponent({
       };
     };
 
+    const assignCriticalSections = (spans: any[]) => {
+      const sectionsBySpan = new Map<string, CriticalPathSection[]>();
+      computeCriticalPathForRoots(traceTree.value.map(toCriticalPathNode)).forEach((section) => {
+        const sections = sectionsBySpan.get(section.spanId) ?? [];
+        sections.push(section);
+        sectionsBySpan.set(section.spanId, sections);
+      });
+      spans.forEach((span) => {
+        span.criticalSections = sectionsBySpan.get(span.spanId) ?? [];
+      });
+    };
+
     const convertTime = (time: number) => {
       return Number((time / 1000).toFixed(2));
     };
@@ -2796,9 +2959,19 @@ export default defineComponent({
       });
     };
 
-    const handleTreeViewCorrelatedLogs = (span: any) => {
+    const handleTreeViewCorrelatedLogs = async (span: any) => {
       const spanId = span.spanId || span.span_id;
       updateSelectedSpan(spanId);
+
+      // Let the sidebar switch spans and run its own View Logs, which waits for the span's correlation.
+      await nextTick();
+      const sidebar = treeSidebarRef.value;
+      if (sidebar?.viewSpanLogs) {
+        // The selection moved on before the sidebar showed this span.
+        if (selectedSpanId.value !== spanId || sidebar.span?.span_id !== spanId) return;
+        await sidebar.viewSpanLogs();
+        return;
+      }
 
       const correlationData = searchObj.data.traceDetails.correlationProps;
       if (correlationData?.logStreams?.length) {
@@ -3014,6 +3187,11 @@ export default defineComponent({
       router,
       t,
       raw,
+      showCriticalPath,
+      setShowCriticalPath,
+      traceGraphView,
+      setTraceGraphView,
+      traceGraphSearch,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.
@@ -3048,6 +3226,7 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
+      treeSidebarRef,
       activeVisual,
       traceVisuals,
       getImageURL,
