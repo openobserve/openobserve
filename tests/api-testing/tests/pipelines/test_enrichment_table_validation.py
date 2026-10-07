@@ -35,8 +35,12 @@ def _delete_table(session, base_url, name):
     )
 
 
-def _wait_for_lookup(session, base_url, vrl, events):
-    """Poll the function-test endpoint until the table backs the lookup."""
+def _poll_function_test(session, base_url, vrl, events, accept):
+    """Poll the function-test endpoint until `accept(resp)`, then return that response.
+
+    Returns the last response on timeout so the caller's assertion reports the
+    real failure rather than a timeout with no detail.
+    """
     deadline = time.time() + TABLE_READY_TIMEOUT
     last = None
     while time.time() < deadline:
@@ -45,12 +49,44 @@ def _wait_for_lookup(session, base_url, vrl, events):
             json={"function": vrl, "events": events},
             timeout=60,
         )
-        if last.status_code == 200:
-            results = last.json().get("results", [])
-            if results and all(r.get("event", {}).get("label") for r in results):
-                return last
+        if accept(last):
+            return last
         time.sleep(3)
     return last
+
+
+def _compiles(resp):
+    """The VRL compiler resolved the table name.
+
+    Its known-table list is a cached enum, so a table this test only just
+    created is not in it yet and `get_enrichment_table_record` fails to
+    *compile* with `E401 invalid enum variant` — a 400, before any row is
+    looked up. Every test that names a fresh table has to wait for this.
+    """
+    return resp.status_code == 200
+
+
+def _labels_applied(resp):
+    """The table is not just resolvable but actually backing the lookup."""
+    if not _compiles(resp):
+        return False
+    results = resp.json().get("results", [])
+    return bool(results) and all(r.get("event", {}).get("label") for r in results)
+
+
+def _wait_for_lookup(session, base_url, vrl, events):
+    """Poll until the table backs the lookup and every event carries its label."""
+    return _poll_function_test(session, base_url, vrl, events, _labels_applied)
+
+
+def _wait_for_compile(session, base_url, vrl, events):
+    """Poll only until the table name resolves.
+
+    For assertions about what a lookup does *not* produce — `_wait_for_lookup`
+    waits for a label on every event, which is the opposite of a missing-key
+    expectation and would always time out.
+    """
+    return _poll_function_test(session, base_url, vrl, events, _compiles)
 
 
 @pytest.fixture
@@ -126,10 +162,12 @@ def test_vrl_lookup_of_a_missing_key_leaves_the_event_unenriched(
         f'rec, err = get_enrichment_table_record("{enrichment_table}", '
         '{"code": to_string!(.code)})\n.label = rec.label\n.'
     )
-    resp = create_session.post(
-        f"{base_url}api/{ORG_ID}/functions/test",
-        json={"function": vrl, "events": [{"code": "no-such-code"}]},
-        timeout=60,
+    # Must wait like its sibling: the fixture is function-scoped, so this is a
+    # brand-new table and the VRL compiler's cached table list has not picked it
+    # up yet. Posting straight away raced that refresh and failed with
+    # `E401 invalid enum variant ... received: "et_validation_<uuid>"`.
+    resp = _wait_for_compile(
+        create_session, base_url, vrl, [{"code": "no-such-code"}]
     )
 
     assert resp.status_code == 200, f"function test failed: {resp.text}"
