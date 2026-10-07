@@ -52,7 +52,7 @@
             style="width: 6.25rem"
           />
         </div>
-        <div class="function-stream-select-input w-75">
+        <div class="function-stream-select-input max-w-100 min-w-50 flex-1">
           <div class="text-text-label text-xs">
             {{ t("alerts.stream_name") + " *" }}
           </div>
@@ -72,29 +72,29 @@
             {{ t("common.duration") + " *" }}
           </div>
 
-          <DateTime
-            :label="t('alerts.startTime')"
-            auto-apply
-            :default-type="dateTime.type"
-            :default-absolute-time="{
-              startTime: dateTime.startTime,
-              endTime: dateTime.endTime,
-            }"
-            :default-relative-time="dateTime.relativeTimePeriod"
-            data-test="logs-search-bar-date-time-dropdown"
-            @on:date-change="updateDateTime"
-          />
-        </div>
-        <div class="self-end">
-          <OButton
-            data-test="test-function-run-query-btn"
-            variant="primary"
-            size="sm-action"
-            :disabled="!selectedStream.name || !inputQuery || loading.events"
-            @click="getResults"
-          >
-            {{ t("search.runQuery") }}
-          </OButton>
+          <div class="flex items-center gap-3">
+            <DateTime
+              :label="t('alerts.startTime')"
+              auto-apply
+              :default-type="dateTime.type"
+              :default-absolute-time="{
+                startTime: dateTime.startTime,
+                endTime: dateTime.endTime,
+              }"
+              :default-relative-time="dateTime.relativeTimePeriod"
+              data-test="logs-search-bar-date-time-dropdown"
+              @on:date-change="updateDateTime"
+            />
+            <OButton
+              data-test="test-function-run-query-btn"
+              variant="primary"
+              size="sm-action"
+              :disabled="!selectedStream.name || !inputQuery || loading.events"
+              @click="getResults"
+            >
+              {{ t("search.runQuery") }}
+            </OButton>
+          </div>
         </div>
 
         <div class="text-text-label mt-1 w-full text-xs">
