@@ -867,7 +867,7 @@ watch(
         @variablesManagerReady="onVariablesManagerReady"
       >
         <template #before_panels>
-          <div class="flex flex-col gap-2 pb-2">
+          <div class="flex flex-col gap-2 pt-2">
             <!-- One banner per outage: a stack of near-identical warnings buries the panels it qualifies. -->
             <OBanner
               v-if="staleDurations.length > 0"
