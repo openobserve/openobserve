@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod otlp_json_compat;
+pub mod query;
+mod validation;
+
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use axum::{http, response::Response as HttpResponse};
@@ -54,13 +58,10 @@ use crate::{
     },
 };
 
-mod otlp_json_compat;
-pub mod query;
-
-/// Transport-neutral failure from profile ingestion. HTTP and gRPC map this
-/// separately so a gate/circuit-breaker reject is not acknowledged as success.
+/// Ingestion failures retain their meaning across HTTP and gRPC.
 #[derive(Debug)]
 pub enum ProfilesExportError {
+    InvalidArgument(String),
     TrialPeriodExpired(String),
     Unavailable(String),
     Internal(anyhow::Error),
@@ -69,7 +70,9 @@ pub enum ProfilesExportError {
 impl std::fmt::Display for ProfilesExportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => write!(f, "{msg}"),
+            Self::InvalidArgument(msg) | Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => {
+                write!(f, "{msg}")
+            }
             Self::Internal(err) => write!(f, "{err}"),
         }
     }
@@ -126,6 +129,7 @@ fn map_otlp_handler_error(
         "[PROFILES:OTLP] Error while handling {kind} request: org_id: {org_id}, error: {err}"
     );
     let (status, rpc_code, msg) = match err {
+        ProfilesExportError::InvalidArgument(msg) => (http::StatusCode::BAD_REQUEST, 3, msg),
         ProfilesExportError::TrialPeriodExpired(msg) => {
             (http::StatusCode::TOO_MANY_REQUESTS, 8, msg) // RESOURCE_EXHAUSTED
         }
@@ -279,6 +283,8 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+
+    validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
 
     let start = std::time::Instant::now();
     let started_at = now_micros();
@@ -2286,6 +2292,42 @@ mod tests {
         let resource =
             ingestion_gate_error(infra::errors::Error::ResourceError("disk full".into()));
         assert!(matches!(resource, ProfilesExportError::Unavailable(_)));
+    }
+
+    #[tokio::test]
+    async fn malformed_dictionary_returns_http_400_with_otlp_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        let message = "dictionary.stack_table[0] must be the zero value";
+        for req_type in [OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf] {
+            let response = map_otlp_handler_error(
+                "default",
+                req_type,
+                ProfilesExportError::InvalidArgument(message.into()),
+            );
+            assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+            let expected_type = if req_type == OtlpRequestType::HttpJson {
+                CONTENT_TYPE_JSON
+            } else {
+                CONTENT_TYPE_PROTO
+            };
+            assert_eq!(
+                response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+                expected_type
+            );
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            if req_type == OtlpRequestType::HttpJson {
+                let status: json::Value = json::from_slice(&body).unwrap();
+                assert_eq!(status["code"], 3);
+                assert_eq!(status["message"], message);
+            } else {
+                let status = GoogleRpcStatus::decode(body).unwrap();
+                assert_eq!(status.code, 3);
+                assert_eq!(status.message, message);
+            }
+        }
     }
 
     #[test]
