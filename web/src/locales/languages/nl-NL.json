@@ -4181,7 +4181,7 @@
     "selectFunction": "Functie selecteren",
     "appendData": "Gegevens toevoegen aan bestaande verrijkingstabel",
     "deleteAssociatedFunction": "Bijbehorende functie verwijderen",
-    "streamPipeline": "Stroompijpleidingen",
+    "streamPipeline": "Datapipelines",
     "testFunction": "Testfunctie",
     "errorDetails": "Fout",
     "jsErrorDetails": "Details van JavaScript-fouten",
@@ -7247,7 +7247,7 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
-    "allAlerts": "Alle meldingen",
+    "allAlerts": "Alle alarmen",
     "compositeAlert": "Samengesteld",
     "import": {
       "anomalyImportSuccess": "Anomaliedetectie - {index}: \"{name}\" succesvol geïmporteerd",
@@ -8794,7 +8794,7 @@
     "sectionOtherConsumers": "Ook gebruikt door"
   },
   "alert_library": {
-    "header": "Meldingenbibliotheek",
+    "header": "Alarmbibliotheek",
     "subtitle": "Samengestelde, gebruiksklare alarmen, afgestemd op de gegevens die u al binnenhaalt.",
     "contribute": "Bijdragen op GitHub",
     "searchPlaceholder": "Zoeken op naam, beschrijving of stream",

@@ -4181,7 +4181,7 @@
     "selectFunction": "Seleccione la función",
     "appendData": "Anexar datos a la tabla de enriquecimiento existente",
     "deleteAssociatedFunction": "Eliminar función asociada",
-    "streamPipeline": "Tuberías de transmisión",
+    "streamPipeline": "Pipelines de datos",
     "testFunction": "Función de prueba",
     "errorDetails": "Error",
     "jsErrorDetails": "Detalles del error de JavaScript",

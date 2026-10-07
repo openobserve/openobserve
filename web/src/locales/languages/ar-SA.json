@@ -1274,7 +1274,7 @@
   },
   "menu": {
     "upgradeToProPlan": "الترقية إلى خطة PRO",
-    "home": "المنزل",
+    "home": "الرئيسية",
     "about": "حول",
     "index": "الجداول",
     "search": "السجلات",
@@ -1311,7 +1311,7 @@
     "navigationLink": "رابط التنقل",
     "ariaCurrentPage": "{label} - الصفحة الحالية",
     "ariaWithNotifications": "{label} (إشعارات {count})",
-    "infra": "الأشعة تحت الأرض",
+    "infra": "البنية التحتية",
     "databases": "قواعد البيانات",
     "hosts": "المضيفون",
     "kubernetes": "Kubernetes",

@@ -4181,7 +4181,7 @@
     "selectFunction": "Sélectionnez une fonction",
     "appendData": "Ajouter des données à la table d'enrichissement existante",
     "deleteAssociatedFunction": "Supprimer la fonction associée",
-    "streamPipeline": "Canalisations fluviaux",
+    "streamPipeline": "Pipelines de données",
     "testFunction": "Fonction de test",
     "errorDetails": "Erreur",
     "jsErrorDetails": "Détails de l'erreur JavaScript",

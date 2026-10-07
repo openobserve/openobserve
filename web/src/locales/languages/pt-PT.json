@@ -4181,7 +4181,7 @@
     "selectFunction": "Selecione a função",
     "appendData": "Anexar dados à tabela de enriquecimento existente",
     "deleteAssociatedFunction": "Excluir função associada",
-    "streamPipeline": "Oleodutos de transmissão",
+    "streamPipeline": "Pipelines de dados",
     "testFunction": "Função de teste",
     "errorDetails": "Erro",
     "jsErrorDetails": "Detalhes do erro de JavaScript",
