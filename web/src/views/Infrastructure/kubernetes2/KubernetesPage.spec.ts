@@ -429,6 +429,26 @@ describe("KubernetesPage", () => {
       expect(objects()).toEqual({ state: "loading" });
     });
 
+    it("is loading while a Refresh reloads the filtered map's labels", async () => {
+      await mountPage({ view: "map", cluster: "alpha", filter: "app:web" });
+      expect(objects()).toEqual({ state: "ok" });
+      holdMapObjects();
+      wrapper.findComponent(MapStub).vm.$emit("refresh");
+      await flushPromises();
+      expect(objects()).toEqual({ state: "loading" });
+    });
+
+    it("stays ok while grouping by node reloads with the same object query", async () => {
+      await mountPage({ view: "map", cluster: "alpha", group: "none", filter: "app:web" });
+      expect(objects()).toEqual({ state: "ok" });
+      holdMapObjects();
+      wrapper.findComponent(MapStub).vm.$emit("update", { group: "node" });
+      await wrapper.vm.$nextTick();
+      expect(objects()).toEqual({ state: "ok" });
+      await flushPromises();
+      expect(objects()).toEqual({ state: "ok" });
+    });
+
     it("is loading when coming back to a filtered map from the Pods list", async () => {
       await mountPage({ view: "map", cluster: "alpha", filter: "app:web" });
       expect(objects()).toEqual({ state: "ok" });

@@ -546,6 +546,41 @@ describe("K8sHexMap on a phone (below md)", () => {
     expect((y[1] - 0) * scale).toBeCloseTo(0.04 * 343, 6);
   });
 
+  const renderedScale = () => {
+    const { x } = ranges();
+    return 343 / (x[1] - x[0]);
+  };
+
+  it("renders a single card at exactly 17 px per unit", async () => {
+    await mountMap(workloads(1), { group: "workload" });
+    expect(renderedScale()).toBeCloseTo(17, 9);
+  });
+
+  it("renders two 16-pod cards side by side at 17 px per unit", async () => {
+    const rows = [0, 1].flatMap((w) =>
+      Array.from({ length: 16 }, (_, i) => ({
+        ...pod(`p${w}-${i}`, "n1", 10),
+        workload: { kind: "Deployment", name: `service-${w}` },
+      })),
+    ) as PodRow[];
+    await mountMap(rows, { group: "workload" });
+    expect(renderedScale()).toBeCloseTo(17, 9);
+    const [a, b] = options().series[1].data;
+    expect(b[1]).toBe(a[1]);
+  });
+
+  it("keeps 17 px per unit for 300 workloads, scrolling inside a screen-high canvas", async () => {
+    const rows = Array.from({ length: 5000 }, (_, i) => ({
+      ...pod(`p${i}`, "n1", 10),
+      workload: { kind: "Deployment", name: `service-${i % 300}` },
+    })) as PodRow[];
+    await mountMap(rows, { group: "workload", legend: true });
+    expect(renderedScale()).toBeCloseTo(17, 9);
+    expect(root().classes()).toContain("flex-1");
+    expect(wrapper.find('[data-test="k8s2-map-canvas"]').classes()).toContain("touch-none");
+    expect(options().grid.bottom).toBe(wrapper.vm.bottomInset);
+  });
+
   it("keeps node grouping on one screen", async () => {
     await mountMap(ROWS, { group: "node" });
     expect(root().classes()).toContain("flex-1");

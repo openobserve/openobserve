@@ -195,8 +195,7 @@ const mapObjects = computed<MapObjects>(() => {
   if (!k8s.loading.value && !k8s.effectiveCluster.value) {
     return { state: "skipped", reason: "noCluster" };
   }
-  // Another view's or scope's O:pod (the Pods list's has no labels) must not read as the map's.
-  if (k8s.loading.value && !objectsCurrent()) return { state: "loading" };
+  if (k8s.objectsPending.value) return { state: "loading" };
   if (k8s.failed.value.has(name)) return { state: "failed" };
   return k8s.sql.value.has(name) ? { state: "ok" } : { state: "loading" };
 });
@@ -209,20 +208,6 @@ const loadKey = computed(() => {
 });
 
 const load = () => k8s.load();
-
-function objectsCurrent() {
-  const loaded = k8s.loadedView.value;
-  const s = state.value;
-  // Node objects are cluster-wide, so only the pod query depends on the namespace scope.
-  const sameNamespaces =
-    s.entity === "nodes" || JSON.stringify(loaded?.namespaces) === JSON.stringify(s.namespaces);
-  return (
-    loaded?.view === "map" &&
-    loaded.entity === s.entity &&
-    loaded.cluster === k8s.effectiveCluster.value &&
-    sameNamespaces
-  );
-}
 
 const onRefresh = async () => {
   await k8s.loadStreams({ force: true });

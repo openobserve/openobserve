@@ -90,6 +90,9 @@ const MAX_WIDEN_ROUNDS = 8;
 // Run sums equal a cursor position exactly, but float addition order differs.
 const EPSILON = 1e-9;
 
+// Run sums closer than this are one candidate, as in the listed path's rounding.
+const SAME_SUM = 1e-6;
+
 let last: { params: LayoutParams; layout: HexLayout } | null = null;
 
 export function hexLayout(params: LayoutParams): HexLayout {
@@ -118,25 +121,36 @@ export function shelfCandidates(widths: readonly number[]): number[] {
   return Array.from({ length: MAX_SHELF_CANDIDATES }, (_, k) => sorted[Math.round(k * step)]);
 }
 
-// The smallest run sum at or above each of 200 evenly spaced targets, in O(200 · B).
+// Up to 200 distinct run sums in O(200 · B): all of them if there are no more, else one per target.
 function sampledRunSums(widths: readonly number[]): number[] {
   const n = widths.length;
   const prefix = new Float64Array(n + 1);
   for (let k = 0; k < n; k++) prefix[k + 1] = prefix[k] + widths[k] + GAP;
-  const widest = widths.reduce((max, w) => Math.max(max, w), 0);
-  const total = prefix[n] - GAP;
-  const step = (total - widest) / (MAX_SHELF_CANDIDATES - 1);
-  return Array.from({ length: MAX_SHELF_CANDIDATES }, (_, k) => {
-    const target = widest + k * step - EPSILON;
-    let best = total;
-    for (let i = 0, j = 0; i < n; i++) {
+  const atLeast = (target: number) => {
+    let best = Infinity;
+    for (let i = 0, j = 1; i < n; i++) {
       j = Math.max(j, i + 1);
       while (j <= n && prefix[j] - prefix[i] - GAP < target) j++;
       if (j > n) break;
       best = Math.min(best, prefix[j] - prefix[i] - GAP);
     }
     return best;
-  });
+  };
+  const widest = widths.reduce((max, w) => Math.max(max, w), 0);
+  const distinct: number[] = [];
+  for (let v = atLeast(widest - EPSILON); v < Infinity; v = atLeast(v + SAME_SUM)) {
+    distinct.push(v);
+    if (distinct.length > MAX_SHELF_CANDIDATES) break;
+  }
+  if (distinct.length <= MAX_SHELF_CANDIDATES) return distinct;
+  const total = prefix[n] - GAP;
+  const step = (total - widest) / (MAX_SHELF_CANDIDATES - 1);
+  const sampled: number[] = [];
+  for (let k = 0; k < MAX_SHELF_CANDIDATES; k++) {
+    const v = atLeast(widest + k * step - EPSILON);
+    if (!sampled.length || v - sampled[sampled.length - 1] >= SAME_SUM) sampled.push(v);
+  }
+  return sampled;
 }
 
 // Strips a shared ".domain" suffix, e.g. EKS's ".ec2.internal"; never a prefix.
@@ -185,13 +199,15 @@ function isFramed(params: LayoutParams) {
   return params.group !== "none";
 }
 
-function blocksOf(params: LayoutParams, minWidth = MIN_FRAME_WIDTH): Block[] {
+function blocksOf(params: LayoutParams, minWidth = MIN_FRAME_WIDTH, maxWidth = Infinity): Block[] {
   const framed = isFramed(params);
   const pad = framed ? PAD : 0;
   const band = framed ? LABEL_BAND : 0;
   return params.groups.map((keys) => {
     const n = keys.length;
-    const cols = Math.max(1, Math.min(n, Math.ceil(Math.sqrt((n * ROW_STEP) / HEX_WIDTH))));
+    const fitCols = Math.floor((maxWidth - 2 * pad - HEX_HALF_WIDTH) / HEX_WIDTH);
+    const square = Math.ceil(Math.sqrt((n * ROW_STEP) / HEX_WIDTH));
+    const cols = Math.max(1, Math.min(n, square, fitCols));
     const rows = Math.ceil(n / cols);
     const contentWidth = cols * HEX_WIDTH + (rows > 1 ? HEX_HALF_WIDTH : 0);
     const contentHeight = (rows - 1) * ROW_STEP + 2 * HEX_HALF_HEIGHT;
@@ -258,7 +274,8 @@ function blocksWithMinPx(params: LayoutParams) {
 
 function blocksAtScale(params: LayoutParams, scale: number) {
   const pad = PAD_SHARE * params.width;
-  const blocks = blocksOf(params, Math.max(MIN_FRAME_WIDTH, (params.minFramePx ?? 0) / scale));
+  const card = Math.max(MIN_FRAME_WIDTH, (params.minFramePx ?? 0) / scale);
+  const blocks = blocksOf(params, card, card);
   pack(blocks, (params.width - 2 * pad) / scale);
   return blocks;
 }

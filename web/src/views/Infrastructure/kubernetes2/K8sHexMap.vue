@@ -120,7 +120,6 @@ const TITLE_CHARS = 18;
 
 const SAMPLE_TEXT = "abcdefghijklmnopqrstuvwxyz-0123456789";
 
-// Both header lines show at this scale.
 const TALL_SCALE = LINE_TWO_MIN_PX / LABEL_BAND;
 
 // Literal classes, so Tailwind emits them; a tall canvas takes the first that fits its content.
@@ -194,28 +193,38 @@ const layout = computed<HexLayout | null>(() =>
     : null,
 );
 
-const tallHeightClass = computed(() => {
+const tallNeededPx = computed(() => {
   const l = layout.value;
-  if (!tall.value || !l) return null;
-  const rem = remPx();
-  const needed =
-    (l.bounds.maxY - l.bounds.minY) * TALL_SCALE +
-    2 * PAD_SHARE * size.value.width +
-    bottomInset.value;
-  return (
-    TALL_HEIGHTS.find((h) => h.rem * rem >= needed)?.cls ??
-    TALL_HEIGHTS[TALL_HEIGHTS.length - 1].cls
-  );
+  if (!tall.value || !l) return 0;
+  const contentPx = (l.bounds.maxY - l.bounds.minY) * TALL_SCALE;
+  return contentPx + 2 * PAD_SHARE * size.value.width + bottomInset.value;
 });
+
+const tallHeightClass = computed(() => {
+  if (!tallNeededPx.value) return null;
+  const rem = remPx();
+  return TALL_HEIGHTS.find((h) => h.rem * rem >= tallNeededPx.value)?.cls ?? null;
+});
+
+// Past the largest height step the map scrolls inside a screen-high canvas, drawn above the overlays.
+const scrolling = computed(() => !!tallNeededPx.value && !tallHeightClass.value);
+
+const plot = computed(() => ({
+  width: size.value.width,
+  height: size.value.height - (scrolling.value ? bottomInset.value : 0),
+}));
 
 // A height step leaves slack below the content, so a tall map is top-aligned, not centred.
 const fitState = computed(() => {
   const l = layout.value;
   if (!l) return null;
-  const state = fit(l.bounds, size.value.width, size.value.height, bottomInset.value);
-  if (!tallHeightClass.value) return state;
+  if (!tall.value) return fit(l.bounds, size.value.width, size.value.height, bottomInset.value);
   const pad = PAD_SHARE * size.value.width;
-  return { ...state, cy: l.bounds.maxY + (pad - size.value.height / 2) / state.scale };
+  return {
+    scale: TALL_SCALE,
+    cx: l.bounds.minX + (plot.value.width / 2 - pad) / TALL_SCALE,
+    cy: l.bounds.maxY + (pad - plot.value.height / 2) / TALL_SCALE,
+  };
 });
 
 const hexData = computed(() => {
@@ -396,7 +405,7 @@ function headerTexts(
 }
 
 function buildOptions() {
-  const { width, height } = size.value;
+  const { width, height } = plot.value;
   const state = view.value;
   if (!state || !width || !height) return {};
   const palette = CLASSES.map((c) => chartColor(CLASS_TOKEN[c]));
@@ -422,7 +431,7 @@ function buildOptions() {
   const range = axisRanges(state, width, height);
   return {
     animation: false,
-    grid: { left: 0, right: 0, top: 0, bottom: 0, containLabel: false },
+    grid: { left: 0, right: 0, top: 0, bottom: size.value.height - height, containLabel: false },
     xAxis: { type: "value", show: false, min: range.x[0], max: range.x[1] },
     yAxis: { type: "value", show: false, min: range.y[0], max: range.y[1] },
     tooltip: {
@@ -522,11 +531,11 @@ function local(e: { clientX: number; clientY: number }) {
 function zoomBy(px: number, py: number, factor: number) {
   const fitScale = fitState.value?.scale;
   if (!view.value || !fitScale) return;
-  view.value = zoomAt(view.value, px, py, factor, { ...size.value, fit: fitScale });
+  view.value = zoomAt(view.value, px, py, factor, { ...plot.value, fit: fitScale });
 }
 
 function zoomStep(factor: number) {
-  zoomBy(size.value.width / 2, size.value.height / 2, factor);
+  zoomBy(plot.value.width / 2, plot.value.height / 2, factor);
 }
 
 function onWheel(e: WheelEvent) {
@@ -552,7 +561,7 @@ function onPointerMove(e: PointerEvent) {
     const to = [...pointers.values()].slice(0, 2);
     dragging = true;
     const fitScale = fitState.value?.scale;
-    if (fitScale) view.value = pinch(view.value, from, to, { ...size.value, fit: fitScale });
+    if (fitScale) view.value = pinch(view.value, from, to, { ...plot.value, fit: fitScale });
     return;
   }
   pointers.set(e.pointerId, next);

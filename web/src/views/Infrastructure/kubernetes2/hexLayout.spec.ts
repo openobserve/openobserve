@@ -221,10 +221,24 @@ describe("hexLayout fills the canvas (AC 82)", () => {
       if (sum >= widest) smallest = Math.min(smallest, sum);
     }
     const picked = shelfCandidates(widths);
-    expect(picked).toHaveLength(200);
+    expect(picked.length).toBeLessThanOrEqual(200);
+    expect(picked.length).toBeGreaterThan(150);
     expect(picked[0]).toBeCloseTo(smallest, 9);
-    expect(picked[199]).toBeCloseTo(total, 6);
-    for (let k = 1; k < 200; k++) expect(picked[k]).toBeGreaterThanOrEqual(picked[k - 1]);
+    expect(picked[picked.length - 1]).toBeCloseTo(total, 6);
+    for (let k = 1; k < picked.length; k++) expect(picked[k]).toBeGreaterThan(picked[k - 1]);
+  });
+
+  it("returns each distinct run sum once, all of them when there are at most 200", () => {
+    const widths = Array.from({ length: 65 }, () => 8);
+    const picked = shelfCandidates(widths);
+    expect(picked).toHaveLength(65);
+    expect(new Set(picked).size).toBe(65);
+    const p = params(
+      Array.from({ length: 65 }, () => 1),
+      { width: 920, height: 470, bottomInset: INSET },
+    );
+    const { best } = bruteForce(p);
+    expect(fit(hexLayout(p).bounds, 920, 470, INSET).scale).toBeCloseTo(best, 9);
   });
 
   it("samples exactly 200 run sums, keeping the smallest and largest", () => {
@@ -291,6 +305,17 @@ describe("hexLayout minimum card width in pixels", () => {
 });
 
 describe("hexLayout at a fixed scale (narrow canvas)", () => {
+  it("narrows a card's columns so two 16-pod cards share a row", () => {
+    const width = 343;
+    const half = (width * (1 - 0.08) - 17) / 2;
+    const layout = hexLayout(
+      params([16, 16], { group: "workload", width, height: 400, fixedScale: 17, minFramePx: half }),
+    );
+    const [a, b] = layout.frames;
+    expect(b.top).toBe(a.top);
+    expect(layout.bounds.maxX * 17).toBeLessThanOrEqual(width * (1 - 0.08) + 1e-6);
+  });
+
   it("packs at the given scale, two cards per row, each at least the requested pixels", () => {
     const sizes = Array.from({ length: 27 }, (_, i) => (i < 5 ? 3 : 1));
     const layout = hexLayout(

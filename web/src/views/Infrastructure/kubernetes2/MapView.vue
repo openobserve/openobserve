@@ -189,7 +189,6 @@ const labelsHeader = computed(() => {
     : t("infra.k8s2.mapLabelsHeaderNodes", params);
 });
 
-// One disabled row says why labels cannot be offered; null once they can.
 const labelsState = computed<I18nText | null>(() => {
   const o = props.objects;
   if (o.state !== "ok") return t(NOT_OK_TEXT[o.reason ?? o.state]);

@@ -39,7 +39,6 @@ import {
   queryText,
   type ClusterMatchers,
   type DetailKind,
-  type MapEntity,
   type QueryId,
   type View,
 } from "./kubernetesQueries";
@@ -146,10 +145,10 @@ export function useKubernetesInventory(
     end: number;
     details: DetailsRef | null;
     viewKey: string;
-    view: View;
-    entity: MapEntity;
-    namespaces: string[];
   } | null>(null);
+  // What each load's object query depends on: a refresh, a new time or another scope changes it.
+  const pendingObjects = ref<string | null>(null);
+  const loadedObjects = ref<string | null>(null);
 
   // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
   let generation = 0;
@@ -419,6 +418,15 @@ export function useKubernetesInventory(
       await queryClient.invalidateQueries({ queryKey: k8sKeys.all(org), refetchType: "none" });
       refreshNonce.value++;
     }
+    const objectsKey = JSON.stringify([
+      s.view,
+      s.entity,
+      effectiveCluster.value,
+      s.entity === "pods" ? s.namespaces : [],
+      t.end,
+      refreshNonce.value,
+    ]);
+    pendingObjects.value = objectsKey;
     const cl = await settle(
       org,
       t,
@@ -457,6 +465,7 @@ export function useKubernetesInventory(
       return;
     }
     commit(main, cluster, t, s);
+    loadedObjects.value = objectsKey;
     const detail = s.details;
     if (detail) {
       const row = findRow(
@@ -504,9 +513,6 @@ export function useKubernetesInventory(
       end: t.end,
       details: s.details,
       viewKey: viewKeyOf(s),
-      view: s.view,
-      entity: s.entity,
-      namespaces: s.namespaces,
     };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
@@ -566,13 +572,9 @@ export function useKubernetesInventory(
     return hits && detailCurrent.value ? parseEvents(hits) : null;
   });
 
-  // The view, entity and scope the loaded object queries were sent for.
-  const loadedView = computed(() => {
-    const f = loadedFor.value;
-    return f
-      ? { view: f.view, entity: f.entity, cluster: f.cluster, namespaces: f.namespaces }
-      : null;
-  });
+  const objectsPending = computed(
+    () => loading.value && pendingObjects.value !== loadedObjects.value,
+  );
 
   // Rows on screen belong to another view or scope until the current one commits.
   const viewStale = computed(() => loadedFor.value?.viewKey !== viewKeyOf(state()));
@@ -673,7 +675,7 @@ export function useKubernetesInventory(
     detailEventsFailed,
     detailObserved,
     viewStale,
-    loadedView,
+    objectsPending,
     namespaceOptions,
     banners,
     has,
