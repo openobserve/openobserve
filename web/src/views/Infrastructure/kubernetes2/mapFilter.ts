@@ -20,7 +20,7 @@ import type { MapRow } from "./mapFill";
 
 export interface MapObjects {
   state: "loading" | "skipped" | "failed" | "ok";
-  reason?: "noStream" | "unscoped" | "anchor";
+  reason?: "noStream" | "unscoped" | "anchor" | "noCluster";
 }
 
 export interface LabelKeyStats {

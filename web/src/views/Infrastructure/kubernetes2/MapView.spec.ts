@@ -881,12 +881,15 @@ describe("MapView review fixes", () => {
     ).toEqual(["1.5", "2.5"]);
   });
 
-  it("says no labels were seen when every observed key is noise or empty", async () => {
+  it("says only system labels were seen when every observed key is noise or empty", async () => {
     const inv = labelledInventory();
     inv.pods.forEach((p) => (p.object = observed({ "pod-template-hash": "abc", tier: "" })));
     await mountView(mapState(), inv);
     expect(filterOptions()).toEqual([
-      expect.objectContaining({ label: "No pod labels seen in the last 24 hours", disabled: true }),
+      expect.objectContaining({
+        label: "Only system labels seen, nothing to filter on",
+        disabled: true,
+      }),
     ]);
   });
 

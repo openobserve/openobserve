@@ -453,10 +453,14 @@ export const queryText = (id: QueryId, matchers: ClusterMatchers | null = null) 
   return QUERIES[id](familyOf(id) === "kubeletstats" ? matchers.kubelet : matchers.ksm);
 };
 
+// The only grouping that changes what the map fetches: pods grouped by node also need N1.
+export const groupsPodsByNode = (entity: MapEntity, group: MapGroup) =>
+  entity === "pods" && group === "node";
+
 export const mapQueries = (entity: MapEntity, group: MapGroup): QueryId[] =>
   entity === "nodes"
     ? ["N1", "N2", "K3", "K4"]
-    : group === "node"
+    : groupsPodsByNode(entity, group)
       ? [...MAP_POD_SET, "N1"]
       : [...MAP_POD_SET];
 

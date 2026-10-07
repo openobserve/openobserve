@@ -168,7 +168,6 @@ let suppressClick = false;
 
 const rows = computed(() => markRaw(props.groups.flatMap((g) => g.rows)));
 
-// Below md, titled groupings grow the canvas downwards instead of squeezing every card into one screen.
 const tall = computed(
   () =>
     isMobile.value &&
@@ -209,7 +208,7 @@ const tallHeightClass = computed(() => {
   );
 });
 
-// A tall canvas is a whole step high, so its map starts at the top rather than mid-slack.
+// A height step leaves slack below the content, so a tall map is top-aligned, not centred.
 const fitState = computed(() => {
   const l = layout.value;
   if (!l) return null;
@@ -302,8 +301,6 @@ function requestRender() {
   });
 }
 
-// Workload names are long and line 1 must always show one, so these cards get ~18 average chars.
-// Two cards and the one-unit gap between them fill the canvas width at TALL_SCALE.
 function twoColumnCardPx() {
   return (size.value.width * (1 - 2 * PAD_SHARE) - TALL_SCALE) / 2;
 }
@@ -312,6 +309,7 @@ function remPx() {
   return parseFloat(getComputedStyle(document.documentElement).fontSize) || DEFAULT_REM_PX;
 }
 
+// Line 1 must always show a workload name, so its card fits ~18 average title characters.
 function workloadCardPx() {
   const perChar = textWidth(SAMPLE_TEXT, TITLE_FONT) / SAMPLE_TEXT.length;
   return TITLE_CHARS * perChar + textWidth("99", COUNT_FONT) + 3 * HEADER_PAD_PX;

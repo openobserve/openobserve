@@ -125,6 +125,7 @@ const NOT_OK_TEXT: Record<string, I18nKey> = {
   noStream: "infra.k8s2.mapLabelsNoStream",
   unscoped: "infra.k8s2.mapLabelsUnscoped",
   anchor: "infra.k8s2.mapLabelsNoData",
+  noCluster: "infra.k8s2.mapLabelsNoCluster",
   loading: "infra.k8s2.mapLabelsLoading",
   failed: "infra.k8s2.mapLabelsFailed",
 };
@@ -193,6 +194,7 @@ const labelsState = computed<I18nText | null>(() => {
   const o = props.objects;
   if (o.state !== "ok") return t(NOT_OK_TEXT[o.reason ?? o.state]);
   if (index.value.keys.length > 0) return null;
+  if (index.value.observed > 0) return t("infra.k8s2.mapLabelsOnlySystem");
   return isPods.value
     ? t("infra.k8s2.mapLabelsNoneSeenPods")
     : t("infra.k8s2.mapLabelsNoneSeenNodes");

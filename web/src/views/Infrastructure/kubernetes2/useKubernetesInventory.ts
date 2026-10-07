@@ -34,6 +34,7 @@ import {
   detailQueries,
   escapeLabel,
   familyOf,
+  groupsPodsByNode,
   mapQueries,
   queryText,
   type ClusterMatchers,
@@ -147,6 +148,7 @@ export function useKubernetesInventory(
     viewKey: string;
     view: View;
     entity: MapEntity;
+    namespaces: string[];
   } | null>(null);
 
   // metrics_query and search take no AbortSignal, so superseded responses are dropped by generation.
@@ -504,6 +506,7 @@ export function useKubernetesInventory(
       viewKey: viewKeyOf(s),
       view: s.view,
       entity: s.entity,
+      namespaces: s.namespaces,
     };
     lastUpdatedAt.value = main.updatedAt;
     loading.value = false;
@@ -563,10 +566,13 @@ export function useKubernetesInventory(
     return hits && detailCurrent.value ? parseEvents(hits) : null;
   });
 
-  // Unlike viewStale, a group change keeps this: it says only which view and entity the data is for.
-  const loadedView = computed(() =>
-    loadedFor.value ? { view: loadedFor.value.view, entity: loadedFor.value.entity } : null,
-  );
+  // The view, entity and scope the loaded object queries were sent for.
+  const loadedView = computed(() => {
+    const f = loadedFor.value;
+    return f
+      ? { view: f.view, entity: f.entity, cluster: f.cluster, namespaces: f.namespaces }
+      : null;
+  });
 
   // Rows on screen belong to another view or scope until the current one commits.
   const viewStale = computed(() => loadedFor.value?.viewKey !== viewKeyOf(state()));
@@ -679,7 +685,8 @@ export function useKubernetesInventory(
 }
 
 function viewKeyOf(s: K8sUrlState) {
-  return JSON.stringify([s.view, s.cluster, s.namespaces, s.entity, s.group]);
+  const byNode = s.view === "map" && groupsPodsByNode(s.entity, s.group);
+  return JSON.stringify([s.view, s.cluster, s.namespaces, s.entity, byNode]);
 }
 
 function dedupe(requests: SqlRequest[]): SqlRequest[] {

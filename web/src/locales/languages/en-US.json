@@ -18686,7 +18686,9 @@
       "mapAriaPodsByLabel": "Map of {count} pod grouped by label {key}, filled by {fill} | Map of {count} pods grouped by label {key}, filled by {fill}",
       "mapAriaNodesByLabel": "Map of {count} node grouped by label {key}, filled by {fill} | Map of {count} nodes grouped by label {key}, filled by {fill}",
       "mapLegendOf": "Legend: {fill}",
-      "mapMoreUseSearch": "{count} more: use search"
+      "mapMoreUseSearch": "{count} more: use search",
+      "mapLabelsNoCluster": "Labels unavailable: no cluster found",
+      "mapLabelsOnlySystem": "Only system labels seen, nothing to filter on"
     }
   },
   "dbm": {

@@ -324,6 +324,32 @@ describe("KubernetesPage", () => {
     });
   });
 
+  describe("map grouping and requests", () => {
+    const sent = () => [metricsQuery.mock.calls.length, search.mock.calls.length];
+    const sentIds = () => metricsQuery.mock.calls.map(([args]: any[]) => idOf(args.query));
+
+    it("sends nothing on a group change that reuses loaded rows, even with a cold cache", async () => {
+      await mountPage({ view: "map", cluster: "alpha", group: "none" });
+      queryClient.clear();
+      const before = sent();
+      for (const group of ["label.app", "namespace", "workload", "none"]) {
+        wrapper.findComponent(MapStub).vm.$emit("update", { group });
+        await flushPromises();
+        expect(query().group).toBe(group);
+      }
+      expect(sent()).toEqual(before);
+    });
+
+    it("adds only N1 when grouping pods by node", async () => {
+      await mountPage({ view: "map", cluster: "alpha", group: "none" });
+      const [metrics, sql] = sent();
+      wrapper.findComponent(MapStub).vm.$emit("update", { group: "node" });
+      await flushPromises();
+      expect(sentIds().slice(metrics)).toEqual(["N1"]);
+      expect(search.mock.calls.length).toBe(sql);
+    });
+  });
+
   describe("map label objects (AC 81)", () => {
     const POD_OBJECTS = "k8s_resource_name = 'pods'";
     const objects = () => wrapper.findComponent(MapStub).props("objects");
@@ -375,6 +401,30 @@ describe("KubernetesPage", () => {
       await mountPage({ view: "pods", cluster: "alpha" });
       holdMapObjects();
       await router.push({ query: { view: "map", cluster: "alpha" } });
+      await flushPromises();
+      expect(objects()).toEqual({ state: "loading" });
+    });
+
+    it("is skipped, not loading forever, when no cluster can be resolved", async () => {
+      fixture = {};
+      await mountPage({ view: "map", filter: "app:web" });
+      expect(objects()).toEqual({ state: "skipped", reason: "noCluster" });
+    });
+
+    it("is loading, not ok, while the map reloads for another cluster", async () => {
+      await mountPage({ view: "map", cluster: "alpha" });
+      expect(objects()).toEqual({ state: "ok" });
+      holdMapObjects();
+      wrapper.findComponent(MapStub).vm.$emit("update", { cluster: "beta" });
+      await flushPromises();
+      expect(objects()).toEqual({ state: "loading" });
+    });
+
+    it("is loading, not ok, while the map reloads for a wider namespace scope", async () => {
+      await mountPage({ view: "map", cluster: "alpha", namespace: "a" });
+      expect(objects()).toEqual({ state: "ok" });
+      holdMapObjects();
+      wrapper.findComponent(MapStub).vm.$emit("update", { namespaces: [] });
       await flushPromises();
       expect(objects()).toEqual({ state: "loading" });
     });
