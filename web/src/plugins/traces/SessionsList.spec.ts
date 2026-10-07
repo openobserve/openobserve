@@ -707,10 +707,13 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     config.isCloud = "false";
   });
 
-  it("hides the Stream/Agent toggle — Agent mode needs the enterprise-only agent-mapping API", async () => {
+  it("locks the Agent item in the Stream/Agent toggle instead of hiding it — Agent mode needs the enterprise-only agent-mapping API", async () => {
     config.isEnterprise = "false";
     const wrapper = await mountComponent();
-    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
+    const agentItem = wrapper.find("[data-test='sessions-list-filter-mode-agent']");
+    expect(agentItem.exists()).toBe(true);
+    expect((agentItem.element as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("forces Stream mode even when the URL asks for Agent mode", async () => {
@@ -718,7 +721,8 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     mockRouteQuery = { type: "agent" };
     const wrapper = await mountComponent();
     await flushPromises();
-    // With no toggle, the stream selector is always visible.
+    // The toggle itself is visible (locked), but filterMode is still pinned
+    // to stream — the stream selector stays up regardless.
     expect(wrapper.find("[data-test='sessions-list-stream-selector']").exists()).toBe(true);
     expect(wrapper.findComponent(AgentScopeCascade).exists()).toBe(false);
   });
