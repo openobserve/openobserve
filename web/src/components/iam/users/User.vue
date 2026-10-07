@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-actions="{ row }">
             <OButton
-              v-if="row.enableDelete && row.status != 'pending'"
+              v-if="row.enableDelete && row.status != 'pending' && !row.isDomainMapped"
               :title="t('user.delete')"
               variant="ghost"
               size="icon-sm"
@@ -183,6 +183,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="confirmDeleteAction(row)"
             >
               <OIcon name="delete" size="sm" />
+            </OButton>
+            <OButton
+              v-if="row.enableDelete && row.status != 'pending' && row.isDomainMapped"
+              :title="t('user.block')"
+              variant="ghost"
+              size="icon-sm"
+              class="max-md:hidden"
+              :data-test="`block-basic-user-${row.email}`"
+              data-row-action="delete"
+              @click="confirmBlockAction(row)"
+            >
+              <OIcon name="block" size="sm" />
             </OButton>
             <OButton
               v-if="row.status == 'pending' && row.token"
@@ -228,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <ODropdownItem
-                v-if="row.enableDelete && row.status != 'pending'"
+                v-if="row.enableDelete && row.status != 'pending' && !row.isDomainMapped"
                 icon-left="delete"
                 variant="destructive"
                 class="md:hidden"
@@ -236,6 +248,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="confirmDeleteAction(row)"
               >
                 <span>{{ t("user.delete") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.enableDelete && row.status != 'pending' && row.isDomainMapped"
+                icon-left="block"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`block-basic-user-${row.email}-menu`"
+                @select="confirmBlockAction(row)"
+              >
+                <span>{{ t("user.block") }}</span>
               </ODropdownItem>
               <ODropdownItem
                 v-if="row.status == 'pending' && row.token"
@@ -313,6 +335,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <ODialog
+      data-test="user-block-dialog"
+      v-model:open="confirmBlock"
+      size="sm"
+      :title="t('user.confirmBlockHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.block')"
+      @click:secondary="confirmBlock = false"
+      @click:primary="blockUser"
+    >
+      <p>{{ t("user.confirmBlockMsg", { email: blockUserEmail }) }}</p>
+    </ODialog>
+
+    <ODialog
       data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
@@ -336,6 +371,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="bulkDeleteUsers"
     >
       <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
+      <p v-if="bulkBlockCount > 0" class="mt-2">
+        {{ t("user.deleteUsersBlockNote", { count: bulkBlockCount }) }}
+      </p>
     </ODialog>
   </OPageLayout>
 </template>
@@ -344,7 +382,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { orgUsersQuery, assignableRolesQuery, allUserRolesQuery } from "@/services/users.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { userKeys } from "@/services/users.querykeys";
+import {
+  orgDomainsQuery,
+  orgSettingsQuery,
+  updateOrgSettingsMutation,
+} from "@/services/organizations.queries";
+import { blockEmailsInConfig } from "@/components/settings/orgDomainRestrictions";
 import { queryClient } from "@/composables/query/queryClient";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -411,6 +456,12 @@ export default defineComponent({
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmRevoke = ref<boolean>(false);
+    const confirmBlock = ref<boolean>(false);
+    const blockUserEmail = ref("");
+    const verifiedDomains = ref<Set<string>>(new Set());
+    const updateSettings = useMutation(() =>
+      updateOrgSettingsMutation(store.state.selectedOrganization.identifier),
+    );
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
@@ -442,7 +493,7 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
-      await getOrgMembers();
+      await Promise.all([getOrgMembers(), getVerifiedDomains()]);
       updateUserActions();
       await getRoles();
       await getCustomRoles();
@@ -1020,6 +1071,7 @@ export default defineComponent({
         member.enableEdit = shouldAllowEdit(member);
         member.enableChangeRole = shouldAllowChangeRole(member);
         member.enableDelete = shouldAllowDelete(member);
+        member.isDomainMapped = isDomainMapped(member);
       });
     };
 
@@ -1329,6 +1381,70 @@ export default defineComponent({
         });
     };
 
+    // Only verified domains auto-add users on SSO login, so only those users would come back after a plain delete.
+    const getVerifiedDomains = async () => {
+      if (config.isCloud !== "true") return;
+      try {
+        const domains = await queryClient.fetchQuery(
+          orgDomainsQuery(store.state.selectedOrganization.identifier),
+        );
+        verifiedDomains.value = new Set(
+          domains.filter((d) => d.verification_state === 1).map((d) => d.domain.toLowerCase()),
+        );
+      } catch {
+        verifiedDomains.value = new Set();
+      }
+    };
+
+    const isDomainMapped = (user: any) => {
+      if (config.isCloud !== "true") return false;
+      const domain = String(user.email ?? "")
+        .toLowerCase()
+        .split("@")[1];
+      return !!domain && verifiedDomains.value.has(domain);
+    };
+
+    const confirmBlockAction = (row: any) => {
+      confirmBlock.value = true;
+      blockUserEmail.value = row.email;
+    };
+
+    const writeBlocks = async (org: string, emails: string[]) => {
+      try {
+        // Fetch fresh so the write is not based on a stale cached config.
+        const settings = await queryClient.fetchQuery({ ...orgSettingsQuery(org), staleTime: 0 });
+        await updateSettings.mutateAsync({
+          domain_management_config: blockEmailsInConfig(
+            settings?.data?.domain_management_config,
+            emails,
+          ),
+        });
+        return true;
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message:
+            raw(err?.response?.data?.message || err?.message) || t("iam.user.errorBlockingUser"),
+        });
+        return false;
+      }
+    };
+
+    // The user is removed from this org only; the next SSO login evaluates the block and removes them from mapped child orgs.
+    const blockUser = async () => {
+      confirmBlock.value = false;
+      const org = store.state.selectedOrganization.identifier;
+      if (!(await writeBlocks(org, [blockUserEmail.value]))) return;
+      try {
+        await usersService.delete(org, blockUserEmail.value);
+        toast({ variant: "success", message: t("iam.user.userBlockedSuccess") });
+      } catch {
+        toast({ variant: "error", message: t("iam.user.blockedButNotRemoved") });
+      }
+      await getOrgMembers(true);
+      updateUserActions();
+    };
+
     const confirmRevokeAction = (row: any) => {
       confirmRevoke.value = true;
       revokeInviteToken = row.token;
@@ -1413,52 +1529,82 @@ export default defineComponent({
       confirmBulkDelete.value = true;
     };
 
-    const bulkDeleteUsers = async () => {
-      bulkDeleteLoading.value = true;
-      const userEmails = selectedUsers.value.map((user: any) => user.email);
-
+    const bulkRemove = async (org: string, emails: string[], blocked: boolean) => {
       try {
-        const res = await usersService.bulkDelete(store.state.selectedOrganization.identifier, {
-          ids: userEmails,
-        });
+        const res = await usersService.bulkDelete(org, { ids: emails });
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: t("iam.user.deletedUsersSuccess", { count: successful.length }),
+            message: blocked
+              ? t("iam.user.blockedUsersSuccess", { count: successful.length })
+              : t("iam.user.deletedUsersSuccess", { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
+          const counts = { count: successful.length, failed: unsuccessful.length };
           toast({
-            message: t("iam.user.deletedUsersPartial", {
-              count: successful.length,
-              failed: unsuccessful.length,
-            }),
+            message: blocked
+              ? t("iam.user.blockedUsersPartial", counts)
+              : t("iam.user.deletedUsersPartial", counts),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: t("iam.user.failedToDeleteUsers", { count: unsuccessful.length }),
+            message: blocked
+              ? t("iam.user.blockedUsersNotRemoved", { count: unsuccessful.length })
+              : t("iam.user.failedToDeleteUsers", { count: unsuccessful.length }),
             variant: "error",
           });
         }
+      } catch (err: any) {
+        if (err.response?.status != 403 || err?.status != 403) {
+          toast({
+            message: blocked
+              ? t("iam.user.blockedUsersNotRemoved", { count: emails.length })
+              : err.response?.data?.message || err?.message || t("iam.user.errorDeletingUsers"),
+            variant: "error",
+          });
+        }
+      }
+    };
 
+    const bulkBlock = async (org: string, emails: string[]) => {
+      if (await writeBlocks(org, emails)) await bulkRemove(org, emails, true);
+    };
+
+    const bulkDeleteUsers = async () => {
+      bulkDeleteLoading.value = true;
+      const org = store.state.selectedOrganization.identifier;
+      const blockable = selectedUsers.value.filter((u: any) => u.isDomainMapped);
+      const deletable = selectedUsers.value.filter((u: any) => !u.isDomainMapped);
+
+      try {
+        await Promise.all([
+          deletable.length > 0 &&
+            bulkRemove(
+              org,
+              deletable.map((u: any) => u.email),
+              false,
+            ),
+          blockable.length > 0 &&
+            bulkBlock(
+              org,
+              blockable.map((u: any) => u.email),
+            ),
+        ]);
         selectedUsers.value = [];
         confirmBulkDelete.value = false;
         await getOrgMembers(true);
         updateUserActions();
-      } catch (err: any) {
-        if (err.response?.status != 403 || err?.status != 403) {
-          toast({
-            message:
-              err.response?.data?.message || err?.message || t("iam.user.errorDeletingUsers"),
-            variant: "error",
-          });
-        }
       } finally {
         bulkDeleteLoading.value = false;
       }
     };
+
+    const bulkBlockCount = computed(
+      () => selectedUsers.value.filter((u: any) => u.isDomainMapped).length,
+    );
 
     const updateUserRole = (row: any) => {
       const dismiss = toast({
@@ -1564,6 +1710,10 @@ export default defineComponent({
       confirmDelete,
       deleteUser,
       confirmDeleteAction,
+      confirmBlock,
+      blockUser,
+      blockUserEmail,
+      confirmBlockAction,
       confirmRevoke,
       revokeInvite,
       revokeInviteEmail,
@@ -1617,6 +1767,7 @@ export default defineComponent({
       bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteUsers,
+      bulkBlockCount,
       rows,
       displayedRows,
       roleFilter,

@@ -1208,6 +1208,46 @@ describe("User Component", () => {
       expect(mockUsersService.bulkDelete).toHaveBeenCalled();
     });
 
+    it("deletes regular users and blocks domain-mapped users in separate calls", async () => {
+      wrapper.vm.selectedUsers = [
+        { email: "a@example.com", enableDelete: true },
+        { email: "b@acme.com", enableDelete: true, isDomainMapped: true },
+      ];
+      mockOrganizationsService.get_organization_settings.mockResolvedValue({
+        data: { data: { domain_management_config: { domains: [], blocked_emails: [] } } },
+      } as any);
+      mockOrganizationsService.post_organization_settings.mockResolvedValue({ data: {} } as any);
+      mockUsersService.bulkDelete.mockImplementation(
+        async (_org: string, { ids }: { ids: string[] }) =>
+          ({ data: { successful: ids, unsuccessful: [] } }) as any,
+      );
+
+      await wrapper.vm.bulkDeleteUsers();
+
+      const org = store.state.selectedOrganization.identifier;
+      expect(mockUsersService.bulkDelete).toHaveBeenCalledWith(org, { ids: ["a@example.com"] });
+      expect(mockUsersService.bulkDelete).toHaveBeenCalledWith(org, { ids: ["b@acme.com"] });
+      expect(mockOrganizationsService.post_organization_settings).toHaveBeenCalledWith(
+        org,
+        expect.objectContaining({
+          domain_management_config: expect.objectContaining({ blocked_emails: ["b@acme.com"] }),
+        }),
+      );
+    });
+
+    it("does not remove domain-mapped users when the block write fails", async () => {
+      wrapper.vm.selectedUsers = [
+        { email: "b@acme.com", enableDelete: true, isDomainMapped: true },
+      ];
+      mockOrganizationsService.get_organization_settings.mockRejectedValue(
+        new Error("settings down"),
+      );
+
+      await wrapper.vm.bulkDeleteUsers();
+
+      expect(mockUsersService.bulkDelete).not.toHaveBeenCalled();
+    });
+
     it("should suppress 403 errors", async () => {
       wrapper.vm.selectedUsers = [{ email: "a@example.com", enableDelete: true }];
       mockUsersService.bulkDelete.mockRejectedValue({

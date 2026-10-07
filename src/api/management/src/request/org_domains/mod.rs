@@ -45,6 +45,21 @@ pub async fn link_domain(
     };
     let domain = body.domain.trim().to_lowercase();
 
+    match org_domain_ownership::get_verified_org_for_domain(&domain).await {
+        Ok(Some(v)) => {
+            log::info!(
+                "org {org_id} tried to link domain {domain} but it is already verfied by org {v}"
+            );
+            return MetaHttpResponse::bad_request(
+                "this domain is already linked by some other org",
+            );
+        }
+        Err(e) => {
+            MetaHttpResponse::internal_error(format!("error getting org domain linking : {e}"));
+        }
+        _ => {}
+    }
+
     if org_settings
         .domain_org_mappings
         .iter()

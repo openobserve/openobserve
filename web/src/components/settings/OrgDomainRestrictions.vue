@@ -94,44 +94,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div
-            v-if="card.policy === 'allow_specific' || card.policy === 'block_specific'"
+            v-for="kind in emailKinds(card.policy)"
+            :key="kind"
+            :data-test="`settings-org-domain-restrictions-${kind}-emails-${card.name}`"
             class="ms-6 max-md:ms-0"
           >
             <OForm
-              :key="`${card.name}-${card.policy}`"
-              :ref="(el) => setEmailFormRef(card.name, el)"
+              :key="`${card.name}-${card.policy}-${kind}`"
+              :ref="(el) => setEmailFormRef(`${card.name}-${kind}`, el)"
               :schema="getEmailSchema(card.name)"
               :default-values="addEmailDefaults()"
-              @submit="(v) => addEmail(card, v.newEmail)"
+              @submit="(v) => addEmail(card, kind, v.newEmail)"
             >
               <div class="text-input-label-text mb-1 text-sm font-medium">
                 {{
-                  card.policy === "allow_specific"
+                  kind === "allowed"
                     ? t("settings.emailPlaceholder", { domain: "@" + card.name })
                     : t("settings.blockedEmailPlaceholder", { domain: "@" + card.name })
                 }}
               </div>
               <div class="flex items-start gap-x-2">
                 <OFormInput
-                  :data-test="`settings-org-domain-restrictions-email-input-${card.name}`"
+                  :data-test="`settings-org-domain-restrictions-${kind}-email-input-${card.name}`"
                   name="newEmail"
                   class="min-w-62.5 max-md:min-w-0 max-md:flex-1"
                 />
                 <OButton
-                  :data-test="`settings-org-domain-restrictions-add-email-${card.name}`"
-                  :variant="card.policy === 'allow_specific' ? 'primary' : 'destructive'"
+                  :data-test="`settings-org-domain-restrictions-add-${kind}-email-${card.name}`"
+                  :variant="kind === 'allowed' ? 'primary' : 'destructive'"
                   size="sm-action"
                   type="submit"
                   >{{
-                    card.policy === "allow_specific"
-                      ? t("settings.addEmail")
-                      : t("settings.addBlockedEmail")
+                    kind === "allowed" ? t("settings.addEmail") : t("settings.addBlockedEmail")
                   }}</OButton
                 >
               </div>
             </OForm>
             <div
-              v-for="(email, emailIndex) in emailList(card)"
+              v-if="kind === 'allowed' && card.allowedEmails.length === 0"
+              :data-test="`settings-org-domain-restrictions-no-allowed-${card.name}`"
+              class="rounded-default bg-status-warning-bg text-status-warning-text mt-1 p-2 text-sm"
+            >
+              {{ t("settings.noAllowedEmailsDenyAll", { domain: "@" + card.name }) }}
+            </div>
+            <div
+              v-for="(email, emailIndex) in emailList(card, kind)"
               :key="email"
               class="rounded-default border-border-default bg-surface-subtle mt-1 flex items-center justify-between border p-2"
             >
@@ -141,13 +148,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-destructive"
                 size="icon-xs-sq"
                 :title="t('common.delete')"
-                @click="emailList(card).splice(emailIndex, 1)"
+                @click="emailList(card, kind).splice(emailIndex, 1)"
               />
             </div>
           </div>
 
           <div
-            v-if="card.policy === 'block_specific' || card.policy === 'block_all'"
+            v-if="!isAllowPolicy(card.policy) || card.blockedEmails.length > 0"
             class="text-text-secondary text-xs"
           >
             {{ t("settings.blockedUsersHint") }}
@@ -219,8 +226,10 @@ import {
   cardsSnapshot,
   cardsToConfig,
   configToCards,
+  isAllowPolicy,
   type DomainManagementConfig,
   type RestrictionCard,
+  type RestrictionPolicy,
 } from "./orgDomainRestrictions";
 
 const props = defineProps<{ orgId: string; config?: Partial<DomainManagementConfig> }>();
@@ -252,13 +261,21 @@ const getEmailSchema = (domain: string) => {
 };
 
 const emailFormRefs: Record<string, any> = {};
-const setEmailFormRef = (domain: string, el: any) => {
-  if (el) emailFormRefs[domain] = el;
-  else delete emailFormRefs[domain];
+const setEmailFormRef = (key: string, el: any) => {
+  if (el) emailFormRefs[key] = el;
+  else delete emailFormRefs[key];
 };
 
-const emailList = (card: RestrictionCard) =>
-  card.policy === "allow_specific" ? card.allowedEmails : card.blockedEmails;
+type EmailKind = "allowed" | "blocked";
+
+const emailKinds = (policy: RestrictionPolicy): EmailKind[] => {
+  if (policy === "allow_specific") return ["allowed", "blocked"];
+  if (policy === "block_all") return [];
+  return ["blocked"];
+};
+
+const emailList = (card: RestrictionCard, kind: EmailKind) =>
+  kind === "allowed" ? card.allowedEmails : card.blockedEmails;
 
 function addDomain(value?: AddDomainForm) {
   const name = (value?.newDomain ?? "").trim().toLowerCase();
@@ -279,16 +296,16 @@ async function removeDomain(index: number) {
   if (ok) cards.splice(index, 1);
 }
 
-function addEmail(card: RestrictionCard, value?: string) {
+function addEmail(card: RestrictionCard, kind: EmailKind, value?: string) {
   const email = (value ?? "").trim().toLowerCase();
   if (!email) return;
-  const list = emailList(card);
+  const list = emailList(card, kind);
   if (list.includes(email)) {
     toast({ variant: "error", message: t("settings.emailAlreadyExists") });
     return;
   }
   list.push(email);
-  emailFormRefs[card.name]?.form?.reset();
+  emailFormRefs[`${card.name}-${kind}`]?.form?.reset();
 }
 
 function reset() {
@@ -297,10 +314,6 @@ function reset() {
 
 async function save() {
   for (const card of cards) {
-    if (card.policy === "allow_specific" && card.allowedEmails.length === 0) {
-      toast({ variant: "error", message: t("settings.domainNeedsEmails", { domain: card.name }) });
-      return;
-    }
     if (card.policy === "block_specific" && card.blockedEmails.length === 0) {
       toast({
         variant: "error",

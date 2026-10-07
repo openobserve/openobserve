@@ -28,7 +28,6 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.create_table(create_domains_stmt()).await?;
         manager.create_index(domain_org_idx()).await?;
-        manager.create_index(org_domain_state_unique()).await?;
         Ok(())
     }
 
@@ -103,18 +102,6 @@ fn domain_org_idx() -> IndexCreateStatement {
         .col(OrgDomainOwnership::OrgId)
         .col(OrgDomainOwnership::Domain)
         .col(OrgDomainOwnership::VerificationState)
-        .to_owned()
-}
-
-fn org_domain_state_unique() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .if_not_exists()
-        .name("org_domain_ownership_unique_idx")
-        .table(OrgDomainOwnership::Table)
-        .col(OrgDomainOwnership::OrgId)
-        .col(OrgDomainOwnership::Domain)
-        .col(OrgDomainOwnership::VerificationState)
-        .unique()
         .to_owned()
 }
 
