@@ -155,6 +155,9 @@ We check for following in CI pipeline for any pull requests.
 
 ## How to contribute code
 
+External contributors without write access may have at most 2 open pull requests at a time, including drafts.
+If you already have 2 open PRs, wait for one to be merged or close one before opening another.
+
 1. Fork the repository on github (e.g. awesomedev/openobserve)
 1. Clone the repo from the forked repository ( e.g. awesomedev/openobserve) to your machine.
 1. create a new branch locally.

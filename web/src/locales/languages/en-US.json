@@ -10893,11 +10893,9 @@
       "or": "Or:",
       "askAi": "Ask AI to set up tracing"
     },
-    "configureFullTextSearch": "to configure a full text search field to the stream.",
     "collapseFields": "Collapse Fields",
     "openFields": "Open Fields",
     "timeRangeUpdated": "The selected time range did not include this trace. The time range has been updated to match the trace's timestamp.",
-    "errorRetrievingTraces": "Error occurred while retrieving traces.",
     "fetchingTraces": "Loading Traces...",
     "noStream": {
       "title": "Pick a stream to start exploring",
@@ -11158,7 +11156,6 @@
       "viewQueryTrend": "View query trend in Database Monitoring"
     },
     "index": {
-      "clickHere": "Click here",
       "changeStreamTitle": "Change stream?",
       "switchStream": "Switch stream",
       "cancel": "Cancel",

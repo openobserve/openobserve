@@ -10525,11 +10525,9 @@
       "or": "Of:",
       "askAi": "Vraag AI om tracering in te stellen"
     },
-    "configureFullTextSearch": "om een volledig tekstzoekveld voor de stream in te stellen.",
     "collapseFields": "Velden samenvouwen",
     "openFields": "Open velden",
     "timeRangeUpdated": "Het geselecteerde tijdsbereik bevatte deze trace niet. Het tijdsbereik is bijgewerkt naar de tijdstempel van de trace.",
-    "errorRetrievingTraces": "Er is een fout opgetreden tijdens het ophalen van traces.",
     "fetchingTraces": "Traces laden...",
     "noStream": {
       "title": "Kies een stream om te beginnen met verkennen",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Bekijk querytrend in Database Monitoring"
     },
     "index": {
-      "clickHere": "Klik hier",
       "changeStreamTitle": "Stream wijzigen?",
       "switchStream": "Stream wisselen",
       "cancel": "Annuleren",

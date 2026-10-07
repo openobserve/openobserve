@@ -19673,7 +19673,6 @@
     "clearErrorFilter": "b634835f3e3a5324",
     "collapseFields": "166bd3007d204cc4",
     "comingSoon": "0c47ae112d18c257",
-    "configureFullTextSearch": "50146d7463d12e15",
     "copyStacktrace": "ffe4845db8d7fc77",
     "copyTraceId": "f8619a86627d2a9c",
     "correlation": {
@@ -19719,7 +19718,6 @@
     "errLabel": "af440ad05977eb32",
     "error": "d98ee0e5f9399db9",
     "errorCount": "6b8c59fe228558f0",
-    "errorRetrievingTraces": "27c9a1e15af589f3",
     "errorSpans": "19c03e5b2f215135",
     "errorTraces": "e9aefb224ed93ab1",
     "errorsLabel": "be4bd56772770471",
@@ -19784,7 +19782,6 @@
       "cancel": "19766ed6ccb2f4a3",
       "changeStreamMessage": "325d9159012c82f5",
       "changeStreamTitle": "5d42c9c748868957",
-      "clickHere": "62dca007a0990ba1",
       "errorConstructingQuery": "75b8400fe21aeef3",
       "errorGettingFunctions": "1edd5f4aa42fba05",
       "errorGettingStreams": "5a1bf044a10307a5",

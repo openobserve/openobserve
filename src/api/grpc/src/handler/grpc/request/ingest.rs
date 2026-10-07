@@ -50,6 +50,28 @@ fn caller_identity(
     }
 }
 
+/// The org a request writes to; a user credential only reaches the org check_auth verified it in.
+fn destination_org(
+    user_id: Option<&str>,
+    header_org: Option<&str>,
+    body_org: String,
+) -> std::result::Result<String, Status> {
+    if user_id.is_none() {
+        return Ok(body_org);
+    }
+    let Some(header_org) = header_org else {
+        return Err(Status::unauthenticated(
+            "missing organization header for user-authenticated request",
+        ));
+    };
+    if !body_org.is_empty() && body_org != header_org {
+        return Err(Status::permission_denied(format!(
+            "credentials for organization {header_org} cannot ingest into {body_org}"
+        )));
+    }
+    Ok(header_org.to_string())
+}
+
 #[tonic::async_trait]
 impl Ingest for Ingester {
     async fn ingest(
@@ -65,8 +87,13 @@ impl Ingest for Ingester {
             .next_back()
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let header_org = request
+            .metadata()
+            .get(&config::get_config().grpc.org_header_key)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
         let req = request.into_inner();
-        let org_id = req.org_id;
+        let org_id = destination_org(user_id.as_deref(), header_org.as_deref(), req.org_id)?;
         let stream_type: StreamType = req.stream_type.into();
         let stream_name = req.stream_name;
         let in_data = req.data.unwrap_or_default();
@@ -308,6 +335,32 @@ mod tests {
         let (user, derived) = caller_identity(Some("a@b.c"), json, true).unwrap();
         assert!(matches!(user, IngestUser::User(ref email) if email == "a@b.c"));
         assert!(!derived, "a user cannot claim pipeline-derived routing");
+    }
+
+    #[test]
+    fn destination_org_user_call_cannot_name_another_org() {
+        let err = destination_org(Some("a@b.c"), Some("org_a"), "org_b".to_string()).unwrap_err();
+        assert_eq!(err.code(), tonic::Code::PermissionDenied);
+    }
+
+    #[test]
+    fn destination_org_user_call_writes_to_the_authenticated_org() {
+        for body_org in ["org_a", ""] {
+            let org = destination_org(Some("a@b.c"), Some("org_a"), body_org.to_string()).unwrap();
+            assert_eq!(org, "org_a");
+        }
+    }
+
+    #[test]
+    fn destination_org_user_call_without_an_org_header_is_unauthenticated() {
+        let err = destination_org(Some("a@b.c"), None, "org_b".to_string()).unwrap_err();
+        assert_eq!(err.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn destination_org_internal_token_keeps_the_body_org() {
+        let org = destination_org(None, Some("org_a"), "org_b".to_string()).unwrap();
+        assert_eq!(org, "org_b");
     }
 
     fn metrics_resp(

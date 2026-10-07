@@ -269,64 +269,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="download" size="sm" />
           </OButton>
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                data-test="traces-search-bar-saved-views-btn"
-                variant="outline"
-                size="icon-toolbar"
-                :title="t('search.listSavedViews')"
-              >
-                <OIcon name="saved-search" size="sm" />
-                <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
-              </OButton>
-            </template>
-            <ODropdownGroup :label="t('search.savedViewsLabel')">
-              <div
-                v-if="tracesSavedViews.length"
-                class="max-h-72 overflow-y-auto overscroll-contain"
-              >
-                <ODropdownItem
-                  v-for="view in tracesSavedViews"
-                  :key="view.view_id"
-                  :data-test="`traces-saved-view-apply-${view.view_id}`"
-                  @select="applySavedView(view)"
+          <OButtonGroup
+            data-test="traces-search-bar-saved-views"
+            class="element-box-shadow border-button-outline-border border p-0"
+          >
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  data-test="traces-search-bar-saved-views-btn"
+                  variant="ghost"
+                  size="sm-toolbar"
                 >
-                  <span class="max-w-56 truncate">{{ view.view_name }}</span>
-                  <template #icon-right>
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      icon-left="edit"
-                      class="ms-auto"
-                      :title="t('search.updateSavedViewWithCurrent')"
-                      :data-test="`traces-saved-view-update-${view.view_id}`"
-                      @click.stop.prevent="updateSavedViewFromCurrent(view)"
-                    />
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      icon-left="delete"
-                      :title="t('search.deleteSavedView')"
-                      :data-test="`traces-saved-view-delete-${view.view_id}`"
-                      @click.stop.prevent="deleteTracesSavedView(view)"
-                    />
-                  </template>
+                  <OIcon name="saved-search" size="sm" />
+                  <OIcon name="arrow-drop-down" size="sm" />
+                  <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
+                </OButton>
+              </template>
+              <ODropdownGroup :label="t('search.savedViewsLabel')">
+                <div
+                  v-if="tracesSavedViews.length"
+                  class="max-h-72 overflow-y-auto overscroll-contain"
+                >
+                  <ODropdownItem
+                    v-for="view in tracesSavedViews"
+                    :key="view.view_id"
+                    :data-test="`traces-saved-view-apply-${view.view_id}`"
+                    @select="applySavedView(view)"
+                  >
+                    <span class="max-w-56 truncate">{{ view.view_name }}</span>
+                    <template #icon-right>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        icon-left="edit"
+                        class="ms-auto"
+                        :title="t('search.updateSavedViewWithCurrent')"
+                        :data-test="`traces-saved-view-update-${view.view_id}`"
+                        @click.stop.prevent="updateSavedViewFromCurrent(view)"
+                      />
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        icon-left="delete"
+                        :title="t('search.deleteSavedView')"
+                        :data-test="`traces-saved-view-delete-${view.view_id}`"
+                        @click.stop.prevent="deleteTracesSavedView(view)"
+                      />
+                    </template>
+                  </ODropdownItem>
+                </div>
+                <ODropdownItem v-else disabled>
+                  {{ t("search.savedViewsNotFound") }}
                 </ODropdownItem>
-              </div>
-              <ODropdownItem v-else disabled>
-                {{ t("search.savedViewsNotFound") }}
+              </ODropdownGroup>
+              <ODropdownSeparator />
+              <ODropdownItem
+                icon-left="save"
+                data-test="traces-saved-view-create"
+                @select="openSaveViewDialog"
+              >
+                {{ t("search.createSavedView") }}
               </ODropdownItem>
-            </ODropdownGroup>
-            <ODropdownSeparator />
-            <ODropdownItem
-              icon-left="save"
-              data-test="traces-saved-view-create"
-              @select="openSaveViewDialog"
+            </ODropdown>
+            <OSeparator vertical />
+            <OButton
+              data-test="traces-search-bar-saved-views-create-btn"
+              variant="ghost"
+              size="icon-toolbar"
+              @click="openSaveViewDialog"
             >
-              {{ t("search.createSavedView") }}
-            </ODropdownItem>
-          </ODropdown>
+              <OIcon name="save" size="sm" />
+              <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+            </OButton>
+          </OButtonGroup>
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
@@ -482,6 +497,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -532,6 +548,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OButtonGroup,
     OIcon,
     ODropdown,
     ODropdownItem,

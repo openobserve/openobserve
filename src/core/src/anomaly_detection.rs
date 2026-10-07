@@ -3165,8 +3165,9 @@ async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook was actually
-/// sent; a skip returns `Ok(false)` so the caller never arms a cooldown on nothing.
+/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
+/// send (2xx); a skip or a non-2xx rejection returns `Ok(false)` so the caller never arms
+/// a cooldown, or records a run as delivered, on a send nobody actually received.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
@@ -3238,6 +3239,18 @@ pub async fn send_anomaly_alert(
         .await?;
 
     let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        log::warn!(
+            "[anomaly_detection {}] destination '{}' rejected the alert: status={}, body={}",
+            anomaly_id,
+            destination_id,
+            status,
+            body
+        );
+        return Ok(false);
+    }
+
     log::info!(
         "[anomaly_detection {}] alert sent to '{}': status={}",
         anomaly_id,
