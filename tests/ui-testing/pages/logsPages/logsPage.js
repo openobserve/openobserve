@@ -13167,4 +13167,134 @@ export class LogsPage {
         );
     }
 
+    // -----------------------------------------------------------------------
+    // Results-table reads for the #15086 coverage specs.
+    //
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream
+    // each declared these selectors inline; every one of them already existed on
+    // this class (logsSearchResultLogsTable, searchBarRefreshButton,
+    // highlightedMatch, logsDetailTableSearchAroundBtn, logDetailDialog), so the
+    // specs were re-declaring page-object surface rather than extending it.
+    // -----------------------------------------------------------------------
+
+    /** The results table itself. */
+    resultsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /** Refreshes and waits for the results table to render. */
+    async runSearchAndWaitForResults(timeout = 30000) {
+        await this.page.locator(this.searchBarRefreshButton).click();
+        await expect(this.resultsTable()).toBeVisible({ timeout });
+    }
+
+    /** Body cells of one column in the results table. */
+    resultCells(column) {
+        return this.page.locator(
+            `${this.logsSearchResultLogsTable} td[data-test="o2-table-cell-${column}"]`
+        );
+    }
+
+    /** Highlighted strings inside one column's cells. */
+    highlightsIn(column) {
+        return this.resultCells(column).locator('.log-highlighted');
+    }
+
+    /**
+     * Highlight texts of one column, polled until they settle.
+     *
+     * Highlighting is applied asynchronously after the rows render
+     * (processHitsInChunks), so the table is visible — and even partly highlighted —
+     * before the final markup exists. Reading allInnerTexts() once races that and
+     * returns [] or a partial list.
+     */
+    expectHighlightsIn(column, timeout = 20000) {
+        return expect.poll(async () => this.highlightsIn(column).allInnerTexts(), { timeout });
+    }
+
+    /**
+     * Asserts nothing is highlighted, and keeps asserting it across a settled window.
+     *
+     * The same async pass is why this cannot be a single count(): a zero read before
+     * processHitsInChunks runs is indistinguishable from "never highlighted", so a
+     * one-shot assertion passes for the wrong reason and a regression that started
+     * highlighting negative filters would still go green. A retrying toHaveCount(0)
+     * does not help either — it is satisfied by its first check, which is exactly the
+     * read that is too early. Sampling until the window closes can tell them apart.
+     */
+    async expectNoHighlights(windowMs = 5000) {
+        const highlights = this.page.locator(this.highlightedMatch);
+        const deadline = Date.now() + windowMs;
+        let worst = 0;
+        do {
+            worst = Math.max(worst, await highlights.count());
+            await this.page.waitForTimeout(250);
+        } while (Date.now() < deadline);
+        expect(worst, 'a highlight appeared where a negative filter should mark nothing').toBe(0);
+    }
+
+    /** Column ids actually rendered in the results table, in order. */
+    async renderedColumnIds() {
+        return this.page
+            .locator(`${this.logsSearchResultLogsTable} td[data-test^="o2-table-cell-"]`)
+            .evaluateAll((cells) => [
+                ...new Set(
+                    cells.map((td) => td.getAttribute('data-test').replace('o2-table-cell-', ''))
+                ),
+            ]);
+    }
+
+    /** The rendered column set, polled: it is re-resolved on every search. */
+    expectRenderedColumnIds(timeout = 30000) {
+        return expect.poll(() => this.renderedColumnIds(), { timeout });
+    }
+
+    /** The per-row stream-name cells a multi-stream result set carries. */
+    streamNameCells() {
+        return this.resultCells('_stream_name');
+    }
+
+    /** The distinct stream names the results currently show. */
+    async distinctStreamNames() {
+        const cells = await this.streamNameCells().allInnerTexts();
+        return [...new Set(cells.map((c) => c.trim()))].filter(Boolean);
+    }
+
+    /** Opens the first row's detail and returns the stream name that row came from. */
+    async openFirstHitDetail(timeout = 20000) {
+        const streamCell = this.streamNameCells().first();
+        const hitStream = (await streamCell.innerText()).trim();
+        await streamCell.click();
+        await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });
+        return hitStream;
+    }
+
+    searchAroundButton() {
+        return this.page.locator(this.logsDetailTableSearchAroundBtn);
+    }
+
+    /**
+     * Clicks Search around and resolves with the _around response.
+     *
+     * Reading the table straight after the click races the round trip: the pre-click
+     * table is still the previous result set, so an assertion about the new rows can be
+     * satisfied by the old ones.
+     */
+    async clickSearchAroundAwaitingResponse(timeout = 30000) {
+        const [response] = await Promise.all([
+            this.page.waitForResponse((r) => /_around/.test(r.url()), { timeout }),
+            this.searchAroundButton().click(),
+        ]);
+        return response;
+    }
+
+    /** Clicks Search around and resolves with the _around request (not its answer). */
+    async clickSearchAroundAwaitingRequest(timeout = 30000) {
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => /_around/.test(r.url()), { timeout }),
+            this.searchAroundButton().click(),
+        ]);
+        return request;
+    }
+
 }
