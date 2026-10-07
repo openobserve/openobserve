@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ORouteTab
                 exact
                 name="plans"
+                data-test="billing-tab-plans"
                 :to="
                   '/billings/plans?org_identifier=' + store.state.selectedOrganization.identifier
                 "
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ORouteTab
                 exact
                 name="usage"
+                data-test="billing-tab-usage"
                 :to="
                   '/billings/usage?org_identifier=' +
                   store.state.selectedOrganization.identifier +
@@ -68,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showInvoiceTab"
                 exact
                 name="invoice_history"
+                data-test="billing-tab-invoices"
                 :to="
                   '/billings/invoice_history?org_identifier=' +
                   store.state.selectedOrganization.identifier
@@ -79,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="config.isCloud == 'true'"
                 exact
                 name="billing_group"
+                data-test="billing-tab-group"
                 :to="
                   '/billings/billing_group?org_identifier=' +
                   store.state.selectedOrganization.identifier

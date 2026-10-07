@@ -16,16 +16,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { openobserveRum } from "@openobserve/browser-rum";
 import analytics from "@/services/product_analytics";
-import config from "@/aws-exports";
 
 vi.mock("@openobserve/browser-rum", () => ({
-  openobserveRum: { addAction: vi.fn() },
+  openobserveRum: { addAction: vi.fn(), getInitConfiguration: vi.fn() },
 }));
 
 describe("product_analytics", () => {
   beforeEach(() => {
     vi.mocked(openobserveRum.addAction).mockClear();
-    config.enableAnalytics = "true";
+    vi.mocked(openobserveRum.getInitConfiguration).mockReturnValue({ applicationId: "app" } as any);
   });
 
   it("forwards track to the RUM SDK as a custom action", () => {
@@ -40,8 +39,8 @@ describe("product_analytics", () => {
     expect(openobserveRum.addAction).toHaveBeenCalledWith("alert_created", undefined);
   });
 
-  it("sends nothing when telemetry is disabled", () => {
-    config.enableAnalytics = "false";
+  it("sends nothing while RUM is not initialised", () => {
+    vi.mocked(openobserveRum.getInitConfiguration).mockReturnValue(undefined);
     analytics.track("alert_created");
     expect(openobserveRum.addAction).not.toHaveBeenCalled();
   });

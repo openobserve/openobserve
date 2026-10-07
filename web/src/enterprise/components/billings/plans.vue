@@ -204,6 +204,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import paidOverage from "@/services/paidOverage";
 import type { PaidOverageStatus } from "@/services/paidOverage";
+import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
@@ -230,6 +231,10 @@ export default defineComponent({
 
   emits: ["update:proSubscription"],
   async mounted() {
+    // Stripe sends the user back here after checkout; the referrer is the only trace of that return.
+    if (document.referrer.includes("checkout.stripe.com")) {
+      analytics.track("billing_checkout_returned", { plan: config.paidPlan });
+    }
     this.loading = true;
     this.fetchMembership();
     await Promise.all([this.loadSubscription(), this.fetchPricingData()]);

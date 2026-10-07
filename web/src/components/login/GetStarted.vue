@@ -124,6 +124,7 @@ import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import { makeGetStartedSchema, getStartedDefaults, type GetStartedForm } from "./GetStarted.schema";
 import { useStore } from "vuex";
 import billings from "@/services/billings";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 const store = useStore();
@@ -144,6 +145,7 @@ const doSubmit = async (value: GetStartedForm) => {
     // Notify first-login follow-ups (e.g. the community Slack invite) that the
     // onboarding form is done, so they don't stack on top of this full-screen dialog.
     window.dispatchEvent(new CustomEvent("o2:onboarding-complete"));
+    analytics.track("onboarding_get_started_submitted");
     toast({
       message: t("toastMessages.login.thankYouForYourFeedback"),
       variant: "success",
