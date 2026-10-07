@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Criar Template de Email",
     "headers": "Cabeçalhos",
     "previewError": "Falha ao gerar visualização",
+    "webhookPreviewNote": "O seu URL recebe este corpo tal como está, não como um cartão formatado. Os valores são dados de alerta de exemplo.",
     "slackOAuth": {
       "setupMethodLabel": "Como você quer conectar o Slack?",
       "oauthMethodTitle": "Conectar Slack",

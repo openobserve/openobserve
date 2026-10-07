@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Tạo Mẫu Email",
     "headers": "Tiêu đề",
     "previewError": "Không thể tạo bản xem trước",
+    "webhookPreviewNote": "URL của bạn nhận nội dung này nguyên trạng, không phải dưới dạng thẻ được định dạng. Các giá trị là dữ liệu cảnh báo mẫu.",
     "slackOAuth": {
       "setupMethodLabel": "Bạn muốn kết nối Slack bằng cách nào?",
       "oauthMethodTitle": "Kết nối Slack",

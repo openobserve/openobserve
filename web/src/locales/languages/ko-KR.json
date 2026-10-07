@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "이메일 템플릿 생성",
     "headers": "헤더",
     "previewError": "미리보기 생성 실패",
+    "webhookPreviewNote": "URL은 이 바디를 서식이 적용된 카드가 아닌 그대로 받습니다. 값은 샘플 알림 데이터입니다.",
     "slackOAuth": {
       "setupMethodLabel": "Slack을 어떻게 연결하시겠습니까?",
       "oauthMethodTitle": "Slack 연결",

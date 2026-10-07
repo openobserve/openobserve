@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Utwórz szablon e-mail",
     "headers": "Nagłówki",
     "previewError": "Nie udało się wygenerować podglądu",
+    "webhookPreviewNote": "Twój adres URL otrzymuje tę treść w niezmienionej postaci, a nie jako sformatowaną kartę. Wartości to przykładowe dane alertu.",
     "slackOAuth": {
       "setupMethodLabel": "Jak chcesz połączyć Slacka?",
       "oauthMethodTitle": "Połącz Slacka",

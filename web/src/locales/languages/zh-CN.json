@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "创建电子邮件模板",
     "headers": "标头",
     "previewError": "生成预览失败",
+    "webhookPreviewNote": "您的 URL 将原样收到此请求体，而不是格式化的卡片。这些值是示例告警数据。",
     "slackOAuth": {
       "setupMethodLabel": "您希望如何连接 Slack？",
       "oauthMethodTitle": "连接 Slack",

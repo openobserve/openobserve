@@ -9218,6 +9218,7 @@
     "createEmailTemplate": "Créer un modèle d'e-mail",
     "headers": "En-têtes",
     "previewError": "Échec de la génération de l'aperçu",
+    "webhookPreviewNote": "Votre URL reçoit ce corps tel quel, et non sous forme de carte mise en forme. Les valeurs sont des données d’alerte d’exemple.",
     "slackOAuth": {
       "setupMethodLabel": "Comment voulez-vous connecter Slack ?",
       "oauthMethodTitle": "Connecter Slack",
