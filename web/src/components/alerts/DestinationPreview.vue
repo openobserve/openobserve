@@ -26,13 +26,13 @@ limitations under the License.
       <div
         v-if="type === 'slack'"
         data-test="slack-preview"
-        class="slack-message border-border-default rounded-default mx-auto max-w-150 border bg-white p-4 shadow-sm"
+        class="slack-message border-brand-msg-divider rounded-default mx-auto max-w-150 border bg-white p-4 shadow-sm"
       >
         <div class="slack-message-container flex gap-3">
           <div class="slack-avatar">
             <div
               data-test="slack-avatar-icon"
-              class="avatar-circle rounded-default border-border-default bg-surface-base text-text-secondary flex h-9 w-9 items-center justify-center border"
+              class="avatar-circle rounded-default border-brand-msg-divider text-brand-slack-meta flex h-9 w-9 items-center justify-center border bg-white"
             >
               <OIcon name="notifications" size="sm" />
             </div>
@@ -104,7 +104,7 @@ limitations under the License.
             </div>
           </div>
         </div>
-        <p data-test="slack-preview-disclaimer" class="text-text-secondary m-0 mt-3 text-xs">
+        <p data-test="slack-preview-disclaimer" class="text-brand-slack-meta m-0 mt-3 text-xs">
           {{ t("alert_destinations.slackOAuth.previewDisclaimer") }}
         </p>
       </div>
@@ -388,7 +388,7 @@ limitations under the License.
             </div>
           </div>
           <div class="opsgenie-actions mt-4 flex justify-center">
-            <OButton variant="preview-action">{{ raw("View in OpenObserve") }}</OButton>
+            <OButton variant="preview-opsgenie">{{ raw("View in OpenObserve") }}</OButton>
           </div>
         </div>
       </div>

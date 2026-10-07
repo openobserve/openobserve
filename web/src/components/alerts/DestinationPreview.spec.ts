@@ -224,6 +224,33 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="opsgenie-preview"]').exists()).toBe(true);
   });
 
+  // The cards are fixed-light brand replicas, so each CTA needs its fixed brand
+  // variant; a theme-following one turns unreadable in dark mode.
+  it.each([
+    ["slack", "preview-slack"],
+    ["msteams", "preview-teams"],
+    ["email", "preview-email"],
+    ["opsgenie", "preview-opsgenie"],
+  ])("renders the %s CTA with the %s variant", (type, variant) => {
+    wrapper = mountComponent({ type });
+    const cta = wrapper
+      .findAllComponents({ name: "OButton" })
+      .find((button) => button.text() === "View in OpenObserve");
+    expect(cta?.props("variant")).toBe(variant);
+  });
+
+  it.each(["slack", "msteams", "email", "pagerduty", "servicenow", "opsgenie"])(
+    "keeps theme-following colors out of the fixed-light %s card",
+    (type) => {
+      wrapper = mountComponent({ type });
+      const card = wrapper.find(`[data-test="${type}-preview"]`);
+      const themed = [card, ...card.findAll("*")]
+        .flatMap((element) => element.classes())
+        .filter((name) => /(^|:)(text-text-|bg-surface-|border-border-|[a-z]+-button-)/.test(name));
+      expect(themed).toEqual([]);
+    },
+  );
+
   it("should emit update:modelValue=false when Close button is clicked", async () => {
     // @click:primary removed from ODialog — Close button now lives in footer slot (commit 1f896ef747)
     wrapper = mountComponent({ type: "slack" });
