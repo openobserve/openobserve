@@ -4184,43 +4184,6 @@ export default defineComponent({
       }
     };
 
-    const filteredSavedViews = computed(() => {
-      const filter = (searchObj.data.savedViewFilterFields ?? "").toLowerCase();
-      if (!filter) return searchObj.data.savedViews;
-      return searchObj.data.savedViews.filter((v: any) =>
-        (v.view_name ?? "").toLowerCase().includes(filter),
-      );
-    });
-
-    const savedViewPage = ref(1);
-    const savedViewPageSize = ref(10);
-
-    const savedViewTotalPages = computed(() =>
-      Math.ceil(filteredSavedViews.value.length / savedViewPageSize.value),
-    );
-
-    const paginatedSavedViews = computed(() => {
-      const start = (savedViewPage.value - 1) * savedViewPageSize.value;
-      return filteredSavedViews.value.slice(start, start + savedViewPageSize.value);
-    });
-
-    watch(filteredSavedViews, () => {
-      savedViewPage.value = 1;
-    });
-
-    const filterSavedViewFn = (rows: any, terms: any) => {
-      var filtered = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["view_name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      }
-      return filtered;
-    };
-
     const regionFilterMethod = (node, filter) => {
       const filt = filter.toLowerCase();
       return node.label && node.label.toLowerCase().indexOf(filt) > -1;
@@ -4841,12 +4804,6 @@ export default defineComponent({
       favoriteViews,
       localSavedViews,
       loadSavedView,
-      filterSavedViewFn,
-      filteredSavedViews,
-      savedViewPage,
-      savedViewPageSize,
-      savedViewTotalPages,
-      paginatedSavedViews,
       config,
       handleRegionsSelection,
       handleQuickMode,

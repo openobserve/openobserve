@@ -23,7 +23,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -117,7 +116,7 @@ const TRACES_TEST_IDS: DialogTestIds = {
   more: (pane, row) => `${tracesPrefix(pane)}-more-actions-${row.view_id}`,
 };
 
-// No `isAction`: it pins the column right, and a pinned column draws a sticky shadow over the row.
+// `meta.isAction` gives the right-aligned action cell; the column-level `isAction` would also pin it with a sticky shadow.
 const columns = [
   {
     id: "view_name",
@@ -131,7 +130,7 @@ const columns = [
     header: raw(""),
     sortable: false,
     size: 30,
-    meta: { align: "right" as const, actionCount: 3 },
+    meta: { align: "right" as const, actionCount: 3, isAction: true },
   },
 ];
 
@@ -220,7 +219,6 @@ const applyView = (row: SavedViewRow) => {
               <div class="text-text-secondary p-2 text-xs leading-6 font-bold tracking-wide">
                 {{ t("search.favoriteViews") }}
               </div>
-              <OSeparator class="my-1" />
             </template>
           </template>
           <template #cell-view_name="{ row, value }">

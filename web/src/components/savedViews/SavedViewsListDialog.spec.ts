@@ -168,6 +168,7 @@ describe("SavedViewsListDialog", () => {
     const favorites = find("traces-saved-views-dialog-favorites-table");
     expect(favorites.exists()).toBe(true);
     expect(favorites.text()).toContain("search.favoriteViews");
+    expect(favorites.findComponent({ name: "OSeparator" }).exists()).toBe(false);
     expect(
       favorites.find('[data-test="traces-saved-views-dialog-favorites-apply-t2"]').text(),
     ).toBe("slow payments");
@@ -215,9 +216,17 @@ describe("SavedViewsListDialog", () => {
     expect(table.props("showHeader")).toBe(false);
     expect(table.props("paginationBordered")).toBe(false);
     expect(table.find("thead").exists()).toBe(false);
-    expect(
-      wrapper.find('[data-test="o2-table-cell-actions"]').attributes("style") ?? "",
-    ).not.toContain("sticky");
+  });
+
+  it("renders the actions as an unpinned, right-aligned action cell", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+
+    const cell = wrapper.find('[data-test="o2-table-cell-actions"]');
+    expect(cell.attributes("style") ?? "").not.toContain("sticky");
+    expect(cell.classes()).toContain("text-right");
+    expect(cell.element.firstElementChild!.className).toContain("inline-flex");
+    expect(cell.find(".truncate").exists()).toBe(false);
   });
 
   it("keeps every Logs data-test value for module logs", async () => {
