@@ -32,6 +32,8 @@ const MARGIN_MICROS: i64 = MICROS_PER_DAY;
 const MICROS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000;
 /// Deleted chats whose replica copies are re-purged per org per pass.
 const REPLICA_PURGE_PER_PASS: u64 = 100;
+/// Deleted chats keep being purged this long, for replicas that were down at delete time.
+const REPLICA_REPURGE_WINDOW_MICROS: i64 = 7 * MICROS_PER_DAY;
 
 pub fn run() {
     if !LOCAL_NODE.is_scheduler() {
@@ -126,7 +128,14 @@ async fn refresh_in_use(org_id: &str, days: i64, now: i64) {
 
 /// A deleted chat is done once one pass reaches every live replica; until then it is retried.
 async fn purge_deleted_replicas(org_id: &str) {
-    let due = match ai_chat_sessions::due_for_replica_purge(org_id, REPLICA_PURGE_PER_PASS).await {
+    let repurge_since = now_micros() - REPLICA_REPURGE_WINDOW_MICROS;
+    let due = match ai_chat_sessions::due_for_replica_purge(
+        org_id,
+        REPLICA_PURGE_PER_PASS,
+        repurge_since,
+    )
+    .await
+    {
         Ok(rows) if rows.is_empty() => return,
         Ok(rows) => rows,
         Err(e) => {

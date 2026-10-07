@@ -694,7 +694,10 @@ async fn prepare_alert(
         return Err(AlertError::AlertNameContainsForwardSlash);
     }
     // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
-    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(&alert.stream_name) {
+    // Case-insensitive, so no spelling of the chat stream slips through.
+    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+        &alert.stream_name.trim().to_lowercase(),
+    ) {
         return Err(AlertError::ProtectedStream(alert.stream_name.clone()));
     }
 
@@ -4877,6 +4880,12 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_ai_chat_events"));
+        let mut upper = Alert::default();
+        upper.name = "exfiltrate-upper".into();
+        let err = prepare_alert("org", " _O2_AI_CHAT_EVENTS", "", &mut upper, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(_)));
         assert_eq!(
             axum::response::Response::from(err).status(),
             axum::http::StatusCode::BAD_REQUEST

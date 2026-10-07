@@ -1062,26 +1062,34 @@ fn end_frames_as(turn: &mut serde_json::Map<String, Value>, status: &str, code: 
         .iter()
         .any(|f| f.get("type").and_then(Value::as_str) == Some("error"));
     if status == TURN_FAILED && !has_error {
-        frames.push(serde_json::json!({
-            "type": "error",
-            "error": error,
-            "error_code": code,
-            "recoverable": false,
-        }));
+        frames.push(error_frame(&error, code));
     }
     if status == TURN_FAILED {
         turn.insert("error".into(), error.into());
     }
 }
 
+/// A failed turn that stored nothing; the prompt is not kept server-side, so `user` is null.
 fn failed_turn(record: &TurnRecord) -> Value {
+    let code = record.error_code.as_deref();
+    let error = failed_turn_message(code);
     serde_json::json!({
         "turn_id": record.turn_id,
         "status": TURN_FAILED,
-        "error_code": record.error_code,
-        "error": failed_turn_message(record.error_code.as_deref()),
+        "error_code": code,
+        "frames": [error_frame(&error, code)],
+        "error": error,
         "user": null,
-        "frames": [],
+    })
+}
+
+/// The terminal frame a failed turn's live stream would have ended with.
+fn error_frame(error: &str, code: Option<&str>) -> Value {
+    serde_json::json!({
+        "type": "error",
+        "error": error,
+        "error_code": code,
+        "recoverable": false,
     })
 }
 
@@ -1330,7 +1338,21 @@ mod tests {
         );
         let synthetic = &history.turns[1];
         assert_eq!(synthetic["user"], Value::Null);
-        assert_eq!(synthetic["frames"], serde_json::json!([]));
+        assert_eq!(
+            synthetic["frames"],
+            serde_json::json!([{
+                "type": "error",
+                "error": synthetic["error"],
+                "error_code": "upstream_error",
+                "recoverable": false,
+            }])
+        );
+        assert!(
+            synthetic["error"]
+                .as_str()
+                .unwrap()
+                .contains("upstream_error")
+        );
         assert_eq!(synthetic["error_code"], "upstream_error");
         assert_eq!(history.turns[3]["error_code"], "upstream_error");
         assert_eq!(history.turns[0]["error_code"], Value::Null);
@@ -1490,6 +1512,8 @@ mod tests {
         assert_eq!(failed["status"], "failed");
         assert_eq!(frame_types(failed), vec!["message", "error"]);
         assert_eq!(failed["frames"][1]["error_code"], "upstream_error");
+        assert_eq!(failed["frames"][1]["recoverable"], false);
+        assert_eq!(failed["frames"][1]["error"], failed["error"]);
         assert!(failed["error"].as_str().unwrap().contains("upstream_error"));
         let running = by_id("t5");
         assert_eq!(running["status"], "running");
