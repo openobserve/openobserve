@@ -12400,6 +12400,13 @@
         "previewEmpty": "Ne çalışacağını görmek için bir veri kümesi seçin.",
         "previewLoading": "Yuvalar hesaplanıyor…",
         "previewSlots": "çalıştırılacak yuva",
+        "costEstimate": "~{cost} tahmini (büyüklük mertebesi)",
+        "costUnknown": "Maliyet tahmin edilemedi",
+        "costLowerBound": "alt sınır, bazı modellerin fiyatı yok",
+        "costScoringOnly": "yalnızca puanlama maliyeti",
+        "costConfirmTitle": "Bu maliyetli deney çalıştırılsın mı?",
+        "costConfirmMessage": "Bu deneyin maliyetinin yaklaşık {cost} olacağı tahmin ediliyor ve bu, {threshold} uyarı eşiğinin üzerinde. Yine de oluşturulup çalıştırılsın mı?",
+        "costConfirmOk": "Yine de oluştur",
         "skippedFully": "{count} satır tamamen atlandı — seçilen her puanlayıcı beklenen bir çıktı gerektirir. Atlanan satırların çalıştırılması hiçbir maliyet gerektirmez.",
         "skippedPartially": "{count} satır kısmen atlandı — görev yine de çalışır, ancak referans tabanlı puanlayıcılar beklenen çıktısı olmayan satırları puanlayamaz.",
         "skippedNone": "Eşleşen her satır en az bir boyutta puanlanabilir.",
@@ -13023,6 +13030,7 @@
       },
       "testPanel": {
         "title": "Bağlantıyı Test Et",
+        "storedCredentialsHint": "Yayımlanmış sürümü, kayıtlı kimlik bilgileriyle test eder. Kaydedilmemiş düzenlemeleriniz yayımladığınızda test edilir.",
         "sourceLabel": "Örnek Girdi",
         "sourceDataset": "Bir Veri Kümesinden",
         "sourceManual": "Manuel",
@@ -13147,6 +13155,14 @@
         },
         "attemptsValue": "{count} / {max}",
         "resultsTitle": "Sonuçlar"
+      },
+      "credentialsDialog": {
+        "open": "Kimlik bilgilerini değiştir",
+        "title": "Kimlik bilgilerini değiştir",
+        "body": "Yeni değer, kayıtlı değerin yerini alır. Görev sürümünü korur ve kayıtlı değer hiçbir zaman gösterilmez.",
+        "submit": "Değiştir",
+        "success": "Kimlik bilgileri değiştirildi",
+        "error": "Kimlik bilgileri değiştirilemedi"
       },
       "signingPanel": {
         "title": "İmzalama Anahtarları",

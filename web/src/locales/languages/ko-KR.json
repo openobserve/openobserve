@@ -12400,6 +12400,13 @@
         "previewEmpty": "실행될 내용을 보려면 데이터셋을 선택하세요.",
         "previewLoading": "슬롯 계산 중…",
         "previewSlots": "실행할 슬롯",
+        "costEstimate": "~{cost} 예상 (대략적인 규모)",
+        "costUnknown": "비용을 추정할 수 없습니다",
+        "costLowerBound": "하한값, 일부 모델은 가격 정보가 없습니다",
+        "costScoringOnly": "채점 비용만",
+        "costConfirmTitle": "비용이 많이 드는 실험을 실행하시겠습니까?",
+        "costConfirmMessage": "이 실험은 약 {cost}의 비용이 예상되며, 경고 임계값인 {threshold}를 초과합니다. 그래도 생성하고 실행하시겠습니까?",
+        "costConfirmOk": "그래도 생성",
         "skippedFully": "{count}개 행이 완전히 건너뛰어졌습니다. 선택한 모든 스코어러에는 예상 출력이 필요합니다. 건너뛴 행은 실행 비용이 들지 않습니다.",
         "skippedPartially": "{count}개 행이 부분적으로 건너뛰어졌습니다. 작업은 계속 실행되지만, 참조 기반 스코어러는 예상 출력이 없는 행을 점수화할 수 없습니다.",
         "skippedNone": "일치하는 모든 행은 최소 하나의 차원에서 점수화될 수 있습니다.",
@@ -13023,6 +13030,7 @@
       },
       "testPanel": {
         "title": "연결 테스트",
+        "storedCredentialsHint": "저장된 자격 증명으로 게시된 버전을 테스트합니다. 저장하지 않은 편집 내용은 게시할 때 테스트됩니다.",
         "sourceLabel": "샘플 입력",
         "sourceDataset": "데이터셋에서",
         "sourceManual": "수동",
@@ -13147,6 +13155,14 @@
         },
         "attemptsValue": "{count} / {max}",
         "resultsTitle": "결과"
+      },
+      "credentialsDialog": {
+        "open": "자격 증명 교체",
+        "title": "자격 증명 교체",
+        "body": "새 값은 저장된 값을 제자리에서 대체합니다. 작업은 버전을 유지하며, 저장된 값은 절대 표시되지 않습니다.",
+        "submit": "교체",
+        "success": "자격 증명이 교체되었습니다",
+        "error": "자격 증명을 교체할 수 없습니다"
       },
       "signingPanel": {
         "title": "서명 키",

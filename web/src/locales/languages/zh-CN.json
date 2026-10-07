@@ -12400,6 +12400,13 @@
         "previewEmpty": "选择数据集以查看将运行的内容。",
         "previewLoading": "正在计算槽位…",
         "previewSlots": "待运行槽位",
+        "costEstimate": "预计 ~{cost}（数量级）",
+        "costUnknown": "无法估算成本",
+        "costLowerBound": "下限，部分模型没有价格",
+        "costScoringOnly": "仅评分成本",
+        "costConfirmTitle": "运行这个高成本的实验？",
+        "costConfirmMessage": "该实验预计成本约为 {cost}，超过 {threshold} 警告阈值。仍要创建并运行吗？",
+        "costConfirmOk": "仍然创建",
         "skippedFully": "{count} 行被完全跳过——每个选定的评分器都需要预期输出。跳过的行运行无需成本。",
         "skippedPartially": "{count} 行被部分跳过——任务仍会运行，但基于参考的评分器无法对没有预期输出的行进行评分。",
         "skippedNone": "每个匹配的行至少可以在一个维度上进行评分。",
@@ -13023,6 +13030,7 @@
       },
       "testPanel": {
         "title": "测试连接",
+        "storedCredentialsHint": "使用已存储的凭据测试已发布版本。未保存的编辑会在发布时进行测试。",
         "sourceLabel": "示例输入",
         "sourceDataset": "来自数据集",
         "sourceManual": "手动",
@@ -13147,6 +13155,14 @@
         },
         "attemptsValue": "{count} / {max}",
         "resultsTitle": "结果"
+      },
+      "credentialsDialog": {
+        "open": "替换凭据",
+        "title": "替换凭据",
+        "body": "新值会就地替换已存储的值。任务保留其版本，已存储的值不会显示。",
+        "submit": "替换",
+        "success": "凭据已替换",
+        "error": "无法替换凭据"
       },
       "signingPanel": {
         "title": "签名密钥",

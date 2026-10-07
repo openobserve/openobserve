@@ -12400,6 +12400,13 @@
         "previewEmpty": "Seleziona un dataset per vedere cosa verrà eseguito.",
         "previewLoading": "Calcolo degli slot…",
         "previewSlots": "slot da eseguire",
+        "costEstimate": "~{cost} stimato (ordine di grandezza)",
+        "costUnknown": "Impossibile stimare il costo",
+        "costLowerBound": "limite inferiore, alcuni modelli non hanno un prezzo",
+        "costScoringOnly": "solo costo di scoring",
+        "costConfirmTitle": "Eseguire questo esperimento costoso?",
+        "costConfirmMessage": "Questo esperimento è stimato costare circa {cost}, oltre la soglia di avviso di {threshold}. Crearlo ed eseguirlo comunque?",
+        "costConfirmOk": "Crea comunque",
         "skippedFully": "{count} righe completamente saltate — ogni valutatore selezionato richiede un output atteso. Le righe saltate non costano nulla da eseguire.",
         "skippedPartially": "{count} righe parzialmente saltate — l'attività viene comunque eseguita, ma i valutatori basati su riferimento non possono valutare righe senza un output atteso.",
         "skippedNone": "Ogni riga corrispondente può essere valutata su almeno una dimensione.",
@@ -13023,6 +13030,7 @@
       },
       "testPanel": {
         "title": "Prova connessione",
+        "storedCredentialsHint": "Verifica la versione pubblicata con le credenziali memorizzate. Le modifiche non salvate vengono verificate al momento della pubblicazione.",
         "sourceLabel": "Input di esempio",
         "sourceDataset": "Da un dataset",
         "sourceManual": "Manuale",
@@ -13147,6 +13155,14 @@
         },
         "attemptsValue": "{count} di {max}",
         "resultsTitle": "Risultati"
+      },
+      "credentialsDialog": {
+        "open": "Sostituisci credenziali",
+        "title": "Sostituisci credenziali",
+        "body": "Il nuovo valore sostituisce quello memorizzato sul posto. L'attività mantiene la sua versione e il valore memorizzato non viene mai mostrato.",
+        "submit": "Sostituisci",
+        "success": "Credenziali sostituite",
+        "error": "Impossibile sostituire le credenziali"
       },
       "signingPanel": {
         "title": "Chiavi di firma",
