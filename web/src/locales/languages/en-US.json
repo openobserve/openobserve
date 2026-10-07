@@ -4285,7 +4285,9 @@
       "experiments": "Compare model and prompt changes against your datasets before rollout.",
       "remoteTasks": "Run evaluation and scoring jobs against remote models and agents.",
       "evaluations": "Score AI quality automatically and track it over time.",
-      "genAiAgentMapping": "Group traces by the AI agent that produced them, and compare versions side-by-side."
+      "genAiAgentMapping": "Group traces by the AI agent that produced them, and compare versions side-by-side.",
+      "scheduledSearch": "Run a saved search automatically on a schedule, instead of re-running it by hand.",
+      "customBranding": "Replace the default logo and text with your own branding."
     }
   },
   "errorInsights": {
