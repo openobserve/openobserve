@@ -73,14 +73,20 @@ async fn resolve(slug: &str) -> Servable {
         Ok(Some(pd)) => pd,
         _ => return Servable::NotFound,
     };
+    let blocked = db::org_status::is_blocked(&pd.org_id);
+    servable(pd, blocked, now_micros())
+}
+
+/// Whether a loaded link may be served; it is read fresh per request, so changes apply at once.
+fn servable(pd: Model, org_blocked: bool, now: i64) -> Servable {
     // visibility: 0 draft, 1 public.
     if pd.visibility != 1 {
         return Servable::NotFound;
     }
-    if db::org_status::is_blocked(&pd.org_id) {
+    if org_blocked {
         return Servable::Unavailable;
     }
-    if pd.expires_at.is_some_and(|exp| exp <= now_micros()) {
+    if pd.expires_at.is_some_and(|exp| exp <= now) {
         return Servable::Expired;
     }
     if !pd.enabled {
@@ -385,6 +391,63 @@ mod tests {
         let mut v = serde_json::json!("plain");
         strip_secrets(&mut v);
         assert_eq!(v, serde_json::json!("plain"));
+    }
+
+    #[test]
+    fn only_a_live_public_link_is_served() {
+        let now = 1_000_000;
+        let live = || Model {
+            id: "l1".into(),
+            org_id: "o".into(),
+            folder_id: "f".into(),
+            dashboard_id: "d".into(),
+            slug: "s".into(),
+            name: "n".into(),
+            visibility: 1,
+            time_ranges: None,
+            default_range_key: None,
+            frozen_variables: None,
+            rebuild_secs: 60,
+            last_rebuilt_at: None,
+            rebuild_state: 0,
+            unauthorized_streams: None,
+            dashboard_version: 1,
+            published_by: "p".into(),
+            last_authorized_streams: None,
+            enabled: true,
+            expires_at: None,
+            created_by: "p".into(),
+            updated_by: None,
+            created_at: 0,
+            updated_at: 0,
+            last_accessed_at: None,
+            access_count: 0,
+        };
+        assert!(matches!(servable(live(), false, now), Servable::Ok(_)));
+        let draft = Model {
+            visibility: 0,
+            ..live()
+        };
+        assert!(matches!(servable(draft, false, now), Servable::NotFound));
+        let paused = Model {
+            enabled: false,
+            ..live()
+        };
+        assert!(matches!(
+            servable(paused, false, now),
+            Servable::Unavailable
+        ));
+        assert!(matches!(servable(live(), true, now), Servable::Unavailable));
+        let expired = Model {
+            expires_at: Some(now),
+            ..live()
+        };
+        assert!(matches!(servable(expired, false, now), Servable::Expired));
+        let not_yet = Model {
+            expires_at: Some(now + 1),
+            ..live()
+        };
+        assert!(matches!(servable(not_yet, false, now), Servable::Ok(_)));
     }
 
     #[test]
