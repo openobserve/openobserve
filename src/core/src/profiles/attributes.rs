@@ -143,6 +143,24 @@ mod tests {
     }
 
     #[test]
+    fn omitted_empty_collections_survive_nested_json_extraction() {
+        for (value, expected) in [
+            (json::json!({"arrayValue": {}}), "[]"),
+            (json::json!({"kvlistValue": {}}), "{}"),
+            (
+                json::json!({"arrayValue": {"values": [{"arrayValue": {}}, {"kvlistValue": {}}]}}),
+                "[[],{}]",
+            ),
+            (
+                json::json!({"kvlistValue": {"values": [{"keyStrindex": 1, "value": {"arrayValue": {}}}]}}),
+                r#"{"context":[]}"#,
+            ),
+        ] {
+            assert_extracted(value, expected);
+        }
+    }
+
+    #[test]
     fn ordinary_attribute_values_keep_their_extraction() {
         for (value, expected) in [
             (json::json!({"stringValue": "literal"}), "literal"),

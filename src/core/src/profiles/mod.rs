@@ -1929,6 +1929,42 @@ mod tests {
     }
 
     #[test]
+    fn omitted_empty_collection_values_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "empty.array", "empty.kv", "nested"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {}}},
+                    {"keyStrindex": 3, "value": {"arrayValue": {"values": [{"arrayValue": {}}, {"kvlistValue": {}}]}}}
+                ]
+            },
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2, 3], "values": [7]}]}]}]}]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["empty_array"], "[]");
+        assert_eq!(records[0]["empty_kv"], "{}");
+        assert_eq!(records[0]["nested"], "[[],{}]");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
     fn nested_json_string_references_survive_record_extraction() {
         let mut payload = json::json!({
             "dictionary": {

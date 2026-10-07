@@ -28,6 +28,7 @@ use opentelemetry_proto::tonic::{
     collector::profiles::v1development::ExportProfilesServiceRequest,
     common::v1::{AnyValue, ArrayValue, KeyValueList, any_value::Value},
 };
+use serde::de::Error as _;
 
 const INTEGRAL_KEYS: &[&str] = &[
     "timeUnixNano",
@@ -150,6 +151,7 @@ fn deserialize_any_value(mut value: json::Value) -> Result<AnyValue, json::Error
         });
     }
     if let Some(array) = value.get_mut("arrayValue") {
+        ensure_collection_values(array)?;
         let values: Vec<json::Value> = json::from_value(
             array
                 .get_mut("values")
@@ -165,6 +167,7 @@ fn deserialize_any_value(mut value: json::Value) -> Result<AnyValue, json::Error
         });
     }
     if let Some(list) = value.get_mut("kvlistValue") {
+        ensure_collection_values(list)?;
         let mut values = Vec::new();
         if let Some(attributes) = list.get_mut("values") {
             take_attribute_values(attributes, &mut values)?;
@@ -178,6 +181,16 @@ fn deserialize_any_value(mut value: json::Value) -> Result<AnyValue, json::Error
         });
     }
     json::from_value(value)
+}
+
+fn ensure_collection_values(value: &mut json::Value) -> Result<(), json::Error> {
+    let value = value
+        .as_object_mut()
+        .ok_or_else(|| json::Error::custom("profile collection must be an object"))?;
+    if !value.contains_key("values") {
+        value.insert("values".to_string(), json::Value::Array(vec![]));
+    }
+    Ok(())
 }
 
 fn normalize_value(value: &mut json::Value) {
@@ -843,6 +856,81 @@ mod tests {
                 json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
             normalize(&mut payload);
             assert!(deserialize(payload).is_err());
+        }
+    }
+
+    #[test]
+    fn omitted_empty_collection_values_match_explicit_empty_lists() {
+        for collection in ["arrayValue", "kvlistValue"] {
+            let mut requests = Vec::new();
+            for content in [json::json!({}), json::json!({"values": []})] {
+                let mut value = json::json!({});
+                value[collection] = content;
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                let request = deserialize(payload).unwrap();
+                super::super::validation::validate(&request).unwrap();
+                requests.push(request);
+            }
+            assert_eq!(requests[0], requests[1]);
+        }
+    }
+
+    #[test]
+    fn active_empty_collections_do_not_qualify_as_zero_sentinels() {
+        for value in [
+            json::json!({"arrayValue": {}}),
+            json::json!({"kvlistValue": {}}),
+        ] {
+            let mut payload = json::json!({"dictionary": {"attributeTable": [{"value": value}]}});
+            normalize(&mut payload);
+            let request = deserialize(payload).unwrap();
+            assert_eq!(
+                super::super::validation::validate(&request).unwrap_err(),
+                "dictionary.attribute_table[0] must be the zero value"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_collection_values_and_containers_are_rejected() {
+        for collection in ["arrayValue", "kvlistValue"] {
+            for invalid in [
+                json::Value::Null,
+                json::json!({}),
+                json::json!(true),
+                json::json!(7),
+                json::json!("bad"),
+            ] {
+                let mut value = json::json!({});
+                value[collection] = json::json!({"values": invalid});
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                assert!(
+                    deserialize(payload).is_err(),
+                    "invalid {collection} values accepted"
+                );
+            }
+            for invalid in [
+                json::Value::Null,
+                json::json!([]),
+                json::json!([[]]),
+                json::json!(true),
+                json::json!(7),
+                json::json!("bad"),
+            ] {
+                let mut value = json::json!({});
+                value[collection] = invalid;
+                let mut payload =
+                    json::json!({"dictionary": {"attributeTable": [{}, {"value": value}]}});
+                normalize(&mut payload);
+                assert!(
+                    deserialize(payload).is_err(),
+                    "invalid {collection} container accepted"
+                );
+            }
         }
     }
 
