@@ -60,6 +60,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OButton>
 
   <OButton
+    v-else-if="variant === 'toolbar'"
+    variant="outline"
+    size="sm-toolbar"
+    :disabled="!!disabledReason"
+    :icon-left="source_.icon"
+    :aria-label="label"
+    :data-test="dataTest"
+    @click="onActivate"
+  >
+    <span class="max-md:hidden">{{ label }}</span>
+    <OTooltip :content="disabledReason || label" />
+  </OButton>
+
+  <OButton
     v-else
     variant="ghost"
     size="sm"
@@ -94,7 +108,7 @@ const props = withDefaults(
      * and again if the dialog re-parameterises it (see rebuildAlertPrefill).
      */
     build: (options?: AlertBuildOptions) => AlertPrefill;
-    variant?: "menu-item" | "button" | "icon";
+    variant?: "menu-item" | "button" | "toolbar" | "icon";
     /** Non-null disables the control and is shown as the tooltip reason. */
     disabledReason?: I18nText | null;
     /** Folder the alert lands in. */

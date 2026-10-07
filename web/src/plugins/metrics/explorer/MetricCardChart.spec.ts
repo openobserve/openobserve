@@ -39,6 +39,7 @@ const PanelSchemaRendererStub = {
     "allowAlertCreation",
     "allowAnnotationsAdd",
     "allowAnnotationsAPI",
+    "alertSource",
   ],
   template: "<div data-test='panel-schema-renderer' />",
 };
@@ -75,6 +76,10 @@ describe("MetricCardChart builds the panel schema from its props", () => {
    * schema must track the live value so the axis is not formatted with a
    * superseded unit.
    */
+  it("names the Explorer as the source of a right-click alert", () => {
+    expect(panelProp(mountChart({ allowAlertCreation: true }), "alertSource")).toBe("explorer");
+  });
+
   it("reflects unitCustom in the schema config and updates when it changes", async () => {
     const wrapper = mountChart();
     expect(panelProp(wrapper, "panelSchema").config.unit_custom).toBe("c/s");
@@ -309,7 +314,7 @@ describe("MetricCardChart feeds the queue's results in as injected data", () => 
 
     const named = options.series.filter((s: any) => s.name);
     expect(named.map((s: any) => s.name)).toEqual(["a", "a (1 day ago)"]);
-    expect(named[1].lineStyle.type).toBe("dashed");
+    expect(named[1].lineStyle.type).toBe("dotted");
     const xs = new Set(named.flatMap((s: any) => s.data.map((point: any) => String(point[0]))));
     expect(xs.size).toBe(10);
   });

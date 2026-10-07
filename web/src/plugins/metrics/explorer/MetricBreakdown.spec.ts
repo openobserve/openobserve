@@ -675,6 +675,18 @@ describe("MetricBreakdown", () => {
       ]);
     });
 
+    it("names the focused chart's overlays, and says when the compared period has no data", async () => {
+      const compare = { gapMs: 86_400_000, periodAsStr: "1 day ago" };
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        Promise.resolve(opts?.window ? { resultType: "matrix", result: [] } : SERIES),
+      );
+      wrapper = mountBreakdown({ compare, stepSeconds: 60, selectedLabel: "method" });
+      await flushPromises();
+      const key = wrapper.find('[data-test="metrics-breakdown-overlay-key"]');
+      expect(key.text()).toContain("No data 1 day ago");
+      expect(key.text()).not.toContain("Forecast");
+    });
+
     it("keeps the right-click alert off the small label tiles", async () => {
       wrapper = mountBreakdown();
       await flushPromises();

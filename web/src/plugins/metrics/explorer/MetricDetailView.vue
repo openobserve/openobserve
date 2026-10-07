@@ -67,60 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-unit"
             >{{ unitLabel }}</span
           >
-          <OSelect
-            v-if="compareEligible"
-            :model-value="compare ?? 'off'"
-            :options="compareOptions"
-            :label="t('metrics.explorer.detail.compare.label')"
-            label-position="inside"
-            :searchable="false"
-            size="sm"
-            width="sm"
-            class="min-w-0"
-            data-test="metrics-detail-compare"
-            @update:model-value="onCompareChange"
-          />
-          <template v-if="forecastEligible">
-            <OSelect
-              :model-value="forecast ?? 'off'"
-              :options="forecastOptions"
-              :label="t('metrics.explorer.detail.forecast.label')"
-              label-position="inside"
-              :searchable="false"
-              size="sm"
-              width="sm"
-              class="min-w-0"
-              data-test="metrics-detail-forecast"
-              @update:model-value="onForecastChange"
-            />
-            <OSelect
-              v-if="forecast"
-              :model-value="forecastHorizonChoice"
-              :options="forecastHorizonOptions"
-              :label="t('metrics.explorer.detail.forecast.horizon')"
-              label-position="inside"
-              :searchable="false"
-              size="sm"
-              width="sm"
-              class="min-w-0 max-md:hidden"
-              data-test="metrics-detail-forecast-horizon"
-              @update:model-value="onForecastHorizonChange"
-            />
-            <OButton
-              v-if="forecast === 'smoothed'"
-              variant="ghost"
-              size="icon"
-              icon-left="info-outline"
-              class="shrink-0"
-              :aria-label="t('metrics.explorer.detail.forecast.smoothedHelp')"
-              data-test="metrics-detail-forecast-help"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('metrics.explorer.detail.forecast.smoothedHelp')"
-              />
-            </OButton>
-          </template>
           <!-- The subtitle truncates and hides on a phone; this always holds the whole sentence. -->
           <OButton
             v-if="card.help"
@@ -349,27 +295,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </span>
           </OTooltip>
-          <ODropdown align="end">
-            <template #trigger>
-              <OButton
-                variant="ghost"
-                size="icon-toolbar"
-                icon-left="more-horiz"
-                :aria-label="t('metrics.explorer.detail.moreActions')"
-                data-test="metrics-detail-more"
-              >
-                <OTooltip :content="t('metrics.explorer.detail.moreActions')" />
-              </OButton>
-            </template>
-            <CreateAlertAction
-              source="panel"
-              :build="buildOverviewAlertPrefill"
-              :disabled-reason="
-                overview.queries.length ? null : t('metrics.explorer.detail.noAlertQuery')
-              "
-              data-test="metrics-detail-create-alert"
-            />
-          </ODropdown>
+          <CreateAlertAction
+            variant="toolbar"
+            source="explorer"
+            :build="buildOverviewAlertPrefill"
+            :disabled-reason="
+              overview.queries.length ? null : t('metrics.explorer.detail.noAlertQuery')
+            "
+            data-test="metrics-detail-create-alert"
+          />
           <OButton
             variant="ghost"
             size="icon-toolbar"
@@ -412,6 +346,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="metrics-detail-filters-not-applied"
           />
+          <!-- Selects own popovers, which the header's overflow menu would unmount, so they get a row here. -->
+          <div
+            v-if="compareEligible || forecastEligible"
+            class="flex flex-wrap items-center gap-x-5 gap-y-2"
+            data-test="metrics-detail-chart-options"
+          >
+            <div v-if="compareEligible" class="flex items-center gap-1.5">
+              <label for="metrics-detail-compare" class="text-text-secondary text-xs">{{
+                t("metrics.explorer.detail.compare.label")
+              }}</label>
+              <OSelect
+                id="metrics-detail-compare"
+                :model-value="compare ?? 'off'"
+                :options="compareOptions"
+                appearance="inline"
+                size="sm"
+                :searchable="false"
+                class="min-w-20"
+                data-test="metrics-detail-compare"
+                @update:model-value="onCompareChange"
+              />
+            </div>
+            <template v-if="forecastEligible">
+              <div class="flex items-center gap-1.5">
+                <label for="metrics-detail-forecast" class="text-text-secondary text-xs">{{
+                  t("metrics.explorer.detail.forecast.label")
+                }}</label>
+                <OSelect
+                  id="metrics-detail-forecast"
+                  :model-value="forecast ?? 'off'"
+                  :options="forecastOptions"
+                  appearance="inline"
+                  size="sm"
+                  :searchable="false"
+                  class="min-w-24"
+                  data-test="metrics-detail-forecast"
+                  @update:model-value="onForecastChange"
+                />
+              </div>
+              <div v-if="forecast" class="flex items-center gap-1.5">
+                <template v-if="forecastHorizonOptions.length > 1">
+                  <label
+                    for="metrics-detail-forecast-horizon"
+                    class="text-text-secondary text-xs"
+                    >{{ t("metrics.explorer.detail.forecast.horizon") }}</label
+                  >
+                  <OSelect
+                    id="metrics-detail-forecast-horizon"
+                    :model-value="forecastHorizonChoice"
+                    :options="forecastHorizonOptions"
+                    appearance="inline"
+                    size="sm"
+                    :searchable="false"
+                    class="min-w-28"
+                    data-test="metrics-detail-forecast-horizon"
+                    @update:model-value="onForecastHorizonChange"
+                  />
+                </template>
+                <template v-else>
+                  <span class="text-text-secondary text-xs">{{
+                    t("metrics.explorer.detail.forecast.horizon")
+                  }}</span>
+                  <span class="text-sm" data-test="metrics-detail-forecast-horizon-auto">{{
+                    t("metrics.explorer.detail.forecast.horizonComputed", {
+                      duration: forecastHorizonText,
+                    })
+                  }}</span>
+                </template>
+              </div>
+            </template>
+            <MetricOverlayKey
+              v-if="compareShift || activeForecast"
+              class="ms-auto"
+              :period="compareShift?.periodAsStr ?? null"
+              :period-empty="overviewPeriodEmpty"
+              :forecast="!!activeForecast"
+              data-test="metrics-detail-overlay-key"
+            />
+          </div>
           <section
             class="border-border-default rounded-surface relative h-60 border"
             data-test="metrics-detail-overview"
@@ -508,6 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="activeTab === 'used_in'"
             :usage="usage"
             :status="usageStatus"
+            @retry="loadUsage(card?.name)"
           />
 
           <div v-else data-test="metrics-detail-related">
@@ -586,6 +600,7 @@ import MetricChartTile, {
   type TileQuery,
 } from "./MetricChartTile.vue";
 import MetricUsageList from "./MetricUsageList.vue";
+import MetricOverlayKey from "./MetricOverlayKey.vue";
 import metricsService, { type MetricUsage } from "@/services/metrics";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -609,7 +624,8 @@ import { useMetricDrilldown } from "@/composables/metrics/useMetricDrilldown";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
-import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
+import { withBareMetricNames, withSourceStreams } from "@/utils/metrics/metricsHandoff";
+import { durationFormatter } from "@/utils/formatters";
 import { parseSearchError } from "@/utils/query/searchError";
 import { CARD_KIND, supportsBreakdown, toO2Unit } from "@/utils/metrics/metricDefaults";
 import {
@@ -684,6 +700,7 @@ export default defineComponent({
     MetricBreakdown,
     MetricChartTile,
     MetricUsageList,
+    MetricOverlayKey,
     OPageHeader,
     OContent,
     OButton,
@@ -932,8 +949,16 @@ export default defineComponent({
     );
     const forecastOptions = computed(() => [
       { label: t("metrics.explorer.detail.forecast.off"), value: "off" },
-      { label: t("metrics.explorer.detail.forecast.linear"), value: "linear" },
-      { label: t("metrics.explorer.detail.forecast.smoothed"), value: "smoothed" },
+      {
+        label: t("metrics.explorer.detail.forecast.linear"),
+        value: "linear",
+        subLabel: t("metrics.explorer.detail.forecast.linearHelp"),
+      },
+      {
+        label: t("metrics.explorer.detail.forecast.smoothed"),
+        value: "smoothed",
+        subLabel: t("metrics.explorer.detail.forecast.smoothedHelp"),
+      },
     ]);
     const forecastHorizonOptions = computed(() => [
       { label: t("metrics.explorer.detail.forecast.horizonAuto"), value: "auto" },
@@ -983,10 +1008,10 @@ export default defineComponent({
     /** The overview's queries as a panel's, with no threshold: the form defaults to `>= 1`. */
     const buildOverviewAlertPrefill = (options: AlertBuildOptions = {}) => {
       const queries = overviewQueries.value.map((query) => ({
-        query: query.expr,
+        query: withBareMetricNames(query.expr),
         fields: { stream: query.stream, stream_type: "metrics" },
       }));
-      return buildPrefillFromPanel({
+      const prefill = buildPrefillFromPanel({
         panelTitle: props.card?.name,
         queries,
         queryType: "promql",
@@ -1000,12 +1025,21 @@ export default defineComponent({
           end_time: new Date(props.timeRange.end_time / 1000),
         },
       });
+      return { ...prefill, source: "explorer" };
     };
     // The earlier period alone is still worth charting: it says what this window is missing.
     const overviewHasSamples = computed(
       () =>
         overviewState.value.results.some(hasSamples) ||
         !!overviewState.value.shifted?.some((entry) => hasSamples(entry.result)),
+    );
+    const overviewPeriodEmpty = computed(
+      () =>
+        overviewState.value.status === "done" &&
+        !overviewState.value.shifted?.some((entry) => hasSamples(entry.result)),
+    );
+    const forecastHorizonText = computed(() =>
+      raw(durationFormatter(activeForecast.value?.horizon ?? 0)),
     );
     const overviewUnit = computed(() => toO2Unit(props.overview.unit));
     const overviewBucketUnit = computed(() =>
@@ -1187,6 +1221,10 @@ export default defineComponent({
       forecastHorizonChoice,
       onForecastChange,
       onForecastHorizonChange,
+      overviewPeriodEmpty,
+      loadUsage,
+      forecastHorizonText,
+      activeForecast,
       overviewHasSamples,
       overviewUnit,
       overviewBucketUnit,

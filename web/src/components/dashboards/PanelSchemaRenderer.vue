@@ -254,6 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value="contextMenuValue"
         :panel-query-index="contextMenuData?.panelQueryIndex"
         :series-role="contextMenuData?.seriesRole"
+        :unit="panelSchema?.config?.unit"
+        :unit-custom="panelSchema?.config?.unit_custom"
+        :decimals="panelSchema?.config?.decimals"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />
@@ -472,6 +475,12 @@ export default defineComponent({
       default: false,
       required: false,
       type: Boolean,
+    },
+    /** The registered alert source a right-click alert names, so its toast says where it came from. */
+    alertSource: {
+      default: "panel",
+      required: false,
+      type: String,
     },
     runId: {
       type: String,
@@ -742,6 +751,7 @@ export default defineComponent({
       allowAnnotationsAdd,
       allowAnnotationsAPI,
       allowAlertCreation,
+      alertSource,
       runId,
       tabId,
       tabName,
@@ -1149,6 +1159,7 @@ export default defineComponent({
       emit,
       visibleQueryIndexes,
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
+      alertSource,
     });
     // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
     const onChartDomContextMenu = (event: any) => {

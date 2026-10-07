@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import AlertContextMenu from "./AlertContextMenu.vue";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 
 describe("AlertContextMenu Component", () => {
   let wrapper: any;
@@ -125,9 +127,9 @@ describe("AlertContextMenu Component", () => {
       expect(wrapper.vm.menuStyle.top).toBe("400px");
     });
 
-    it("should handle zero position values", () => {
+    it("keeps a click at the viewport's corner off its edge", () => {
       wrapper = createWrapper({ x: 0, y: 0 });
-      expect(wrapper.vm.menuStyle).toEqual({ left: "0px", top: "0px" });
+      expect(wrapper.vm.menuStyle).toEqual({ left: "8px", top: "8px" });
     });
   });
 
@@ -172,7 +174,7 @@ describe("AlertContextMenu Component", () => {
       expect(wrapper.find('[data-test="alert-context-menu-above"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alert-context-menu-below"]').exists()).toBe(false);
       const item = wrapper.find('[data-test="alert-context-menu-forecast"]');
-      expect(item.text()).toBe("Alert when the forecast reaches 0.9");
+      expect(item.text()).toBe("Alert when forecast reaches 0.9");
 
       await item.trigger("click");
       expect(wrapper.emitted("select")[0][0]).toEqual({
@@ -186,7 +188,7 @@ describe("AlertContextMenu Component", () => {
     it("alerts on the forecast value it shows", async () => {
       wrapper = createWrapper({ value: 0.904237, panelQueryIndex: 0, seriesRole: "forecast" });
       const item = wrapper.find('[data-test="alert-context-menu-forecast"]');
-      expect(item.text()).toBe("Alert when the forecast reaches 0.9042");
+      expect(item.text()).toBe("Alert when forecast reaches 0.9042");
       await item.trigger("click");
       expect(wrapper.emitted("select")[0][0].threshold).toBe(0.9042);
     });
@@ -240,6 +242,48 @@ describe("AlertContextMenu Component", () => {
       wrapper = createWrapper({ value: 42, visible: true });
       const belowItem = wrapper.find('[data-test="alert-context-menu-below"]');
       expect(belowItem.text()).toContain("42");
+    });
+  });
+
+  describe("Copy and placement", () => {
+    it("reads as one phrase per item", async () => {
+      wrapper = createWrapper({ value: 42 });
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').text()).toBe(
+        "Alert when above 42",
+      );
+      expect(wrapper.find('[data-test="alert-context-menu-below"]').text()).toBe(
+        "Alert when below 42",
+      );
+      await wrapper.setProps({ seriesRole: "forecast" });
+      expect(wrapper.find('[data-test="alert-context-menu-forecast"]').text()).toBe(
+        "Alert when forecast reaches 42",
+      );
+    });
+
+    it("shows the value in the panel's unit", () => {
+      wrapper = createWrapper({ value: 1536, unit: "bytes", decimals: 1 });
+      const shown = formatUnitValue(getUnitValue(1536, "bytes", "", 1));
+      expect(wrapper.find('[data-test="alert-context-menu-above"]').text()).toBe(
+        `Alert when above ${shown}`,
+      );
+    });
+
+    it("keeps item text on one line", () => {
+      wrapper = createWrapper();
+      expect(
+        wrapper.find('[data-test="alert-context-menu-above"] span.select-none').classes(),
+      ).toContain("whitespace-nowrap");
+    });
+
+    it("flips to the left of the click near the viewport's right edge", async () => {
+      const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(280);
+      const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(40);
+      wrapper = createWrapper({ visible: false, x: window.innerWidth - 20, y: 100 });
+      await wrapper.setProps({ visible: true });
+      await nextTick();
+      expect(wrapper.vm.menuStyle.left).toBe(`${window.innerWidth - 20 - 280}px`);
+      width.mockRestore();
+      height.mockRestore();
     });
   });
 

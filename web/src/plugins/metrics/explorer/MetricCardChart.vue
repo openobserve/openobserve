@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :injected-promql-data="injectedPromqlData"
       :injected-exemplars="injectedExemplars"
       :allow-alert-creation="allowAlertCreation"
+      alert-source="explorer"
       :allow-annotations-add="false"
       :allow-annotations-a-p-i="false"
       @error="onPanelError"

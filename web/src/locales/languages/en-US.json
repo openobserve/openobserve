@@ -5225,9 +5225,9 @@
     "hundredPlaceholder": "100",
     "last": "Last",
     "alertContextMenu": {
-      "thresholdAbove": "Create Alert with threshold above {value}",
-      "thresholdBelow": "Create Alert with threshold below {value}",
-      "forecastReaches": "Alert when the forecast reaches {value}"
+      "thresholdAbove": "Alert when above {value}",
+      "thresholdBelow": "Alert when below {value}",
+      "forecastReaches": "Alert when forecast reaches {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Errors ({count})"
@@ -8675,6 +8675,10 @@
           "label": "Customize in editor",
           "toast": "From Alert Library: {sourceLabel}"
         },
+        "explorer": {
+          "label": "Create alert",
+          "toast": "Query imported from the Metrics Explorer"
+        },
         "dbm": {
           "label": "Alert me",
           "toast": "Imported from Database Monitoring: \"{sourceLabel}\""
@@ -9356,7 +9360,11 @@
         "close": "Back to metrics",
         "backTo": "metrics",
         "openInVisualize": "Open in Visualize",
-        "moreActions": "More actions",
+        "overlay": {
+          "current": "Current",
+          "noData": "No data {period}",
+          "forecast": "Forecast"
+        },
         "noAlertQuery": "This metric has no query to alert on",
         "drilldown": {
           "button": "Logs & traces",
@@ -9364,11 +9372,11 @@
           "enterprise": "Logs and traces drilldown is an Enterprise feature.",
           "discoveryOff": "Service discovery is turned off for this organization.",
           "forbidden": "You do not have permission to use service correlation.",
-          "checking": "Checking access...",
-          "loading": "Loading...",
+          "checking": "Checking access…",
+          "loading": "Loading…",
           "schemaError": "Could not load this metric's labels.",
           "retry": "Retry",
-          "pickService": "Pick a service ({label})",
+          "pickService": "Choose a {label} to see its logs and traces",
           "noServiceValues": "No {label} values in this time range.",
           "noServiceLabel": "This metric has no service label to correlate on.",
           "needIdentity": "Filter by an identity label, such as a namespace, to correlate.",
@@ -9389,6 +9397,8 @@
           "smoothedHelp": "Smoothed trend is a linear projection of a smoothed series: each point is smoothed over the ten steps before it, then a straight line is fitted. It is not a seasonal forecast.",
           "horizon": "Horizon",
           "horizonAuto": "25% of range",
+          "horizonComputed": "{duration} (25% of range)",
+          "linearHelp": "A straight line fitted to the visible range.",
           "horizon1h": "1 hour",
           "horizon6h": "6 hours",
           "horizon1d": "1 day",
@@ -9417,7 +9427,8 @@
           "empty": "No dashboard, alert, SLO or scheduled pipeline you can see uses this metric",
           "error": "Could not look up where this metric is used",
           "unparsed": "{count} query could not be parsed and was matched by name | {count} queries could not be parsed and were matched by name",
-          "textMatch": "Matched by name"
+          "textMatch": "Matched by name",
+          "textMatchHelp": "This query could not be parsed, so it was found by searching its text for the metric’s name. It may not read this metric."
         },
         "breakdown": {
           "distinctCount": "{count} value | {count} values",

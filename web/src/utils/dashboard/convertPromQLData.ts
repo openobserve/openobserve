@@ -25,6 +25,7 @@ import {
   getMetricMinMaxValue,
   getSeriesColor,
   getAreaStyleOverride,
+  getColorPalette,
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
@@ -583,6 +584,9 @@ export const convertPromQLData = async (
           }
         });
 
+        // Overlays add x values where no series has a sample; a timestamp alone says nothing.
+        if (!hoverText.length) return "";
+
         // A query fanning out to dozens of series makes an unreadable wall of
         // rows; the list is already sorted by value with the hovered series
         // hoisted first, so the cap keeps what the reader came for.
@@ -888,9 +892,14 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
-                // The shared colour leaves the dash as the only cue to the earlier period.
+                // The shared colour leaves the line style as the cue: dotted for a past period, dashed for a forecast.
                 ...(nameSuffixes[index]
-                  ? { lineStyle: { ...seriesPropsBasedOnChartType?.lineStyle, type: "dashed" } }
+                  ? {
+                      lineStyle: {
+                        ...seriesPropsBasedOnChartType?.lineStyle,
+                        type: seriesRoles[index] === "forecast" ? "dashed" : "dotted",
+                      },
+                    }
                   : {}),
                 ...getAreaStyleOverride(
                   panelSchema.type,
@@ -1293,6 +1302,24 @@ export const convertPromQLData = async (
       .filter((mapping: any) => mapping?.value && mapping?.color)
       .map((mapping: any) => String(mapping.value)),
   );
+  // The classic palette colours by series position, which would hand each twin the next series' colour.
+  if (panelSchema?.config?.color?.mode === "palette-classic" && shiftedTwins.length) {
+    const palette = getColorPalette(store.state.theme);
+    [...primaryByMetric.entries()].forEach(([metric, primary], position) => {
+      if (primary.itemStyle.color) return;
+      primary.itemStyle.color = palette[position % palette.length];
+      Object.assign(
+        primary,
+        getAreaStyleOverride(
+          panelSchema.type,
+          seriesPropsBasedOnChartType?.areaStyle,
+          primary.itemStyle.color,
+          seriesNames.get(metric) ?? "",
+          store.state.theme,
+        ),
+      );
+    });
+  }
   for (const [twin, metric] of shiftedTwins) {
     if (twin._seriesRole === "forecast") {
       const drawn: any[] = primaryByMetric.get(metric)?.data ?? [];
@@ -1318,6 +1345,14 @@ export const convertPromQLData = async (
         store.state.theme,
       ),
     );
+  }
+
+  // A twin is drawn in its primary's colour, so its own legend entry would only repeat the primary's.
+  if (shiftedTwins.length) {
+    const twins = new Set(shiftedTwins.map(([twin]) => twin));
+    legendConfig.data = options.series
+      .filter((series: any) => series?.name && !twins.has(series))
+      .map((series: any) => series.name);
   }
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width

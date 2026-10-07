@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -124,7 +124,7 @@ export interface TileQuery {
 
 export interface TileCompare {
   gapMs: number;
-  periodAsStr: string;
+  periodAsStr: I18nText;
 }
 
 /** `horizon` in seconds; the fits are trained on the tile's own window. */
@@ -186,14 +186,24 @@ const props = withDefaults(
 const emit = defineEmits<{
   select: [];
   /** What the tile holds, so a parent can read the fetched series without querying again. */
-  results: [state: { status: TileState["status"]; results: any[] }];
+  results: [state: { status: TileState["status"]; results: any[]; periodEmpty: boolean }];
 }>();
 
 const { t } = useI18nTyped();
 
 const root = ref<HTMLElement | null>(null);
 const state = ref<TileState>(IDLE);
-watch(state, ({ status, results }) => emit("results", { status, results }), { immediate: true });
+watch(
+  state,
+  ({ status, results, shifted }) =>
+    emit("results", {
+      status,
+      results,
+      periodEmpty:
+        status === "done" && !!props.compare && !shifted?.some((entry) => hasSamples(entry.result)),
+    }),
+  { immediate: true },
+);
 // The earlier period alone is still worth charting: it says what this window is missing.
 const hasData = computed(
   () =>

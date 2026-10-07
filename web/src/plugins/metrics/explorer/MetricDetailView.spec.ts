@@ -350,6 +350,30 @@ describe("MetricDetailView", () => {
       expect(wrapper.emitted("update:compare")).toEqual([["1w"], [null]]);
     });
 
+    it("keeps the chart controls in a row of their own, out of the page header", async () => {
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW }, { stubs: selectStub });
+      const select = compareSelect(wrapper)!;
+      expect(select.element.closest("header")).toBeNull();
+      expect(select.element.closest('[data-test="metrics-detail-chart-options"]')).not.toBeNull();
+    });
+
+    it("names the compared period beside the chart, and says when it has no data", async () => {
+      const EMPTY = { resultType: "matrix", result: [] };
+      runQuery.mockImplementation((_e: string, _s: any, _c: any, opts: any) =>
+        Promise.resolve(opts?.window ? EMPTY : SERIES),
+      );
+      wrapper = mountView({ overview: LINE, timeRange: WINDOW, compare: "1d", stepSeconds: 30 });
+      await flushPromises();
+      const key = () => wrapper.find('[data-test="metrics-detail-overlay-key"]');
+      expect(key().text()).toContain("No data 1 day ago");
+
+      runQuery.mockImplementation(() => Promise.resolve(SERIES));
+      await wrapper.setProps({ compare: "1h" });
+      await flushPromises();
+      expect(key().text()).toContain("1 hour ago");
+      expect(key().text()).not.toContain("No data");
+    });
+
     it("hides the control on a heatmap and charts no comparison there", async () => {
       wrapper = mountView({ compare: "1d", timeRange: WINDOW }, { stubs: selectStub });
       await flushPromises();
@@ -567,14 +591,40 @@ describe("MetricDetailView", () => {
       expect(wrapper.emitted("update:forecastHorizon")).toEqual([["1h"], [null]]);
     });
 
-    it("says Smoothed trend is a linear projection of a smoothed series", () => {
+    it("explains each method in its option, with no help icon of its own", () => {
       wrapper = mountView(
         { overview: LINE, timeRange: WINDOW, forecast: "smoothed", stepSeconds: 30 },
-        { realHeader: false },
+        { stubs: selectStub },
       );
-      expect(
-        wrapper.find('[data-test="metrics-detail-forecast-help"]').attributes("aria-label"),
-      ).toContain("linear projection of a smoothed series");
+      const options = selectNamed(wrapper, "metrics-detail-forecast")!.props("options");
+      expect(options.find((o: any) => o.value === "smoothed").subLabel).toContain(
+        "linear projection of a smoothed series",
+      );
+      expect(options.find((o: any) => o.value === "linear").subLabel).toBeTruthy();
+      expect(wrapper.find('[data-test="metrics-detail-forecast-help"]').exists()).toBe(false);
+    });
+
+    it("shows the computed horizon instead of a select when only the default applies", () => {
+      const quarter = { start_time: WINDOW.end_time - HOUR_US / 4, end_time: WINDOW.end_time };
+      wrapper = mountView(
+        { overview: LINE, timeRange: quarter, forecast: "linear", stepSeconds: 30 },
+        { stubs: selectStub },
+      );
+      expect(selectNamed(wrapper, "metrics-detail-forecast-horizon")).toBeUndefined();
+      expect(wrapper.find('[data-test="metrics-detail-forecast-horizon-auto"]').text()).toContain(
+        "3m 45s",
+      );
+    });
+
+    it("names the forecast beside the chart", async () => {
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "linear",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-overlay-key"]').text()).toContain("Forecast");
     });
 
     it("offers no forecast on a heatmap or on an info metric", async () => {
@@ -704,7 +754,7 @@ describe("MetricDetailView", () => {
         expect((button().element as HTMLButtonElement).disabled).toBe(true);
         expect(isMenuTrigger()).toBe(false);
         expect(button().find('[data-test="metrics-detail-drilldown-lock"]').exists()).toBe(false);
-        expect(await tooltipText()).toContain("Checking access...");
+        expect(await tooltipText()).toContain("Checking access…");
 
         answer({ data: [] });
         await flushPromises();
@@ -754,7 +804,30 @@ describe("MetricDetailView", () => {
       );
     });
 
-    it("opens the alert form on the overview query from the header's overflow menu", async () => {
+    it("is a toolbar button, with no single-item overflow menu", async () => {
+      wrapper = mountView();
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "CreateAlertAction" }).props("variant")).toBe("toolbar");
+      expect(wrapper.find('[data-test="metrics-detail-more"]').exists()).toBe(false);
+    });
+
+    it("prefills the bare metric name and says it came from the Explorer", async () => {
+      wrapper = mountView({
+        overview: {
+          queries: [{ expr: 'sum(rate({__name__="http_requests_total", job="api"}[4m]))' }],
+          chartType: "line",
+          unit: "",
+          bucketUnit: null,
+        },
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="metrics-detail-create-alert"]').trigger("click");
+      const prefill = (openAlertCreation.mock.calls[0] as any[])[0];
+      expect(prefill.source).toBe("explorer");
+      expect(prefill.promql).toBe('sum(rate(http_requests_total{job="api"}[4m]))');
+    });
+
+    it("opens the alert form on the overview query from the header", async () => {
       wrapper = mountView(
         { timeRange: { start_time: 10 * HOUR_US, end_time: 11 * HOUR_US } },
         { stubs: dropdownStubs },
@@ -765,7 +838,7 @@ describe("MetricDetailView", () => {
       expect(openAlertCreation).toHaveBeenCalledTimes(1);
       const prefill = (openAlertCreation.mock.calls[0] as any[])[0];
       expect(prefill).toMatchObject({
-        source: "panel",
+        source: "explorer",
         queryType: "promql",
         streamName: SELECTED.name,
         streamType: "metrics",

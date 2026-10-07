@@ -132,6 +132,7 @@ export function usePanelAlertCreation({
   emit,
   visibleQueryIndexes,
   hideChartTooltip,
+  alertSource,
 }: {
   panelSchema: any;
   allowAlertCreation: any;
@@ -144,6 +145,7 @@ export function usePanelAlertCreation({
   /** Panel queries not hidden in the editor; all of them when absent. */
   visibleQueryIndexes?: { value: number[] };
   hideChartTooltip?: () => void;
+  alertSource?: { value: string };
 }) {
   // Context menu state for alert creation
   const contextMenuVisible = ref(false);
@@ -243,7 +245,7 @@ export function usePanelAlertCreation({
         : undefined;
     const build = (options: AlertBuildOptions = {}) => {
       const index = options.queryIndex ?? queryIndex ?? visible[0] ?? 0;
-      return buildPrefillFromPanel({
+      const prefill = buildPrefillFromPanel({
         panelTitle: panelSchema.value.title || "Unnamed Panel",
         panelId: panelSchema.value.id,
         queries,
@@ -257,6 +259,7 @@ export function usePanelAlertCreation({
         executedQuery: executedQueryOf(index),
         metadataQueries: metadata.value?.queries,
       });
+      return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
     };
 
     const point = contextMenuData.value?.forecastPoint;

@@ -190,6 +190,17 @@ describe("forecast entries", () => {
     expect(row("api-1")).not.toContain("fitted");
   });
 
+  it("show no tooltip where no series has a value", async () => {
+    const result = await convert([current(), ahead("api-1")]);
+    const empty = { data: ["2023-11-14T22:16:00", null], value: ["2023-11-14T22:16:00", null] };
+    expect(
+      result.options.tooltip.formatter([
+        { ...empty, seriesIndex: 0, seriesName: "api-1", marker: "" },
+        { ...empty, seriesIndex: 2, seriesName: "api-1 (forecast)", marker: "" },
+      ]),
+    ).toBe("");
+  });
+
   it("never take a primary's place at the series cap", async () => {
     const tight = { state: { ...store.state, zoConfig: { max_dashboard_series: 2 } } };
     const result = await convert([current(), ahead("api-1", "api-2")], tight);

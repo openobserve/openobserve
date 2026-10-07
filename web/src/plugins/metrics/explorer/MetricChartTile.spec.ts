@@ -507,9 +507,20 @@ describe("MetricChartTile", () => {
       await flushPromises();
 
       expect(wrapper.emitted("results")).toEqual([
-        [{ status: "idle", results: [] }],
-        [{ status: "loading", results: [] }],
-        [{ status: "done", results: [SERIES] }],
+        [{ status: "idle", results: [], periodEmpty: false }],
+        [{ status: "loading", results: [], periodEmpty: false }],
+        [{ status: "done", results: [SERIES], periodEmpty: false }],
+      ]);
+    });
+
+    it("reports an empty compared period once its result lands", async () => {
+      runQuery.mockImplementation((_e: string, _s: AbortSignal, opts: any) =>
+        Promise.resolve(opts?.window ? EMPTY : SERIES),
+      );
+      wrapper = mountTile({ compare: { gapMs: 3_600_000, periodAsStr: "1 hour ago" } });
+      await flushPromises();
+      expect(wrapper.emitted("results")!.at(-1)).toEqual([
+        { status: "done", results: [SERIES], periodEmpty: true },
       ]);
     });
 
@@ -519,9 +530,9 @@ describe("MetricChartTile", () => {
       await flushPromises();
 
       expect(wrapper.emitted("results")).toEqual([
-        [{ status: "idle", results: [] }],
-        [{ status: "loading", results: [] }],
-        [{ status: "error", results: [] }],
+        [{ status: "idle", results: [], periodEmpty: false }],
+        [{ status: "loading", results: [], periodEmpty: false }],
+        [{ status: "error", results: [], periodEmpty: false }],
       ]);
     });
   });

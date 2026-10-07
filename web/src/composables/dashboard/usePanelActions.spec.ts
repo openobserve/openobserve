@@ -117,6 +117,16 @@ describe("usePanelActions", () => {
       expect(api.contextMenuVisible.value).toBe(false);
     });
 
+    it("names the surface the alert came from, when the host is not a dashboard", () => {
+      const args = { ...makeBase(), alertSource: { value: "explorer" } };
+      const api = usePanelAlertCreation(args as any);
+      args.contextMenuData.value = { seriesName: "errors" };
+
+      api.handleCreateAlert({ condition: "above", threshold: 10 });
+
+      expect(readAlertPrefill()?.source).toBe("explorer");
+    });
+
     it("navigates to alert creation, carrying the payload out of the URL", () => {
       const args = makeBase();
       const api = usePanelAlertCreation(args as any);

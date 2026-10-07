@@ -64,6 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-breakdown-topk"
             >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
           >
+          <MetricOverlayKey
+            v-if="!heatmap && (compare || forecast)"
+            class="shrink-0 max-md:hidden"
+            :period="compare?.periodAsStr ?? null"
+            :period-empty="focused.periodEmpty"
+            :forecast="!!forecast"
+            data-test="metrics-breakdown-overlay-key"
+          />
           <div class="flex-1" />
           <!-- Only once the chart has drawn: the panel's decimals come from its values. -->
           <OButton
@@ -382,6 +390,7 @@ import MetricChartTile, {
   type TileQuery,
 } from "./MetricChartTile.vue";
 import MetricCardChart from "./MetricCardChart.vue";
+import MetricOverlayKey from "./MetricOverlayKey.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -511,6 +520,7 @@ export default defineComponent({
   components: {
     MetricChartTile,
     MetricCardChart,
+    MetricOverlayKey,
     AddToDashboard,
     PanelBar,
     OButton,
@@ -817,7 +827,10 @@ export default defineComponent({
     );
 
     /** The focused chart's fetched series: the table summarises them rather than querying again. */
-    const focused = ref<{ status: string; results: any[] }>({ status: "idle", results: [] });
+    const focused = ref<{ status: string; results: any[]; periodEmpty?: boolean }>({
+      status: "idle",
+      results: [],
+    });
     const statsLoading = computed(
       () => focused.value.status === "idle" || focused.value.status === "loading",
     );

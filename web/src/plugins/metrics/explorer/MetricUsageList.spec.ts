@@ -35,8 +35,17 @@ const USAGE = {
   unparsed: 2,
 };
 
+const RouterLinkStub = {
+  name: "RouterLink",
+  props: ["to"],
+  template: "<a href='#'><slot /></a>",
+};
+
 const mountList = (props: Record<string, any>) =>
-  mount(MetricUsageList, { props, global: { plugins: [i18n, store] } });
+  mount(MetricUsageList, {
+    props,
+    global: { plugins: [i18n, store], stubs: { RouterLink: RouterLinkStub } },
+  });
 
 const find = (w: VueWrapper<any>, test: string) => w.find(`[data-test="${test}"]`);
 
@@ -51,9 +60,11 @@ describe("MetricUsageList", () => {
     expect(find(wrapper, "metrics-detail-used-in-loading").exists()).toBe(true);
   });
 
-  it("says so when the lookup failed", () => {
+  it("says so when the lookup failed, and offers to try again", async () => {
     wrapper = mountList({ usage: null, status: "error" });
     expect(find(wrapper, "metrics-detail-used-in-error").exists()).toBe(true);
+    await find(wrapper, "metrics-detail-used-in-retry").trigger("click");
+    expect(wrapper.emitted("retry")).toHaveLength(1);
   });
 
   it("says so when nothing uses the metric", () => {
@@ -82,16 +93,25 @@ describe("MetricUsageList", () => {
     expect(find(wrapper, "metrics-detail-used-in-unparsed").text()).toContain(
       "2 queries could not be parsed and were matched by name",
     );
-    expect(find(wrapper, "metrics-detail-used-in-text-match-pipelines-p1").exists()).toBe(true);
+    const badge = find(wrapper, "metrics-detail-used-in-text-match-pipelines-p1");
+    expect(badge.exists()).toBe(true);
+    expect(
+      wrapper
+        .findAllComponents({ name: "OTooltip" })
+        .some((tip) => String(tip.props("content")).includes("searching its text")),
+    ).toBe(true);
     expect(find(wrapper, "metrics-detail-used-in-text-match-dashboards-d1").exists()).toBe(false);
   });
 
-  it("links each object to its own page", async () => {
+  it("links each object to its own page with a real link", async () => {
     wrapper = mountList({ usage: USAGE, status: "done" });
     const org = store.state.selectedOrganization.identifier;
     const open = async (kind: string, id: string) => {
-      await find(wrapper, `metrics-detail-used-in-link-${kind}-${id}`).trigger("click");
-      return push.mock.calls.at(-1)![0];
+      const link = wrapper
+        .findAllComponents(RouterLinkStub)
+        .find((l) => l.attributes("data-test") === `metrics-detail-used-in-link-${kind}-${id}`)!;
+      expect(link.element.tagName).toBe("A");
+      return link.props("to");
     };
 
     expect(find(wrapper, "metrics-detail-used-in-link-dashboards-d1").text()).toBe("Board");

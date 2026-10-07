@@ -27,7 +27,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="error"
       :content="t('metrics.explorer.detail.usedIn.error')"
       data-test="metrics-detail-used-in-error"
-    />
+    >
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="replay"
+          data-test="metrics-detail-used-in-retry"
+          @click="emit('retry')"
+          >{{ t("metrics.explorer.retry") }}</OButton
+        >
+      </template>
+    </OBanner>
     <template v-else-if="usage">
       <OBanner
         v-if="usage.unparsed"
@@ -52,22 +63,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-detail-used-in-${group.kind}`"
       >
         <h3 class="text-text-secondary mb-1 text-xs font-semibold">{{ group.label }}</h3>
-        <ul>
+        <ul class="flex flex-col gap-1">
           <li v-for="item in group.items" :key="item.id" class="flex items-center gap-2">
-            <OButton
-              variant="ghost-primary"
-              size="sm"
+            <router-link
+              :to="group.to(item)"
+              class="text-text-link text-sm hover:underline"
               :data-test="`metrics-detail-used-in-link-${group.kind}-${item.id}`"
-              @click="router.push(group.to(item))"
-              >{{ item.title ?? item.name }}</OButton
+              >{{ item.title ?? item.name }}</router-link
             >
             <OBadge
               v-if="item.match === 'text'"
               variant="warning-outline"
               size="xs"
               :data-test="`metrics-detail-used-in-text-match-${group.kind}-${item.id}`"
-              >{{ t("metrics.explorer.detail.usedIn.textMatch") }}</OBadge
             >
+              {{ t("metrics.explorer.detail.usedIn.textMatch") }}
+              <OTooltip
+                :content="t('metrics.explorer.detail.usedIn.textMatchHelp')"
+                max-width="22.5rem"
+              />
+            </OBadge>
           </li>
         </ul>
       </section>
@@ -77,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter, type RouteLocationRaw } from "vue-router";
+import type { RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -85,6 +100,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { MetricUsage, MetricUsageEntry } from "@/services/metrics";
 
 interface UsageGroup {
@@ -99,8 +115,9 @@ const props = defineProps<{
   status: "idle" | "loading" | "done" | "error";
 }>();
 
+const emit = defineEmits<{ retry: [] }>();
+
 const { t } = useI18nTyped();
-const router = useRouter();
 const store = useStore();
 
 const groups = computed<UsageGroup[]>(() => {

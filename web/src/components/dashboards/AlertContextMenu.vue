@@ -31,10 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-forecast"
       >
         <OIcon name="trending-up" size="sm" class="me-2" />
-        <span class="select-none">{{
-          t("dashboard.alertContextMenu.forecastReaches", {
-            value: forecastValue.toLocaleString(undefined, { maximumSignificantDigits: 4 }),
-          })
+        <span class="whitespace-nowrap select-none">{{
+          t("dashboard.alertContextMenu.forecastReaches", { value: forecastText })
         }}</span>
       </div>
       <div
@@ -44,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-above"
       >
         <OIcon name="arrow-upward" size="sm" class="me-2" />
-        <span class="select-none">{{
-          t("dashboard.alertContextMenu.thresholdAbove", { value: formattedValue })
+        <span class="whitespace-nowrap select-none">{{
+          t("dashboard.alertContextMenu.thresholdAbove", { value: valueText })
         }}</span>
       </div>
       <div
@@ -55,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-below"
       >
         <OIcon name="arrow-downward" size="sm" class="me-2" />
-        <span class="select-none">{{
-          t("dashboard.alertContextMenu.thresholdBelow", { value: formattedValue })
+        <span class="whitespace-nowrap select-none">{{
+          t("dashboard.alertContextMenu.thresholdBelow", { value: valueText })
         }}</span>
       </div>
     </div>
@@ -64,9 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
+import { defineComponent, ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { placeMenu } from "@/utils/dashboard/menuPlacement";
 
 export default defineComponent({
   name: "AlertContextMenu",
@@ -99,6 +99,10 @@ export default defineComponent({
       type: String,
       default: undefined,
     },
+    /** The panel's unit config, so the item reads the value as the chart's axis does. */
+    unit: { type: String, default: null },
+    unitCustom: { type: String, default: null },
+    decimals: { type: Number, default: null },
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
@@ -114,13 +118,35 @@ export default defineComponent({
       return props.value;
     });
 
-    const menuStyle = computed(() => ({
-      left: `${props.x}px`,
-      top: `${props.y}px`,
-    }));
+    const menuSize = ref({ width: 0, height: 0 });
+    const menuStyle = computed(() => {
+      const { left, top } = placeMenu({ x: props.x, y: props.y }, menuSize.value, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+      return { left: `${left}px`, top: `${top}px` };
+    });
 
     // The threshold is written into the alert's PromQL and notification, so it is the value the item shows.
     const forecastValue = computed(() => Number(Number(props.value).toPrecision(4)));
+
+    const withUnit = (value: number, plain: string) =>
+      props.unit
+        ? formatUnitValue(
+            getUnitValue(value, props.unit, props.unitCustom ?? "", props.decimals ?? 2),
+          )
+        : plain;
+    const valueText = computed(() =>
+      typeof props.value === "number"
+        ? withUnit(props.value, formattedValue.value as string)
+        : props.value,
+    );
+    const forecastText = computed(() =>
+      withUnit(
+        forecastValue.value,
+        forecastValue.value.toLocaleString(undefined, { maximumSignificantDigits: 4 }),
+      ),
+    );
 
     const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {
       emit("select", {
@@ -147,6 +173,14 @@ export default defineComponent({
       () => props.visible,
       (newVisible) => {
         if (newVisible) {
+          // The size is known only once rendered; until then the menu sits at the click.
+          menuSize.value = { width: 0, height: 0 };
+          nextTick(() => {
+            menuSize.value = {
+              width: menuRef.value?.offsetWidth ?? 0,
+              height: menuRef.value?.offsetHeight ?? 0,
+            };
+          });
           setTimeout(() => {
             document.addEventListener("click", handleClickOutside);
             document.addEventListener("keydown", handleEscape);
@@ -168,6 +202,8 @@ export default defineComponent({
       menuRef,
       formattedValue,
       forecastValue,
+      valueText,
+      forecastText,
       menuStyle,
       handleMenuItemClick,
     };
