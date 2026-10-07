@@ -77,8 +77,6 @@ export interface SubnavChild {
    * user switches tab.
    */
   activeOnRoutes?: string[];
-  /** Shows the shared Beta tag after the label. */
-  beta?: boolean;
   /** Group children only: include only when this top-level item is present. */
   requires?: string;
   /**
