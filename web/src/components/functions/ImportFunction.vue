@@ -185,6 +185,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (val: any) => updateTransType(String(val), errorMessage.itemIndex)
                         "
                       />
+                      <!-- Same lock affordance as FunctionsToolbar's VRL/JS
+                           toggle for this exact choice — explains why
+                           JavaScript is disabled instead of leaving it mute. -->
+                      <LockedFeatureTooltip
+                        v-if="!isJsAllowed"
+                        :message="t('enterpriseFeature.locked', { feature: raw('JavaScript') })"
+                        icon="function"
+                        :title="raw('JavaScript')"
+                      />
                     </div>
 
                     <div v-else-if="errorMessage.field === 'params'" class="w-75 py-2">
@@ -237,6 +246,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import BaseImport from "../common/BaseImport.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { functionNameRegex } from "./AddFunction.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import jsTransformService from "@/services/jstransform";
@@ -264,6 +274,7 @@ export default defineComponent({
     OButton,
     OSeparator,
     BaseImport,
+    LockedFeatureTooltip,
     OInput: defineAsyncComponent(() => import("@/lib/forms/Input/OInput.vue")),
     OSelect: defineAsyncComponent(() => import("@/lib/forms/Select/OSelect.vue")),
     OCheckbox: defineAsyncComponent(() => import("@/lib/forms/Checkbox/OCheckbox.vue")),
@@ -708,6 +719,8 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      isJsAllowed,
       baseImportRef,
       isImporting,
       functionErrors,

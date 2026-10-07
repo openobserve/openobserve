@@ -20,6 +20,7 @@ import store from "@/test/unit/helpers/store";
 
 import NodePalette from "@/components/flow/NodePalette.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers — the shared palette is fully prop-driven (no composable).
@@ -205,5 +206,47 @@ describe("NodePalette - drag and click callbacks", () => {
     await btn.trigger("click");
     expect(onItemClick).toHaveBeenCalledTimes(1);
     expect(onItemClick.mock.calls[0][0]).toMatchObject({ subtype: "stream" });
+  });
+});
+
+// A locked item (edition doesn't unlock it, e.g. Remote Destination on
+// OSS/Cloud) stays IN the palette instead of being omitted — dimmed, not
+// draggable, and a click opens the upgrade dialog instead of adding the node.
+describe("NodePalette - locked nodes", () => {
+  let wrapper: any = null;
+  const onDragStart = vi.fn();
+  const onItemClick = vi.fn();
+  const lockedNode = makeNode({
+    io_type: "output",
+    subtype: "remote_stream",
+    label: "Remote Destination",
+    icon: "input",
+    locked: true,
+    lockedMessage: "Upgrade to unlock remote destinations",
+  });
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    useEnterpriseUpgradeDialog().close();
+    wrapper = await mountComp({ items: [lockedNode], onDragStart, onItemClick });
+  });
+  afterEach(() => {
+    wrapper?.unmount();
+    useEnterpriseUpgradeDialog().close();
+  });
+
+  it("is not draggable", () => {
+    expect(wrapper.find("[draggable='true']").exists()).toBe(false);
+  });
+
+  it("shows a lock icon instead of the drag-dots indicator", () => {
+    expect(wrapper.find(".drag-dots").exists()).toBe(false);
+  });
+
+  it("opens the upgrade dialog on click instead of calling onItemClick", async () => {
+    const btn = wrapper.find('[data-test="flow-node-palette-remote_stream-output-btn"]');
+    await btn.trigger("click");
+    expect(onItemClick).not.toHaveBeenCalled();
+    expect(useEnterpriseUpgradeDialog().isOpen.value).toBe(true);
   });
 });
