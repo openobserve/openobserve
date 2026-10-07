@@ -15,6 +15,7 @@
 
 import { orgKey } from "@/composables/query/keys";
 
+/** Keys only, so another domain can drop this scope without importing this domain's transport (no import cycle). */
 export const k8sKeys = {
   all: (org: string) => orgKey(org, "kubernetes"),
   instant: (org: string, id: string, query: string, endBucket: number) =>
