@@ -147,12 +147,6 @@ function sampledRunSums(widths: readonly number[]): number[] {
     return best;
   };
   const widest = widths.reduce((max, w) => Math.max(max, w), 0);
-  const distinct: number[] = [];
-  for (let v = atLeast(widest - EPSILON); v < Infinity; v = atLeast(v + SAME_SUM)) {
-    distinct.push(v);
-    if (distinct.length > MAX_SHELF_CANDIDATES) break;
-  }
-  if (distinct.length <= MAX_SHELF_CANDIDATES) return distinct;
   const total = prefix[n] - GAP;
   const step = (total - widest) / (MAX_SHELF_CANDIDATES - 1);
   const sampled: number[] = [];
@@ -160,7 +154,14 @@ function sampledRunSums(widths: readonly number[]): number[] {
     const v = atLeast(widest + k * step - EPSILON);
     if (!sampled.length || v - sampled[sampled.length - 1] >= SAME_SUM) sampled.push(v);
   }
-  return sampled;
+  if (sampled.length === MAX_SHELF_CANDIDATES) return sampled;
+  // Duplicates mean the targets may have skipped values, so list them all if there are few.
+  const distinct: number[] = [];
+  for (let v = atLeast(widest - EPSILON); v < Infinity; v = atLeast(v + SAME_SUM)) {
+    distinct.push(v);
+    if (distinct.length > MAX_SHELF_CANDIDATES) return sampled;
+  }
+  return distinct;
 }
 
 // Strips a shared ".domain" suffix, e.g. EKS's ".ec2.internal"; never a prefix.
@@ -267,9 +268,9 @@ function pack(blocks: Block[], shelfWidth: number) {
   return { spanX, spanY: cursorY + shelfHeight };
 }
 
-function bestShelf(blocks: Block[], params: LayoutParams) {
+function bestShelf(blocks: Block[], params: LayoutParams, candidates: readonly number[]) {
   let best = { width: 0, scale: -Infinity };
-  for (const width of shelfCandidates(blocks.map((b) => b.width))) {
+  for (const width of candidates) {
     const { spanX, spanY } = pack(blocks, width);
     const scale = fitScale(spanX, spanY, params.width, params.height, params.bottomInset);
     if (scale > best.scale) best = { width, scale };
@@ -282,9 +283,16 @@ function settled(params: LayoutParams): { blocks: Block[]; sizing: Sizing } {
   const sizing: Sizing = { minWidth: MIN_FRAME_WIDTH, maxWidth: Infinity, band: LABEL_BAND };
   let minFramePx = params.minFramePx ?? 0;
   let noBand = false;
+  const candidatesByWidth = new Map<number, number[]>();
   for (let round = 0; ; round++) {
     const blocks = blocksOf(params, sizing);
-    const { spanX, spanY } = pack(blocks, bestShelf(blocks, params));
+    // Card widths change only when widened, so a band-only round reuses its shelf candidates.
+    let candidates = candidatesByWidth.get(sizing.minWidth);
+    if (!candidates) {
+      candidates = shelfCandidates(blocks.map((b) => b.width));
+      candidatesByWidth.set(sizing.minWidth, candidates);
+    }
+    const { spanX, spanY } = pack(blocks, bestShelf(blocks, params, candidates));
     const scale = Math.min(
       fitScale(spanX, spanY, params.width, params.height, params.bottomInset),
       MAX_FIT_SCALE,
