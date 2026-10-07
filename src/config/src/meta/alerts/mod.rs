@@ -187,7 +187,8 @@ impl TriggerCondition {
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
                     .timestamp_micros()
-                    + tolerance)
+                    .checked_add(tolerance)
+                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
             } else {
                 // This is important, if provided start_utc was `Some`, it should use the next run
                 // after the start_utc. If it was `None`, it should use the next run after the
@@ -199,7 +200,8 @@ impl TriggerCondition {
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
                     .timestamp_micros()
-                    + tolerance)
+                    .checked_add(tolerance)
+                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
             }
         } else if apply_silence {
             // silence is in minutes, frequency is in seconds

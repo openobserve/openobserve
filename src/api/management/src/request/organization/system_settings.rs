@@ -75,7 +75,9 @@ fn openfga_enabled() -> bool {
 }
 
 fn foreign_user_response() -> Response {
-    MetaHttpResponse::forbidden("Settings of another user require user administration")
+    MetaHttpResponse::forbidden(
+        "Accessing settings of another user requires user administration permissions",
+    )
 }
 
 /// Get a specific system setting with resolution (user -> org -> system)

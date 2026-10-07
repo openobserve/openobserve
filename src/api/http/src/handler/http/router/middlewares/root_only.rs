@@ -34,7 +34,7 @@ pub async fn root_only_middleware(request: Request, next: Next) -> Response {
     if !is_root {
         return (
             StatusCode::FORBIDDEN,
-            Json(serde_json::json!({"message": "Only root users can manage nodes"})),
+            Json(serde_json::json!({"message": "Only root users can access this resource"})),
         )
             .into_response();
     }
