@@ -4274,7 +4274,18 @@
       "correlation": "Jump from a log line straight to its related metrics and traces.",
       "aiAssistant": "Ask AI to write queries and explain your data in plain English.",
       "alertInsights": "See how often an alert fires and spot correlated alerts at a glance.",
-      "anomalyDetection": "Catch unusual metric behavior automatically, before it fires a threshold alert."
+      "anomalyDetection": "Catch unusual metric behavior automatically, before it fires a threshold alert.",
+      "agentGraph": "See how your AI agents and tools call each other, visualized as a graph.",
+      "agentBehavior": "Spot anomalies in agent tool-calling behavior over time.",
+      "discovery": "Automatically surface AI sessions worth reviewing.",
+      "queues": "Route flagged AI sessions to reviewers for human-in-the-loop annotation.",
+      "datasets": "Curate datasets from real sessions to evaluate and fine-tune your AI.",
+      "prompts": "Version and manage the prompts powering your AI features.",
+      "playground": "Test prompts and models side-by-side before shipping changes.",
+      "experiments": "Compare model and prompt changes against your datasets before rollout.",
+      "remoteTasks": "Run evaluation and scoring jobs against remote models and agents.",
+      "evaluations": "Score AI quality automatically and track it over time.",
+      "genAiAgentMapping": "Group traces by the AI agent that produced them, and compare versions side-by-side."
     }
   },
   "errorInsights": {

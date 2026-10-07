@@ -49,7 +49,7 @@ import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
 import { navSection } from "./navSection";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import config from "@/aws-exports";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 /** The same mark the primary nav uses for this module, so the collapsed rail
  *  still says which module it belongs to. */
@@ -100,16 +100,27 @@ function evalLink(tab: EvalTab) {
 
 const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
-// Only Monitor's LLM Insights + Sessions have OSS-registered routes (see
-// web/src/composables/router.ts). The remaining sections require the
-// enterprise/cloud backend, so true OSS builds must not link to them.
-const OSS_AVAILABLE_KEYS = new Set(["llmInsights", "sessions"]);
-const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
-
 // Single source of truth for the rail items (groups) AND the breadcrumb
-// switcher. Order here is the order shown in the rail.
-const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
-  [
+// switcher. Order here is the order shown in the rail. Every section beyond
+// Monitor's LLM Insights + Sessions is enterprise/cloud-only — rather than
+// hiding those items in OSS, they stay visible but locked (lock icon +
+// pitch-card tooltip), matching the Settings/IAM rail pattern. The routes
+// they link to are still registered in OSS (see web/src/composables/router.ts)
+// and redirect to the shared locked-feature page via `withFeatureGate`.
+const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
+  const featureGateCtx = buildFeatureGateContext(store.state.zoConfig);
+  const agentGraphAccess = checkFeatureAccess("agentGraph", featureGateCtx);
+  const agentBehaviorAccess = checkFeatureAccess("agentBehavior", featureGateCtx);
+  const discoveryAccess = checkFeatureAccess("discovery", featureGateCtx);
+  const queuesAccess = checkFeatureAccess("queues", featureGateCtx);
+  const datasetsAccess = checkFeatureAccess("datasets", featureGateCtx);
+  const promptsAccess = checkFeatureAccess("prompts", featureGateCtx);
+  const playgroundAccess = checkFeatureAccess("playground", featureGateCtx);
+  const experimentsAccess = checkFeatureAccess("experiments", featureGateCtx);
+  const remoteTasksAccess = checkFeatureAccess("remoteTasks", featureGateCtx);
+  const evaluationsAccess = checkFeatureAccess("evaluations", featureGateCtx);
+
+  return [
     {
       key: "llmInsights",
       label: t("aiObservability.nav.llmInsights"),
@@ -133,6 +144,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiAgentGraph", query: orgQuery.value },
       dataTest: "ai-secondary-nav-agent-graph",
       group: "Monitor",
+      locked: !agentGraphAccess.allowed,
+      lockedMessage: agentGraphAccess.message,
     },
     {
       key: "agentBehavior",
@@ -141,6 +154,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiAgentBehavior", query: orgQuery.value },
       dataTest: "ai-secondary-nav-agent-behavior",
       group: "Monitor",
+      locked: !agentBehaviorAccess.allowed,
+      lockedMessage: agentBehaviorAccess.message,
     },
     {
       key: "discovery",
@@ -149,6 +164,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiDiscovery", query: orgQuery.value },
       dataTest: "ai-secondary-nav-discovery",
       group: "Annotate",
+      locked: !discoveryAccess.allowed,
+      lockedMessage: discoveryAccess.message,
     },
     {
       key: "queues",
@@ -157,6 +174,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiQueues", query: orgQuery.value },
       dataTest: "ai-secondary-nav-queues",
       group: "Annotate",
+      locked: !queuesAccess.allowed,
+      lockedMessage: queuesAccess.message,
     },
     {
       key: "datasets",
@@ -165,6 +184,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiDatasets", query: orgQuery.value },
       dataTest: "ai-secondary-nav-datasets",
       group: "Annotate",
+      locked: !datasetsAccess.allowed,
+      lockedMessage: datasetsAccess.message,
     },
     {
       key: "prompts",
@@ -173,6 +194,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiPrompts", query: orgQuery.value },
       dataTest: "ai-secondary-nav-prompts",
       group: "Experiment",
+      locked: !promptsAccess.allowed,
+      lockedMessage: promptsAccess.message,
     },
     {
       key: "playground",
@@ -181,6 +204,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiPlayground", query: orgQuery.value },
       dataTest: "ai-secondary-nav-playground",
       group: "Experiment",
+      locked: !playgroundAccess.allowed,
+      lockedMessage: playgroundAccess.message,
     },
     {
       key: "experiments",
@@ -189,6 +214,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiExperiments", query: orgQuery.value },
       dataTest: "ai-secondary-nav-experiments",
       group: "Experiment",
+      locked: !experimentsAccess.allowed,
+      lockedMessage: experimentsAccess.message,
     },
     {
       key: "remoteTasks",
@@ -197,6 +224,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: { name: "aiRemoteTasks", query: orgQuery.value },
       dataTest: "ai-secondary-nav-remote-tasks",
       group: "Experiment",
+      locked: !remoteTasksAccess.allowed,
+      lockedMessage: remoteTasksAccess.message,
     },
     {
       key: "quality",
@@ -205,6 +234,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: evalLink("quality"),
       dataTest: "ai-secondary-nav-quality",
       group: "Evaluate",
+      locked: !evaluationsAccess.allowed,
+      lockedMessage: evaluationsAccess.message,
     },
     {
       key: "jobs",
@@ -213,6 +244,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: evalLink("jobs"),
       dataTest: "ai-secondary-nav-eval-jobs",
       group: "Evaluate",
+      locked: !evaluationsAccess.allowed,
+      lockedMessage: evaluationsAccess.message,
     },
     {
       key: "scorers",
@@ -221,6 +254,8 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: evalLink("scorers"),
       dataTest: "ai-secondary-nav-scorers",
       group: "Evaluate",
+      locked: !evaluationsAccess.allowed,
+      lockedMessage: evaluationsAccess.message,
     },
     {
       key: "scoreConfigs",
@@ -229,9 +264,11 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() =>
       to: evalLink("scoreConfigs"),
       dataTest: "ai-secondary-nav-score-configs",
       group: "Evaluate",
+      locked: !evaluationsAccess.allowed,
+      lockedMessage: evaluationsAccess.message,
     },
-  ].filter((item) => isEnterpriseOrCloud || OSS_AVAILABLE_KEYS.has(item.key)),
-);
+  ];
+});
 
 const activeSectionItem = computed(() =>
   sectionItems.value.find((i) => i.key === activeSection.value),

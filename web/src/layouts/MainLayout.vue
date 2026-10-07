@@ -462,9 +462,10 @@ export default defineComponent({
 
     // The AI Observability menu entry itself ships on true OSS builds too —
     // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
-    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
-    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
-    // behind `isOnlineEvalsEnabled` as before.
+    // of the module. AIObservabilityShell (Index.vue) renders Evaluate/
+    // Experiment/Annotate/Agent Graph/Agent Behavior too, but locked (lock
+    // icon + tooltip) rather than hidden, so this entry point itself doesn't
+    // need to wait on `isOnlineEvalsEnabled` for those.
     const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
     const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
 
