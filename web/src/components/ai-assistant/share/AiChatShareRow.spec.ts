@@ -56,14 +56,29 @@ describe("AiChatShareRow", () => {
     expect(find(wrapper, "revoke-confirm").exists()).toBe(false);
   });
 
-  it("shows the tools-hidden badge and toggles redaction", async () => {
+  it("confirms before showing tool data on a public link", async () => {
     const wrapper = mount(AiChatShareRow, { props: { share: share() } });
     expect(find(wrapper, "redacted").exists()).toBe(true);
     await find(wrapper, "toggle-redaction").trigger("click");
+    expect(wrapper.emitted("toggle-redaction")).toBeUndefined();
+    expect(find(wrapper, "show-tools-confirm").exists()).toBe(true);
+    await find(wrapper, "show-tools-confirm-btn").trigger("click");
     expect(wrapper.emitted("toggle-redaction")).toHaveLength(1);
 
     const shown = mount(AiChatShareRow, { props: { share: share({ redact_tools: false }) } });
     expect(find(shown, "redacted").exists()).toBe(false);
+    expect(find(shown, "tools-visible").exists()).toBe(true);
+  });
+
+  it("toggles redaction at once on an org link, and hiding tools never asks", async () => {
+    const org = mount(AiChatShareRow, { props: { share: share({ visibility: "org" }) } });
+    await find(org, "toggle-redaction").trigger("click");
+    expect(org.emitted("toggle-redaction")).toHaveLength(1);
+    expect(find(org, "tools-visible").exists()).toBe(false);
+
+    const shown = mount(AiChatShareRow, { props: { share: share({ redact_tools: false }) } });
+    await find(shown, "toggle-redaction").trigger("click");
+    expect(shown.emitted("toggle-redaction")).toHaveLength(1);
   });
 
   it("offers only copy and revoke, with the owner, on the admin list", () => {

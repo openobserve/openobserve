@@ -16,6 +16,7 @@
 import { foldTurns, mergeIncremental, type StoredTurn } from "@/components/O2AIChat.history";
 import type { ChatMessage, ChatHistoryEntry, TurnSpan } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
+import { notifyChatListChanged } from "@/utils/chatListRevision";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
 
 const DB_NAME = "o2ChatDB";
@@ -24,15 +25,13 @@ const STORE_NAME = "chatHistory";
 const MAX_HISTORY_ITEMS = 100;
 // Turns a top-up read may return; a longer gap is cheaper as one full read.
 const INCREMENTAL_TURN_LIMIT = 50;
+// A live save whose turn the server never reports stops winning after this, so a lost turn cannot pin a stale copy.
+const LIVE_SAVE_GRACE_MS = 10 * 60_000;
 
-// Opening a connection per call leaked one IDBDatabase per operation, so the
-// single connection is memoised and reused for the page's lifetime.
+// One memoised connection: opening one per call leaked an IDBDatabase per operation.
 let dbPromise: Promise<IDBDatabase> | null = null;
 
-/**
- * Initialize IndexedDB for chat history storage.
- * Version 2 adds the userOrgKey index for per-user/org isolation.
- */
+/** Open the chat history store; version 2 added the userOrgKey index. */
 const initDB = (): Promise<IDBDatabase> => {
   if (dbPromise) return dbPromise;
 
@@ -97,6 +96,8 @@ export interface ServerChatSummary {
 /** A stored chat (`GET /api/{org}/ai/chats/{session_id}`). */
 export interface ServerChatDetail extends ServerChatSummary {
   not_modified: boolean;
+  /** Changes with the committed seq or any turn's status; pass back as `known_version`. */
+  state_version?: string;
   turns?: StoredTurn[];
   /** A turn is still being generated. */
   active_turn?: boolean;
@@ -106,11 +107,7 @@ export interface ServerChatDetail extends ServerChatSummary {
   has_more?: boolean;
 }
 
-/**
- * Server-side chat persistence. When `enabled()`, the server holds the
- * canonical history and IndexedDB is a cache of it (see `useChatHistory`).
- * Errors carry the HTTP `status` when there was one.
- */
+/** Server-side chat persistence; when enabled IndexedDB only caches it, and errors carry the HTTP `status`. */
 export interface ChatHistoryServer {
   enabled: () => boolean;
   list: (
@@ -122,16 +119,16 @@ export interface ChatHistoryServer {
     sessionId: string,
     knownSeq?: number,
     limit?: number,
+    knownVersion?: string,
   ) => Promise<ServerChatDetail>;
   rename: (orgId: string, sessionId: string, title: string) => Promise<unknown>;
   remove: (orgId: string, sessionId: string) => Promise<unknown>;
   removeAll: (orgId: string) => Promise<unknown>;
 }
 
-// Entry id → session id of server chats listed but not cached locally. Module
-// scope: the list (HomeChatHistory) and the chat that opens an entry
-// (O2AIChat) are separate instances that share only the numeric id.
+// Module scope: the list (HomeChatHistory) and the chat that opens an entry (O2AIChat) share only the numeric id.
 const listedSessions = new Map<number, string>();
+const listedTitles = new Map<number, string>();
 
 /** Chat entry ids are creation times in ms; a UUIDv7 session id carries one. */
 const idFromSessionId = (sessionId: string): number =>
@@ -148,24 +145,18 @@ const spansCover = (record: ChatHistoryEntry): boolean =>
 const isSettled = (detail: ServerChatDetail, turns: StoredTurn[]): boolean =>
   !detail.active_turn && !turns.some((turn) => turn.status === "running");
 
-/**
- * Composable for managing AI chat history in IndexedDB.
- * Shared between O2AIChat (full chat) and QueryEditor (inline AI bar).
- *
- * All operations are scoped to the current user + organization by an opaque
- * SHA-256 hash stored on each record. Switching users or orgs automatically
- * shows only that context's history.
- *
- * @param getUserEmail - Getter returning the logged-in user's email. Using a
- *   getter (instead of a plain string) ensures the composable always reads the
- *   current value from the Vuex store, so org/user switches are reflected
- *   immediately without re-mounting the component.
- * @param getOrgIdentifier - Getter returning the current org identifier.
- * @param t - Translator from the calling component's `useI18nTyped()`.
- * @param server - Server-side persistence. When enabled, lists, loads,
- *   renames and deletes go to the server, and IndexedDB only caches what it
- *   returned (plus chats that predate persistence, which stay browser-only).
- */
+// A turn that ended here commits on the server a moment later (a Stop, notably), so until the server has it settled the save wins.
+const isLiveSaveAhead = (record: ChatHistoryEntry, turns: StoredTurn[]): boolean => {
+  if (!record.serverBacked || record.cachedLastSeq !== undefined || !record.liveTurnId)
+    return false;
+  if (record.liveSavedAt !== undefined && Date.now() - record.liveSavedAt > LIVE_SAVE_GRACE_MS) {
+    return false;
+  }
+  const turn = turns.find((stored) => stored.turn_id === record.liveTurnId);
+  return !turn || turn.status === "running";
+};
+
+/** AI chat history scoped to the current user and org, cached in IndexedDB and backed by the server when `server` is enabled. */
 export function useChatHistory(
   getUserEmail: () => string,
   getOrgIdentifier: () => string,
@@ -173,8 +164,7 @@ export function useChatHistory(
   server?: ChatHistoryServer,
 ) {
   const serverOn = () => server?.enabled() ?? false;
-  // Cache the last computed hash alongside the raw input that produced it.
-  // When the org or user changes the raw string changes, triggering a new hash.
+  // Keyed by the raw input, so a user or org switch recomputes the hash.
   let _cachedRaw: string | null = null;
   let _cachedKeyPromise: Promise<string> | null = null;
 
@@ -187,20 +177,13 @@ export function useChatHistory(
     return _cachedKeyPromise!;
   };
 
-  /**
-   * Save a chat session (messages + metadata) to IndexedDB.
-   *
-   * @param messages - Array of ChatMessage objects (user + assistant)
-   * @param sessionId - UUIDv7 session ID for tracking
-   * @param title - Chat title (defaults to truncated first user message)
-   * @param existingChatId - If updating an existing entry, pass its ID
-   * @returns The chat ID of the saved entry
-   */
+  /** Save a chat to IndexedDB and return its entry id; `endedTurnId` marks a save made as that turn ended. */
   const saveToHistory = async (
     messages: ChatMessage[],
     sessionId: string,
     title?: string,
     existingChatId?: number | null,
+    endedTurnId?: string,
   ): Promise<number | null> => {
     if (messages.length === 0) return null;
 
@@ -243,9 +226,9 @@ export function useChatHistory(
         messages: serializableMessages,
         sessionId,
         userOrgKey,
-        // A live save may be ahead of (or differ from) what the server
-        // committed, so the next open revalidates (no cachedLastSeq).
+        // No cachedLastSeq: a live save may differ from what the server committed, so the next open revalidates.
         ...(serverOn() && { serverBacked: true }),
+        ...(serverOn() && endedTurnId && { liveTurnId: endedTurnId, liveSavedAt: Date.now() }),
       };
 
       const chatId = existingChatId || Date.now();
@@ -267,13 +250,7 @@ export function useChatHistory(
     }
   };
 
-  /**
-   * Load all chat history entries for the current user+org,
-   * sorted by timestamp descending.
-   * Automatically prunes entries beyond MAX_HISTORY_ITEMS.
-   *
-   * @returns Array of ChatHistoryEntry objects
-   */
+  /** This user+org's cached chats, newest first, pruned to MAX_HISTORY_ITEMS. */
   const loadLocalHistory = async (): Promise<ChatHistoryEntry[]> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
@@ -315,13 +292,7 @@ export function useChatHistory(
     }
   };
 
-  /**
-   * Load a single chat entry by its ID.
-   * Returns null if not found or if it belongs to a different user+org.
-   *
-   * @param chatId - The ID of the chat to load
-   * @returns The chat entry, or null if not found / not owned
-   */
+  /** One cached chat, or null when missing or owned by another user+org. */
   const loadLocalChat = async (chatId: number): Promise<ChatHistoryEntry | null> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
@@ -350,13 +321,7 @@ export function useChatHistory(
     }
   };
 
-  /**
-   * Delete a single chat entry by its ID.
-   * No-ops if the record belongs to a different user+org.
-   *
-   * @param chatId - The ID of the chat to delete
-   * @returns true if deletion succeeded
-   */
+  /** Delete one cached chat of this user+org. */
   const deleteLocalChat = async (chatId: number): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
@@ -389,12 +354,7 @@ export function useChatHistory(
     }
   };
 
-  /**
-   * Clear all chat history entries for the current user+org only.
-   * Does not affect other users' or orgs' records.
-   *
-   * @returns true if clear succeeded
-   */
+  /** Delete every cached chat of this user+org only. */
   const clearLocalHistory = async (): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
@@ -424,14 +384,7 @@ export function useChatHistory(
     }
   };
 
-  /**
-   * Update the title of an existing chat entry.
-   * No-ops if the record belongs to a different user+org.
-   *
-   * @param chatId - The ID of the chat to update
-   * @param newTitle - The new title
-   * @returns true if update succeeded
-   */
+  /** Rename one cached chat of this user+org. */
   const updateLocalTitle = async (chatId: number, newTitle: string): Promise<boolean> => {
     try {
       const [db, userOrgKey] = await Promise.all([initDB(), getUserOrgKey()]);
@@ -474,8 +427,6 @@ export function useChatHistory(
     });
   };
 
-  // --- Server-backed operations ------------------------------------------
-
   const loadHistory = async (): Promise<ChatHistoryEntry[]> => {
     const local = await loadLocalHistory();
     if (!serverOn()) return local;
@@ -494,11 +445,15 @@ export function useChatHistory(
     const listed = new Set<string>();
     const merged: ChatHistoryEntry[] = [];
     listedSessions.clear();
+    listedTitles.clear();
     for (const chat of page.chats) {
       listed.add(chat.session_id);
       const cached = cachedBySession.get(chat.session_id);
       const id = cached?.id ?? idFromSessionId(chat.session_id);
-      if (!cached) listedSessions.set(id, chat.session_id);
+      if (!cached) {
+        listedSessions.set(id, chat.session_id);
+        listedTitles.set(id, chat.title);
+      }
       merged.push({
         id,
         timestamp: new Date(chat.updated_at / 1000).toISOString(),
@@ -514,8 +469,7 @@ export function useChatHistory(
     const oldestListed = Math.min(...page.chats.map((c) => c.updated_at / 1000));
     for (const record of local) {
       if (record.sessionId && listed.has(record.sessionId)) continue;
-      // Synced from the server before, within the range the listing covers,
-      // yet absent: deleted (possibly from another device).
+      // Synced before and within the listed range, yet absent: deleted, possibly from another device.
       const goneFromServer =
         record.serverBacked &&
         record.cachedLastSeq !== undefined &&
@@ -539,7 +493,8 @@ export function useChatHistory(
   ): Promise<{ detail: ServerChatDetail; folded: Folded | null }> => {
     const knownSeq = record?.cachedLastSeq;
     const limit = knownSeq === undefined ? undefined : INCREMENTAL_TURN_LIMIT;
-    const detail = await server!.get(getOrgIdentifier(), sessionId, knownSeq, limit);
+    const knownVersion = knownSeq === undefined ? undefined : record?.cachedStateVersion;
+    const detail = await server!.get(getOrgIdentifier(), sessionId, knownSeq, limit, knownVersion);
     if (detail.not_modified) return { detail, folded: null };
     const partial = detail.partial_from_seq !== undefined && detail.partial_from_seq !== null;
     if (!partial) return { detail, folded: foldTurns(detail.turns ?? [], t) };
@@ -552,6 +507,24 @@ export function useChatHistory(
     return { detail: full, folded: foldTurns(full.turns ?? [], t) };
   };
 
+  // A history the server cannot read must still open, flagged, rather than leave the click silent.
+  const unavailableEntry = async (
+    chatId: number,
+    sessionId: string,
+    record: ChatHistoryEntry | null,
+  ): Promise<ChatHistoryEntry> => ({
+    ...(record ?? {
+      id: chatId,
+      timestamp: new Date().toISOString(),
+      title: raw(listedTitles.get(chatId) || t("common.newChat")),
+      messages: [],
+      sessionId,
+      userOrgKey: await getUserOrgKey(),
+      serverBacked: true,
+    }),
+    historyUnavailable: true,
+  });
+
   const loadChat = async (chatId: number): Promise<ChatHistoryEntry | null> => {
     const record = await loadLocalChat(chatId);
     const sessionId = record?.sessionId ?? listedSessions.get(chatId);
@@ -561,23 +534,21 @@ export function useChatHistory(
     try {
       ({ detail, folded } = await fetchFolded(sessionId, record));
     } catch (error) {
-      if (statusOf(error) === 404 && record?.serverBacked) {
+      const status = statusOf(error);
+      if (status === 404 && record?.serverBacked) {
         // Deleted on the server: the cached copy must not resurface.
         await deleteLocalChat(record.id);
         return null;
       }
-      // Browser-only chat (404), or offline/transient: show what is cached.
-      return record;
+      // A browser-only chat is a 404 too; it simply has nothing on the server.
+      if (status === 404) return record;
+      if (record && !record.serverBacked) return record;
+      return unavailableEntry(chatId, sessionId, record);
     }
     if (!folded) return record;
 
     const { messages, spans } = folded;
-    // A live save ahead of the server (a stopped turn commits after its cancel returns) must not be replaced by the older copy.
-    const liveSaveAhead =
-      record?.serverBacked &&
-      record.cachedLastSeq === undefined &&
-      messages.length < record.messages.length;
-    if (record && liveSaveAhead) {
+    if (record && isLiveSaveAhead(record, detail.turns ?? [])) {
       return { ...record, forkedFromShare: detail.forked_from_share ?? record.forkedFromShare };
     }
     // Feedback votes live only in this browser; keep them when the shape matches.
@@ -595,12 +566,17 @@ export function useChatHistory(
       sessionId,
       userOrgKey: await getUserOrgKey(),
       serverBacked: true,
-      ...(settled && { cachedLastSeq: detail.last_committed_seq, cachedTurnSpans: spans }),
+      ...(settled && {
+        cachedLastSeq: detail.last_committed_seq,
+        cachedTurnSpans: spans,
+        ...(detail.state_version !== undefined && { cachedStateVersion: detail.state_version }),
+      }),
       forkedFromShare: detail.forked_from_share,
     };
     try {
       await putRecord(entry);
       listedSessions.delete(chatId);
+      listedTitles.delete(chatId);
     } catch (error) {
       console.error("Error caching chat:", error);
     }
@@ -615,7 +591,11 @@ export function useChatHistory(
 
   const deleteChatById = async (chatId: number): Promise<boolean> => {
     const sessionId = serverOn() ? await serverSessionOf(chatId) : null;
-    if (!sessionId) return deleteLocalChat(chatId);
+    if (!sessionId) {
+      const deleted = await deleteLocalChat(chatId);
+      if (deleted) notifyChatListChanged();
+      return deleted;
+    }
     try {
       await server!.remove(getOrgIdentifier(), sessionId);
     } catch (error) {
@@ -626,7 +606,9 @@ export function useChatHistory(
       }
     }
     listedSessions.delete(chatId);
+    listedTitles.delete(chatId);
     await deleteLocalChat(chatId);
+    notifyChatListChanged();
     return true;
   };
 
@@ -639,8 +621,11 @@ export function useChatHistory(
         return false;
       }
       listedSessions.clear();
+      listedTitles.clear();
     }
-    return clearLocalHistory();
+    const cleared = await clearLocalHistory();
+    notifyChatListChanged();
+    return cleared;
   };
 
   const updateChatTitle = async (chatId: number, newTitle: string): Promise<boolean> => {
@@ -653,17 +638,17 @@ export function useChatHistory(
           console.error("Error renaming chat on the server:", error);
           return false;
         }
+        notifyChatListChanged();
         const cached = await loadLocalChat(chatId);
         if (!cached) return true;
       }
     }
-    return updateLocalTitle(chatId, newTitle);
+    const renamed = await updateLocalTitle(chatId, newTitle);
+    if (renamed) notifyChatListChanged();
+    return renamed;
   };
 
-  /**
-   * Cache a server chat this browser has not listed yet (a fork) and return
-   * its entry id, so `loadChat` can open it straight away.
-   */
+  /** Cache a server chat this browser has not listed yet (a fork) so `loadChat` can open it at once. */
   const adoptServerChat = async (sessionId: string, title: string): Promise<number> => {
     const id = idFromSessionId(sessionId);
     const existing = await loadLocalChat(id);
@@ -678,6 +663,7 @@ export function useChatHistory(
       userOrgKey: await getUserOrgKey(),
       serverBacked: true,
     });
+    notifyChatListChanged();
     return id;
   };
 

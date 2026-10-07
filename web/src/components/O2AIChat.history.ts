@@ -23,6 +23,9 @@ export type { TurnSpan };
 
 export type TurnStatus = "running" | "completed" | "cancelled" | "failed" | "interrupted";
 
+/** Who reads the fold: the owner can still act on a running turn, a viewer of a share cannot. */
+export type HistoryAudience = "owner" | "viewer";
+
 /** One turn of a stored conversation, as `GET /ai/chats/{id}` returns it. */
 export interface StoredTurn {
   /** Absent from shared reads. */
@@ -85,6 +88,7 @@ function markTurnStatus(
   from: number,
   state: StreamState,
   ctx: ReducerCtx,
+  audience: HistoryAudience,
 ): void {
   const has = (type: string) => turn.frames.some((frame) => frame?.type === type);
   const { t } = ctx;
@@ -92,7 +96,8 @@ function markTurnStatus(
     appendMarker(messages, from, {
       type: "status",
       turnStatus: "running",
-      message: t("aiAssistant.turnRunning"),
+      message:
+        audience === "viewer" ? t("aiAssistant.turnRunningViewer") : t("aiAssistant.turnRunning"),
     });
   } else if (turn.status === "cancelled" && !has("cancelled") && !state.halted) {
     reduce(state, { type: "cancelled" }, ctx);
@@ -112,7 +117,12 @@ function markTurnStatus(
   }
 }
 
-function foldTurn(turn: StoredTurn, messages: ChatMessage[], ctx: ReducerCtx): void {
+function foldTurn(
+  turn: StoredTurn,
+  messages: ChatMessage[],
+  ctx: ReducerCtx,
+  audience: HistoryAudience,
+): void {
   const from = messages.length;
   if (turn.user) {
     const images = (turn.user.images ?? [])
@@ -140,13 +150,14 @@ function foldTurn(turn: StoredTurn, messages: ChatMessage[], ctx: ReducerCtx): v
     if (state.halted) break;
     reduce(state, frame, ctx);
   }
-  markTurnStatus(turn, messages, from, state, ctx);
+  markTurnStatus(turn, messages, from, state, ctx, audience);
 }
 
 /** Fold stored turns with the live reducer so they render like a live chat, marking unfinished or failed turns. */
 export function foldTurns(
   turns: StoredTurn[],
   t: TranslateFn,
+  audience: HistoryAudience = "owner",
 ): { messages: ChatMessage[]; spans: TurnSpan[] } {
   const messages: ChatMessage[] = [];
   const spans: TurnSpan[] = [];
@@ -160,7 +171,7 @@ export function foldTurns(
   };
   for (const turn of turns) {
     const before = messages.length;
-    foldTurn(turn, messages, ctx);
+    foldTurn(turn, messages, ctx, audience);
     spans.push({
       turn_id: turn.turn_id,
       first_seq: turn.first_seq,
@@ -171,53 +182,56 @@ export function foldTurns(
   return { messages, spans };
 }
 
-export function messagesFromTurns(turns: StoredTurn[], t: TranslateFn): ChatMessage[] {
-  return foldTurns(turns, t).messages;
+export function messagesFromTurns(
+  turns: StoredTurn[],
+  t: TranslateFn,
+  audience: HistoryAudience = "owner",
+): ChatMessage[] {
+  return foldTurns(turns, t, audience).messages;
 }
 
 const hasSeq = (span: { first_seq?: number | null }) => typeof span.first_seq === "number";
 
-/** Merge an incremental read into a cached fold: returned turns replace cached ones by `first_seq`. */
+type Piece = { span: TurnSpan; messages: ChatMessage[] };
+
+const piecesOf = (folded: { messages: ChatMessage[]; spans: TurnSpan[] }): Piece[] => {
+  const pieces: Piece[] = [];
+  let offset = 0;
+  for (const span of folded.spans) {
+    pieces.push({ span, messages: folded.messages.slice(offset, offset + span.count) });
+    offset += span.count;
+  }
+  return pieces;
+};
+
+const sameTurn = (a: TurnSpan, b: TurnSpan): boolean =>
+  (hasSeq(a) && hasSeq(b) && a.first_seq === b.first_seq) ||
+  (!!a.turn_id && a.turn_id === b.turn_id);
+
+/** Merge an incremental read into a cached fold: a returned turn replaces its cached copy in place, new ones follow in server order. */
 export function mergeIncremental(
   cached: { messages: ChatMessage[]; spans: TurnSpan[] },
   knownSeq: number,
   incoming: StoredTurn[],
   t: TranslateFn,
 ): { messages: ChatMessage[]; spans: TurnSpan[] } {
-  const folded = foldTurns(incoming, t);
-  const newFirstSeqs = new Set(incoming.filter(hasSeq).map((turn) => turn.first_seq));
-  const newTurnIds = new Set(incoming.map((turn) => turn.turn_id).filter(Boolean));
-
-  type Piece = { span: TurnSpan; messages: ChatMessage[] };
-  const cachedPieces: Piece[] = [];
-  let offset = 0;
-  for (const span of cached.spans) {
-    cachedPieces.push({ span, messages: cached.messages.slice(offset, offset + span.count) });
-    offset += span.count;
+  const fresh = piecesOf(foldTurns(incoming, t));
+  const used = new Set<Piece>();
+  const ordered: Piece[] = [];
+  for (const piece of piecesOf(cached)) {
+    const replacement = fresh.find((next) => !used.has(next) && sameTurn(piece.span, next.span));
+    if (replacement) {
+      used.add(replacement);
+      ordered.push(replacement);
+      continue;
+    }
+    const committed =
+      !hasSeq(piece.span) ||
+      (typeof piece.span.last_seq === "number" && piece.span.last_seq <= knownSeq);
+    if (committed) ordered.push(piece);
   }
-  const newPieces: Piece[] = [];
-  offset = 0;
-  for (const span of folded.spans) {
-    newPieces.push({ span, messages: folded.messages.slice(offset, offset + span.count) });
-    offset += span.count;
-  }
-
-  const keptStored = cachedPieces.filter(
-    ({ span }) =>
-      hasSeq(span) &&
-      typeof span.last_seq === "number" &&
-      span.last_seq <= knownSeq &&
-      !newFirstSeqs.has(span.first_seq),
-  );
-  const keptUnstored = cachedPieces.filter(
-    ({ span }) => !hasSeq(span) && !(span.turn_id && newTurnIds.has(span.turn_id)),
-  );
-  const stored = [...keptStored, ...newPieces.filter(({ span }) => hasSeq(span))].sort(
-    (a, b) => (a.span.first_seq as number) - (b.span.first_seq as number),
-  );
-  // A full read lists never-stored failed turns after the stored ones, so the merge does too.
-  const unstored = [...keptUnstored, ...newPieces.filter(({ span }) => !hasSeq(span))];
-  const ordered = [...stored, ...unstored];
+  // The server lists the turns past knownSeq in the order they started, so they keep that order.
+  ordered.push(...fresh.filter((piece) => !used.has(piece)));
   return {
     messages: ordered.flatMap((piece) => piece.messages),
     spans: ordered.map((piece) => piece.span),

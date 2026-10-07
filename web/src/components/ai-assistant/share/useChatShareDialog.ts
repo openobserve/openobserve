@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, reactive, ref, watch, type Ref } from "vue";
-import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useMutation, useQuery, type QueryClient } from "@tanstack/vue-query";
+import { useStore } from "vuex";
 import type { ShareView, ShareVisibility, UpdateShareRequest } from "@/services/ai_chat_share";
 import {
   chatSharesQuery,
@@ -22,6 +23,7 @@ import {
   revokeShareMutation,
   updateShareMutation,
 } from "@/services/ai_chat_share.queries";
+import { orgUsersQuery } from "@/services/users.queries";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -30,6 +32,8 @@ import {
   buildCreateRequest,
   defaultShareForm,
   expiryPresetsFor,
+  isAdminInMembers,
+  orgAdminFlag,
   otherMode,
   serverMessageOf,
   shareLinkOf,
@@ -190,6 +194,34 @@ export function useChatShareDialog(options: ChatShareDialogOptions) {
     resetForm,
     create,
   };
+}
+
+/** Org admin of the selected org: the server's flag, else the member list the IAM pages read, fetched only while `enabled`. */
+export function useIsOrgAdmin(orgId: Ref<string>, enabled: Ref<boolean>) {
+  const store = useStore();
+  const explicit = computed(() => orgAdminFlag(store.state));
+  const membersQuery = useQuery(() =>
+    Object.assign(orgUsersQuery(orgId.value), {
+      enabled: enabled.value && explicit.value === undefined && !!orgId.value,
+    }),
+  );
+  return computed(
+    () => explicit.value ?? isAdminInMembers(membersQuery.data.value, store.state.userInfo?.email),
+  );
+}
+
+/** Active links of a chat, for warning before it is deleted; 0 when they cannot be read. */
+export async function activeShareCount(
+  client: QueryClient,
+  orgId: string,
+  sessionId: string | undefined,
+): Promise<number> {
+  if (!orgId || !sessionId) return 0;
+  try {
+    return (await client.fetchQuery(chatSharesQuery(orgId, sessionId))).length;
+  } catch {
+    return 0;
+  }
 }
 
 function failToast(error: unknown, fallback: I18nText) {

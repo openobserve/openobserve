@@ -37,6 +37,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 const props = defineProps<{
   sessionId: string | null | undefined;
   chatTitle?: string;
+  /** The server could not read this chat's history, so viewers of a link will not see it either. */
+  historyUnavailable?: boolean;
 }>();
 
 const open = defineModel<boolean>("open", { required: true });
@@ -108,6 +110,14 @@ const setRedactTools = (value: unknown) => {
     @click:secondary="open = false"
   >
     <div class="flex flex-col gap-5">
+      <OBanner
+        v-if="historyUnavailable"
+        variant="warning"
+        icon="error"
+        dense
+        :content="t('aiChatShare.historyUnavailableWarning')"
+        data-test="ai-chat-share-dialog-history-unavailable"
+      />
       <OBanner
         v-if="createdShare ? !createdShare.redact_tools : !form.redactTools"
         variant="warning"

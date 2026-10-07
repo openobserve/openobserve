@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
+import { queryClient } from "@/composables/query/queryClient";
 import { useI18nTyped } from "@/types/i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
+import { chatListRevision } from "@/utils/chatListRevision";
 import useAiChat from "@/composables/useAiChat";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -13,6 +15,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AiChatShareDialog from "@/components/ai-assistant/share/AiChatShareDialog.vue";
 import AiChatSharedByMe from "@/components/ai-assistant/share/AiChatSharedByMe.vue";
 import { isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
+import { activeShareCount } from "@/components/ai-assistant/share/useChatShareDialog";
 
 const emit = defineEmits<{
   (e: "load-chat", id: number): void;
@@ -40,13 +43,14 @@ async function refresh() {
 
 onMounted(refresh);
 
-// Re-fetch whenever a chat is saved (chatUpdated flips true)
+// chatUpdated is reset within the same tick it is raised, so the list follows its own revision counter too.
 watch(
   () => store.state.chatUpdated,
   (val) => {
     if (val) refresh();
   },
 );
+watch(chatListRevision, refresh);
 
 const filtered = computed(() => {
   const q = searchTerm.value.trim().toLowerCase();
@@ -66,11 +70,32 @@ function newChat() {
   emit("new-chat");
 }
 
-async function deleteChat(e: MouseEvent, id: number) {
+async function deleteChat(e: Event, chat: ChatHistoryEntry) {
   e.stopPropagation();
-  await deleteChatById(id);
-  if (activeChatId.value === id) newChat();
+  const links = canShare(chat)
+    ? await activeShareCount(
+        queryClient,
+        store.state.selectedOrganization?.identifier ?? "",
+        chat.sessionId,
+      )
+    : 0;
+  const ok = await confirm({
+    title: t("aiAssistant.deleteChat"),
+    message:
+      links > 0
+        ? t("aiAssistant.deleteChatWithLinksMessage", { count: links }, links)
+        : t("aiAssistant.deleteChatConfirmMessage"),
+  });
+  if (!ok) return;
+  await deleteChatById(chat.id);
+  if (activeChatId.value === chat.id) newChat();
   await refresh();
+}
+
+function onRowKeydown(e: KeyboardEvent, id: number) {
+  if (e.target !== e.currentTarget) return;
+  e.preventDefault();
+  selectChat(id);
 }
 
 async function clearAll() {
@@ -93,14 +118,14 @@ const sharedByMeOpen = ref(false);
 const canShare = (chat: ChatHistoryEntry) =>
   persistenceEnabled.value && !!chat.serverBacked && !!chat.sessionId;
 
-function openShare(e: MouseEvent, chat: ChatHistoryEntry) {
+function openShare(e: Event, chat: ChatHistoryEntry) {
   e.stopPropagation();
   shareTarget.value = chat;
   shareDialogOpen.value = true;
 }
 
 function formatTime(ts: string): string {
-  const d = new Date(Number(ts));
+  const d = new Date(ts);
   if (isNaN(d.getTime())) return "";
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
@@ -116,7 +141,6 @@ function formatTime(ts: string): string {
   <div
     class="border-card-glass-border bg-card-glass-bg flex h-full w-[15em] shrink-0 flex-col overflow-hidden border-e border-e-[0.0625em] text-base"
   >
-    <!-- Header -->
     <div class="flex shrink-0 items-center justify-between px-3 pt-[0.625em] pb-[0.375em]">
       <span class="text-[0.8125em] font-semibold opacity-70">{{ t("chatHistory.title") }}</span>
       <span class="flex items-center gap-0.5">
@@ -125,6 +149,7 @@ function formatTime(ts: string): string {
           variant="ghost-muted"
           size="icon"
           data-test="home-chat-history-shared-by-me"
+          :aria-label="t('aiChatShare.sharedByMe')"
           @click="sharedByMeOpen = true"
         >
           <OIcon name="link" size="sm" />
@@ -134,6 +159,7 @@ function formatTime(ts: string): string {
           variant="ghost-muted"
           size="icon"
           :title="t('chatHistory.newChat')"
+          :aria-label="t('chatHistory.newChat')"
           @click="newChat"
         >
           <svg
@@ -153,7 +179,6 @@ function formatTime(ts: string): string {
       </span>
     </div>
 
-    <!-- Search -->
     <div class="shrink-0 px-2 pb-[0.375em]">
       <div class="bg-input-bg rounded-default flex items-center gap-[0.375em] px-[0.375em]">
         <svg
@@ -174,9 +199,16 @@ function formatTime(ts: string): string {
           v-model="searchTerm"
           class="hch-search-input text-text-body placeholder:text-text-muted min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none placeholder:opacity-70"
           :placeholder="t('chatHistory.search')"
+          :aria-label="t('chatHistory.search')"
           type="text"
         />
-        <OButton v-if="searchTerm" variant="ghost-subtle" size="icon" @click="searchTerm = ''">
+        <OButton
+          v-if="searchTerm"
+          variant="ghost-subtle"
+          size="icon"
+          :aria-label="t('chatHistory.clearSearch')"
+          @click="searchTerm = ''"
+        >
           <svg
             width="0.75em"
             height="0.75em"
@@ -193,16 +225,21 @@ function formatTime(ts: string): string {
       </div>
     </div>
 
-    <!-- List -->
     <div class="hch-list flex-1 overflow-y-auto px-[0.375em] py-1">
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group rounded-default hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms]"
+        class="group rounded-default hover:bg-interactive-hover-bg focus-visible:ring-accent/40 flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms] focus-visible:ring-2 focus-visible:outline-none"
         :class="{
           'bg-surface-accent-active!': activeChatId === chat.id,
         }"
+        role="button"
+        tabindex="0"
+        :aria-current="activeChatId === chat.id ? 'true' : undefined"
+        :data-test="`home-chat-history-item-${chat.id}`"
         @click="selectChat(chat.id)"
+        @keydown.enter="onRowKeydown($event, chat.id)"
+        @keydown.space="onRowKeydown($event, chat.id)"
       >
         <div class="min-w-0 flex-1">
           <OTruncatedText
@@ -217,13 +254,14 @@ function formatTime(ts: string): string {
           </div>
         </div>
         <span
-          class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 max-md:opacity-100"
+          class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
         >
           <OButton
             v-if="canShare(chat)"
             variant="ghost-muted"
             size="icon"
             :data-test="`home-chat-history-share-${chat.id}`"
+            :aria-label="t('aiChatShare.share')"
             @click="openShare($event, chat)"
           >
             <OIcon name="share" size="sm" />
@@ -233,7 +271,9 @@ function formatTime(ts: string): string {
             variant="ghost-destructive"
             size="icon"
             :title="t('chatHistory.delete')"
-            @click="deleteChat($event, chat.id)"
+            :aria-label="t('chatHistory.delete')"
+            :data-test="`home-chat-history-delete-${chat.id}`"
+            @click="deleteChat($event, chat)"
           >
             <svg
               width="0.875em"
@@ -263,7 +303,6 @@ function formatTime(ts: string): string {
       </div>
     </div>
 
-    <!-- Clear all -->
     <div
       v-if="history.length > 0"
       class="border-t-card-glass-border shrink-0 border-t border-t-[0.0625em] px-2 py-[0.375em]"

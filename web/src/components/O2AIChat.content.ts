@@ -111,8 +111,9 @@ export function processTextBlock(text: string): RenderedBlock[] {
 
 export const processMessageContent = processTextBlock;
 
-// Helper to format JSON with syntax highlighting
-export function formatLogEntryContent(content: string): string {
+/** A log entry as highlighted JSON or escaped text; `strict` for read-only views of other people's chats. */
+export function formatLogEntryContent(content: string, strict = false): string {
+  const sanitize = (html: string) => (strict ? sanitizeStrict(html) : DOMPurify.sanitize(html));
   try {
     const parsed = JSON.parse(content);
     const formatted = JSON.stringify(parsed, null, 2);
@@ -134,10 +135,10 @@ export function formatLogEntryContent(content: string): string {
         return `<span class="${cls}">${match}</span>`;
       },
     );
-    return DOMPurify.sanitize(highlighted);
+    return sanitize(highlighted);
   } catch {
     // Not JSON, return plain text with HTML escaping
-    return DOMPurify.sanitize(
+    return sanitize(
       content
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -246,12 +247,47 @@ export function chatErrorMessage(error: any, t: TranslateFn): string {
   }
 }
 
-// Read-only views render other people's chats, so nothing may load remote content or restyle the page.
+// Read-only views render other people's chats: only the markup markdown produces, nothing interactive or remote.
 const STRICT_PURIFY = {
-  USE_PROFILES: { html: true },
-  FORBID_TAGS: ["style", "video", "audio", "source", "picture", "track", "form", "button"],
-  FORBID_ATTR: ["style", "srcset", "background", "poster"],
+  ALLOWED_TAGS: [
+    "a",
+    "b",
+    "blockquote",
+    "br",
+    "code",
+    "del",
+    "div",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "i",
+    "img",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "s",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "tfoot",
+    "th",
+    "thead",
+    "tr",
+    "ul",
+  ],
+  ALLOWED_ATTR: ["href", "title", "alt", "src", "class", "colspan", "rowspan", "align", "start"],
   ALLOW_DATA_ATTR: false,
+  ALLOW_ARIA_ATTR: false,
 };
 
 const SHARED_LINK_REL = "noopener noreferrer nofollow";

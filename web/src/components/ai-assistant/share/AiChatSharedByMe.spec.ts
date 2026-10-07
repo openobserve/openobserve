@@ -25,6 +25,8 @@ const service = vi.hoisted(() => ({
   revoke: vi.fn(),
 }));
 vi.mock("@/services/ai_chat_share", () => ({ default: service }));
+const users = vi.hoisted(() => ({ orgUsers: vi.fn() }));
+vi.mock("@/services/users", () => ({ default: users }));
 
 import AiChatSharedByMe from "./AiChatSharedByMe.vue";
 
@@ -46,12 +48,12 @@ const share = (id: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-function mountDrawer(role: string) {
+function mountDrawer(isOrgAdmin?: boolean, loginRole = "") {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "org1" },
-      userInfo: { email: "me@example.com", role },
-      zoConfig: {},
+      userInfo: { email: "me@example.com", role: loginRole },
+      zoConfig: isOrgAdmin === undefined ? {} : { is_org_admin: isOrgAdmin },
       theme: "light",
     },
   });
@@ -71,20 +73,38 @@ describe("AiChatSharedByMe", () => {
     document.body.innerHTML = "";
     service.listMine.mockResolvedValue({ data: { shares: [share("mine")] } });
     service.listAll.mockResolvedValue({
-      data: { shares: [share("mine"), share("other", { owner_name: "Ada" })] },
+      data: {
+        shares: [
+          share("mine"),
+          share("other", { owner_name: "Ada", token: undefined, url_path: undefined }),
+        ],
+      },
     });
+    users.orgUsers.mockResolvedValue({ data: { data: [] } });
   });
 
   it("hides the org-wide scope from non-admins", async () => {
-    const wrapper = mountDrawer("editor");
+    const wrapper = mountDrawer(false);
     await flushPromises();
     expect(service.listMine).toHaveBeenCalledWith("org1");
     expect(q("ai-chat-shared-by-me-scope")).toBeNull();
+    expect(users.orgUsers).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("falls back to the member list when the server sends no admin flag", async () => {
+    users.orgUsers.mockResolvedValue({
+      data: { data: [{ email: "ME@example.com", role: "Admin" }] },
+    });
+    const wrapper = mountDrawer();
+    await flushPromises();
+    expect(users.orgUsers).toHaveBeenCalledWith("org1");
+    expect(q("ai-chat-shared-by-me-scope")).not.toBeNull();
     wrapper.unmount();
   });
 
   it("lets an admin list every share in the org, read-only apart from revoke", async () => {
-    const wrapper = mountDrawer("admin");
+    const wrapper = mountDrawer(true);
     await flushPromises();
     expect(q("ai-chat-shared-by-me-scope")).not.toBeNull();
     (q("ai-chat-shared-by-me-scope-all") as HTMLElement).click();
@@ -93,12 +113,14 @@ describe("AiChatSharedByMe", () => {
     expect(q("ai-chat-share-row-other")).not.toBeNull();
     expect(q("ai-chat-share-row-owner")?.textContent).toContain("Ada");
     expect(q("ai-chat-share-row-switch-mode")).toBeNull();
+    const other = q("ai-chat-share-row-other") as HTMLElement;
+    expect(other.querySelector('[data-test="ai-chat-share-row-copy"]')).toBeNull();
     wrapper.unmount();
   });
 
   it("shows a forbidden state when the server refuses the org-wide list", async () => {
     service.listAll.mockRejectedValue({ response: { status: 403 } });
-    const wrapper = mountDrawer("root");
+    const wrapper = mountDrawer(undefined, "root");
     await flushPromises();
     (q("ai-chat-shared-by-me-scope-all") as HTMLElement).click();
     await flushPromises();

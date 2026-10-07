@@ -125,11 +125,10 @@ describe("messagesFromTurns", () => {
       frames: [{ type: "message_delta", content: "Partial" }, { type: "cancelled" }],
     };
     const [, assistant] = messagesFromTurns([stopped], t);
-    const note = "_[aiAssistant.responseStoppedByUser]_";
-    expect(assistant.content).toBe(`Partial\n\n${note}`);
+    expect(assistant.content).toBe("Partial");
     expect(assistant.contentBlocks).toEqual([
       { type: "text", text: "Partial" },
-      { type: "text", text: note },
+      { type: "status", turnStatus: "stopped", message: "aiAssistant.responseStoppedByUser" },
     ]);
   });
 
@@ -144,8 +143,9 @@ describe("messagesFromTurns", () => {
     };
     const messages = messagesFromTurns([stopped], t);
     expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
-    expect(messages[1].contentBlocks?.map((b) => b.type)).toEqual(["tool_call", "text"]);
-    expect(messages[1].content).toBe("_[aiAssistant.responseStoppedByUser]_");
+    expect(messages[1].contentBlocks?.map((b) => b.type)).toEqual(["tool_call", "status"]);
+    expect(messages[1].contentBlocks?.[1]?.turnStatus).toBe("stopped");
+    expect(messages[1].content).toBe("");
   });
 
   it("marks a running turn as still generating", () => {
@@ -164,6 +164,15 @@ describe("messagesFromTurns", () => {
       turnStatus: "running",
       message: "aiAssistant.turnRunning",
     });
+  });
+
+  it("words a running turn for a viewer, who cannot act on it", () => {
+    const [, assistant] = messagesFromTurns(
+      [{ user: { text: "go" }, frames: [], status: "running" }],
+      t,
+      "viewer",
+    );
+    expect(assistant.contentBlocks?.at(-1)?.message).toBe("aiAssistant.turnRunningViewer");
   });
 
   it("marks an interrupted turn after its partial answer, with the error code", () => {
@@ -227,7 +236,7 @@ describe("messagesFromTurns", () => {
       ],
       t,
     );
-    expect(assistant.content).toBe("P\n\n_[aiAssistant.responseStoppedByUser]_");
+    expect(assistant.contentBlocks?.filter((b) => b.turnStatus === "stopped")).toHaveLength(1);
     const [, stopped] = messagesFromTurns(
       [
         {
@@ -238,7 +247,7 @@ describe("messagesFromTurns", () => {
       ],
       t,
     );
-    expect(stopped.content).toBe("P\n\n_[aiAssistant.responseStoppedByUser]_");
+    expect(stopped.contentBlocks?.filter((b) => b.turnStatus === "stopped")).toHaveLength(1);
   });
 });
 
@@ -271,10 +280,23 @@ describe("mergeIncremental", () => {
     expect(merged.spans.map((s) => s.first_seq)).toEqual([1, 3, 7]);
   });
 
-  it("keeps never-stored failed turns after the stored ones, deduplicated by turn id", () => {
+  it("keeps a cached failed turn in place and new turns in the server's order", () => {
     const cached = foldTurns([seqTurn("a", 1, 2), failed("f1")], t);
     const merged = mergeIncremental(cached, 2, [seqTurn("b", 3, 4), failed("f1"), failed("f2")], t);
-    expect(merged.spans.map((s) => s.first_seq ?? s.turn_id)).toEqual([1, 3, "f1", "f2"]);
+    expect(merged.spans.map((s) => s.first_seq ?? s.turn_id)).toEqual([1, "f1", 3, "f2"]);
     expect(merged.messages).toHaveLength(6);
+  });
+
+  it("orders a failed turn that started between stored turns as the server lists it", () => {
+    const cached = foldTurns([seqTurn("a", 1, 2)], t);
+    const merged = mergeIncremental(cached, 2, [failed("f1"), seqTurn("b", 3, 4)], t);
+    expect(merged.spans.map((s) => s.first_seq ?? s.turn_id)).toEqual([1, "f1", 3]);
+  });
+
+  it("replaces a grown turn in place, ahead of a failed turn cached after it", () => {
+    const cached = foldTurns([seqTurn("a", 1, 2), seqTurn("b", 3, 4), failed("f1")], t);
+    const merged = mergeIncremental(cached, 4, [seqTurn("b2", 3, 6)], t);
+    expect(merged.spans.map((s) => s.first_seq ?? s.turn_id)).toEqual([1, 3, "f1"]);
+    expect(merged.messages[2].content).toBe("b2");
   });
 });

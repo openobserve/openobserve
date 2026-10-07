@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { ChatMessage, ContentBlock, NavigationAction } from "@/ts/interfaces/chat";
 import {
@@ -43,6 +44,7 @@ const emit = defineEmits<{
   (e: "like"): void;
   (e: "dislike"): void;
   (e: "preview-image", img: ImageAttachment): void;
+  (e: "stop-turn"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -50,6 +52,13 @@ const { t } = useI18nTyped();
 // Positional key shape must match the shell's toggleLogEntryExpanded.
 const isLogEntryExpanded = (blockIndex: number) =>
   props.expandedLogEntries.has(`${props.index}-${blockIndex}`);
+
+// A stopped turn is not an answer to vote on; it is retried instead.
+const isStopped = computed(() =>
+  props.message.contentBlocks.some(
+    (block) => block.type === "status" && block.turnStatus === "stopped",
+  ),
+);
 </script>
 
 <template>
@@ -73,7 +82,6 @@ const isLogEntryExpanded = (blockIndex: number) =>
       <div
         class="message-blocks flex max-w-full min-w-0 flex-1 flex-col gap-0 overflow-x-auto bg-transparent wrap-break-word [word-wrap:break-word]"
       >
-        <!-- Loading indicator inside message box for empty assistant messages -->
         <div
           v-if="
             message.role === 'assistant' &&
@@ -86,9 +94,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
           <OSpinner variant="dots" size="sm" />
           <span>{{ currentAnalyzingMessage }}</span>
         </div>
-        <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
         <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
-          <!-- Tool call block - expandable -->
           <O2AIChatToolCallBlock
             v-if="block.type === 'tool_call'"
             :block="block"
@@ -99,7 +105,6 @@ const isLogEntryExpanded = (blockIndex: number) =>
             @toggle="emit('toggle-tool-call', blockIndex)"
             @navigate="(action: NavigationAction) => emit('navigate', action)"
           />
-          <!-- Log Entry block - expandable -->
           <div
             v-else-if="block.type === 'log_entry'"
             class="log-entry-item rounded-default text-text-secondary dark:bg-surface-panel dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary mb-1 flex cursor-pointer flex-col px-2.5 py-1.5 text-xs [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:border"
@@ -116,7 +121,6 @@ const isLogEntryExpanded = (blockIndex: number) =>
                 class="expand-icon opacity-60 transition-transform duration-200"
               />
             </div>
-            <!-- Expandable details -->
             <div v-if="isLogEntryExpanded(blockIndex)" class="log-entry-details mt-2.5" @click.stop>
               <div
                 class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
@@ -125,6 +129,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
                   variant="ghost"
                   size="icon-xs-circle"
                   class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
+                  :aria-label="t('aiAssistant.copyContent')"
                   @click.stop="copyToClipboard(block.content, t)"
                 >
                   <OIcon name="content-copy" size="sm" />
@@ -132,12 +137,11 @@ const isLogEntryExpanded = (blockIndex: number) =>
                 </OButton>
                 <code
                   class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pe-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
-                  v-html="formatLogEntryContent(block.content)"
+                  v-html="formatLogEntryContent(block.content, readonly)"
                 ></code>
               </div>
             </div>
           </div>
-          <!-- Stream-level error block -->
           <div
             v-else-if="block.type === 'error'"
             data-test="o2-ai-chat-stream-error"
@@ -163,14 +167,41 @@ const isLogEntryExpanded = (blockIndex: number) =>
             </div>
           </div>
           <div
+            v-else-if="block.type === 'status' && block.turnStatus === 'stopped'"
+            class="rounded-default border-border-default text-compact text-text-secondary bg-surface-subtle mb-2 flex flex-wrap items-center gap-2 border-s-3 px-3 py-2"
+            data-test="o2-ai-chat-turn-status-stopped"
+          >
+            <OIcon name="stop-circle" size="sm" />
+            <span class="min-w-0 flex-1">{{ block.message }}</span>
+            <OButton
+              v-if="!readonly"
+              variant="ghost"
+              size="xs"
+              data-test="o2-ai-chat-stopped-retry"
+              @click="emit('retry', message)"
+            >
+              <template #icon-left><OIcon name="refresh" size="sm" /></template>
+              {{ t("common.retry") }}
+            </OButton>
+          </div>
+          <div
             v-else-if="block.type === 'status'"
-            class="text-text-secondary mb-2 flex items-center gap-2 text-xs"
+            class="text-text-secondary mb-2 flex flex-wrap items-center gap-2 text-xs"
             :data-test="`o2-ai-chat-turn-status-${block.turnStatus}`"
           >
             <OIcon name="hourglass-empty" size="sm" />
-            <span>{{ block.message }}</span>
+            <span class="min-w-0 flex-1">{{ block.message }}</span>
+            <OButton
+              v-if="!readonly && block.turnStatus === 'running'"
+              variant="outline"
+              size="xs"
+              data-test="o2-ai-chat-running-stop"
+              @click="emit('stop-turn')"
+            >
+              <template #icon-left><OIcon name="stop" size="sm" /></template>
+              {{ t("aiAssistant.stopTurn") }}
+            </OButton>
           </div>
-          <!-- Navigation block - standalone navigation button -->
           <div
             v-else-if="block.type === 'navigation' && block.navigationAction && !readonly"
             class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
@@ -185,7 +216,6 @@ const isLogEntryExpanded = (blockIndex: number) =>
               {{ block.navigationAction.label }}
             </OButton>
           </div>
-          <!-- Text block - render with markdown processing -->
           <template v-else-if="block.type === 'text' && block.text">
             <template
               v-for="(textBlock, tbIndex) in processTextBlock(block.text)"
@@ -243,9 +273,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
             </template>
           </template>
         </template>
-        <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
         <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
-          <!-- Display images for user messages -->
           <div
             v-if="message.role === 'user' && message.images && message.images.length > 0"
             class="message-images mb-2 flex flex-wrap gap-2"
@@ -299,10 +327,10 @@ const isLogEntryExpanded = (blockIndex: number) =>
             ></div>
           </template>
         </template>
-        <!-- Feedback buttons for assistant messages -->
         <div
           v-if="
             !readonly &&
+            !isStopped &&
             message.role === 'assistant' &&
             message.content &&
             message.content.trim() !== ''
@@ -316,6 +344,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
             :disabled="message.feedback === 'thumbs_up'"
             :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
             data-test="o2-ai-chat-thumbs-up-btn"
+            :aria-label="t('aiAssistant.helpful')"
             @click="emit('like')"
           >
             <OIcon name="thumb-up-off-alt" size="xs" />
@@ -327,6 +356,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
             :disabled="message.feedback === 'thumbs_down'"
             :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
             data-test="o2-ai-chat-thumbs-down-btn"
+            :aria-label="t('aiAssistant.notHelpful')"
             @click="emit('dislike')"
           >
             <OIcon name="thumb-down-off-alt" size="xs" />
@@ -339,16 +369,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
 </template>
 
 <style scoped>
-/* keep(generated-content): markdown/log/code markup is injected with v-html, so
-   it carries no scope attribute and cannot take utility classes — it can only be
-   reached from here through :deep().
-   keep(lib-override:hljs): highlight.js emits its own .hljs-* class names; the
-   token mapping below mirrors lib/core/Code/OCodeBlock.vue exactly (D6). */
-
-/* ============================================================
-   keep(generated-content) — markdown rendered from v-html inside .text-block.
-   `!important` retained: these fight the global base-elements typography layer.
-   ============================================================ */
+/* keep(generated-content): v-html markup has no scope attribute, so only :deep() reaches it; !important beats the base typography layer. */
 .text-block :deep(h1) {
   font-size: var(--text-2xl) !important;
   font-weight: 600 !important;
@@ -429,14 +450,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
   margin: 0.25em 0;
 }
 
-/* ============================================================
-   keep(generated-content) — code blocks.
-   .generated-code-block is emitted BOTH from the template and by the markdown
-   renderer (which rewrites <pre> into <span class="generated-code-block">), so
-   it must be reachable through :deep() either way. The background/border are
-   set here rather than as utilities because they have to beat .hljs below,
-   which is unlayered and would otherwise win over @layer utilities.
-   ============================================================ */
+/* keep(generated-content): the renderer also emits .generated-code-block, and its colours must beat the unlayered .hljs rules. */
 .message-blocks :deep(.generated-code-block),
 .text-block :deep(pre) {
   display: block;
@@ -461,8 +475,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
   border-top: none;
 }
 
-/* Markdown lists can nest a fenced block; hljs sets the palette, these two
-   only need the reset. */
+/* Markdown lists can nest a fenced block; hljs sets the palette, so these only reset layout. */
 .text-block :deep(ul pre),
 .text-block :deep(ol pre) {
   white-space: pre-wrap;
@@ -472,9 +485,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
   padding: 0;
 }
 
-/* ============================================================
-   keep(generated-content) — formatLogEntryContent() emits these json spans.
-   ============================================================ */
+/* keep(generated-content): formatLogEntryContent() emits these json spans. */
 .log-entry-code :deep(.json-key) {
   color: var(--color-json-key);
   font-weight: 600;
@@ -494,11 +505,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
   font-weight: 600;
 }
 
-/* ============================================================
-   keep(lib-override:hljs) — highlight.js output. Token mapping mirrors
-   lib/core/Code/OCodeBlock.vue (D6); tokens flip via dark.css, so one rule set
-   covers both themes.
-   ============================================================ */
+/* keep(lib-override:hljs): highlight.js class names, mapped like lib/core/Code/OCodeBlock.vue; dark.css flips the tokens. */
 .message-blocks :deep(.hljs) {
   display: block;
   overflow-x: auto;

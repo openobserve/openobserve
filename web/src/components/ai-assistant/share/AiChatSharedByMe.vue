@@ -16,13 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { allSharesQuery, mySharesQuery } from "@/services/ai_chat_share.queries";
-import { isOrgAdmin, statusOfError } from "./chatShare";
-import { useShareActions } from "./useChatShareDialog";
+import { statusOfError } from "./chatShare";
+import { useIsOrgAdmin, useShareActions } from "./useChatShareDialog";
 import AiChatShareRow from "./AiChatShareRow.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -37,11 +36,10 @@ const open = defineModel<boolean>("open", { required: true });
 
 type Scope = "mine" | "all";
 
-const store = useStore();
 const { t } = useI18nTyped();
 const orgId = useOrgId();
 
-const isAdmin = computed(() => isOrgAdmin(store.state));
+const isAdmin = useIsOrgAdmin(orgId, open);
 const scope = ref<Scope>("mine");
 const showAll = computed(() => isAdmin.value && scope.value === "all");
 
@@ -82,6 +80,7 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
         size="icon-sm"
         :loading="fetching"
         data-test="ai-chat-shared-by-me-refresh"
+        :aria-label="t('common.refresh')"
         @click="refreshShares"
       >
         <OIcon name="refresh" size="sm" />

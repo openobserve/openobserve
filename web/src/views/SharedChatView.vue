@@ -22,10 +22,13 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query/useOrgId";
 import {
   forkSharedChatMutation,
+  mySharesQuery,
   publicSharedChatQuery,
+  sharedChatPollInterval,
   sharedChatQuery,
 } from "@/services/ai_chat_share.queries";
 import { messagesFromTurns } from "@/components/O2AIChat.history";
+import type { SharedChat } from "@/services/ai_chat_share";
 import {
   formatMicros,
   serverMessageOf,
@@ -53,12 +56,19 @@ const store = useStore();
 const { t } = useI18nTyped();
 const orgId = useOrgId();
 
+// Polls while a turn runs, and slowly for a live share, so the page follows the owner's chat.
 const chatQuery = useQuery(() =>
-  props.isPublic
-    ? Object.assign(publicSharedChatQuery(props.token), { enabled: !!props.token })
-    : Object.assign(sharedChatQuery(orgId.value, props.token), {
-        enabled: !!props.token && !!orgId.value,
-      }),
+  Object.assign(
+    props.isPublic
+      ? Object.assign(publicSharedChatQuery(props.token), { enabled: !!props.token })
+      : Object.assign(sharedChatQuery(orgId.value, props.token), {
+          enabled: !!props.token && !!orgId.value,
+        }),
+    {
+      refetchInterval: (query: { state: { data?: SharedChat } }) =>
+        sharedChatPollInterval(query.state.data),
+    },
+  ),
 );
 
 const chat = computed(() => chatQuery.data.value);
@@ -66,12 +76,31 @@ const loading = computed(() => !chat.value && !chatQuery.error.value);
 const fetching = chatQuery.isFetching;
 // Every unavailable share answers 404 with the same body, so all of them read the same here.
 const notFound = computed(() => statusOfError(chatQuery.error.value) === 404);
-const failed = computed(() => !!chatQuery.error.value && !notFound.value);
-const messages = computed(() => messagesFromTurns(chat.value?.turns ?? [], t));
+const failed = computed(() => !!chatQuery.error.value && !notFound.value && !chat.value);
+const messages = computed(() => messagesFromTurns(chat.value?.turns ?? [], t, "viewer"));
 const title = computed(() =>
   chat.value ? raw(chat.value.title) || t("aiChatShare.untitled") : t("routeTitles.sharedChat"),
 );
+const following = computed(() => sharedChatPollInterval(chat.value) !== false);
+const updatedAt = computed(() =>
+  chatQuery.dataUpdatedAt.value
+    ? new Date(chatQuery.dataUpdatedAt.value).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "",
+);
 const reload = () => chatQuery.refetch();
+
+// The owner's own links are in their share list, which holds the source chat to open instead of forking a copy.
+const mySharesRead = useQuery(() =>
+  Object.assign(mySharesQuery(orgId.value), { enabled: !props.isPublic && !!orgId.value }),
+);
+const ownShare = computed(() =>
+  props.isPublic
+    ? undefined
+    : mySharesRead.data.value?.find((share) => share.token === props.token),
+);
 
 const forkMutation = useMutation(() => forkSharedChatMutation(orgId.value));
 const forking = computed(() => forkMutation.isPending.value);
@@ -82,13 +111,21 @@ const { adoptServerChat } = useChatHistory(
   useAiChat().chatHistoryServer(),
 );
 
+const openChat = (chatId: number) => {
+  store.dispatch("setCurrentChatTimestamp", chatId);
+  store.dispatch("setIsAiChatEnabled", true);
+  store.dispatch("setChatUpdated", true);
+};
+
+const openOwnChat = async () => {
+  if (!ownShare.value) return;
+  openChat(await adoptServerChat(ownShare.value.session_id, ownShare.value.title));
+};
+
 const fork = async () => {
   try {
     const result = await forkMutation.mutateAsync(props.token);
-    const chatId = await adoptServerChat(result.session_id, result.title);
-    store.dispatch("setCurrentChatTimestamp", chatId);
-    store.dispatch("setIsAiChatEnabled", true);
-    store.dispatch("setChatUpdated", true);
+    openChat(await adoptServerChat(result.session_id, result.title));
     toast({ variant: "success", message: t("aiChatShare.forked") });
   } catch (error) {
     toast({
@@ -116,11 +153,22 @@ const fork = async () => {
         </OBadge>
       </template>
       <template v-if="chat" #subtitle>
-        <span class="text-text-secondary text-xs" data-test="shared-chat-view-shared-by">
+        <span
+          v-if="chat.owner_name"
+          class="text-text-secondary me-2 text-xs"
+          data-test="shared-chat-view-shared-by"
+        >
           {{ t("aiChatShare.sharedBy", { name: chat.owner_name }) }}
         </span>
-        <span class="text-text-secondary ms-2 text-xs">
+        <span class="text-text-secondary text-xs">
           {{ t("aiChatShare.sharedOn", { time: formatMicros(chat.shared_at) }) }}
+        </span>
+        <span
+          v-if="following && updatedAt"
+          class="text-text-secondary ms-2 text-xs"
+          data-test="shared-chat-view-updated"
+        >
+          {{ t("aiChatShare.updatedAt", { time: updatedAt }) }}
         </span>
       </template>
       <template v-if="chat" #actions>
@@ -129,13 +177,24 @@ const fork = async () => {
           size="icon-sm"
           :loading="fetching"
           data-test="shared-chat-view-refresh"
+          :aria-label="t('common.refresh')"
           @click="reload"
         >
           <OIcon name="refresh" size="sm" />
           <OTooltip :content="t('common.refresh')" />
         </OButton>
         <OButton
-          v-if="!isPublic"
+          v-if="ownShare"
+          variant="primary"
+          size="sm-action"
+          data-test="shared-chat-view-open-mine"
+          @click="openOwnChat"
+        >
+          <template #icon-left><OIcon name="open-in-new" size="sm" /></template>
+          {{ t("aiChatShare.openInMyChats") }}
+        </OButton>
+        <OButton
+          v-else-if="!isPublic"
           variant="primary"
           size="sm-action"
           :loading="forking"
@@ -163,7 +222,8 @@ const fork = async () => {
           v-else-if="failed"
           size="hero"
           icon="error"
-          :title="t('aiChatShare.loadErrorTitle')"
+          :title="t('aiChatShare.unavailableTitle')"
+          :description="t('aiChatShare.unavailableDescription')"
           :action-label="t('common.retry')"
           data-test="shared-chat-view-error"
           @action="reload"
