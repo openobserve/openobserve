@@ -164,6 +164,13 @@ const options = shallowRef<Record<string, any>>({});
 let frame = 0;
 let pending = false;
 let observer: ResizeObserver | null = null;
+// Outlives one options object, so a pan that rebuilds options at the same scale skips re-measuring every title.
+let titleCache: {
+  headers: GroupHeader[];
+  frames: number[][];
+  scale: number;
+  titles: string[];
+} | null = null;
 const pointers = new Map<number, { x: number; y: number }>();
 let press: { x: number; y: number } | null = null;
 let dragging = false;
@@ -448,19 +455,18 @@ function buildOptions() {
   const headers = props.headers;
   const frames = frameData.value;
   const measureTitle = (t: string) => textWidth(t, TITLE_FONT);
-  let titleScale = NaN;
-  let titles: string[] = [];
   const titleAt = (index: number, scale: number) => {
-    if (scale !== titleScale) {
+    let cache = titleCache;
+    if (cache?.headers !== headers || cache.frames !== frames || cache.scale !== scale) {
       const widths = frames.map((f, i) => titleWidthOf(headers[i], (f[2] - f[0]) * scale));
-      titles = distinctTitles(
+      const titles = distinctTitles(
         frames.map((_, i) => headers[i]?.title ?? ""),
         widths,
         measureTitle,
       );
-      titleScale = scale;
+      cache = titleCache = { headers, frames, scale, titles };
     }
-    return titles[index] ?? "";
+    return cache.titles[index] ?? "";
   };
   const rowList = rows.value;
   const fill = props.fill;

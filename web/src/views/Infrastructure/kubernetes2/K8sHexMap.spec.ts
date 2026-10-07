@@ -25,6 +25,7 @@ import { contrastRatio, resolveColor, resolveTokens } from "@/lib/styles/tokens/
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import { chartColor } from "@/utils/chartTheme";
 import K8sHexMap from "./K8sHexMap.vue";
+import * as layoutModule from "./hexLayout";
 import { MAX_ZOOM } from "./hexViewport";
 import type { PodRow } from "./kubernetesModel";
 import type { MapGroup } from "./kubernetesQueries";
@@ -32,6 +33,11 @@ import { groupRows, statusCounts, type GroupHeader, type RowGroup } from "./mapF
 
 const palette = vi.hoisted(() => ({ dark: false }));
 const viewport = vi.hoisted(() => ({ mobile: false }));
+
+vi.mock("./hexLayout", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, distinctTitles: vi.fn(actual.distinctTitles) };
+});
 
 vi.mock("@/composables/useBreakpoint", async () => {
   const { computed } = await import("vue");
@@ -335,6 +341,27 @@ describe("K8sHexMap group cards (AC 83, 84, 85, 100)", () => {
     const { x } = ranges();
     return WIDTH / (x[1] - x[0]);
   };
+
+  it("reuses the header titles across a pan, and recomputes them on a zoom or a regroup", async () => {
+    const distinct = vi.mocked(layoutModule.distinctTitles);
+    await mountMap();
+    const draw = () => cardAt(0, fitScale());
+    draw();
+    distinct.mockClear();
+    await pointer("pointerdown", 100, 100);
+    await pointer("pointermove", 160, 140);
+    await pointer("pointerup", 160, 140);
+    draw();
+    expect(distinct).not.toHaveBeenCalled();
+    await wheel(-100, 500, 300);
+    cardAt(0, fitScale() * 1.2);
+    expect(distinct).toHaveBeenCalledTimes(1);
+    distinct.mockClear();
+    const { groups } = groupRows(ROWS, "namespace");
+    await wrapper.setProps({ group: "namespace", groups, headers: headersOf(groups) });
+    cardAt(0, fitScale());
+    expect(distinct).toHaveBeenCalledTimes(1);
+  });
 
   it("paints the plot in surface-base and writes the status line at 12px", async () => {
     await mountMap();
