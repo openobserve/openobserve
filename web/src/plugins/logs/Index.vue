@@ -430,6 +430,7 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -470,6 +471,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { shouldReloadStreamFieldsForVisualize } from "@/utils/logs/visualizeStreamFields";
 import useAiChat from "@/composables/useAiChat";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { onBeforeAppReload } from "@/utils/beforeAppReload";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -676,6 +678,7 @@ export default defineComponent({
       isWithQuery,
       isLimitQuery,
       updateUrlQueryParams,
+      generateURLQuery,
       addTraceId,
     } = logsUtils();
     const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
@@ -856,9 +859,35 @@ export default defineComponent({
       searchResultRef.value = null;
     });
 
+    // Logs has no beforeunload guard; the URL is what restoreUrlQueryParams reads back after the language reload.
+    const persistQueryForReload = async (): Promise<void> => {
+      const query = generateURLQuery(false);
+      if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+        delete query.type;
+      }
+      await router.replace({ query });
+    };
+
+    let stopBeforeAppReload: (() => void) | null = null;
+    const unregisterBeforeAppReload = () => {
+      stopBeforeAppReload?.();
+      stopBeforeAppReload = null;
+    };
+    const registerBeforeAppReload = () => {
+      unregisterBeforeAppReload();
+      stopBeforeAppReload = onBeforeAppReload(persistQueryForReload);
+    };
+
+    // Logs is not in MainLayout's keep-alive include list, so onActivated alone would never run.
+    onMounted(registerBeforeAppReload);
+
     onActivated(() => {
+      registerBeforeAppReload();
       if (isLogsMounted.value) handleActivation();
     });
+
+    onDeactivated(unregisterBeforeAppReload);
+    onBeforeUnmount(unregisterBeforeAppReload);
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
