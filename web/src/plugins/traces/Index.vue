@@ -598,10 +598,13 @@ const getDefaultRequest = () => {
 
 function resolveSearchWindow(reuseLastWindow: boolean) {
   const lastQuery = searchObj.data.queryPayload?.query;
-  if (reuseLastWindow && lastQuery?.start_time && lastQuery?.end_time) {
+  const datetime = searchObj.data.datetime;
+  // An unsearched box or brush moves the picker with the editor, so a sort takes that window, never the old one.
+  const pickerMoved =
+    datetime.startTime !== lastQuery?.start_time || datetime.endTime !== lastQuery?.end_time;
+  if (reuseLastWindow && !pickerMoved && lastQuery?.start_time && lastQuery?.end_time) {
     return { startTime: lastQuery.start_time, endTime: lastQuery.end_time };
   }
-  const datetime = searchObj.data.datetime;
   if (datetime.type !== "relative") return cloneDeep(datetime);
 
   const timestamps: any = getConsumableRelativeTime(datetime.relativeTimePeriod);
@@ -784,7 +787,7 @@ function buildEditorFilter() {
   return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
 }
 
-// Stream and mode changes reach getQueryData without searchData, so the heatmap entry is checked here.
+// Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the heatmap entry is checked there.
 const dropStaleHeatmapSelection = () => {
   const filters = searchObj.meta.metricsRangeFilters;
   let dropped = false;
@@ -852,13 +855,14 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    if (!isPagination) submittedFilter = buildEditorFilter();
+    // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
+    if (!isPagination) {
+      submittedFilter = buildEditorFilter();
+      dropStaleHeatmapSelection();
+    }
     const combinedFilter = submittedFilter;
 
-    if (!isPagination && !isSort) {
-      dropStaleHeatmapSelection();
-      searchResultRef?.value?.getDashboardData();
-    }
+    if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {

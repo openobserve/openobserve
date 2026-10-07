@@ -1098,6 +1098,61 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockClearOriginalTimeRange).toHaveBeenCalled();
     });
 
+    it("drops an entry made stale by an unsearched filter edit on a sort", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      mockSearchObj.data.editorValue = `${composed} and service_name = 'b'`;
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      expect(filters.size).toBe(0);
+      expect(mockClearOriginalTimeRange).toHaveBeenCalled();
+    });
+
+    it("keeps the entry on a page fetch after an unsearched filter edit, as the page keeps page 1's filter", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+      mockSearchObj.data.editorValue = `${composed} and service_name = 'b'`;
+
+      wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+      expect(mockClearOriginalTimeRange).not.toHaveBeenCalled();
+    });
+
+    it("sorts an unsearched manual-mode box over its own window and keeps it", async () => {
+      await mountPage();
+      // The last search ran over the wider pre-box range; the box moved the picker and the editor only.
+      mockSearchObj.data.queryPayload = {
+        query: {
+          start_time: APPLIED.startTime - 600_000_000,
+          end_time: APPLIED.endTime + 600_000_000,
+        },
+      };
+      filters.set("heatmap", heatmapEntry());
+      mockFetchQueryDataWithHttpStream.mockClear();
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      const req: any = mockFetchQueryDataWithHttpStream.mock.calls.at(-1)?.[0];
+      const query = req.queryReq.query ?? req.queryReq;
+      expect([query.start_time, query.end_time]).toEqual([APPLIED.startTime, APPLIED.endTime]);
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+    });
+
+    it("keeps a current entry across a sort", async () => {
+      await mountPage();
+      filters.set("heatmap", heatmapEntry());
+
+      wrapper.vm.runQueryOnSort();
+      await flushPromises();
+
+      expect([...filters.keys()]).toEqual(["heatmap"]);
+    });
+
     it("clears the original range on Reset", async () => {
       await mountPage();
 
