@@ -1091,7 +1091,7 @@ fn around_multi_sqls(
     let given = sql_param.split(',').collect::<Vec<&str>>();
     if given.len() > sqls.len() {
         return Err(format!(
-            "{} sql entries given for {} streams",
+            "sql has more entries ({}) than streams ({})",
             given.len(),
             sqls.len()
         ));
