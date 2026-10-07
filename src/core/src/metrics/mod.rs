@@ -73,9 +73,11 @@ impl LabelPair for (std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>) {
 /// What the value policy makes of one sample.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SanitizedValue {
+    /// A sample written with this value.
     Value(f64),
-    /// A Prometheus staleness marker, stored as a NULL `value`.
+    /// A Prometheus staleness marker, written as a NULL `value` while markers are enabled.
     Stale,
+    /// A sample that writes no row.
     Drop,
 }
 
