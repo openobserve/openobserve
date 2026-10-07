@@ -44,6 +44,7 @@ import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legen
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
+import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
@@ -821,7 +822,7 @@ export const convertPromQLData = async (
     (limitedSearchQueryData ?? []).map((it: any, index: number) => ({
       metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend,
-      fallback: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend_fallback,
+      fallback: legendFallbackOf(panelSchema.queries?.[parentQueryIndex[index]]),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );

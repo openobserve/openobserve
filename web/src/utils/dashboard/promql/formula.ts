@@ -138,3 +138,8 @@ export const substituteFormula = (
   }
   return { expr: expr + formula.slice(last) };
 };
+
+/** A formula's label-less series are named after the formula unless the panel names them. */
+export const legendFallbackOf = (query: any): string | undefined =>
+  query?.config?.promql_legend_fallback ??
+  (isFormulaQuery(query) ? query.config.formula : undefined);

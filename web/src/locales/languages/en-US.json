@@ -5251,6 +5251,7 @@
     "renameQuery": "Rename query",
     "addFormula": "Add formula",
     "formulaNumber": "Formula {index}",
+    "queryTabWithRef": "{ref} · {name}",
     "formulaUnknownLetter": "{letter} is not a query in this panel",
     "formulaReferencesFormula": "{letter} is a formula, and a formula may not reference another formula",
     "formulaInputNote": "Used in a formula: there, this query's instant/range setting, legend, step and time shift do not apply.",
@@ -9693,9 +9694,27 @@
     },
     "builderSwitch": {
       "unsupported": "The builder cannot show {construct}",
-      "twoMetrics": "The builder cannot show a binary operation between two metrics — use a formula",
+      "twoMetrics": "The builder cannot show arithmetic between two metrics — use a formula",
       "noMetric": "The builder needs a query over one named metric",
-      "mismatch": "The builder cannot show this query exactly"
+      "mismatch": "The builder cannot show this query exactly",
+      "constructs": {
+        "without": "a without (…) grouping",
+        "offset": "an offset modifier",
+        "at": "an {'@'} modifier",
+        "orMatchers": "an or between label matchers",
+        "subquery": "a subquery",
+        "vectorMatching": "on (…) or ignoring (…) vector matching",
+        "bool": "a bool comparison",
+        "unaryMinus": "a negated expression",
+        "string": "a string argument",
+        "nonFinite": "a non-finite number",
+        "rangeVector": "a bare range vector",
+        "setOperator": "the set operator {op}",
+        "function": "the function {name}()",
+        "aggregation": "the aggregation {name}",
+        "numberFirst": "a number on the left of {op}",
+        "operator": "the operator {op}"
+      }
     },
     "operationsList": {
       "params": {
@@ -9717,6 +9736,8 @@
         "nearestMultipleLabel": "Nearest multiple"
       },
       "rangeOnlyFirst": "A range function can only be the first step",
+      "rangeOnlyFirstNote": "A range function reads the raw samples, so it can only be the first step. Remove the other steps to add one.",
+      "firstStepOnlyGroup": "{group} · First step only",
       "dragToReorder": "Drag to reorder",
       "noMatchingLabels": "No matching labels",
       "selectMetricFirst": "Select a metric first to load labels",

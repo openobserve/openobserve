@@ -103,6 +103,17 @@ describe("dataProcessor", () => {
       expect(result[0].series.map((entry: any) => entry.name)).toEqual(["api-1", "api-2"]);
     });
 
+    it("names a formula's label-less series after the formula, not {}", async () => {
+      const searchQueryData = [
+        { status: "success", resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] },
+      ] as any;
+      const formula = { ...mockPanelSchema, queries: [{ config: { formula: "B / A * 100" } }] };
+
+      const result = await processPromQLData(searchQueryData, formula, mockStore);
+
+      expect(result[0].series[0].name).toBe("B / A * 100");
+    });
+
     it("should process OpenObserve format (direct result)", async () => {
       const searchQueryData: PromQLResponse[] = [
         {

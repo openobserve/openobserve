@@ -15,7 +15,7 @@
 
 import { isEqual } from "lodash-es";
 import metricsService from "@/services/metrics";
-import { gt } from "@/types/i18n";
+import { gt, type I18nKey } from "@/types/i18n";
 import { promqlRenderer } from "./operations/queryModeller";
 import {
   PromqlStepGroup,
@@ -46,6 +46,33 @@ const SCALAR_STEPS: Record<string, PromqlStepId> = {
 
 const cannotShow = (construct: string) =>
   gt("metrics.builderSwitch.unsupported", { construct }) as string;
+
+const KIND_PHRASES: Record<string, I18nKey> = {
+  without: "metrics.builderSwitch.constructs.without",
+  offset: "metrics.builderSwitch.constructs.offset",
+  "@": "metrics.builderSwitch.constructs.at",
+  "or matchers": "metrics.builderSwitch.constructs.orMatchers",
+  subquery: "metrics.builderSwitch.constructs.subquery",
+  "vector matching": "metrics.builderSwitch.constructs.vectorMatching",
+  bool: "metrics.builderSwitch.constructs.bool",
+  "unary minus": "metrics.builderSwitch.constructs.unaryMinus",
+  string: "metrics.builderSwitch.constructs.string",
+  "non-finite number": "metrics.builderSwitch.constructs.nonFinite",
+  "range vector": "metrics.builderSwitch.constructs.rangeVector",
+};
+
+const SET_OPERATORS = new Set(["and", "or", "unless"]);
+
+/** A backend `unsupported` kind in words; an unknown kind is shown as written. */
+const kindPhrase = (kind: string): string => {
+  if (SET_OPERATORS.has(kind)) {
+    return gt("metrics.builderSwitch.constructs.setOperator", { op: kind }) as string;
+  }
+  return KIND_PHRASES[kind] ? (gt(KIND_PHRASES[kind]) as string) : kind;
+};
+
+const functionPhrase = (name: string) =>
+  gt("metrics.builderSwitch.constructs.function", { name }) as string;
 
 const isNumber = (node: PromqlTree | undefined): boolean => node?.type === "number";
 
@@ -80,10 +107,10 @@ export const stripParens = (tree: PromqlTree): PromqlTree => {
 const rangeLayer = (func: string, args: PromqlTree[]): Layer => {
   const withQuantile = func === PromqlStepId.QuantileOverTime;
   const [quantile, matrix] = withQuantile ? args : [undefined, args[0]];
-  if (args.length !== (withQuantile ? 2 : 1)) return { reason: cannotShow(`${func}()`) };
-  if (matrix?.type === "unsupported") return { reason: cannotShow(matrix.kind) };
+  if (args.length !== (withQuantile ? 2 : 1)) return { reason: cannotShow(functionPhrase(func)) };
+  if (matrix?.type === "unsupported") return { reason: cannotShow(kindPhrase(matrix.kind)) };
   if (matrix?.type !== "matrix" || (withQuantile && !isNumber(quantile))) {
-    return { reason: cannotShow(`${func}()`) };
+    return { reason: cannotShow(functionPhrase(func)) };
   }
   const params = withQuantile ? [quantile!.value, matrix.range] : [matrix.range];
   return { step: { id: func, params }, selector: matrix.selector };
@@ -91,7 +118,7 @@ const rangeLayer = (func: string, args: PromqlTree[]): Layer => {
 
 /** `[leading numbers…, expr, trailing numbers…]` as each catalog function takes them. */
 const functionLayer = (func: string, args: PromqlTree[]): Layer => {
-  const fail = { reason: cannotShow(`${func}()`) };
+  const fail = { reason: cannotShow(functionPhrase(func)) };
   const numbers = (nodes: PromqlTree[]) =>
     nodes.every(isNumber) ? nodes.map((node) => node.value) : null;
   let inner: PromqlTree | undefined;
@@ -120,7 +147,7 @@ const functionLayer = (func: string, args: PromqlTree[]): Layer => {
 
 const callLayer = (node: PromqlTree): Layer => {
   const spec = promqlRenderer.getStepSpec(node.func);
-  if (!spec || spec.retired) return { reason: cannotShow(`${node.func}()`) };
+  if (!spec || spec.retired) return { reason: cannotShow(functionPhrase(node.func)) };
   return spec.group === PromqlStepGroup.RateAndRange
     ? rangeLayer(node.func, node.args)
     : functionLayer(node.func, node.args);
@@ -129,11 +156,19 @@ const callLayer = (node: PromqlTree): Layer => {
 const aggregateLayer = (node: PromqlTree): Layer => {
   const spec = promqlRenderer.getStepSpec(node.op);
   if (spec?.group !== PromqlStepGroup.Aggregation || spec.retired) {
-    return { reason: cannotShow(node.op) };
+    return {
+      reason: cannotShow(
+        gt("metrics.builderSwitch.constructs.aggregation", { name: node.op }) as string,
+      ),
+    };
   }
   const takesParam = spec.params.length === 2;
   if (takesParam !== !!node.param || (node.param && !isNumber(node.param))) {
-    return { reason: cannotShow(node.op) };
+    return {
+      reason: cannotShow(
+        gt("metrics.builderSwitch.constructs.aggregation", { name: node.op }) as string,
+      ),
+    };
   }
   const params = takesParam ? [node.param.value, node.by] : [node.by];
   return { step: { id: node.op, params }, inner: node.expr };
@@ -142,7 +177,7 @@ const aggregateLayer = (node: PromqlTree): Layer => {
 const binaryLayer = (node: PromqlTree): Layer => {
   // A side the backend could not express hides its metric, so name what it is instead.
   const opaque = [node.lhs, node.rhs].find((side) => side?.type === "unsupported");
-  if (opaque) return { reason: cannotShow(opaque.kind) };
+  if (opaque) return { reason: cannotShow(kindPhrase(opaque.kind)) };
   const stepId = SCALAR_STEPS[node.op];
   if (stepId && isNumber(node.rhs)) {
     return { step: { id: stepId, params: [node.rhs.value] }, inner: node.lhs };
@@ -150,8 +185,15 @@ const binaryLayer = (node: PromqlTree): Layer => {
   if (hasMetric(node.lhs) && hasMetric(node.rhs)) {
     return { reason: gt("metrics.builderSwitch.twoMetrics") as string };
   }
-  if (stepId && isNumber(node.lhs)) return { reason: cannotShow(`${node.lhs.value} ${node.op} …`) };
-  return { reason: cannotShow(node.op) };
+  if (stepId && isNumber(node.lhs))
+    return {
+      reason: cannotShow(
+        gt("metrics.builderSwitch.constructs.numberFirst", { op: node.op }) as string,
+      ),
+    };
+  return {
+    reason: cannotShow(gt("metrics.builderSwitch.constructs.operator", { op: node.op }) as string),
+  };
 };
 
 const layerOf = (node: PromqlTree): Layer => {
@@ -165,9 +207,9 @@ const layerOf = (node: PromqlTree): Layer => {
     case "binary":
       return binaryLayer(node);
     case "unsupported":
-      return { reason: cannotShow(node.kind) };
+      return { reason: cannotShow(kindPhrase(node.kind)) };
     case "matrix":
-      return { reason: cannotShow("range vector") };
+      return { reason: cannotShow(kindPhrase("range vector")) };
     default:
       return { reason: gt("metrics.builderSwitch.noMetric") as string };
   }

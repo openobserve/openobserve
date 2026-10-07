@@ -57,6 +57,26 @@ test.describe('Metrics PromQL formulas', () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
+  test('reports a letter that is not a query where the user is looking', {
+    tag: ['@metrics', '@P2', '@all'],
+  }, async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    const pm = new PageManager(page);
+    const builder = pm.metricsBuilderPage;
+    await pm.metricsPage.gotoMetricsPage();
+    await builder.builderModeBtn.waitFor({ state: 'visible', timeout: 30000 });
+
+    await builder.switchToCustomMode();
+    await typeIntoCurrentTab(page, A);
+    await page.locator('[data-test="dashboard-panel-query-tab-add-formula"]').click();
+    await typeIntoCurrentTab(page, 'A / C');
+
+    const error = page.locator('[data-test="dashboard-panel-formula-error"]');
+    await expect(error).toContainText('C is not a query in this panel', { timeout: 15000 });
+    await expect(error).toBeInViewport();
+  });
+
   test('A / B * 100 over hidden inputs runs as one query, saves to a dashboard and survives a reload', {
     tag: ['@metrics', '@dashboards', '@P1', '@all'],
   }, async ({ page }, testInfo) => {

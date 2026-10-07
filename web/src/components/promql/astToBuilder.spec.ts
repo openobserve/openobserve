@@ -120,32 +120,53 @@ describe("treeToBuilder", () => {
 
   it("names the first construct it cannot show", () => {
     expect(reason({ type: "unsupported", kind: "without" })).toBe(
-      "The builder cannot show without",
+      "The builder cannot show a without (…) grouping",
     );
     expect(reason(call("rate", { type: "unsupported", kind: "subquery" }))).toBe(
-      "The builder cannot show subquery",
+      "The builder cannot show a subquery",
     );
-    expect(reason(call("label_replace", sel("x")))).toBe("The builder cannot show label_replace()");
-    expect(reason(agg("count_values", sel("x")))).toBe("The builder cannot show count_values");
-    expect(reason(bin("+", num(1), sel("x")))).toBe("The builder cannot show 1 + …");
-    expect(reason(bin(">", sel("x"), num(1)))).toBe("The builder cannot show >");
+    expect(reason(call("label_replace", sel("x")))).toBe(
+      "The builder cannot show the function label_replace()",
+    );
+    expect(reason(agg("count_values", sel("x")))).toBe(
+      "The builder cannot show the aggregation count_values",
+    );
+    expect(reason(bin("+", num(1), sel("x")))).toBe(
+      "The builder cannot show a number on the left of +",
+    );
+    expect(reason(bin(">", sel("x"), num(1)))).toBe("The builder cannot show the operator >");
     expect(reason(sel(null))).toBe("The builder needs a query over one named metric");
     expect(reason(num(3))).toBe("The builder needs a query over one named metric");
   });
 
+  it("describes every construct the backend marks unsupported in words", () => {
+    const said = (kind: string) => reason({ type: "unsupported", kind });
+    expect(said("@")).toBe("The builder cannot show an @ modifier");
+    expect(said("or matchers")).toBe("The builder cannot show an or between label matchers");
+    expect(said("vector matching")).toBe(
+      "The builder cannot show on (…) or ignoring (…) vector matching",
+    );
+    expect(said("bool")).toBe("The builder cannot show a bool comparison");
+    expect(said("unary minus")).toBe("The builder cannot show a negated expression");
+    expect(said("string")).toBe("The builder cannot show a string argument");
+    expect(said("or")).toBe("The builder cannot show the set operator or");
+    expect(said("unless")).toBe("The builder cannot show the set operator unless");
+    expect(reason(matrix("x", "5m"))).toBe("The builder cannot show a bare range vector");
+  });
+
   it("names an unsupported construct on either side of a binary", () => {
     expect(reason(bin("/", sel("x"), { type: "unsupported", kind: "offset" }))).toBe(
-      "The builder cannot show offset",
+      "The builder cannot show an offset modifier",
     );
   });
 
   it("does not map onto a retired step", () => {
-    expect(reason(call("pi", sel("x")))).toBe("The builder cannot show pi()");
+    expect(reason(call("pi", sel("x")))).toBe("The builder cannot show the function pi()");
   });
 
   it("points a binary between two metrics at formulas", () => {
     expect(reason(bin("/", call("rate", matrix("a", "5m")), call("rate", matrix("b", "5m"))))).toBe(
-      "The builder cannot show a binary operation between two metrics — use a formula",
+      "The builder cannot show arithmetic between two metrics — use a formula",
     );
   });
 });

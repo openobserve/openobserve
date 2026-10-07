@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
     >
       <div
-        class="flex min-w-0 flex-1 flex-row items-center self-stretch"
+        class="flex min-w-0 flex-1 flex-row items-center self-stretch max-md:basis-full"
         data-test="dashboard-query-data"
       >
         <!-- -mt-0.75 cancels OTabs' inner pt-0.75 so the tabs sit centred
@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer px-0.5 text-sm whitespace-nowrap select-none"
+                :class="{ 'text-text-muted': tab.config?.hide }"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tabLabel(tab, Number(index)) }}</span
               >
@@ -97,20 +98,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- Hiding the only query would leave the panel with nothing to
                    draw, so the eye appears from the second query onwards. -->
-              <span
+              <OButton
                 v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
-                class="relative inline-flex items-center"
+                variant="ghost"
+                size="icon-inline"
+                :icon-left="tab.config?.hide ? 'visibility-off' : 'visibility'"
+                :aria-label="
+                  tab.config?.hide
+                    ? t('dashboard.showQueryResults')
+                    : t('dashboard.hideQueryResults')
+                "
+                @click.stop="toggleQueryVisibility(index)"
+                @mousedown.stop
+                @pointerdown.stop
+                :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+                :data-test-hidden="tab.config?.hide ? 'true' : 'false'"
               >
-                <OIcon
-                  :name="tab.config?.hide ? 'visibility-off' : 'visibility'"
-                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
-                  @click.stop="toggleQueryVisibility(index)"
-                  @mousedown.stop.prevent
-                  @pointerdown.stop.prevent
-                  size="sm"
-                  :data-test="`dashboard-panel-query-tab-visibility-${index}`"
-                  :data-test-hidden="tab.config?.hide ? 'true' : 'false'"
-                />
                 <OTooltip
                   :content="
                     tab.config?.hide
@@ -118,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t('dashboard.hideQueryResults')
                   "
                 />
-              </span>
+              </OButton>
               <OIcon
                 v-if="
                   Number(index) > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)
@@ -146,11 +149,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="promqlMode"
           variant="ghost"
           size="sm"
+          :aria-label="t('dashboard.addFormula')"
           @click.stop="addFormulaTab"
           data-test="dashboard-panel-query-tab-add-formula"
           icon-left="functions"
         >
-          {{ t("dashboard.addFormula") }}
+          <span class="max-md:hidden">{{ t("dashboard.addFormula") }}</span>
+          <OTooltip :content="t('dashboard.addFormula')" :disabled="!isMobile" />
         </OButton>
         <!-- Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
@@ -186,7 +191,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-query"
   >
     <div class="flex h-full w-full flex-col">
-      <div class="flex h-full w-full flex-col">
+      <div
+        v-if="queryErrorText || formulaError || isFormulaInput"
+        class="flex shrink-0 flex-col gap-1 px-2 pt-1"
+      >
+        <OBanner
+          v-if="queryErrorText"
+          variant="error-soft"
+          role="alert"
+          dense
+          data-test="dashboard-panel-query-errors"
+        >
+          {{ queryErrorText }}
+        </OBanner>
+        <OBanner
+          v-if="formulaError"
+          variant="error-soft"
+          role="alert"
+          dense
+          data-test="dashboard-panel-formula-error"
+        >
+          {{ formulaError }}
+        </OBanner>
+        <OBanner
+          v-else-if="isFormulaInput"
+          variant="info"
+          dense
+          data-test="dashboard-panel-formula-input-note"
+        >
+          {{ t("dashboard.formulaInputNote") }}
+        </OBanner>
+      </div>
+      <div class="flex min-h-0 w-full flex-1 flex-col">
         <div class="flex h-full">
           <OSplitter
             class="h-full w-full"
@@ -299,23 +335,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSplitter>
         </div>
       </div>
-      <div class="text-status-error-text z-100000 col-auto mx-2">
-        {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
-      </div>
-      <div
-        v-if="formulaError"
-        class="text-status-error-text mx-2 text-sm"
-        data-test="dashboard-panel-formula-error"
-      >
-        {{ formulaError }}
-      </div>
-      <div
-        v-else-if="isFormulaInput"
-        class="text-text-secondary mx-2 text-sm"
-        data-test="dashboard-panel-formula-input-note"
-      >
-        {{ t("dashboard.formulaInputNote") }}
-      </div>
     </div>
   </div>
 </template>
@@ -359,6 +378,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   formulaInputs,
   formulaRefs,
@@ -396,6 +417,7 @@ export default defineComponent({
     OIcon,
     OSplitter,
     OTag,
+    OBanner,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -602,11 +624,23 @@ export default defineComponent({
     const currentQueryText = computed(() => queryTextOf(currentQuery.value));
 
     const tabLabel = (tab: any, index: number) => {
-      if (isFormulaQuery(tab))
-        return tab.tabName || t("dashboard.formulaNumber", { index: index + 1 });
+      if (isFormulaQuery(tab)) {
+        const formulaNumber = dashboardPanelData.data.queries
+          .slice(0, index + 1)
+          .filter(isFormulaQuery).length;
+        return tab.tabName || t("dashboard.formulaNumber", { index: formulaNumber });
+      }
       const name = tab.tabName || t("common.queryNumber", { index: index + 1 });
-      return promqlMode.value && tab.config?.ref ? `${tab.config.ref} · ${name}` : name;
+      return promqlMode.value && tab.config?.ref
+        ? t("dashboard.queryTabWithRef", { ref: raw(tab.config.ref), name })
+        : name;
     };
+
+    const queryErrorText = computed(() =>
+      raw((dashboardPanelData.meta.errors.queryErrors ?? []).join(", ")),
+    );
+
+    const { isMobile } = useBreakpoint();
 
     const formulaError = computed(() => {
       if (!isFormulaQuery(currentQuery.value)) return "";
@@ -1046,6 +1080,8 @@ export default defineComponent({
       addFormulaTab,
       currentQueryText,
       tabLabel,
+      queryErrorText,
+      isMobile,
       formulaError,
       isFormulaInput,
       removeTab,

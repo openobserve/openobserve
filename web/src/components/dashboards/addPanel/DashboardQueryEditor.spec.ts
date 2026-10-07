@@ -798,7 +798,7 @@ describe("formula letters and the saved hide flag", () => {
     expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-0"]').text()).toBe(
       "A · Query 1",
     );
-    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-1"]').text()).toBe("Formula 2");
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-1"]').text()).toBe("Formula 1");
   });
 
   it("backs the visibility toggle with config.hide", async () => {
@@ -850,5 +850,68 @@ describe("formula letters and the saved hide flag", () => {
     wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 1;
     await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(false);
+  });
+
+  describe("where messages render", () => {
+    const precedesEditor = (selector: string) => {
+      const editor = wrapper.find('[data-test="dashboard-panel-query-editor"]').element;
+      const node = wrapper.find(selector).element;
+      return !!(node.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING);
+    };
+
+    it("shows the formula error above the editor", async () => {
+      mountWith([q({ ref: "A" }), q({ formula: "A / B" }, "")], 1);
+      await wrapper.vm.$nextTick();
+      expect(precedesEditor('[data-test="dashboard-panel-formula-error"]')).toBe(true);
+    });
+
+    it("shows the formula-input note above the editor", async () => {
+      mountWith([q({ ref: "A" }), q({ formula: "A * 2" }, "")]);
+      await wrapper.vm.$nextTick();
+      expect(precedesEditor('[data-test="dashboard-panel-formula-input-note"]')).toBe(true);
+    });
+
+    it("shows query errors, such as the builder refusal, above the editor", async () => {
+      const data = mountWith([q({ ref: "A" })]);
+      data.meta.errors.queryErrors = ["The builder cannot show a subquery"];
+      await wrapper.vm.$nextTick();
+      const errors = wrapper.find('[data-test="dashboard-panel-query-errors"]');
+      expect(errors.text()).toContain("The builder cannot show a subquery");
+      expect(precedesEditor('[data-test="dashboard-panel-query-errors"]')).toBe(true);
+    });
+
+    it("renders no message row when there is nothing to say", async () => {
+      mountWith([q({ ref: "A" })]);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-query-errors"]').exists()).toBe(false);
+    });
+  });
+
+  it("numbers formulas among formulas", async () => {
+    mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "A" }, ""), q({ formula: "B" }, "")]);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-2"]').text()).toBe("Formula 1");
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-3"]').text()).toBe("Formula 2");
+  });
+
+  it("makes the eye a labelled button and mutes a hidden query's label", async () => {
+    mountWith([q({ ref: "A", hide: true }), q({ ref: "B" })]);
+    await wrapper.vm.$nextTick();
+    const eye = (i: number) =>
+      wrapper.find(`[data-test="dashboard-panel-query-tab-visibility-${i}"]`);
+    expect(eye(0).element.tagName).toBe("BUTTON");
+    expect(eye(0).attributes("aria-label")).toBe("Show query results");
+    expect(eye(1).attributes("aria-label")).toBe("Hide query results");
+    const label = (i: number) => wrapper.find(`[data-test="dashboard-panel-query-tab-name-${i}"]`);
+    expect(label(0).classes()).toContain("text-text-muted");
+    expect(label(1).classes()).not.toContain("text-text-muted");
+  });
+
+  it("keeps Add formula reachable as a labelled icon on a phone", async () => {
+    mountWith([q({ ref: "A" })]);
+    await wrapper.vm.$nextTick();
+    const button = wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]');
+    expect(button.attributes("aria-label")).toBe("Add formula");
+    expect(button.find(".max-md\\:hidden").text()).toBe("Add formula");
   });
 });

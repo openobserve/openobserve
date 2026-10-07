@@ -550,6 +550,22 @@ describe("OperationsList", () => {
       expect(sumOption.attributes("aria-disabled")).toBe("false");
     });
 
+    it("explains the blocked group in place, not only on hover", async () => {
+      wrapper = createWrapper({ operations: [{ id: PromqlStepId.Sum, params: [[]] }] });
+      await open();
+      const group = wrapper.find('[data-test="operations-list-category-Rate & range"]');
+      expect(group.text()).toContain("First step only");
+      expect(group.find('[data-test="operations-list-range-first-note"]').text()).toBe(
+        "A range function reads the raw samples, so it can only be the first step. Remove the other steps to add one.",
+      );
+    });
+
+    it("says nothing extra while a range function can still be added", async () => {
+      wrapper = createWrapper({ operations: [] });
+      await open();
+      expect(wrapper.find('[data-test="operations-list-range-first-note"]').exists()).toBe(false);
+    });
+
     it("refuses a reorder that moves a range function off the first step", () => {
       wrapper = createWrapper();
       wrapper.vm.handleDragUpdate([mockOperations[1], mockOperations[0]]);

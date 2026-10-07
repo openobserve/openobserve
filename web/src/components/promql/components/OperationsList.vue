@@ -167,8 +167,15 @@
           :key="category"
           :data-test="`operations-list-category-${category}`"
         >
-          <OCollapsible :default-open="true" :label="raw(category)">
+          <OCollapsible :default-open="true" :label="categoryLabel(category)">
             <div>
+              <p
+                v-if="isRangeGroupBlocked(category)"
+                class="text-text-secondary px-4 pt-2 text-xs"
+                data-test="operations-list-range-first-note"
+              >
+                {{ t("metrics.operationsList.rangeOnlyFirstNote") }}
+              </p>
               <div
                 v-for="op in getFilteredOperationsForCategory(category)"
                 :key="op.id"
@@ -304,6 +311,14 @@ const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] =>
 const isRangeStep = (id: string) => getStepSpec(id)?.group === PromqlStepGroup.RateAndRange;
 
 const isBlocked = (op: PromqlStepSpec) => isRangeStep(op.id) && props.operations.length > 0;
+
+const isRangeGroupBlocked = (category: string) =>
+  category === PromqlStepGroup.RateAndRange && props.operations.length > 0;
+
+const categoryLabel = (category: string): I18nText =>
+  isRangeGroupBlocked(category)
+    ? t("metrics.operationsList.firstStepOnlyGroup", { group: raw(category) })
+    : raw(category);
 
 const handleDragUpdate = (newVal: PromqlStep[]) => {
   if (newVal.some((step, index) => index > 0 && isRangeStep(step.id))) return;

@@ -73,7 +73,9 @@ test.describe('Metrics PromQL builder round-trip', () => {
     await setCodeQuery(builder, page, query);
 
     await builder.builderModeBtn.click();
-    await expect(page.getByText(/The builder cannot show .*without/).first()).toBeVisible({ timeout: 15000 });
+    const refusal = page.locator('[data-test="dashboard-panel-query-errors"]');
+    await expect(refusal).toContainText('The builder cannot show a without (…) grouping', { timeout: 15000 });
+    await expect(refusal).toBeInViewport();
     await expect(builder.customModeBtn).toHaveAttribute('data-state', 'on');
     expect(await editorText(page)).toBe(query);
   });

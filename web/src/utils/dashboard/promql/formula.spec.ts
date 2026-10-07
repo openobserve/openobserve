@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import {
   formulaInputs,
   formulaRefs,
+  legendFallbackOf,
   isFormulaQuery,
   queryRefs,
   substituteFormula,
@@ -179,5 +180,19 @@ describe("formulaInputs", () => {
   it("maps a lettered formula to null", () => {
     const queries = [{ config: { formula: "", ref: "F" } }, { config: { ref: "A" } }];
     expect(formulaInputs(queries, ["", "up"])).toEqual({ F: null, A: "up" });
+  });
+});
+
+describe("legendFallbackOf", () => {
+  it("names a formula's label-less series after the formula", () => {
+    expect(legendFallbackOf({ config: { formula: "B / A * 100" } })).toBe("B / A * 100");
+  });
+
+  it("keeps an explicit fallback, and gives an ordinary query none", () => {
+    expect(legendFallbackOf({ config: { formula: "A", promql_legend_fallback: "errors" } })).toBe(
+      "errors",
+    );
+    expect(legendFallbackOf({ config: { promql_legend_fallback: "x" } })).toBe("x");
+    expect(legendFallbackOf({ config: {} })).toBeUndefined();
   });
 });
