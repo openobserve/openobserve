@@ -36,6 +36,7 @@ import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
+import { scrubAuthParams } from "./utils/rum/scrubAuthParams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
@@ -156,6 +157,8 @@ const getConfig = async () => {
             ]
           : [],
         beforeSend: (event) => {
+          event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
+          event.view.referrer = scrubAuthParams(event.view.referrer);
           // Filter out specific errors before sending to RUM
           if (event.type === "error") {
             const errorMessage = event.error?.message || "";
@@ -194,6 +197,7 @@ const getConfig = async () => {
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
         beforeSend: (log) => {
+          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url);
           // Filter out specific logs before sending
           const logMessage = log.message || "";
 
