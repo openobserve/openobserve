@@ -18,6 +18,10 @@ use chrono::{TimeZone, Utc};
 use common::utils::http::get_work_group;
 #[cfg(feature = "vectorscan")]
 use config::meta::projections::ProjectionColumnMapping;
+#[cfg(any(feature = "vectorscan", test))]
+use config::meta::self_reporting::redaction::{
+    DataWindow, EvidenceScope, FailPosture, RedactionEvidence,
+};
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -1233,8 +1237,9 @@ pub async fn apply_regex_to_response(
             return redaction_skipped(
                 config::get_config().common.sdr_fail_closed,
                 || true,
-                all_streams,
+                &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
                 &format!("pattern manager unavailable: {e}"),
+                usage_reporting::redaction_evidence::publish_search_scan_unavailable,
             );
         }
     };
@@ -1250,8 +1255,9 @@ pub async fn apply_regex_to_response(
                 )
             })
         },
-        all_streams,
+        &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
         "a configured pattern failed to build",
+        usage_reporting::redaction_evidence::publish_search_scan_unavailable,
     )?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
@@ -1271,8 +1277,9 @@ pub async fn apply_regex_to_response(
                             .any(|a| a.apply_at != at_ingestion)
                     })
                 },
-                all_streams,
+                &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
                 &e.to_string(),
+                usage_reporting::redaction_evidence::publish_search_scan_unavailable,
             );
         }
     };
@@ -1311,18 +1318,78 @@ fn any_stream(all_streams: &str, pred: impl Fn(&str) -> bool) -> bool {
     all_streams.split(',').any(|stream| pred(stream.trim()))
 }
 
+/// The hits a search was about to return when redaction could not run on them.
+#[cfg(any(feature = "vectorscan", test))]
+struct SkippedHits<'a> {
+    org_id: &'a str,
+    stream_type: StreamType,
+    all_streams: &'a str,
+    hits: &'a [json::Value],
+}
+
+#[cfg(any(feature = "vectorscan", test))]
+impl<'a> SkippedHits<'a> {
+    fn new(
+        org_id: &'a str,
+        stream_type: StreamType,
+        all_streams: &'a str,
+        hits: &'a [json::Value],
+    ) -> Self {
+        Self {
+            org_id,
+            stream_type,
+            all_streams,
+            hits,
+        }
+    }
+
+    /// One row per stream the query read, since a join exposes the fields of each.
+    fn evidence(&self, posture: FailPosture, reason: &str) -> Vec<RedactionEvidence> {
+        let data = DataWindow::from_timestamps(
+            self.hits
+                .iter()
+                .filter_map(|hit| hit.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)),
+        );
+        self.all_streams
+            .split(',')
+            .map(str::trim)
+            .filter(|stream| !stream.is_empty())
+            .map(|stream| {
+                RedactionEvidence::search_scan_unavailable(
+                    &EvidenceScope::new(self.org_id, stream, self.stream_type),
+                    posture,
+                    self.hits.len() as u64,
+                    data,
+                    reason,
+                )
+            })
+            .collect()
+    }
+}
+
 /// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
 #[cfg(any(feature = "vectorscan", test))]
 fn redaction_skipped(
     fail_closed: bool,
     has_search_patterns: impl FnOnce() -> bool,
-    all_streams: &str,
+    skipped: &SkippedHits<'_>,
     reason: &str,
+    publish: impl FnOnce(Vec<RedactionEvidence>),
 ) -> Result<(), infra::errors::Error> {
-    if fail_closed && has_search_patterns() {
+    if !has_search_patterns() {
+        return Ok(());
+    }
+    let posture = if fail_closed {
+        FailPosture::Closed
+    } else {
+        FailPosture::Open
+    };
+    publish(skipped.evidence(posture, reason));
+    if fail_closed {
         // 503, not 400: the refusal is a server-side condition, not a fault in the query.
         return Err(infra::errors::Error::ResourceError(format!(
-            "sensitive-data redaction could not run for {all_streams}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)"
+            "sensitive-data redaction could not run for {}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)",
+            skipped.all_streams
         )));
     }
     Ok(())
@@ -1353,18 +1420,80 @@ mod tests {
         assert!(err.to_string().contains("app_logs"), "{err}");
     }
 
+    fn skip(
+        fail_closed: bool,
+        has_search_patterns: bool,
+        hits: &[json::Value],
+    ) -> (Result<(), infra::errors::Error>, Vec<RedactionEvidence>) {
+        let mut published = Vec::new();
+        let skipped = SkippedHits::new("org_a", StreamType::Logs, "app_logs, audit_logs", hits);
+        let ret = redaction_skipped(
+            fail_closed,
+            || has_search_patterns,
+            &skipped,
+            "parse error",
+            |rows| published = rows,
+        );
+        (ret, published)
+    }
+
     #[test]
     fn test_redaction_skipped_fails_open_by_default() {
-        assert!(redaction_skipped(false, || true, "app_logs", "parse error").is_ok());
+        assert!(skip(false, true, &[]).0.is_ok());
     }
 
     #[test]
     fn test_redaction_skipped_fails_closed_only_with_search_patterns() {
-        let err = redaction_skipped(true, || true, "app_logs", "parse error")
+        let err = skip(true, true, &[])
+            .0
             .expect_err("a stream with search-time patterns must not return unredacted hits");
         assert!(err.to_string().contains("app_logs"), "{err}");
         assert_eq!(err.http_status(), 503, "{err}");
-        assert!(redaction_skipped(true, || false, "app_logs", "parse error").is_ok());
+        assert!(skip(true, false, &[]).0.is_ok());
+    }
+
+    #[test]
+    fn test_fail_open_search_publishes_an_evidence_row_per_stream() {
+        let ts = TIMESTAMP_COL_NAME;
+        let hits = [
+            json::json!({ ts: 30, "card": "4111" }),
+            json::json!({ ts: 10, "card": "4222" }),
+            json::json!({ ts: 20, "card": "4333" }),
+        ];
+        let (ret, rows) = skip(false, true, &hits);
+        assert!(ret.is_ok());
+        let streams: Vec<&str> = rows.iter().map(|r| r.stream_name.as_str()).collect();
+        assert_eq!(streams, ["app_logs", "audit_logs"]);
+        for row in &rows {
+            assert_eq!(row.kind, "scan_unavailable");
+            assert_eq!(row.apply_time, "search");
+            assert_eq!(row.org_id, "org_a");
+            assert_eq!(row.stream_type, "logs");
+            assert_eq!(row.fail_posture.as_deref(), Some("open"));
+            assert_eq!(row.reason.as_deref(), Some("parse error"));
+            assert_eq!(row.records_scanned, 3);
+            assert_eq!((row.data_min_ts, row.data_max_ts), (Some(10), Some(30)));
+        }
+    }
+
+    #[test]
+    fn test_fail_closed_search_publishes_a_closed_row() {
+        let (ret, rows) = skip(true, true, &[]);
+        assert!(ret.is_err());
+        assert_eq!(rows.len(), 2);
+        assert!(
+            rows.iter()
+                .all(|r| r.fail_posture.as_deref() == Some("closed"))
+        );
+    }
+
+    #[test]
+    fn test_search_without_search_patterns_publishes_nothing() {
+        for fail_closed in [false, true] {
+            let (ret, rows) = skip(fail_closed, false, &[]);
+            assert!(ret.is_ok());
+            assert!(rows.is_empty(), "{rows:?}");
+        }
     }
 
     #[test]
