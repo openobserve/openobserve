@@ -43,6 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : t('alerts.downtimes.form.alertFolders')
       "
       :options="folderOptions"
+      :disabled="noAccess"
+      :help-text="noAccess ? noAccessHint : undefined"
       multiple
       searchable
       required
@@ -108,7 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary text-xs">{{ t("alerts.downtimes.form.itemsHint") }}</span>
     </div>
 
-    <div v-if="!idsOpen || (module === 'synthetics' && !tagsOpen)" class="flex flex-wrap gap-1">
+    <div
+      v-if="!noAccess && (!idsOpen || (module === 'synthetics' && !tagsOpen))"
+      class="flex flex-wrap gap-1"
+    >
       <OButton
         v-if="module === 'synthetics' && !tagsOpen"
         variant="ghost"
@@ -173,7 +178,7 @@ import { computed, inject, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
-import { foldersQuery } from "@/services/common.queries";
+import { optionalFoldersQuery } from "@/services/common.queries";
 import type { TargetModule } from "@/services/downtimes";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -221,20 +226,26 @@ const sloMode = computed(() => values.value?.slo_mode);
 
 const folderType = computed(() => (props.module === "synthetics" ? "synthetics" : "alerts"));
 const foldersList = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, folderType.value), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, folderType.value), { enabled: !!orgId.value }),
+);
+const folders = computed(() => foldersList.data.value?.folders ?? []);
+const noAccess = computed(() => !!foldersList.data.value?.forbidden);
+const noAccessHint = computed(() =>
+  folderType.value === "synthetics"
+    ? t("alerts.downtimes.form.noSyntheticsFolderAccess")
+    : t("alerts.downtimes.form.noAlertFolderAccess"),
 );
 
 const folderOptions = computed<SelectOption[]>(() => [
   { label: t("alerts.downtimes.allFolders"), value: ALL_FOLDERS },
-  ...(foldersList.data.value ?? []).map((f) => ({ label: raw(f.name), value: f.folderId })),
+  ...folders.value.map((f) => ({ label: raw(f.name), value: f.folderId })),
 ]);
 
-const folderName = (id: string) =>
-  foldersList.data.value?.find((f) => f.folderId === id)?.name ?? id;
+const folderName = (id: string) => folders.value.find((f) => f.folderId === id)?.name ?? id;
 
 const { items, query: itemsQuery } = useDowntimeItems(
   () => props.module,
-  () => idsOpen.value || (props.module === "synthetics" && tagsOpen.value),
+  () => !noAccess.value && (idsOpen.value || (props.module === "synthetics" && tagsOpen.value)),
 );
 
 const chosenFolders = computed(() => values.value?.folders ?? []);

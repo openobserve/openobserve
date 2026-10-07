@@ -48,6 +48,28 @@ export const permittedFoldersQuery = (org: string, type: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+/** A module's folders for a page that works without that module; `forbidden` is a 403. */
+export interface OptionalFolders {
+  folders: Folder[];
+  forbidden: boolean;
+}
+
+/** Like `foldersQuery`, but a 403 means no access to the module: no toast, and no error. */
+export const optionalFoldersQuery = (org: string, type: string) =>
+  queryOptions({
+    queryKey: folderKeys.optional(org, type),
+    queryFn: async (): Promise<OptionalFolders> => {
+      try {
+        const res = await common.list_Folders(org, type, { skipAccessToast: true });
+        return { folders: normalizeFolders(res.data.list ?? []), forbidden: false };
+      } catch (err: any) {
+        if (err?.response?.status === 403) return { folders: [], forbidden: true };
+        throw err;
+      }
+    },
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 export const nodesQuery = (org: string) =>
   queryOptions({
     queryKey: nodeKeys.list(org),

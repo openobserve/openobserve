@@ -314,7 +314,7 @@ import { useOrgId } from "@/composables/query";
 import { useAutoName } from "@/composables/useAutoName";
 import { useDowntimeItems } from "@/composables/downtimes/useDowntimeItems";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
-import { foldersQuery } from "@/services/common.queries";
+import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import {
   downtimeDetailQuery,
   downtimePreviewQuery,
@@ -414,10 +414,10 @@ const downtimeFolders = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
 );
 const alertFolders = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
 const syntheticFolders = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
 );
 const detailQuery = useQuery(() =>
   Object.assign(downtimeDetailQuery(orgId.value, sourceId.value, sourceFolder), {
@@ -567,7 +567,12 @@ const folderLabel = computed<I18nText>(() =>
 );
 
 const targetFolderName: FolderNameFn = (module, id) =>
-  folderNameIn(module === "synthetics" ? syntheticFolders.data.value : alertFolders.data.value, id);
+  folderNameIn(
+    module === "synthetics"
+      ? syntheticFolders.data.value?.folders
+      : alertFolders.data.value?.folders,
+    id,
+  );
 
 const autoName = useAutoName({
   suggestion: computed(() => buildDowntimeAutoName(values.value, t, itemName, targetFolderName)),

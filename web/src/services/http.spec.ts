@@ -46,10 +46,15 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
+vi.mock("@/composables/useUnauthorizedErrorGrouper", () => ({
+  addUnauthorizedError: vi.fn(),
+}));
+
 import config from "../aws-exports";
 import store from "../stores";
 import axios from "axios";
-import { attemptTokenRefresh } from "./http";
+import http, { attemptTokenRefresh } from "./http";
+import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,5 +179,52 @@ describe("attemptTokenRefresh", () => {
 
     expect(vi.mocked(store.dispatch)).toHaveBeenCalledWith("logout");
     expect(reloadMock).toHaveBeenCalled();
+  });
+});
+
+describe("http 403 interceptor", () => {
+  /** Builds an instance and returns the rejection handler it registered. */
+  const errorHandler = () => {
+    let onError: (error: any) => Promise<unknown> = () => Promise.resolve();
+    vi.mocked(axios.create).mockReturnValue({
+      interceptors: {
+        response: {
+          use: (_ok: unknown, err: (error: any) => Promise<unknown>) => {
+            onError = err;
+          },
+        },
+      },
+    } as any);
+    http();
+    return onError;
+  };
+
+  const forbidden = (config: Record<string, unknown> = {}) => ({
+    response: { status: 403, data: {} },
+    request: { responseURL: "http://localhost:5080/api/v2/org/folders/alerts" },
+    config: { url: "/api/v2/org/folders/alerts", ...config },
+  });
+
+  beforeEach(() => {
+    (config as any).isEnterprise = "true";
+    (config as any).isCloud = "false";
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("adds a 403 to the Access Required toast", async () => {
+    const error = forbidden();
+    await expect(errorHandler()(error)).rejects.toBe(error);
+    expect(addUnauthorizedError).toHaveBeenCalledWith(
+      "http://localhost:5080/api/v2/org/folders/alerts",
+    );
+  });
+
+  it("leaves a 403 out of the toast when the request opts out, and still rejects", async () => {
+    const error = forbidden({ skipAccessToast: true });
+    await expect(errorHandler()(error)).rejects.toBe(error);
+    expect(addUnauthorizedError).not.toHaveBeenCalled();
   });
 });

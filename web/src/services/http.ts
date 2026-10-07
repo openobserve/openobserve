@@ -22,6 +22,13 @@ import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper"
 import { usePasswordReset } from "@/composables/usePasswordReset";
 import { isPasswordResetError } from "@/utils/passwordResetErrors";
 
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /** The caller renders a 403 itself, so it is left out of the grouped "Access Required" toast. */
+    skipAccessToast?: boolean;
+  }
+}
+
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
 // concurrent 401s wait on the same Promise and retry once it resolves.
@@ -145,7 +152,10 @@ const http = ({ headers } = {} as any) => {
             }
             break;
           case 403:
-            if (config.isEnterprise == "true" || config.isCloud == "true") {
+            if (
+              (config.isEnterprise == "true" || config.isCloud == "true") &&
+              !error.config?.skipAccessToast
+            ) {
               const responseUrl = error.request?.responseURL || error.config?.url || "";
               addUnauthorizedError(responseUrl);
             }

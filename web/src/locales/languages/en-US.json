@@ -8897,6 +8897,8 @@
         },
         "alertFolders": "Alert folders",
         "syntheticsFolders": "Synthetics folders",
+        "noAlertFolderAccess": "You don't have access to alert folders.",
+        "noSyntheticsFolderAccess": "You don't have access to synthetics folders.",
         "tags": "Tags",
         "tagPlaceholder": "key:value",
         "tagsHint": "Every tag must be on the check.",

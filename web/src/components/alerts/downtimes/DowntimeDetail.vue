@@ -254,7 +254,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
-import { foldersQuery } from "@/services/common.queries";
+import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import { alertHistoryQuery } from "@/services/alerts.queries";
 import {
   cancelDowntimeMutation,
@@ -327,10 +327,10 @@ const downtimeFolders = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
 );
 const alertFolders = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
 const syntheticFolders = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
 );
 
 const historyQuery = useQuery(() =>
@@ -369,7 +369,9 @@ const folderLabel = computed(() =>
 
 const targetFolderName: FolderNameFn = (module, fid) =>
   folderNameIn(
-    module === "synthetics" ? syntheticFolders.data.value : alertFolders.data.value,
+    module === "synthetics"
+      ? syntheticFolders.data.value?.folders
+      : alertFolders.data.value?.folders,
     fid,
   );
 

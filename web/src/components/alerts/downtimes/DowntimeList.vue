@@ -422,7 +422,7 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { queryClient } from "@/composables/query/queryClient";
-import { foldersQuery } from "@/services/common.queries";
+import { foldersQuery, optionalFoldersQuery } from "@/services/common.queries";
 import { folderKeys } from "@/services/common.querykeys";
 import { downtimeKeys } from "@/services/downtimes.querykeys";
 import {
@@ -486,10 +486,10 @@ const listQuery = useQuery(() =>
   Object.assign(downtimesListQuery(orgId.value), { enabled: !!orgId.value }),
 );
 const alertFoldersList = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "alerts"), { enabled: !!orgId.value }),
 );
 const syntheticFoldersList = useQuery(() =>
-  Object.assign(foldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
+  Object.assign(optionalFoldersQuery(orgId.value, "synthetics"), { enabled: !!orgId.value }),
 );
 const downtimeFoldersList = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
@@ -512,7 +512,9 @@ const folderNameIn = (folders: { folderId: string; name: string }[] | undefined,
 
 const targetFolderName: FolderNameFn = (module: TargetModule, id: string) =>
   folderNameIn(
-    module === "synthetics" ? syntheticFoldersList.data.value : alertFoldersList.data.value,
+    module === "synthetics"
+      ? syntheticFoldersList.data.value?.folders
+      : alertFoldersList.data.value?.folders,
     id,
   );
 

@@ -7,6 +7,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { ALL_FOLDERS, defaultDowntimeValues } from "@/utils/downtimes/downtimeForm";
 import store from "@/test/unit/helpers/store";
+import common from "@/services/common";
 import DowntimeTargetCard from "./DowntimeTargetCard.vue";
 
 const toast = vi.fn();
@@ -33,15 +34,15 @@ vi.mock("@/services/common", async (importOriginal) => {
   };
 });
 
-const mountCard = () => {
+const mountCard = (module: "alerts" | "synthetics" = "alerts", idsOpen = true) => {
   let form!: ReturnType<typeof useOForm<any>>;
   const Host = defineComponent({
     setup() {
       const values = defaultDowntimeValues(Date.parse("2026-09-17T12:00:00Z"), "UTC");
-      values.targets.alerts.ids_open = true;
-      values.targets.alerts.ids = ["a1", "a2"];
+      values.targets.alerts.ids_open = idsOpen;
+      values.targets.alerts.ids = idsOpen ? ["a1", "a2"] : [];
       form = useOForm({ defaultValues: values });
-      return () => h(OForm, { form }, () => h(DowntimeTargetCard, { module: "alerts" }));
+      return () => h(OForm, { form }, () => h(DowntimeTargetCard, { module }));
     },
   });
   const wrapper = mount(Host, { global: { plugins: [store] } });
@@ -71,6 +72,32 @@ describe("DowntimeTargetCard", () => {
     form().setFieldValue("targets.alerts.folders", ["payments", ALL_FOLDERS]);
     await flushPromises();
     expect(form().state.values.targets.alerts.folders).toEqual([ALL_FOLDERS]);
+    wrapper.unmount();
+  });
+
+  it("keeps the folder picker usable when the module's folders load", async () => {
+    const { wrapper } = mountCard("alerts", false);
+    await flushPromises();
+    const picker = wrapper.find('[data-test="downtime-target-alerts-folders"]');
+    expect(picker.find("[disabled]").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("You don't have access to alert folders.");
+    expect(wrapper.find('[data-test="downtime-target-alerts-add-items"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("disables the folder picker with a hint when the module's folders answer 403", async () => {
+    vi.mocked(common.list_Folders).mockRejectedValueOnce({ response: { status: 403 } });
+    const { wrapper, form } = mountCard("synthetics", false);
+    await flushPromises();
+    const picker = wrapper.find('[data-test="downtime-target-synthetics-folders"]');
+    expect(picker.find("[disabled]").exists()).toBe(true);
+    expect(wrapper.text()).toContain("You don't have access to synthetics folders.");
+    expect(wrapper.find('[data-test="downtime-target-synthetics-add-items"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="downtime-target-synthetics-add-tags"]').exists()).toBe(false);
+    expect(form().state.values.targets.synthetics.folders).toEqual([ALL_FOLDERS]);
+    expect(common.list_Folders).toHaveBeenCalledWith(expect.any(String), "synthetics", {
+      skipAccessToast: true,
+    });
     wrapper.unmount();
   });
 });
