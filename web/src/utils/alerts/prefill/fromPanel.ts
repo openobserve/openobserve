@@ -233,6 +233,8 @@ export const panelQueryChoices = (
   visibleIndexes.map((index) => ({
     index,
     tabName: queries[index]?.tabName,
+    legend: queries[index]?.config?.promql_legend || undefined,
+    ref: queries[index]?.config?.ref || undefined,
     query: executedPanelQuery(metadataQueries, index) ?? queries[index]?.query ?? "",
   }));
 

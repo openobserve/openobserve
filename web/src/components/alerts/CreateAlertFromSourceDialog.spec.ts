@@ -259,9 +259,49 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(select.exists()).toBe(true);
       expect(select.props("modelValue")).toBe(0);
       expect(select.props("options").map((o: any) => [o.value, String(o.label)])).toEqual([
-        [0, "Query 1"],
-        [1, "IO"],
+        [0, "A: avg(disk_used)"],
+        [1, "IO: sum(rate(io_ops[1m]))"],
       ]);
+    });
+
+    it("names a query by its legend, else its formula letter", () => {
+      wrapper = mountDialog(
+        prefill({
+          queryType: "promql",
+          sql: undefined,
+          promql: "sum(rate(requests[5m]))",
+          queryIndex: 0,
+          queryChoices: [
+            { index: 0, legend: "requests", ref: "A", query: "sum(rate(requests[5m]))" },
+            { index: 1, ref: "C", query: "sum(rate(errors[5m]))" },
+          ],
+        }),
+      );
+      const labels = wrapper
+        .findComponent({ name: "OSelect" })
+        .props("options")
+        .map((o: any) => String(o.label));
+      expect(labels).toEqual(["requests: sum(rate(requests[5m]))", "C: sum(rate(errors[5m]))"]);
+    });
+
+    it("cuts a long expression short in its option label", () => {
+      const long = `sum by (instance) (rate(${"a".repeat(80)}[5m]))`;
+      wrapper = mountDialog(
+        prefill({
+          queryType: "promql",
+          sql: undefined,
+          promql: long,
+          queryIndex: 0,
+          queryChoices: [
+            { index: 0, query: long },
+            { index: 1, query: "avg(disk_used)" },
+          ],
+        }),
+      );
+      const label = String(wrapper.findComponent({ name: "OSelect" }).props("options")[0].label);
+      expect(label.startsWith("A: sum by (instance) (rate(aaa")).toBe(true);
+      expect(label.endsWith("…")).toBe(true);
+      expect(label.length).toBeLessThan(long.length);
     });
 
     it("rebuilds the prefill for the chosen query", async () => {

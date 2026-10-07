@@ -480,6 +480,17 @@ describe("panelQueryChoices", () => {
       { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
     ]);
   });
+
+  it("carries each query's legend and formula letter for the picker label", () => {
+    const queries = [
+      { query: "sum(rate(requests[5m]))", config: { ref: "A", promql_legend: "requests" } },
+      { query: "sum(rate(errors[5m]))", config: { ref: "B" } },
+    ];
+    expect(panelQueryChoices(queries, undefined)).toEqual([
+      { index: 0, legend: "requests", ref: "A", query: "sum(rate(requests[5m]))" },
+      { index: 1, ref: "B", query: "sum(rate(errors[5m]))" },
+    ]);
+  });
 });
 
 describe("buildPrefillFromPanel — a formula query", () => {

@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.queryLabel") }}
         </span>
         <OCodeBlock
+          class="[&_pre]:px-3 [&_pre]:py-2"
           wrap
           :max-lines="10"
           :code="previewQuery"
@@ -198,6 +199,8 @@ import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
 
+const QUERY_LABEL_MAX = 60;
+
 const props = defineProps<{
   open: boolean;
   prefill: AlertPrefill | null;
@@ -234,12 +237,17 @@ const onPatternModeChange = (value: unknown) => {
 };
 
 const queryOptions = computed(() =>
-  (props.prefill?.queryChoices ?? []).map((choice) => ({
-    value: choice.index,
-    label: choice.tabName
-      ? raw(choice.tabName)
-      : t("common.queryNumber", { index: choice.index + 1 }),
-  })),
+  (props.prefill?.queryChoices ?? []).map((choice) => {
+    const query = choice.query.replace(/\s+/g, " ").trim();
+    return {
+      value: choice.index,
+      label: t("alerts.prefill.dialog.queryChoiceOption", {
+        name:
+          choice.tabName || choice.legend || choice.ref || String.fromCharCode(65 + choice.index),
+        query: query.length > QUERY_LABEL_MAX ? `${query.slice(0, QUERY_LABEL_MAX - 1)}…` : query,
+      }),
+    };
+  }),
 );
 
 const onQueryChange = (value: unknown) => {

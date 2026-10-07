@@ -116,6 +116,10 @@ export interface AlertPrefillQueryChoice {
   /** The query's index among the surface's queries. */
   index: number;
   tabName?: string;
+  /** The query's PromQL legend, which names it on the chart. */
+  legend?: string;
+  /** The query's formula letter. */
+  ref?: string;
   query: string;
 }
 
