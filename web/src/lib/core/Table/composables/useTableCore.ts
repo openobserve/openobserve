@@ -59,7 +59,7 @@ export function useTableCore<TData>(
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
   },
-  _emit?: unknown,
+  emit?: (event: any, ...args: any[]) => void,
 ) {
   // ── Effective columns ───────────────────────────────────────────
   // When `showIndex` is set (and the caller hasn't already declared a `#`
@@ -209,6 +209,19 @@ export function useTableCore<TData>(
 
   const sortingState = ref<any[]>(initialSorting.value);
 
+  // The parent's sortBy/sortOrder (often the URL) is the source of truth once it changes.
+  watch([() => props.sortBy, () => props.sortOrder], () => {
+    if (props.sorting === "client") sortingState.value = initialSorting.value;
+  });
+
+  function emitClientSort(next: { id: string; desc: boolean }[]) {
+    const column = next[0]?.id ?? "";
+    const order = next[0]?.desc ? "desc" : "asc";
+    emit?.("update:sortBy", column);
+    emit?.("update:sortOrder", order);
+    emit?.("sort-change", { column, order });
+  }
+
   // Column pinning — auto-pin isAction columns to right, pivotRowColumns to left, plus explicitly pinned columns
   const pivotRowColumnIds = computed(() => {
     const raw = (props as any).pivotRowColumns as any[] | undefined;
@@ -284,6 +297,7 @@ export function useTableCore<TData>(
           : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
+        sortUndefined: col.sortUndefined,
         enableColumnFilter: col.filterable ?? false,
         filterFn: col.filterable ? valueInSet : undefined,
         // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
@@ -375,6 +389,7 @@ export function useTableCore<TData>(
       const old = sortingState.value;
       const next = typeof updater === "function" ? updater(old) : updater;
       sortingState.value = next;
+      emitClientSort(next);
     },
     onColumnSizingChange: (updater: any) => {
       const old = columnSizing.value;
