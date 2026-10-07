@@ -239,10 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
-                  size="icon-toolbar"
+                  size="sm-toolbar"
                 >
                   <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
@@ -306,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("search.manageSavedViews") }}
               </ODropdownItem>
             </ODropdown>
+            <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
               variant="ghost"
@@ -2591,7 +2592,7 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 62 };
+    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 87 };
     const SYNTAX_GUIDE_LABEL_WIDTH = 108;
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 4;

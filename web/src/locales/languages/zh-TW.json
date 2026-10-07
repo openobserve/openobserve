@@ -10520,11 +10520,9 @@
       "or": "或：",
       "askAi": "詢問 AI 以設定追蹤"
     },
-    "configureFullTextSearch": "以設定串流的全文搜尋欄位。",
     "collapseFields": "收合欄位",
     "openFields": "展開欄位",
     "timeRangeUpdated": "選取的時間範圍未包含此追蹤。時間範圍已更新以符合追蹤的時間戳記。",
-    "errorRetrievingTraces": "擷取追蹤時發生錯誤。",
     "fetchingTraces": "載入追蹤中...",
     "noStream": {
       "title": "選擇一個串流以開始探索",
@@ -10785,7 +10783,6 @@
       "viewQueryTrend": "在資料庫監控中檢視查詢趨勢"
     },
     "index": {
-      "clickHere": "點選此處",
       "changeStreamTitle": "變更串流？",
       "switchStream": "切換串流",
       "cancel": "取消",

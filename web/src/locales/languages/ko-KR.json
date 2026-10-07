@@ -10525,11 +10525,9 @@
       "or": "또는:",
       "askAi": "AI에게 추적 설정 요청"
     },
-    "configureFullTextSearch": "스트림에 전체 텍스트 검색 필드를 구성합니다.",
     "collapseFields": "필드 축소",
     "openFields": "오픈 필드",
     "timeRangeUpdated": "선택한 시간 범위에 이 트레이스가 포함되지 않았습니다. 트레이스의 타임스탬프에 맞게 시간 범위가 업데이트되었습니다.",
-    "errorRetrievingTraces": "트레이스를 검색하는 중 오류가 발생했습니다.",
     "fetchingTraces": "트레이스를 불러오는 중...",
     "noStream": {
       "title": "스트림을 선택하여 탐색을 시작하세요",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "데이터베이스 모니터링에서 쿼리 추세 보기"
     },
     "index": {
-      "clickHere": "여기를 클릭",
       "changeStreamTitle": "스트림 변경?",
       "switchStream": "스트림 전환",
       "cancel": "취소",

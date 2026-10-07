@@ -367,13 +367,29 @@ describe("scope-load builders (G2)", () => {
     );
   });
 
-  it("Q3 summary equals the proven shape and keeps synthetic sessions countable", () => {
+  it("Q3 summary equals the proven shape, counts synthetic sessions and excludes them from sessions (P1-M2)", () => {
     const sql = summarySql(s, CS);
     const unscoped = "application_id = 'web' AND session_id IS NOT NULL";
     expect(sql.split(unscoped).join("{scope}").split(String(CS)).join("{cs}")).toBe(
       PROVEN.Q3_SUMMARY,
     );
-    expect(sql).not.toContain("<> 'synthetics'");
+    // `sessions`/`prev_sessions` must drop synthetics so the KPI matches the "N synthetic sessions
+    // excluded" caption, while `synthetic_sessions` still counts them via its own, unfiltered CASE.
+    expect(sql).toContain(
+      "CASE WHEN _timestamp >= {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS sessions".replace(
+        "{cs}",
+        String(CS),
+      ),
+    );
+    expect(sql).toContain(
+      "CASE WHEN _timestamp < {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS prev_sessions".replace(
+        "{cs}",
+        String(CS),
+      ),
+    );
+    expect(sql).toContain(
+      `CASE WHEN _timestamp >= ${CS} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`,
+    );
   });
 
   it("Q3 without session_type or candidates reports zero synthetics and no identity pairs", () => {
@@ -872,8 +888,19 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
       `WHERE ${scopeClause(s)} AND type = 'view' GROUP BY`,
     );
     expect(pathsSql(s, null, { ...def, include: "clicks" }, opts)).toContain(
-      `WHERE ${scopeClause(s)} AND (type = 'action' AND action_target_name <> '') GROUP BY`,
+      `WHERE ${scopeClause(s)} AND ((type = 'action' AND action_target_name <> '') OR ${stepPredicateRaw(def.anchor, s, opts.events)}) GROUP BY`,
     );
+  });
+
+  it("a page anchor survives a mismatched Clicks filter, so its own reach is never lost (P0 o2#15*)", () => {
+    const sql = pathsSql(s, null, { ...def, include: "clicks" }, opts);
+    expect(sql).toContain(
+      `AND ((type = 'action' AND action_target_name <> '') OR (type = 'view' AND (strpos(view_url, '${def.anchor.key}') > 0) AND ${pageKeyExpr("view_url", s.schema)} = '${def.anchor.key}')) GROUP BY`,
+    );
+    expect(sql).toContain(
+      "MIN(CASE WHEN key = 'p:/web/logs' THEN n END) OVER (PARTITION BY sid) AS n0",
+    );
+    expect(() => assertJoinFree(sql)).not.toThrow();
   });
 
   it("a named-event anchor marks rows by the event's rules", () => {
@@ -1000,7 +1027,9 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     expect(pages).not.toContain("action_target_name");
     const clicks = pathsSql(noClicks, null, { ...def, include: "clicks" }, opts);
     expect(clicks).not.toContain("action_target_name");
-    expect(clicks).toContain(`WHERE ${scopeClause(noClicks)} AND FALSE GROUP BY`);
+    expect(clicks).toContain(
+      `WHERE ${scopeClause(noClicks)} AND (FALSE OR ${stepPredicateRaw(def.anchor, noClicks, opts.events)}) GROUP BY`,
+    );
     expect(() => assertJoinFree(all)).not.toThrow();
     expect(() => assertJoinFree(clicks)).not.toThrow();
   });

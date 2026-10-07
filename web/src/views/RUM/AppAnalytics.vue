@@ -18,12 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :key="org"
     data-test="rum-analytics-page"
-    :title="t('rum.analytics.title')"
     :subtitle="t('rum.analytics.subtitle')"
     title-data-test="rum-analytics-title"
     icon="insights"
     bleed
   >
+    <!-- Beta tag rides inside the title line, like Workflows (see BetaBadge.vue). -->
+    <template #title>
+      <span class="inline-flex items-center gap-2">
+        {{ t("rum.analytics.title") }}
+        <BetaBadge />
+      </span>
+    </template>
     <template #actions>
       <OSelect
         v-if="appOptions.length > 1"
@@ -65,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onVersionChange"
       />
       <DateTimePickerDashboard
+        ref="dateTimePickerRef"
         :model-value="state.datetime"
         menu-align="end"
         data-test="rum-analytics-date-picker"
@@ -279,6 +286,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
@@ -343,6 +351,7 @@ let active = false;
 let activatedOnce = false;
 const invalidDismissed = ref(false);
 const identityOpen = ref(false);
+const dateTimePickerRef = ref<any>(null);
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
@@ -463,11 +472,31 @@ const sameRange = (a: AnalyticsDateTime, b: AnalyticsDateTime) =>
     ? a.relativeTimePeriod === b.relativeTimePeriod
     : a.startTime === b.startTime && a.endTime === b.endTime);
 
+// The picker reads this shape into an already-mounted DateTime (see DateTimePickerDashboard.setSavedDate).
+const toPickerSavedDate = (dt: AnalyticsDateTime) =>
+  dt.valueType === "absolute"
+    ? { type: "absolute", startTime: dt.startTime, endTime: dt.endTime }
+    : { type: "relative", relativeTimePeriod: dt.relativeTimePeriod };
+
 const onDateChange = (value: AnalyticsDateTime) => {
   if (sameRange(value, state.datetime)) return;
   pa.setScope({ datetime: { ...value } });
   void reload();
 };
+
+// The picker only reads its v-model on mount, so a programmatic scope change that
+// doesn't come from the picker itself (widenRange's "show the past 30 days" fallback,
+// initFromRoute's URL restore, a sub-tab switch that carries a new range) never reaches
+// its displayed label unless pushed in here.
+watch(
+  () => [
+    state.datetime.valueType,
+    state.datetime.relativeTimePeriod,
+    state.datetime.startTime,
+    state.datetime.endTime,
+  ],
+  () => dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime)),
+);
 
 const toggleIncludeAll = () => {
   identityOpen.value = false;

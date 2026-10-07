@@ -371,6 +371,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: PA_ROUTES.shell,
         requires: PA_ROUTES.shell,
         activeOnRoutes: Object.values(PA_ROUTES),
+        beta: true,
       },
     ],
   },

@@ -10525,11 +10525,9 @@
       "or": "または:",
       "askAi": "AIにトレーシングの設定を依頼"
     },
-    "configureFullTextSearch": "ストリームに全文検索フィールドを設定します。",
     "collapseFields": "フィールドを折りたたむ",
     "openFields": "オープンフィールド",
     "timeRangeUpdated": "選択した時間範囲にこのトレースが含まれていませんでした。時間範囲はトレースのタイムスタンプに合わせて更新されました。",
-    "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
     "fetchingTraces": "トレースを読み込んでいます...",
     "noStream": {
       "title": "ストリームを選んで探索を始めましょう",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "データベースモニタリングでクエリトレンドを表示"
     },
     "index": {
-      "clickHere": "ここをクリック",
       "changeStreamTitle": "ストリームを変更しますか？",
       "switchStream": "ストリームを切り替え",
       "cancel": "キャンセル",

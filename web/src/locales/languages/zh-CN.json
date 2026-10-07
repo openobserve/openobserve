@@ -10525,11 +10525,9 @@
       "or": "或者：",
       "askAi": "让 AI 设置追踪"
     },
-    "configureFullTextSearch": "为数据流配置全文搜索字段。",
     "collapseFields": "折叠字段",
     "openFields": "打开字段",
     "timeRangeUpdated": "所选时间范围未包含此追踪。时间范围已更新以匹配该追踪的时间戳。",
-    "errorRetrievingTraces": "检索追踪时发生错误。",
     "fetchingTraces": "正在加载追踪...",
     "noStream": {
       "title": "选择数据流开始探索",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "在数据库监控中查看查询趋势"
     },
     "index": {
-      "clickHere": "点击此处",
       "changeStreamTitle": "更改流？",
       "switchStream": "切换流",
       "cancel": "取消",

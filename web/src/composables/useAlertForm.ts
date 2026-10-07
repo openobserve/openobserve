@@ -292,6 +292,17 @@ export const anomalyBandPayload = (
   alert_window_recover_pct: numberOrNull(c.alert_window_recover_pct),
 });
 
+/**
+ * Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+ * Band/percentile mode must send an explicit null (not omit the field): the update endpoint's
+ * `alert_budget_per_day` is a double-Option, so an absent field means "leave as-is" and a
+ * previously stored budget would never clear.
+ */
+export const anomalySensitivityPayload = (budgetPerDay: number | null, threshold: unknown) =>
+  budgetPerDay !== null
+    ? { alert_budget_per_day: budgetPerDay }
+    : { threshold, alert_budget_per_day: null };
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -2044,10 +2055,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
-          ...(budgetPerDay !== null
-            ? { alert_budget_per_day: budgetPerDay }
-            : { threshold: c.threshold }),
+          ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
         },

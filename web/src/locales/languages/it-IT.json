@@ -10525,11 +10525,9 @@
       "or": "Oppure:",
       "askAi": "Chiedi all'IA di configurare il tracciamento"
     },
-    "configureFullTextSearch": "per configurare un campo di ricerca a testo completo per lo stream.",
     "collapseFields": "Comprimi campi",
     "openFields": "Campi aperti",
     "timeRangeUpdated": "L'intervallo di tempo selezionato non includeva questa traccia. L'intervallo di tempo è stato aggiornato per corrispondere al timestamp della traccia.",
-    "errorRetrievingTraces": "Errore durante il recupero delle tracce.",
     "fetchingTraces": "Caricamento delle tracce...",
     "noStream": {
       "title": "Scegli uno stream per iniziare a esplorare",
@@ -10790,7 +10788,6 @@
       "viewQueryTrend": "Visualizza l'andamento delle query nel Monitoraggio database"
     },
     "index": {
-      "clickHere": "Clicca qui",
       "changeStreamTitle": "Cambiare flusso?",
       "switchStream": "Cambia flusso",
       "cancel": "Annulla",
