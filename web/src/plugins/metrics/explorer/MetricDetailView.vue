@@ -380,10 +380,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   appearance="inline"
                   size="sm"
                   :searchable="false"
-                  class="min-w-24"
+                  class="min-w-32"
                   data-test="metrics-detail-forecast"
                   @update:model-value="onForecastChange"
                 />
+                <OButton
+                  variant="ghost"
+                  size="icon"
+                  icon-left="info-outline"
+                  :aria-label="forecastMethodsHelp"
+                  data-test="metrics-detail-forecast-help"
+                >
+                  <OTooltip side="bottom" max-width="22.5rem">
+                    <template #content>
+                      <div class="flex flex-col gap-1.5">
+                        <div>{{ t("metrics.explorer.detail.forecast.linearHelp") }}</div>
+                        <div>{{ t("metrics.explorer.detail.forecast.smoothedHelp") }}</div>
+                      </div>
+                    </template>
+                  </OTooltip>
+                </OButton>
               </div>
               <div v-if="forecast" class="flex items-center gap-1.5">
                 <template v-if="forecastHorizonOptions.length > 1">
@@ -408,11 +424,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-secondary text-xs">{{
                     t("metrics.explorer.detail.forecast.horizon")
                   }}</span>
-                  <span class="text-sm" data-test="metrics-detail-forecast-horizon-auto">{{
-                    t("metrics.explorer.detail.forecast.horizonComputed", {
-                      duration: forecastHorizonText,
-                    })
-                  }}</span>
+                  <span
+                    class="text-text-body text-xs font-medium"
+                    data-test="metrics-detail-forecast-horizon-auto"
+                    >{{
+                      t("metrics.explorer.detail.forecast.horizonComputed", {
+                        duration: forecastHorizonText,
+                      })
+                    }}</span
+                  >
                 </template>
               </div>
             </template>
@@ -949,17 +969,15 @@ export default defineComponent({
     );
     const forecastOptions = computed(() => [
       { label: t("metrics.explorer.detail.forecast.off"), value: "off" },
-      {
-        label: t("metrics.explorer.detail.forecast.linear"),
-        value: "linear",
-        subLabel: t("metrics.explorer.detail.forecast.linearHelp"),
-      },
-      {
-        label: t("metrics.explorer.detail.forecast.smoothed"),
-        value: "smoothed",
-        subLabel: t("metrics.explorer.detail.forecast.smoothedHelp"),
-      },
+      { label: t("metrics.explorer.detail.forecast.linear"), value: "linear" },
+      { label: t("metrics.explorer.detail.forecast.smoothed"), value: "smoothed" },
     ]);
+    const forecastMethodsHelp = computed(() =>
+      t("metrics.explorer.detail.forecast.methodsHelp", {
+        linear: t("metrics.explorer.detail.forecast.linearHelp"),
+        smoothed: t("metrics.explorer.detail.forecast.smoothedHelp"),
+      }),
+    );
     const forecastHorizonOptions = computed(() => [
       { label: t("metrics.explorer.detail.forecast.horizonAuto"), value: "auto" },
       ...forecastHorizonPresets(rangeSeconds.value).map((preset) => ({
@@ -1222,6 +1240,7 @@ export default defineComponent({
       onForecastChange,
       onForecastHorizonChange,
       overviewPeriodEmpty,
+      forecastMethodsHelp,
       loadUsage,
       forecastHorizonText,
       activeForecast,

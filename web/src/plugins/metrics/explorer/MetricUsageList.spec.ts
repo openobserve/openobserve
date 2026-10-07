@@ -95,6 +95,7 @@ describe("MetricUsageList", () => {
     );
     const badge = find(wrapper, "metrics-detail-used-in-text-match-pipelines-p1");
     expect(badge.exists()).toBe(true);
+    expect(badge.element.closest('[tabindex="0"]')).not.toBeNull();
     expect(
       wrapper
         .findAllComponents({ name: "OTooltip" })

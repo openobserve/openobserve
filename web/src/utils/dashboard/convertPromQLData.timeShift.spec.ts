@@ -15,7 +15,8 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { alignShiftedPromQLResults, convertPromQLData } from "./convertPromQLData";
-import { getAreaGradientColor, getColorPalette } from "./colorPalette";
+import { getAreaGradientColor } from "./colorPalette";
+import echartsTokens from "echarts/lib/visual/tokens.js";
 
 vi.mock("./chartDimensionUtils", () => ({
   calculateOptimalFontSize: vi.fn(() => 14),
@@ -340,7 +341,12 @@ describe("convertPromQLData with time-shifted results", () => {
       { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" },
     ]);
 
-    it("draws it dotted in the primary's palette colour, so it reads apart from a dashed forecast", async () => {
+    const explorer = (config: Record<string, any> = {}) => ({
+      ...panel("line"),
+      config: { explorer_overlays: true, ...config },
+    });
+
+    it("draws it dashed in the primary's palette colour", async () => {
       const result = await convert(
         panel("line"),
         [twoPods(), twoPods(DAY_S)],
@@ -352,31 +358,56 @@ describe("convertPromQLData with time-shifted results", () => {
         const [primary, shifted] = pair(result, name);
         expect(shifted.itemStyle.color).toBeTruthy();
         expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
-        expect(shifted.lineStyle.type).toBe("dotted");
+        expect(shifted.lineStyle.type).toBe("dashed");
         expect(primary.lineStyle?.type).toBeUndefined();
       }
     });
 
-    it("in the classic palette, pins each primary's palette colour by position and gives it to its twin", async () => {
-      const classic = { ...panel("line"), config: { color: { mode: "palette-classic" } } };
-      const result = await convert(classic, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
-      const palette = getColorPalette("light");
-
-      ["api-1", "api-2"].forEach((name, position) => {
-        const [primary, shifted] = pair(result, name);
-        expect(primary.itemStyle.color).toBe(palette[position]);
-        expect(shifted.itemStyle.color).toBe(palette[position]);
-      });
-    });
-
-    it("keeps the twins out of the legend", async () => {
+    it("in the Explorer, draws it dotted so it reads apart from a dashed forecast", async () => {
       const result = await convert(
-        panel("line"),
+        explorer(),
         [twoPods(), twoPods(DAY_S)],
         oneDay,
         stepMeta(2, 60),
       );
-      expect(result.options.legend.data).toEqual(["api-1", "api-2"]);
+      const [, shifted] = pair(result, "api-1");
+      expect(shifted.lineStyle.type).toBe("dotted");
+    });
+
+    it("in the Explorer's classic palette, keeps ECharts' own primary colours and gives them to the twins", async () => {
+      const classic = explorer({ color: { mode: "palette-classic" } });
+      const alone = await convert(
+        classic,
+        [twoPods()],
+        meta([{ panelQueryIndex: 0 }]),
+        stepMeta(1, 60),
+      );
+      const overlaid = await convert(classic, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+      const theme = echartsTokens.color.theme;
+
+      ["api-1", "api-2"].forEach((name, position) => {
+        const [before] = pair(alone, name);
+        const [primary, shifted] = pair(overlaid, name);
+        expect(before.itemStyle.color).toBe(theme[position]);
+        expect(primary.itemStyle.color).toBe(theme[position]);
+        expect(shifted.itemStyle.color).toBe(theme[position]);
+      });
+    });
+
+    it("on a dashboard, leaves the classic palette to ECharts", async () => {
+      const classic = { ...panel("line"), config: { color: { mode: "palette-classic" } } };
+      const result = await convert(classic, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.color).toBeNull();
+      expect(shifted.itemStyle.color).toBeNull();
+    });
+
+    it("keeps the twins out of the Explorer's legend, and in a dashboard's", async () => {
+      const data = [twoPods(), twoPods(DAY_S)];
+      const inExplorer = await convert(explorer(), data, oneDay, stepMeta(2, 60));
+      expect(inExplorer.options.legend.data).toEqual(["api-1", "api-2"]);
+      const onDashboard = await convert(panel("line"), data, oneDay, stepMeta(2, 60));
+      expect(onDashboard.options.legend.data).toBeUndefined();
     });
 
     it("follows a series colour mapping set on the primary", async () => {
@@ -452,7 +483,7 @@ describe("convertPromQLData with time-shifted results", () => {
       },
     );
 
-    it("keeps line and area series unfaded, the dots mark them", async () => {
+    it("keeps line and area series unfaded, the dash marks them", async () => {
       for (const type of ["line", "area"]) {
         const result = await convert(
           panel(type),
@@ -462,7 +493,7 @@ describe("convertPromQLData with time-shifted results", () => {
         );
         const [, shifted] = pair(result, "api-1");
         expect(shifted.itemStyle.opacity).toBeUndefined();
-        expect(shifted.lineStyle.type).toBe("dotted");
+        expect(shifted.lineStyle.type).toBe("dashed");
       }
     });
 

@@ -141,12 +141,19 @@ export default defineComponent({
         ? withUnit(props.value, formattedValue.value as string)
         : props.value,
     );
-    const forecastText = computed(() =>
-      withUnit(
-        forecastValue.value,
-        forecastValue.value.toLocaleString(undefined, { maximumSignificantDigits: 4 }),
-      ),
-    );
+    // The unit is shown only where it keeps the number written into the alert; a rescaled one would not read the same.
+    const forecastText = computed(() => {
+      const value = forecastValue.value;
+      const plain = value.toLocaleString(undefined, { maximumSignificantDigits: 4 });
+      if (!props.unit) return plain;
+      const decimals = (String(value).split(".")[1] ?? "").length;
+      const shown = getUnitValue(value, props.unit, props.unitCustom ?? "", decimals);
+      if (Number(shown.value) === value) return formatUnitValue(shown);
+      const base = getUnitValue(1, props.unit, props.unitCustom ?? "", 0);
+      return Number(base.value) === 1
+        ? formatUnitValue({ value: String(value), unit: base.unit })
+        : plain;
+    });
 
     const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {
       emit("select", {
@@ -169,18 +176,24 @@ export default defineComponent({
       }
     };
 
+    const measure = async () => {
+      await nextTick();
+      menuSize.value = {
+        width: menuRef.value?.offsetWidth ?? 0,
+        height: menuRef.value?.offsetHeight ?? 0,
+      };
+    };
+    watch([valueText, forecastText, () => props.seriesRole], () => {
+      if (props.visible) measure();
+    });
+
     watch(
       () => props.visible,
       (newVisible) => {
         if (newVisible) {
           // The size is known only once rendered; until then the menu sits at the click.
           menuSize.value = { width: 0, height: 0 };
-          nextTick(() => {
-            menuSize.value = {
-              width: menuRef.value?.offsetWidth ?? 0,
-              height: menuRef.value?.offsetHeight ?? 0,
-            };
-          });
+          measure();
           setTimeout(() => {
             document.addEventListener("click", handleClickOutside);
             document.addEventListener("keydown", handleEscape);

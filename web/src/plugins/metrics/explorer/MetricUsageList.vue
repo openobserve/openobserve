@@ -71,18 +71,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`metrics-detail-used-in-link-${group.kind}-${item.id}`"
               >{{ item.title ?? item.name }}</router-link
             >
-            <OBadge
+            <OTooltip
               v-if="item.match === 'text'"
-              variant="warning-outline"
-              size="xs"
-              :data-test="`metrics-detail-used-in-text-match-${group.kind}-${item.id}`"
+              :content="t('metrics.explorer.detail.usedIn.textMatchHelp')"
+              max-width="22.5rem"
             >
-              {{ t("metrics.explorer.detail.usedIn.textMatch") }}
-              <OTooltip
-                :content="t('metrics.explorer.detail.usedIn.textMatchHelp')"
-                max-width="22.5rem"
-              />
-            </OBadge>
+              <!-- Focusable so the explanation reaches a keyboard user too. -->
+              <span
+                tabindex="0"
+                class="rounded-default focus-visible:outline-accent/40 inline-flex focus:outline-none focus-visible:outline-2"
+              >
+                <OBadge
+                  variant="warning-outline"
+                  size="xs"
+                  :data-test="`metrics-detail-used-in-text-match-${group.kind}-${item.id}`"
+                  >{{ t("metrics.explorer.detail.usedIn.textMatch") }}</OBadge
+                >
+              </span>
+            </OTooltip>
           </li>
         </ul>
       </section>

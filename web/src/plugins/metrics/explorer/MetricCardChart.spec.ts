@@ -129,6 +129,15 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     expect(panelProp(wrapper, "panelSchema").queries[0].query).toBe("sum(rate(up[5m]))");
   });
 
+  it("hands a right-click alert the bare metric name, and marks the chart as the Explorer's", () => {
+    const wrapper = mountChart({
+      queries: [{ expr: 'sum(rate({__name__="up",job="api"}[5m]))', legendTemplate: "" }],
+    });
+    const schema = panelProp(wrapper, "panelSchema");
+    expect(schema.queries[0].query).toBe('sum(rate(up{job="api"}[5m]))');
+    expect(schema.config.explorer_overlays).toBe(true);
+  });
+
   it("gives each query the stream it reads, so an alert from the chart has one", () => {
     const queries = withSourceStreams(
       [

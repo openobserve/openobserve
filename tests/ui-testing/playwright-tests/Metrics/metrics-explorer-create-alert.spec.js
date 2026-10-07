@@ -1,4 +1,4 @@
-// Create alert from Explorer charts: a grid card's right-click, and the detail view's header menu.
+// Create alert from Explorer charts: a grid card's right-click, and the detail view header button.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
@@ -36,7 +36,7 @@ test.describe('Metrics Explorer create alert', () => {
     await explorer.expectAlertFormStream(DETAIL_METRIC);
   });
 
-  test('Detail view: overview right-click and the header menu both open the form on the metric', {
+  test('Detail view: overview right-click and the header button both open the form on the metric', {
     tag: ['@metrics', '@metrics-explorer', '@alerts', '@P1', '@all'],
   }, async ({ page }, testInfo) => {
     const explorer = await openGrid(page, testInfo);
@@ -50,7 +50,7 @@ test.describe('Metrics Explorer create alert', () => {
 
     await page.goBack();
     await explorer.expectDetailOpen(DETAIL_METRIC);
-    await explorer.createAlertFromDetailMenu();
+    await explorer.createAlertFromDetailHeader();
     await explorer.expectAlertFormStream(DETAIL_METRIC);
   });
 });

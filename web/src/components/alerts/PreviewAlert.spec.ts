@@ -2605,6 +2605,15 @@ describe("PreviewAlert - Forecast mode", () => {
     w.unmount();
   });
 
+  it("gives no verdict while the horizon is out of range, as the summary does", async () => {
+    for (const H of [0, 31, 2.5]) {
+      const w = await mountForecast(H);
+      await emitSeries(w, series("a", ["0", "0"]));
+      expect(w.vm.evaluationStatus).toBeNull();
+      w.unmount();
+    }
+  });
+
   it("labels the charted series as days until the threshold", async () => {
     const w = await mountForecast();
     w.vm.refreshData();

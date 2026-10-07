@@ -79,7 +79,6 @@ export class MetricsExplorerPage {
         this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
         this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
         this.detailOverview = '[data-test="metrics-detail-overview"]';
-        this.detailMore = '[data-test="metrics-detail-more"]';
         this.detailCreateAlert = '[data-test="metrics-detail-create-alert"]';
         this.alertContextMenuAbove = '[data-test="alert-context-menu-above"]';
         this.alertStreamName = '[data-test="add-alert-stream-name-select-dropdown"]';
@@ -476,19 +475,18 @@ export class MetricsExplorerPage {
         return this.cardRoot(metric).locator(this.cardChartCanvas).first();
     }
 
-    /** Right-click a drawn chart, then "Alert when above"; the alert form opens on a panel prefill. */
+    /** Right-click a drawn chart, then "Alert when above"; the alert form opens on an Explorer prefill. */
     async createAlertAboveFromChart(chart) {
         // zrender stacks a hover canvas over the drawn one, so click their shared root instead.
         await chart.locator('xpath=..').click({ button: 'right' });
         await this.page.locator(this.alertContextMenuAbove).click();
-        await this.page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
+        await this.page.waitForURL(/alerts\/add.*prefill=explorer/, { timeout: 30000 });
     }
 
-    /** The detail header's overflow menu → Create alert; the alert form opens on a panel prefill. */
-    async createAlertFromDetailMenu() {
-        await this.page.locator(this.detailMore).click();
+    /** The detail header's Create alert button; the alert form opens on an Explorer prefill. */
+    async createAlertFromDetailHeader() {
         await this.page.locator(this.detailCreateAlert).click();
-        await this.page.waitForURL(/alerts\/add.*prefill=panel/, { timeout: 30000 });
+        await this.page.waitForURL(/alerts\/add.*prefill=explorer/, { timeout: 30000 });
     }
 
     /** OSS: the drilldown is shown locked; its span, not the disabled button, carries the tooltip. */

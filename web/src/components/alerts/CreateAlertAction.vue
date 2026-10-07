@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   The one entry point for "create an alert from here", in whichever shape the
-  host surface needs: a dropdown item, a button, or a bare icon button.
+  host surface needs: a dropdown item, a button, a page-header toolbar button,
+  or a bare icon button.
 
   A surface supplies `source` and `build`; this owns the label, icon, disabled
   tooltip, confirm dialog, and the hand-off to the alert form. That is what
@@ -70,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="onActivate"
   >
     <span class="max-md:hidden">{{ label }}</span>
-    <OTooltip :content="disabledReason || label" />
+    <OTooltip v-if="disabledReason || isMobile" :content="disabledReason || label" />
   </OButton>
 
   <OButton
@@ -98,6 +99,7 @@ import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefi
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = withDefaults(
   defineProps<{
@@ -126,6 +128,8 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const { openAlertCreation } = useAlertCreation();
+// The toolbar label is visible from md up, where a tooltip would only repeat it.
+const { isMobile } = useBreakpoint();
 
 const source_ = computed(() => getAlertSource(props.source));
 const label = computed(() => t(source_.value.labelKey));

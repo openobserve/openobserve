@@ -48,6 +48,7 @@ import { computed, defineComponent, type PropType } from "vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
+import { withBareMetricNames } from "@/utils/metrics/metricsHandoff";
 
 /** `gapMs` is in ms although dashboards store it as `timeRangeGap.seconds`. */
 export interface ShiftedResult {
@@ -155,7 +156,8 @@ export default defineComponent({
       type: props.chartType,
       queryType: "promql",
       queries: (props.queries ?? []).map((q: any) => ({
-        query: q.expr,
+        // The data is injected, so the query text only seeds a right-click alert, which should read naturally.
+        query: withBareMetricNames(q.expr),
         customQuery: true,
         fields: { ...(q.stream ? { stream: q.stream } : {}), stream_type: "metrics" },
         config: { promql_legend: q.legendTemplate ?? "" },
@@ -176,6 +178,7 @@ export default defineComponent({
         // Injected data is never "loading", so the converter would auto-range
         // the x-axis; pin it to the queried window instead. See `timeRange`.
         pin_x_axis_to_range: true,
+        explorer_overlays: true,
         // Activates the classic-histogram transform (le-sort + de-accumulate)
         // and the card-sized heatmap look (small colour bar, thinned bucket
         // labels, no top gap). Without them a cumulative-bucket heatmap renders

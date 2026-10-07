@@ -268,6 +268,33 @@ describe("AlertContextMenu Component", () => {
       );
     });
 
+    it("shows the forecast threshold it writes, in the unit only when that keeps the number", async () => {
+      wrapper = createWrapper({ value: 0.904249, unit: "percent", seriesRole: "forecast" });
+      const item = () => wrapper.find('[data-test="alert-context-menu-forecast"]');
+      expect(item().text()).toBe("Alert when forecast reaches 0.9042%");
+      await item().trigger("click");
+      expect(wrapper.emitted("select")![0][0]).toMatchObject({ threshold: 0.9042 });
+
+      await wrapper.setProps({ value: 1536, unit: "bytes" });
+      expect(item().text()).toContain("1536");
+      expect(item().text()).not.toContain("KB");
+    });
+
+    it("measures itself again when its text changes while open", async () => {
+      const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(100);
+      const height = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(40);
+      wrapper = createWrapper({ visible: false, x: window.innerWidth - 150, y: 100 });
+      await wrapper.setProps({ visible: true });
+      await nextTick();
+      expect(wrapper.vm.menuStyle.left).toBe(`${window.innerWidth - 150}px`);
+      width.mockReturnValue(280);
+      await wrapper.setProps({ value: 123456789 });
+      await nextTick();
+      expect(wrapper.vm.menuStyle.left).toBe(`${window.innerWidth - 150 - 280}px`);
+      width.mockRestore();
+      height.mockRestore();
+    });
+
     it("keeps item text on one line", () => {
       wrapper = createWrapper();
       expect(

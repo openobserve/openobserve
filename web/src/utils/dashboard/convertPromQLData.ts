@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { gt } from "@/types/i18n";
+import echartsTokens from "echarts/lib/visual/tokens.js";
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
@@ -25,7 +26,6 @@ import {
   getMetricMinMaxValue,
   getSeriesColor,
   getAreaStyleOverride,
-  getColorPalette,
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
@@ -216,6 +216,27 @@ export const convertPromQLData = async (
   const alignment = alignShiftedPromQLResults(searchQueryData, metadata, resultMetaData);
   searchQueryData = alignment.data;
   const { parentQueryIndex, nameSuffixes, seriesRoles } = alignment;
+  // Set by the Metrics Explorer, whose overlays are styled, keyed and hovered apart from a dashboard's time shift.
+  const explorerOverlays = !!panelSchema?.config?.explorer_overlays;
+  const stepSeconds = Number(resultMetaData?.[0]?.[0]?.step) / 1e6;
+  // Overlay grids interleave with the primary's, so a hover between two samples reads the nearest within a step.
+  const nearestSample = (data: any[] | undefined, index: number) => {
+    const at = xAxisData[index]?.[0];
+    if (!data || !(stepSeconds > 0) || at === undefined) return null;
+    let best: any = null;
+    let bestGap = Infinity;
+    for (const direction of [-1, 1]) {
+      for (let i = index + direction; i >= 0 && i < data.length; i += direction) {
+        const gap = Math.abs(xAxisData[i][0] - at);
+        if (gap > stepSeconds) break;
+        if (data[i]?.[1] != null) {
+          if (gap < bestGap) [best, bestGap] = [data[i][1], gap];
+          break;
+        }
+      }
+    }
+    return best;
+  };
   const nameOf = (names: Map<any, string>, metric: any, index: number) => {
     const name = names.get(metric) ?? "";
     return nameSuffixes[index] ? `${name} (${nameSuffixes[index]})` : name;
@@ -557,6 +578,10 @@ export const convertPromQLData = async (
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
+          if (explorerOverlays && it.data[1] == null) {
+            const near = nearestSample(options.series?.[it.seriesIndex]?.data, it.dataIndex);
+            if (near != null) it = { ...it, data: [it.data[0], near] };
+          }
           // if data is not null than show in tooltip
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
@@ -585,7 +610,7 @@ export const convertPromQLData = async (
         });
 
         // Overlays add x values where no series has a sample; a timestamp alone says nothing.
-        if (!hoverText.length) return "";
+        if (explorerOverlays && !hoverText.length) return "";
 
         // A query fanning out to dozens of series makes an unreadable wall of
         // rows; the list is already sorted by value with the hovered series
@@ -892,12 +917,15 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
-                // The shared colour leaves the line style as the cue: dotted for a past period, dashed for a forecast.
+                // The shared colour leaves the line style as the cue; the Explorer also tells a past period from a forecast.
                 ...(nameSuffixes[index]
                   ? {
                       lineStyle: {
                         ...seriesPropsBasedOnChartType?.lineStyle,
-                        type: seriesRoles[index] === "forecast" ? "dashed" : "dotted",
+                        type:
+                          explorerOverlays && seriesRoles[index] !== "forecast"
+                            ? "dotted"
+                            : "dashed",
                       },
                     }
                   : {}),
@@ -1302,9 +1330,9 @@ export const convertPromQLData = async (
       .filter((mapping: any) => mapping?.value && mapping?.color)
       .map((mapping: any) => String(mapping.value)),
   );
-  // The classic palette colours by series position, which would hand each twin the next series' colour.
-  if (panelSchema?.config?.color?.mode === "palette-classic" && shiftedTwins.length) {
-    const palette = getColorPalette(store.state.theme);
+  // ECharts gives each name the next theme colour, so a twin would take the next series' colour; pin the primaries' own.
+  if (explorerOverlays && panelSchema?.config?.color?.mode === "palette-classic") {
+    const palette: string[] = echartsTokens.color.theme;
     [...primaryByMetric.entries()].forEach(([metric, primary], position) => {
       if (primary.itemStyle.color) return;
       primary.itemStyle.color = palette[position % palette.length];
@@ -1347,8 +1375,8 @@ export const convertPromQLData = async (
     );
   }
 
-  // A twin is drawn in its primary's colour, so its own legend entry would only repeat the primary's.
-  if (shiftedTwins.length) {
+  // A twin is drawn in its primary's colour and named in the Explorer's key, so its legend entry would repeat the primary's.
+  if (explorerOverlays && shiftedTwins.length) {
     const twins = new Set(shiftedTwins.map(([twin]) => twin));
     legendConfig.data = options.series
       .filter((series: any) => series?.name && !twins.has(series))

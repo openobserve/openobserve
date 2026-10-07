@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <MetricOverlayKey
             v-if="!heatmap && (compare || forecast)"
-            class="shrink-0 max-md:hidden"
+            class="shrink-0"
             :period="compare?.periodAsStr ?? null"
             :period-empty="focused.periodEmpty"
             :forecast="!!forecast"

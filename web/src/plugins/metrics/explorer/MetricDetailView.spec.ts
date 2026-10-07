@@ -591,17 +591,19 @@ describe("MetricDetailView", () => {
       expect(wrapper.emitted("update:forecastHorizon")).toEqual([["1h"], [null]]);
     });
 
-    it("explains each method in its option, with no help icon of its own", () => {
-      wrapper = mountView(
-        { overview: LINE, timeRange: WINDOW, forecast: "smoothed", stepSeconds: 30 },
-        { stubs: selectStub },
+    it("explains both methods behind one info button beside the Forecast select", async () => {
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "smoothed",
+        stepSeconds: 30,
+      });
+      const help = wrapper.find(
+        '[data-test="metrics-detail-chart-options"] [data-test="metrics-detail-forecast-help"]',
       );
-      const options = selectNamed(wrapper, "metrics-detail-forecast")!.props("options");
-      expect(options.find((o: any) => o.value === "smoothed").subLabel).toContain(
-        "linear projection of a smoothed series",
-      );
-      expect(options.find((o: any) => o.value === "linear").subLabel).toBeTruthy();
-      expect(wrapper.find('[data-test="metrics-detail-forecast-help"]').exists()).toBe(false);
+      expect(help.attributes("aria-label")).toContain("linear projection of a smoothed series");
+      expect(help.attributes("aria-label")).toContain("straight line fitted to the visible range");
+      expect(wrapper.findAll('[data-test="metrics-detail-forecast-help"]')).toHaveLength(1);
     });
 
     it("shows the computed horizon instead of a select when only the default applies", () => {

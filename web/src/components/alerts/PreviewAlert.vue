@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick, reactive, onBeforeMount } from "vue";
+import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import {
   cleanAggregationQuery,
@@ -1150,6 +1151,11 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   const criticalGate = evaluateCountGate(criticalCount);
   const forecast = props.formData._ui?.forecast;
   if (forecast) {
+    // The summary states nothing until the horizon is usable, and the verdict must not contradict it.
+    if (critical === null || !isForecastHorizonValid(critical)) {
+      evaluationStatus.value = null;
+      return;
+    }
     evaluationStatus.value = {
       wouldTrigger: criticalGate.passes,
       reason: t("alerts.forecast.previewReason", {

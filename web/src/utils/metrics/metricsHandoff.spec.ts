@@ -413,4 +413,28 @@ describe("withBareMetricNames", () => {
     const expr = '{__name__="1st_stream",job="api"}';
     expect(withBareMetricNames(expr)).toBe(expr);
   });
+
+  it("keeps the selector form for a name PromQL reads as a keyword", () => {
+    for (const name of ["sum", "count", "offset", "bool", "on", "by", "without", "inf", "nan"]) {
+      const expr = `rate({__name__="${name}"}[5m])`;
+      expect(withBareMetricNames(expr)).toBe(expr);
+    }
+  });
+
+  it("keeps a regex or negated name matcher as it is", () => {
+    for (const expr of ['{__name__=~"http_.*"}', '{__name__!="up",job="api"}']) {
+      expect(withBareMetricNames(expr)).toBe(expr);
+    }
+  });
+
+  it("lifts the name out wherever it sits among the matchers", () => {
+    expect(withBareMetricNames('{job="api", __name__="up", path="/a,b}"}')).toBe(
+      'up{job="api",path="/a,b}"}',
+    );
+  });
+
+  it("leaves a selector written inside a string alone", () => {
+    const expr = 'label_replace(up, "q", "{__name__=\\"up\\"}", "", "")';
+    expect(withBareMetricNames(expr)).toBe(expr);
+  });
 });

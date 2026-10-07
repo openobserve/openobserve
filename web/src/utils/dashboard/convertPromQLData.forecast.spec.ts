@@ -190,15 +190,53 @@ describe("forecast entries", () => {
     expect(row("api-1")).not.toContain("fitted");
   });
 
-  it("show no tooltip where no series has a value", async () => {
+  it("in the Explorer, read the nearest sample within a step, and show nothing where none is", async () => {
+    // The forecast's times sit off the primary's grid, so the axis stops where the primary has no sample.
+    const offGrid = matrix(series("api-1", [NOW_S + 17, NOW_S + 17 + STEP_S]));
+    const explorer = { ...panel, config: { explorer_overlays: true } };
+    const result = await convertPromQLData(
+      explorer,
+      [current(), offGrid],
+      store,
+      { value: { offsetWidth: 500, offsetHeight: 300 } },
+      null,
+      [],
+      metadata,
+      stepMeta,
+      false,
+    );
+    const all = result.options.series;
+    const twin = all.find((s: any) => s.name === "api-1 (forecast)");
+    const primaryIndex = all.findIndex((s: any) => s.name === "api-1");
+    const at = twin._timestamps.indexOf(NOW_S + 17);
+    const hover = (dataIndex: number) =>
+      result.options.tooltip.formatter([
+        {
+          data: [twin.data[dataIndex][0], null],
+          value: [twin.data[dataIndex][0], null],
+          dataIndex,
+          seriesIndex: primaryIndex,
+          seriesName: "api-1",
+          marker: "",
+        },
+      ]);
+    expect(hover(at)).toContain("api-1 : 1");
+    const empty = { data: ["2023-11-14T22:16:00", null], value: ["2023-11-14T22:16:00", null] };
+    expect(
+      result.options.tooltip.formatter([
+        { ...empty, dataIndex: -1, seriesIndex: 0, seriesName: "x", marker: "" },
+      ]),
+    ).toBe("");
+  });
+
+  it("on a dashboard, keep the tooltip as it was where a series has no sample", async () => {
     const result = await convert([current(), ahead("api-1")]);
     const empty = { data: ["2023-11-14T22:16:00", null], value: ["2023-11-14T22:16:00", null] };
     expect(
       result.options.tooltip.formatter([
         { ...empty, seriesIndex: 0, seriesName: "api-1", marker: "" },
-        { ...empty, seriesIndex: 2, seriesName: "api-1 (forecast)", marker: "" },
       ]),
-    ).toBe("");
+    ).toContain("2023-11-14");
   });
 
   it("never take a primary's place at the series cap", async () => {

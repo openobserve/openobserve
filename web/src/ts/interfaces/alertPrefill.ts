@@ -118,7 +118,6 @@ export interface AlertPrefillQueryChoice {
   tabName?: string;
   /** The query's PromQL legend, which names it on the chart. */
   legend?: string;
-  /** The query's formula letter. */
   ref?: string;
   query: string;
 }

@@ -108,6 +108,11 @@ describe("CreateAlertAction", () => {
     expect(button.find("span.max-md\\:hidden").text()).toBe("Create alert");
   });
 
+  it("adds no tooltip on a toolbar button whose label is visible", () => {
+    wrapper = mountAction({ variant: "toolbar", source: "explorer" });
+    expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(false);
+  });
+
   it("does NOT call build on render — only on activation", async () => {
     const build = vi.fn(prefill);
     wrapper = mountAction({}, build);
