@@ -2045,6 +2045,24 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
     });
 
+    it("a curated TILE wraps its title and keeps two lines; a plain tile stays one line", () => {
+      wrapper = createWrapper({
+        data: { ...eligible(), type: "metric", title: "Deployments not ready" },
+        viewOnly: true,
+      });
+      const curated = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(curated).toEqual(expect.arrayContaining(["line-clamp-2", "min-h-[2lh]"]));
+      wrapper.unmount();
+
+      wrapper = createWrapper({
+        data: { ...mockPanelData, type: "metric", title: "Deployments not ready", config: {} },
+        viewOnly: true,
+      });
+      const plain = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(plain).not.toContain("line-clamp-2");
+      expect(plain).toContain("whitespace-nowrap");
+    });
+
     it("gives the title the full bar — nothing between it and the flex spacer", () => {
       // The truncation was structural, not cosmetic: a sibling in the same
       // one-line flex row takes width the title then has to ellipsise into.

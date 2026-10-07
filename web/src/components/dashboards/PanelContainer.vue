@@ -47,9 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              running into it. The margin is outside the overflow box, so the
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
+        <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
         <div
           :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap max-md:line-clamp-2 max-md:whitespace-normal"
+          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap max-lg:line-clamp-2 max-lg:whitespace-normal"
+          :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -682,6 +684,10 @@ export default defineComponent({
      * from PromQLTableChart's own #empty slot. Claiming tables here too printed the
      * words twice, once from each layer.
      */
+    const curatedTile = computed(
+      () =>
+        props.data?.type === "metric" && props.data?.config?.curated_no_data_eligible !== undefined,
+    );
     const curatedAllClear = computed(
       () =>
         props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
@@ -1143,6 +1149,7 @@ export default defineComponent({
       curatedBadgeTooltip,
       curatedNoData,
       curatedAllClear,
+      curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       alertDisabledReason,
