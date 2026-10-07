@@ -55,38 +55,29 @@ def _poll_function_test(session, base_url, vrl, events, accept):
     return last
 
 
-def _compiles(resp):
-    """The VRL compiler resolved the table name.
-
-    Its known-table list is a cached enum, so a table this test only just
-    created is not in it yet and `get_enrichment_table_record` fails to
-    *compile* with `E401 invalid enum variant` — a 400, before any row is
-    looked up. Every test that names a fresh table has to wait for this.
-    """
-    return resp.status_code == 200
-
-
 def _labels_applied(resp):
-    """The table is not just resolvable but actually backing the lookup."""
-    if not _compiles(resp):
+    """Every event carries its label, so the table is actually backing the lookup."""
+    if resp.status_code != 200:
         return False
     results = resp.json().get("results", [])
     return bool(results) and all(r.get("event", {}).get("label") for r in results)
 
 
+def _control_event_labelled(resp):
+    """The control event carries its label; later events may deliberately not.
+
+    `_labels_applied` demands a label on every event, which a known-missing key
+    can never satisfy.
+    """
+    if resp.status_code != 200:
+        return False
+    results = resp.json().get("results", [])
+    return bool(results) and bool(results[0].get("event", {}).get("label"))
+
+
 def _wait_for_lookup(session, base_url, vrl, events):
     """Poll until the table backs the lookup and every event carries its label."""
     return _poll_function_test(session, base_url, vrl, events, _labels_applied)
-
-
-def _wait_for_compile(session, base_url, vrl, events):
-    """Poll only until the table name resolves.
-
-    For assertions about what a lookup does *not* produce — `_wait_for_lookup`
-    waits for a label on every event, which is the opposite of a missing-key
-    expectation and would always time out.
-    """
-    return _poll_function_test(session, base_url, vrl, events, _compiles)
 
 
 @pytest.fixture
@@ -162,13 +153,16 @@ def test_vrl_lookup_of_a_missing_key_leaves_the_event_unenriched(
         f'rec, err = get_enrichment_table_record("{enrichment_table}", '
         '{"code": to_string!(.code)})\n.label = rec.label\n.'
     )
-    # Must wait like its sibling: the fixture is function-scoped, so this is a
-    # brand-new table and the VRL compiler's cached table list has not picked it
-    # up yet. Posting straight away raced that refresh and failed with
-    # `E401 invalid enum variant ... received: "et_validation_<uuid>"`.
-    resp = _wait_for_compile(
-        create_session, base_url, vrl, [{"code": "no-such-code"}]
-    )
+    # A known key rides along as the control: a table that resolves but holds no rows
+    # yet, and a lookup broken outright, both produce the same empty label otherwise.
+    events = [{"code": "c1"}, {"code": "no-such-code"}]
+    resp = _poll_function_test(create_session, base_url, vrl, events, _control_event_labelled)
 
     assert resp.status_code == 200, f"function test failed: {resp.text}"
-    assert not resp.json()["results"][0]["event"].get("label")
+    results = resp.json()["results"]
+    assert results[0]["event"].get("label") == "ALPHA", (
+        "the known key must still enrich, or this test cannot tell a missing key from a "
+        f"lookup that does not work at all: {results}"
+    )
+    assert not results[1]["event"].get("label"), \
+        f"a key with no row must not fabricate a value: {results}"

@@ -51,22 +51,15 @@ from support.wait import wait_until
 
 ROWS = json.dumps([{"injected_by": "grpc_org_binding_test", "n": 1}]).encode()
 
-# Every arm of the handler's `match stream_type`. The deny is resolved *before*
-# that match, so one check covers them all — they are listed explicitly because
-# the report asked for each to be verified rather than argued from the code.
-# `service_graph` is the fifth and easiest to forget: it is reachable
-# (`StreamType::ServiceGraph` in ingest.rs) even though no public collector
-# targets it directly.
+# All five arms of the handler's match; the deny resolves before it, so one check covers each.
 STREAM_TYPES = ["logs", "traces", "metrics", "enrichment_tables", "service_graph"]
 
 
 @pytest.fixture(scope="module")
 def channel():
+    # No skip-on-unreachable: a lost listener must fail this P0 suite, not pass it silently.
     ch = grpc.insecure_channel(grpc_target())
-    try:
-        grpc.channel_ready_future(ch).result(timeout=30)
-    except grpc.FutureTimeoutError:
-        pytest.skip(f"no gRPC listener at {grpc_target()}")
+    grpc.channel_ready_future(ch).result(timeout=30)
     yield ch
     ch.close()
 
@@ -76,11 +69,7 @@ def root_auth() -> str:
     return basic_auth(os.environ["ZO_ROOT_USER_EMAIL"], os.environ["ZO_ROOT_USER_PASSWORD"])
 
 
-# The org a cross-org write would land in. `_meta` rather than a freshly created
-# one on purpose: `destination_org` compares the header org with the body org and
-# does not consult membership, so any second org exercises the binding
-# identically — and orgs have no DELETE route, so creating one would leak a
-# tenant per run with no way to clean it up.
+# `_meta` as the second tenant: orgs have no DELETE route, so creating one leaks a tenant per run.
 OTHER_ORG = "_meta"
 
 
@@ -227,7 +216,59 @@ def test_a_call_without_the_organization_header_is_refused(channel, root_auth: s
     and rejects before the handler — so the binding can never be asked to
     resolve an org that was never authorized."""
     resp = ingest(channel, body_org="default", stream_name=stream_name, rows=ROWS, authorization=root_auth)
-    assert resp.code in (grpc.StatusCode.INVALID_ARGUMENT, grpc.StatusCode.UNAUTHENTICATED), (
-        "a user credential with no `organization` header must be refused, got "
-        f"{resp.code}: {resp.details}"
+    assert resp.code == grpc.StatusCode.INVALID_ARGUMENT, (
+        "a credential with no `organization` header must be refused by check_auth with "
+        f"InvalidArgument, got {resp.code}: {resp.details}"
+    )
+
+
+# ─── The non-root credential, which is the attacker shape ─────────────────────
+
+
+@pytest.fixture
+def member_auth(client: OpenObserveClient, temp_user_email: str) -> str:
+    """Basic auth for a user who is a member of `default` only.
+
+    Every test above uses root, which `is_root_user` admits to any org via
+    `ROOT_USER` — so they exercise `destination_org` but never `check_auth`'s
+    membership lookup. These two cover the realistic shape.
+    """
+    password = "Complexpass#123"
+    resp = client.users.create({
+        "email": temp_user_email, "password": password,
+        "first_name": "Grpc", "last_name": "Member", "role": "admin",
+    })
+    assert resp.status_code == 200, f"could not create the member user: {resp.status_code} {resp.text}"
+    return basic_auth(temp_user_email, password)
+
+
+def test_a_member_of_one_org_cannot_name_another_in_the_body(
+    channel, member_auth: str, stream_name: str
+):
+    """The attacker shape: a real member of org A naming org B in the body."""
+    result = ingest(
+        channel, body_org=OTHER_ORG, stream_name=stream_name, rows=ROWS,
+        authorization=member_auth, header_org="default",
+    )
+    assert result.code == grpc.StatusCode.PERMISSION_DENIED, (
+        f"a member of 'default' naming {OTHER_ORG!r} in the body must be refused, got "
+        f"{result.code} (status_code={result.status_code}, {result.message or result.details!r})"
+    )
+
+
+def test_a_member_cannot_authenticate_against_an_org_it_does_not_belong_to(
+    channel, member_auth: str, stream_name: str
+):
+    """Header = body = victim org must fail at `check_auth`, not reach the binding.
+
+    Without this, `destination_org` could be satisfied by setting both to the
+    victim org and every other test here would stay green.
+    """
+    result = ingest(
+        channel, body_org=OTHER_ORG, stream_name=stream_name, rows=ROWS,
+        authorization=member_auth, header_org=OTHER_ORG,
+    )
+    assert result.code == grpc.StatusCode.UNAUTHENTICATED, (
+        f"a non-member authenticating against {OTHER_ORG!r} must be refused by check_auth, got "
+        f"{result.code} (status_code={result.status_code}, {result.message or result.details!r})"
     )

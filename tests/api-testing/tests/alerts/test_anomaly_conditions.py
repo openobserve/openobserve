@@ -405,12 +405,6 @@ def test_the_direct_anomaly_api_clears_a_budget(
 
 
 # ─── A3b. Band width, and the budget→band escape hatch (ENT#2813) ─────────────
-#
-# `band_width` had no API coverage at all before this block, which is how
-# ENT#2813 stayed open: the web app renders Band and Budget as mutually
-# unreachable modes, and the one payload that moves a config between them is
-# the one payload the UI never sends. The tests below pin that payload from the
-# outside, so the server half stays correct while the UI half is fixed.
 
 
 def test_clearing_a_budget_in_the_same_call_puts_the_band_width_in_force(
@@ -472,19 +466,26 @@ def test_a_band_width_outside_one_to_ten_is_rejected(
     try:
         assert resp.status_code == HTTPStatus.BAD_REQUEST, \
             f"band_width={band_width} must be rejected, got {resp.status_code}: {resp.text}"
-        assert "band_width" in resp.text, f"the rejection must name the field: {resp.text}"
+        assert "between 1 and 10" in resp.text, (
+            "the rejection must name the range rule — 'band_width' alone also matches "
+            f"the mutual-exclusion error, so it cannot say which rule fired: {resp.text}"
+        )
     finally:
         _cleanup(client, resp)
 
 
-def test_a_band_width_inside_the_range_round_trips(client: OpenObserveClient):
-    """A plain band-mode create keeps the width it was given."""
-    resp = _create(client, _config(band_width=3))
+# The inclusive edges are the point: narrowing 1.0..=10.0 to 1.0..10.0 would pass every
+# rejection case above, so the bounds themselves must be asserted as accepted.
+@pytest.mark.parametrize("band_width", [1.0, 3, 10.0])
+def test_a_band_width_inside_the_range_round_trips(client: OpenObserveClient, band_width):
+    """A plain band-mode create keeps the width it was given, edges included."""
+    resp = _create(client, _config(band_width=band_width))
     try:
-        assert resp.status_code == HTTPStatus.OK, resp.text
+        assert resp.status_code == HTTPStatus.OK, \
+            f"band_width={band_width} is inside BAND_WIDTH_RANGE and must be accepted: {resp.text}"
         stored = client.get(f"anomaly_detection/{resp.json()['anomaly_id']}").json()
         stored = stored.get("data", stored)
-        assert stored["band_width"] == 3.0, \
+        assert stored["band_width"] == float(band_width), \
             f"band_width must round-trip, got {stored['band_width']!r}"
     finally:
         _cleanup(client, resp)
