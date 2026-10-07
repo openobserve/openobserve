@@ -233,13 +233,41 @@ mod tests {
         request.resource_profiles[0].scope_profiles[0].profiles[0].samples[0].stack_index = 0;
         let proto =
             ExportProfilesServiceRequest::decode(request.encode_to_vec().as_slice()).unwrap();
-        let json: ExportProfilesServiceRequest =
-            serde_json::from_value(serde_json::to_value(&request).unwrap()).unwrap();
+        let mut json = serde_json::to_value(&request).unwrap();
+        super::super::otlp_json_compat::normalize(&mut json);
+        let json = super::super::otlp_json_compat::deserialize(json).unwrap();
         for request in [proto, json] {
             assert_eq!(
                 validate(&request).unwrap_err(),
                 "dictionary.stack_table[0] must be the zero value"
             );
+        }
+    }
+
+    #[test]
+    fn json_string_indices_survive_normalization_for_common_validation() {
+        for index in [-1, 99] {
+            for value in [
+                serde_json::json!(index),
+                serde_json::json!(index.to_string()),
+            ] {
+                let mut json = serde_json::json!({
+                    "dictionary": {
+                        "stringTable": ["", "thread.name"],
+                        "attributeTable": [{}, {"keyStrindex": 1, "value": {"stringValueStrindex": value}}]
+                    },
+                    "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1], "values": [1]}]}]}]}]
+                });
+                super::super::otlp_json_compat::normalize(&mut json);
+                let request = super::super::otlp_json_compat::deserialize(json).unwrap();
+                let error = validate(&request).unwrap_err();
+                assert!(
+                    error.contains(&format!(
+                        "dictionary.attribute_table[1].value.string_value_strindex: index {index}"
+                    )),
+                    "{error}"
+                );
+            }
         }
     }
 

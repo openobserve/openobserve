@@ -240,7 +240,7 @@ pub async fn otlp_json(
         }
     };
     otlp_json_compat::normalize(&mut body_json);
-    let request = match serde_json::from_value::<ExportProfilesServiceRequest>(body_json) {
+    let request = match otlp_json_compat::deserialize(body_json) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[PROFILES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -2298,34 +2298,48 @@ mod tests {
     async fn malformed_dictionary_returns_http_400_with_otlp_status() {
         use crate::common::meta::otlp::GoogleRpcStatus;
 
-        let message = "dictionary.stack_table[0] must be the zero value";
-        for req_type in [OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf] {
-            let response = map_otlp_handler_error(
-                "default",
-                req_type,
-                ProfilesExportError::InvalidArgument(message.into()),
-            );
-            assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
-            let expected_type = if req_type == OtlpRequestType::HttpJson {
-                CONTENT_TYPE_JSON
-            } else {
-                CONTENT_TYPE_PROTO
-            };
-            assert_eq!(
-                response.headers().get(http::header::CONTENT_TYPE).unwrap(),
-                expected_type
-            );
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-                .await
-                .unwrap();
-            if req_type == OtlpRequestType::HttpJson {
-                let status: json::Value = json::from_slice(&body).unwrap();
-                assert_eq!(status["code"], 3);
-                assert_eq!(status["message"], message);
-            } else {
-                let status = GoogleRpcStatus::decode(body).unwrap();
-                assert_eq!(status.code, 3);
-                assert_eq!(status.message, message);
+        for index in [-1, 99] {
+            let mut payload = json::json!({
+                "dictionary": {
+                    "stringTable": ["", "thread.name"],
+                    "attributeTable": [{}, {"keyStrindex": 1, "value": {"stringValueStrindex": index}}]
+                },
+                "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1], "values": [1]}]}]}]}]
+            });
+            otlp_json_compat::normalize(&mut payload);
+            let request = otlp_json_compat::deserialize(payload).unwrap();
+            let message = validation::validate(&request).unwrap_err();
+            assert!(message.contains(&format!(
+                "dictionary.attribute_table[1].value.string_value_strindex: index {index}"
+            )));
+            for req_type in [OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf] {
+                let response = map_otlp_handler_error(
+                    "default",
+                    req_type,
+                    ProfilesExportError::InvalidArgument(message.clone()),
+                );
+                assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+                let expected_type = if req_type == OtlpRequestType::HttpJson {
+                    CONTENT_TYPE_JSON
+                } else {
+                    CONTENT_TYPE_PROTO
+                };
+                assert_eq!(
+                    response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+                    expected_type
+                );
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                if req_type == OtlpRequestType::HttpJson {
+                    let status: json::Value = json::from_slice(&body).unwrap();
+                    assert_eq!(status["code"], 3);
+                    assert_eq!(status["message"], message);
+                } else {
+                    let status = GoogleRpcStatus::decode(body).unwrap();
+                    assert_eq!(status.code, 3);
+                    assert_eq!(status.message, message);
+                }
             }
         }
     }
