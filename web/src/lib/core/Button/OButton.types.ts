@@ -70,7 +70,6 @@ export type ButtonSize =
   | "icon"
   | "icon-xs"
   | "icon-xs-circle"
-  | "icon-inline"
   | "icon-xs-sq"
   | "icon-chip"
   | "icon-sm"

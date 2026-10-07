@@ -139,7 +139,11 @@ export const substituteFormula = (
   return { expr: expr + formula.slice(last) };
 };
 
-/** A formula's label-less series are named after the formula unless the panel names them. */
-export const legendFallbackOf = (query: any): string | undefined =>
-  query?.config?.promql_legend_fallback ??
-  (isFormulaQuery(query) ? query.config.formula : undefined);
+/** Name for a query's label-less series: a formula's text, or an input's letter in a panel with a formula. */
+export const legendFallbackOf = (queries: any[] | undefined, index: number): string | undefined => {
+  const query = queries?.[index];
+  if (query?.config?.promql_legend_fallback) return query.config.promql_legend_fallback;
+  if (isFormulaQuery(query)) return query.config.formula;
+  if (!queries?.some(isFormulaQuery) || query?.config?.promql_legend) return undefined;
+  return queryRefs(queries)[index];
+};

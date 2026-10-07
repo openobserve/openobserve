@@ -355,6 +355,48 @@ describe("OTabs", () => {
     });
   });
 
+  describe("a tab with trailing controls", () => {
+    // jsdom lays nothing out: the trigger spans 3–63 and its trailing controls 63–93.
+    async function mountWithTrailing(stripWidth: number) {
+      const wrapper = mount(OTabs, {
+        props: { modelValue: "tab2" },
+        slots: {
+          default: `<OTab name="tab1" label="Tab 1"><template #trailing><button>x</button></template></OTab><OTab name="tab2" label="Tab 2" />`,
+        },
+        global: { components: { OTab } },
+        attachTo: document.body,
+      });
+      const place = (el: Element, left: number, width: number) => {
+        Object.defineProperty(el, "offsetLeft", { value: left });
+        Object.defineProperty(el, "offsetWidth", { value: width });
+      };
+      const [first, second] = wrapper.findAll('[role="tab"]').map((t) => t.element);
+      place(first, 3, 60);
+      place(wrapper.find("[data-otab-trailing]").element, 63, 30);
+      place(second, 0, 0);
+      const strip = wrapper.find(".overflow-x-auto").element;
+      Object.defineProperty(strip, "clientWidth", { value: stripWidth });
+      await wrapper.setProps({ modelValue: "tab1" });
+      await flushPromises();
+      strip.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("underlines the trigger and its trailing controls together", async () => {
+      const wrapper = await mountWithTrailing(500);
+      const bar = wrapper.find('[data-test="otabs-active-indicator"]').element as HTMLElement;
+      expect(bar.style.width).toBe("90px");
+      expect(bar.style.transform).toBe("translateX(3px)");
+    });
+
+    it("counts trailing controls when deciding the strip overflows", async () => {
+      const wrapper = await mountWithTrailing(80);
+      const arrow = wrapper.findAll('button[aria-hidden="true"]')[0].element as HTMLElement;
+      expect(arrow.style.display).not.toBe("none");
+    });
+  });
+
   // --- Focusin with no target (bug: null-guard before getAttribute) ---
 
   describe("focusin handling", () => {

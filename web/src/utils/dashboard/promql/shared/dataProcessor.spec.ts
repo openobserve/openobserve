@@ -114,6 +114,28 @@ describe("dataProcessor", () => {
       expect(result[0].series[0].name).toBe("B / A * 100");
     });
 
+    it("names an input's label-less series after its letter in a panel with a formula", async () => {
+      const unlabelled = () => ({
+        status: "success",
+        resultType: "matrix",
+        result: [{ metric: {}, values: [[1, "1"]] }],
+      });
+      const searchQueryData = [unlabelled(), unlabelled(), unlabelled()] as any;
+      const queries = [
+        { config: { ref: "A" } },
+        { config: { ref: "B" } },
+        { config: { formula: "B / A" } },
+      ];
+
+      const result = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, queries },
+        mockStore,
+      );
+
+      expect(result.map((query: any) => query.series[0].name)).toEqual(["A", "B", "B / A"]);
+    });
+
     it("should process OpenObserve format (direct result)", async () => {
       const searchQueryData: PromQLResponse[] = [
         {

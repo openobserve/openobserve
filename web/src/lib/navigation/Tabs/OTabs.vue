@@ -202,6 +202,13 @@ const indicator = reactive({ left: 0, width: 0, visible: false });
 // left edge on initial mount — only later selections animate.
 const indicatorReady = ref(false);
 
+// A tab's trailing controls sit beside its trigger and belong to the tab.
+function tabRight(tab: HTMLElement): number {
+  const next = tab.nextElementSibling;
+  const end = next instanceof HTMLElement && next.hasAttribute("data-otab-trailing") ? next : tab;
+  return end.offsetLeft + end.offsetWidth;
+}
+
 function updateIndicator(): void {
   if (isVertical.value) return;
   const list = tablistRef.value;
@@ -212,7 +219,7 @@ function updateIndicator(): void {
     return;
   }
   indicator.left = active.offsetLeft;
-  indicator.width = active.offsetWidth;
+  indicator.width = tabRight(active) - active.offsetLeft;
   indicator.visible = true;
 }
 
@@ -235,7 +242,7 @@ function updateScrollState(): void {
   const list = tablistRef.value;
   if (list) {
     for (const tab of list.querySelectorAll<HTMLElement>('[role="tab"]')) {
-      const right = tab.offsetLeft + tab.offsetWidth;
+      const right = tabRight(tab);
       if (right > contentWidth) contentWidth = right;
     }
     if (contentWidth > 0) contentWidth += 3; // tablist px-0.75 (3px) right padding

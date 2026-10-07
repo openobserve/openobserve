@@ -184,15 +184,31 @@ describe("formulaInputs", () => {
 });
 
 describe("legendFallbackOf", () => {
+  const withFormula = [{ config: { ref: "A" } }, { config: {} }, { config: { formula: "B / A" } }];
+
   it("names a formula's label-less series after the formula", () => {
-    expect(legendFallbackOf({ config: { formula: "B / A * 100" } })).toBe("B / A * 100");
+    expect(legendFallbackOf(withFormula, 2)).toBe("B / A");
   });
 
-  it("keeps an explicit fallback, and gives an ordinary query none", () => {
-    expect(legendFallbackOf({ config: { formula: "A", promql_legend_fallback: "errors" } })).toBe(
-      "errors",
+  it("names an input's label-less series after its letter when the panel has a formula", () => {
+    expect(legendFallbackOf(withFormula, 0)).toBe("A");
+    expect(legendFallbackOf(withFormula, 1)).toBe("B");
+  });
+
+  it("leaves an input with its own legend alone", () => {
+    const queries = [
+      { config: { ref: "A", promql_legend: "{pod}" } },
+      { config: { formula: "A" } },
+    ];
+    expect(legendFallbackOf(queries, 0)).toBeUndefined();
+  });
+
+  it("keeps an explicit fallback, and gives queries in a formula-free panel none", () => {
+    expect(legendFallbackOf([{ config: { formula: "A", promql_legend_fallback: "e" } }], 0)).toBe(
+      "e",
     );
-    expect(legendFallbackOf({ config: { promql_legend_fallback: "x" } })).toBe("x");
-    expect(legendFallbackOf({ config: {} })).toBeUndefined();
+    expect(legendFallbackOf([{ config: { promql_legend_fallback: "x" } }], 0)).toBe("x");
+    expect(legendFallbackOf([{ config: { ref: "A" } }, { config: {} }], 0)).toBeUndefined();
+    expect(legendFallbackOf(undefined, 0)).toBeUndefined();
   });
 });

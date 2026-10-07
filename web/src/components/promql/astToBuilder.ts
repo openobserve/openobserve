@@ -63,12 +63,13 @@ const KIND_PHRASES: Record<string, I18nKey> = {
 
 const SET_OPERATORS = new Set(["and", "or", "unless"]);
 
-/** A backend `unsupported` kind in words; an unknown kind is shown as written. */
-const kindPhrase = (kind: string): string => {
+/** The refusal for a backend `unsupported` kind; a kind with no words gets the generic one. */
+const cannotShowKind = (kind: string): string => {
   if (SET_OPERATORS.has(kind)) {
-    return gt("metrics.builderSwitch.constructs.setOperator", { op: kind }) as string;
+    return cannotShow(gt("metrics.builderSwitch.constructs.setOperator", { op: kind }) as string);
   }
-  return KIND_PHRASES[kind] ? (gt(KIND_PHRASES[kind]) as string) : kind;
+  if (!KIND_PHRASES[kind]) return gt("metrics.builderSwitch.mismatch") as string;
+  return cannotShow(gt(KIND_PHRASES[kind]) as string);
 };
 
 const functionPhrase = (name: string) =>
@@ -108,7 +109,7 @@ const rangeLayer = (func: string, args: PromqlTree[]): Layer => {
   const withQuantile = func === PromqlStepId.QuantileOverTime;
   const [quantile, matrix] = withQuantile ? args : [undefined, args[0]];
   if (args.length !== (withQuantile ? 2 : 1)) return { reason: cannotShow(functionPhrase(func)) };
-  if (matrix?.type === "unsupported") return { reason: cannotShow(kindPhrase(matrix.kind)) };
+  if (matrix?.type === "unsupported") return { reason: cannotShowKind(matrix.kind) };
   if (matrix?.type !== "matrix" || (withQuantile && !isNumber(quantile))) {
     return { reason: cannotShow(functionPhrase(func)) };
   }
@@ -177,7 +178,7 @@ const aggregateLayer = (node: PromqlTree): Layer => {
 const binaryLayer = (node: PromqlTree): Layer => {
   // A side the backend could not express hides its metric, so name what it is instead.
   const opaque = [node.lhs, node.rhs].find((side) => side?.type === "unsupported");
-  if (opaque) return { reason: cannotShow(kindPhrase(opaque.kind)) };
+  if (opaque) return { reason: cannotShowKind(opaque.kind) };
   const stepId = SCALAR_STEPS[node.op];
   if (stepId && isNumber(node.rhs)) {
     return { step: { id: stepId, params: [node.rhs.value] }, inner: node.lhs };
@@ -207,9 +208,9 @@ const layerOf = (node: PromqlTree): Layer => {
     case "binary":
       return binaryLayer(node);
     case "unsupported":
-      return { reason: cannotShow(kindPhrase(node.kind)) };
+      return { reason: cannotShowKind(node.kind) };
     case "matrix":
-      return { reason: cannotShow(kindPhrase("range vector")) };
+      return { reason: cannotShowKind("range vector") };
     default:
       return { reason: gt("metrics.builderSwitch.noMetric") as string };
   }

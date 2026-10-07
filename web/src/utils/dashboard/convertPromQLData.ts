@@ -822,7 +822,7 @@ export const convertPromQLData = async (
     (limitedSearchQueryData ?? []).map((it: any, index: number) => ({
       metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend,
-      fallback: legendFallbackOf(panelSchema.queries?.[parentQueryIndex[index]]),
+      fallback: legendFallbackOf(panelSchema.queries, parentQueryIndex[index]),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );

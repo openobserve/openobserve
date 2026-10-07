@@ -290,8 +290,6 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "icon-xs": "h-7.5 shrink-0 px-2 text-lg rounded-default gap-x-0",
   // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
   "icon-xs-circle": "size-6 shrink-0 p-0 rounded-full gap-x-0",
-  // 16px round — an icon control inline in a tab or chip label, no wider than the icon it replaces
-  "icon-inline": "size-4 shrink-0 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
   "icon-xs-sq": "h-7 w-7 shrink-0 p-0 rounded-default gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons

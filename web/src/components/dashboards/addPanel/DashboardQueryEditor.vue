@@ -79,12 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer px-0.5 text-sm whitespace-nowrap select-none"
-                :class="{ 'text-text-muted': tab.config?.hide }"
+                :class="{
+                  'text-text-muted':
+                    tab.config?.hide && index !== dashboardPanelData.layout.currentQueryIndex,
+                }"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tabLabel(tab, Number(index)) }}</span
               >
               <!-- xs matches the tick it swaps with, so the tab keeps its width. -->
-              <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
+              <span
+                v-if="editingQueryIndex !== index"
+                class="relative inline-flex items-center"
+                :class="{ 'max-md:hidden': index !== dashboardPanelData.layout.currentQueryIndex }"
+              >
                 <OIcon
                   name="edit"
                   size="xs"
@@ -96,44 +103,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OTooltip :content="t('dashboard.renameQuery')" />
               </span>
-              <!-- Hiding the only query would leave the panel with nothing to
-                   draw, so the eye appears from the second query onwards. -->
-              <OButton
-                v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
-                variant="ghost"
-                size="icon-inline"
-                :icon-left="tab.config?.hide ? 'visibility-off' : 'visibility'"
-                :aria-label="
-                  tab.config?.hide
-                    ? t('dashboard.showQueryResults')
-                    : t('dashboard.hideQueryResults')
-                "
-                @click.stop="toggleQueryVisibility(index)"
-                @mousedown.stop
-                @pointerdown.stop
-                :data-test="`dashboard-panel-query-tab-visibility-${index}`"
-                :data-test-hidden="tab.config?.hide ? 'true' : 'false'"
-              >
-                <OTooltip
-                  :content="
+              <template #trailing>
+                <!-- Hiding the only query would leave the panel with nothing to
+                     draw, so the eye appears from the second query onwards. -->
+                <OButton
+                  v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
+                  variant="ghost"
+                  size="icon-xs-circle"
+                  :class="{
+                    'max-md:hidden': index !== dashboardPanelData.layout.currentQueryIndex,
+                  }"
+                  :icon-left="tab.config?.hide ? 'visibility-off' : 'visibility'"
+                  :aria-label="
                     tab.config?.hide
                       ? t('dashboard.showQueryResults')
                       : t('dashboard.hideQueryResults')
                   "
+                  @click.stop="toggleQueryVisibility(index)"
+                  @mousedown.stop
+                  @pointerdown.stop
+                  :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+                  :data-test-hidden="tab.config?.hide ? 'true' : 'false'"
+                >
+                  <OTooltip
+                    :content="
+                      tab.config?.hide
+                        ? t('dashboard.showQueryResults')
+                        : t('dashboard.hideQueryResults')
+                    "
+                  />
+                </OButton>
+                <OIcon
+                  v-if="
+                    Number(index) > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)
+                  "
+                  name="close"
+                  size="sm"
+                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
+                  :class="{
+                    'max-md:hidden': index !== dashboardPanelData.layout.currentQueryIndex,
+                  }"
+                  @click.stop.prevent="removeTab(index)"
+                  @mousedown.stop.prevent
+                  @pointerdown.stop.prevent
+                  :data-test="`dashboard-panel-query-tab-remove-${index}`"
                 />
-              </OButton>
-              <OIcon
-                v-if="
-                  Number(index) > 0 || (index === 0 && dashboardPanelData.data.queries.length > 1)
-                "
-                name="close"
-                size="sm"
-                class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
-                @click.stop.prevent="removeTab(index)"
-                @mousedown.stop.prevent
-                @pointerdown.stop.prevent
-                :data-test="`dashboard-panel-query-tab-remove-${index}`"
-              />
+              </template>
             </OTab>
           </OTabs>
         </div>
@@ -194,6 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="queryErrorText || formulaError || isFormulaInput"
         class="flex shrink-0 flex-col gap-1 px-2 pt-1"
+        data-test="dashboard-panel-query-messages"
       >
         <OBanner
           v-if="queryErrorText"
@@ -630,7 +646,10 @@ export default defineComponent({
           .filter(isFormulaQuery).length;
         return tab.tabName || t("dashboard.formulaNumber", { index: formulaNumber });
       }
-      const name = tab.tabName || t("common.queryNumber", { index: index + 1 });
+      const queryNumber = dashboardPanelData.data.queries
+        .slice(0, index + 1)
+        .filter((query: any) => !isFormulaQuery(query)).length;
+      const name = tab.tabName || t("common.queryNumber", { index: queryNumber });
       return promqlMode.value && tab.config?.ref
         ? t("dashboard.queryTabWithRef", { ref: raw(tab.config.ref), name })
         : name;
@@ -904,6 +923,19 @@ export default defineComponent({
       () => dashboardPanelData.meta.errors.queryErrors,
       () => {
         window.dispatchEvent(new Event("resize"));
+      },
+    );
+
+    // Only the builder refusal lands in queryErrors in PromQL mode, and it describes one query's text.
+    watch(
+      () => {
+        const query = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+        return [dashboardPanelData.layout.currentQueryIndex, query?.query, query?.config?.formula];
+      },
+      () => {
+        if (promqlMode.value && dashboardPanelData.meta.errors.queryErrors?.length) {
+          dashboardPanelData.meta.errors.queryErrors = [];
+        }
       },
     );
 

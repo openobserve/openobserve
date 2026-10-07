@@ -9694,7 +9694,7 @@
     },
     "builderSwitch": {
       "unsupported": "The builder cannot show {construct}",
-      "twoMetrics": "The builder cannot show arithmetic between two metrics — use a formula",
+      "twoMetrics": "The builder cannot show an operation between two metrics — use a formula",
       "noMetric": "The builder needs a query over one named metric",
       "mismatch": "The builder cannot show this query exactly",
       "constructs": {
@@ -9737,7 +9737,6 @@
       },
       "rangeOnlyFirst": "A range function can only be the first step",
       "rangeOnlyFirstNote": "A range function reads the raw samples, so it can only be the first step. Remove the other steps to add one.",
-      "firstStepOnlyGroup": "{group} · First step only",
       "dragToReorder": "Drag to reorder",
       "noMatchingLabels": "No matching labels",
       "selectMetricFirst": "Select a metric first to load labels",

@@ -78,5 +78,9 @@ test.describe('Metrics PromQL builder round-trip', () => {
     await expect(refusal).toBeInViewport();
     await expect(builder.customModeBtn).toHaveAttribute('data-state', 'on');
     expect(await editorText(page)).toBe(query);
+
+    await editorText(page, 'max(node_load1)');
+    await refusal.click();
+    await expect(refusal).toHaveCount(0, { timeout: 15000 });
   });
 });

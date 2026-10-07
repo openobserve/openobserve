@@ -883,7 +883,30 @@ describe("formula letters and the saved hide flag", () => {
     it("renders no message row when there is nothing to say", async () => {
       mountWith([q({ ref: "A" })]);
       await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-query-messages"]').exists()).toBe(false);
+    });
+
+    it("drops the builder refusal once the query text changes", async () => {
+      const data = mountWith([q({ ref: "A" })]);
+      data.meta.errors.queryErrors = ["The builder cannot show a subquery"];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-query-errors"]').exists()).toBe(true);
+
+      data.data.queries[0].query = "rate(up[5m])";
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="dashboard-panel-query-errors"]').exists()).toBe(false);
+    });
+
+    it("drops the builder refusal when another tab becomes active", async () => {
+      const data = mountWith([q({ ref: "A" }), q({ ref: "B" })]);
+      data.meta.errors.queryErrors = ["The builder cannot show a subquery"];
+      await wrapper.vm.$nextTick();
+
+      data.layout.currentQueryIndex = 1;
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+      expect(data.meta.errors.queryErrors).toEqual([]);
     });
   });
 
@@ -894,17 +917,57 @@ describe("formula letters and the saved hide flag", () => {
     expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-3"]').text()).toBe("Formula 2");
   });
 
-  it("makes the eye a labelled button and mutes a hidden query's label", async () => {
-    mountWith([q({ ref: "A", hide: true }), q({ ref: "B" })]);
+  it("numbers queries among queries", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A" }, ""), q({ ref: "B" })]);
     await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-2"]').text()).toBe(
+      "B · Query 2",
+    );
+  });
+
+  describe("the eye", () => {
     const eye = (i: number) =>
       wrapper.find(`[data-test="dashboard-panel-query-tab-visibility-${i}"]`);
-    expect(eye(0).element.tagName).toBe("BUTTON");
-    expect(eye(0).attributes("aria-label")).toBe("Show query results");
-    expect(eye(1).attributes("aria-label")).toBe("Hide query results");
     const label = (i: number) => wrapper.find(`[data-test="dashboard-panel-query-tab-name-${i}"]`);
-    expect(label(0).classes()).toContain("text-text-muted");
-    expect(label(1).classes()).not.toContain("text-text-muted");
+
+    it("is a labelled button beside the tab, not inside it", async () => {
+      mountWith([q({ ref: "A", hide: true }), q({ ref: "B" })]);
+      await wrapper.vm.$nextTick();
+      expect(eye(0).element.tagName).toBe("BUTTON");
+      expect(eye(0).attributes("aria-label")).toBe("Show query results");
+      expect(eye(1).attributes("aria-label")).toBe("Hide query results");
+      expect(eye(0).element.closest('[role="tab"]')).toBeNull();
+      expect(wrapper.find('[data-test="dashboard-panel-query-tab-0"]').text()).toBe("A · Query 1");
+    });
+
+    it("toggles from the keyboard without switching tabs", async () => {
+      const data = mountWith([q({ ref: "A" }), q({ ref: "B" })]);
+      await wrapper.vm.$nextTick();
+      await eye(1).trigger("keydown", { key: "Enter" });
+      await eye(1).trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(data.layout.currentQueryIndex).toBe(0);
+      expect(data.data.queries[1].config.hide).toBe(true);
+    });
+
+    it("mutes a hidden query's label only on inactive tabs", async () => {
+      mountWith([q({ ref: "A", hide: true }), q({ ref: "B", hide: true }), q({ ref: "C" })]);
+      await wrapper.vm.$nextTick();
+      expect(label(0).classes()).not.toContain("text-text-muted");
+      expect(label(1).classes()).toContain("text-text-muted");
+      expect(label(2).classes()).not.toContain("text-text-muted");
+    });
+
+    it("keeps an inactive tab's controls off a phone's strip", async () => {
+      mountWith([q({ ref: "A" }), q({ ref: "B" })]);
+      await wrapper.vm.$nextTick();
+      const phoneHidden = (selector: string) =>
+        !!wrapper.find(selector).element.closest(".max-md\\:hidden");
+      for (const control of ["rename", "visibility", "remove"]) {
+        expect(phoneHidden(`[data-test="dashboard-panel-query-tab-${control}-0"]`)).toBe(false);
+        expect(phoneHidden(`[data-test="dashboard-panel-query-tab-${control}-1"]`)).toBe(true);
+      }
+    });
   });
 
   it("keeps Add formula reachable as a labelled icon on a phone", async () => {

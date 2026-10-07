@@ -154,6 +154,12 @@ describe("treeToBuilder", () => {
     expect(reason(matrix("x", "5m"))).toBe("The builder cannot show a bare range vector");
   });
 
+  it("says only that it cannot show the query for a kind it has no words for", () => {
+    expect(reason({ type: "unsupported", kind: "extension" })).toBe(
+      "The builder cannot show this query exactly",
+    );
+  });
+
   it("names an unsupported construct on either side of a binary", () => {
     expect(reason(bin("/", sel("x"), { type: "unsupported", kind: "offset" }))).toBe(
       "The builder cannot show an offset modifier",
@@ -166,7 +172,7 @@ describe("treeToBuilder", () => {
 
   it("points a binary between two metrics at formulas", () => {
     expect(reason(bin("/", call("rate", matrix("a", "5m")), call("rate", matrix("b", "5m"))))).toBe(
-      "The builder cannot show arithmetic between two metrics — use a formula",
+      "The builder cannot show an operation between two metrics — use a formula",
     );
   });
 });

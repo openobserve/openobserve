@@ -75,6 +75,11 @@ test.describe('Metrics PromQL formulas', () => {
     const error = page.locator('[data-test="dashboard-panel-formula-error"]');
     await expect(error).toContainText('C is not a query in this panel', { timeout: 15000 });
     await expect(error).toBeInViewport();
+
+    await page.locator('[data-test="dashboard-panel-query-tab-0"]').click();
+    const note = page.locator('[data-test="dashboard-panel-formula-input-note"]');
+    await expect(note).toBeVisible({ timeout: 15000 });
+    await expect(note).toBeInViewport();
   });
 
   test('A / B * 100 over hidden inputs runs as one query, saves to a dashboard and survives a reload', {

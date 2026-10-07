@@ -164,7 +164,7 @@ describe("QueryTypeSelector code to builder", () => {
     expect(slot.query).toBe("a / b");
     expect(slot.fields.promql_operations).toEqual([]);
     expect(data.meta.errors.queryErrors).toEqual([
-      "The builder cannot show arithmetic between two metrics — use a formula",
+      "The builder cannot show an operation between two metrics — use a formula",
     ]);
     expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(false);
   });

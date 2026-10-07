@@ -55,7 +55,7 @@ export async function processPromQLData(
         .map((metric: any) => metric?.metric)
         .filter(Boolean),
       template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
-      fallback: legendFallbackOf(panelSchema.queries?.[queryIndexOf(index)]),
+      fallback: legendFallbackOf(panelSchema.queries, queryIndexOf(index)),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
