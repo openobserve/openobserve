@@ -71,7 +71,7 @@ pub struct IndexCache {
     entries: LruCache<CacheKey, (Arc<CachedIndex>, CacheWeight)>,
     pub bytes: usize,
     limit: usize,
-    metrics: IndexBlocksCacheMetrics,
+    metrics: Arc<IndexBlocksCacheMetrics>,
 }
 
 impl IndexCache {
@@ -80,7 +80,7 @@ impl IndexCache {
             entries: LruCache::new_unbounded(),
             bytes: 0,
             limit: 0,
-            metrics,
+            metrics: Arc::new(metrics),
         }
     }
 
@@ -97,24 +97,25 @@ impl IndexCache {
         self.entries.is_empty()
     }
 
-    pub fn lookup(
-        &mut self,
-        key: &CacheKey,
-        labels: &[String],
-    ) -> Result<(Option<Arc<CachedIndex>>, bool)> {
+    pub fn get(&mut self, key: &CacheKey) -> Option<Arc<CachedIndex>> {
         if self.limit == 0 {
-            return Ok((None, false));
+            return None;
         }
-        let Some(entry) = self.entries.get(key).map(|entry| Arc::clone(&entry.0)) else {
+        let entry = self.entries.get(key).map(|entry| Arc::clone(&entry.0));
+        if entry.is_some() {
+            self.metrics.hits.inc();
+        } else {
             self.metrics.misses.inc();
-            return Ok((None, false));
-        };
-        self.metrics.hits.inc();
-        let complete = entry.index.missing_labels(labels)?.is_empty();
-        if !complete {
-            self.metrics.partial_hits.inc();
         }
-        Ok((Some(entry), complete))
+        entry
+    }
+
+    /// Classify the returned lookup after releasing the cache mutex.
+    pub fn lookup(&mut self, key: &CacheKey) -> IndexCacheLookup {
+        IndexCacheLookup {
+            entry: self.get(key),
+            metrics: Arc::clone(&self.metrics),
+        }
     }
 
     pub fn remove(&mut self, key: &CacheKey) {
@@ -186,6 +187,24 @@ impl IndexCache {
 impl Default for IndexCache {
     fn default() -> Self {
         Self::new(IndexBlocksCacheMetrics::default())
+    }
+}
+
+pub struct IndexCacheLookup {
+    entry: Option<Arc<CachedIndex>>,
+    metrics: Arc<IndexBlocksCacheMetrics>,
+}
+
+impl IndexCacheLookup {
+    pub fn classify(self, labels: &[String]) -> Result<(Option<Arc<CachedIndex>>, bool)> {
+        let Some(entry) = self.entry else {
+            return Ok((None, false));
+        };
+        let complete = entry.index.missing_labels(labels)?.is_empty();
+        if !complete {
+            self.metrics.partial_hits.inc();
+        }
+        Ok((Some(entry), complete))
     }
 }
 

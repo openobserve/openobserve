@@ -732,11 +732,12 @@ async fn load_index_cached(
         account: file.account.clone(),
         parent: parent.clone(),
     };
-    let (cached, complete) = {
+    let lookup = {
         let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
         cache.trim(limit);
-        cache.lookup(&key, labels)?
+        cache.lookup(&key)
     };
+    let (cached, complete) = lookup.classify(labels)?;
     MetadataLoad {
         file,
         labels,
@@ -1191,9 +1192,7 @@ mod tests {
             INDEX_CACHE
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
-                .lookup(&cache_key, &[])
-                .unwrap()
-                .0
+                .get(&cache_key)
                 .is_none()
         );
     }
@@ -2597,7 +2596,7 @@ mod tests {
         let (mut cache, registry) = observed_cache();
         let (key, entry, weight) = cache_entry();
         cache.trim(weight.total);
-        let (cached, complete) = cache.lookup(&key, &["group".into()]).unwrap();
+        let (cached, complete) = cache.lookup(&key).classify(&["group".into()]).unwrap();
         assert!(cached.is_none());
         assert!(!complete);
         let partial = Arc::new(CachedIndex {
@@ -2605,12 +2604,13 @@ mod tests {
             binding: entry.binding.clone(),
         });
         cache.insert(key.clone(), partial, weight.total).unwrap();
-        let (cached, complete) = cache.lookup(&key, &["group".into()]).unwrap();
+        let (cached, complete) = cache.lookup(&key).classify(&["group".into()]).unwrap();
         assert!(cached.is_some());
         assert!(!complete);
         cache.insert(key.clone(), entry, weight.total).unwrap();
         let (cached, complete) = cache
-            .lookup(&key, &["group".into(), "absent_from_source".into()])
+            .lookup(&key)
+            .classify(&["group".into(), "absent_from_source".into()])
             .unwrap();
         assert!(cached.is_some());
         assert!(complete);
@@ -2618,10 +2618,54 @@ mod tests {
         assert_eq!(values["hits_total"], 2.0);
         assert_eq!(values["partial_hits_total"], 1.0);
         assert_eq!(values["misses_total"], 1.0);
-        assert!(cache.lookup(&key, &["value".into()]).is_err());
+        assert!(cache.lookup(&key).classify(&["value".into()]).is_err());
         let values = cache_snapshot(&registry);
         assert_eq!(values["hits_total"], 3.0);
         assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[test]
+    fn metadata_cache_lookup_classifies_after_releasing_cache_lock() {
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
+        let (key, entry, weight) = cache_entry();
+        let partial = Arc::new(CachedIndex {
+            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            binding: entry.binding.clone(),
+        });
+        let lookup = {
+            let mut cache = cache.lock().unwrap();
+            cache.insert(key.clone(), partial, weight.total).unwrap();
+            cache.lookup(&key)
+        };
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        cache.try_lock().unwrap().trim(0);
+        let (cached, complete) = lookup.classify(&["group".into()]).unwrap();
+        assert!(cached.is_some());
+        assert!(!complete);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 0.0);
+        assert_eq!(values["used_bytes"], 0.0);
+    }
+
+    #[test]
+    fn metadata_cache_get_preserves_key_lookup_compatibility() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        assert!(cache.get(&key).is_none());
+        assert_eq!(cache_snapshot(&registry)["misses_total"], 0.0);
+        cache.trim(weight.total);
+        assert!(cache.get(&key).is_none());
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        assert!(cache.get(&key).is_some());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
         assert_eq!(values["misses_total"], 1.0);
     }
 
@@ -2752,7 +2796,7 @@ mod tests {
         let mut c = a.clone();
         c.account = "c".into();
         cache.trim(weight.total * 2);
-        assert!(cache.lookup(&a, &[]).unwrap().0.is_none());
+        assert!(cache.get(&a).is_none());
         cache
             .insert(a.clone(), Arc::clone(&entry), weight.total * 2)
             .unwrap();
@@ -2761,12 +2805,12 @@ mod tests {
         cache
             .insert(b.clone(), Arc::clone(&entry), weight.total * 2)
             .unwrap();
-        assert!(cache.lookup(&a, &[]).unwrap().0.is_some());
+        assert!(cache.get(&a).is_some());
         cache
             .insert(c.clone(), Arc::clone(&entry), weight.total * 2)
             .unwrap();
-        assert!(cache.lookup(&b, &[]).unwrap().0.is_none());
-        assert!(cache.lookup(&a, &[]).unwrap().0.is_some());
+        assert!(cache.get(&b).is_none());
+        assert!(cache.get(&a).is_some());
         cache.insert(a.clone(), entry, weight.total * 2).unwrap();
         assert_eq!(
             cache_snapshot(&registry)["used_bytes"],
@@ -2789,10 +2833,10 @@ mod tests {
         let (mut cache, registry) = observed_cache();
         let (key, entry, weight) = cache_entry();
         cache.trim(0);
-        assert!(cache.lookup(&key, &[]).unwrap().0.is_none());
+        assert!(cache.get(&key).is_none());
         cache.insert(key.clone(), Arc::clone(&entry), 0).unwrap();
         cache.trim(weight.total - 1);
-        assert!(cache.lookup(&key, &[]).unwrap().0.is_none());
+        assert!(cache.get(&key).is_none());
         cache
             .insert(key.clone(), Arc::clone(&entry), weight.total - 1)
             .unwrap();
@@ -2833,7 +2877,7 @@ mod tests {
                         cache
                             .insert(key.clone(), Arc::clone(&entry), weight.total * 3)
                             .unwrap();
-                        assert!(cache.lookup(&key, &[]).unwrap().0.is_some());
+                        assert!(cache.get(&key).is_some());
                         if iteration % 5 == 0 {
                             cache.remove(&key);
                         }
@@ -2861,16 +2905,7 @@ mod tests {
         let worker_cache = Arc::clone(&cache);
         let (started, entered) = tokio::sync::oneshot::channel();
         let task = tokio::spawn(async move {
-            let held = Arc::clone(
-                &worker_cache
-                    .lock()
-                    .unwrap()
-                    .lookup(&key, &[])
-                    .unwrap()
-                    .0
-                    .unwrap()
-                    .index,
-            );
+            let held = Arc::clone(&worker_cache.lock().unwrap().get(&key).unwrap().index);
             started.send(()).unwrap();
             std::future::pending::<()>().await;
             drop(held);
@@ -2917,16 +2952,16 @@ mod tests {
             .insert(key.clone(), Arc::clone(&index), usize::MAX)
             .unwrap();
         assert!(cache.bytes >= expected_heap + std::mem::size_of::<CachedIndex>());
-        assert!(cache.lookup(&key, &[]).unwrap().0.is_some());
+        assert!(cache.get(&key).is_some());
         let mut other = key.clone();
         other.account = "b".into();
-        assert!(cache.lookup(&other, &[]).unwrap().0.is_none());
+        assert!(cache.get(&other).is_none());
         cache.trim(cache.bytes - 1);
-        assert!(cache.lookup(&key, &[]).unwrap().0.is_none());
+        assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
         cache.insert(key.clone(), index, usize::MAX).unwrap();
         cache.trim(0);
-        assert!(cache.lookup(&key, &[]).unwrap().0.is_none());
+        assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
     }
 }
