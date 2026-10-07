@@ -636,6 +636,38 @@ confirm*, a sensible value for every field the user has no opinion about, and a
 preview instead of a wizard step. Do not hit the budget by hiding required
 fields behind "Advanced" — that moves the click, it does not remove it.
 
+## Copy and values — read the screen with real data
+
+Lint proves a string is translated; it cannot prove the sentence it produces is
+English, that a number means what its label claims, or that a blank is not a
+zero. Before a screen is done, read it with real data in every state (loading,
+never set up, stopped, partly there, failed, populated). The recurring defects:
+
+- **Casing reaches past your template** — shared component copy and `en-US.json`
+  values are sentence case too; a library never forces caps.
+- **An interpolated slot takes a noun phrase or a value**, never another
+  sentence; every `{count}` message is a plural called with the count.
+- **Say it once, by the label on screen** — no chip and text repeating each
+  other, no two headings for one thing, no help text naming a control by a word
+  the control does not show.
+- **Names, not ids; what differs, first** — an org label, not its identifier; the
+  database name, not the host every row shares.
+- **Minute-precision times, whole-number counts, `—` for unknown, skeleton (never
+  `0`) while loading; one failure look** (`#error` → load-error with Retry).
+- **Warning icons only on problems; a page publishes only its own facts** into
+  any state its sibling tabs share.
+- **Density: a screen states, the reader opens the rest** — explanatory copy opens
+  from an "About …" info popover beside its control instead of a paragraph or a
+  truncated sentence; a banner is one line (what + since when + action); a list
+  shows one line per item and each item opens on its own; one entity is one row;
+  a column header carries no qualifier (it goes in `meta.headerTooltip`); "All
+  clear" is never followed by "0 of 0".
+- **Rewording a shared key rewords every screen using it** — search its callers and
+  add a new key instead; every new key gets all 16 locales.
+
+Full rules, each with the bug it came from:
+[references/copy-and-values.md](references/copy-and-values.md).
+
 ## Pick a component
 
 The **scenario → component** index and the per-file catalog (what each `O*` is,
@@ -821,6 +853,32 @@ considering the UI done:
       to their trigger's row (or come from `OPageLayout #sidebar` / `FolderList`);
       inline row actions are `max-md:hidden` with a `md:hidden` kebab mirroring them
       (`<data-test>-menu`); no hover-only affordance without `max-md:opacity-100`.
+- [ ] **Copy and values read right with real data** — sentence case in the
+      rendered screen (shared copy included); interpolated slots read as a
+      sentence; every `{count}` is a plural; controls named by their visible
+      label; nothing said twice; labels instead of ids; times to the minute,
+      counts without decimals, `—` for unknown. See
+      [copy-and-values](references/copy-and-values.md).
+- [ ] **Every state was seen with real data** — loading (skeletons, never `0`),
+      never set up, stopped/stale, partly there, failed (`#error` → load-error
+      with Retry, never the raw red bar) and populated — in light and dark.
+- [ ] **Nothing is clipped, not just nothing scrolls** — text runs past no cell
+      or container at 375 / 768 / 1024 / 1280 (an `overflow-hidden` ancestor hides
+      it from a page-width check); right-aligned cells checked on their left edge;
+      every ellipsis read (a cut title or header is a bug, a cut SQL statement is not).
+- [ ] **Nothing is sparse or doubled** — the page edge is applied once (`bleed`
+      when the body insets itself); a one-line disclosure is sized to its label with
+      its info control beside it, not a full-width bar; the primary table column has
+      an explicit `size`; a status screen fits 1366×768 and 375 collapsed; tiles that
+      sit six to a row wrap and keep two title lines so their values line up.
+- [ ] **Same job, same component** — refresh is `ORefreshButton`, an explainer is
+      the `OPopover` info recipe, an expandable row is `OCollapsible`, a toolbar view
+      toggle is `OToggleGroup mobile-dropdown`; never a hand-built `<button>`. See
+      [conventions § The same affordance](references/conventions.md).
+- [ ] **A UI pass changes UI only** — no new capability in a shared engine; a shared
+      component's visual change is gated below lg or on a flag only your page sets,
+      and a regular page using it is unchanged at ≥1024. See
+      [conventions § A UI pass changes UI only](references/conventions.md).
 - [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
       never layout narration ("< md this wraps"), a re-telling of the code, or the
       history of the PR that added it (no ticket ids, "review finding", "as
