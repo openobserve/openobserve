@@ -99,10 +99,8 @@ export default defineComponent({
       type: String,
       default: undefined,
     },
-    /** The panel's unit config, so the item reads the value as the chart's axis does. */
     unit: { type: String, default: null },
     unitCustom: { type: String, default: null },
-    decimals: { type: Number, default: null },
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
@@ -130,29 +128,29 @@ export default defineComponent({
     // The threshold is written into the alert's PromQL and notification, so it is the value the item shows.
     const forecastValue = computed(() => Number(Number(props.value).toPrecision(4)));
 
-    const withUnit = (value: number, plain: string) =>
-      props.unit
-        ? formatUnitValue(
-            getUnitValue(value, props.unit, props.unitCustom ?? "", props.decimals ?? 2),
-          )
-        : plain;
-    const valueText = computed(() =>
-      typeof props.value === "number"
-        ? withUnit(props.value, formattedValue.value as string)
-        : props.value,
-    );
     // The unit is shown only where it keeps the number written into the alert; a rescaled one would not read the same.
-    const forecastText = computed(() => {
-      const value = forecastValue.value;
-      const plain = value.toLocaleString(undefined, { maximumSignificantDigits: 4 });
+    const withUnit = (value: number, plain: string, baseText: string) => {
       if (!props.unit) return plain;
       const decimals = (String(value).split(".")[1] ?? "").length;
       const shown = getUnitValue(value, props.unit, props.unitCustom ?? "", decimals);
       if (Number(shown.value) === value) return formatUnitValue(shown);
       const base = getUnitValue(1, props.unit, props.unitCustom ?? "", 0);
       return Number(base.value) === 1
-        ? formatUnitValue({ value: String(value), unit: base.unit })
+        ? formatUnitValue({ value: baseText, unit: base.unit })
         : plain;
+    };
+    const valueText = computed(() =>
+      typeof props.value === "number"
+        ? withUnit(props.value, formattedValue.value as string, formattedValue.value as string)
+        : props.value,
+    );
+    const forecastText = computed(() => {
+      const value = forecastValue.value;
+      return withUnit(
+        value,
+        value.toLocaleString(undefined, { maximumSignificantDigits: 4 }),
+        String(value),
+      );
     });
 
     const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {

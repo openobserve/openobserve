@@ -256,7 +256,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :series-role="contextMenuData?.seriesRole"
         :unit="panelSchema?.config?.unit"
         :unit-custom="panelSchema?.config?.unit_custom"
-        :decimals="panelSchema?.config?.decimals"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />

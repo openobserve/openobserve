@@ -261,11 +261,22 @@ describe("AlertContextMenu Component", () => {
     });
 
     it("shows the value in the panel's unit", () => {
-      wrapper = createWrapper({ value: 1536, unit: "bytes", decimals: 1 });
-      const shown = formatUnitValue(getUnitValue(1536, "bytes", "", 1));
+      wrapper = createWrapper({ value: 2, unit: "bytes" });
+      const shown = formatUnitValue(getUnitValue(2, "bytes", "", 0));
       expect(wrapper.find('[data-test="alert-context-menu-above"]').text()).toBe(
         `Alert when above ${shown}`,
       );
+    });
+
+    it("shows the threshold it writes, not a rescaled one", async () => {
+      wrapper = createWrapper({ value: 1536, unit: "bytes" });
+      for (const condition of ["above", "below"]) {
+        const item = wrapper.find(`[data-test="alert-context-menu-${condition}"]`);
+        expect(item.text()).toContain("1,536");
+        expect(item.text()).not.toContain("KB");
+      }
+      await wrapper.find('[data-test="alert-context-menu-above"]').trigger("click");
+      expect(wrapper.emitted("select")![0][0]).toMatchObject({ threshold: 1536 });
     });
 
     it("shows the forecast threshold it writes, in the unit only when that keeps the number", async () => {
