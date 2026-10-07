@@ -73,12 +73,14 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   streaming: false,
   error: null,
   dense: true,
+  compact: false,
   bordered: true,
   // No outer box border on tables (design system): the app chrome already frames
   // content, and CRUD listing tables sit flush to the edges. Row dividers (the
   // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
   frame: false,
   toolbarBordered: true,
+  paginationBordered: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
@@ -718,7 +720,7 @@ const {
   scrollMargin: props.scrollMargin ?? 0,
   // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
   // virtualizer's measured height matches the actual rendered row height.
-  rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
+  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
   // A delegated scroller can contain a histogram or other content before this
@@ -938,6 +940,7 @@ watch(
     effectiveColumns,
     () => props.loading,
     () => props.dense,
+    () => props.compact,
     () => frozen.value,
     () => measuredColumnSizeVars.value,
     () => containerWidth.value,
@@ -1411,9 +1414,11 @@ defineExpose({
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`
-                : props.dense
-                  ? 'var(--table-row-height-dense, 2.25rem)'
-                  : 'var(--table-row-height-normal, 2.75rem)',
+                : props.compact
+                  ? 'var(--table-row-height-compact, 1.5625rem)'
+                  : props.dense
+                    ? 'var(--table-row-height-dense, 2.25rem)'
+                    : 'var(--table-row-height-normal, 2.75rem)',
           }"
           data-test="o2-table"
           :data-test-loading="props.loading ? 'true' : 'false'"
@@ -1445,6 +1450,7 @@ defineExpose({
             :sticky-header="props.stickyHeader"
             :bordered="props.bordered"
             :dense="props.dense"
+            :compact="props.compact"
             :pivot-header-levels="props.pivotHeaderLevels"
             :pivot-row-columns="props.pivotRowColumns"
             :sticky-col-totals="props.stickyColTotals"
@@ -1494,6 +1500,7 @@ defineExpose({
             :get-highlighted-html="highlighting.getHighlightedHtml"
             :wrap="props.wrap"
             :dense="props.dense"
+            :compact="props.compact"
             :bordered="props.bordered"
             :striped="props.striped"
             :row-class="resolvedRowClass as any"
@@ -1751,6 +1758,7 @@ defineExpose({
         :is-last-page="pagination.isLastPage.value"
         :loading="heldLoading"
         :selected-count="selection.selectedCount.value"
+        :bordered="props.paginationBordered"
         @update:page-size="pagination.setPageSize"
         @first-page="pagination.firstPage"
         @prev-page="pagination.prevPage"
@@ -1822,7 +1830,7 @@ defineExpose({
 
 /* keep(lib-override:o2-table-hide-header): public modifier, same shape as the
    block above — `thead` is this component's own render, and the class is passed
-   in by components/queries/QueryList.vue and plugins/logs/SearchBar.vue (x2). */
+   in by components/queries/QueryList.vue. */
 .o2-table-hide-header :deep(thead) {
   display: none;
 }

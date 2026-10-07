@@ -444,6 +444,8 @@ export interface OTableProps<TData = any> {
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;
+  /** Short rows (`--table-row-height-compact`) with no cell padding, for small list dialogs; overrides `dense`. */
+  compact?: boolean;
   bordered?: boolean;
   /**
    * Draws the outer frame (border) around the whole table region. Default true.
@@ -453,6 +455,8 @@ export interface OTableProps<TData = any> {
   frame?: boolean;
   /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
   toolbarBordered?: boolean;
+  /** Draws the hairline above the built-in pager (default true); set false when the table sits flush in a dialog. */
+  paginationBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;

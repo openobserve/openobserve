@@ -56,6 +56,7 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   enableCellCopy?: boolean;
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
@@ -427,7 +428,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
       'text-text-body',
-      meta?.spacer
+      meta?.spacer || compact
         ? 'px-0 align-middle'
         : meta?.compactPadding
           ? 'px-1 align-middle'

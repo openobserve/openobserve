@@ -293,7 +293,7 @@ vi.mock("@/composables/useTraces", () => ({
 // Import the component AFTER all vi.mock declarations.
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
-import TracesSavedViewsDialog from "@/plugins/traces/TracesSavedViewsDialog.vue";
+import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 
 // ---------------------------------------------------------------------------
@@ -1538,7 +1538,18 @@ describe("SearchBar", () => {
   });
 
   describe("saved views", () => {
-    const tracesView = { view_id: "t1", view_name: "checkout errors", view_type: "traces" };
+    const tracesView = {
+      view_id: "t1",
+      view_name: "checkout errors",
+      view_type: "traces",
+      org_id: "default",
+    };
+    const tracesView2 = {
+      view_id: "t2",
+      view_name: "Alpha latency",
+      view_type: "traces",
+      org_id: "default",
+    };
     const logsView = { view_id: "l1", view_name: "logs view" };
 
     const { isPinned, togglePin } = useToolbarPins("traces");
@@ -1579,6 +1590,7 @@ describe("SearchBar", () => {
       breakpointState.lgUp = true;
       if (!isPinned("savedViews")) togglePin("savedViews");
       widthSpy = mockToolbarWidth(1600);
+      localStorage.removeItem("savedViews");
     });
 
     afterEach(() => {
@@ -1699,33 +1711,47 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("apply-saved-view")).toBeUndefined();
     });
 
-    it("delete calls the delete mutation once confirmed", async () => {
+    it("pinned dropdown has no delete action", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
-      await wrapper.find('[data-test="traces-saved-view-delete-t1"]').trigger("click");
-      await flushPromises();
-
-      expect(mockConfirm).toHaveBeenCalledTimes(1);
-      expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
+      expect(wrapper.find('[data-test="traces-saved-view-update-t1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-saved-view-delete-t1"]').exists()).toBe(false);
     });
 
-    it("delete does nothing when not confirmed", async () => {
-      mockConfirm.mockResolvedValue(false);
+    it("pinned dropdown lists favourites first, then by name, with a star on favourites", async () => {
+      mockSavedViewsGet.mockResolvedValue({ data: { views: [tracesView, tracesView2, logsView] } });
+      localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));
       wrapper = mountSearchBar();
       await flushPromises();
 
-      await wrapper.find('[data-test="traces-saved-view-delete-t1"]').trigger("click");
+      const items = wrapper
+        .findAll('[data-test^="traces-saved-view-apply-"]')
+        .map((item) => item.attributes("data-test"));
+      expect(items).toEqual(["traces-saved-view-apply-t1", "traces-saved-view-apply-t2"]);
+      const iconName = (id: string) =>
+        wrapper
+          .findAllComponents({ name: "OIcon" })
+          .find((c) => c.attributes("data-test") === `traces-saved-view-icon-${id}`)
+          ?.props("name");
+      expect(iconName("t1")).toBe("star");
+      expect(iconName("t2")).toBe("saved-search");
+    });
+
+    it("pinned dropdown shows a loading row while the list loads", async () => {
+      mockSavedViewsGet.mockReturnValue(new Promise(() => {}));
+      wrapper = mountSearchBar();
       await flushPromises();
 
-      expect(mockSavedViewsDelete).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="traces-saved-views-menu-loading"]').exists()).toBe(true);
+      expect(wrapper.findComponent(SavedViewsListDialog).props("loading")).toBe(true);
     });
 
     describe("in the More menu", () => {
       const moreGroup = () =>
         wrapper.find('[data-test="traces-search-bar-menu-saved-views-group"]');
       const toolbarGroup = () => wrapper.find('[data-test="traces-search-bar-saved-views"]');
-      const dialog = () => wrapper.findComponent(TracesSavedViewsDialog);
+      const dialog = () => wrapper.findComponent(SavedViewsListDialog);
 
       it("shows the saved-views group with List, Create and the pin button", async () => {
         wrapper = mountSearchBar();
@@ -1794,6 +1820,87 @@ describe("SearchBar", () => {
           view_name: "checkout errors",
           data: expectedData(),
         });
+      });
+
+      it("passes the traces module, views and favourites to the dialog", async () => {
+        localStorage.setItem(
+          "savedViews",
+          JSON.stringify({ t1: tracesView, l1: { ...logsView, org_id: "default" } }),
+        );
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(dialog().props("module")).toBe("traces");
+        expect(dialog().props("loading")).toBe(false);
+        expect(dialog().props("favoriteIds")).toEqual(["t1"]);
+        expect(dialog().props("favoriteViews")).toEqual([tracesView]);
+      });
+
+      it("update from the dialog closes it and asks for confirmation first", async () => {
+        mockConfirm.mockResolvedValue(false);
+        wrapper = mountSearchBar();
+        await flushPromises();
+        await wrapper
+          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
+          .trigger("click");
+        expect(dialog().props("open")).toBe(true);
+
+        dialog().vm.$emit("update", tracesView);
+        await flushPromises();
+
+        expect(dialog().props("open")).toBe(false);
+        expect(mockConfirm).toHaveBeenCalledWith({
+          title: "search.updateSavedView",
+          message: "search.updateSavedViewConfirm",
+        });
+        expect(mockSavedViewsPut).not.toHaveBeenCalled();
+      });
+
+      it("delete from the dialog closes it, confirms, and drops the favourite", async () => {
+        localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));
+        wrapper = mountSearchBar();
+        await flushPromises();
+        await wrapper
+          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
+          .trigger("click");
+
+        dialog().vm.$emit("delete", tracesView);
+        await flushPromises();
+
+        expect(dialog().props("open")).toBe(false);
+        expect(mockConfirm).toHaveBeenCalledWith({
+          title: "search.deleteSavedView",
+          message: "search.deleteSavedViewConfirm",
+        });
+        expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
+        expect(dialog().props("favoriteIds")).toEqual([]);
+        expect(JSON.parse(localStorage.getItem("savedViews") || "{}")).toEqual({});
+      });
+
+      it("delete from the dialog does nothing when not confirmed", async () => {
+        mockConfirm.mockResolvedValue(false);
+        localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("delete", tracesView);
+        await flushPromises();
+
+        expect(mockSavedViewsDelete).not.toHaveBeenCalled();
+        expect(dialog().props("favoriteIds")).toEqual(["t1"]);
+      });
+
+      it("toggles a favourite from the dialog", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        dialog().vm.$emit("toggle-favorite", tracesView, false);
+        await flushPromises();
+        expect(dialog().props("favoriteIds")).toEqual(["t1"]);
+
+        dialog().vm.$emit("toggle-favorite", tracesView, true);
+        await flushPromises();
+        expect(dialog().props("favoriteIds")).toEqual([]);
       });
 
       it("pin click toggles the toolbar group without closing the menu", async () => {
