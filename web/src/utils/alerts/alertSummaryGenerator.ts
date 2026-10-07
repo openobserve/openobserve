@@ -138,13 +138,11 @@ export function generateAlertSummary(
     );
   } else if (forecast) {
     parts.push(
-      `✓ ${translate("alerts.forecast.basedOn")}: ${clickable(translate(`alerts.forecast.window${forecast.W}`), "forecast")}`,
+      `✓ ${translate("alerts.forecast.basedOn")}: ${clickable(translate(`alerts.forecast.window${forecast.W}`), "query")}`,
     );
     const trigger = forecastPhrase(forecast, "trigger", translate);
     if (trigger) {
-      parts.push(
-        `✓ ${translate("alerts.summary.triggersWhen")}: ${clickable(trigger, "forecast")}`,
-      );
+      parts.push(`✓ ${translate("alerts.summary.triggersWhen")}: ${clickable(trigger, "query")}`);
     }
   } else {
     // Scheduled alert summary

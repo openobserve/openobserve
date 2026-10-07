@@ -412,6 +412,16 @@ describe("convertPromQLData with time-shifted results", () => {
       expect(onDashboard.options.legend.data).toBeUndefined();
     });
 
+    it("keeps a compared series with no current counterpart in the Explorer's legend", async () => {
+      const onlyPast = await convert(
+        explorer(),
+        [matrix(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      expect(onlyPast.options.legend.data).toEqual(["api-1 (1 day ago)", "api-2 (1 day ago)"]);
+    });
+
     it("follows a series colour mapping set on the primary", async () => {
       const mapped: any = panel("line");
       mapped.config = { color: { colorBySeries: [{ value: "api-1", color: "#123456" }] } };

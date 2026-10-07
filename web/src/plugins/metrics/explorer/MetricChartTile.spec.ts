@@ -507,9 +507,9 @@ describe("MetricChartTile", () => {
       await flushPromises();
 
       expect(wrapper.emitted("results")).toEqual([
-        [{ status: "idle", results: [], periodEmpty: false }],
-        [{ status: "loading", results: [], periodEmpty: false }],
-        [{ status: "done", results: [SERIES], periodEmpty: false }],
+        [{ status: "idle", results: [], periodEmpty: false, forecastDrawn: false }],
+        [{ status: "loading", results: [], periodEmpty: false, forecastDrawn: false }],
+        [{ status: "done", results: [SERIES], periodEmpty: false, forecastDrawn: false }],
       ]);
     });
 
@@ -520,7 +520,7 @@ describe("MetricChartTile", () => {
       wrapper = mountTile({ compare: { gapMs: 3_600_000, periodAsStr: "1 hour ago" } });
       await flushPromises();
       expect(wrapper.emitted("results")!.at(-1)).toEqual([
-        { status: "done", results: [SERIES], periodEmpty: true },
+        { status: "done", results: [SERIES], periodEmpty: true, forecastDrawn: false },
       ]);
     });
 
@@ -530,9 +530,9 @@ describe("MetricChartTile", () => {
       await flushPromises();
 
       expect(wrapper.emitted("results")).toEqual([
-        [{ status: "idle", results: [], periodEmpty: false }],
-        [{ status: "loading", results: [], periodEmpty: false }],
-        [{ status: "error", results: [], periodEmpty: false }],
+        [{ status: "idle", results: [], periodEmpty: false, forecastDrawn: false }],
+        [{ status: "loading", results: [], periodEmpty: false, forecastDrawn: false }],
+        [{ status: "error", results: [], periodEmpty: false, forecastDrawn: false }],
       ]);
     });
   });

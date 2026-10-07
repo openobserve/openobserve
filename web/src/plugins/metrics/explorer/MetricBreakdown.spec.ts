@@ -685,6 +685,22 @@ describe("MetricBreakdown", () => {
       const key = wrapper.find('[data-test="metrics-breakdown-overlay-key"]');
       expect(key.text()).toContain("No data 1 day ago");
       expect(key.text()).not.toContain("Forecast");
+      // The chart header is one clipped row, so a phone shows the key above the chart instead.
+      expect(key.classes()).toContain("max-md:hidden");
+      const phoneKey = wrapper.find('[data-test="metrics-breakdown-overlay-key-phone"]');
+      expect(phoneKey.classes()).toContain("md:hidden");
+      expect(phoneKey.text()).toContain("No data 1 day ago");
+    });
+
+    it("names the forecast in the key only once it is drawn", async () => {
+      const forecast = { method: "linear", horizon: 900, label: "forecast" };
+      const timeRange = { start_time: 1_000_000_000, end_time: 4_600_000_000 };
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        opts?.instantAt ? Promise.reject(new Error("timeout")) : Promise.resolve(SERIES),
+      );
+      wrapper = mountBreakdown({ forecast, stepSeconds: 60, timeRange, selectedLabel: "method" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-overlay-key"]').exists()).toBe(false);
     });
 
     it("keeps the right-click alert off the small label tiles", async () => {

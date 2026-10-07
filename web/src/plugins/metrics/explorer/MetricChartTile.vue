@@ -186,7 +186,14 @@ const props = withDefaults(
 const emit = defineEmits<{
   select: [];
   /** What the tile holds, so a parent can read the fetched series without querying again. */
-  results: [state: { status: TileState["status"]; results: any[]; periodEmpty: boolean }];
+  results: [
+    state: {
+      status: TileState["status"];
+      results: any[];
+      periodEmpty: boolean;
+      forecastDrawn: boolean;
+    },
+  ];
 }>();
 
 const { t } = useI18nTyped();
@@ -195,10 +202,11 @@ const root = ref<HTMLElement | null>(null);
 const state = ref<TileState>(IDLE);
 watch(
   state,
-  ({ status, results, shifted }) =>
+  ({ status, results, shifted, forecast }) =>
     emit("results", {
       status,
       results,
+      forecastDrawn: !!forecast,
       periodEmpty:
         status === "done" && !!props.compare && !shifted?.some((entry) => hasSamples(entry.result)),
     }),

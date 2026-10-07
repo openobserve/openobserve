@@ -629,6 +629,20 @@ describe("MetricDetailView", () => {
       expect(wrapper.find('[data-test="metrics-detail-overlay-key"]').text()).toContain("Forecast");
     });
 
+    it("leaves the forecast out of the key when no forecast was drawn", async () => {
+      runQuery.mockImplementation((_e: string, _s: any, _c: any, opts: any) =>
+        opts?.instantAt ? Promise.reject(new Error("timeout")) : Promise.resolve(SERIES),
+      );
+      wrapper = mountView({
+        overview: LINE,
+        timeRange: WINDOW,
+        forecast: "linear",
+        stepSeconds: 30,
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-detail-overlay-key"]').exists()).toBe(false);
+    });
+
     it("offers no forecast on a heatmap or on an info metric", async () => {
       wrapper = mountView(
         { forecast: "linear", timeRange: WINDOW, stepSeconds: 30 },

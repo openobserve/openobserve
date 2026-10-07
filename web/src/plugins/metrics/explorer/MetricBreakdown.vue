@@ -37,6 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
+      <!-- The chart header is one clipped row, too narrow on a phone for the key beside the title. -->
+      <MetricOverlayKey
+        v-if="showOverlayKey"
+        class="mb-1.5 md:hidden"
+        :period="compare?.periodAsStr ?? null"
+        :period-empty="focused.periodEmpty"
+        :forecast="!!focused.forecastDrawn"
+        data-test="metrics-breakdown-overlay-key-phone"
+      />
       <MetricChartTile
         ref="focusedTile"
         :class="heatmap ? 'min-h-60' : 'h-60'"
@@ -65,11 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
           >
           <MetricOverlayKey
-            v-if="!heatmap && (compare || forecast)"
-            class="shrink-0"
+            v-if="showOverlayKey"
+            class="shrink-0 max-md:hidden"
             :period="compare?.periodAsStr ?? null"
             :period-empty="focused.periodEmpty"
-            :forecast="!!forecast"
+            :forecast="!!focused.forecastDrawn"
             data-test="metrics-breakdown-overlay-key"
           />
           <div class="flex-1" />
@@ -827,7 +836,12 @@ export default defineComponent({
     );
 
     /** The focused chart's fetched series: the table summarises them rather than querying again. */
-    const focused = ref<{ status: string; results: any[]; periodEmpty?: boolean }>({
+    const focused = ref<{
+      status: string;
+      results: any[];
+      periodEmpty?: boolean;
+      forecastDrawn?: boolean;
+    }>({
       status: "idle",
       results: [],
     });
@@ -888,6 +902,9 @@ export default defineComponent({
     const heatmapRowClass = (row: BreakdownRow) =>
       row.value === selectedValue.value ? "bg-table-row-selected-bg" : "";
 
+    const showOverlayKey = computed(
+      () => !heatmap.value && (!!props.compare || !!focused.value.forecastDrawn),
+    );
     const focusedTitle = computed(() => {
       const label = activeLabel.value;
       if (!label) return "";
@@ -1132,6 +1149,7 @@ export default defineComponent({
       raw,
       titleOf,
       focusedTitle,
+      showOverlayKey,
       heatmap,
       heatmapQueries,
       runHeatmapQuery,

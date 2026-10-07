@@ -1377,9 +1377,10 @@ export const convertPromQLData = async (
 
   // A twin is drawn in its primary's colour and named in the Explorer's key, so its legend entry would repeat the primary's.
   if (explorerOverlays && shiftedTwins.length) {
-    for (const [twin, metric] of shiftedTwins)
-      twin._legendFollows = primaryByMetric.get(metric)?.name;
-    const twins = new Set(shiftedTwins.map(([twin]) => twin));
+    // A past period drawn without a current series has no entry to follow, so it keeps its own.
+    const followers = shiftedTwins.filter(([, metric]) => primaryByMetric.has(metric));
+    for (const [twin, metric] of followers) twin._legendFollows = primaryByMetric.get(metric).name;
+    const twins = new Set(followers.map(([twin]) => twin));
     legendConfig.data = options.series
       .filter((series: any) => series?.name && !twins.has(series))
       .map((series: any) => series.name);

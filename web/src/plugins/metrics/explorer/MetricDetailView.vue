@@ -437,11 +437,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <MetricOverlayKey
-              v-if="compareShift || activeForecast"
+              v-if="compareShift || overviewState.forecast"
               class="ms-auto"
               :period="compareShift?.periodAsStr ?? null"
               :period-empty="overviewPeriodEmpty"
-              :forecast="!!activeForecast"
+              :forecast="!!overviewState.forecast"
               data-test="metrics-detail-overlay-key"
             />
           </div>

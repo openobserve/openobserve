@@ -52,6 +52,12 @@ describe("generateAlertSummary in Forecast mode", () => {
     expect(text).not.toContain("the last 5 minutes");
   });
 
+  it("links the forecast phrases to a field the form can focus", () => {
+    const text = summary(forecastForm());
+    expect(text).not.toContain('data-focus-target="forecast"');
+    expect(text.match(/data-focus-target="query"/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("says fall for a falling forecast and a singular day", () => {
     const text = summary(forecastForm({ direction: "falls", T: 10, H: 1 }));
     expect(text).toContain("Alert when it is forecast to fall to 10 within 1 day");
