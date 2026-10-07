@@ -635,6 +635,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("system settings cache failed");
 
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
+
     if config::get_config().common.model_pricing_enabled {
         db::model_pricing::cache()
             .await
