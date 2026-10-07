@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod attributes;
 mod otlp_json_compat;
 pub mod query;
 mod validation;
@@ -46,6 +47,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use schema::check_for_schema;
 
+use self::attributes::resolve_any_value_string;
 use crate::{
     common::meta::{
         authz::Authz,
@@ -1080,30 +1082,6 @@ fn resolve_key_value_string(
     resolve_any_value_string(attr.value.as_ref(), dictionary)
 }
 
-fn resolve_any_value_string(
-    value: Option<&opentelemetry_proto::tonic::common::v1::AnyValue>,
-    dictionary: Option<&ProfilesDictionary>,
-) -> Option<String> {
-    let value = value?;
-    match value.value.as_ref() {
-        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValueStrindex(
-            index,
-        )) => lookup_string(
-            dictionary.map(|d| d.string_table.as_slice()).unwrap_or(&[]),
-            *index,
-        ),
-        _ => {
-            let normalized = crate::ingestion::grpc::get_val_with_type_retained(&Some(value));
-            let string_value = config::utils::json::get_string_value(&normalized);
-            if string_value.is_empty() {
-                None
-            } else {
-                Some(string_value)
-            }
-        }
-    }
-}
-
 fn resource_attr_tag_key(otel_key: &str) -> String {
     if let Some((_, alias)) = TAG_RESOURCE_ATTR_ALIASES
         .iter()
@@ -1893,6 +1871,44 @@ mod tests {
         );
         assert!(row.get("sample_tags").is_none());
         assert!(row.get("profile_blob").is_none());
+    }
+
+    #[test]
+    fn nested_json_string_references_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "sample.array", "sample.kv", "worker-1"],
+                "attributeTable": [{},
+                    {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {"values": [{"key": "label", "value": {"stringValueStrindex": 3}}]}}}
+                ]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"key": "context.array", "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}}]},
+                "scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2], "values": [7]}]}]}]
+            }]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["sample_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["sample_kv"], r#"{"label":"worker-1"}"#);
+        assert_eq!(records[0]["context_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["value"], 7);
     }
 
     #[test]
