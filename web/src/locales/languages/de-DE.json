@@ -5278,8 +5278,9 @@
     "hundredPlaceholder": "100",
     "last": "Letzte",
     "alertContextMenu": {
-      "thresholdAbove": "Alert mit Schwellenwert über {value} erstellen",
-      "thresholdBelow": "Alert mit Schwellenwert unter {value} erstellen"
+      "thresholdAbove": "Warnmeldung bei Überschreiten von {value}",
+      "thresholdBelow": "Warnmeldung bei Unterschreiten von {value}",
+      "forecastReaches": "Warnmeldung, wenn die Prognose {value} erreicht"
     },
     "dashboardErrors": {
       "errorsCount": "Fehler ({count})"
@@ -5301,6 +5302,12 @@
     "showQueryResults": "Abfrageergebnisse anzeigen",
     "hideQueryResults": "Abfrageergebnisse ausblenden",
     "renameQuery": "Abfrage umbenennen",
+    "addFormula": "Formel hinzufügen",
+    "formulaNumber": "Formel {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} ist keine Abfrage in diesem Panel",
+    "formulaReferencesFormula": "{letter} ist eine Formel, und eine Formel darf nicht auf eine andere Formel verweisen",
+    "formulaInputNote": "In einer Formel verwendet: dort gelten die Instant-/Bereichseinstellung, die Legende, der Schritt und die Zeitverschiebung dieser Abfrage nicht.",
     "multiSqlQueryLabel": "Bezeichnung abfragen",
     "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
     "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
@@ -6327,8 +6334,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Abfragemodus ändern",
-      "changeQueryModeConfirm": "Sind Sie sicher, dass Sie den Abfragemodus ändern möchten? Die für X-Achse, Y-Achse und Filter gespeicherten Daten werden gelöscht.",
-      "switchToBuilderConfirm": "Sind Sie sicher, dass Sie in den Builder-Modus wechseln möchten? Ihre benutzerdefinierte PromQL-Abfrage wird gelöscht."
+      "changeQueryModeConfirm": "Sind Sie sicher, dass Sie den Abfragemodus ändern möchten? Die für X-Achse, Y-Achse und Filter gespeicherten Daten werden gelöscht."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Abfrage auch durch Beispielabfrage ersetzen",
@@ -6476,6 +6482,7 @@
       "selectRequiredFields": "Bitte wählen Sie die erforderlichen Felder aus, um das Diagramm darzustellen",
       "noDataFound": "Keine Daten gefunden",
       "seriesLimitWarning": "Die angezeigten Serien werden begrenzt, um eine optimale Leistung zu gewährleisten",
+      "fitted": "angepasst",
       "mapLayerName": "Ebene 1",
       "mapLayerNameIndexed": "Ebene {index}",
       "secondsAgo": "{count} Sekunde her | {count} Sekunden her",
@@ -8662,10 +8669,39 @@
     "noData": "Keine Daten",
     "recentData": "aktuelle Daten",
     "theLastDay": "der letzte Tag | die letzten {count} Tage",
+    "forecast": {
+      "modeThreshold": "Schwellenwert",
+      "modeForecast": "Prognose",
+      "expression": "Auszuwertender Ausdruck",
+      "alertWhen": "Warnmeldung, wenn er",
+      "rises": "steigt auf",
+      "falls": "sinkt auf",
+      "threshold": "Schwellenwert",
+      "within": "innerhalb von",
+      "days": "Tagen",
+      "basedOn": "Basierend auf den letzten",
+      "window6h": "6 Stunden",
+      "window1d": "1 Tag",
+      "window2d": "2 Tagen",
+      "window7d": "7 Tagen",
+      "help": "Für jede Reihe wird eine gerade Trendlinie durch diesen Zeitraum der Historie gezogen. Jede Reihe, deren Linie den Schwellenwert rechtzeitig erreicht, löst eigenständig eine Warnmeldung aus.",
+      "horizonRange": "Geben Sie eine ganze Zahl an Tagen von {min} bis {max} ein",
+      "horizonLabel": "Horizont in Tagen",
+      "dayCount": "{n} Tag | {n} Tage",
+      "summaryRises": "Warnmeldung, wenn ein Anstieg auf {threshold} innerhalb von {horizon} prognostiziert wird",
+      "summaryFalls": "Warnmeldung, wenn ein Abfall auf {threshold} innerhalb von {horizon} prognostiziert wird",
+      "triggerRises": "prognostizierter Anstieg auf {threshold} innerhalb von {horizon}",
+      "triggerFalls": "prognostizierter Abfall auf {threshold} innerhalb von {horizon}",
+      "previewSeries": "Tage bis {threshold}",
+      "previewReason": "{count} Reihen erreichen laut Prognose {threshold} innerhalb von {horizon}",
+      "rowTemplateHint": "Die Zeile jeder Reihe liest sich wie „erreicht 90 in 3 Tagen“. Zeilen werden nur in einer Ziel-Vorlage angezeigt, die {'{'}rows{'}'} enthält."
+    },
     "prefill": {
       "dialog": {
         "title": "Alarm erstellen",
         "continue": "Weiter zum Alarm",
+        "queryChoiceLabel": "Warnmeldung für Abfrage",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Stream",
         "thresholdLabel": "Alarm bei",
         "thresholdMatchingRows": "Übereinstimmende Zeilen",
@@ -8701,6 +8737,10 @@
         "library": {
           "label": "Im Editor anpassen",
           "toast": "Aus der Alarm-Bibliothek: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Warnmeldung erstellen",
+          "toast": "Abfrage aus dem Metriken-Explorer importiert"
         },
         "dbm": {
           "label": "Alarm erstellen",
@@ -9384,11 +9424,77 @@
         "close": "Zurück zu den Metriken",
         "backTo": "Metriken",
         "openInVisualize": "In Visualize öffnen",
+        "overlay": {
+          "current": "Aktuell",
+          "noData": "Keine Daten {period}",
+          "forecast": "Prognose"
+        },
+        "noAlertQuery": "Für diese Metrik gibt es keine Abfrage für eine Warnmeldung",
+        "drilldown": {
+          "button": "Logs & Traces",
+          "help": "Öffnet die Logs und Traces des Dienstes dieser Metrik. Die Korrelation benötigt Labels, die einen Dienst identifizieren; Infrastrukturmetriken ohne Dienst-Label finden daher meist keine, es sei denn, die Organisation macht den Dienst optional.",
+          "enterprise": "Der Drilldown zu Logs und Traces ist eine Enterprise-Funktion.",
+          "discoveryOff": "Die Diensterkennung ist für diese Organisation deaktiviert.",
+          "forbidden": "Sie haben keine Berechtigung, die Dienstkorrelation zu verwenden.",
+          "checking": "Zugriff wird geprüft…",
+          "loading": "Wird geladen…",
+          "schemaError": "Die Labels dieser Metrik konnten nicht geladen werden.",
+          "retry": "Erneut versuchen",
+          "pickService": "Wählen Sie ein {label}, um dessen Logs und Traces anzuzeigen",
+          "noServiceValues": "Keine {label}-Werte in diesem Zeitraum.",
+          "noServiceLabel": "Diese Metrik hat kein Service-Label zur Korrelation.",
+          "needIdentity": "Filtern Sie nach einem Identitätslabel, z. B. einem Namespace, um zu korrelieren.",
+          "noService": "Für diese Filter wurde kein Service gefunden.",
+          "noPermission": "Sie haben keine Berechtigung, Services anzuzeigen.",
+          "logs": "Logs",
+          "traces": "Traces",
+          "noLogsStream": "Kein Logs-Stream für Service {service}",
+          "noTracesStream": "Kein Traces-Stream für Service {service}",
+          "noServiceField": "Kein Service-Feld in diesem Stream",
+          "notApplied": "Nicht angewendet: {labels} (kein passendes Feld in diesem Stream)"
+        },
+        "forecast": {
+          "label": "Prognose",
+          "off": "Aus",
+          "linear": "Linear",
+          "smoothed": "Geglätteter Trend",
+          "smoothedHelp": "Der geglättete Trend ist eine lineare Projektion einer geglätteten Reihe: Jeder Punkt wird über die zehn Schritte davor geglättet, anschließend wird eine Gerade angepasst. Es handelt sich nicht um eine saisonale Prognose.",
+          "horizon": "Horizont",
+          "horizonAuto": "25 % des Bereichs",
+          "horizonComputed": "{duration} (25 % des Bereichs)",
+          "linearHelp": "Linear: eine Gerade, die an den sichtbaren Bereich angepasst wird.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 Stunde",
+          "horizon6h": "6 Stunden",
+          "horizon1d": "1 Tag",
+          "horizon1w": "1 Woche",
+          "suffix": "Prognose"
+        },
+        "compare": {
+          "label": "Vergleichen mit",
+          "off": "Aus",
+          "ago1h": "Vor 1 Stunde",
+          "ago1d": "Vor 1 Tag",
+          "ago1w": "Vor 1 Woche"
+        },
         "noPreview": "Keine Vorschau — in Visualize öffnen",
         "exemplars": "Exemplare",
         "filtersNotApplied": "Filter {filters} gilt nicht für diese Metrik; alle zugehörigen Zeitreihen werden angezeigt | Filter {filters} gelten nicht für diese Metrik; alle zugehörigen Zeitreihen werden angezeigt",
         "tabBreakdown": "Aufschlüsselung",
         "tabRelated": "Zugehörig",
+        "tabUsedIn": "Verwendet in",
+        "tabUsedInCount": "Verwendet in ({count})",
+        "usedIn": {
+          "dashboards": "Dashboards ({count})",
+          "alerts": "Warnmeldungen ({count})",
+          "slos": "SLOs ({count})",
+          "pipelines": "Geplante Rohrleitungen ({count})",
+          "empty": "Kein für Sie sichtbares Dashboard, keine Warnmeldung, kein SLO und keine geplante Rohrleitung verwendet diese Metrik",
+          "error": "Es konnte nicht ermittelt werden, wo diese Metrik verwendet wird",
+          "unparsed": "{count} Abfrage konnte nicht geparst werden und wurde über den Namen zugeordnet | {count} Abfragen konnten nicht geparst werden und wurden über den Namen zugeordnet",
+          "textMatch": "Über den Namen zugeordnet",
+          "textMatchHelp": "Diese Abfrage konnte nicht geparst werden, daher wurde sie gefunden, indem ihr Text nach dem Namen der Metrik durchsucht wurde. Möglicherweise liest sie diese Metrik nicht."
+        },
         "breakdown": {
           "distinctCount": "{count} Wert | {count} Werte",
           "distinctMany": "{count}+ Werte",
@@ -9640,6 +9746,30 @@
       "regexPattern": "Regex-Muster (z. B. prod.*)",
       "regexNotMatching": "Regex nicht zutreffend (z. B. test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "Der Builder kann {construct} nicht anzeigen",
+      "twoMetrics": "Der Builder kann keine Operation zwischen zwei Metriken anzeigen – verwenden Sie eine Formel",
+      "noMetric": "Der Builder benötigt eine Abfrage über eine benannte Metrik",
+      "mismatch": "Der Builder kann diese Abfrage nicht exakt anzeigen",
+      "constructs": {
+        "without": "eine without (…)-Gruppierung",
+        "offset": "ein Offset-Modifier",
+        "at": "ein {'@'}-Modifier",
+        "orMatchers": "ein or zwischen Label-Matchern",
+        "subquery": "eine Unterabfrage",
+        "vectorMatching": "Vektorabgleich mit on (…) oder ignoring (…)",
+        "bool": "ein bool-Vergleich",
+        "unaryMinus": "ein negierter Ausdruck",
+        "string": "ein String-Argument",
+        "nonFinite": "eine nicht-finite Zahl",
+        "rangeVector": "ein reiner Range-Vektor",
+        "setOperator": "der Mengenoperator {op}",
+        "function": "die Funktion {name}()",
+        "aggregation": "die Aggregation {name}",
+        "numberFirst": "eine Zahl links von {op}",
+        "operator": "der Operator {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Zeitbereich für die Ratenberechnung",
@@ -9659,6 +9789,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Nächstes Vielfaches"
       },
+      "rangeOnlyFirst": "Eine Range-Funktion kann nur der erste Schritt sein",
+      "rangeOnlyFirstNote": "Eine Range-Funktion liest die Roh-Samples und kann daher nur der erste Schritt sein. Entfernen Sie die anderen Schritte, um eine hinzuzufügen.",
       "dragToReorder": "Zum Neuanordnen ziehen",
       "noMatchingLabels": "Keine passenden Labels",
       "selectMetricFirst": "Wählen Sie zuerst eine Metrik aus, um Labels zu laden",

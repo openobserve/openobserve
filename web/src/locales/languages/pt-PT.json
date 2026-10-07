@@ -5278,8 +5278,9 @@
     "hundredPlaceholder": "100",
     "last": "Último",
     "alertContextMenu": {
-      "thresholdAbove": "Criar alerta com limite acima de {value}",
-      "thresholdBelow": "Criar alerta com limite abaixo de {value}"
+      "thresholdAbove": "Alertar quando acima de {value}",
+      "thresholdBelow": "Alertar quando abaixo de {value}",
+      "forecastReaches": "Alertar quando a previsão atingir {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Erros ({count})"
@@ -5301,6 +5302,12 @@
     "showQueryResults": "Mostrar resultados da consulta",
     "hideQueryResults": "Ocultar resultados da consulta",
     "renameQuery": "Renomear consulta",
+    "addFormula": "Adicionar fórmula",
+    "formulaNumber": "Fórmula {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} não é uma consulta neste painel",
+    "formulaReferencesFormula": "{letter} é uma fórmula, e uma fórmula não pode referenciar outra fórmula",
+    "formulaInputNote": "Usada em uma fórmula: nesse caso, a configuração de instantâneo/intervalo, a legenda, o passo e o deslocamento temporal desta consulta não se aplicam.",
     "multiSqlQueryLabel": "Rótulo de consulta",
     "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
     "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
@@ -6327,8 +6334,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Alterar Modo de Consulta",
-      "changeQueryModeConfirm": "Tem certeza de que deseja alterar o modo de consulta? Os dados salvos para o Eixo X, Eixo Y e Filtros serão apagados.",
-      "switchToBuilderConfirm": "Tem certeza de que deseja mudar para o modo construtor? Sua consulta PromQL personalizada será apagada."
+      "changeQueryModeConfirm": "Tem certeza de que deseja alterar o modo de consulta? Os dados salvos para o Eixo X, Eixo Y e Filtros serão apagados."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Substituir consulta também por consulta de exemplo",
@@ -6476,6 +6482,7 @@
       "selectRequiredFields": "Selecione os campos obrigatórios para renderizar o gráfico",
       "noDataFound": "Nenhum dado encontrado",
       "seriesLimitWarning": "Limitando as séries exibidas para garantir o desempenho ideal",
+      "fitted": "ajustado",
       "mapLayerName": "Camada 1",
       "mapLayerNameIndexed": "Camada {index}",
       "secondsAgo": "{count} segundo atrás | {count} segundos atrás",
@@ -8662,10 +8669,39 @@
     "noData": "Sem dados",
     "recentData": "dados recentes",
     "theLastDay": "o último dia | os últimos {count} dias",
+    "forecast": {
+      "modeThreshold": "Limite",
+      "modeForecast": "Previsão",
+      "expression": "Expressão a prever",
+      "alertWhen": "Alertar quando ela",
+      "rises": "subir para",
+      "falls": "cair para",
+      "threshold": "Limite",
+      "within": "dentro de",
+      "days": "dias",
+      "basedOn": "Com base nos últimos",
+      "window6h": "6 horas",
+      "window1d": "1 dia",
+      "window2d": "2 dias",
+      "window7d": "7 dias",
+      "help": "Uma linha de tendência reta é traçada ao longo deste histórico para cada série. Cada série cuja linha atinge o limite dentro do prazo gera um alerta por conta própria.",
+      "horizonRange": "Insira um número inteiro de dias de {min} a {max}",
+      "horizonLabel": "Horizonte em dias",
+      "dayCount": "{n} dia | {n} dias",
+      "summaryRises": "Alertar quando a previsão for subir para {threshold} dentro de {horizon}",
+      "summaryFalls": "Alertar quando a previsão for cair para {threshold} dentro de {horizon}",
+      "triggerRises": "com previsão de subir para {threshold} dentro de {horizon}",
+      "triggerFalls": "com previsão de cair para {threshold} dentro de {horizon}",
+      "previewSeries": "dias até {threshold}",
+      "previewReason": "{count} séries com previsão de atingir {threshold} dentro de {horizon}",
+      "rowTemplateHint": "A linha de cada série aparece como “atinge 90 em 3 dias”. As linhas aparecem apenas em um template de destino que inclui {'{'}rows{'}'}."
+    },
     "prefill": {
       "dialog": {
         "title": "Criar alerta",
         "continue": "Continuar para o alerta",
+        "queryChoiceLabel": "Alertar sobre a consulta",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Stream",
         "thresholdLabel": "Alertar sobre",
         "thresholdMatchingRows": "Linhas correspondentes",
@@ -8701,6 +8737,10 @@
         "library": {
           "label": "Personalizar no editor",
           "toast": "Da Biblioteca de Alertas: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Criar alerta",
+          "toast": "Consulta importada do Explorador de Métricas"
         },
         "dbm": {
           "label": "Alertar-me",
@@ -9384,11 +9424,77 @@
         "close": "Voltar para métricas",
         "backTo": "métricas",
         "openInVisualize": "Abrir em Visualizar",
+        "overlay": {
+          "current": "Atual",
+          "noData": "Sem dados {period}",
+          "forecast": "Previsão"
+        },
+        "noAlertQuery": "Esta métrica não tem consulta para alertar",
+        "drilldown": {
+          "button": "Registros e rastros",
+          "help": "Abre os registros e rastros do serviço desta métrica. A correlação precisa de rótulos que identifiquem um serviço, então métricas de infraestrutura sem um rótulo de serviço geralmente não encontram nada, a menos que a organização torne o serviço opcional.",
+          "enterprise": "O detalhamento de registros e rastros é um recurso Enterprise.",
+          "discoveryOff": "A descoberta de serviços está desativada para esta organização.",
+          "forbidden": "Você não tem permissão para usar a correlação de serviços.",
+          "checking": "Verificando acesso…",
+          "loading": "Carregando…",
+          "schemaError": "Não foi possível carregar os rótulos desta métrica.",
+          "retry": "Tentar novamente",
+          "pickService": "Escolha um {label} para ver seus registros e rastros",
+          "noServiceValues": "Nenhum valor de {label} neste intervalo de tempo.",
+          "noServiceLabel": "Esta métrica não tem rótulo de serviço para correlacionar.",
+          "needIdentity": "Filtre por um rótulo de identidade, como um namespace, para correlacionar.",
+          "noService": "Nenhum serviço encontrado para estes filtros.",
+          "noPermission": "Você não tem permissão para visualizar serviços.",
+          "logs": "Registros",
+          "traces": "Rastros",
+          "noLogsStream": "Nenhum stream de registros para o serviço {service}",
+          "noTracesStream": "Nenhum stream de rastros para o serviço {service}",
+          "noServiceField": "Nenhum campo de serviço neste stream",
+          "notApplied": "Não aplicado: {labels} (nenhum campo correspondente neste stream)"
+        },
+        "forecast": {
+          "label": "Previsão",
+          "off": "Desativado",
+          "linear": "Linear",
+          "smoothed": "Tendência suavizada",
+          "smoothedHelp": "A tendência suavizada é uma projeção linear de uma série suavizada: cada ponto é suavizado ao longo dos dez passos anteriores e, em seguida, uma linha reta é ajustada. Não é uma previsão sazonal.",
+          "horizon": "Horizonte",
+          "horizonAuto": "25% do intervalo",
+          "horizonComputed": "{duration} (25% do intervalo)",
+          "linearHelp": "Linear: uma linha reta ajustada ao intervalo visível.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 hora",
+          "horizon6h": "6 horas",
+          "horizon1d": "1 dia",
+          "horizon1w": "1 semana",
+          "suffix": "previsão"
+        },
+        "compare": {
+          "label": "Comparar com",
+          "off": "Desativado",
+          "ago1h": "1 hora atrás",
+          "ago1d": "1 dia atrás",
+          "ago1w": "1 semana atrás"
+        },
         "noPreview": "Sem prévia — abra em Visualizar",
         "exemplars": "Exemplares",
         "filtersNotApplied": "O filtro {filters} não se aplica a esta métrica; mostrando todas as suas séries | Os filtros {filters} não se aplicam a esta métrica; mostrando todas as suas séries",
         "tabBreakdown": "Detalhamento",
         "tabRelated": "Relacionados",
+        "tabUsedIn": "Usado em",
+        "tabUsedInCount": "Usado em ({count})",
+        "usedIn": {
+          "dashboards": "Painéis ({count})",
+          "alerts": "Alertas ({count})",
+          "slos": "SLOs ({count})",
+          "pipelines": "Oleodutos agendados ({count})",
+          "empty": "Nenhum painel, alerta, SLO ou oleoduto agendado que você possa ver usa esta métrica",
+          "error": "Não foi possível descobrir onde esta métrica é usada",
+          "unparsed": "{count} consulta não pôde ser interpretada e foi associada por nome | {count} consultas não puderam ser interpretadas e foram associadas por nome",
+          "textMatch": "Associada por nome",
+          "textMatchHelp": "Esta consulta não pôde ser interpretada, então foi encontrada pesquisando o nome da métrica em seu texto. Ela pode não ler esta métrica."
+        },
         "breakdown": {
           "distinctCount": "{count} valor | {count} valores",
           "distinctMany": "{count}+ valores",
@@ -9640,6 +9746,30 @@
       "regexPattern": "Padrão regex (ex.: prod.*)",
       "regexNotMatching": "Regex não correspondente (ex.: test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "O construtor não pode exibir {construct}",
+      "twoMetrics": "O construtor não pode exibir uma operação entre duas métricas — use uma fórmula",
+      "noMetric": "O construtor precisa de uma consulta sobre uma única métrica nomeada",
+      "mismatch": "O construtor não pode exibir esta consulta exatamente",
+      "constructs": {
+        "without": "um agrupamento without (…)",
+        "offset": "um modificador de offset",
+        "at": "um modificador {'@'}",
+        "orMatchers": "um or entre correspondências de rótulos",
+        "subquery": "uma subconsulta",
+        "vectorMatching": "correspondência vetorial com on (…) ou ignoring (…)",
+        "bool": "uma comparação bool",
+        "unaryMinus": "uma expressão negada",
+        "string": "um argumento de string",
+        "nonFinite": "um número não finito",
+        "rangeVector": "um vetor de intervalo simples",
+        "setOperator": "o operador de conjunto {op}",
+        "function": "a função {name}()",
+        "aggregation": "a agregação {name}",
+        "numberFirst": "um número à esquerda de {op}",
+        "operator": "o operador {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Intervalo de tempo para cálculo de taxa",
@@ -9659,6 +9789,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Múltiplo mais próximo"
       },
+      "rangeOnlyFirst": "Uma função de intervalo só pode ser a primeira etapa",
+      "rangeOnlyFirstNote": "Uma função de intervalo lê as amostras brutas, portanto só pode ser a primeira etapa. Remova as outras etapas para adicionar uma.",
       "dragToReorder": "Arraste para reordenar",
       "noMatchingLabels": "Nenhum rótulo correspondente",
       "selectMetricFirst": "Selecione uma métrica primeiro para carregar rótulos",

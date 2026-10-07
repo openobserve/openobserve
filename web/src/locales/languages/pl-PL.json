@@ -5278,8 +5278,9 @@
     "hundredPlaceholder": "100",
     "last": "Ostatni",
     "alertContextMenu": {
-      "thresholdAbove": "Utwórz alert z progiem powyżej {value}",
-      "thresholdBelow": "Utwórz alert z progiem poniżej {value}"
+      "thresholdAbove": "Alert, gdy powyżej {value}",
+      "thresholdBelow": "Alert, gdy poniżej {value}",
+      "forecastReaches": "Alert, gdy prognoza osiągnie {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Błędy ({count})"
@@ -5301,6 +5302,12 @@
     "showQueryResults": "Pokaż wyniki zapytania",
     "hideQueryResults": "Ukryj wyniki zapytania",
     "renameQuery": "Zmień nazwę zapytania",
+    "addFormula": "Dodaj formułę",
+    "formulaNumber": "Formuła {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} nie jest zapytaniem w tym panelu",
+    "formulaReferencesFormula": "{letter} to formuła, a formuła nie może odwoływać się do innej formuły",
+    "formulaInputNote": "Używane w formule: tam ustawienie instant/range tego zapytania, legenda, krok i przesunięcie czasu nie mają zastosowania.",
     "multiSqlQueryLabel": "Etykieta zapytania",
     "multiSqlQueryLabelHint": "Niestandardowa nazwa tego zapytania w legendach (np. 'Produkcja')",
     "multiQueryWarning": "Tylko zapytanie 1 jest renderowane dla {chartType}",
@@ -6327,8 +6334,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Zmień tryb zapytania",
-      "changeQueryModeConfirm": "Czy na pewno chcesz zmienić tryb zapytania? Dane zapisane dla osi X, osi Y i filtrów zostaną usunięte.",
-      "switchToBuilderConfirm": "Czy na pewno chcesz przełączyć się na tryb kreatora? Twoje niestandardowe zapytanie PromQL zostanie usunięte."
+      "changeQueryModeConfirm": "Czy na pewno chcesz zmienić tryb zapytania? Dane zapisane dla osi X, osi Y i filtrów zostaną usunięte."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Zastąp również zapytanie przykładowym zapytaniem",
@@ -6476,6 +6482,7 @@
       "selectRequiredFields": "Wybierz wymagane pola, aby wyświetlić wykres",
       "noDataFound": "Nie znaleziono danych",
       "seriesLimitWarning": "Ograniczanie wyświetlanej serii w celu zapewnienia optymalnej wydajności",
+      "fitted": "dopasowany",
       "mapLayerName": "Warstwa 1",
       "mapLayerNameIndexed": "Warstwa {index}",
       "secondsAgo": "{count} sekundę temu | {count} sekund temu",
@@ -8662,10 +8669,39 @@
     "noData": "Brak danych",
     "recentData": "ostatnie dane",
     "theLastDay": "ostatni dzień | ostatnie {count} dni",
+    "forecast": {
+      "modeThreshold": "Próg",
+      "modeForecast": "Prognoza",
+      "expression": "Wyrażenie do prognozy",
+      "alertWhen": "Alert, gdy",
+      "rises": "wzrośnie do",
+      "falls": "spadnie do",
+      "threshold": "Próg",
+      "within": "w ciągu",
+      "days": "dni",
+      "basedOn": "Na podstawie ostatnich",
+      "window6h": "6 godzin",
+      "window1d": "1 dzień",
+      "window2d": "2 dni",
+      "window7d": "7 dni",
+      "help": "Dla każdej serii przez tyle historii rysowana jest prosta linia trendu. Każda seria, której linia osiągnie próg w terminie, zgłasza alert samodzielnie.",
+      "horizonRange": "Wprowadź całkowitą liczbę dni od {min} do {max}",
+      "horizonLabel": "Horyzont w dniach",
+      "dayCount": "{n} dzień | {n} dni",
+      "summaryRises": "Alert, gdy przewidywany jest wzrost do {threshold} w ciągu {horizon}",
+      "summaryFalls": "Alert, gdy przewidywany jest spadek do {threshold} w ciągu {horizon}",
+      "triggerRises": "prognoza wzrostu do {threshold} w ciągu {horizon}",
+      "triggerFalls": "prognoza spadku do {threshold} w ciągu {horizon}",
+      "previewSeries": "dni do {threshold}",
+      "previewReason": "Prognoza dla {count} serii: osiągnięcie {threshold} w ciągu {horizon}",
+      "rowTemplateHint": "Wiersz każdej serii wygląda jak „osiąga 90 w 3 dni”. Wiersze są wyświetlane tylko w szablonie miejsca docelowego, który zawiera {'{'}rows{'}'}."
+    },
     "prefill": {
       "dialog": {
         "title": "Utwórz alert",
         "continue": "Przejdź do alertu",
+        "queryChoiceLabel": "Alert dla zapytania",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Strumień",
         "thresholdLabel": "Alert na",
         "thresholdMatchingRows": "Pasujące wiersze",
@@ -8701,6 +8737,10 @@
         "library": {
           "label": "Dostosuj w edytorze",
           "toast": "Z biblioteki alertów: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Utwórz alert",
+          "toast": "Zapytanie zaimportowane z Eksploratora metryk"
         },
         "dbm": {
           "label": "Powiadom mnie",
@@ -9384,11 +9424,77 @@
         "close": "Powrót do metryk",
         "backTo": "metryk",
         "openInVisualize": "Otwórz w Wizualizacji",
+        "overlay": {
+          "current": "Bieżące",
+          "noData": "Brak danych {period}",
+          "forecast": "Prognoza"
+        },
+        "noAlertQuery": "Ta metryka nie ma zapytania, na którym można utworzyć alert",
+        "drilldown": {
+          "button": "Logi i trace",
+          "help": "Otwiera logi i trace usługi tej metryki. Korelacja wymaga etykiet identyfikujących usługę, więc metryki infrastruktury bez etykiety usługi zwykle nie znajdują żadnej, chyba że organizacja uzna usługę za opcjonalną.",
+          "enterprise": "Drilldown logów i trace jest funkcją Enterprise.",
+          "discoveryOff": "Odkrywanie usług jest wyłączone dla tej organizacji.",
+          "forbidden": "Nie masz uprawnień do korzystania z korelacji usług.",
+          "checking": "Sprawdzanie dostępu…",
+          "loading": "Ładowanie…",
+          "schemaError": "Nie udało się wczytać etykiet tej metryki.",
+          "retry": "Ponów",
+          "pickService": "Wybierz {label}, aby zobaczyć powiązane logi i trace",
+          "noServiceValues": "Brak wartości {label} w tym zakresie czasu.",
+          "noServiceLabel": "Ta metryka nie ma etykiety usługi do korelacji.",
+          "needIdentity": "Aby skorelować dane, filtruj po etykiecie tożsamości, takiej jak namespace.",
+          "noService": "Nie znaleziono usługi dla tych filtrów.",
+          "noPermission": "Nie masz uprawnień do wyświetlania usług.",
+          "logs": "Logi",
+          "traces": "Trace",
+          "noLogsStream": "Brak strumienia logów dla usługi {service}",
+          "noTracesStream": "Brak strumienia trace dla usługi {service}",
+          "noServiceField": "Brak pola usługi w tym strumieniu",
+          "notApplied": "Nie zastosowano: {labels} (brak pasującego pola w tym strumieniu)"
+        },
+        "forecast": {
+          "label": "Prognoza",
+          "off": "Wyłączone",
+          "linear": "Liniowa",
+          "smoothed": "Wygładzony trend",
+          "smoothedHelp": "Wygładzony trend to liniowa projekcja wygładzonego szeregu: każdy punkt jest wygładzany na podstawie dziesięciu poprzedzających go kroków, a następnie dopasowywana jest linia prosta. Nie jest to prognoza sezonowa.",
+          "horizon": "Horyzont",
+          "horizonAuto": "25% zakresu",
+          "horizonComputed": "{duration} (25% zakresu)",
+          "linearHelp": "Liniowa: linia prosta dopasowana do widocznego zakresu.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 godzina",
+          "horizon6h": "6 godzin",
+          "horizon1d": "1 dzień",
+          "horizon1w": "1 tydzień",
+          "suffix": "prognoza"
+        },
+        "compare": {
+          "label": "Porównaj z",
+          "off": "Wyłączone",
+          "ago1h": "1 godzinę temu",
+          "ago1d": "1 dzień temu",
+          "ago1w": "1 tydzień temu"
+        },
         "noPreview": "Brak podglądu — otwórz w Wizualizacji",
         "exemplars": "Egzemplarze",
         "filtersNotApplied": "Filtr {filters} nie dotyczy tej metryki; wyświetlane są wszystkie jej serie | Filtry {filters} nie dotyczą tej metryki; wyświetlane są wszystkie jej serie",
         "tabBreakdown": "Podział",
         "tabRelated": "Powiązane",
+        "tabUsedIn": "Używana w",
+        "tabUsedInCount": "Używana w ({count})",
+        "usedIn": {
+          "dashboards": "Pulpity ({count})",
+          "alerts": "Alerty ({count})",
+          "slos": "SLO ({count})",
+          "pipelines": "Zaplanowane potoki ({count})",
+          "empty": "Żaden widoczny dla Ciebie pulpit, alert, SLO ani zaplanowany potok nie używa tej metryki",
+          "error": "Nie udało się sprawdzić, gdzie używana jest ta metryka",
+          "unparsed": "{count} zapytanie nie zostało przeanalizowane i dopasowano je po nazwie | {count} zapytań nie zostało przeanalizowanych i dopasowano je po nazwie",
+          "textMatch": "Dopasowano po nazwie",
+          "textMatchHelp": "Nie udało się przeanalizować tego zapytania, więc znaleziono je, wyszukując nazwę metryki w jego treści. Może ono nie odczytywać tej metryki."
+        },
         "breakdown": {
           "distinctCount": "{count} wartość | {count} wartości",
           "distinctMany": "{count}+ wartości",
@@ -9640,6 +9746,30 @@
       "regexPattern": "Wzorzec regex (np. prod.*)",
       "regexNotMatching": "Regex niepasujący (np. test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "Kreator nie może wyświetlić {construct}",
+      "twoMetrics": "Kreator nie może wyświetlić operacji między dwiema metrykami — użyj formuły",
+      "noMetric": "Kreator wymaga zapytania dotyczącego jednej nazwanej metryki",
+      "mismatch": "Kreator nie może dokładnie wyświetlić tego zapytania",
+      "constructs": {
+        "without": "grupowanie without (…)",
+        "offset": "modyfikator offset",
+        "at": "modyfikator {'@'}",
+        "orMatchers": "or pomiędzy dopasowaniami etykiet",
+        "subquery": "podzapytanie",
+        "vectorMatching": "dopasowanie wektorów z on (…) lub ignoring (…)",
+        "bool": "porównanie bool",
+        "unaryMinus": "zaprzeczone wyrażenie",
+        "string": "argument typu string",
+        "nonFinite": "liczba niefinitna",
+        "rangeVector": "sam wektor zakresowy",
+        "setOperator": "operator zbiorowy {op}",
+        "function": "funkcja {name}()",
+        "aggregation": "agregacja {name}",
+        "numberFirst": "liczba po lewej stronie {op}",
+        "operator": "operator {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Zakres czasu dla obliczania tempa",
@@ -9659,6 +9789,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Najbliższa wielokrotność"
       },
+      "rangeOnlyFirst": "Funkcja zakresowa może być tylko pierwszym krokiem",
+      "rangeOnlyFirstNote": "Funkcja zakresowa odczytuje surowe próbki, więc może być tylko pierwszym krokiem. Usuń pozostałe kroki, aby ją dodać.",
       "dragToReorder": "Przeciągnij, aby zmienić kolejność",
       "noMatchingLabels": "Brak pasujących etykiet",
       "selectMetricFirst": "Najpierw wybierz metrykę, aby załadować etykiety",

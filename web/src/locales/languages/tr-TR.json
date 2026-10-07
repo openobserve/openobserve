@@ -5278,8 +5278,9 @@
     "hundredPlaceholder": "100",
     "last": "Son",
     "alertContextMenu": {
-      "thresholdAbove": "{value} değerinin üzerinde eşikle uyarı oluştur",
-      "thresholdBelow": "{value} değerinin altında eşikle uyarı oluştur"
+      "thresholdAbove": "Değer {value} üzerindeyken uyar",
+      "thresholdBelow": "Değer {value} altındayken uyar",
+      "forecastReaches": "Tahmin {value} değerine ulaştığında uyar"
     },
     "dashboardErrors": {
       "errorsCount": "Hatalar ({count})"
@@ -5301,6 +5302,12 @@
     "showQueryResults": "Sorgu sonuçlarını göster",
     "hideQueryResults": "Sorgu sonuçlarını gizle",
     "renameQuery": "Sorguyu yeniden adlandır",
+    "addFormula": "Formül ekle",
+    "formulaNumber": "Formül {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter}, bu panelde bir sorgu değil",
+    "formulaReferencesFormula": "{letter} bir formüldür ve bir formül başka bir formüle başvuramaz",
+    "formulaInputNote": "Bir formülde kullanıldığında: burada bu sorgunun anlık/aralık ayarı, lejantı, adımı ve zaman kaydırması geçerli olmaz.",
     "multiSqlQueryLabel": "Sorgu Etiketi",
     "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
     "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
@@ -6327,8 +6334,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Sorgu Modunu Değiştir",
-      "changeQueryModeConfirm": "Sorgu modunu değiştirmek istediğinize emin misiniz? X-Ekseni, Y-Ekseni ve Filtreler için kaydedilen veriler silinecek.",
-      "switchToBuilderConfirm": "Oluşturucu moduna geçmek istediğinize emin misiniz? Özel PromQL sorgunuz silinecek."
+      "changeQueryModeConfirm": "Sorgu modunu değiştirmek istediğinize emin misiniz? X-Ekseni, Y-Ekseni ve Filtreler için kaydedilen veriler silinecek."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Ayrıca sorguyu örnek sorgu ile değiştir",
@@ -6476,6 +6482,7 @@
       "selectRequiredFields": "Grafiği görüntülemek için lütfen gerekli alanları seçin",
       "noDataFound": "Veri bulunamadı",
       "seriesLimitWarning": "En iyi performansı sağlamak için görüntülenen seriler sınırlanıyor",
+      "fitted": "uyarlanmış",
       "mapLayerName": "Katman 1",
       "mapLayerNameIndexed": "Katman {index}",
       "secondsAgo": "{count} Saniye önce | {count} Saniye önce",
@@ -8662,10 +8669,39 @@
     "noData": "Veri Yok",
     "recentData": "son veriler",
     "theLastDay": "son gün | son {count} gün",
+    "forecast": {
+      "modeThreshold": "Eşik",
+      "modeForecast": "Tahmin",
+      "expression": "Tahmin edilecek ifade",
+      "alertWhen": "Şu durumda uyar",
+      "rises": "yükselirse",
+      "falls": "düşerse",
+      "threshold": "Eşik",
+      "within": "içinde",
+      "days": "gün",
+      "basedOn": "Temel alınan dönem",
+      "window6h": "6 saat",
+      "window1d": "1 gün",
+      "window2d": "2 gün",
+      "window7d": "7 gün",
+      "help": "Bu kadarlık geçmiş üzerinden her seri için düz bir trend çizgisi çizilir. Çizgisi eşiğe zamanında ulaşan her seri kendi başına uyarı verir.",
+      "horizonRange": "{min} ile {max} arasında tam gün sayısı girin",
+      "horizonLabel": "Gün cinsinden ufuk",
+      "dayCount": "{n} gün | {n} gün",
+      "summaryRises": "{horizon} içinde {threshold} değerine yükselmesi tahmin edildiğinde uyar",
+      "summaryFalls": "{horizon} içinde {threshold} değerine düşmesi tahmin edildiğinde uyar",
+      "triggerRises": "{horizon} içinde {threshold} değerine yükselmesi tahmin ediliyor",
+      "triggerFalls": "{horizon} içinde {threshold} değerine düşmesi tahmin ediliyor",
+      "previewSeries": "{threshold} değerine kalan gün sayısı",
+      "previewReason": "{horizon} içinde {threshold} değerine ulaşması tahmin edilen {count} seri",
+      "rowTemplateHint": "Her serinin satırı “3 gün içinde 90’a ulaşır” gibi okunur. Satırlar yalnızca {'{'}rows{'}'} içeren bir hedef şablonunda gösterilir."
+    },
     "prefill": {
       "dialog": {
         "title": "Uyarı oluştur",
         "continue": "Uyarıya devam et",
+        "queryChoiceLabel": "Uyarılacak sorgu",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Akış",
         "thresholdLabel": "Uyarı kaynağı",
         "thresholdMatchingRows": "Eşleşen satırlar",
@@ -8701,6 +8737,10 @@
         "library": {
           "label": "Düzenleyicide özelleştir",
           "toast": "Uyarı Kitaplığı'ndan: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Uyarı oluştur",
+          "toast": "Sorgu Metrik Gezgini'nden içe aktarıldı"
         },
         "dbm": {
           "label": "Beni uyar",
@@ -9384,11 +9424,77 @@
         "close": "Metriklere dön",
         "backTo": "metrikler",
         "openInVisualize": "Visualize'da Aç",
+        "overlay": {
+          "current": "Güncel",
+          "noData": "{period} için veri yok",
+          "forecast": "Tahmin"
+        },
+        "noAlertQuery": "Bu metriğin uyarı verilecek bir sorgusu yok",
+        "drilldown": {
+          "button": "Günlükler ve izler",
+          "help": "Bu metriğin hizmetine ait günlükleri ve izleri açar. Korelasyon, bir hizmeti tanımlayan etiketler gerektirir; bu nedenle hizmet etiketi olmayan altyapı metrikleri, organizasyon hizmeti isteğe bağlı yapmadıkça genellikle hiçbir şey bulamaz.",
+          "enterprise": "Günlükler ve izlerde detaya inme bir Enterprise özelliğidir.",
+          "discoveryOff": "Bu organizasyon için hizmet keşfi kapalı.",
+          "forbidden": "Hizmet korelasyonunu kullanma izniniz yok.",
+          "checking": "Erişim kontrol ediliyor…",
+          "loading": "Yükleniyor…",
+          "schemaError": "Bu metriğin etiketleri yüklenemedi.",
+          "retry": "Yeniden dene",
+          "pickService": "Günlüklerini ve izlerini görmek için bir {label} seçin",
+          "noServiceValues": "Bu zaman aralığında {label} değeri yok.",
+          "noServiceLabel": "Bu metriğin ilişkilendirilebilecek bir hizmet etiketi yok.",
+          "needIdentity": "İlişkilendirmek için ad alanı gibi bir kimlik etiketine göre filtreleyin.",
+          "noService": "Bu filtreler için hizmet bulunamadı.",
+          "noPermission": "Hizmetleri görüntüleme izniniz yok.",
+          "logs": "Günlükler",
+          "traces": "İzler",
+          "noLogsStream": "{service} hizmeti için günlük akışı yok",
+          "noTracesStream": "{service} hizmeti için iz akışı yok",
+          "noServiceField": "Bu akışta hizmet alanı yok",
+          "notApplied": "Uygulanmadı: {labels} (bu akışta eşleşen alan yok)"
+        },
+        "forecast": {
+          "label": "Tahmin",
+          "off": "Kapalı",
+          "linear": "Doğrusal",
+          "smoothed": "Yumuşatılmış eğilim",
+          "smoothedHelp": "Yumuşatılmış eğilim, yumuşatılmış bir serinin doğrusal projeksiyonudur: her nokta kendisinden önceki on adım üzerinden yumuşatılır, ardından düz bir çizgi uydurulur. Mevsimsel bir tahmin değildir.",
+          "horizon": "Tahmin Ufku",
+          "horizonAuto": "Aralığın %25'i",
+          "horizonComputed": "{duration} (aralığın %25'i)",
+          "linearHelp": "Doğrusal: görünür aralığa uydurulan düz bir çizgi.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 saat",
+          "horizon6h": "6 saat",
+          "horizon1d": "1 gün",
+          "horizon1w": "1 hafta",
+          "suffix": "tahmin"
+        },
+        "compare": {
+          "label": "Karşılaştır",
+          "off": "Kapalı",
+          "ago1h": "1 saat önce",
+          "ago1d": "1 gün önce",
+          "ago1w": "1 hafta önce"
+        },
         "noPreview": "Önizleme yok — Visualize'da açın",
         "exemplars": "Örnekler",
         "filtersNotApplied": "{filters} filtresi bu metriğe uygulanmıyor; tüm serileri gösteriliyor | {filters} filtreleri bu metriğe uygulanmıyor; tüm serileri gösteriliyor",
         "tabBreakdown": "Kırılım",
         "tabRelated": "İlgili",
+        "tabUsedIn": "Kullanıldığı yerler",
+        "tabUsedInCount": "Kullanıldığı yerler ({count})",
+        "usedIn": {
+          "dashboards": "Gösterge panoları ({count})",
+          "alerts": "Uyarılar ({count})",
+          "slos": "SLO'lar ({count})",
+          "pipelines": "Zamanlanmış boru hatları ({count})",
+          "empty": "Görebildiğiniz hiçbir gösterge panosu, uyarı, SLO veya zamanlanmış boru hattı bu metriği kullanmıyor",
+          "error": "Bu metriğin nerede kullanıldığı bulunamadı",
+          "unparsed": "{count} sorgu ayrıştırılamadı ve ada göre eşleştirildi | {count} sorgu ayrıştırılamadı ve ada göre eşleştirildi",
+          "textMatch": "Ada göre eşleştirildi",
+          "textMatchHelp": "Bu sorgu ayrıştırılamadı, bu nedenle metni metriğin adı aranarak bulundu. Bu metriği okumuyor olabilir."
+        },
         "breakdown": {
           "distinctCount": "{count} değer | {count} değer",
           "distinctMany": "{count}+ değer",
@@ -9640,6 +9746,30 @@
       "regexPattern": "Regex deseni (örn. prod.*)",
       "regexNotMatching": "Regex eşleşmiyor (örn. test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "Oluşturucu {construct} yapısını gösteremiyor",
+      "twoMetrics": "Oluşturucu iki metrik arasındaki bir işlemi gösteremiyor — bir formül kullanın",
+      "noMetric": "Oluşturucu, adlandırılmış tek bir metrik üzerinde sorgu gerektirir",
+      "mismatch": "Oluşturucu bu sorguyu tam olarak gösteremiyor",
+      "constructs": {
+        "without": "bir without (…) gruplaması",
+        "offset": "bir offset değiştiricisi",
+        "at": "bir {'@'} değiştiricisi",
+        "orMatchers": "etiket eşleştiricileri arasında bir veya",
+        "subquery": "bir alt sorgu",
+        "vectorMatching": "on (…) veya ignoring (…) ile vektör eşleştirme",
+        "bool": "bir bool karşılaştırması",
+        "unaryMinus": "olumsuzlanmış bir ifade",
+        "string": "bir dize argümanı",
+        "nonFinite": "sonlu olmayan bir sayı",
+        "rangeVector": "çıplak bir aralık vektörü",
+        "setOperator": "{op} küme operatörü",
+        "function": "{name}() fonksiyonu",
+        "aggregation": "{name} toplulaştırması",
+        "numberFirst": "{op} operatörünün solundaki bir sayı",
+        "operator": "{op} operatörü"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Oran hesaplaması için zaman aralığı",
@@ -9659,6 +9789,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "En yakın kat"
       },
+      "rangeOnlyFirst": "Bir aralık fonksiyonu yalnızca ilk adım olabilir",
+      "rangeOnlyFirstNote": "Bir aralık fonksiyonu ham örnekleri okur, bu nedenle yalnızca ilk adım olabilir. Bir tane eklemek için diğer adımları kaldırın.",
       "dragToReorder": "Sürükleyerek yeniden sırala",
       "noMatchingLabels": "Eşleşen etiket yok",
       "selectMetricFirst": "Etiketleri yüklemek için önce bir metrik seçin",
