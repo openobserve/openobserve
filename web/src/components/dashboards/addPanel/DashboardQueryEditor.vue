@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="flex flex-1 flex-col overflow-hidden max-md:h-80 max-md:flex-none"
+    class="flex flex-1 flex-col overflow-clip max-md:h-80 max-md:flex-none"
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0; flex: none;' : ''"
     data-test="dashboard-query"
   >
@@ -188,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full">
           <OSplitter
             class="h-full w-full"
+            after-class="overflow-clip!"
             v-model="splitterModel"
             :disable="promqlMode || !dashboardPanelData.layout.vrlFunctionToggle"
             :limits="[30, promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70]"
@@ -230,34 +231,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #after>
               <div class="flex h-full w-full flex-col">
-                <div
-                  class="border-border-default flex w-full shrink-0 items-center gap-1 border-b px-2 py-1.5"
-                  data-test="dashboard-vrl-function-toolbar"
-                >
-                  <OSelect
-                    v-model="selectedFunction"
-                    :label="t('dashboard.useSavedFunction')"
-                    :options="functionSelectOptions"
-                    label-position="inside"
-                    data-test="dashboard-use-saved-vrl-function"
-                    labelKey="name"
-                    valueKey="function"
-                    @search="onFunctionSearch"
-                    @update:model-value="onFunctionSelect"
-                    class="min-w-0 flex-1"
-                  />
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    data-test="dashboard-addpanel-config-drilldown-info"
-                  >
-                    <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                    <OTooltip
-                      :content="t('dashboard.vrlExtractionTooltip')"
-                      max-width="15.625rem"
-                    />
-                  </OButton>
-                </div>
                 <div class="relative min-h-0 w-full flex-1">
                   <UnifiedQueryEditor
                     class="h-full w-full"
@@ -295,6 +268,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ vrlPlaceholder }}</span
                     >
                   </div>
+                </div>
+                <div
+                  class="border-border-default bg-surface-subtle sticky bottom-0 z-10 flex w-full shrink-0 items-center gap-1 border-t px-2 py-1.5"
+                  data-test="dashboard-vrl-function-toolbar"
+                >
+                  <OSelect
+                    v-model="selectedFunction"
+                    :label="t('dashboard.useSavedFunction')"
+                    :options="functionSelectOptions"
+                    label-position="inside"
+                    data-test="dashboard-use-saved-vrl-function"
+                    labelKey="name"
+                    valueKey="function"
+                    @search="onFunctionSearch"
+                    @update:model-value="onFunctionSelect"
+                    class="min-w-0 flex-1"
+                  />
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    data-test="dashboard-addpanel-config-drilldown-info"
+                  >
+                    <template #icon-left><OIcon name="info-outline" size="sm" /></template>
+                    <OTooltip
+                      :content="t('dashboard.vrlExtractionTooltip')"
+                      max-width="15.625rem"
+                    />
+                  </OButton>
                 </div>
               </div>
             </template>
