@@ -616,6 +616,13 @@
   --color-chart-series-11: #f5d0fe;
   --color-chart-series-12: #fef08a;
 
+  --color-map-seq-1: #03a92e;
+  --color-map-seq-2: #9db303;
+  --color-map-seq-3: #eeb400;
+  --color-map-seq-4: #fe933f;
+  --color-map-seq-5: #ff664b;
+  --color-map-card-header: var(--d-well);
+
   --color-chart-markline-shadow: rgba(0, 0, 0, 0.7);
 
   /* Dashboard table row-highlight palette — dark overrides */
