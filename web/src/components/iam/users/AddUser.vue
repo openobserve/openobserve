@@ -81,12 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               hide-bottom-space
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
+              :rules="[passwordRule]"
               data-test="user-password-field"
             >
               <template v-slot:append>
@@ -97,6 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </q-input>
+            <PasswordRequirementList
+              :requirements="passwordRequirements"
+              :password="formData.password || ''"
+              data-test="user-password-requirements"
+            />
           </div>
 
           <q-input
@@ -192,12 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               hide-bottom-space
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
+              :rules="[(val: any) => !!val || 'Field is required']"
               data-test="user-old-passoword-field"
             >
               <template v-slot:append>
@@ -219,13 +214,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               hide-bottom-space
               borderless
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
+              :rules="[passwordRule]"
+              :error="!!newPasswordServerError"
+              :error-message="newPasswordServerError"
               data-test="user-new-password-field"
+              @update:model-value="newPasswordServerError = ''"
             >
               <template v-slot:append>
                 <q-icon
@@ -235,7 +228,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </q-input>
+            <PasswordRequirementList
+              v-if="formData.change_password"
+              :requirements="passwordRequirements"
+              :password="formData.new_password || ''"
+              data-test="user-new-password-requirements"
+            />
           </div>
+          <!-- Unlock is STAGED, not sent: one PUT carries it alongside any other edit. -->
+          <q-banner
+            v-if="lockout?.locked"
+            dense
+            inline-actions
+            class="bg-warning text-black tw:mt-4 tw:rounded"
+            data-test="user-lockout-banner"
+          >
+            <template #avatar><q-icon name="lock" /></template>
+            <div class="text-weight-medium">{{ t("user.lockout.locked") }}</div>
+            <div class="text-caption">
+              {{
+                unlockStaged
+                  ? t("user.lockout.staged")
+                  : t("user.lockout.autoUnlock", {
+                      duration: durationFormatter(lockout.retry_after_secs ?? 0),
+                    })
+              }}
+            </div>
+            <template #action>
+              <q-btn
+                :flat="unlockStaged"
+                :outline="!unlockStaged"
+                dense
+                no-caps
+                :label="unlockStaged ? t('user.lockout.undo') : t('user.lockout.unlock')"
+                data-test="user-lockout-unlock-btn"
+                @click="unlockStaged = !unlockStaged"
+              />
+            </template>
+          </q-banner>
           <q-input
             v-if="
               !beingUpdated &&
@@ -311,9 +341,17 @@ import {
   useLocalCurrentUser,
   useLocalUserInfo,
   invalidateLoginData,
+  durationFormatter,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
+import PasswordRequirementList from "@/components/common/PasswordRequirementList.vue";
+import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
+import {
+  reuseRejection,
+  type TranslateFn,
+  validateAgainstComplexity,
+} from "@/utils/passwordComplexity";
 
 const defaultValue: any = () => {
   return {
@@ -332,6 +370,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
+  components: { PasswordRequirementList },
   props: {
     modelValue: {
       type: Object,
@@ -378,6 +417,37 @@ export default defineComponent({
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
     const filterdOption = ref(props.customRoles);
+    // The edited user's lockout state, read once when the form opens on someone else's row.
+    const lockout = ref<{ locked: boolean; retry_after_secs?: number } | null>(null);
+    const unlockStaged = ref(false);
+    const newPasswordServerError = ref("");
+
+    // The instance policy, not a hardcoded rule: a fixed mirror would drift from what the server enforces.
+    const {
+      complexity: passwordComplexity,
+      requirements: passwordRequirements,
+      load: loadPasswordComplexity,
+    } = usePasswordComplexity();
+
+    const passwordRule = (val: string) =>
+      !val
+        ? "Field is required"
+        : (validateAgainstComplexity(val, passwordComplexity.value, t as TranslateFn) ?? true);
+
+    // Only when administering someone else: a locked-out user must not lift their own lock.
+    const loadLockoutState = (email: string) => {
+      lockout.value = null;
+      unlockStaged.value = false;
+      if (config.isEnterprise != "true" || email === loggedInUserEmail.value) return;
+      userServiece
+        .get(store.state.selectedOrganization.identifier, email)
+        .then((response: any) => {
+          lockout.value = response.data?.lockout ?? null;
+        })
+        .catch(() => {
+          lockout.value = null;
+        });
+    };
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -430,6 +500,15 @@ export default defineComponent({
       filterdOption,
       invalidateLoginData,
       config,
+      lockout,
+      unlockStaged,
+      newPasswordServerError,
+      passwordRequirements,
+      passwordRule,
+      loadPasswordComplexity,
+      loadLockoutState,
+      durationFormatter,
+      reuseRejection: (err: unknown) => reuseRejection(err, t as TranslateFn),
       filterFn(val: any, update: any) {
         if (val === "") {
           update(() => {
@@ -448,6 +527,7 @@ export default defineComponent({
   created() {
     this.formData = { ...defaultValue, ...this.modelValue };
     this.beingUpdated = this.isUpdated;
+    this.loadPasswordComplexity();
 
     if (
       this.modelValue &&
@@ -459,6 +539,7 @@ export default defineComponent({
       this.formData = { ...this.modelValue };
       this.formData.change_password = false;
       this.formData.password = "";
+      this.loadLockoutState(this.modelValue.email);
       if (config.isEnterprise == "true" || config.isCloud == true) {
         this.fetchUserRoles(this.modelValue.email);
       }
@@ -476,7 +557,26 @@ export default defineComponent({
 
       this.$router.push("/logout");
     },
-    onSubmit() {
+    // A security-relevant action on someone else's account confirms before the write.
+    confirmUnlock(email: string): Promise<boolean> {
+      return new Promise((resolve) => {
+        this.q
+          .dialog({
+            title: this.t("user.lockout.confirmTitle", { email }),
+            message: this.t("user.lockout.confirmMessage"),
+            cancel: { flat: true, noCaps: true },
+            ok: { color: "primary", noCaps: true, label: this.t("user.lockout.unlock") },
+            persistent: true,
+          })
+          .onOk(() => resolve(true))
+          .onCancel(() => resolve(false));
+      });
+    },
+    async onSubmit() {
+      if (this.beingUpdated && this.unlockStaged) {
+        if (!(await this.confirmUnlock(this.formData.email))) return;
+        this.formData.remove_lockout = true;
+      }
       const dismiss = this.q.notify({
         spinner: true,
         message: "Please wait...",
@@ -510,11 +610,17 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.q.notify({
-              color: "negative",
-              message: err.response.data.message,
-              timeout: 2000,
-            });
+            // A reuse rejection belongs on the field, not a toast: every checklist row is ticked.
+            const reused = this.reuseRejection(err);
+            if (reused) {
+              this.newPasswordServerError = reused;
+            } else {
+              this.q.notify({
+                color: "negative",
+                message: err.response?.data?.message || this.t("toastMessages.iam.userSaveFailed"),
+                timeout: 2000,
+              });
+            }
             dismiss();
             this.formData.email = userEmail;
           });
@@ -555,7 +661,7 @@ export default defineComponent({
               if (err.response?.status != 403 || err?.status != 403) {
                 this.q.notify({
                   color: "negative",
-                  message: err.response.data.message,
+                  message: err.response?.data?.message || this.t("toastMessages.iam.userSaveFailed"),
                   timeout: 2000,
                 });
                 dismiss();
@@ -577,7 +683,7 @@ export default defineComponent({
             .catch((err: any) => {
               this.q.notify({
                 color: "negative",
-                message: err.response.data.message,
+                message: err.response?.data?.message || this.t("toastMessages.iam.userSaveFailed"),
                 timeout: 2000,
               });
               dismiss();
