@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from collections.abc import Generator
 
 import grpc
 import pytest
@@ -67,30 +68,39 @@ def root_auth() -> str:
     return basic_auth(os.environ["ZO_ROOT_USER_EMAIL"], os.environ["ZO_ROOT_USER_PASSWORD"])
 
 
-@pytest.fixture(scope="module")
-def other_org(client: OpenObserveClient) -> str:
-    """A second org, the one a cross-org write would land in. Identified by the
-    generated identifier, not the name."""
-    resp = client.post(
-        "api/organizations",
-        prefix="",
-        json={"name": f"grpcbind{uuid.uuid4().hex[:8]}"},
-        raise_for_status=False,
-    )
-    if resp.status_code != 200:
-        pytest.skip(f"cannot create a second org ({resp.status_code}): {resp.text[:200]}")
-    return resp.json()["identifier"]
+# The org a cross-org write would land in. `_meta` rather than a freshly created
+# one on purpose: `destination_org` compares the header org with the body org and
+# does not consult membership, so any second org exercises the binding
+# identically — and orgs have no DELETE route, so creating one would leak a
+# tenant per run with no way to clean it up.
+OTHER_ORG = "_meta"
 
 
 @pytest.fixture
-def stream_name() -> str:
-    return f"grpc_org_binding_{uuid.uuid4().hex[:8]}"
+def stream_name(client: OpenObserveClient) -> Generator[str, None, None]:
+    """A unique stream name, removed from both orgs afterwards.
+
+    The accepted-write tests really do create a stream, and ingest
+    auto-creates, so without this the suite leaves one behind on every run.
+    Both orgs are swept because which one a stream lands in is precisely what
+    is in question here.
+    """
+    name = f"grpc_org_binding_{uuid.uuid4().hex[:8]}"
+    yield name
+    for org in ("default", OTHER_ORG):
+        client.delete(f"streams/{name}?type=logs", org=org, raise_for_status=False)
 
 
 def _stream_exists(client: OpenObserveClient, org: str, name: str) -> bool:
+    """Whether `name` exists in `org`.
+
+    Asserts the listing succeeded rather than returning False on an error: a
+    failed list would otherwise read as "the stream is absent" and turn the
+    did-not-reach-the-other-org test into a vacuous pass.
+    """
     resp = client.get("streams", org=org, raise_for_status=False)
-    if resp.status_code != 200:
-        return False
+    assert resp.status_code == 200, \
+        f"could not list streams in {org!r} ({resp.status_code}), so absence cannot be asserted: {resp.text[:200]}"
     return any(s.get("name") == name for s in resp.json().get("list", []))
 
 
@@ -99,7 +109,7 @@ def _stream_exists(client: OpenObserveClient, org: str, name: str) -> bool:
 
 @pytest.mark.parametrize("stream_type", STREAM_TYPES)
 def test_naming_another_org_in_the_body_is_refused(
-    channel, root_auth: str, other_org: str, stream_name: str, stream_type: str
+    channel, root_auth: str, stream_name: str, stream_type: str
 ):
     """A credential authenticated against org A cannot name org B in the body.
 
@@ -109,7 +119,7 @@ def test_naming_another_org_in_the_body_is_refused(
     """
     result = ingest(
         channel,
-        body_org=other_org,
+        body_org=OTHER_ORG,
         stream_name=stream_name,
         stream_type=stream_type,
         rows=ROWS,
@@ -117,7 +127,7 @@ def test_naming_another_org_in_the_body_is_refused(
         header_org="default",
     )
     assert result.code == grpc.StatusCode.PERMISSION_DENIED, (
-        f"[{stream_type}] a body org of {other_org!r} beside an authenticated header org of "
+        f"[{stream_type}] a body org of {OTHER_ORG!r} beside an authenticated header org of "
         f"'default' must be refused, got {result.code} "
         f"(status_code={result.status_code}, {result.message or result.details!r}). "
         "This is o2-enterprise#2821: a cross-tenant write."
@@ -125,7 +135,7 @@ def test_naming_another_org_in_the_body_is_refused(
 
 
 def test_the_refused_write_does_not_reach_the_other_org(
-    client: OpenObserveClient, channel, root_auth: str, other_org: str, stream_name: str
+    client: OpenObserveClient, channel, root_auth: str, stream_name: str
 ):
     """The status code is not the whole claim — nothing may be written either.
 
@@ -135,7 +145,7 @@ def test_the_refused_write_does_not_reach_the_other_org(
     """
     result = ingest(
         channel,
-        body_org=other_org,
+        body_org=OTHER_ORG,
         stream_name=stream_name,
         rows=ROWS,
         authorization=root_auth,
@@ -143,8 +153,8 @@ def test_the_refused_write_does_not_reach_the_other_org(
     )
     assert result.code == grpc.StatusCode.PERMISSION_DENIED, result
 
-    assert not _stream_exists(client, other_org, stream_name), (
-        f"the refused write must not create {stream_name!r} in {other_org!r}; "
+    assert not _stream_exists(client, OTHER_ORG, stream_name), (
+        f"the refused write must not create {stream_name!r} in {OTHER_ORG!r}; "
         "ingest auto-creates streams, so a deny that still wrote would hand the "
         "caller stream names and schema in another tenant's org"
     )
