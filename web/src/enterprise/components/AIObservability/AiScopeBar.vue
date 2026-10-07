@@ -43,16 +43,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="px-page-edge flex flex-wrap items-center gap-3 py-2"
     :class="{ 'border-border-default border-b': bordered }"
   >
-    <OToggleGroup
-      v-if="showAgentToggle"
-      :model-value="filterMode"
-      type="single"
-      :data-test="`${dataTest}-filter-mode`"
-      @update:model-value="onFilterModeChange"
-    >
-      <OToggleGroupItem value="agent" size="sm">{{ labels.agent }}</OToggleGroupItem>
-      <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
-    </OToggleGroup>
+    <template v-if="showAgentToggle || agentToggleLockedMessage">
+      <OToggleGroup
+        :model-value="filterMode"
+        type="single"
+        :data-test="`${dataTest}-filter-mode`"
+        @update:model-value="onFilterModeChange"
+      >
+        <!-- Locked case: rendered disabled with a lock suffix rather than
+             omitted, so an OSS caller still advertises Agent mode exists
+             (see `agentToggleLockedMessage`) instead of just disappearing. -->
+        <OToggleGroupItem
+          value="agent"
+          size="sm"
+          :disabled="!showAgentToggle"
+          :icon-right="!showAgentToggle ? 'lock' : undefined"
+        >
+          {{ labels.agent }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
+      </OToggleGroup>
+      <LockedFeatureTooltip
+        v-if="!showAgentToggle && agentToggleLockedMessage"
+        :message="agentToggleLockedMessage"
+        :title="raw(labels.agent)"
+      />
+    </template>
 
     <!-- Explicit if/else on isStreamMode itself (not on a descendant's own
          condition) — StreamAgentCountBadge below has its own separate
@@ -118,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -126,6 +142,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import AgentScopeCascade from "./AgentScopeCascade.vue";
 
 type FilterMode = "stream" | "agent";
@@ -195,12 +212,18 @@ const props = withDefaults(
         false because its topology is version-agnostic. Forwarded to
         AgentScopeCascade. */
     showVersion?: boolean;
-    /** Show the Stream/Agent toggle at all. Agent mode depends on the
-        enterprise-only agent-mapping API, so an OSS caller passes false to
-        hide the toggle entirely and pin the bar to Stream mode — there is no
-        control left to switch into Agent, and the parent must never set
-        filterMode to "agent" in that case. Defaults to true. */
+    /** Show the Stream/Agent toggle as interactive. Agent mode depends on the
+        enterprise-only agent-mapping API, so an OSS caller passes false — the
+        bar is pinned to Stream mode either way (see `isStreamMode` below),
+        and the parent must never set filterMode to "agent" in that case.
+        Defaults to true. */
     showAgentToggle?: boolean;
+    /** Pitch message for the Agent toggle when `showAgentToggle` is false —
+        renders the toggle anyway with the Agent item disabled + a lock
+        suffix, plus this tooltip, instead of omitting it outright. Leave
+        unset for a caller with truly no Agent concept to advertise (there is
+        none today; every `showAgentToggle: false` caller passes this). */
+    agentToggleLockedMessage?: I18nText;
   }>(),
   {
     allAgents: false,
@@ -211,6 +234,7 @@ const props = withDefaults(
     streamOptionTooltip: false,
     showVersion: true,
     showAgentToggle: true,
+    agentToggleLockedMessage: undefined,
   },
 );
 

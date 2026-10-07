@@ -45,7 +45,17 @@ export type FeatureKey =
   | "logPatterns"
   | "correlation"
   | "aiAssistant"
-  | "alertInsights";
+  | "alertInsights"
+  | "agentGraph"
+  | "agentBehavior"
+  | "discovery"
+  | "queues"
+  | "datasets"
+  | "prompts"
+  | "playground"
+  | "experiments"
+  | "remoteTasks"
+  | "evaluations";
 
 /**
  * The flags every predicate below reads — EDITION-only, plus RBAC's own
@@ -173,9 +183,15 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "llmProviders.tabLabel",
   },
+  // Also gates the LLM Insights/Sessions Agent-mode toggle and the LLM
+  // Insights version-compare entry — both call the same agent-mapping API
+  // this Settings tab configures, so they share this one gate rather than
+  // each re-deriving their own edition check (see AiScopeBar.vue,
+  // LLMInsightsDashboard.vue, SessionsList.vue).
   genAiAgentMapping: {
     predicate: (c) => c.isEnterprise || c.isCloud,
     labelKey: "settings.genAiAgentMapping.tabLabel",
+    pitchKey: "enterpriseFeature.pitch.genAiAgentMapping",
   },
   incidents: {
     predicate: (c) => c.isEnterprise || c.isCloud,
@@ -223,6 +239,60 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     labelKey: "alerts.insights.title",
     pitchKey: "enterpriseFeature.pitch.alertInsights",
     cloudOffers: false,
+  },
+  // The AI Observability rail's Monitor/Annotate/Experiment/Evaluate sections
+  // beyond LLM Insights + Sessions — same dual predicate as workflows/oncall
+  // since Cloud offers the whole module, not just the OSS-shipped half (see
+  // `sectionItems` in enterprise/views/AIObservability/Index.vue).
+  agentGraph: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.agentGraph",
+    pitchKey: "enterpriseFeature.pitch.agentGraph",
+  },
+  agentBehavior: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.agentBehavior",
+    pitchKey: "enterpriseFeature.pitch.agentBehavior",
+  },
+  discovery: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.discovery",
+    pitchKey: "enterpriseFeature.pitch.discovery",
+  },
+  queues: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.queues",
+    pitchKey: "enterpriseFeature.pitch.queues",
+  },
+  datasets: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.datasets",
+    pitchKey: "enterpriseFeature.pitch.datasets",
+  },
+  prompts: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.prompts",
+    pitchKey: "enterpriseFeature.pitch.prompts",
+  },
+  playground: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.playground",
+    pitchKey: "enterpriseFeature.pitch.playground",
+  },
+  experiments: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.experiments",
+    pitchKey: "enterpriseFeature.pitch.experiments",
+  },
+  remoteTasks: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.nav.remoteTasks",
+    pitchKey: "enterpriseFeature.pitch.remoteTasks",
+  },
+  evaluations: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "aiObservability.sections.evaluate",
+    pitchKey: "enterpriseFeature.pitch.evaluations",
   },
 };
 
