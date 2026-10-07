@@ -55,7 +55,9 @@ export type FeatureKey =
   | "playground"
   | "experiments"
   | "remoteTasks"
-  | "evaluations";
+  | "evaluations"
+  | "scheduledSearch"
+  | "customBranding";
 
 /**
  * The flags every predicate below reads — EDITION-only, plus RBAC's own
@@ -294,12 +296,33 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     labelKey: "aiObservability.sections.evaluate",
     pitchKey: "enterpriseFeature.pitch.evaluations",
   },
+  // The Logs search bar's "Scheduled Search" menu (create/list queries that
+  // re-run on a schedule) — same dual predicate as workflows/oncall, no
+  // existing label of its own to borrow so it carries its own pitch.
+  scheduledSearch: {
+    predicate: (c) => c.isEnterprise || c.isCloud,
+    labelKey: "search.createScheduledSearch",
+    pitchKey: "enterpriseFeature.pitch.scheduledSearch",
+  },
+  // Settings → General's white-label logo/text section. Self-hosted-only —
+  // re-skinning a managed Cloud deployment per-org isn't offered there either.
+  customBranding: {
+    predicate: (c) => c.isEnterprise,
+    labelKey: "settings.customLogoText",
+    pitchKey: "enterpriseFeature.pitch.customBranding",
+    cloudOffers: false,
+  },
 };
 
 /** True when `key` names a registered feature gate (vs. some other `gate`/flag string a caller is checking). */
 export function isFeatureKey(key: string): key is FeatureKey {
   return Object.prototype.hasOwnProperty.call(FEATURE_GATES, key);
 }
+
+/** Every registered key — `FeatureKey` is a type, erased at runtime, so
+    tooling that has to iterate "all of them" (the completeness test, any
+    future lint rule) reads this instead of hand-maintaining its own copy. */
+export const ALL_FEATURE_KEYS: FeatureKey[] = Object.keys(FEATURE_GATES) as FeatureKey[];
 
 export interface FeatureAccess {
   allowed: boolean;
