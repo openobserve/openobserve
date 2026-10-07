@@ -414,7 +414,7 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
 
 /// The request body as the audit trail may store it.
 #[cfg(any(feature = "enterprise", test))]
-fn audit_body(method: &Method, path: &str, body: Vec<u8>) -> String {
+fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec<u8>) -> String {
     use base64::Engine as _;
     if is_secret_write(method, path) {
         return "[REDACTED: secret write]".to_string();
@@ -424,6 +424,9 @@ fn audit_body(method: &Method, path: &str, body: Vec<u8>) -> String {
     }
     if body.is_empty() {
         return String::new();
+    }
+    if content_type.is_some_and(|ct| ct.starts_with("application/x-www-form-urlencoded")) {
+        return redact_form_fields(&body);
     }
     // Field names are the only signal a route-independent filter has, so unparsable bodies go.
     match serde_json::from_slice::<serde_json::Value>(&body) {
@@ -455,15 +458,42 @@ fn redact_secret_fields(value: &mut serde_json::Value) {
     }
 }
 
-/// Whether a JSON field holds a credential; `url` and `headers` carry destination webhook secrets.
+#[cfg(any(feature = "enterprise", test))]
+fn redact_form_fields(body: &[u8]) -> String {
+    let mut out = url::form_urlencoded::Serializer::new(String::new());
+    for (name, value) in url::form_urlencoded::parse(body) {
+        out.append_pair(
+            &name,
+            if is_secret_field(&name) {
+                "[REDACTED]"
+            } else {
+                &value
+            },
+        );
+    }
+    out.finish()
+}
+
+/// Whether a field holds a credential; `url`, `endpoint` and headers carry webhook secrets.
 #[cfg(any(feature = "enterprise", test))]
 fn is_secret_field(name: &str) -> bool {
+    const SECRET_KEYS: [&str; 8] = [
+        "apikey",
+        "accesskey",
+        "privatekey",
+        "routingkey",
+        "integrationkey",
+        "signingkey",
+        "accountkey",
+        "encryptionkey",
+    ];
     let name = name.to_ascii_lowercase().replace(['-', '_'], "");
     matches!(
         name.as_str(),
-        "url" | "headers" | "auth" | "authorization" | "cookie" | "passcode"
-    ) || name.ends_with("token")
-        || name.ends_with("key")
+        "url" | "endpoint" | "auth" | "authorization" | "cookie" | "passcode"
+    ) || name.ends_with("headers")
+        || name.ends_with("token")
+        || SECRET_KEYS.iter().any(|key| name.ends_with(key))
         || ["password", "secret", "credential"]
             .iter()
             .any(|word| name.contains(word))
@@ -511,6 +541,12 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .unwrap_or("")
             .to_string();
 
+        let content_type = request
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
         // Extract body
         let (parts, body) = request.into_parts();
         let bytes = match to_bytes(body, usize::MAX).await {
@@ -537,7 +573,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         response.headers_mut().remove(ERROR_HEADER);
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = audit_body(&http_method, &path, request_body);
+            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
 
             audit(AuditMessage {
                 user_email,
@@ -2310,7 +2346,55 @@ mod tests {
     }
 
     fn audited(method: Method, path: &str, body: &str) -> String {
-        audit_body(&method, path, body.as_bytes().to_vec())
+        audit_body(&method, path, None, body.as_bytes().to_vec())
+    }
+
+    #[test]
+    fn audit_body_drops_header_values_under_any_headers_field() {
+        let body = audited(
+            Method::POST,
+            "api/default/scorers",
+            r#"{"params":{"custom_headers":[{"key":"X-Api-Key","value":"hv-1"}]}}"#,
+        );
+        assert!(!body.contains("hv-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_drops_webhook_endpoints() {
+        let body = audited(
+            Method::PUT,
+            "api/default/prompts/settings",
+            r#"{"webhook":{"endpoint":"https://hooks.example.com/x?token=ep-1"}}"#,
+        );
+        assert!(!body.contains("ep-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_keeps_identifiers_that_merely_end_in_key() {
+        let body = audited(
+            Method::POST,
+            "api/default/settings/v2",
+            r#"{"setting_key":"theme","setting_value":"dark","group_key":"g-1","idempotency_key":"i-1"}"#,
+        );
+        for kept in ["theme", "dark", "g-1", "i-1"] {
+            assert!(body.contains(kept), "{kept} lost: {body}");
+        }
+    }
+
+    #[test]
+    fn audit_body_keeps_form_queries_but_drops_form_secrets() {
+        let body = audit_body(
+            &Method::POST,
+            "api/default/prometheus/api/v1/query_range",
+            Some("application/x-www-form-urlencoded"),
+            b"query=up%7Bjob%3D%22api%22%7D&start=1&password=pf-1".to_vec(),
+        );
+        assert!(
+            body.contains("up%7Bjob") || body.contains(r#"up{job="api"}"#),
+            "{body}"
+        );
+        assert!(body.contains("start=1"), "{body}");
+        assert!(!body.contains("pf-1"), "{body}");
     }
 
     #[test]
