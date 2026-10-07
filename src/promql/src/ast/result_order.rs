@@ -15,7 +15,7 @@
 
 use std::cmp::Ordering;
 
-use config::meta::promql::value::{InstantValue, LabelsExt, Value};
+use config::meta::promql::value::{InstantValue, Labels, Value};
 use promql_parser::parser::Expr;
 
 /// How a top-level ordering function orders an instant query's result.
@@ -79,9 +79,17 @@ pub fn top_level_order(expr: &Expr) -> Option<ResultOrder> {
 fn compare_by_labels(a: &InstantValue, b: &InstantValue, labels: &[String]) -> Ordering {
     labels
         .iter()
-        .map(|name| natural_cmp(&a.labels.get_value(name), &b.labels.get_value(name)))
+        .map(|name| natural_cmp(label_value(&a.labels, name), label_value(&b.labels, name)))
         .find(|order| order.is_ne())
         .unwrap_or_else(|| a.labels.partial_cmp(&b.labels).unwrap_or(Ordering::Equal))
+}
+
+/// A borrowed lookup, since the comparator runs O(n log n) times per sort.
+fn label_value<'a>(labels: &'a Labels, name: &str) -> &'a str {
+    labels
+        .iter()
+        .find(|label| label.name == name)
+        .map_or("", |label| label.value.as_str())
 }
 
 /// Natural order: runs of digits compare by value, so `host2` sorts before `host10`.
@@ -121,6 +129,7 @@ fn is_number(chunk: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::LabelsExt;
     use promql_parser::parser;
 
     use super::*;
