@@ -110,6 +110,7 @@ pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
     METRICS_HASH_EXCLUDED_LABELS.contains(&name)
 }
 
+/// Whether `value` is the Prometheus staleness marker; any other NaN is not one.
 #[inline]
 pub fn is_stale_marker(value: f64) -> bool {
     value.to_bits() == STALE_NAN_BITS
@@ -362,6 +363,7 @@ pub struct RequestFormatQuery {
     pub query: String,
 }
 
+/// The PromQL query whose syntax tree `parse_tree` returns.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RequestParseTree {
     pub query: String,
