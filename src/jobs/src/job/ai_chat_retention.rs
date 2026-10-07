@@ -13,23 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Keeps the AI chat index (`ai_chat_sessions`) in step with the retention of
-//! the `_o2_ai_chat_events` stream it indexes.
-//!
-//! Invariant: an index row exists only while ALL of its chat's events do —
-//! otherwise every read and every restore of it fails as an integrity error.
-//! With R the stream's effective retention, each pass:
-//!
-//! 1. refreshes chats in use: a chat used within the last R/2 whose oldest events are older than
-//!    R/2 has its history rewritten with fresh timestamps (byte-identical rows, deduplicated on
-//!    read), under its turn lease, so a chat in use never loses history however long it lives;
-//! 2. purges rows whose oldest events are past R (plus a day of margin for compaction lag): chats
-//!    unused for long enough, and tombstones of deleted chats, which are only needed while the
-//!    deleted events still exist;
-//! 3. re-sends the removal of chats deleted within the last day to every live o2-ai replica until
-//!    one pass reaches them all (a replica down at delete time keeps its copy otherwise).
-//!
-//! Idempotent: any scheduler may run it, and a missed pass only delays work.
+// Keeps `ai_chat_sessions` within `_o2_ai_chat_events` retention; chats in use are rewritten first.
 
 use config::{
     cluster::LOCAL_NODE,
@@ -43,9 +27,8 @@ use infra::table::{ai_chat_sessions, ai_chat_turns};
 const SWEEP_INTERVAL_SECS: u64 = 60 * 60;
 /// Chats refreshed per org per pass; the rest wait for the next pass.
 const REFRESH_PER_PASS: u64 = 50;
-/// Removal lags the stream's retention by this much, so a row is never
-/// dropped while compaction may still be deleting its events.
-const MARGIN_DAYS: i64 = 1;
+/// A row is removed this long before compaction may start deleting its oldest events.
+const MARGIN_MICROS: i64 = MICROS_PER_DAY;
 const MICROS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000;
 /// Deleted chats whose replica copies are re-purged per org per pass.
 const REPLICA_PURGE_PER_PASS: u64 = 100;
@@ -65,7 +48,7 @@ pub fn run() {
 async fn sweep() -> Result<(), infra::errors::Error> {
     let now = now_micros();
     for org_id in ai_chat_sessions::orgs_with_chats().await? {
-        purge_deleted_replicas(&org_id, now).await;
+        purge_deleted_replicas(&org_id).await;
         let settings =
             infra::schema::get_settings(&org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs)
                 .await
@@ -77,7 +60,7 @@ async fn sweep() -> Result<(), infra::errors::Error> {
             continue;
         };
         refresh_in_use(&org_id, days, now).await;
-        let cutoff = now - (days + MARGIN_DAYS) * MICROS_PER_DAY;
+        let cutoff = now - purge_age(days);
         match ai_chat_sessions::purge_expired(&org_id, cutoff).await {
             Ok(0) => {}
             Ok(n) => log::info!("[AI_CHAT_RETENTION] {org_id}: removed {n} expired chat(s)"),
@@ -121,7 +104,13 @@ async fn refresh_in_use(org_id: &str, days: i64, now: i64) {
                 Ok(lease) => lease,
                 Err(_) => continue,
             };
-        match openobserve_core::ai_chat::refresh_chat_history(&row, chat_retention).await {
+        match openobserve_core::ai_chat::refresh_chat_history(
+            org_id,
+            &row.session_id,
+            chat_retention,
+        )
+        .await
+        {
             Ok(n) => log::info!(
                 "[AI_CHAT_RETENTION] {org_id}/{}: refreshed {n} event(s)",
                 row.session_id
@@ -135,15 +124,9 @@ async fn refresh_in_use(org_id: &str, days: i64, now: i64) {
     }
 }
 
-/// A chat deleted within the last day is done once one pass reaches every live replica.
-async fn purge_deleted_replicas(org_id: &str, now: i64) {
-    let due = match ai_chat_sessions::due_for_replica_purge(
-        org_id,
-        now - MICROS_PER_DAY,
-        REPLICA_PURGE_PER_PASS,
-    )
-    .await
-    {
+/// A deleted chat is done once one pass reaches every live replica; until then it is retried.
+async fn purge_deleted_replicas(org_id: &str) {
+    let due = match ai_chat_sessions::due_for_replica_purge(org_id, REPLICA_PURGE_PER_PASS).await {
         Ok(rows) if rows.is_empty() => return,
         Ok(rows) => rows,
         Err(e) => {
@@ -179,17 +162,26 @@ async fn purge_deleted_replicas(org_id: &str, now: i64) {
                     );
                 }
             }
-            Err(e) => log::warn!(
-                "[AI_CHAT_RETENTION] {org_id}/{}: replica purge failed: {e:#}",
-                row.session_id
-            ),
+            Err(e) => {
+                log::warn!(
+                    "[AI_CHAT_RETENTION] {org_id}/{}: replica purge failed: {e:#}",
+                    row.session_id
+                );
+                if let Err(e) =
+                    ai_chat_sessions::defer_replica_purge(org_id, &row.session_id, now_micros())
+                        .await
+                {
+                    log::warn!(
+                        "[AI_CHAT_RETENTION] {org_id}/{}: cannot defer the purge: {e}",
+                        row.session_id
+                    );
+                }
+            }
         }
     }
 }
 
-/// The stream's effective retention in days, or `None` when it keeps data
-/// forever. Same resolution as the compactor: the stream's own setting when
-/// set, else the global default.
+/// The stream's retention in days as the compactor resolves it; `None` keeps data forever.
 fn effective_retention_days(stream_days: i64, global_days: i64) -> Option<i64> {
     let days = if stream_days > 0 {
         stream_days
@@ -197,6 +189,12 @@ fn effective_retention_days(stream_days: i64, global_days: i64) -> Option<i64> {
         global_days
     };
     (days > 0).then_some(days)
+}
+
+/// Age (micros) past which a row goes: before its events may, but beyond the refresh horizon (R/2).
+fn purge_age(days: i64) -> i64 {
+    let retention = days * MICROS_PER_DAY;
+    (retention - MARGIN_MICROS).max(retention * 3 / 4)
 }
 
 #[cfg(test)]
@@ -208,5 +206,17 @@ mod tests {
         assert_eq!(effective_retention_days(30, 7), Some(30));
         assert_eq!(effective_retention_days(0, 7), Some(7));
         assert_eq!(effective_retention_days(0, 0), None);
+    }
+
+    #[test]
+    fn rows_go_before_their_events_and_never_inside_the_refresh_horizon() {
+        assert_eq!(purge_age(30), 29 * MICROS_PER_DAY);
+        assert_eq!(purge_age(2), MICROS_PER_DAY * 3 / 2);
+        assert_eq!(purge_age(1), MICROS_PER_DAY * 3 / 4);
+        for days in 1..=60 {
+            let age = purge_age(days);
+            assert!(age < days * MICROS_PER_DAY, "{days}");
+            assert!(age > days * MICROS_PER_DAY / 2, "{days}");
+        }
     }
 }

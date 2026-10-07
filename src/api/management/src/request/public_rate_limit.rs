@@ -17,7 +17,7 @@
 
 use std::{
     collections::HashMap,
-    sync::RwLock,
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
@@ -31,31 +31,74 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// How a client whose `RealIp` was not resolved shows up in logs.
 pub const UNKNOWN_IP: &str = "unknown";
+const MAX_KEYS: usize = 65_536;
 
-pub type Counters = RwLock<HashMap<String, (u32, Instant)>>;
+/// Hit counts per key in fixed windows, holding at most a fixed number of keys.
+pub struct Counters {
+    max_keys: usize,
+    state: Mutex<CounterState>,
+}
+
+impl Counters {
+    pub fn new(max_keys: usize) -> Self {
+        Self {
+            max_keys,
+            state: Mutex::new(CounterState::default()),
+        }
+    }
+
+    /// Counts one hit for `key`; true past its budget, or for a new key while the map is full.
+    pub fn over_budget(&self, key: &str, window: Duration, max: u32) -> bool {
+        self.over_budget_at(key, window, max, Instant::now())
+    }
+
+    fn over_budget_at(&self, key: &str, window: Duration, max: u32, now: Instant) -> bool {
+        let Ok(mut state) = self.state.lock() else {
+            return false;
+        };
+        // One sweep per window keeps a flood of keys from making every hit O(n).
+        if state
+            .swept_at
+            .is_none_or(|at| now.duration_since(at) >= window)
+        {
+            state
+                .hits
+                .retain(|_, (_, at)| now.duration_since(*at) < window);
+            state.swept_at = Some(now);
+        }
+        let full = state.hits.len() >= self.max_keys;
+        match state.hits.get_mut(key) {
+            Some(entry) => {
+                if now.duration_since(entry.1) >= window {
+                    *entry = (0, now);
+                }
+                entry.0 = entry.0.saturating_add(1);
+                entry.0 > max
+            }
+            None if full => true,
+            None => {
+                state.hits.insert(key.to_owned(), (1, now));
+                max == 0
+            }
+        }
+    }
+}
+
+impl Default for Counters {
+    fn default() -> Self {
+        Self::new(MAX_KEYS)
+    }
+}
+
+#[derive(Default)]
+struct CounterState {
+    hits: HashMap<String, (u32, Instant)>,
+    swept_at: Option<Instant>,
+}
 
 /// The client's address for logs: the ingress-resolved `RealIp`, or [`UNKNOWN_IP`].
 pub fn client_ip(ip: Option<RealIp>) -> String {
     ip.map_or_else(|| UNKNOWN_IP.to_owned(), |ip| ip.0.to_string())
-}
-
-/// Counts one hit for `key` and reports whether the window's budget is exceeded; fails open on a
-/// poisoned lock.
-pub fn over_budget(counters: &Counters, key: String, window: Duration, max: u32) -> bool {
-    let Ok(mut guard) = counters.write() else {
-        return false;
-    };
-    let now = Instant::now();
-    // Opportunistic cleanup keeps the map bounded.
-    if guard.len() > 8192 {
-        guard.retain(|_, (_, at)| now.duration_since(*at) < window);
-    }
-    let e = guard.entry(key).or_insert((0, now));
-    if now.duration_since(e.1) >= window {
-        *e = (0, now);
-    }
-    e.0 = e.0.saturating_add(1);
-    e.0 > max
 }
 
 /// A JSON 429 telling the client when to come back.
@@ -74,12 +117,26 @@ mod tests {
 
     #[test]
     fn over_budget_trips_after_max_hits_in_the_window() {
-        let counters: Counters = RwLock::new(HashMap::new());
+        let counters = Counters::default();
         let window = Duration::from_secs(60);
-        assert!(!over_budget(&counters, "ip".into(), window, 2));
-        assert!(!over_budget(&counters, "ip".into(), window, 2));
-        assert!(over_budget(&counters, "ip".into(), window, 2));
-        assert!(!over_budget(&counters, "other".into(), window, 2));
+        assert!(!counters.over_budget("ip", window, 2));
+        assert!(!counters.over_budget("ip", window, 2));
+        assert!(counters.over_budget("ip", window, 2));
+        assert!(!counters.over_budget("other", window, 2));
+    }
+
+    #[test]
+    fn a_full_map_refuses_new_keys_until_the_window_sweeps_them() {
+        let counters = Counters::new(2);
+        let window = Duration::from_secs(60);
+        let t0 = Instant::now();
+        assert!(!counters.over_budget_at("a", window, 5, t0));
+        assert!(!counters.over_budget_at("b", window, 5, t0));
+        assert!(counters.over_budget_at("c", window, 5, t0));
+        assert!(!counters.over_budget_at("a", window, 5, t0));
+        let later = t0 + window;
+        assert!(!counters.over_budget_at("c", window, 5, later));
+        assert_eq!(counters.state.lock().unwrap().hits.len(), 1);
     }
 
     #[tokio::test]

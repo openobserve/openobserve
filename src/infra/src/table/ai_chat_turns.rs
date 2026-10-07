@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Service layer for `ai_chat_turns`: one row per submitted turn of a
-//! persisted chat, so a retried turn id is recognised whichever turn it was,
-//! and history reads can tell how each turn ended.
-//!
-//! Admission inserts the row as `running` while holding the chat's turn
-//! lease; the turn task finishes it exactly once. A turn that failed before
-//! storing anything may be submitted again under the same id.
+//! `ai_chat_turns`: one row per submitted turn, inserted under the lease and finished once.
 
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
@@ -44,7 +38,7 @@ pub const TURN_INTERRUPTED: &str = "interrupted";
 pub enum Admission {
     /// A new turn id: recorded as running.
     Admitted,
-    /// A turn that failed before storing anything, submitted again.
+    /// A failed or interrupted turn that stored nothing, submitted again.
     Retried,
     /// The turn id was seen before; running it again would re-run the model.
     AlreadySubmitted,
@@ -54,8 +48,7 @@ fn db_err(e: impl ToString) -> errors::Error {
     errors::DbError::SeaORMError(e.to_string()).into()
 }
 
-/// Record `turn_id` as running from `start_seq`; under the lease, any other running turn is dead
-/// and marked interrupted.
+/// Records `turn_id` as running from `start_seq`; under the lease any other running turn is dead.
 pub async fn admit(
     org_id: &str,
     session_id: &str,
@@ -112,8 +105,7 @@ pub async fn admit_with<C: ConnectionTrait>(
     Ok(admission)
 }
 
-/// Record how a running turn ended (`false` when it no longer runs); a `None` start keeps the
-/// admission value.
+/// Records how a running turn ended (`false` if not running); `None` start keeps admission's.
 #[allow(clippy::too_many_arguments)]
 pub async fn finish(
     org_id: &str,
@@ -221,7 +213,7 @@ pub fn is_running(record: &Model, stale_before: i64) -> bool {
     record.status == TURN_RUNNING && record.started_at >= stale_before
 }
 
-/// Reset a failed turn that stored nothing back to running.
+/// Reset a failed or interrupted turn that stored nothing back to running.
 async fn retry_failed_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -239,8 +231,17 @@ async fn retry_failed_with<C: ConnectionTrait>(
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::SessionId.eq(session_id))
         .filter(Column::TurnId.eq(turn_id))
-        .filter(Column::Status.eq(TURN_FAILED))
         .filter(Column::EndSeq.is_null())
+        .filter(
+            Condition::any()
+                .add(Column::Status.eq(TURN_FAILED))
+                // Its own start is still the next seq: nothing was committed since it began.
+                .add(
+                    Condition::all()
+                        .add(Column::Status.eq(TURN_INTERRUPTED))
+                        .add(Column::StartSeq.eq(start_seq)),
+                ),
+        )
         .exec(conn)
         .await
         .map_err(db_err)?;
@@ -398,16 +399,35 @@ mod tests {
             admit_with(&db, ORG, SID, "partial", 5, 32).await.unwrap(),
             Admission::AlreadySubmitted
         );
-        for (turn, status) in [("c", TURN_CANCELLED), ("i", TURN_INTERRUPTED)] {
-            admit_with(&db, ORG, SID, turn, 5, 40).await.unwrap();
-            finish_with(&db, ORG, SID, turn, status, None, None, None, 41)
-                .await
-                .unwrap();
-            assert_eq!(
-                admit_with(&db, ORG, SID, turn, 5, 42).await.unwrap(),
-                Admission::AlreadySubmitted
-            );
-        }
+        admit_with(&db, ORG, SID, "c", 5, 40).await.unwrap();
+        finish_with(&db, ORG, SID, "c", TURN_CANCELLED, None, None, None, 41)
+            .await
+            .unwrap();
+        assert_eq!(
+            admit_with(&db, ORG, SID, "c", 5, 42).await.unwrap(),
+            Admission::AlreadySubmitted
+        );
+    }
+
+    #[tokio::test]
+    async fn an_interrupted_turn_is_retried_only_while_nothing_was_committed_since() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "i", 5, 40).await.unwrap();
+        finish_with(&db, ORG, SID, "i", TURN_INTERRUPTED, None, None, None, 41)
+            .await
+            .unwrap();
+        assert_eq!(
+            admit_with(&db, ORG, SID, "i", 5, 42).await.unwrap(),
+            Admission::Retried
+        );
+        finish_with(&db, ORG, SID, "i", TURN_INTERRUPTED, None, None, None, 43)
+            .await
+            .unwrap();
+        // The watermark moved past its start: it may have stored events.
+        assert_eq!(
+            admit_with(&db, ORG, SID, "i", 8, 44).await.unwrap(),
+            Admission::AlreadySubmitted
+        );
     }
 
     #[tokio::test]

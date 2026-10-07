@@ -17,7 +17,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, LazyLock, Mutex, RwLock},
+    sync::{Arc, LazyLock, Mutex, Once},
     time::{Duration, Instant},
 };
 
@@ -27,13 +27,21 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use config::{axum::middlewares::RealIp, meta::user::UserRole, utils::time::now_micros};
+use config::{
+    axum::middlewares::RealIp,
+    meta::user::UserRole,
+    utils::{
+        hash::{Sum64, fnv},
+        time::now_micros,
+    },
+};
 use infra::table::{
     ai_chat_sessions::{self, Model as ChatModel, NO_SEQ, NewFork, STATUS_ACTIVE},
     ai_chat_shares::{
         self, MODE_LIVE, MODE_SNAPSHOT, Model as ShareModel, NewShare, ShareSettings,
         VISIBILITY_ORG, VISIBILITY_PUBLIC,
     },
+    ai_chat_turns::{self, Model as TurnRecord, TURN_INTERRUPTED, TURN_RUNNING},
 };
 use o2_enterprise::enterprise::ai::chat::{
     batcher::DurableEvent,
@@ -46,11 +54,12 @@ use tokio::sync::{Semaphore, SemaphorePermit};
 use utoipa::ToSchema;
 
 use super::chats::{
-    MAX_TITLE_CHARS, attach_turn_status, is_uuid, load_turns, owned_chat, resolve_owner, user_email,
+    MAX_TITLE_CHARS, attach_turn_status_at, load_turns, normalize_uuid, owned_chat, resolve_owner,
+    running_since, user_email,
 };
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    request::public_rate_limit::{Counters, client_ip, over_budget, too_many_requests},
+    request::public_rate_limit::{Counters, client_ip, too_many_requests},
     service::auth::check_permissions,
 };
 
@@ -61,6 +70,10 @@ const DAY_SECS: i64 = 24 * 60 * 60;
 const MAX_BODY_BYTES: usize = 16 * 1024;
 const PUBLIC_READ_WINDOW: Duration = Duration::from_secs(60);
 const PUBLIC_READ_SLOTS: usize = 8;
+const PROJECTION_SLOTS: usize = 16;
+const PROJECTION_WAIT: Duration = Duration::from_secs(5);
+// Above this a shared read keeps only the newest turns and says `truncated`.
+const SHARED_TURNS_MAX_BYTES: usize = 16 * 1024 * 1024;
 const PUBLIC_TURNS_TTL: Duration = Duration::from_secs(60);
 const PUBLIC_TURNS_MAX_ENTRIES: usize = 256;
 const PUBLIC_TURNS_MAX_BYTES: usize = 64 * 1024 * 1024;
@@ -70,26 +83,30 @@ const ACCESS_MAX_PENDING: usize = 8192;
 const SEED_MAX_MESSAGES: usize = 200;
 const SEED_MAX_CHARS: usize = 200_000;
 const FALLBACK_TITLE: &str = "Shared chat";
-const TURN_RUNNING: &str = "A response is still being generated; share again when it finishes";
+const TURN_IN_PROGRESS: &str = "A response is still being generated; share again when it finishes";
 const SEED_HEADER: &str = "[Restored conversation]\n";
 const SEED_FENCE: &str = "\n---\n\n";
 const CONTEXT_HEADER: &str = "[Context]\n";
 
-static PUBLIC_READS: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
+static PUBLIC_READS: LazyLock<Counters> = LazyLock::new(Counters::default);
 // Reads that resolve no client address still cannot pile up without bound.
 static PUBLIC_READ_GATE: Semaphore = Semaphore::const_new(PUBLIC_READ_SLOTS);
+static PROJECTION_GATE: Semaphore = Semaphore::const_new(PROJECTION_SLOTS);
 static PUBLIC_TURNS: LazyLock<TurnCache> = LazyLock::new(|| TurnCache::new(PUBLIC_TURNS_TTL));
 static PENDING_READS: LazyLock<ReadCounter> =
     LazyLock::new(|| ReadCounter::new(ACCESS_FLUSH_EVERY));
+static READ_FLUSHER: Once = Once::new();
 
 /// A share as its owner sees it.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ShareView {
     pub id: String,
-    /// Bearer secret of the link; part of `url_path`.
-    pub token: String,
-    /// Path of the web page that shows the share.
-    pub url_path: String,
+    /// Bearer secret of the link; absent on other creators' rows of the org-wide listing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    /// Path of the web page that shows the share; absent whenever `token` is.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url_path: Option<String>,
     pub mode: String,
     pub visibility: String,
     pub snapshot_seq: Option<i64>,
@@ -114,12 +131,12 @@ pub struct ShareView {
 impl ShareView {
     fn new(share: ShareModel, title: &str) -> Self {
         Self {
-            url_path: url_path(&share),
+            url_path: Some(url_path(&share)),
             redact_tools: share.redact_tools,
             owner_name: None,
             owner_email: None,
             id: share.id,
-            token: share.token,
+            token: Some(share.token),
             mode: share.mode,
             visibility: share.visibility,
             snapshot_seq: share.snapshot_seq,
@@ -173,10 +190,12 @@ pub struct ListSharesParams {
     pub all: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub struct SharedChatParams {
     /// The `seq` of the caller's cached copy.
     pub known_seq: Option<i64>,
+    /// The `state_version` of the caller's cached copy.
+    pub known_version: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -185,16 +204,22 @@ pub struct SharedChat {
     pub mode: String,
     /// Last committed event the share shows; pass back as `known_seq`.
     pub seq: i64,
+    /// Changes with `seq`, turn statuses and share settings; send back as `known_version`.
+    pub state_version: String,
+    /// A turn of a live share is running; poll until it is false.
+    pub active_turn: bool,
     /// When the chat was started (micros).
     pub created_at: i64,
     /// When the share was created (micros).
     pub shared_at: i64,
     /// The owner's display name; never their email on a public link.
     pub owner_name: Option<String>,
-    /// True when `known_seq` is current; `turns` is then omitted.
+    /// True when `known_seq` and `known_version` are current; `turns` is then omitted.
     pub not_modified: bool,
     /// Tool inputs and outputs are left out of `turns`.
     pub redact_tools: bool,
+    /// The oldest turns were left out to keep the response within the server's size cap.
+    pub truncated: bool,
     /// Same shape as `GET /ai/chats/{session_id}` returns, without `user_message_id`.
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -337,7 +362,7 @@ impl Folded {
     }
 }
 
-/// Projected turns of public reads per (share, seq, redacted), so a busy link is not re-projected.
+/// Projected turns of public reads per (share, state version), so a busy link is not re-projected.
 struct TurnCache {
     ttl: Duration,
     entries: Mutex<HashMap<TurnKey, CachedTurns>>,
@@ -351,16 +376,16 @@ impl TurnCache {
         }
     }
 
-    fn get(&self, key: &TurnKey, now: Instant) -> Option<Arc<Vec<Value>>> {
+    fn get(&self, key: &TurnKey, now: Instant) -> Option<Shown> {
         let entries = self.entries.lock().ok()?;
         entries
             .get(key)
             .filter(|cached| now.duration_since(cached.at) < self.ttl)
-            .map(|cached| cached.turns.clone())
+            .map(|cached| cached.shown.clone())
     }
 
-    fn put(&self, key: TurnKey, turns: Arc<Vec<Value>>, now: Instant) {
-        let bytes = serde_json::to_vec(turns.as_ref()).map_or(usize::MAX, |b| b.len());
+    fn put(&self, key: TurnKey, shown: Shown, now: Instant) {
+        let bytes = serde_json::to_vec(shown.0.as_ref()).map_or(usize::MAX, |b| b.len());
         // One huge chat must not evict every other link's entry.
         if bytes > PUBLIC_TURNS_MAX_BYTES / 4 {
             return;
@@ -389,25 +414,27 @@ impl TurnCache {
             CachedTurns {
                 at: now,
                 bytes,
-                turns,
+                shown,
             },
         );
     }
 }
 
-/// `(share id, seq, redacted)`.
-type TurnKey = (String, i64, bool);
+/// `(share id, state version)`.
+type TurnKey = (String, String);
+/// The turns a reader is shown, and whether the oldest were cut for size.
+type Shown = (Arc<Vec<Value>>, bool);
 
 struct CachedTurns {
     at: Instant,
     bytes: usize,
-    turns: Arc<Vec<Value>>,
+    shown: Shown,
 }
 
-/// Reads not yet added to `access_count`; each share is written at most once per interval.
+/// Reads not yet in `access_count`; a share's first is written at once, the rest by the flush.
 struct ReadCounter {
     every: Duration,
-    /// Per share: reads since its last write, and when that write was.
+    /// Per share: reads not yet written, and when it was last written.
     pending: Mutex<HashMap<String, (i64, Instant)>>,
 }
 
@@ -424,21 +451,32 @@ impl ReadCounter {
         let Ok(mut pending) = self.pending.lock() else {
             return Some(1);
         };
-        if pending.len() > ACCESS_MAX_PENDING {
-            let every = self.every;
-            pending.retain(|_, (reads, at)| *reads > 0 || now.duration_since(*at) < every);
-        }
-        let Some((reads, at)) = pending.get_mut(share_id) else {
-            pending.insert(share_id.to_string(), (0, now));
-            return Some(1);
-        };
-        *reads += 1;
-        if now.duration_since(*at) < self.every {
+        if let Some((reads, _)) = pending.get_mut(share_id) {
+            *reads += 1;
             return None;
         }
-        let due = std::mem::take(reads);
-        *at = now;
-        Some(due)
+        if pending.len() >= ACCESS_MAX_PENDING {
+            return Some(1);
+        }
+        pending.insert(share_id.to_string(), (0, now));
+        Some(1)
+    }
+
+    /// Takes every share's unwritten reads and forgets shares idle for a whole interval.
+    fn drain(&self, now: Instant) -> Vec<(String, i64)> {
+        let Ok(mut pending) = self.pending.lock() else {
+            return Vec::new();
+        };
+        let every = self.every;
+        pending.retain(|_, (reads, at)| *reads > 0 || now.duration_since(*at) < every);
+        pending
+            .iter_mut()
+            .filter(|(_, (reads, _))| *reads > 0)
+            .map(|(id, (reads, at))| {
+                *at = now;
+                (id.clone(), std::mem::take(reads))
+            })
+            .collect()
     }
 }
 
@@ -506,7 +544,7 @@ pub async fn create(
     let now = now_micros();
     let new = NewShare {
         org_id: &org_id,
-        session_id: &session_id,
+        session_id: &chat.session_id,
         created_by: &owner,
         mode: &req.mode,
         snapshot_seq: (req.mode == MODE_SNAPSHOT).then_some(chat.last_committed_seq),
@@ -567,7 +605,7 @@ pub async fn list_for_chat(
         Ok(chat) => chat,
         Err(resp) => return resp,
     };
-    match ai_chat_shares::list_live_for_session(&org_id, &session_id, now_micros()).await {
+    match ai_chat_shares::list_live_for_session(&org_id, &chat.session_id, now_micros()).await {
         Ok(shares) => Json(ShareListResponse {
             shares: shares
                 .into_iter()
@@ -614,19 +652,23 @@ pub async fn list_mine(
         Err(resp) => return resp,
     };
     let now = now_micros();
-    let (shares, scope) = if params.all {
+    let (shares, scope, caller) = if params.all {
         if !is_org_admin(&org_id, &user_email).await {
             return MetaHttpResponse::forbidden("Only organization admins can list every share");
         }
         let shares = ai_chat_shares::list_live_for_org(&org_id, now).await;
-        (shares, org_id.clone())
+        (
+            shares,
+            org_id.clone(),
+            resolve_owner(&user_email).await.ok(),
+        )
     } else {
         let owner = match resolve_owner(&user_email).await {
             Ok(owner) => owner,
             Err(resp) => return resp,
         };
         let shares = ai_chat_shares::list_live_for_creator(&org_id, &owner, now).await;
-        (shares, format!("{org_id}/{owner}"))
+        (shares, format!("{org_id}/{owner}"), Some(owner))
     };
     let shares = match shares {
         Ok(shares) => shares,
@@ -635,7 +677,7 @@ pub async fn list_mine(
             return unavailable();
         }
     };
-    match share_views(&org_id, shares, params.all).await {
+    match share_views(&org_id, shares, params.all, caller.as_deref()).await {
         Ok(shares) => Json(ShareListResponse { shares }).into_response(),
         Err(resp) => resp,
     }
@@ -790,16 +832,19 @@ pub async fn revoke(
     operation_id = "GetSharedAiChat",
     summary = "Read a shared AI conversation",
     description = "The conversation behind a share link, cut at the share's sequence. With \
-                   `known_seq` equal to it the body says `not_modified` and carries no turns.",
+                   `known_seq` and `known_version` equal to the current `seq` and \
+                   `state_version` the body says `not_modified` and carries no turns.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("token" = String, Path, description = "Share token"),
         ("known_seq" = Option<i64>, Query, description = "Sequence of the caller's cached copy"),
+        ("known_version" = Option<String>, Query, description = "`state_version` of the cached copy"),
     ),
     responses(
         (status = 200, description = "The shared conversation", body = inline(SharedChat)),
         (status = 404, description = "Unknown, revoked or expired share", body = Object),
+        (status = 429, description = "Too many shared reads in flight; retry", body = Object),
         (status = 503, description = "History temporarily unreadable", body = Object),
     ),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
@@ -819,7 +864,7 @@ pub async fn get_shared(
     };
     let (parts, _) = in_req.into_parts();
     let auth = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
-    read_shared(served, params.known_seq, Some(&auth), VISIBILITY_ORG).await
+    read_shared(served, &params, Some(&auth), VISIBILITY_ORG).await
 }
 
 /// ForkSharedAiChat
@@ -910,13 +955,22 @@ pub async fn fork(
 }
 
 /// GET /api/public/ai_chats/{token}: a public share, without authentication.
-pub async fn get_public(ip: Option<Extension<RealIp>>, Path(token): Path<String>) -> Response {
+pub async fn get_public(
+    ip: Option<Extension<RealIp>>,
+    Path(token): Path<String>,
+    Query(params): Query<SharedChatParams>,
+) -> Response {
     let ip = ip.map(|e| e.0);
     if public_rate_limited(ip) {
         return with_public_headers(too_many_requests(PUBLIC_READ_WINDOW));
     }
-    let Some(_slot) = enter(&PUBLIC_READ_GATE) else {
-        return with_public_headers(too_many_requests(Duration::from_secs(1)));
+    // Only clients outside the per-IP limit share the node-wide gate (design: public links).
+    let _slot = match ip {
+        Some(_) => None,
+        None => match enter(&PUBLIC_READ_GATE) {
+            Some(slot) => Some(slot),
+            None => return with_public_headers(too_many_requests(Duration::from_secs(1))),
+        },
     };
     log::info!(
         "[AI-CHAT-SHARE] public read of {}… from {}",
@@ -931,7 +985,7 @@ pub async fn get_public(ip: Option<Extension<RealIp>>, Path(token): Path<String>
         Ok(None) => return with_public_headers(not_found()),
         Err(resp) => return with_public_headers(resp),
     };
-    let resp = read_shared(served, None, None, VISIBILITY_PUBLIC).await;
+    let resp = read_shared(served, &params, None, VISIBILITY_PUBLIC).await;
     // Internal error details are for signed-in readers only.
     if resp.status().is_server_error() {
         return with_public_headers(unavailable());
@@ -953,10 +1007,10 @@ pub(super) async fn fork_seed(
     session_id: Option<&str>,
     user_email: &str,
 ) -> Result<Option<Vec<Value>>, Response> {
-    let Some(session_id) = session_id.filter(|s| is_uuid(s)) else {
+    let Some(session_id) = session_id.and_then(normalize_uuid) else {
         return Ok(None);
     };
-    let row = match ai_chat_sessions::get(org_id, session_id).await {
+    let row = match ai_chat_sessions::get(org_id, &session_id).await {
         Ok(Some(row)) => row,
         Ok(None) => return Ok(None),
         Err(e) => {
@@ -1005,21 +1059,18 @@ async fn seed_source(org_id: &str, share_id: &str) -> Result<Option<ChatModel>, 
             return Err(unavailable());
         }
     };
-    match ai_chat_sessions::get(org_id, &share.session_id).await {
-        Ok(Some(chat))
-            if chat.status == STATUS_ACTIVE && creator_is_member(&share, &chat).await =>
-        {
-            Ok(Some(chat))
-        }
-        Ok(_) => Ok(None),
+    let chat = match ai_chat_sessions::get(org_id, &share.session_id).await {
+        Ok(Some(chat)) if chat.status == STATUS_ACTIVE => chat,
+        Ok(_) => return Ok(None),
         Err(e) => {
             log::error!(
                 "[AI-CHAT-SHARE] cannot read chat {org_id}/{}: {e}",
                 share.session_id
             );
-            Err(unavailable())
+            return Err(unavailable());
         }
-    }
+    };
+    Ok(creator_is_member(&share, &chat).await?.then_some(chat))
 }
 
 /// The caller's email, once chat history is known to be on.
@@ -1069,20 +1120,21 @@ async fn resolve(
     if public_only && db::org_status::is_blocked(&share.org_id) {
         return Ok(None);
     }
-    match ai_chat_sessions::get(&share.org_id, &share.session_id).await {
-        Ok(Some(chat)) if chat_servable(&chat) && creator_is_member(&share, &chat).await => {
-            Ok(Some(Served { share, chat }))
-        }
-        Ok(_) => Ok(None),
+    let chat = match ai_chat_sessions::get(&share.org_id, &share.session_id).await {
+        Ok(Some(chat)) if chat_servable(&chat) => chat,
+        Ok(_) => return Ok(None),
         Err(e) => {
             log::error!(
                 "[AI-CHAT-SHARE] cannot read chat {}/{}: {e}",
                 share.org_id,
                 share.session_id
             );
-            Err(unavailable())
+            return Err(unavailable());
         }
-    }
+    };
+    Ok(creator_is_member(&share, &chat)
+        .await?
+        .then_some(Served { share, chat }))
 }
 
 /// One of the caller's own live shares, with its active chat.
@@ -1113,7 +1165,7 @@ async fn settled_chat(chat: &ChatModel, owner: &str) -> Result<ChatModel, Respon
     let (org_id, session_id) = (&chat.org_id, &chat.session_id);
     let lease = match lease::acquire(org_id, session_id, 0).await {
         Ok(lease) => lease,
-        Err(LeaseError::Busy) => return Err(MetaHttpResponse::conflict(TURN_RUNNING)),
+        Err(LeaseError::Busy) => return Err(MetaHttpResponse::conflict(TURN_IN_PROGRESS)),
         Err(LeaseError::Backend(e)) => {
             log::error!("[AI-CHAT-SHARE] turn lease unavailable for {org_id}/{session_id}: {e}");
             return Err(unavailable());
@@ -1126,76 +1178,145 @@ async fn settled_chat(chat: &ChatModel, owner: &str) -> Result<ChatModel, Respon
 
 async fn read_shared(
     served: Served,
-    known_seq: Option<i64>,
+    params: &SharedChatParams,
     auth: Option<&str>,
     route: &'static str,
 ) -> Response {
     let Served { share, chat } = served;
+    let public = route == VISIBILITY_PUBLIC;
     let seq = ai_chat_shares::visible_seq(&share, chat.last_committed_seq);
+    let records = turn_records(&chat).await;
+    let since = running_since(now_micros());
+    let state_version = state_version(&share, seq, &records, since);
+    let not_modified =
+        params.known_seq == Some(seq) && params.known_version.as_deref() == Some(&state_version);
     let mut body = SharedChat {
         title: chat.title.clone(),
         mode: share.mode.clone(),
         seq,
+        active_turn: share.mode == MODE_LIVE
+            && records.iter().any(|r| ai_chat_turns::is_running(r, since)),
+        state_version,
         created_at: chat.created_at,
         shared_at: share.created_at,
         owner_name: None,
-        not_modified: known_seq == Some(seq),
+        not_modified,
         redact_tools: share.redact_tools,
+        truncated: false,
         turns: None,
     };
-    if !body.not_modified {
-        let public = route == VISIBILITY_PUBLIC;
-        body.turns = match shared_turns(&share, &chat, seq, auth, public).await {
-            Ok(turns) => Some(turns),
+    if !not_modified {
+        let key = (share.id.clone(), body.state_version.clone());
+        let (turns, truncated) = match shared_turns(&share, &chat, seq, key, auth, public).await {
+            Ok(shown) => shown,
             Err(resp) => return resp,
         };
+        body.turns = Some(turns);
+        body.truncated = truncated;
         count_read(&share.id).await;
         config::metrics::AI_CHAT_SHARE_READS_TOTAL
             .with_label_values(&[route])
             .inc();
     }
-    body.owner_name = owner_name(&chat, route == VISIBILITY_PUBLIC).await;
+    body.owner_name = owner_name(&chat, public).await;
     Json(body).into_response()
 }
 
-/// The share's turns through `seq` as readers see them; public reads are served from a short cache.
+/// The share's turns through `seq` as readers see them, and whether old ones were cut for size.
 async fn shared_turns(
     share: &ShareModel,
     chat: &ChatModel,
     seq: i64,
+    key: TurnKey,
     auth: Option<&str>,
     public: bool,
-) -> Result<Arc<Vec<Value>>, Response> {
-    let key = (share.id.clone(), seq, share.redact_tools);
-    if public && let Some(turns) = PUBLIC_TURNS.get(&key, Instant::now()) {
-        return Ok(turns);
+) -> Result<Shown, Response> {
+    if public && let Some(shown) = PUBLIC_TURNS.get(&key, Instant::now()) {
+        return Ok(shown);
     }
+    let Ok(Ok(_slot)) = tokio::time::timeout(PROJECTION_WAIT, PROJECTION_GATE.acquire()).await
+    else {
+        return Err(too_many_requests(Duration::from_secs(1)));
+    };
     let mut cut = chat.clone();
     cut.last_committed_seq = seq;
-    let turns = attach_turn_status(&cut, load_turns(&cut, auth).await?).await;
-    let turns = Arc::new(reader_view(turns, share.redact_tools));
+    // A snapshot hides turns admitted after it was taken, including failures that stored nothing.
+    let admitted_by = (share.mode == MODE_SNAPSHOT).then_some(share.updated_at);
+    let turns = attach_turn_status_at(&cut, load_turns(&cut, auth).await?, admitted_by).await;
+    let (turns, truncated) = newest_within(
+        reader_view(turns, share.redact_tools),
+        SHARED_TURNS_MAX_BYTES,
+    );
+    let shown = (Arc::new(turns), truncated);
     if public {
-        PUBLIC_TURNS.put(key, turns.clone(), Instant::now());
+        PUBLIC_TURNS.put(key, shown.clone(), Instant::now());
     }
-    Ok(turns)
+    Ok(shown)
 }
 
 async fn count_read(share_id: &str) {
+    READ_FLUSHER.call_once(|| {
+        tokio::spawn(flush_reads());
+    });
     let Some(reads) = PENDING_READS.hit(share_id, Instant::now()) else {
         return;
     };
+    write_reads(share_id, reads).await;
+}
+
+/// Writes buffered read counts every interval, so a share read only now and then is still counted.
+async fn flush_reads() {
+    let mut tick = tokio::time::interval(ACCESS_FLUSH_EVERY);
+    loop {
+        tick.tick().await;
+        for (share_id, reads) in PENDING_READS.drain(Instant::now()) {
+            write_reads(&share_id, reads).await;
+        }
+    }
+}
+
+async fn write_reads(share_id: &str, reads: i64) {
     if let Err(e) = ai_chat_shares::record_access(share_id, reads, now_micros()).await {
         log::warn!("[AI-CHAT-SHARE] cannot count {reads} reads of {share_id}: {e}");
     }
 }
 
-/// Whether the share's creator still owns the chat and belongs to the org, so a leaver's links die.
-async fn creator_is_member(share: &ShareModel, chat: &ChatModel) -> bool {
-    chat.user_id == share.created_by
-        && (db::user::is_root_user(&chat.user_email)
-            || openobserve_core::users::get_user(Some(&share.org_id), &chat.user_email)
-                .await
-                .is_some())
+async fn turn_records(chat: &ChatModel) -> Vec<TurnRecord> {
+    match ai_chat_turns::list_for_session(&chat.org_id, &chat.session_id).await {
+        Ok(records) => records,
+        Err(e) => {
+            // Statuses only annotate the history; the version then differs and readers refetch.
+            log::error!(
+                "[AI-CHAT-SHARE] cannot read the turn records of {}/{}: {e}",
+                chat.org_id,
+                chat.session_id
+            );
+            Vec::new()
+        }
+    }
+}
+
+/// Whether the share's creator still owns the chat under the same user id and belongs to the org.
+async fn creator_is_member(share: &ShareModel, chat: &ChatModel) -> Result<bool, Response> {
+    if chat.user_id != share.created_by {
+        return Ok(false);
+    }
+    // A deleted user's email can come back as a new user, who must not revive the old links.
+    match infra::table::users::get_id_by_email(&chat.user_email).await {
+        Ok(Some(id)) if id == share.created_by => {}
+        Ok(_) => return Ok(false),
+        Err(e) => {
+            log::error!(
+                "[AI-CHAT-SHARE] cannot resolve the owner of share {}: {e}",
+                share.id
+            );
+            return Err(unavailable());
+        }
+    }
+    Ok(db::user::is_root_user(&chat.user_email)
+        || openobserve_core::users::get_user(Some(&share.org_id), &chat.user_email)
+            .await
+            .is_some())
 }
 
 async fn owner_name(chat: &ChatModel, public: bool) -> Option<String> {
@@ -1226,11 +1347,12 @@ async fn is_org_admin(org_id: &str, user_email: &str) -> bool {
         .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
-/// Views of `shares` whose chat is still active and owned by the share's creator.
+/// Views of `shares` whose active chat its creator still owns; only the caller's own carry links.
 async fn share_views(
     org_id: &str,
     shares: Vec<ShareModel>,
     with_owner: bool,
+    caller: Option<&str>,
 ) -> Result<Vec<ShareView>, Response> {
     let mut session_ids: Vec<String> = shares.iter().map(|s| s.session_id.clone()).collect();
     session_ids.sort();
@@ -1262,10 +1384,15 @@ async fn share_views(
             let chat = chats
                 .get(&s.session_id)
                 .filter(|c| c.user_id == s.created_by)?;
+            let own = caller == Some(s.created_by.as_str());
             let mut view = ShareView::new(s, &chat.title);
             if with_owner {
                 view.owner_name = names.get(&chat.user_id).cloned().flatten();
                 view.owner_email = Some(chat.user_email.clone());
+            }
+            if !own {
+                view.token = None;
+                view.url_path = None;
             }
             Some(view)
         })
@@ -1291,7 +1418,7 @@ fn public_rate_limited(ip: Option<RealIp>) -> bool {
     let Some(ip) = ip else {
         return false;
     };
-    rpm != 0 && over_budget(&PUBLIC_READS, ip.0.to_string(), PUBLIC_READ_WINDOW, rpm)
+    rpm != 0 && PUBLIC_READS.over_budget(&ip.0.to_string(), PUBLIC_READ_WINDOW, rpm)
 }
 
 fn enter(gate: &Semaphore) -> Option<SemaphorePermit<'_>> {
@@ -1478,17 +1605,62 @@ fn fork_title(source: &str) -> String {
     title
 }
 
-/// Turns as a share reader sees them: no opencode message ids, and tool details only if allowed.
+/// Turns as a share reader sees them: no opencode ids or remote images, tool details if allowed.
 fn reader_view(mut turns: Vec<Value>, redact_tools: bool) -> Vec<Value> {
     if redact_tools {
         projection::redact_turns(&mut turns);
     }
     for turn in &mut turns {
+        projection::keep_inline_images(turn);
         if let Some(turn) = turn.as_object_mut() {
             turn.remove("user_message_id");
         }
     }
     turns
+}
+
+/// Changes whenever a reader's copy would: the seq, a shown turn's status or error, or a setting.
+fn state_version(
+    share: &ShareModel,
+    seq: i64,
+    records: &[TurnRecord],
+    running_since: i64,
+) -> String {
+    let mut key = format!(
+        "{seq}|{}|{}|{:?}",
+        share.mode, share.redact_tools, share.snapshot_seq
+    );
+    for record in records
+        .iter()
+        .filter(|r| r.start_seq.is_none_or(|start| start <= seq + 1))
+    {
+        let status =
+            if record.status == TURN_RUNNING && !ai_chat_turns::is_running(record, running_since) {
+                TURN_INTERRUPTED
+            } else {
+                record.status.as_str()
+            };
+        let error_code = record.error_code.as_deref().unwrap_or_default();
+        key.push_str(&format!("|{}:{status}:{error_code}", record.turn_id));
+    }
+    format!("{seq}.{:016x}", fnv::new().sum64(&key))
+}
+
+/// The newest `turns` whose JSON fits in `max_bytes`, and whether any were left out.
+fn newest_within(mut turns: Vec<Value>, max_bytes: usize) -> (Vec<Value>, bool) {
+    let mut total = 0usize;
+    let mut keep = 0;
+    for turn in turns.iter().rev() {
+        let bytes = serde_json::to_vec(turn).map_or(usize::MAX, |b| b.len() + 1);
+        total = total.saturating_add(bytes);
+        if total > max_bytes {
+            break;
+        }
+        keep += 1;
+    }
+    let cut = turns.len() - keep;
+    turns.drain(..cut);
+    (turns, cut > 0)
 }
 
 /// A chat's stored events as `{role, content}` messages, tool calls as `[tool <name>]` notes.
@@ -1710,6 +1882,11 @@ mod tests {
         let turns = vec![json!({"user_message_id": "msg_1", "user": {"text": "hi"}, "frames": []})];
         let view = reader_view(turns, false);
         assert_eq!(view, vec![json!({"user": {"text": "hi"}, "frames": []})]);
+        let remote = vec![json!({"user": {"text": "", "images": [{"url": "https://x/y.png"}]}})];
+        assert_eq!(
+            reader_view(remote, false)[0]["user"]["images"][0]["url"],
+            Value::Null
+        );
     }
 
     #[test]
@@ -1763,17 +1940,24 @@ mod tests {
     }
 
     #[test]
-    fn public_turns_are_cached_per_share_seq_and_redaction_until_they_expire() {
+    fn public_turns_are_cached_per_share_and_version_until_they_expire() {
         let cache = TurnCache::new(Duration::from_secs(60));
         let t0 = Instant::now();
-        let key = ("s".to_string(), 4, true);
-        cache.put(key.clone(), Arc::new(vec![json!({"a": 1})]), t0);
+        let key = ("s".to_string(), "4.a".to_string());
+        cache.put(key.clone(), (Arc::new(vec![json!({"a": 1})]), false), t0);
         assert!(cache.get(&key, t0 + Duration::from_secs(59)).is_some());
-        assert!(cache.get(&("s".to_string(), 4, false), t0).is_none());
-        assert!(cache.get(&("s".to_string(), 5, true), t0).is_none());
+        assert!(
+            cache
+                .get(&("s".to_string(), "4.b".to_string()), t0)
+                .is_none()
+        );
         assert!(cache.get(&key, t0 + Duration::from_secs(60)).is_none());
         for i in 0..PUBLIC_TURNS_MAX_ENTRIES + 5 {
-            cache.put((format!("s{i}"), 1, false), Arc::new(Vec::new()), t0);
+            cache.put(
+                (format!("s{i}"), "1".into()),
+                (Arc::new(Vec::new()), false),
+                t0,
+            );
         }
         assert_eq!(
             cache.entries.lock().unwrap().len(),
@@ -1782,15 +1966,89 @@ mod tests {
     }
 
     #[test]
-    fn reads_are_written_at_most_once_per_interval_per_share() {
+    fn first_reads_are_written_at_once_and_the_rest_by_the_flush() {
         let counter = ReadCounter::new(Duration::from_secs(60));
         let t0 = Instant::now();
         assert_eq!(counter.hit("a", t0), Some(1));
         assert_eq!(counter.hit("a", t0 + Duration::from_secs(1)), None);
         assert_eq!(counter.hit("a", t0 + Duration::from_secs(2)), None);
         assert_eq!(counter.hit("b", t0 + Duration::from_secs(2)), Some(1));
-        assert_eq!(counter.hit("a", t0 + Duration::from_secs(60)), Some(3));
-        assert_eq!(counter.hit("a", t0 + Duration::from_secs(61)), None);
+        assert_eq!(
+            counter.drain(t0 + Duration::from_secs(60)),
+            vec![("a".to_string(), 2)]
+        );
+        assert!(counter.drain(t0 + Duration::from_secs(61)).is_empty());
+        assert_eq!(counter.hit("a", t0 + Duration::from_secs(62)), None);
+        assert!(counter.drain(t0 + Duration::from_secs(200)).len() == 1);
+        assert!(counter.drain(t0 + Duration::from_secs(400)).is_empty());
+        assert!(counter.pending.lock().unwrap().is_empty());
+        assert_eq!(counter.hit("a", t0 + Duration::from_secs(401)), Some(1));
+    }
+
+    fn record(turn_id: &str, status: &str, start_seq: i64, started_at: i64) -> TurnRecord {
+        TurnRecord {
+            org_id: ORG.into(),
+            session_id: "s".into(),
+            turn_id: turn_id.into(),
+            status: status.into(),
+            error_code: None,
+            start_seq: Some(start_seq),
+            end_seq: None,
+            started_at,
+            ended_at: None,
+        }
+    }
+
+    #[test]
+    fn the_state_version_follows_statuses_settings_and_the_cut() {
+        let live = share(MODE_LIVE, VISIBILITY_ORG);
+        let running = vec![
+            record("t1", "completed", 0, 5),
+            record("t2", TURN_RUNNING, 5, 10),
+        ];
+        let base = state_version(&live, 4, &running, 0);
+        assert_eq!(base, state_version(&live, 4, &running, 0));
+        assert!(base.starts_with("4."));
+        let mut done = running.clone();
+        done[1].status = "completed".into();
+        assert_ne!(base, state_version(&live, 4, &done, 0));
+        assert_ne!(
+            base,
+            state_version(&live, 4, &running, 11),
+            "running turn went stale"
+        );
+        let mut failed = done.clone();
+        failed[1].error_code = Some("agent_error".into());
+        assert_ne!(
+            state_version(&live, 4, &done, 0),
+            state_version(&live, 4, &failed, 0)
+        );
+        let mut redacted = live.clone();
+        redacted.redact_tools = true;
+        assert_ne!(base, state_version(&redacted, 4, &running, 0));
+        let mut snap = share(MODE_SNAPSHOT, VISIBILITY_ORG);
+        snap.snapshot_seq = Some(2);
+        let before = state_version(&snap, 2, &running[..1], 0);
+        assert_eq!(
+            before,
+            state_version(&snap, 2, &running, 0),
+            "turn after the cut"
+        );
+    }
+
+    #[test]
+    fn oversized_histories_keep_the_newest_turns() {
+        let turns: Vec<Value> = (0..4)
+            .map(|i| json!({"n": i, "pad": "x".repeat(100)}))
+            .collect();
+        let one = serde_json::to_vec(&turns[0]).unwrap().len() + 1;
+        let (all, cut) = newest_within(turns.clone(), one * 4);
+        assert_eq!((all.len(), cut), (4, false));
+        let (kept, cut) = newest_within(turns.clone(), one * 2 + 1);
+        assert!(cut);
+        assert_eq!(kept, turns[2..].to_vec());
+        let (none, cut) = newest_within(turns, 1);
+        assert!(none.is_empty() && cut);
     }
 
     #[test]
@@ -2045,7 +2303,7 @@ mod tests {
     }
 
     #[test]
-    fn public_reads_are_limited_per_ip_and_by_a_global_gate() {
+    fn public_reads_are_limited_per_ip_and_unknown_clients_by_a_gate() {
         assert!(!public_rate_limited(None));
         let gate = Semaphore::new(1);
         let first = enter(&gate);

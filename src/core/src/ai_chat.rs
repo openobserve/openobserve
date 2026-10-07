@@ -13,30 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Durable storage for AI chat events.
-//!
-//! Server-side chat persistence itself lives in
-//! `o2_enterprise::enterprise::ai::chat` — the background turn task,
-//! batching, watermark and leases. This module is the one piece that has to
-//! live here: writing to a stream needs OpenObserve's own ingestion and
-//! schema plumbing, which sits above the enterprise crate in the dependency
-//! graph. It is injected into a turn as a
-//! [`ChatStore`](o2_enterprise::enterprise::ai::chat::ChatStore).
-//!
-//! Index/stream consistency (design §12). The stream is written first and the
-//! index watermark second, so the only divergence a crash can leave is events
-//! stored past the watermark. That needs no repair job: readers stop at the
-//! watermark (the extra events are invisible), and the next turn re-sends from
-//! the watermark — o2-ai forwards `seq > known_seq` — so those events are
-//! written again byte-identically and the reader deduplicates them. A watermark
-//! ahead of readable data (the other direction) is reported as an integrity
-//! error and never papered over. Index rows of chats whose events aged out are
-//! removed by the `ai_chat_retention` job.
+//! The `_o2_ai_chat_events` store behind persisted chat turns, and its verified reader.
 
 pub mod projection;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     sync::{Arc, LazyLock as Lazy},
     time::Duration,
 };
@@ -53,25 +35,26 @@ use config::{
 };
 use dashmap::DashMap;
 use infra::table::{
-    ai_chat_sessions::{self, NO_SEQ},
-    ai_chat_turns,
+    ai_chat_sessions::{self, NO_SEQ, STATUS_ACTIVE},
+    ai_chat_shares, ai_chat_turns,
 };
 use o2_enterprise::enterprise::ai::chat::{
-    AiChatEventRecord, Binding, ChatStore, batcher::DurableEvent,
+    AiChatEventRecord, Binding, CancelReason, ChatStore, batcher::DurableEvent,
+    record::assemble_event, registry,
 };
 use tokio::sync::OnceCell;
 
-// One cell per org: concurrent first writers wait on the same initialization
-// (as `llm_scores_schema` does), success is a node-lifetime no-op, and a
-// failure leaves the cell empty so the next write retries.
+// A failed initialization leaves the org's cell empty, so the next write retries it.
 static INITIALIZED_ORGS: Lazy<DashMap<String, Arc<OnceCell<()>>>> = Lazy::new(DashMap::new);
 
 const SESSION_FIELD: &str = "session_id";
+/// A window is a `seq` range, so every stored copy of one event is compared in the same window.
+const READ_WINDOW: i64 = 500;
+/// Search-visibility lag is retried this often before a missing committed event is an error.
+const READ_RETRIES: u32 = 4;
+const REFRESH_BATCH: usize = 500;
 
-/// The storage a running chat turn writes through: durable events into the
-/// org's protected `_o2_ai_chat_events` stream (via the internal ingestion
-/// path — directly on an ingester, over gRPC to one otherwise), and the
-/// session index in the meta DB.
+/// Writes a persisted turn's durable events to the org's protected stream and its session index.
 pub struct StreamChatStore {
     retention_days: i64,
 }
@@ -197,7 +180,6 @@ impl ChatStore for StreamChatStore {
         .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
         if !finished {
-            // Superseded: a later turn found it still running and marked it interrupted.
             log::warn!(
                 "[AI-CHAT] turn {turn_id} of {org_id}/{session_id} was no longer running \
                  when it ended as {status}"
@@ -205,14 +187,14 @@ impl ChatStore for StreamChatStore {
         }
         Ok(())
     }
-}
 
-/// Events per read window. A window is a `seq` range, so every copy of a
-/// retried (duplicated) event lands in the same window and is compared there.
-const READ_WINDOW: i64 = 500;
-/// Search-visibility lag is retried this many times before a missing committed
-/// event is reported as an integrity failure.
-const READ_RETRIES: u32 = 4;
+    async fn is_deleted(&self, org_id: &str, session_id: &str) -> Result<bool> {
+        let row = ai_chat_sessions::get(org_id, session_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        Ok(row.is_none_or(|row| row.status != STATUS_ACTIVE))
+    }
+}
 
 /// Why committed history could not be read back intact.
 #[derive(Debug, thiserror::Error)]
@@ -220,7 +202,7 @@ pub enum ReadError {
     /// Committed events are missing (after retrying for visibility lag).
     #[error("committed history has a gap: expected seq {expected}, found {found:?}")]
     Gap { expected: i64, found: Option<i64> },
-    /// Two stored copies of one seq differ — never resolved by picking one.
+    /// Two stored versions of one seq that no turn record or epoch tells apart.
     #[error("seq {seq} is stored with different contents ({a} vs {b})")]
     Divergence { seq: i64, a: String, b: String },
     /// A stored row does not verify against its own hash, or cannot be decoded.
@@ -244,10 +226,94 @@ impl ReadError {
     }
 }
 
-/// A chat's committed durable events with `seq > after_seq` through its
-/// committed watermark: ascending, one per seq, each verified against its
-/// stored hash, and contiguous. Anything less is an error — a shortened
-/// history is never returned as if it were complete (design §9.3, §12.3).
+/// One committed event: the stored rows (its parts, in order) it was assembled from.
+pub type StoredEvent = (Vec<AiChatEventRecord>, DurableEvent);
+
+/// Which stored rows count as a chat's committed history (contract R1).
+#[derive(Debug, Default)]
+struct Resolver {
+    /// Rows of any other opencode session were written by an abandoned replica.
+    opencode_session_id: Option<String>,
+    epoch: i64,
+    /// `(first_seq, last_seq, turn_id)` each recorded turn committed.
+    coverage: Vec<(i64, i64, String)>,
+}
+
+impl Resolver {
+    fn new(row: &ai_chat_sessions::Model, records: &[ai_chat_turns::Model]) -> Self {
+        Self {
+            opencode_session_id: row.opencode_session_id.clone(),
+            epoch: row.session_epoch,
+            coverage: turn_coverage(records, row.last_committed_seq),
+        }
+    }
+
+    fn admits(&self, row: &AiChatEventRecord) -> bool {
+        self.opencode_session_id
+            .as_deref()
+            .is_none_or(|bound| row.opencode_session_id == bound)
+    }
+
+    /// The turn that committed `seq`; the latest recorded one when ranges overlap.
+    fn covering_turn(&self, seq: i64) -> Option<&str> {
+        self.coverage
+            .iter()
+            .rev()
+            .find(|(first, last, _)| (*first..=*last).contains(&seq))
+            .map(|(.., turn)| turn.as_str())
+    }
+
+    /// The committed version of `seq` among its complete stored versions (`None`: not visible).
+    fn pick<'a>(
+        &self,
+        seq: i64,
+        versions: &'a [Version],
+    ) -> std::result::Result<Option<&'a Version>, ReadError> {
+        // Rows of any other turn at a seq a recorded turn committed are stray, whatever they hold.
+        let candidates: Vec<&Version> = match self.covering_turn(seq) {
+            Some(turn) => versions.iter().filter(|v| v.turn_id == turn).collect(),
+            None => versions.iter().collect(),
+        };
+        if distinct_hashes(candidates.iter().copied()) <= 1 {
+            // Empty: only strays are visible, the committing turn's rows are not yet.
+            return Ok(candidates.first().copied());
+        }
+        let newest = candidates
+            .iter()
+            .map(|v| v.epoch)
+            .filter(|epoch| *epoch <= self.epoch)
+            .max();
+        let newest: Vec<&Version> = candidates
+            .iter()
+            .copied()
+            .filter(|v| Some(v.epoch) == newest)
+            .collect();
+        match distinct_hashes(newest.iter().copied()) {
+            1 => Ok(newest.first().copied()),
+            _ => Err(divergence(seq, candidates.into_iter())),
+        }
+    }
+}
+
+/// One stored version of an event: every part row a single write produced for it.
+#[derive(Debug)]
+struct Version {
+    turn_id: String,
+    epoch: i64,
+    hash: String,
+    parts: BTreeMap<i64, AiChatEventRecord>,
+}
+
+impl Version {
+    fn is_complete(&self) -> bool {
+        self.parts
+            .values()
+            .next()
+            .is_some_and(|row| row.parts >= 1 && self.parts.len() as i64 == row.parts)
+    }
+}
+
+/// A chat's verified, contiguous committed events past `after_seq`, or an error, never fewer.
 pub async fn read_committed_events(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
@@ -259,12 +325,143 @@ pub async fn read_committed_events(
         .collect())
 }
 
-/// [`read_committed_events`], as the stored rows (each verified) with the
-/// events they hold.
+/// Rewrites committed rows with fresh timestamps (caller holds the lease); returns how many.
+pub async fn refresh_chat_history(
+    org_id: &str,
+    session_id: &str,
+    retention_days: i64,
+) -> Result<usize> {
+    // Re-read under the lease: the row the caller listed may predate the last turn's commits.
+    let Some(row) = ai_chat_sessions::get(org_id, session_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+        .filter(|row| row.status == STATUS_ACTIVE)
+    else {
+        return Ok(0);
+    };
+    let events = read_verified(&row, NO_SEQ).await?;
+    if events.is_empty() {
+        return Ok(0);
+    }
+    ensure_stream_initialized(org_id, retention_days).await;
+    let stream = StreamParams::new(org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs);
+    let rows: Vec<&AiChatEventRecord> = events.iter().flat_map(|(rows, _)| rows).collect();
+    let first = now_micros();
+    let mut last = first;
+    for chunk in rows.chunks(REFRESH_BATCH) {
+        last = now_micros().max(last);
+        let values = chunk
+            .iter()
+            .map(|record| {
+                let mut copy = (*record).clone();
+                copy.timestamp = last;
+                json::to_value(copy)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        crate::self_reporting::ingest_internal_logs(values, stream.clone()).await?;
+    }
+    let moved = ai_chat_sessions::set_refreshed_range(
+        org_id,
+        session_id,
+        first,
+        last,
+        row.last_committed_seq,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("{e}"))?;
+    if !moved {
+        anyhow::bail!("the chat committed more events during the refresh; retried next pass");
+    }
+    Ok(events.len())
+}
+
+/// Delete every chat `user_id` owns in `org_id` as the user's own delete does; returns their ids.
+pub async fn delete_all_for_user(org_id: &str, user_id: &str) -> Result<Vec<String>> {
+    match ai_chat_sessions::active_ids_for_user(org_id, user_id).await {
+        Ok(ids) => {
+            for session_id in ids {
+                registry::cancel(org_id, &session_id, CancelReason::Deleted);
+            }
+        }
+        Err(e) => log::warn!("[AI-CHAT] cannot list chats of {org_id}/{user_id} to stop: {e}"),
+    }
+    let now = now_micros();
+    let session_ids = ai_chat_sessions::mark_all_deleted(org_id, user_id, now)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    if !session_ids.is_empty()
+        && let Err(e) = ai_chat_shares::revoke_for_sessions(org_id, &session_ids, now).await
+    {
+        // A share of a deleted chat is already unservable; this only tidies the rows.
+        log::error!("[AI-CHAT] cannot revoke shares of deleted chats in {org_id}: {e}");
+    }
+    Ok(session_ids)
+}
+
+/// Split a chat's events into chunks of whole turns of at most `max_events` (a longer turn alone).
+pub fn turn_chunks(events: &[DurableEvent], max_events: usize) -> Vec<&[DurableEvent]> {
+    let mut starts = vec![0usize];
+    let mut seen_users = HashSet::new();
+    for (i, event) in events.iter().enumerate() {
+        if !event.event_type.starts_with("message.updated") {
+            continue;
+        }
+        let info = &event.data["info"];
+        if info["role"] == "user"
+            && let Some(id) = info["id"].as_str()
+            && seen_users.insert(id.to_string())
+            && i > 0
+        {
+            starts.push(i);
+        }
+    }
+    starts.push(events.len());
+
+    let mut chunks = Vec::new();
+    let mut chunk_start = 0;
+    for window in starts.windows(2) {
+        let (turn_start, turn_end) = (window[0], window[1]);
+        if turn_end - chunk_start > max_events.max(1) && turn_start > chunk_start {
+            chunks.push(&events[chunk_start..turn_start]);
+            chunk_start = turn_start;
+        }
+    }
+    if chunk_start < events.len() {
+        chunks.push(&events[chunk_start..]);
+    }
+    chunks
+}
+
+/// Create the org's chat-events stream with the expected schema and settings, once per node.
+pub async fn ensure_stream_initialized(org_id: &str, retention_days: i64) {
+    let cell = INITIALIZED_ORGS
+        .entry(org_id.to_string())
+        .or_insert_with(|| Arc::new(OnceCell::new()))
+        .clone();
+    let _ = cell
+        .get_or_try_init(|| async {
+            purge_stream_alerts(org_id).await;
+            initialize_schema(org_id).await.inspect_err(|e| {
+                log::warn!(
+                    "[AI-CHAT] Failed to initialize {AI_CHAT_EVENTS_STREAM} schema for org {org_id}: {e}"
+                )
+            })?;
+            initialize_settings(org_id, retention_days)
+                .await
+                .inspect_err(|e| {
+                    log::warn!(
+                        "[AI-CHAT] Failed to apply {AI_CHAT_EVENTS_STREAM} settings for org {org_id}: {e}"
+                    )
+                })
+        })
+        .await;
+}
+
+/// [`read_committed_events`], with the stored rows each event was assembled from.
 async fn read_verified(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
-) -> std::result::Result<Vec<(AiChatEventRecord, DurableEvent)>, ReadError> {
+) -> std::result::Result<Vec<StoredEvent>, ReadError> {
     let result = read_committed_inner(row, after_seq).await;
     if let Err(e) = &result {
         metrics::AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL
@@ -284,7 +481,7 @@ async fn read_verified(
 async fn read_committed_inner(
     row: &ai_chat_sessions::Model,
     after_seq: i64,
-) -> std::result::Result<Vec<(AiChatEventRecord, DurableEvent)>, ReadError> {
+) -> std::result::Result<Vec<StoredEvent>, ReadError> {
     let last = row.last_committed_seq;
     if last <= after_seq.max(NO_SEQ) {
         return Ok(Vec::new());
@@ -292,6 +489,10 @@ async fn read_committed_inner(
     let (Some(first_at), Some(last_at)) = (row.first_event_at, row.last_event_at) else {
         return Err(ReadError::NoTimeRange);
     };
+    let records = ai_chat_turns::list_for_session(&row.org_id, &row.session_id)
+        .await
+        .map_err(|e| ReadError::Search(format!("turn records: {e}")))?;
+    let resolver = Resolver::new(row, &records);
 
     let mut events = Vec::with_capacity((last - after_seq.max(NO_SEQ)) as usize);
     let mut lo = after_seq.max(NO_SEQ);
@@ -300,7 +501,7 @@ async fn read_committed_inner(
         let mut attempt = 0;
         let window = loop {
             let rows = search_window(row, lo, hi, first_at, last_at).await?;
-            match verify_window(rows, lo, hi) {
+            match verify_window(rows, lo, hi, &resolver) {
                 // Visibility lag: what was acknowledged may not be searchable yet.
                 Err(ReadError::Gap { .. }) if attempt < READ_RETRIES => {
                     attempt += 1;
@@ -355,8 +556,7 @@ async fn search_window(
         timeout: 0,
         search_type: Some(SearchEventType::Other),
         search_event_context: None,
-        // Never serve chat history from the result cache: it must reflect the
-        // committed watermark exactly.
+        // Chat history must reflect the committed watermark exactly, never a cached result.
         use_cache: false,
         clear_cache: false,
         local_mode: None,
@@ -378,142 +578,147 @@ async fn search_window(
             resp.function_error.join(", ")
         )));
     }
-    resp.hits
-        .into_iter()
-        .map(|hit| {
-            json::from_value::<AiChatEventRecord>(hit)
-                .map_err(|e| ReadError::Corrupt(format!("undecodable row: {e}")))
-        })
-        .collect()
+    resp.hits.into_iter().map(decode_row).collect()
 }
 
-/// Deduplicate one window's rows by seq and check it covers `(lo, hi]`.
+/// A search hit as a stored row; columns a file predates come back null and take their default.
+fn decode_row(mut hit: json::Value) -> std::result::Result<AiChatEventRecord, ReadError> {
+    if let Some(obj) = hit.as_object_mut() {
+        obj.retain(|_, value| !value.is_null());
+    }
+    json::from_value::<AiChatEventRecord>(hit)
+        .map_err(|e| ReadError::Corrupt(format!("undecodable row: {e}")))
+}
+
+/// Resolve one window's rows to the committed event of each seq and check `(lo, hi]` is covered.
 fn verify_window(
     rows: Vec<AiChatEventRecord>,
     lo: i64,
     hi: i64,
-) -> std::result::Result<Vec<(AiChatEventRecord, DurableEvent)>, ReadError> {
-    let mut by_seq: BTreeMap<i64, AiChatEventRecord> = BTreeMap::new();
+    resolver: &Resolver,
+) -> std::result::Result<Vec<StoredEvent>, ReadError> {
+    let mut by_seq: BTreeMap<i64, Vec<Version>> = BTreeMap::new();
     for row in rows {
-        if row.seq <= lo || row.seq > hi {
+        if row.seq <= lo || row.seq > hi || !resolver.admits(&row) {
             continue;
         }
-        match by_seq.get(&row.seq) {
-            // A retried batch: byte-identical copies are expected.
-            Some(kept) if kept.event_hash == row.event_hash => {}
-            Some(kept) => {
-                return Err(ReadError::Divergence {
-                    seq: row.seq,
-                    a: kept.event_hash.clone(),
-                    b: row.event_hash,
-                });
-            }
-            None => {
-                by_seq.insert(row.seq, row);
-            }
-        }
+        add_part(by_seq.entry(row.seq).or_default(), row)?;
     }
     let mut events = Vec::with_capacity(by_seq.len());
-    for (expected, (seq, row)) in (lo + 1..=hi).zip(by_seq) {
+    let mut expected = lo + 1;
+    for (seq, mut versions) in by_seq {
+        versions.retain(Version::is_complete);
+        let Some(version) = resolver.pick(seq, &versions)? else {
+            continue;
+        };
         if seq != expected {
             return Err(ReadError::Gap {
                 expected,
                 found: Some(seq),
             });
         }
-        let event = row
-            .to_verified_event()
-            .map_err(|e| ReadError::Corrupt(e.to_string()))?;
-        events.push((row, event));
+        let rows: Vec<AiChatEventRecord> = version.parts.values().cloned().collect();
+        let event = assemble_event(&rows).map_err(|e| ReadError::Corrupt(e.to_string()))?;
+        events.push((rows, event));
+        expected += 1;
     }
-    if events.len() as i64 != hi - lo {
+    if expected <= hi {
         return Err(ReadError::Gap {
-            expected: lo + 1 + events.len() as i64,
+            expected,
             found: None,
         });
     }
     Ok(events)
 }
 
-/// Rewrite a chat's committed history with fresh timestamps so it does not
-/// age out of the chat-events stream while the chat is in use (see the
-/// `ai_chat_retention` job). The copies are byte-identical rows — same seq,
-/// same hash — so readers deduplicate them; once all are written, the chat's
-/// read window moves to them. The caller holds the chat's turn lease.
-/// Returns how many events were rewritten.
-pub async fn refresh_chat_history(
-    row: &ai_chat_sessions::Model,
-    retention_days: i64,
-) -> Result<usize> {
-    let records = read_verified(row, NO_SEQ).await?;
-    if records.is_empty() {
-        return Ok(0);
-    }
-    ensure_stream_initialized(&row.org_id, retention_days).await;
-    let stream = StreamParams::new(&row.org_id, AI_CHAT_EVENTS_STREAM, StreamType::Logs);
-    let first = now_micros();
-    let mut last = first;
-    for chunk in records.chunks(REFRESH_BATCH) {
-        last = now_micros().max(last);
-        let values = chunk
-            .iter()
-            .map(|(record, _)| {
-                let mut copy = record.clone();
-                copy.timestamp = last;
-                json::to_value(copy)
+/// File `row` under its version of the event; a retried write repeats parts byte for byte.
+fn add_part(
+    versions: &mut Vec<Version>,
+    row: AiChatEventRecord,
+) -> std::result::Result<(), ReadError> {
+    let found = versions.iter_mut().find(|v| {
+        v.turn_id == row.turn_id && v.epoch == row.session_epoch && v.hash == row.event_hash
+    });
+    let version = match found {
+        Some(version) => version,
+        None => {
+            versions.push(Version {
+                turn_id: row.turn_id.clone(),
+                epoch: row.session_epoch,
+                hash: row.event_hash.clone(),
+                parts: BTreeMap::new(),
+            });
+            versions.last_mut().expect("just pushed")
+        }
+    };
+    match version.parts.get(&row.part) {
+        Some(kept) if kept.payload != row.payload || kept.parts != row.parts => {
+            Err(ReadError::Divergence {
+                seq: row.seq,
+                a: kept.event_hash.clone(),
+                b: format!("{} (part {} differs)", row.event_hash, row.part),
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        crate::self_reporting::ingest_internal_logs(values, stream.clone()).await?;
+        }
+        Some(_) => Ok(()),
+        None => {
+            version.parts.insert(row.part, row);
+            Ok(())
+        }
     }
-    ai_chat_sessions::set_refreshed_range(&row.org_id, &row.session_id, first, last)
-        .await
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    Ok(records.len())
 }
 
-const REFRESH_BATCH: usize = 500;
+/// The seq range each turn record committed: its recorded end, else up to the next turn's start.
+fn turn_coverage(records: &[ai_chat_turns::Model], last_committed: i64) -> Vec<(i64, i64, String)> {
+    records
+        .iter()
+        .enumerate()
+        .filter_map(|(i, record)| {
+            let first = record.start_seq?;
+            let last = record.end_seq.unwrap_or_else(|| {
+                records[i + 1..]
+                    .iter()
+                    .find_map(|next| next.start_seq)
+                    .map_or(last_committed, |next| next - 1)
+            });
+            (last >= first).then(|| (first, last, record.turn_id.clone()))
+        })
+        .collect()
+}
 
-/// Split a chat's events into chunks of whole turns, each at most
-/// `max_events` long unless a single turn is longer. A turn starts at the
-/// first `message.updated` of a user message; o2-ai projects each chunk on
-/// its own, so no request grows with the length of the conversation.
-pub fn turn_chunks(events: &[DurableEvent], max_events: usize) -> Vec<&[DurableEvent]> {
-    let mut starts = vec![0usize];
-    let mut seen_users = std::collections::HashSet::new();
-    for (i, event) in events.iter().enumerate() {
-        if !event.event_type.starts_with("message.updated") {
-            continue;
-        }
-        let info = &event.data["info"];
-        if info["role"] == "user"
-            && let Some(id) = info["id"].as_str()
-            && seen_users.insert(id.to_string())
-            && i > 0
-        {
-            starts.push(i);
-        }
-    }
-    starts.push(events.len());
+fn distinct_hashes<'a>(versions: impl Iterator<Item = &'a Version>) -> usize {
+    versions
+        .map(|v| v.hash.as_str())
+        .collect::<HashSet<_>>()
+        .len()
+}
 
-    let mut chunks = Vec::new();
-    let mut chunk_start = 0;
-    for window in starts.windows(2) {
-        let (turn_start, turn_end) = (window[0], window[1]);
-        if turn_end - chunk_start > max_events.max(1) && turn_start > chunk_start {
-            chunks.push(&events[chunk_start..turn_start]);
-            chunk_start = turn_start;
-        }
+fn divergence<'a>(seq: i64, mut versions: impl Iterator<Item = &'a Version>) -> ReadError {
+    let a = versions.next().map(|v| v.hash.clone()).unwrap_or_default();
+    let b = versions
+        .find(|v| v.hash != a)
+        .map(|v| v.hash.clone())
+        .unwrap_or_default();
+    ReadError::Divergence { seq, a, b }
+}
+
+/// Realtime alerts on the protected stream would hand every chat to the alert's destination.
+async fn purge_stream_alerts(org_id: &str) {
+    let key = format!("{org_id}/{}/{AI_CHAT_EVENTS_STREAM}", StreamType::Logs);
+    if ::common::infra::config::STREAM_ALERTS
+        .write()
+        .await
+        .remove(&key)
+        .is_some()
+    {
+        log::warn!(
+            "[AI-CHAT] dropped realtime alerts cached on {AI_CHAT_EVENTS_STREAM} of {org_id}"
+        );
     }
-    if chunk_start < events.len() {
-        chunks.push(&events[chunk_start..]);
-    }
-    chunks
 }
 
 fn expected_schema() -> Result<arrow_schema::Schema> {
     let sample = config::utils::json::to_value(AiChatEventRecord::init_for_reflection())?;
-    // Ingestion flattens records before inferring a schema; mirror that so
-    // every column is initialized the same way it will be written.
+    // Ingestion flattens before inferring, so the schema is inferred the same way.
     let sample = config::utils::flatten::flatten(sample)?;
     let sample = sample
         .as_object()
@@ -523,33 +728,6 @@ fn expected_schema() -> Result<arrow_schema::Schema> {
         StreamType::Logs,
         std::iter::once(sample),
     )?)
-}
-
-/// Create the org's chat-events stream with the expected schema and settings.
-/// Idempotent and cheap after the first call per org; a failure is logged and
-/// retried on the next write (ingestion can infer the schema on its own, so
-/// persistence does not depend on this succeeding).
-pub async fn ensure_stream_initialized(org_id: &str, retention_days: i64) {
-    let cell = INITIALIZED_ORGS
-        .entry(org_id.to_string())
-        .or_insert_with(|| Arc::new(OnceCell::new()))
-        .clone();
-    let _ = cell
-        .get_or_try_init(|| async {
-            initialize_schema(org_id).await.inspect_err(|e| {
-                log::warn!(
-                    "[AI-CHAT] Failed to initialize {AI_CHAT_EVENTS_STREAM} schema for org {org_id}: {e}"
-                )
-            })?;
-            initialize_settings(org_id, retention_days)
-                .await
-                .inspect_err(|e| {
-                    log::warn!(
-                        "[AI-CHAT] Failed to apply {AI_CHAT_EVENTS_STREAM} settings for org {org_id}: {e}"
-                    )
-                })
-        })
-        .await;
 }
 
 async fn initialize_schema(org_id: &str) -> Result<()> {
@@ -589,9 +767,7 @@ async fn initialize_settings(org_id: &str, retention_days: i64) -> Result<()> {
     Ok(())
 }
 
-/// A bloom filter and a secondary index on `session_id` make the per-session
-/// reads the Chat API does cheap; retention is applied only when configured.
-/// Returns whether anything changed.
+/// Bloom filter and index on `session_id`, and retention when set; `true` if anything changed.
 fn apply_settings(settings: &mut StreamSettings, retention_days: i64, now: i64) -> bool {
     let mut changed = false;
     if !settings
@@ -618,6 +794,9 @@ fn apply_settings(settings: &mut StreamSettings, retention_days: i64, now: i64) 
 
 #[cfg(test)]
 mod tests {
+    use infra::table::ai_chat_turns::{TURN_COMPLETED, TURN_FAILED, TURN_RUNNING};
+    use o2_enterprise::enterprise::ai::chat::{RecordContext, record};
+
     use super::*;
 
     #[test]
@@ -637,47 +816,94 @@ mod tests {
             "event_hash",
             "payload",
             "payload_bytes",
+            "part",
+            "parts",
         ] {
             assert!(schema.field_with_name(field).is_ok(), "{field}");
         }
-        // A JSON *string*: flattening a nested object here would create a
-        // column per message/part field the model ever emits.
+        // A nested payload would be flattened into a column per field the model ever emits.
         assert_eq!(
             schema.field_with_name("payload").unwrap().data_type(),
             &arrow_schema::DataType::Utf8
         );
-        assert_eq!(schema.fields().len(), 13);
+        assert_eq!(schema.fields().len(), 15);
     }
 
-    fn stored(seq: i64, data: &str) -> AiChatEventRecord {
-        let ctx = o2_enterprise::enterprise::ai::chat::RecordContext {
+    fn ctx(opencode: &str, epoch: i64, turn: &str) -> RecordContext {
+        RecordContext {
             org_id: "org".into(),
             user_id: "u".into(),
             session_id: "sid".into(),
-            opencode_session_id: "ses_A".into(),
-            session_epoch: 1,
-            turn_id: "t".into(),
-        };
-        let event = DurableEvent {
-            id: format!("evt_{seq}"),
-            aggregate_id: "ses_A".into(),
+            opencode_session_id: opencode.into(),
+            session_epoch: epoch,
+            turn_id: turn.into(),
+        }
+    }
+
+    fn event(seq: i64, data: &str, opencode: &str) -> DurableEvent {
+        DurableEvent {
+            id: format!("evt_{seq}_{data}"),
+            aggregate_id: opencode.into(),
             seq,
             event_type: "message.part.updated.1".into(),
             data: json::json!({ "d": data }),
-        };
-        o2_enterprise::enterprise::ai::chat::record::to_record(&ctx, &event, 1)
+        }
+    }
+
+    fn written(seq: i64, data: &str, opencode: &str, epoch: i64, turn: &str) -> AiChatEventRecord {
+        record::to_record(&ctx(opencode, epoch, turn), &event(seq, data, opencode), 1)
+    }
+
+    fn stored(seq: i64, data: &str) -> AiChatEventRecord {
+        written(seq, data, "ses_A", 1, "t")
+    }
+
+    fn resolver(epoch: i64, coverage: &[(i64, i64, &str)]) -> Resolver {
+        Resolver {
+            opencode_session_id: Some("ses_A".into()),
+            epoch,
+            coverage: coverage
+                .iter()
+                .map(|(first, last, turn)| (*first, *last, turn.to_string()))
+                .collect(),
+        }
+    }
+
+    fn data_of(events: &[StoredEvent]) -> Vec<String> {
+        events
+            .iter()
+            .map(|(_, e)| e.data["d"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    fn turn_record(
+        turn: &str,
+        status: &str,
+        start: Option<i64>,
+        end: Option<i64>,
+    ) -> ai_chat_turns::Model {
+        ai_chat_turns::Model {
+            org_id: "org".into(),
+            session_id: "sid".into(),
+            turn_id: turn.into(),
+            status: status.into(),
+            error_code: None,
+            start_seq: start,
+            end_seq: end,
+            started_at: 0,
+            ended_at: None,
+        }
     }
 
     #[test]
     fn a_window_is_deduplicated_and_verified() {
-        // Retried batch: seq 2 stored twice, identically; order is irrelevant.
         let rows = vec![
             stored(2, "b"),
             stored(1, "a"),
             stored(2, "b"),
             stored(3, "c"),
         ];
-        let events = verify_window(rows, 0, 3).unwrap();
+        let events = verify_window(rows, 0, 3, &resolver(1, &[])).unwrap();
         assert_eq!(
             events.iter().map(|(_, e)| e.seq).collect::<Vec<_>>(),
             vec![1, 2, 3]
@@ -686,9 +912,19 @@ mod tests {
 
     #[test]
     fn a_window_with_a_hole_or_a_short_tail_is_a_gap() {
-        let hole = verify_window(vec![stored(1, "a"), stored(3, "c")], 0, 3);
+        let hole = verify_window(
+            vec![stored(1, "a"), stored(3, "c")],
+            0,
+            3,
+            &resolver(1, &[]),
+        );
         assert!(matches!(hole, Err(ReadError::Gap { expected: 2, .. })));
-        let short = verify_window(vec![stored(1, "a"), stored(2, "b")], 0, 3);
+        let short = verify_window(
+            vec![stored(1, "a"), stored(2, "b")],
+            0,
+            3,
+            &resolver(1, &[]),
+        );
         assert!(matches!(
             short,
             Err(ReadError::Gap {
@@ -699,10 +935,10 @@ mod tests {
     }
 
     #[test]
-    fn two_different_copies_of_one_seq_are_never_resolved_silently() {
+    fn two_different_copies_from_one_writer_are_never_resolved_silently() {
         let rows = vec![stored(1, "a"), stored(1, "tampered")];
         assert!(matches!(
-            verify_window(rows, 0, 1),
+            verify_window(rows, 0, 1, &resolver(1, &[])),
             Err(ReadError::Divergence { seq: 1, .. })
         ));
     }
@@ -712,8 +948,100 @@ mod tests {
         let mut row = stored(1, "a");
         row.payload = r#"{"d":"changed"}"#.into();
         assert!(matches!(
-            verify_window(vec![row], 0, 1),
+            verify_window(vec![row], 0, 1, &resolver(1, &[])),
             Err(ReadError::Corrupt(_))
+        ));
+    }
+
+    #[test]
+    fn rows_of_an_abandoned_opencode_session_are_ignored() {
+        // A first turn wrote 0..=1 under ses_B, then a retry bound the chat to ses_A.
+        let rows = vec![
+            written(0, "stray0", "ses_B", 1, "t1"),
+            written(1, "stray1", "ses_B", 1, "t1"),
+            written(0, "a", "ses_A", 2, "t1"),
+            written(1, "b", "ses_A", 2, "t1"),
+        ];
+        let events = verify_window(rows, -1, 1, &resolver(2, &[(0, 1, "t1")])).unwrap();
+        assert_eq!(data_of(&events), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn rows_of_a_turn_that_never_committed_them_are_stray() {
+        // t2 wrote 2..=3 but was fenced before its watermark; t3 regenerated and committed 2..=3.
+        let records = vec![
+            turn_record("t1", TURN_COMPLETED, Some(0), Some(1)),
+            turn_record("t2", TURN_FAILED, Some(2), None),
+            turn_record("t3", TURN_COMPLETED, Some(2), Some(3)),
+        ];
+        let resolver = Resolver {
+            opencode_session_id: Some("ses_A".into()),
+            epoch: 3,
+            coverage: turn_coverage(&records, 3),
+        };
+        let rows = vec![
+            written(0, "a", "ses_A", 1, "t1"),
+            written(1, "b", "ses_A", 1, "t1"),
+            written(2, "stray", "ses_A", 2, "t2"),
+            written(3, "stray", "ses_A", 2, "t2"),
+            written(2, "c", "ses_A", 3, "t3"),
+            written(3, "d", "ses_A", 3, "t3"),
+        ];
+        let events = verify_window(rows.clone(), -1, 3, &resolver).unwrap();
+        assert_eq!(data_of(&events), vec!["a", "b", "c", "d"]);
+        // Only the strays visible yet: that is lag, retried as a gap, never served.
+        let lagging: Vec<_> = rows.into_iter().filter(|r| r.turn_id != "t3").collect();
+        assert!(matches!(
+            verify_window(lagging, -1, 3, &resolver),
+            Err(ReadError::Gap { expected: 2, .. })
+        ));
+    }
+
+    #[test]
+    fn a_running_turn_covers_up_to_the_watermark() {
+        let records = vec![
+            turn_record("t1", TURN_COMPLETED, Some(0), Some(0)),
+            turn_record("t2", TURN_RUNNING, Some(1), None),
+        ];
+        assert_eq!(
+            turn_coverage(&records, 4),
+            vec![(0, 0, "t1".to_string()), (1, 4, "t2".to_string())]
+        );
+        // A turn that stored nothing covers nothing; the next one starts where it did.
+        let records = vec![
+            turn_record("t1", TURN_FAILED, Some(0), None),
+            turn_record("t2", TURN_COMPLETED, Some(0), Some(2)),
+        ];
+        assert_eq!(turn_coverage(&records, 2), vec![(0, 2, "t2".to_string())]);
+    }
+
+    #[test]
+    fn without_a_turn_record_the_newest_epoch_wins() {
+        let rows = vec![
+            written(0, "old", "ses_A", 1, "x"),
+            written(0, "new", "ses_A", 2, "y"),
+            written(0, "future", "ses_A", 9, "z"),
+        ];
+        let events = verify_window(rows, -1, 0, &resolver(2, &[])).unwrap();
+        assert_eq!(data_of(&events), vec!["new"]);
+    }
+
+    #[test]
+    fn a_split_event_is_reassembled_from_its_parts_in_any_order() {
+        let big = event(0, &"é".repeat(300), "ses_A");
+        let mut rows = record::to_records(&ctx("ses_A", 1, "t"), &big, 1, 64);
+        assert!(rows.len() > 3);
+        let parts = rows.clone();
+        rows.reverse();
+        rows.push(parts[1].clone());
+        let events = verify_window(rows, -1, 0, &resolver(1, &[])).unwrap();
+        assert_eq!(events[0].1, big);
+        assert_eq!(events[0].0, parts);
+        // A part not visible yet leaves the event missing, never truncated.
+        let partial = parts[1..].to_vec();
+        assert!(matches!(
+            verify_window(partial, -1, 0, &resolver(1, &[])),
+            Err(ReadError::Gap { expected: 0, .. })
         ));
     }
 
