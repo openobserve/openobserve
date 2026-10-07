@@ -5,7 +5,8 @@ Regression cover for o2-enterprise#2821, fixed by openobserve#15157.
 `check_auth` authenticates a user credential against the `organization`
 *metadata header*, then `attach_user_id` appends `user_id` and drops the org —
 so the handler never saw which org had been authorized. `Ingest::ingest` then
-read `org_id` from the request *body* and passed it to all five arms, and
+read `org_id` from the request *body* and passed it to all five arms (logs,
+traces, metrics, enrichment tables, service graph), and
 `logs::ingest::ingest` performs no org authorization of its own (the HTTP path
 is safe only because `auth_middleware` authorizes the org in the URL). Any
 credential valid in one org could therefore write logs, traces, metrics,
@@ -23,8 +24,11 @@ rule `stream.rs` already had:
 Two notes on what is asserted below:
 
 - The org is resolved once, *before* the `match stream_type`, so the deny case
-  is parametrized across stream types to show every arm is covered by the one
-  check rather than only the logs arm the report reproduced on.
+  is parametrized across all five stream types to show every arm is covered by
+  that single check rather than only the logs arm the report reproduced on. It
+  does not follow that each arm's payload is independently valid — on a pre-fix
+  binary the metrics arm answers `500 missing value` for this payload, which is
+  the same conclusion from the other direction.
 - `destination_org`'s missing-header branch is not reachable through the real
   interceptor: `check_auth` already requires the `organization` header and
   answers `InvalidArgument` first. The handler guard is belt-and-braces for
@@ -47,9 +51,13 @@ from support.wait import wait_until
 
 ROWS = json.dumps([{"injected_by": "grpc_org_binding_test", "n": 1}]).encode()
 
-# The deny decision is taken before the stream_type match, so all five arms
-# share it. Listed explicitly because the report asked for each to be checked.
-STREAM_TYPES = ["logs", "traces", "metrics", "enrichment_tables"]
+# Every arm of the handler's `match stream_type`. The deny is resolved *before*
+# that match, so one check covers them all — they are listed explicitly because
+# the report asked for each to be verified rather than argued from the code.
+# `service_graph` is the fifth and easiest to forget: it is reachable
+# (`StreamType::ServiceGraph` in ingest.rs) even though no public collector
+# targets it directly.
+STREAM_TYPES = ["logs", "traces", "metrics", "enrichment_tables", "service_graph"]
 
 
 @pytest.fixture(scope="module")

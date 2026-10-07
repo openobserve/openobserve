@@ -19,7 +19,9 @@ Deliberately omitted:
   `req.ingestion_type.unwrap_or_default()`, and proto3 does not put a default
   scalar on the wire, so leaving it out is exactly equivalent to sending `JSON`
   (0) — which is what these tests want.
-- `metadata` (field 6). Only used for the `is_derived` flag.
+- `metadata` (field 6). Read for the `is_derived` flag, and for `append_data`
+  on the enrichment-table arm. Omitting it is safe for these tests because both
+  default to what they want: `is_derived` false, `append_data` true.
 """
 from __future__ import annotations
 
