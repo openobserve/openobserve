@@ -18,7 +18,10 @@
 //! Implements wait-and-collect logic to batch multiple alerts with the same
 //! fingerprint before sending a single grouped notification.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use chrono::Utc;
 use config::{meta::alerts::alert::Alert, utils::json};
@@ -133,10 +136,7 @@ pub fn add_to_batch(
     // fingerprint — so this is set once, when the batch is created.
     group_labels: Option<std::collections::BTreeMap<String, String>>,
 ) -> bool {
-    let mut is_new_batch = false;
-
-    // The guard is a temporary, released before the gauge below scans the map.
-    let batch_ready = PENDING_BATCHES
+    PENDING_BATCHES
         .entry(batch_key(&org_id, &fingerprint))
         .and_modify(|batch| {
             if batch.add_alert(alert.clone(), rows.clone()) {
@@ -164,7 +164,6 @@ pub fn add_to_batch(
             }
         })
         .or_insert_with(|| {
-            is_new_batch = true;
             log::info!(
                 "[grouping] Created new batch for fingerprint {}, alert: '{}', org: {}, wait_seconds: {}, max_size: {}",
                 fingerprint,
@@ -175,7 +174,7 @@ pub fn add_to_batch(
             );
             PendingBatch::new(
                 fingerprint.clone(),
-                org_id.clone(),
+                org_id,
                 alert,
                 rows,
                 group_wait_seconds,
@@ -184,17 +183,7 @@ pub fn add_to_batch(
                 group_labels,
             )
         })
-        .is_full();
-
-    if is_new_batch {
-        let batch_count = get_pending_batch_count(&org_id);
-        log::debug!("[grouping] Pending batches for org {org_id}: {batch_count}");
-        config::metrics::ALERT_GROUPING_BATCHES_PENDING
-            .with_label_values(&[org_id.as_str()])
-            .set(batch_count);
-    }
-
-    batch_ready
+        .is_full()
 }
 
 /// Get and remove a batch if it's ready (expired or full)
@@ -214,9 +203,10 @@ pub fn get_ready_batch(org_id: &str, fingerprint: &str) -> Option<PendingBatch> 
         })
 }
 
-/// Get all expired batches
+/// Take every expired batch out of the map, and report each org's remaining pending batches.
 pub fn get_expired_batches() -> Vec<PendingBatch> {
     let mut expired = Vec::new();
+    let mut pending_per_org: HashMap<String, i64> = HashMap::new();
     let now = Utc::now().timestamp_micros();
 
     PENDING_BATCHES.retain(|key, batch| {
@@ -231,9 +221,21 @@ pub fn get_expired_batches() -> Vec<PendingBatch> {
             expired.push(batch.clone());
             false // Remove from map
         } else {
+            if let Some(count) = pending_per_org.get_mut(&batch.org_id) {
+                *count += 1;
+            } else {
+                pending_per_org.insert(batch.org_id.clone(), 1);
+            }
             true // Keep in map
         }
     });
+    // Recounted here, off the scheduler path; reset drops orgs whose batches drained.
+    config::metrics::ALERT_GROUPING_BATCHES_PENDING.reset();
+    for (org_id, count) in &pending_per_org {
+        config::metrics::ALERT_GROUPING_BATCHES_PENDING
+            .with_label_values(&[org_id.as_str()])
+            .set(*count);
+    }
 
     if !expired.is_empty() {
         log::debug!(
@@ -658,25 +660,27 @@ mod tests {
     }
 
     #[test]
-    fn test_pending_gauge_counts_only_own_org() {
-        let (busy, quiet) = ("org-gauge-busy", "org-gauge-quiet");
-        let fps = ["grouping_gauge_fp1", "grouping_gauge_fp2"];
-        for fp in fps {
-            add_one(fp, busy, 10);
-        }
-        add_one(fps[0], quiet, 10);
-
+    fn test_expiry_sweep_reports_pending_batches_per_org() {
+        let (busy, drained) = ("org-gauge-busy", "org-gauge-drained");
+        let (fp1, fp2) = ("grouping_gauge_fp1", "grouping_gauge_fp2");
         let gauge = |org: &str| {
             config::metrics::ALERT_GROUPING_BATCHES_PENDING
                 .with_label_values(&[org])
                 .get()
         };
-        assert_eq!(gauge(busy), 2);
-        assert_eq!(gauge(quiet), 1);
+        add_one(fp1, busy, 10);
+        add_one(fp2, busy, 10);
+        add_one(fp1, drained, 2);
 
-        for fp in fps {
-            PENDING_BATCHES.remove(&batch_key(busy, fp));
-        }
-        PENDING_BATCHES.remove(&batch_key(quiet, fps[0]));
+        get_expired_batches();
+        assert_eq!((gauge(busy), gauge(drained)), (2, 1));
+
+        assert!(add_one(fp1, drained, 2));
+        assert!(get_ready_batch(drained, fp1).is_some());
+        get_expired_batches();
+        assert_eq!((gauge(busy), gauge(drained)), (2, 0));
+
+        PENDING_BATCHES.remove(&batch_key(busy, fp1));
+        PENDING_BATCHES.remove(&batch_key(busy, fp2));
     }
 }
