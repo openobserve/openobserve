@@ -13,11 +13,65 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::fmt::{self, Display};
+
 use opentelemetry_proto::tonic::{
     collector::profiles::v1development::ExportProfilesServiceRequest,
     common::v1::{AnyValue, KeyValue, any_value::Value},
     profiles::v1development::{Profile, ProfilesDictionary, ValueType},
 };
+
+struct Path<'a> {
+    parent: Option<&'a Path<'a>>,
+    field: &'static str,
+    index: Option<usize>,
+}
+
+impl Path<'_> {
+    fn root(field: &'static str) -> Self {
+        Self {
+            parent: None,
+            field,
+            index: None,
+        }
+    }
+
+    fn field(&self, field: &'static str) -> Path<'_> {
+        Path {
+            parent: Some(self),
+            field,
+            index: None,
+        }
+    }
+
+    fn indexed(&self, field: &'static str, index: usize) -> Path<'_> {
+        Path {
+            parent: Some(self),
+            field,
+            index: Some(index),
+        }
+    }
+
+    fn at(&self, index: usize) -> Path<'_> {
+        self.indexed("", index)
+    }
+}
+
+impl Display for Path<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(parent) = self.parent {
+            parent.fmt(f)?;
+            if !self.field.is_empty() {
+                f.write_str(".")?;
+            }
+        }
+        f.write_str(self.field)?;
+        if let Some(index) = self.index {
+            write!(f, "[{index}]")?;
+        }
+        Ok(())
+    }
+}
 
 struct Validator<'a> {
     dictionary: &'a ProfilesDictionary,
@@ -33,126 +87,123 @@ impl Validator<'_> {
         sentinel(&d.string_table, "string_table")?;
         sentinel(&d.attribute_table, "attribute_table")?;
         sentinel(&d.stack_table, "stack_table")?;
+        let root = Path::root("dictionary");
         for (i, mapping) in d.mapping_table.iter().enumerate() {
-            let path = format!("dictionary.mapping_table[{i}]");
-            self.string(
-                mapping.filename_strindex,
-                &format!("{path}.filename_strindex"),
-            )?;
+            let path = root.indexed("mapping_table", i);
+            self.string(mapping.filename_strindex, &path.field("filename_strindex"))?;
             self.attributes(&mapping.attribute_indices, &path)?;
         }
         for (i, location) in d.location_table.iter().enumerate() {
-            let path = format!("dictionary.location_table[{i}]");
+            let path = root.indexed("location_table", i);
             index(
                 location.mapping_index,
                 d.mapping_table.len(),
-                &format!("{path}.mapping_index"),
+                path.field("mapping_index"),
             )?;
             self.attributes(&location.attribute_indices, &path)?;
             for (j, line) in location.lines.iter().enumerate() {
                 index(
                     line.function_index,
                     d.function_table.len(),
-                    &format!("{path}.lines[{j}].function_index"),
+                    path.indexed("lines", j).field("function_index"),
                 )?;
             }
         }
         for (i, function) in d.function_table.iter().enumerate() {
-            let path = format!("dictionary.function_table[{i}]");
-            self.string(function.name_strindex, &format!("{path}.name_strindex"))?;
+            let path = root.indexed("function_table", i);
+            self.string(function.name_strindex, &path.field("name_strindex"))?;
             self.string(
                 function.system_name_strindex,
-                &format!("{path}.system_name_strindex"),
+                &path.field("system_name_strindex"),
             )?;
-            self.string(
-                function.filename_strindex,
-                &format!("{path}.filename_strindex"),
-            )?;
+            self.string(function.filename_strindex, &path.field("filename_strindex"))?;
         }
         for (i, attribute) in d.attribute_table.iter().enumerate() {
-            let path = format!("dictionary.attribute_table[{i}]");
-            self.string(attribute.key_strindex, &format!("{path}.key_strindex"))?;
-            self.string(attribute.unit_strindex, &format!("{path}.unit_strindex"))?;
-            self.value(attribute.value.as_ref(), &format!("{path}.value"))?;
+            let path = root.indexed("attribute_table", i);
+            self.string(attribute.key_strindex, &path.field("key_strindex"))?;
+            self.string(attribute.unit_strindex, &path.field("unit_strindex"))?;
+            self.value(attribute.value.as_ref(), &path.field("value"))?;
         }
         for (i, stack) in d.stack_table.iter().enumerate() {
+            let path = root.indexed("stack_table", i);
             for (j, &location) in stack.location_indices.iter().enumerate() {
                 index(
                     location,
                     d.location_table.len(),
-                    &format!("dictionary.stack_table[{i}].location_indices[{j}]"),
+                    path.indexed("location_indices", j),
                 )?;
             }
         }
         Ok(())
     }
 
-    fn profile(&self, profile: &Profile, path: &str) -> Result<(), String> {
-        self.value_type(profile.sample_type.as_ref(), &format!("{path}.sample_type"))?;
-        self.value_type(profile.period_type.as_ref(), &format!("{path}.period_type"))?;
+    fn profile(&self, profile: &Profile, path: &Path<'_>) -> Result<(), String> {
+        self.value_type(profile.sample_type.as_ref(), &path.field("sample_type"))?;
+        self.value_type(profile.period_type.as_ref(), &path.field("period_type"))?;
         self.attributes(&profile.attribute_indices, path)?;
         for (i, sample) in profile.samples.iter().enumerate() {
-            let path = format!("{path}.samples[{i}]");
+            let path = path.indexed("samples", i);
             index(
                 sample.stack_index,
                 self.dictionary.stack_table.len(),
-                &format!("{path}.stack_index"),
+                path.field("stack_index"),
             )?;
             index(
                 sample.link_index,
                 self.dictionary.link_table.len(),
-                &format!("{path}.link_index"),
+                path.field("link_index"),
             )?;
             self.attributes(&sample.attribute_indices, &path)?;
         }
         Ok(())
     }
 
-    fn value_type(&self, value: Option<&ValueType>, path: &str) -> Result<(), String> {
+    fn value_type(&self, value: Option<&ValueType>, path: &Path<'_>) -> Result<(), String> {
         if let Some(value) = value {
-            self.string(value.type_strindex, &format!("{path}.type_strindex"))?;
-            self.string(value.unit_strindex, &format!("{path}.unit_strindex"))?;
+            self.string(value.type_strindex, &path.field("type_strindex"))?;
+            self.string(value.unit_strindex, &path.field("unit_strindex"))?;
         }
         Ok(())
     }
 
-    fn string(&self, value: i32, path: &str) -> Result<(), String> {
+    fn string(&self, value: i32, path: &Path<'_>) -> Result<(), String> {
         index(value, self.dictionary.string_table.len(), path)
     }
 
-    fn attributes(&self, indices: &[i32], path: &str) -> Result<(), String> {
+    fn attributes(&self, indices: &[i32], path: &Path<'_>) -> Result<(), String> {
         for (i, &value) in indices.iter().enumerate() {
             index(
                 value,
                 self.dictionary.attribute_table.len(),
-                &format!("{path}.attribute_indices[{i}]"),
+                path.indexed("attribute_indices", i),
             )?;
         }
         Ok(())
     }
 
-    fn key_values(&self, attributes: &[KeyValue], path: &str) -> Result<(), String> {
+    fn key_values(&self, attributes: &[KeyValue], path: &Path<'_>) -> Result<(), String> {
         for (i, attribute) in attributes.iter().enumerate() {
-            let path = format!("{path}[{i}]");
-            self.string(attribute.key_strindex, &format!("{path}.key_strindex"))?;
-            self.value(attribute.value.as_ref(), &format!("{path}.value"))?;
+            let path = path.at(i);
+            self.string(attribute.key_strindex, &path.field("key_strindex"))?;
+            self.value(attribute.value.as_ref(), &path.field("value"))?;
         }
         Ok(())
     }
 
-    fn value(&self, value: Option<&AnyValue>, path: &str) -> Result<(), String> {
+    fn value(&self, value: Option<&AnyValue>, path: &Path<'_>) -> Result<(), String> {
         match value.and_then(|value| value.value.as_ref()) {
             Some(Value::StringValueStrindex(value)) => {
-                self.string(*value, &format!("{path}.string_value_strindex"))
+                self.string(*value, &path.field("string_value_strindex"))
             }
             Some(Value::ArrayValue(array)) => {
+                let path = path.field("array_value");
                 for (i, value) in array.values.iter().enumerate() {
-                    self.value(Some(value), &format!("{path}.array_value.values[{i}]"))?;
+                    self.value(Some(value), &path.indexed("values", i))?;
                 }
                 Ok(())
             }
             Some(Value::KvlistValue(list)) => {
-                self.key_values(&list.values, &format!("{path}.kvlist_value.values"))
+                self.key_values(&list.values, &path.field("kvlist_value").field("values"))
             }
             _ => Ok(()),
         }
@@ -165,18 +216,23 @@ pub(super) fn validate(request: &ExportProfilesServiceRequest) -> Result<(), Str
         dictionary: request.dictionary.as_ref().unwrap_or(&empty),
     };
     validator.dictionary()?;
+    let root = Path::root("resource_profiles");
     for (i, resource) in request.resource_profiles.iter().enumerate() {
-        let path = format!("resource_profiles[{i}]");
+        let path = root.at(i);
         if let Some(resource) = &resource.resource {
-            validator.key_values(&resource.attributes, &format!("{path}.resource.attributes"))?;
+            validator.key_values(
+                &resource.attributes,
+                &path.field("resource").field("attributes"),
+            )?;
         }
         for (j, scope) in resource.scope_profiles.iter().enumerate() {
-            let path = format!("{path}.scope_profiles[{j}]");
+            let path = path.indexed("scope_profiles", j);
             if let Some(scope) = &scope.scope {
-                validator.key_values(&scope.attributes, &format!("{path}.scope.attributes"))?;
+                validator
+                    .key_values(&scope.attributes, &path.field("scope").field("attributes"))?;
             }
             for (k, profile) in scope.profiles.iter().enumerate() {
-                validator.profile(profile, &format!("{path}.profiles[{k}]"))?;
+                validator.profile(profile, &path.indexed("profiles", k))?;
             }
         }
     }
@@ -190,7 +246,7 @@ fn sentinel<T: Default + PartialEq>(table: &[T], name: &str) -> Result<(), Strin
     Ok(())
 }
 
-fn index(value: i32, len: usize, path: &str) -> Result<(), String> {
+fn index(value: i32, len: usize, path: impl Display) -> Result<(), String> {
     // Zero remains unset even when an optional dictionary table is omitted.
     if value < 0 || (value > 0 && value as usize >= len) {
         return Err(format!(
@@ -213,8 +269,49 @@ mod tests {
 
     use super::*;
 
+    struct UnformattedPath;
+
+    impl Display for UnformattedPath {
+        fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+            panic!("successful index validation must not format its diagnostic path")
+        }
+    }
+
     type DictionaryMutation = (fn(&mut ProfilesDictionary, i32), &'static str);
     type ProfileMutation = (fn(&mut Profile, i32), &'static str);
+
+    #[test]
+    fn valid_indexes_do_not_format_diagnostic_paths() {
+        assert!(index(0, 0, UnformattedPath).is_ok());
+        assert!(index(1, 2, UnformattedPath).is_ok());
+    }
+
+    #[test]
+    fn lazy_paths_keep_exact_profile_and_nested_attribute_errors() {
+        let mut request = valid_request();
+        request.resource_profiles[0].scope_profiles[0].profiles[0].samples[0].stack_index = -1;
+        assert_eq!(
+            validate(&request).unwrap_err(),
+            "resource_profiles[0].scope_profiles[0].profiles[0].samples[0].stack_index: index -1 is outside dictionary table length 2"
+        );
+        request = valid_request();
+        request.dictionary.as_mut().unwrap().attribute_table[1].value = Some(AnyValue {
+            value: Some(Value::ArrayValue(ArrayValue {
+                values: vec![AnyValue {
+                    value: Some(Value::KvlistValue(KeyValueList {
+                        values: vec![KeyValue {
+                            value: Some(string_index(99)),
+                            ..Default::default()
+                        }],
+                    })),
+                }],
+            })),
+        });
+        assert_eq!(
+            validate(&request).unwrap_err(),
+            "dictionary.attribute_table[1].value.array_value.values[0].kvlist_value.values[0].value.string_value_strindex: index 99 is outside dictionary table length 4"
+        );
+    }
 
     #[test]
     fn valid_dictionary_preserves_sample_weight() {
