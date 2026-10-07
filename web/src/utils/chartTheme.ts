@@ -131,6 +131,9 @@ const FALLBACKS: Record<string, string> = {
   "--color-json-number": "#2563eb",
   "--color-json-object": "#4b5563",
   "--color-json-string": "#047857",
+  "--color-latency-p95": "#0a4ce8",
+  "--color-progress-bar-default": "#3f7994",
+  "--color-progress-bar-neutral": "#a3a3a3",
 };
 
 /**
