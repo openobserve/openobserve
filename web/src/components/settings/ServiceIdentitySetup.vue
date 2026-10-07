@@ -630,9 +630,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="val"
                     class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                     :class="card.theme.pill"
-                    :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
-                    ><span class="truncate">{{ val }}</span
+                    ><OTruncatedText>{{ val }}</OTruncatedText
                     ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
                       ><span
                         v-for="st in getValueStreamTypes(card.dim.group_id, val)"
@@ -665,14 +664,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         v-for="val in card.values.slice(5)"
                         :key="val"
-                        class="text-2xs inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                        class="text-2xs inline-flex max-w-full min-w-0 cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="card.theme.pill"
-                        :title="val"
                         @click.stop="
                           openInsightDialogByIdx(val, idx);
                           dimCardMoreMenuOpen[idx] = false;
                         "
-                        ><span class="truncate">{{ val }}</span
+                        ><OTruncatedText>{{ val }}</OTruncatedText
                         ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
                           ><span
                             v-for="st in getValueStreamTypes(card.dim.group_id, val)"
@@ -915,10 +913,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </div>
                   <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-                    <span
+                    <OTruncatedText
                       v-for="dVal in dim.values"
                       :key="dVal"
-                      class="text-compact rounded-default shrink-0 truncate border px-2.5 py-1"
+                      class="text-compact rounded-default shrink-0 border px-2.5 py-1"
                       :class="{
                         'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text':
                           dim.color === 'teal',
@@ -927,8 +925,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text':
                           dim.color === 'blue',
                       }"
-                      :title="dVal"
-                      >{{ dVal }}</span
+                      >{{ dVal }}</OTruncatedText
                     >
                     <span
                       v-if="dim.values.length === 0"
@@ -1149,6 +1146,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

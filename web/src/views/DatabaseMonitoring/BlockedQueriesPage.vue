@@ -188,10 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTruncatedText>
               </div>
 
-              <span class="text-text-code min-w-0 truncate font-mono text-xs">
-                <OTooltip v-if="row.query" :content="raw(row.query)" />
+              <OTruncatedText class="text-text-code font-mono text-xs">
                 {{ raw(row.query ?? "—") }}
-              </span>
+              </OTruncatedText>
 
               <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
                 <OTag type="dbSystem" :value="row.db_system" size="xs" />
@@ -259,24 +258,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              stays underneath, for the DBA who wants to look it up. -->
         <template #cell-waitingFor="{ row }">
           <div class="flex flex-col items-end leading-tight">
-            <span v-if="row.waitEventLabel" class="text-text-body text-xs">
+            <OTruncatedText v-if="row.waitEventLabel" class="text-text-body max-w-full text-xs">
               {{ row.waitEventLabel }}
-            </span>
-            <span
+            </OTruncatedText>
+            <OTruncatedText
               v-else-if="row.waitEventRaw"
-              class="text-text-body font-mono text-xs"
+              class="text-text-body max-w-full font-mono text-xs"
               data-test="dbm-blocked-wait-event-raw"
             >
               {{ raw(row.waitEventRaw) }}
-            </span>
+            </OTruncatedText>
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
-            <span
+            <OTruncatedText
               v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-secondary text-3xs font-mono"
+              class="text-text-secondary text-3xs max-w-full font-mono"
             >
-              <OTooltip :content="raw(row.waitEventRaw)" />
               {{ raw(row.waitEventRaw) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
@@ -301,8 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-application="{ row }">
-          <span class="text-text-body block truncate font-mono text-xs">
-            <OTooltip v-if="row.application" :content="raw(row.application)" />
+          <span class="text-text-body font-mono text-xs">
             {{ raw(row.application ?? "—") }}
           </span>
         </template>

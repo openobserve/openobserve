@@ -151,7 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-query="{ row }">
           <DbmQueryCell
             :text="raw(row.queryText)"
-            :title-attr="row.queryText"
             :db-system="row.dbSystem"
             :meta-items="[
               { key: 'instance', label: raw(row.dbInstance ?? '') },
@@ -175,9 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-service="{ row }">
-          <span class="text-text-body block truncate text-xs">{{
-            raw(row.serviceName || "—")
-          }}</span>
+          <span class="text-text-body text-xs">{{ raw(row.serviceName || "—") }}</span>
         </template>
 
         <!-- Failed calls carry the driver's status code when there is one;
@@ -305,7 +302,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-query="{ row }">
             <DbmQueryCell
               :text="raw(row.query ?? '')"
-              :title-attr="row.query ?? undefined"
               :db-system="row.db_system"
               :meta-items="[
                 { key: 'instance', label: raw(row.db_instance ?? '') },
@@ -326,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-muted">{{ raw("—") }}</span>
           </template>
           <template #cell-user="{ row }">
-            <span class="text-text-body block truncate text-xs">{{ raw(row.db_user || "—") }}</span>
+            <span class="text-text-body text-xs">{{ raw(row.db_user || "—") }}</span>
           </template>
           <template v-if="serverTruncated" #footer-note>
             <span>{{ t("dbm.samples.serverList.truncated", { count: serverRows.length }) }}</span>

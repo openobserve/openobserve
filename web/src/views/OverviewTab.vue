@@ -190,10 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openServicePanel(svc)"
           >
             <div class="mb-2 flex items-center justify-between">
-              <span
-                class="text-text-heading block min-w-0 flex-1 cursor-default overflow-hidden text-sm font-medium text-ellipsis whitespace-nowrap"
-                :title="svc.label ?? svc.id"
-                >{{ svc.label }}</span
+              <OTruncatedText
+                class="text-text-heading block flex-1 cursor-default text-sm font-medium"
+                >{{ svc.label }}</OTruncatedText
               >
               <span class="ms-1 inline-flex shrink-0 items-center">
                 <OButton

@@ -1135,9 +1135,11 @@ function openInLogs() {
                         >{{ p.pct }}%</span
                       >
                       <!-- Pattern template with wildcards -->
-                      <code class="text-text-secondary flex-1 truncate font-mono text-xs"
-                        >{{ p.template }}<OTooltip :content="raw(p.template)" max-width="22.5rem"
-                      /></code>
+                      <OTruncatedText
+                        as="code"
+                        class="text-text-secondary flex-1 font-mono text-xs"
+                        >{{ p.template }}</OTruncatedText
+                      >
                       <!-- Open in Logs -->
                       <OButton
                         size="sm"
@@ -1156,12 +1158,13 @@ function openInLogs() {
                       />
                     </div>
                     <!-- Sample log line -->
-                    <p
+                    <OTruncatedText
                       v-if="p.sample"
-                      class="text-text-secondary truncate font-mono text-xs leading-snug"
+                      as="p"
+                      class="text-text-secondary font-mono text-xs leading-snug"
                     >
-                      {{ p.sample }}<OTooltip :content="raw(p.sample)" max-width="22.5rem" />
-                    </p>
+                      {{ p.sample }}
+                    </OTruncatedText>
                   </div>
                 </template>
               </div>

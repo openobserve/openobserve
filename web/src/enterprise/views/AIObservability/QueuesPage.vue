@@ -92,7 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-scoreConfigs="{ row }">
-          <div v-if="row.scoreConfigs.length" class="flex flex-nowrap items-center gap-1">
+          <OTruncatedText
+            v-if="row.scoreConfigs.length"
+            as="div"
+            class="flex flex-nowrap items-center gap-1"
+            :tooltip="scorerListLabel(row.scoreConfigs)"
+          >
             <OTag
               v-for="cfg in row.scoreConfigs"
               :key="cfg.scoreConfigId"
@@ -102,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ scorerLabel(cfg) }}
             </OTag>
-          </div>
+          </OTruncatedText>
           <span v-else class="text-text-secondary">—</span>
         </template>
 
@@ -646,6 +651,11 @@ function configForId(id: string): LlmScoreConfigOption | undefined {
  *  the whole label is raw rather than a composed translation. */
 function scorerLabel(cfg: { name: string; version: number }) {
   return raw(`${cfg.name} v${cfg.version}`);
+}
+
+// The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+function scorerListLabel(cfgs: { name: string; version: number }[]) {
+  return raw(cfgs.map((cfg) => `${cfg.name} v${cfg.version}`).join(", "));
 }
 
 function versionOptions(configId: string) {

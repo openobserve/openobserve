@@ -522,7 +522,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-query="{ row }">
             <DbmQueryCell
               :text="raw(row.query ?? '')"
-              :title-attr="row.query ?? undefined"
               :db-system="row.db_system"
               :meta-items="[
                 { key: 'instance', label: raw(row.db_instance ?? '') },

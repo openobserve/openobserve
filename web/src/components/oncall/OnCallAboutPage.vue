@@ -101,12 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
-          <span
-            class="block truncate"
-            :title="subjectStream"
-            data-test="oncall-about-subject-stream"
-            >{{ raw(subjectStream) }}</span
-          >
+          <OTruncatedText class="block" data-test="oncall-about-subject-stream">{{
+            raw(subjectStream)
+          }}</OTruncatedText>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="cause" :label="t('oncall.resolveCause')">

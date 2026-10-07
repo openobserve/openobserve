@@ -195,10 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
 
           <span class="flex min-w-0 flex-1 flex-col">
-            <span
-              class="truncate text-sm font-medium"
+            <OTruncatedText
+              class="text-sm font-medium"
               :class="defaultTeamId ? 'text-text-heading' : 'text-status-error-text'"
-              :title="defaultTeamId ? teamNameOf(defaultTeamId) : undefined"
               data-test="oncall-routing-catch-all-team"
             >
               {{
@@ -206,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t("oncall.routingElseGoesTo", { team: teamNameOf(defaultTeamId) })
                   : t("oncall.routingElseNobody")
               }}
-            </span>
+            </OTruncatedText>
             <OText variant="meta">{{ t("oncall.routingEverythingElseHint") }}</OText>
           </span>
 
@@ -337,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :dim-key="String(name)"
                 :key-label="displayOf(String(name))"
                 :value="value"
+                :value-tooltip="false"
               />
             </span>
           </span>

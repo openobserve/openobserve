@@ -241,13 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>{{ t("alerts.queryEditor.eventsFound", sqlResultCount) }}</span>
                       </template>
                     </div>
-                    <OTooltip
-                      v-if="sqlStatusState === 'sql-status-bar--error'"
-                      side="top"
-                      align="center"
-                      :max-width="'32.5rem'"
-                      :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
-                    />
                   </div>
                 </div>
 

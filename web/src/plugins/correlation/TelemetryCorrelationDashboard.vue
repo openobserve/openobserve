@@ -285,11 +285,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <component v-else :is="outerGroup.icon" />
                         <span class="whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                       </div>
-                      <span
+                      <OTruncatedText
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="max-w-40 truncate text-xs leading-tight opacity-75"
-                        :title="outerTabResourceName[outerGroup.id]"
-                        >{{ outerTabResourceName[outerGroup.id] }}</span
+                        class="max-w-40 text-xs leading-tight opacity-75"
+                        >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
                       >
                     </div>
                   </OTab>
@@ -742,11 +741,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <component v-else :is="outerGroup.icon" />
                       <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
                     </div>
-                    <span
+                    <OTruncatedText
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="max-w-40 truncate text-xs leading-tight opacity-75"
-                      :title="outerTabResourceName[outerGroup.id]"
-                      >{{ outerTabResourceName[outerGroup.id] }}</span
+                      class="max-w-40 text-xs leading-tight opacity-75"
+                      >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
                     >
                   </div>
                 </OTab>

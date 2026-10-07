@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OBadge>
             </OTooltip>
           </div>
-          <span v-else class="truncate" :title="row.node.display_name">
+          <span v-else>
             {{ row.node.display_name }}
           </span>
         </template>

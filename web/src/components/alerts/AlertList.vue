@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
-                  <span class="truncate">{{ row.name || "--" }}</span>
+                  <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -310,19 +310,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Composite rows have no stream/query summary: show the
                      name-resolved expression the backend supplied instead. -->
-                <span
+                <OTruncatedText
                   v-if="row.alert_type === 'Composite' && row.conditions && row.conditions !== '--'"
-                  class="text-text-secondary min-w-0 truncate text-xs"
-                  :title="row.conditions"
+                  class="text-text-secondary block text-xs"
                   :data-test="`alert-list-composite-expression-${row.alert_id}`"
                 >
                   {{ row.conditions }}
-                </span>
-                <OTooltip
-                  v-if="row.name"
-                  :content="row.name"
-                  content-class="max-w-100 whitespace-normal break-words text-xs"
-                />
+                </OTruncatedText>
               </template>
 
               <template #cell-owner="{ row }">

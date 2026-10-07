@@ -210,7 +210,10 @@ function onToggleEnvironment(id: string) {
           </span>
           <div v-for="row in opensIn" :key="row.id" class="flex min-w-0 items-center gap-2 text-xs">
             <span class="text-text-body shrink-0">{{ row.name }}</span>
-            <OTruncatedText class="text-text-secondary font-mono">{{ row.url }}</OTruncatedText>
+            <!-- The filled-in URL can hold secure variable values, so it never gets a hover reveal. -->
+            <OTruncatedText class="text-text-secondary font-mono" :tooltip="false">{{
+              row.url
+            }}</OTruncatedText>
           </div>
         </div>
       </OForm>
@@ -263,7 +266,8 @@ function onToggleEnvironment(id: string) {
               :data-test="`synthetics-journey-start-pill-env-${env.name}`"
               @update:model-value="onToggleEnvironment(env.id)"
             />
-            <OTruncatedText class="text-text-secondary font-mono text-xs">
+            <!-- The filled-in URL can hold secure variable values, so it never gets a hover reveal. -->
+            <OTruncatedText class="text-text-secondary font-mono text-xs" :tooltip="false">
               {{ namedUrls.get(env.id) }}
             </OTruncatedText>
           </div>

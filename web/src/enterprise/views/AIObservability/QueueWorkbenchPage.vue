@@ -119,15 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   item.status === 'reviewed' ? 'text-status-success-text' : 'text-text-disabled'
                 "
               />
-              <span
-                v-if="item.inputPreview"
-                class="flex min-w-0 flex-1 flex-col text-left"
-                :title="item.inputPreview"
-              >
-                <span
-                  class="text-text-body truncate"
+              <span v-if="item.inputPreview" class="flex min-w-0 flex-1 flex-col text-left">
+                <OTruncatedText
+                  class="text-text-body"
                   :data-test="`ai-queue-workbench-nav-preview-${i}`"
-                  >{{ item.inputPreview }}</span
+                  >{{ item.inputPreview }}</OTruncatedText
                 >
                 <OTruncatedText class="text-text-secondary text-2xs font-mono">{{
                   item.refId

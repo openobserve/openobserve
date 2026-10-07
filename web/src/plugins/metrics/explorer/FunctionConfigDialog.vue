@@ -39,12 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header>
       <div class="flex min-w-0 flex-col">
         <div class="flex min-w-0 items-center gap-2">
-          <span
-            class="truncate font-mono text-sm font-semibold"
-            :title="card.name"
-            data-test="metrics-fn-metric"
-            >{{ card.name }}</span
-          >
+          <OTruncatedText class="font-mono text-sm font-semibold" data-test="metrics-fn-metric">{{
+            card.name
+          }}</OTruncatedText>
           <!-- The registry's metricType group — same badge the card footer shows. -->
           <OTag
             type="metricType"
@@ -101,13 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-fn-radio-${variant.id}`"
         />
 
-        <div
-          class="text-3xs text-text-secondary truncate font-mono"
-          :title="exprOf(variant)"
+        <OTruncatedText
+          as="div"
+          class="text-3xs text-text-secondary font-mono"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}
-        </div>
+        </OTruncatedText>
 
         <div class="relative h-30">
           <div

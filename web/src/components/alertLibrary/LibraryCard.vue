@@ -96,11 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- Available: the stream is quiet provenance, tucked opposite the tag. -->
-        <span
+        <OTruncatedText
           v-if="ready"
-          class="text-text-secondary text-2xs min-w-0 flex-1 truncate text-right font-mono"
-          :title="entry.stream"
-          >{{ entry.stream }}</span
+          class="text-text-secondary text-2xs flex-1 text-right font-mono"
+          >{{ entry.stream }}</OTruncatedText
         >
       </div>
 

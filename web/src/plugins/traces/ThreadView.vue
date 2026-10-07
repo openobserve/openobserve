@@ -268,11 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatTime(turn.span.start_time) }}
                 </span>
                 <span
-                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 dark:text-thread-accent-strong inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap"
-                  :title="getModel(turn.span)"
+                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 dark:text-thread-accent-strong inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium"
                 >
                   <OIcon name="bolt" size="xs" />
-                  {{ getModel(turn.span) || t("traces.threadView.unknown") }}
+                  <OTruncatedText>{{
+                    getModel(turn.span) || t("traces.threadView.unknown")
+                  }}</OTruncatedText>
                 </span>
                 <span
                   class="thread-metric rounded-default bg-surface-subtle border-border-default text-text-secondary text-2xs inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none whitespace-nowrap"

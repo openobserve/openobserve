@@ -37,6 +37,8 @@ withDefaults(
     keyLabel?: string;
     /** Show a `key=value` hover tooltip. Default false. */
     tooltip?: boolean;
+    /** Give a cut value its own tooltip; turn off when an enclosing element already shows the full value. */
+    valueTooltip?: boolean;
     /**
      * Render a dismiss affordance inside the chip and emit `remove` on click.
      * A dismissable condition is the chip itself, not a button parked beside
@@ -52,6 +54,7 @@ withDefaults(
   }>(),
   {
     tooltip: false,
+    valueTooltip: true,
     removable: false,
     removeLabel: undefined,
     removeDataTest: undefined,
@@ -76,7 +79,7 @@ const emit = defineEmits<{ (e: "remove"): void }>();
         <OTruncatedText
           class="py-1.5 ps-1 font-semibold"
           :class="removable ? 'pe-1' : 'pe-2.5'"
-          :tooltip="tooltip ? false : undefined"
+          :tooltip="tooltip || !valueTooltip ? false : undefined"
           >{{ value }}</OTruncatedText
         >
         <button

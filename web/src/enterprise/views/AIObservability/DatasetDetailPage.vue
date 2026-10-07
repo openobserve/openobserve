@@ -144,15 +144,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Show the message CONTENT; the role envelope is kept in the stored
              value but only adds noise in a two-line cell. -->
             <template #cell-input="{ row }">
-              <OTruncatedText :lines="2" class="text-text-body wrap-anywhere whitespace-normal">{{
-                row.inputPreview
-              }}</OTruncatedText>
+              <OTruncatedText
+                :lines="2"
+                :tooltip="false"
+                class="text-text-body wrap-anywhere whitespace-normal"
+                >{{ row.inputPreview }}</OTruncatedText
+              >
             </template>
 
             <template #cell-expectedOutput="{ row }">
-              <OTruncatedText :lines="2" class="text-text-body wrap-anywhere whitespace-normal">{{
-                row.expectedOutput ?? "—"
-              }}</OTruncatedText>
+              <OTruncatedText
+                :lines="2"
+                :tooltip="false"
+                class="text-text-body wrap-anywhere whitespace-normal"
+                >{{ row.expectedOutput ?? "—" }}</OTruncatedText
+              >
             </template>
 
             <template #cell-source="{ row }">

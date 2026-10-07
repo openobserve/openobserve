@@ -13,11 +13,10 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   TOOLTIP_OFF_ATTR,
   TOOLTIP_TRIGGER_ATTR,
@@ -37,6 +36,7 @@ import {
   type OTableSlots,
   type OTableColumnDef,
   type OTableSection,
+  type OTableOverflowTooltipState,
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
@@ -61,6 +61,7 @@ import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
+import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
@@ -392,6 +393,13 @@ function enterCell(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): v
 function onOverflowTooltipOpenChange(open: boolean): void {
   if (!open) hideCellOverflow();
 }
+// Handed over as one fixed object: only the tooltip component reads the refs, so opening it never re-renders the table.
+const overflowTooltip: OTableOverflowTooltipState = {
+  anchor: overflowAnchor,
+  text: overflowText,
+  side: overflowSide,
+  onOpenChange: onOverflowTooltipOpenChange,
+};
 watch(
   () => props.cellOverflowTooltip,
   (on) => {
@@ -1836,14 +1844,7 @@ defineExpose({
       </OTablePagination>
     </div>
     <!-- /bordered wrapper -->
-    <OTooltip
-      v-if="cellOverflowTooltip"
-      :anchor="overflowAnchor"
-      :side="overflowSide"
-      :open="!!overflowAnchor"
-      :content="raw(overflowText)"
-      @update:open="onOverflowTooltipOpenChange"
-    />
+    <OTableOverflowTooltip v-if="cellOverflowTooltip" :state="overflowTooltip" />
   </div>
 </template>
 

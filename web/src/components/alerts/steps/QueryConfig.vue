@@ -1189,8 +1189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                 <template v-if="inlineStatusState === 'sql-status-bar--error'">
                   <OIcon class="shrink-0" name="error-outline" size="xs" />
-                  <span class="min-w-0 flex-1 truncate">{{ sqlQueryErrorMsg }}</span>
-                  <OTooltip side="top">{{ sqlQueryErrorMsg }}</OTooltip>
+                  <OTruncatedText class="flex-1">{{ sqlQueryErrorMsg }}</OTruncatedText>
                 </template>
                 <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                   <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
@@ -1789,6 +1788,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1805,6 +1805,7 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     OTag,
+    OTruncatedText,
     AlertMultiToggle,
     AlertQueryPreview,
     FilterGroup,

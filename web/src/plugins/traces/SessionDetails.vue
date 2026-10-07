@@ -741,10 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ i + 1 }}
                       </span>
-                      <span
-                        class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold"
-                        :title="row.name"
-                      >
+                      <span class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold">
                         {{ row.name }}
                       </span>
                       <span

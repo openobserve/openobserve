@@ -28,11 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
         <div class="h-full overflow-auto pt-1.5">
-          <router-view
-            :title="tabs"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-          >
+          <router-view :currOrgIdentifier="currOrgIdentifier" :currUserEmail="currentUserEmail">
           </router-view>
         </div>
       </div>

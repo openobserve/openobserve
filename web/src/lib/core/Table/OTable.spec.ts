@@ -30,6 +30,7 @@ beforeAll(() => {
 import { defineComponent, h, nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
+import OTableBody from "./sub-components/OTableBody.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
 import { raw } from "@/types/i18n";
@@ -1093,6 +1094,26 @@ describe("OTable", () => {
 
       expect(bubbles()).toHaveLength(1);
       expect(bubbles()[0].textContent).toContain("user1@example.com");
+    });
+
+    it("opens and closes the tooltip without re-rendering the table body", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-cell-email"]')[0].element;
+      setWidths(cell, 400, 120);
+      const body = wrapper.findComponent(OTableBody).vm.$;
+      const renderedBody = body.subTree;
+
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+      expect(body.subTree).toBe(renderedBody);
+
+      cell.dispatchEvent(new MouseEvent("mouseleave"));
+      for (let i = 0; i < 4; i++) await nextTick();
+      expect(bubbles()).toHaveLength(0);
+      expect(body.subTree).toBe(renderedBody);
     });
 
     it("opens nothing when the cell's text fits", async () => {

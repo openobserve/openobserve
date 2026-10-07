@@ -237,13 +237,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
-                <div
-                  class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold max-md:max-w-full max-md:text-xs"
+                <OTruncatedText
+                  as="div"
+                  class="font-mono text-sm leading-tight font-semibold max-md:max-w-full max-md:text-xs"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
                   {{ hasNoData ? raw("NA") : traceId }}
-                  <OTooltip v-if="!hasNoData" :content="raw(traceId)" />
-                </div>
+                </OTruncatedText>
               </div>
             </div>
           </div>
@@ -341,11 +341,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-component="{ row }">
-              <span :title="row.component">{{ row.component }}</span>
+              <span>{{ row.component }}</span>
             </template>
 
             <template #cell-desc="{ row }">
-              <span class="text-xs" :title="row.desc || '-'">{{ row.desc || "-" }}</span>
+              <span class="text-xs">{{ row.desc || "-" }}</span>
             </template>
 
             <template #empty>
@@ -431,6 +431,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -480,6 +481,7 @@ export default defineComponent({
     ODialog,
     OBanner,
     OTooltip,
+    OTruncatedText,
     OIcon,
     OTable,
   },

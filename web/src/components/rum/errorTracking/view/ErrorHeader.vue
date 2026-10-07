@@ -94,9 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span v-if="error.error_id" class="text-text-secondary flex min-w-0 items-center gap-1">
           <OIcon name="tag" size="xs" />
-          <code class="min-w-0 truncate" :title="error.error_id" data-test="error-id">{{
-            error.error_id
-          }}</code>
+          <OTruncatedText as="code" data-test="error-id">{{ error.error_id }}</OTruncatedText>
         </span>
         <span v-if="route" class="text-text-secondary flex min-w-0 items-center gap-1">
           <OIcon name="web" size="xs" />

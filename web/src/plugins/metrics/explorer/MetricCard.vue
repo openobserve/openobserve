@@ -43,11 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-1.5">
         <!-- Matches the dashboard panel title's classes (PanelContainer's
              dashboard-panel-header): same size, weight, tracking and token. -->
-        <span
-          class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
-          :title="card.name"
-          >{{ card.name }}</span
-        >
+        <OTruncatedText class="text-compact text-text-heading font-medium tracking-[0.02em]">{{
+          card.name
+        }}</OTruncatedText>
         <!-- Badge text is never the sole carrier of meaning — the card's aria
              label spells the type out too. -->
         <OTag
@@ -556,6 +554,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { BADGE_LABEL_KEYS, cardColorForIndex } from "@/utils/metrics/metricPalette";
@@ -603,6 +602,7 @@ export default defineComponent({
     PanelBar,
     OTag,
     OTooltip,
+    OTruncatedText,
     ExemplarToggle,
   },
   props: {

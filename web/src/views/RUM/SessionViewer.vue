@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
       label: t('rum.sessionReplay'),
       onClick: () => router.back(),
@@ -27,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #title>
       <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-        <span class="truncate">{{
+        <OTruncatedText>{{
           sessionDetails.id ? raw(sessionDetails.id) : t("rum.sessionReplay")
-        }}</span>
+        }}</OTruncatedText>
         <OBadge
           v-if="isLive && loadState !== 'error'"
           variant="success"

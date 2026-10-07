@@ -25,11 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-error-issue-cell-type"
         >{{ issue.error_type || t("rum.error") }}:</span
       >
-      <span
-        class="text-text-body min-w-0 truncate font-semibold"
-        :title="issue.error_message"
+      <OTruncatedText
+        class="text-text-body font-semibold"
         data-test="rum-error-issue-cell-message"
-        >{{ issue.error_message }}</span
+        >{{ issue.error_message }}</OTruncatedText
       >
     </div>
 
@@ -43,13 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0 uppercase"
         data-test="rum-error-issue-cell-handling-tag"
       />
-      <code
-        v-if="topFrame"
-        class="min-w-0 truncate"
-        :title="topFrame.line !== null ? `${topFrame.file}:${topFrame.line}` : topFrame.file"
-        data-test="rum-error-issue-cell-frame"
+      <OTruncatedText v-if="topFrame" as="code" data-test="rum-error-issue-cell-frame"
         >{{ topFrame.file
-        }}<template v-if="topFrame.line !== null">:{{ topFrame.line }}</template></code
+        }}<template v-if="topFrame.line !== null">:{{ topFrame.line }}</template></OTruncatedText
       >
       <OTag
         v-if="route"

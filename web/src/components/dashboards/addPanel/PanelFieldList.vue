@@ -63,7 +63,6 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"

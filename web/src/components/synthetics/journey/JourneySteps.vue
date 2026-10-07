@@ -463,13 +463,13 @@ const startRowColspan = computed(
             </div>
             <div class="flex min-w-0 flex-1 flex-col gap-0.5">
               <OTruncatedText class="text-text-body text-sm">{{ startRow!.name }}</OTruncatedText>
-              <span
+              <OTruncatedText
                 v-if="startRow!.error"
-                class="text-status-error-text truncate font-mono text-xs"
-                :title="startRow!.error"
+                class="text-status-error-text font-mono text-xs"
+                :lines="2"
               >
                 {{ startRow!.error }}
-              </span>
+              </OTruncatedText>
             </div>
             <span class="text-text-secondary shrink-0 font-mono text-xs tabular-nums">
               {{ startRow!.durStr ?? "" }}

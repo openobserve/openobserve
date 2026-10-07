@@ -188,12 +188,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-page="{ row }">
-            <span class="block truncate font-mono text-xs" :title="pageRoute(row)">
+            <span class="font-mono text-xs">
               {{ pageRoute(row) }}
             </span>
           </template>
           <template #cell-route="{ row }">
-            <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
+            <span class="font-mono text-xs">
               {{ traceDisplayName(row) }}
             </span>
           </template>

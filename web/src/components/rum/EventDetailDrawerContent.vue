@@ -42,12 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="me-1 inline"
                   />
                 </template>
-                <div
-                  class="semi-bold flex-1 overflow-hidden text-sm leading-tight text-ellipsis whitespace-nowrap"
-                  :title="event.name"
-                >
+                <OTruncatedText as="div" class="semi-bold flex-1 text-sm leading-tight">
                   {{ event.name }}
-                </div>
+                </OTruncatedText>
               </div>
             </div>
             <div
@@ -204,12 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-secondary w-25 shrink-0 font-medium">
                   {{ t("common.urlLabel") }}
                 </div>
-                <div
-                  class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                  :title="rawEvent.view_url"
-                >
+                <OTruncatedText as="div" class="flex-1">
                   {{ rawEvent.view_url }}
-                </div>
+                </OTruncatedText>
               </div>
               <div v-if="rawEvent?.view_id" class="flex px-1.5 py-1 text-xs">
                 <div class="text-text-secondary w-25 shrink-0 font-medium">

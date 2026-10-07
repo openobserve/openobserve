@@ -90,6 +90,14 @@ export interface OTableOverflowTooltipContext {
 export const OTableOverflowTooltipKey: InjectionKey<OTableOverflowTooltipContext> =
   Symbol("OTableOverflowTooltip");
 
+/** The shared tooltip's state, read only inside its own component so a change never re-renders the table. */
+export interface OTableOverflowTooltipState {
+  anchor: Ref<HTMLElement | null>;
+  text: Ref<string>;
+  side: Ref<TooltipSide>;
+  onOpenChange: (open: boolean) => void;
+}
+
 /** Marks an element inside a cell that clips its own text (slot wrapper, copy value). */
 export const TABLE_CELL_CLIP_ATTR = "data-o2-cell-clip";
 

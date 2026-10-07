@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="trace-details-sidebar-header"
     >
       <div
-        :title="span.operation_name"
         class="flex w-[calc(100%-1.5rem)] items-center truncate ps-1 pb-0"
         data-test="trace-details-sidebar-header-operation-name"
       >
@@ -46,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OTag
         >
 
-        <span class="truncate">{{ span.operation_name }}</span>
+        <OTruncatedText>{{ span.operation_name }}</OTruncatedText>
       </div>
 
       <OButton
@@ -959,6 +958,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
@@ -1112,6 +1112,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OCollapsible,
     OEmptyState,
     LogsHighLighting,

@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex min-w-0 items-center gap-2"
               :data-test="`destination-template-${row.name}`"
             >
-              <span class="min-w-0 truncate" :title="row.template">{{ row.template }}</span>
+              <OTruncatedText>{{ row.template }}</OTruncatedText>
               <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
@@ -368,6 +368,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -397,6 +398,7 @@ export default defineComponent({
     ODropdownItem,
     OSearchInput,
     OTag,
+    OTruncatedText,
     OTable,
     OToggleGroup,
     OToggleGroupItem,

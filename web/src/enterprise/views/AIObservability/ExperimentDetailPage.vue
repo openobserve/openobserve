@@ -743,7 +743,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     sortable: false,
     size: COL.name,
     minSize: 160,
-    meta: { align: "left" as const, flex: true, isName: true },
+    meta: { align: "left" as const, flex: true, isName: true, cellOverflowTooltip: false },
   },
   ...(isMultiTrial.value
     ? [
@@ -763,7 +763,7 @@ const columns = computed<OTableColumnDef[]>(() => [
           accessorKey: "output",
           sortable: false,
           size: 320,
-          meta: { align: "left" as const },
+          meta: { align: "left" as const, cellOverflowTooltip: false },
         },
       ]),
   ...scorerIds.value.map((id) => ({

@@ -34,16 +34,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ initials }}</span
       >
       <div class="min-w-0">
-        <div
-          class="text-text-heading truncate font-semibold"
-          :title="userName"
+        <OTruncatedText
+          as="div"
+          class="text-text-heading font-semibold"
           data-test="rum-error-context-user-name"
         >
           {{ userName }}
-        </div>
-        <small class="block truncate" :title="userEmail" data-test="rum-error-context-user-email">{{
+        </OTruncatedText>
+        <OTruncatedText as="small" class="block" data-test="rum-error-context-user-email">{{
           userEmail
-        }}</small>
+        }}</OTruncatedText>
       </div>
     </div>
 

@@ -39,16 +39,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="depKindColor(focusNode ?? { kind: focus.kind, orphan: false, missing: false })"
         />
         <div class="min-w-0">
-          <div class="text-text-heading truncate text-base font-semibold" :title="entityName">
+          <OTruncatedText as="div" class="text-text-heading text-base font-semibold">
             {{ entityName }}
-          </div>
-          <div
-            class="text-text-secondary truncate text-xs"
-            :title="impactLabel"
+          </OTruncatedText>
+          <OTruncatedText
+            as="div"
+            class="text-text-secondary text-xs"
             data-test="dependency-impact-subtitle"
           >
             {{ impactLabel }}
-          </div>
+          </OTruncatedText>
         </div>
       </div>
     </template>
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="scrollToGroup(g.dest)"
                   >
                     <OIcon name="location-on" size="xs" class="text-info shrink-0" />
-                    <span class="truncate" :title="g.dest.name">{{ g.dest.name }}</span>
+                    <OTruncatedText>{{ g.dest.name }}</OTruncatedText>
                   </div>
                   <!-- Hovering an alert highlights its destination card(s). -->
                   <DependencyEntityRow

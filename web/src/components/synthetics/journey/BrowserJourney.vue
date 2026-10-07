@@ -2139,7 +2139,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           }}</span>
         </span>
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 text-xs">
-          <OTruncatedText>{{ currentUrl }}</OTruncatedText>
+          <!-- The filled-in URL can hold secure variable values, so it never gets a hover reveal. -->
+          <OTruncatedText :tooltip="false">{{ currentUrl }}</OTruncatedText>
         </span>
         <span class="text-text-muted text-xs">{{
           t("synthetics.table.stepsCount", { count: capturedSteps.length })

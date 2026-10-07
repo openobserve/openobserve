@@ -607,10 +607,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallTeam") }}
                           </span>
-                          <span class="text-text-body truncate text-xs">
+                          <OTruncatedText class="text-text-body text-xs">
                             {{ raw(oncallTeamName) }}
-                            <OTooltip side="bottom" :content="raw(oncallTeamName)" />
-                          </span>
+                          </OTruncatedText>
                         </div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-text-secondary text-xs">

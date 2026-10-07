@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
+              <span class="text-text-body">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />

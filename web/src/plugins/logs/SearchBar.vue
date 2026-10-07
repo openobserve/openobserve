@@ -1743,9 +1743,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
+                  <OTruncatedText
+                    as="div"
+                    class="w-full cursor-pointer text-sm"
                     :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                     @click.stop="
                       applySavedView(row);
@@ -1753,7 +1753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ value }}
-                  </div>
+                  </OTruncatedText>
                 </template>
                 <template #cell-actions="{ row }">
                   <div class="flex items-center gap-0.5">
@@ -1852,9 +1852,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="border-border my-1 border-t" />
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
+                  <OTruncatedText
+                    as="div"
+                    class="w-full cursor-pointer text-sm"
                     :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
                     @click.stop="
                       applySavedView(row);
@@ -1862,7 +1862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ value }}
-                  </div>
+                  </OTruncatedText>
                 </template>
                 <template #cell-actions="{ row }">
                   <div class="flex items-center gap-0.5">

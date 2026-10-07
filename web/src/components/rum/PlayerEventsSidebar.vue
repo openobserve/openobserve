@@ -92,14 +92,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="truncate">
-              <div class="me-3 inline" data-test="event-display-time">
+            <div class="flex min-w-0 items-center">
+              <div class="me-3 shrink-0" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="me-3"
+                class="me-3 shrink-0"
                 data-test="event-type-badge"
               />
               <template
@@ -107,12 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="me-1 inline"
+                  class="me-1 shrink-0"
                 />
               </template>
-              <div class="inline" :title="filteredEvent.name" data-test="event-name">
-                {{ filteredEvent.name }}
-              </div>
+              <OTruncatedText data-test="event-name">{{ filteredEvent.name }}</OTruncatedText>
             </div>
           </div>
         </template>
