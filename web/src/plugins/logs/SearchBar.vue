@@ -749,13 +749,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator />
 
-          <ODropdownGroup
-            v-if="config.isEnterprise == 'true'"
-            :label="t('search.menuGroupSchedule')"
-          >
+          <ODropdownGroup :label="t('search.menuGroupSchedule')">
+            <template v-if="!scheduledSearchAccess.allowed" #label-action>
+              <OIcon name="lock" size="xs" class="text-text-secondary" />
+            </template>
+
             <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
               data-test="search-scheduler-create-new-btn"
+              :disabled="!scheduledSearchAccess.allowed"
               @select="createScheduleJob"
             >
               <template #icon-left>
@@ -775,8 +776,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
 
             <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
               data-test="search-scheduler-list-btn"
+              :disabled="!scheduledSearchAccess.allowed"
               @select="routeToSearchSchedule"
             >
               <template #icon-left>
@@ -795,8 +796,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </ODropdownItem>
           </ODropdownGroup>
+          <LockedFeatureTooltip
+            v-if="!scheduledSearchAccess.allowed"
+            :message="scheduledSearchAccess.message"
+            icon="schedule"
+            :title="t('search.menuGroupSchedule')"
+          />
 
-          <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
+          <ODropdownSeparator />
 
           <!-- Alert creation is shared platform machinery: this page contributes
                its search state through a pure adapter and CreateAlertAction owns
@@ -2313,6 +2320,11 @@ export default defineComponent({
     // builds that don't unlock it, with the shared nav/settings tooltip.
     const patternsAccess = computed(() =>
       checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Scheduled Search menu — shown locked (not hidden) in builds that don't
+    // unlock it, same treatment as the Patterns toggle above.
+    const scheduledSearchAccess = computed(() =>
+      checkFeatureAccess("scheduledSearch", buildFeatureGateContext(store.state.zoConfig)),
     );
     const orgIdForWrites = useOrgId();
     const createSavedView = useMutation(() => createSavedViewMutation(orgIdForWrites.value));
@@ -5205,6 +5217,7 @@ export default defineComponent({
       savedViewColumns,
       config,
       patternsAccess,
+      scheduledSearchAccess,
       handleRegionsSelection,
       handleQuickMode,
       handleHistogramMode,
