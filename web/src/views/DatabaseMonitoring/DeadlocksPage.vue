@@ -87,7 +87,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <!-- What a ROW means. Not a data-processing mode — the reader is
                  choosing between "name the bug" and "give me a timestamp". -->
-            <OToggleGroup v-model="grouping" class="shrink-0" data-test="dbm-deadlocks-grouping">
+            <OToggleGroup
+              v-model="grouping"
+              class="shrink-0"
+              mobile-dropdown
+              data-test="dbm-deadlocks-grouping"
+            >
               <OToggleGroupItem value="pairs" size="sm" data-test="dbm-deadlocks-grouping-pairs">
                 {{ t("dbm.deadlocks.grouping.pairs") }}
                 <OTooltip side="bottom" :content="t('dbm.deadlocks.grouping.pairsHint')" />
