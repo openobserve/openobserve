@@ -1536,7 +1536,7 @@ async fn handle_anomaly_detection_triggers(
                     downtime_id = run.suppressed_by.clone();
                     (
                         anomaly_run_status(&run),
-                        None,
+                        run.notify_error.clone(),
                         Some(
                             serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string(),
                         ),
@@ -8031,6 +8031,7 @@ mod tests {
             anomaly_count: 0,
             gate_passed,
             notify_failed,
+            notify_error: None,
             claim_lost,
             ineligible,
             suppressed_by: None,
