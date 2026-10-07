@@ -1445,6 +1445,9 @@ export const MARIADB_DBM_GRANT_SQL = `SET GLOBAL innodb_print_all_deadlocks = ON
 -- MariaDB has no SET PERSIST: add this to my.cnf ([mysqld] section) so the
 -- setting survives a restart, otherwise deadlock history stops silently.
 --   innodb_print_all_deadlocks = ON`;
+// VIEW SERVER PERFORMANCE STATE exists only from SQL Server 2022 (major 16); EXEC stops 2016–2019 rejecting the batch at parse time.
+export const MSSQL_2022_PLUS = "IF CAST(SERVERPROPERTY('ProductMajorVersion') AS int) >= 16";
+
 /**
  * SQL Server needs BOTH grants, for two different reads.
  *
@@ -1454,10 +1457,13 @@ export const MARIADB_DBM_GRANT_SQL = `SET GLOBAL innodb_print_all_deadlocks = ON
  * Extended Events target and fails with msg 300 ("VIEW SERVER PERFORMANCE STATE
  * permission was denied"), which leaves the Deadlocks tab empty forever while
  * blocking works — reading as "deadlocks never happen" rather than as a
- * permissions problem. Neither grant subsumes the other.
+ * permissions problem. On 2022+ neither grant subsumes the other; 2016–2019
+ * have only VIEW SERVER STATE, which covers both reads there.
  */
 export const MSSQL_DBM_GRANT_SQL = `GRANT VIEW SERVER STATE TO otel;
-GRANT VIEW SERVER PERFORMANCE STATE TO otel;`;
+-- SQL Server 2022+ also needs VIEW SERVER PERFORMANCE STATE to read the deadlock history.
+${MSSQL_2022_PLUS}
+  EXEC('GRANT VIEW SERVER PERFORMANCE STATE TO otel');`;
 
 /**
  * Postgres server settings the deadlock recipe DEPENDS ON. Unlike the grant
