@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
@@ -10,6 +11,9 @@ export interface ConfirmDialogOptions {
   confirmLabel?: I18nText;
   cancelLabel?: I18nText;
   persistent?: boolean;
+  confirmVariant?: ButtonVariant;
+  // A destructive confirm starts on Cancel so Enter cannot confirm by accident.
+  focusCancel?: boolean;
 }
 
 interface DialogState extends ConfirmDialogOptions {

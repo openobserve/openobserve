@@ -165,6 +165,9 @@
         v-model="showDeleteChatConfirmDialog"
         :title="t('aiAssistant.deleteChat')"
         :message="deleteChatMessage"
+        :ok-label="t('common.delete')"
+        ok-variant="destructive"
+        focus-cancel
         @update:ok="confirmDeleteChat"
         @update:cancel="showDeleteChatConfirmDialog = false"
       />
@@ -592,6 +595,7 @@ export default defineComponent({
       loadHistory: dbLoadHistory,
       loadChat: dbLoadChat,
       deleteChatById: dbDeleteChatById,
+      discardLocalChat: dbDiscardLocalChat,
       clearAllHistory: dbClearAllHistory,
       updateChatTitle: dbUpdateChatTitle,
     } = useChatHistory(
@@ -1082,7 +1086,8 @@ export default defineComponent({
         currentChatId.value = null;
         currentSessionId.value = null;
         store.dispatch("setCurrentChatTimestamp", null);
-        await dbDeleteChatById(chatId);
+        // A refused first turn never created the chat on the server, so a server delete would only 404.
+        await dbDiscardLocalChat(chatId);
       } else {
         await saveToHistory();
       }
@@ -1367,9 +1372,20 @@ export default defineComponent({
       if (chatToDelete.value === chatId) deleteLinkCount.value = count;
     };
 
-    const shareHistoryChat = (chatId: number) => {
+    // Only the open chat's history state is known here; another chat's is found the way opening it would.
+    const shareHistoryChat = async (chatId: number) => {
       const chat = chatHistory.value.find((c) => c.id === chatId);
-      if (chat) openShareDialog(chat.sessionId, chat.title);
+      if (!chat?.sessionId) return;
+      if (chatId === currentChatId.value) {
+        openShareDialog(chat.sessionId, chat.title, historyUnavailable.value);
+        return;
+      }
+      openShareDialog(chat.sessionId, chat.title);
+      const loaded = await dbLoadChat(chatId);
+      const target = shareTarget.value;
+      if (target?.sessionId === chat.sessionId && loaded?.historyUnavailable) {
+        shareTarget.value = { ...target, historyUnavailable: true };
+      }
     };
 
     const retryGeneration = async (target: ChatMessage | number) => {

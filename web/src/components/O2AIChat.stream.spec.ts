@@ -24,6 +24,7 @@ const mockSaveToHistory = vi.fn().mockResolvedValue(42);
 const mockLoadHistory = vi.fn().mockResolvedValue([]);
 const mockLoadChat = vi.fn().mockResolvedValue(null);
 const mockDeleteChatById = vi.fn().mockResolvedValue(true);
+const mockDiscardLocalChat = vi.fn().mockResolvedValue(true);
 const mockClearAllHistory = vi.fn().mockResolvedValue(true);
 const mockUpdateChatTitle = vi.fn().mockResolvedValue(true);
 
@@ -33,6 +34,7 @@ vi.mock("@/composables/useChatHistory", () => ({
     loadHistory: mockLoadHistory,
     loadChat: mockLoadChat,
     deleteChatById: mockDeleteChatById,
+    discardLocalChat: mockDiscardLocalChat,
     clearAllHistory: mockClearAllHistory,
     updateChatTitle: mockUpdateChatTitle,
   })),
@@ -2333,7 +2335,8 @@ describe("O2AIChat SSE protocol", () => {
       expect(vm.chatMessages).toHaveLength(0);
       expect(vm.inputMessage).toBe("count the errors");
       expect(vm.turnLimitError).toBe(true);
-      expect(mockDeleteChatById).toHaveBeenCalledWith(42);
+      expect(mockDiscardLocalChat).toHaveBeenCalledWith(42);
+      expect(mockDeleteChatById).not.toHaveBeenCalled();
       expect(vm.currentChatId).toBeNull();
       expect(wrapper.find('[data-test="o2-ai-chat-turn-limit"]').exists()).toBe(true);
     });
@@ -2348,6 +2351,7 @@ describe("O2AIChat SSE protocol", () => {
       expect(vm.chatMessages.map((m: any) => m.content)).toEqual(["first", "answer"]);
       expect(vm.inputMessage).toBe("second");
       expect(mockDeleteChatById).not.toHaveBeenCalled();
+      expect(mockDiscardLocalChat).not.toHaveBeenCalled();
     });
 
     it("sends the kept prompt again on Retry", async () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
 import ODialog from "./ODialog.vue";
 import { DialogContent } from "reka-ui";
 
@@ -243,6 +244,39 @@ describe("ODialog", () => {
       const panel = findDialogPanel(wrapper);
       await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+  });
+
+  describe("initial focus", () => {
+    async function openFocused(props: Record<string, unknown>) {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: {
+          open: true,
+          title: "Test",
+          primaryButtonLabel: "Delete",
+          secondaryButtonLabel: "Cancel",
+          ...props,
+        },
+      });
+      const panel = wrapper
+        .findAllComponents(DialogContent)
+        .find((c) => c.attributes("data-o2-dialog") !== undefined)!;
+      await panel.vm.$emit("openAutoFocus", new Event("focus", { cancelable: true }));
+      await nextTick();
+      return wrapper;
+    }
+
+    it("focuses the primary button by default", async () => {
+      const wrapper = await openFocused({});
+      expect(document.activeElement?.getAttribute("data-test")).toBe("o-dialog-primary-btn");
+      wrapper.unmount();
+    });
+
+    it("focuses the secondary button when initialFocus is secondary", async () => {
+      const wrapper = await openFocused({ initialFocus: "secondary" });
+      expect(document.activeElement?.getAttribute("data-test")).toBe("o-dialog-secondary-btn");
+      wrapper.unmount();
     });
   });
 

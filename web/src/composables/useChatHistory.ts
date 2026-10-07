@@ -612,6 +612,15 @@ export function useChatHistory(
     return true;
   };
 
+  /** Drop only this browser's copy, for a chat the server never created. */
+  const discardLocalChat = async (chatId: number): Promise<boolean> => {
+    listedSessions.delete(chatId);
+    listedTitles.delete(chatId);
+    const deleted = await deleteLocalChat(chatId);
+    if (deleted) notifyChatListChanged();
+    return deleted;
+  };
+
   const clearAllHistory = async (): Promise<boolean> => {
     if (serverOn()) {
       try {
@@ -673,6 +682,7 @@ export function useChatHistory(
     adoptServerChat,
     loadChat,
     deleteChatById,
+    discardLocalChat,
     clearAllHistory,
     updateChatTitle,
   };
