@@ -112,16 +112,13 @@ impl UsageSources {
             .collect()
     }
 
+    /// SLOs live in alert folders.
     fn alert_folders(&self) -> HashSet<String> {
         self.alerts
             .iter()
             .map(|(folder, _)| folder.folder_id.clone())
+            .chain(self.slos.iter().map(|slo| slo.folder_id.clone()))
             .collect()
-    }
-
-    /// SLOs live in alert folders, but are listed through their own route.
-    fn slo_folders(&self) -> HashSet<String> {
-        self.slos.iter().map(|slo| slo.folder_id.clone()).collect()
     }
 }
 
@@ -137,8 +134,6 @@ struct FolderAccess {
 struct Access {
     dashboard_folders: HashMap<String, FolderAccess>,
     alert_folders: HashMap<String, FolderAccess>,
-    /// The SLO list endpoint returns everything in a folder its route admits.
-    slo_folders: HashSet<String>,
     dashboards: Option<Vec<String>>,
     alerts: Option<Vec<String>>,
     pipelines_listable: bool,
@@ -264,7 +259,6 @@ async fn load_access(
     Ok(Access {
         dashboard_folders: open(sources.dashboard_folders()),
         alert_folders: open(sources.alert_folders()),
-        slo_folders: sources.slo_folders(),
         dashboards: None,
         alerts: None,
         pipelines_listable: true,
@@ -305,16 +299,6 @@ async fn load_access(
         sources.alert_folders(),
     )
     .await;
-    let slo_folders = futures::stream::iter(sources.slo_folders())
-        .map(|folder| async move {
-            route_allows(org_id, user_id, role, &[org_id, "slos"], &folder)
-                .await
-                .then_some(folder)
-        })
-        .buffer_unordered(FOLDER_CHECKS_IN_FLIGHT)
-        .filter_map(std::future::ready)
-        .collect()
-        .await;
     let individual = |permission: &'static str, object_type: String| async move {
         crate::authz::list_objects_for_user(org_id, user_id, permission, &object_type).await
     };
@@ -326,7 +310,6 @@ async fn load_access(
     Ok(Access {
         dashboard_folders,
         alert_folders,
-        slo_folders,
         dashboards: individual("GET_INDIVIDUAL_FROM_ROLE", "dashboard".to_string()).await?,
         alerts,
         pipelines_listable: route_allows(org_id, user_id, role, &[org_id, "pipelines"], "").await,
@@ -334,7 +317,6 @@ async fn load_access(
     })
 }
 
-/// Each folder's LIST check on `route`, then its GET check as a `folder_type`.
 #[cfg(feature = "enterprise")]
 async fn folder_access(
     org_id: &str,
@@ -451,7 +433,7 @@ fn visible(org_id: &str, sources: UsageSources, access: &Access) -> UsageSources
         slos: sources
             .slos
             .into_iter()
-            .filter(|slo| access.slo_folders.contains(&slo.folder_id))
+            .filter(|slo| access.alert_folder(&slo.folder_id).list)
             .collect(),
         pipelines: sources
             .pipelines
@@ -1235,14 +1217,13 @@ mod tests {
     }
 
     #[test]
-    fn slos_follow_the_slo_route_not_the_alert_folder_grants() {
+    fn an_slo_in_a_folder_the_caller_cannot_list_is_not_listed() {
         let sources = UsageSources {
             slos: vec![promql_slo("hidden"), promql_slo("open")],
             ..Default::default()
         };
         let access = Access {
-            alert_folders: folders(&[("hidden", true, true), ("open", false, false)]),
-            slo_folders: HashSet::from(["open".to_string()]),
+            alert_folders: folders(&[("hidden", false, true), ("open", true, false)]),
             ..Default::default()
         };
         let slos = visible("org", sources, &access).slos;

@@ -363,7 +363,7 @@ pub struct RequestFormatQuery {
     pub query: String,
 }
 
-/// The PromQL query whose syntax tree `parse_tree` returns.
+/// The PromQL query to parse into a syntax tree.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RequestParseTree {
     pub query: String,
