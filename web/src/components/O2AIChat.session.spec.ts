@@ -1209,6 +1209,38 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
   });
 
+  describe("delete confirmation", () => {
+    it("labels the destructive action Delete and starts on Cancel", () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat(
+        {},
+        {
+          ...baseStubs,
+          ConfirmDialog: {
+            name: "ConfirmDialog",
+            template: '<div data-test="confirm-dialog" />',
+            props: {
+              modelValue: Boolean,
+              title: String,
+              message: String,
+              okLabel: String,
+              okVariant: String,
+              focusCancel: Boolean,
+            },
+          },
+        },
+      );
+      const dialog = wrapper
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((c) => c.props("title") === "Delete Chat")!;
+      expect(dialog.props()).toMatchObject({
+        okLabel: "Delete",
+        okVariant: "destructive",
+        focusCancel: true,
+      });
+    });
+  });
+
   describe("forks and sharing", () => {
     const shareStubs = {
       ...baseStubs,
@@ -1278,6 +1310,62 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       vm.addNewChat();
       await flushPromises();
       expect(wrapper!.find(banner).exists()).toBe(false);
+    });
+
+    it("warns on Share from the history menu when that chat's history cannot be read", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      vm.chatHistory = [
+        {
+          id: 9,
+          title: "Old chat",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          messages: [],
+          sessionId: "s-9",
+          serverBacked: true,
+        },
+      ];
+      mockLoadChat.mockResolvedValueOnce({
+        id: 9,
+        title: "Old chat",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [],
+        sessionId: "s-9",
+        serverBacked: true,
+        historyUnavailable: true,
+      });
+      vm.shareHistoryChat(9);
+      await flushPromises();
+      expect(mockLoadChat).toHaveBeenCalledWith(9);
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ sessionId: "s-9", historyUnavailable: true });
+    });
+
+    it("uses the open chat's known history state on Share from the history menu", async () => {
+      wrapper!.unmount();
+      wrapper = mountO2AIChat({}, shareStubs);
+      vm = wrapper.vm as any;
+      const broken = {
+        id: 5,
+        title: "Broken",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        messages: [],
+        sessionId: "s-5",
+        serverBacked: true,
+        historyUnavailable: true,
+      };
+      mockLoadChat.mockResolvedValueOnce(broken);
+      await vm.loadChat(5);
+      await flushPromises();
+      vm.chatHistory = [broken];
+      mockLoadChat.mockClear();
+
+      vm.shareHistoryChat(5);
+      await flushPromises();
+      expect(mockLoadChat).not.toHaveBeenCalled();
+      const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+      expect(dialog.props()).toMatchObject({ sessionId: "s-5", historyUnavailable: true });
     });
 
     it("opens the share dialog for the chat picked in the history menu", async () => {

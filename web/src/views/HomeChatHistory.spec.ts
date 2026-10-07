@@ -22,6 +22,7 @@ import { notifyChatListChanged } from "@/utils/chatListRevision";
 
 const history = vi.hoisted(() => ({
   loadHistory: vi.fn(),
+  loadChat: vi.fn(),
   deleteChatById: vi.fn(),
   clearAllHistory: vi.fn(),
 }));
@@ -74,6 +75,7 @@ describe("HomeChatHistory", () => {
     queryClient.clear();
     history.loadHistory.mockResolvedValue(chats);
     history.deleteChatById.mockResolvedValue(true);
+    history.loadChat.mockResolvedValue({ ...chats[0] });
     service.listForChat.mockResolvedValue({ data: { shares: [{ id: "a" }, { id: "b" }] } });
   });
 
@@ -94,6 +96,12 @@ describe("HomeChatHistory", () => {
     await wrapper.find('[data-test="home-chat-history-delete-1"]').trigger("click");
     await flushPromises();
     expect(currentDialog.value?.message).toContain("2");
+    expect(currentDialog.value).toMatchObject({
+      confirmLabel: "Delete",
+      confirmVariant: "destructive",
+      focusCancel: true,
+      persistent: false,
+    });
     handleCancel();
     await flushPromises();
     expect(history.deleteChatById).not.toHaveBeenCalled();
@@ -103,6 +111,26 @@ describe("HomeChatHistory", () => {
     handleConfirm();
     await flushPromises();
     expect(history.deleteChatById).toHaveBeenCalledWith(1);
+  });
+
+  it("warns on Share when the chat's history cannot be read", async () => {
+    history.loadChat.mockResolvedValueOnce({ ...chats[0], historyUnavailable: true });
+    const { wrapper } = mountList();
+    await flushPromises();
+    await wrapper.find('[data-test="home-chat-history-share-1"]').trigger("click");
+    await flushPromises();
+    expect(history.loadChat).toHaveBeenCalledWith(1);
+    const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+    expect(dialog.props()).toMatchObject({ sessionId: "s-1", historyUnavailable: true });
+  });
+
+  it("does not warn on Share when the chat's history reads", async () => {
+    const { wrapper } = mountList();
+    await flushPromises();
+    await wrapper.find('[data-test="home-chat-history-share-1"]').trigger("click");
+    await flushPromises();
+    const dialog = wrapper.findComponent({ name: "AiChatShareDialog" });
+    expect(dialog.props()).toMatchObject({ sessionId: "s-1", historyUnavailable: false });
   });
 
   it("re-reads the list whenever a chat changed elsewhere", async () => {

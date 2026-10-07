@@ -123,19 +123,27 @@ function foldTurn(
   ctx: ReducerCtx,
   audience: HistoryAudience,
 ): void {
-  const from = messages.length;
+  // A turn folds into its own list so a turn without a user message cannot write into the previous answer.
+  const own: ChatMessage[] = [];
   if (turn.user) {
     const images = (turn.user.images ?? [])
       .map(toAttachment)
       .filter((img): img is ImageAttachment => img !== null);
-    messages.push({
-      role: "user",
-      content: raw(turn.user.text),
-      ...(images.length > 0 && { images }),
-    });
+    if (turn.user.text || images.length > 0) {
+      own.push({
+        role: "user",
+        content: raw(turn.user.text),
+        ...(images.length > 0 && { images }),
+      });
+    }
   }
+  // A message that never reached the agent reads as unsent, not as the server's generic failure text.
+  const unsent = turn.status === "failed" && !turn.user;
+  const shown = unsent
+    ? { ...turn, frames: turn.frames.filter((frame) => frame?.type !== "error") }
+    : turn;
   const state: StreamState = {
-    messages,
+    messages: own,
     activeToolCall: null,
     textSegment: "",
     streamingMsg: "",
@@ -146,11 +154,12 @@ function foldTurn(
     messageComplete: false,
     halted: false,
   };
-  for (const frame of turn.frames) {
+  for (const frame of shown.frames) {
     if (state.halted) break;
     reduce(state, frame, ctx);
   }
-  markTurnStatus(turn, messages, from, state, ctx, audience);
+  markTurnStatus(shown, own, 0, state, ctx, audience);
+  messages.push(...own);
 }
 
 /** Fold stored turns with the live reducer so they render like a live chat, marking unfinished or failed turns. */

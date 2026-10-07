@@ -225,6 +225,72 @@ describe("messagesFromTurns", () => {
     });
   });
 
+  it("shows a turn that stored nothing but carries the server's error frame as failed to send", () => {
+    const errorFrame = {
+      type: "error",
+      error: "The response failed (upstream_error). Please try again.",
+      error_code: "upstream_error",
+      recoverable: false,
+    };
+    const messages = messagesFromTurns(
+      [
+        turn("hello", [{ type: "message_delta", content: "Hi" }]),
+        {
+          turn_id: "t2",
+          status: "failed",
+          error_code: "upstream_error",
+          user: null,
+          frames: [errorFrame],
+        },
+      ],
+      t,
+    );
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "assistant"]);
+    expect(messages[1].content).toBe("Hi");
+    expect(messages[2].contentBlocks).toEqual([
+      {
+        type: "error",
+        message: "aiAssistant.messageFailedToSend",
+        suggestion: "aiAssistant.turnErrorCode",
+      },
+    ]);
+  });
+
+  it("shows a partly stored failed turn with its prompt and its error", () => {
+    const errorFrame = { type: "error", error: "boom", error_code: "x", recoverable: false };
+    const messages = messagesFromTurns(
+      [
+        {
+          user: { text: "go" },
+          frames: [{ type: "message_delta", content: "Part" }, errorFrame],
+          status: "failed",
+        },
+      ],
+      t,
+    );
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(messages[0].content).toBe("go");
+    expect(messages[1].content).toContain("Part");
+    expect(messages[1].content).toContain("boom");
+  });
+
+  it("renders no empty user bubble when the prompt event was not committed", () => {
+    const messages = messagesFromTurns(
+      [
+        turn("hello", [{ type: "message_delta", content: "Hi" }]),
+        {
+          user: { text: "" },
+          frames: [{ type: "error", error: "boom", recoverable: false }],
+          status: "failed",
+        },
+      ],
+      t,
+    );
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant", "assistant"]);
+    expect(messages[1].content).toBe("Hi");
+    expect(messages[2].content).toContain("boom");
+  });
+
   it("adds the stop marker once for a cancelled turn without a cancelled frame", () => {
     const [, assistant] = messagesFromTurns(
       [

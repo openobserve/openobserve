@@ -1373,6 +1373,29 @@ describe("useChatHistory", () => {
     });
   });
 
+  describe("discardLocalChat", () => {
+    it("drops a server-backed chat from this browser without asking the server", async () => {
+      const server = {
+        enabled: () => true,
+        list: vi.fn(),
+        get: vi.fn(),
+        rename: vi.fn(),
+        remove: vi.fn(),
+        removeAll: vi.fn(),
+      };
+      const { saveToHistory, discardLocalChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+        server,
+      );
+      const chatId = await saveToHistory(makeMessages(1), "0190a1b2-c3d4-7000-8000-0000000000bb");
+      expect(await discardLocalChat(chatId!)).toBe(true);
+      expect(server.remove).not.toHaveBeenCalled();
+      expect(await discardLocalChat(chatId!)).toBe(false);
+    });
+  });
+
   describe("adoptServerChat", () => {
     const SESSION = "0190a1b2-c3d4-7000-8000-000000000001";
     const makeServer = () => ({

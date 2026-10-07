@@ -25,7 +25,7 @@ const emit = defineEmits<{
 const store = useStore();
 const { t } = useI18nTyped();
 
-const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
+const { loadHistory, loadChat, deleteChatById, clearAllHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
   () => store.state.selectedOrganization.identifier ?? "",
   t,
@@ -85,6 +85,10 @@ async function deleteChat(e: Event, chat: ChatHistoryEntry) {
       links > 0
         ? t("aiAssistant.deleteChatWithLinksMessage", { count: links }, links)
         : t("aiAssistant.deleteChatConfirmMessage"),
+    confirmLabel: t("common.delete"),
+    confirmVariant: "destructive",
+    focusCancel: true,
+    persistent: false,
   });
   if (!ok) return;
   await deleteChatById(chat.id);
@@ -111,17 +115,22 @@ async function clearAll() {
 }
 
 const persistenceEnabled = computed(() => isChatPersistenceEnabled(store.state.zoConfig));
-const shareTarget = ref<ChatHistoryEntry | null>(null);
+const shareTarget = ref<{ chat: ChatHistoryEntry; historyUnavailable: boolean } | null>(null);
 const shareDialogOpen = ref(false);
 const sharedByMeOpen = ref(false);
 
 const canShare = (chat: ChatHistoryEntry) =>
   persistenceEnabled.value && !!chat.serverBacked && !!chat.sessionId;
 
-function openShare(e: Event, chat: ChatHistoryEntry) {
+// The list does not know whether a chat's history reads, so it is found the way opening the chat would.
+async function openShare(e: Event, chat: ChatHistoryEntry) {
   e.stopPropagation();
-  shareTarget.value = chat;
+  shareTarget.value = { chat, historyUnavailable: false };
   shareDialogOpen.value = true;
+  const loaded = await loadChat(chat.id);
+  if (shareTarget.value?.chat.id === chat.id && loaded?.historyUnavailable) {
+    shareTarget.value = { chat, historyUnavailable: true };
+  }
 }
 
 function formatTime(ts: string): string {
@@ -327,8 +336,9 @@ function formatTime(ts: string): string {
     <AiChatShareDialog
       v-if="shareTarget"
       v-model:open="shareDialogOpen"
-      :session-id="shareTarget.sessionId"
-      :chat-title="shareTarget.title"
+      :session-id="shareTarget.chat.sessionId"
+      :chat-title="shareTarget.chat.title"
+      :history-unavailable="shareTarget.historyUnavailable"
     />
     <AiChatSharedByMe v-if="persistenceEnabled" v-model:open="sharedByMeOpen" />
   </div>
