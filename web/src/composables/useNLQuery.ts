@@ -23,6 +23,7 @@ import {
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
+import { aiCreditsNotice } from "@/utils/aiCredits";
 import analytics from "@/services/product_analytics";
 
 /**
@@ -454,8 +455,8 @@ export function useNLQuery(t: TranslateFn) {
         return null;
       }
 
+      let errorBody: unknown = null;
       if (!response.ok) {
-        let errorBody: unknown = null;
         try {
           errorBody = await response.json();
         } catch {
@@ -485,7 +486,11 @@ export function useNLQuery(t: TranslateFn) {
 
       if (!response.ok) {
         console.error("[NL2Q] AI assistant returned error:", response.status);
-        if (response.status === 403) {
+        if (response.status === 402) {
+          // A consent retry returns a fresh, unread body; the first one was read above.
+          const body = response.bodyUsed ? errorBody : await response.json().catch(() => null);
+          streamingResponse.value = aiCreditsNotice(body, t);
+        } else if (response.status === 403) {
           streamingResponse.value = t(UNAUTHORIZED_MESSAGE_KEY);
         }
         return null;

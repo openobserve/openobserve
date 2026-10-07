@@ -63,6 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("alerts.incidents.rcaAnalyzeIncident") }}
       </OButton>
+      <span
+        v-if="analyzeCreditCost"
+        data-test="rca-credit-cost"
+        class="text-text-secondary ms-2 text-xs"
+      >
+        {{ t("alerts.incidents.rcaCreditCost", { cost: analyzeCreditCost }) }}
+      </span>
     </div>
 
     <!-- Analysis in progress: both background (in-flight) and user-triggered (rcaLoading) -->
@@ -199,6 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="flex flex-col">
             <span>{{ t("alerts.incidents.rcaFreshAnalysis") }}</span>
+            <span v-if="reanalyzeCreditCost" class="text-text-secondary text-xs">
+              {{ t("alerts.incidents.rcaCreditCost", { cost: reanalyzeCreditCost }) }}
+            </span>
             <span class="text-text-secondary text-xs">
               {{ t("alerts.incidents.rcaFreshAnalysisHint") }}
             </span>
@@ -210,6 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="flex flex-col">
             <span>{{ t("alerts.incidents.rcaBuildOnPrevious") }}</span>
+            <span v-if="reanalyzeCreditCost" class="text-text-secondary text-xs">
+              {{ t("alerts.incidents.rcaCreditCost", { cost: reanalyzeCreditCost }) }}
+            </span>
             <span class="text-text-secondary text-xs">
               {{ t("alerts.incidents.rcaBuildOnPreviousHint") }}
             </span>
@@ -325,6 +338,15 @@ export default defineComponent({
     analysisInFlight: {
       type: Boolean,
       default: false,
+    },
+    /** AI credits one analysis uses; unset outside cloud, where no cost is shown. */
+    analyzeCreditCost: {
+      type: Number,
+      default: undefined,
+    },
+    reanalyzeCreditCost: {
+      type: Number,
+      default: undefined,
     },
     /** Last terminal failure, or null when the most recent run did not fail. */
     rcaError: {

@@ -1,26 +1,21 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <!-- The consent prompt's content, shared by the global dialog and the inline chat card. -->
 <template>
-  <div v-if="activeRequest" class="flex flex-col gap-4">
-    <div class="border-border-default bg-surface-subtle rounded-default border p-3">
-      <div class="text-text-heading text-sm font-semibold">
-        {{ t("paidUsage.aiCredits") }}
-      </div>
-      <p class="text-text-secondary mt-1 text-sm">
-        {{ t("paidUsage.freeCreditsDepleted") }}
-      </p>
-    </div>
-
+  <div v-if="activeRequest" class="flex flex-col gap-3">
+    <!-- No figure is shown: the rate comes from the plan or contract, not a catalog price. -->
     <p class="text-text-body text-sm" data-test="paid-overage-billing-cycle-copy">
       {{
         activeRequest.status.payer
-          ? t("paidUsage.payerBillingCycle")
-          : t("paidUsage.organizationBillingCycle")
+          ? t("paidUsage.consentBillingPayer", { payer: activeRequest.status.payer.org_id })
+          : t("paidUsage.consentBilling")
       }}
-      <!-- No rate is shown: this flow has no stable display price. -->
+    </p>
+
+    <p class="text-text-secondary text-xs" data-test="paid-overage-scope-copy">
+      {{ t("paidUsage.consentScope") }}
       <OButton
         variant="ghost-primary"
-        size="sm"
+        size="xs"
         data-test="paid-overage-view-billing"
         @click="openBilling"
       >

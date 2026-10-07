@@ -22,6 +22,15 @@ export interface AiUsage {
   credits_remaining: number;
   mode: string;
   requires_additional_credits: boolean;
+  payer_org_id?: string | null;
+  costs: AiCreditCounts;
+  used_by_feature?: AiCreditCounts | null;
+}
+
+export interface AiCreditCounts {
+  chat: number;
+  incident: number;
+  incident_reanalysis: number;
 }
 
 const billings = {

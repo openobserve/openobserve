@@ -678,45 +678,41 @@ describe("Plans Component", () => {
     expect(BillingService.resume_subscription).toHaveBeenCalledTimes(2);
   });
 
-  it("links consent-required AI usage to Paid Usage settings", async () => {
+  it("hands the paid usage switch the card's current mode", async () => {
     wrapper.vm.aiUsage = {
-      credits_used: 100,
-      credits_limit: 100,
+      credits_used: 5,
+      credits_limit: 5,
       credits_remaining: 0,
       mode: "consent_required",
       requires_additional_credits: false,
     };
     await nextTick();
 
-    expect(wrapper.text()).toContain(
-      "Free AI credits are depleted. Authorize paid usage to continue.",
+    expect(wrapper.findComponent({ name: "PaidAiUsageControl" }).props("mode")).toBe(
+      "consent_required",
     );
-    await wrapper.get('[data-test="billing-open-paid-usage-settings"]').trigger("click");
-    expect(mockRouter.push).toHaveBeenCalledWith({
-      name: "paidUsage",
-      query: { org_identifier: store.state.selectedOrganization.identifier },
-    });
   });
 
-  it("names the payer billing cycle for metered AI usage", async () => {
+  it("keeps a full bar neutral while paid usage carries on, and red only when blocked", async () => {
+    const usage = { credits_used: 5, credits_limit: 5, credits_remaining: 0 };
+    wrapper.vm.aiUsage = { ...usage, mode: "pay_as_you_go", requires_additional_credits: false };
+    expect(wrapper.vm.aiUsageVariant).toBe("default");
+    wrapper.vm.aiUsage = { ...usage, mode: "exhausted", requires_additional_credits: false };
+    expect(wrapper.vm.aiUsageVariant).toBe("danger");
+  });
+
+  it("offers Contact Sales when a contract org runs out", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
     wrapper.vm.aiUsage = {
-      credits_used: 100,
-      credits_limit: 100,
+      credits_used: 5,
+      credits_limit: 5,
       credits_remaining: 0,
-      mode: "pay_as_you_go",
-      requires_additional_credits: false,
-    };
-    wrapper.vm.paidOverageStatus = {
-      feature: "ai_credits",
-      organization: { org_id: "member", enabled: true, can_manage: true },
-      payer: { org_id: "payer", enabled: true, can_manage: false },
-      effective: true,
-      billing_status: "eligible",
+      mode: "exhausted",
+      requires_additional_credits: true,
     };
     await nextTick();
-
-    expect(wrapper.text()).toContain(
-      "Paid AI usage is added to the payer organization’s current billing cycle.",
-    );
+    await wrapper.get('[data-test="billing-ai-contact-sales"]').trigger("click");
+    expect(open).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
+    open.mockRestore();
   });
 });

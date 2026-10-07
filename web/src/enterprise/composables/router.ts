@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { RouteLocationNormalized } from "vue-router";
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
@@ -274,10 +275,10 @@ const useEnvRoutes = () => {
           name: "billing_group",
           component: BillingGroup,
         },
+        // The Paid Usage page moved onto the Plans AI credits card; keep its old links working.
         {
           path: "paid_usage",
-          name: "paidUsage",
-          component: () => import("@/enterprise/components/billings/PaidUsage.vue"),
+          redirect: (to: RouteLocationNormalized) => ({ name: "plans", query: to.query }),
         },
       ],
     },

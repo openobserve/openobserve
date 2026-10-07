@@ -157,7 +157,8 @@ export default defineConfig(({ mode }) => {
   // are kept in dev only when their namespace matches VITE_DEBUG_GROUPS
   // (.env, comma-separated, supports trailing-* wildcards). loadEnv reads
   // every .env* file. console.error/warn are never filtered or stripped.
-  const allowedGroups = (loadEnv(mode, process.cwd(), "").VITE_DEBUG_GROUPS ?? "")
+  const env = loadEnv(mode, process.cwd(), "");
+  const allowedGroups = (env.VITE_DEBUG_GROUPS ?? "")
     .split(",")
     .map((g) => g.trim())
     .filter(Boolean);
@@ -194,6 +195,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 8081,
+      // Server-built links such as Stripe's checkout return use ZO_WEB_URL, which in split dev is this server.
+      proxy: { "/api": `http://127.0.0.1:${env.ZO_HTTP_PORT || 5080}` },
       // headers: {
       //   "Content-Security-Policy":
       //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",

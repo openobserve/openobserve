@@ -147,13 +147,18 @@ export function useChatHistory(
           : t("common.newChat"));
 
       // Strip Vue reactivity from messages
-      const serializableMessages = messages.map((msg) => {
+      const serializableMessages = messages.flatMap((msg) => {
         const serialized: any = {
           role: msg.role,
           content: msg.content,
         };
-        if (msg.contentBlocks && msg.contentBlocks.length > 0) {
-          serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
+        const blocks = msg.contentBlocks?.filter((block) => !block.ephemeral) ?? [];
+        // A reply that held only ephemeral notices has nothing left to restore.
+        if (!msg.content && !blocks.length && msg.contentBlocks?.length) {
+          return [];
+        }
+        if (blocks.length > 0) {
+          serialized.contentBlocks = JSON.parse(JSON.stringify(blocks));
         }
         if (msg.images && msg.images.length > 0) {
           serialized.images = JSON.parse(JSON.stringify(msg.images));
@@ -161,7 +166,7 @@ export function useChatHistory(
         if (msg.feedback) {
           serialized.feedback = msg.feedback;
         }
-        return serialized;
+        return [serialized];
       });
 
       const chatData = {

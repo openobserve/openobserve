@@ -266,12 +266,6 @@ describe("Billing Component", () => {
       expect(result).toBe(wrapper.vm.t("billing.invoiceHistoryLabel"));
     });
 
-    it("should return paid usage label when route is paidUsage", () => {
-      mockRouter.currentRoute.value.name = "paidUsage";
-      const result = wrapper.vm.headerBasedOnRoute();
-      expect(result).toBe(wrapper.vm.t("paidUsage.settingsTitle"));
-    });
-
     it("should return empty string for unknown route", () => {
       mockRouter.currentRoute.value.name = "unknown";
       const result = wrapper.vm.headerBasedOnRoute();

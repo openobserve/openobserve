@@ -669,7 +669,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "info",
-          message: "Paid AI usage was not authorized. No paid request was started.",
+          message: "Paid AI usage is off, so this request wasn't sent.",
         }),
       );
     });

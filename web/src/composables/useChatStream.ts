@@ -42,6 +42,7 @@ import type { useChatHistory } from "@/composables/useChatHistory";
 import type { useChatScroll } from "@/composables/useChatScroll";
 import type { useTypewriter } from "@/composables/useTypewriter";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { aiCreditsRemedy } from "@/utils/aiCredits";
 import analytics from "@/services/product_analytics";
 import type {
   ChatHistoryEntry,
@@ -155,6 +156,8 @@ export function useChatStream(options: UseChatStreamOptions) {
   } = options;
 
   const isLoading = ref(false);
+  // Read after runTurn: a 402 turn hands its draft back to the input.
+  const lastTurnCreditsExhausted = ref(false);
   const currentStreamingMessage = ref("");
   const currentSessionId = ref<string | null>(null);
   const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
@@ -600,8 +603,32 @@ export function useChatStream(options: UseChatStreamOptions) {
     return code === "session_owner_unavailable";
   };
 
-  const appendErrorBlock = (message: string, recoverable = false) => {
-    const block: ContentBlock = { type: "error", message: raw(message), recoverable };
+  const appendErrorBlock = (message: string, recoverable = false) =>
+    appendBlock({ type: "error", message: raw(message), recoverable });
+
+  /** A 402 carries its remedy; ephemeral so a stale "out of credits" never reloads from history. */
+  const appendCreditsExhaustedBlock = (errorBody: any) => {
+    const remedy = errorBody?.remedy;
+    const block: ContentBlock = {
+      type: "error",
+      message: t("aiAssistant.creditsExhausted"),
+      errorType: "ai_credits_exhausted",
+      ephemeral: true,
+      suggestion: aiCreditsRemedy(errorBody, t),
+      recoverable: remedy === "retry",
+    };
+    if (remedy === "subscribe") {
+      block.navigationAction = {
+        resource_type: "billing",
+        action: "navigate_direct",
+        label: t("billing.plansLabel"),
+        target: { path: "/billings/plans" },
+      };
+    }
+    appendBlock(block);
+  };
+
+  const appendBlock = (block: ContentBlock) => {
     const msgs = chatMessages.value;
     const last = msgs[msgs.length - 1];
     if (last && last.role === "assistant") {
@@ -709,6 +736,8 @@ export function useChatStream(options: UseChatStreamOptions) {
     if (target) {
       await router.push({ path: target.path, query: target.query });
     }
+    // Leaving for billing is not an answer to the chat; saving one would outlive the notice that offered it.
+    if (action.resource_type === "billing") return;
 
     // Use setTimeout to add message AFTER navigation fully completes and settles
     setTimeout(async () => {
@@ -777,6 +806,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   };
 
   const runTurn = async (hasImages: boolean, messagesToSend: ImageAttachment[]) => {
+    lastTurnCreditsExhausted.value = false;
     const isNewSession = !currentSessionId.value;
     // Mint the session id before the try so every exit path's cleanup clears the SAME id, or a re-attached instance spins forever.
     if (!currentSessionId.value) {
@@ -902,6 +932,13 @@ export function useChatStream(options: UseChatStreamOptions) {
             return;
           }
           continue;
+        }
+
+        // Not thrown: the catch below would persist the raw server text into history.
+        if (response.status === 402) {
+          appendCreditsExhaustedBlock(errorBody);
+          lastTurnCreditsExhausted.value = true;
+          return;
         }
 
         const err: any = new Error(
@@ -1106,6 +1143,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
   return {
     isLoading,
+    lastTurnCreditsExhausted,
     currentSessionId,
     lastTraceId,
     saveHistoryLoading,

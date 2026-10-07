@@ -943,6 +943,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @download-report="downloadReport"
                 :is-dark-mode="isDarkMode"
                 :analysis-in-flight="analysisInFlight"
+                :analyze-credit-cost="aiCreditCosts?.incident"
+                :reanalyze-credit-cost="aiCreditCosts?.incident_reanalysis"
                 @trigger-rca="triggerRca"
               />
 
@@ -1527,6 +1529,9 @@ import {
   isPaidOverageConsentError,
   usePaidOverageConsent,
 } from "@/composables/usePaidOverageConsent";
+import BillingService, { type AiCreditCounts } from "@/services/billings";
+import { aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -2684,9 +2689,17 @@ export default defineComponent({
       }
     };
 
+    // Credit costs label the analysis actions; without them the actions simply show no cost.
+    const aiCreditCosts = ref<AiCreditCounts | null>(null);
+
     // Add keyboard event listener on mount
     onMounted(() => {
       window.addEventListener("keydown", handleEscapeKey);
+      if (config.isCloud === "true") {
+        BillingService.get_ai_usage(store.state.selectedOrganization.identifier)
+          .then((res) => (aiCreditCosts.value = res.data.costs))
+          .catch(() => {});
+      }
     });
 
     // Remove keyboard event listener on unmount
@@ -3024,7 +3037,11 @@ export default defineComponent({
           } else {
             const ok = await confirm({
               title: t("alerts.incidents.rerunAnalysisTitle"),
-              message: t("alerts.incidents.rerunAnalysisMessage"),
+              message: aiCreditCosts.value
+                ? t("alerts.incidents.rerunAnalysisMessageWithCost", {
+                    cost: aiCreditCosts.value.incident_reanalysis,
+                  })
+                : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
@@ -3042,11 +3059,12 @@ export default defineComponent({
                 await loadDetails(incidentId);
               } catch (error: unknown) {
                 const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
-                const message =
-                  responseData &&
-                  typeof responseData === "object" &&
-                  "message" in responseData &&
-                  typeof responseData.message === "string"
+                const message = isAiCreditsExhausted(responseData)
+                  ? aiCreditsNotice(responseData, t)
+                  : responseData &&
+                      typeof responseData === "object" &&
+                      "message" in responseData &&
+                      typeof responseData.message === "string"
                     ? raw(responseData.message)
                     : t("alerts.incidents.reanalysisStartFailed");
                 toast({ variant: "error", message });
@@ -3543,10 +3561,10 @@ export default defineComponent({
         }
 
         console.error("Failed to trigger RCA:", error);
-        const message =
-          error?.response?.data?.message ||
-          error?.message ||
-          t("alerts.incidents.rcaFailedGeneric");
+        const responseData = error?.response?.data;
+        const message = isAiCreditsExhausted(responseData)
+          ? aiCreditsNotice(responseData, t)
+          : responseData?.message || error?.message || t("alerts.incidents.rcaFailedGeneric");
         // Persist the failure in the panel; the toast alone disappears.
         rcaError.value = { reason: message, details: "" };
         toast({ variant: "error", message });
@@ -3613,6 +3631,7 @@ export default defineComponent({
     };
 
     return {
+      aiCreditCosts,
       raw,
       t,
       store,
