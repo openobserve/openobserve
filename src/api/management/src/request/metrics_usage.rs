@@ -53,8 +53,11 @@ pub async fn get_metric_usage(
         Ok(found) => MetaHttpResponse::json(found),
         Err(e) => {
             tracing::error!("[metric usage] scan failed for {org_id}/{metric_name}: {e}");
-            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                .into_response()
+            MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                "internal error".to_string(),
+            )
+            .into_response()
         }
     }
 }
