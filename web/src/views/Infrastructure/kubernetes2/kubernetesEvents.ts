@@ -212,8 +212,13 @@ export function warningListRows(
       });
     }
   }
-  const pods = inventory.pods.filter((p) => inScope(p, scope));
-  const kept = events.filter((e) => e.kind !== "Pod" || keepPodEvent(e, pods));
+  const podsByName = new Map<string, PodRow[]>();
+  for (const pod of inventory.pods) {
+    if (!inScope(pod, scope) || pod.phase == null) continue;
+    const key = `${pod.namespace}|${pod.name}`;
+    podsByName.set(key, [...(podsByName.get(key) ?? []), pod]);
+  }
+  const kept = events.filter((e) => e.kind !== "Pod" || keepPodEvent(e, podsByName));
   const latest = new Map<string, WarningEvent>();
   const merge = (id: string, event: WarningEvent) => {
     const prev = latest.get(id);
@@ -231,10 +236,28 @@ export function warningListRows(
   const named = (e: WarningEvent) => `${e.kind}|${e.namespace}|${e.name}`;
   // A uid tells a recreated object from its predecessor; uid-less events join the newest of that name.
   for (const event of kept) if (event.uid) merge(`${named(event)}|${event.uid}`, event);
-  for (const event of kept.filter((e) => !e.uid)) {
-    const owners = [...latest.entries()].filter(([, e]) => named(e) === named(event));
-    const newest = owners.sort(([, a], [, b]) => b.lastSeen - a.lastSeen)[0];
-    merge(newest ? newest[0] : named(event), event);
+  // Newest entry per name, ties to the first inserted; merges only raise lastSeen, so one compare keeps it.
+  const order = new Map([...latest.keys()].map((id, i) => [id, i]));
+  const newest = new Map<string, string>();
+  const offer = (name: string, id: string) => {
+    const best = newest.get(name);
+    const [a, b] = [latest.get(id)!, best ? latest.get(best)! : null];
+    if (
+      !b ||
+      a.lastSeen > b.lastSeen ||
+      (a.lastSeen === b.lastSeen && order.get(id)! < order.get(best!)!)
+    ) {
+      newest.set(name, id);
+    }
+  };
+  for (const [id, event] of latest) offer(named(event), id);
+  for (const event of kept) {
+    if (event.uid) continue;
+    const name = named(event);
+    const id = newest.get(name) ?? name;
+    if (!order.has(id)) order.set(id, order.size);
+    merge(id, event);
+    offer(name, id);
   }
   for (const [id, event] of latest) {
     rows.push({
@@ -248,14 +271,10 @@ export function warningListRows(
 }
 
 // Lens drops a pod's events unless the pod still exists and still has an issue.
-function keepPodEvent(event: WarningEvent, pods: PodRow[]) {
-  const pod = pods.find(
-    (p) =>
-      p.namespace === event.namespace &&
-      p.name === event.name &&
-      p.phase != null &&
-      (!event.uid || !p.uid || p.uid === event.uid),
-  );
+function keepPodEvent(event: WarningEvent, podsByName: Map<string, PodRow[]>) {
+  const pod = podsByName
+    .get(`${event.namespace}|${event.name}`)
+    ?.find((p) => !event.uid || !p.uid || p.uid === event.uid);
   return !!pod && LENS_POD_ISSUE(pod);
 }
 

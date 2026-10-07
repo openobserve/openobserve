@@ -26,6 +26,9 @@ import {
 import { buildInventory, type Series, type WarningEvent } from "./kubernetesModel";
 import type { QueryId } from "./kubernetesQueries";
 
+// Catches a quadratic blow-up (seconds), not machine speed: CI runs this slower, under coverage.
+const GROUPING_BUDGET_MS = 250;
+
 const EK =
   "PARTITION BY COALESCE(json_get_str(body_object_metadata,'uid'), k8s_namespace_name || '/' || event_name)";
 
@@ -246,6 +249,162 @@ describe("Cluster overview warnings", () => {
       ["old", "old"],
       ["new", "no uid"],
     ]);
+  });
+
+  describe("grouping, pinned against the original quadratic algorithm", () => {
+    // The pre-index implementation, kept verbatim as the oracle for the indexed one.
+    function reference(inv: any, events: WarningEvent[], cluster: string | null) {
+      const pods = inv.pods.filter((p: any) => cluster == null || p.cluster === cluster);
+      const keep = (e: WarningEvent) => {
+        const pod = pods.find(
+          (p: any) =>
+            p.namespace === e.namespace &&
+            p.name === e.name &&
+            p.phase != null &&
+            (!e.uid || !p.uid || p.uid === e.uid),
+        );
+        return (
+          !!pod &&
+          (pod.phase === "Pending" ||
+            pod.phase === "Failed" ||
+            pod.phase === "Unknown" ||
+            (pod.phase === "Running" && pod.ready !== "true") ||
+            pod.containers.some((c: any) => c.waitingReason))
+        );
+      };
+      const kept = events.filter((e) => e.kind !== "Pod" || keep(e));
+      const latest = new Map<string, WarningEvent>();
+      const merge = (id: string, event: WarningEvent) => {
+        const prev = latest.get(id);
+        latest.set(
+          id,
+          !prev
+            ? event
+            : {
+                ...(event.lastSeen >= prev.lastSeen ? event : prev),
+                uid: prev.uid || event.uid,
+                events: prev.events + event.events,
+              },
+        );
+      };
+      const named = (e: WarningEvent) => `${e.kind}|${e.namespace}|${e.name}`;
+      for (const event of kept) if (event.uid) merge(`${named(event)}|${event.uid}`, event);
+      for (const event of kept.filter((e) => !e.uid)) {
+        const owners = [...latest.entries()].filter(([, e]) => named(e) === named(event));
+        const newest = owners.sort(([, a], [, b]) => b.lastSeen - a.lastSeen)[0];
+        merge(newest ? newest[0] : named(event), event);
+      }
+      return [...latest].map(([id, e]) => ({
+        key: id,
+        message: { text: e.note },
+        object: { kind: e.kind, name: e.name, namespace: e.namespace, uid: e.uid },
+        lastSeen: e.lastSeen,
+      }));
+    }
+
+    const pod = (name: string, uid: string, phase: string | null, ready = "false") => ({
+      kind: "pod",
+      cluster: "prod",
+      namespace: "data",
+      name,
+      uid,
+      phase,
+      ready,
+      containers: [],
+    });
+    const nonNode = (rows: any[]) => rows.filter((r) => r.object.kind !== "Node");
+
+    // mulberry32, so every random case is repeatable.
+    const seeded = (seed: number) => () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+
+    it("matches the original on hand-picked cases: shared names, ties, uid-less first and last, recreated pods", () => {
+      const inv = {
+        nodes: [],
+        pods: [
+          pod("crash", "c1", "Running"),
+          pod("crash", "c2", "Pending"),
+          pod("done", "d1", "Running", "true"),
+          pod("gone", "g1", null),
+        ],
+      } as any;
+      const cases: WarningEvent[][] = [
+        [
+          event({ kind: "Deployment", name: "web", uid: "", lastSeen: 5, note: "first, no uid" }),
+          event({ kind: "Deployment", name: "web", uid: "a", lastSeen: 10, note: "a" }),
+          event({ kind: "Deployment", name: "web", uid: "b", lastSeen: 10, note: "b, tie" }),
+          event({ kind: "Deployment", name: "web", uid: "", lastSeen: 30, note: "late, no uid" }),
+          event({ kind: "Deployment", name: "web", uid: "", lastSeen: 1, note: "old, no uid" }),
+        ],
+        [
+          event({ kind: "Service", name: "svc", uid: "", lastSeen: 7 }),
+          event({ kind: "Service", name: "svc", uid: "", lastSeen: 3 }),
+          event({ kind: "Service", name: "svc", uid: "s1", lastSeen: 1 }),
+        ],
+        [
+          event({ name: "crash", uid: "c1", lastSeen: 4 }),
+          event({ name: "crash", uid: "c2", lastSeen: 2 }),
+          event({ name: "crash", uid: "", lastSeen: 9, note: "pod, no uid" }),
+          event({ name: "done", uid: "d1", lastSeen: 9 }),
+          event({ name: "gone", uid: "g1", lastSeen: 9 }),
+          event({ name: "absent", uid: "", lastSeen: 9 }),
+        ],
+      ];
+      for (const events of cases) {
+        expect(nonNode(warningListRows(inv, events, "prod"))).toEqual(
+          reference(inv, events, "prod"),
+        );
+      }
+    });
+
+    it("matches the original on 300 random event sets", () => {
+      const random = seeded(7);
+      const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)];
+      for (let run = 0; run < 300; run++) {
+        const pods = Array.from({ length: 1 + Math.floor(random() * 6) }, () =>
+          pod(
+            pick(["a", "b", "c"]),
+            pick(["u1", "u2", ""]),
+            pick(["Running", "Pending", null]),
+            pick(["true", "false"]),
+          ),
+        );
+        const inv = { nodes: [], pods } as any;
+        const events = Array.from({ length: Math.floor(random() * 25) }, () =>
+          event({
+            kind: pick(["Pod", "Deployment", "Service"]),
+            name: pick(["a", "b", "c"]),
+            uid: pick(["u1", "u2", "u3", "", ""]),
+            lastSeen: Math.floor(random() * 6),
+            events: 1 + Math.floor(random() * 3),
+            note: `n${Math.floor(random() * 1000)}`,
+          }),
+        );
+        expect(nonNode(warningListRows(inv, events, "prod"))).toEqual(
+          reference(inv, events, "prod"),
+        );
+      }
+    });
+
+    it("groups 20,000 events against 5,000 pods without a blow-up", () => {
+      const pods = Array.from({ length: 5000 }, (_, i) => pod(`p${i}`, `u${i}`, "Pending"));
+      const events = Array.from({ length: 20000 }, (_, i) =>
+        event({
+          kind: i % 2 ? "Pod" : "Deployment",
+          name: `p${i % 5000}`,
+          uid: i % 3 ? `u${i % 5000}` : "",
+          lastSeen: i,
+        }),
+      );
+      const start = performance.now();
+      const rows = warningListRows({ nodes: [], pods } as any, events, "prod");
+      expect(performance.now() - start).toBeLessThanOrEqual(GROUPING_BUDGET_MS);
+      expect(rows.length).toBeGreaterThan(0);
+    });
   });
 
   it("keeps a warning on a kind with no drawer, such as a Service", () => {
