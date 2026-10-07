@@ -29,6 +29,7 @@ static CACHE: LazyLock<config::RwAHashMap<String, String>> =
     LazyLock::new(|| tokio::sync::RwLock::new(HashMap::new()));
 
 pub const ODO_PREFIX: &str = "/org_domain_ownership/";
+const DOMAIN_EXPIRY_BUFFER_SEC: i64 = 60 * 30;
 
 pub async fn init() {
     let items = match infra::table::org_domain_ownership::list_active_domain_org_map().await {
@@ -87,7 +88,7 @@ pub async fn delete_linked_domain(org_id: &str, domain: &str) -> Result<(), anyh
     Ok(())
 }
 
-pub async fn verify(mut record: Model) -> Result<i32, anyhow::Error> {
+pub async fn verify(mut record: Model) -> Result<Model, anyhow::Error> {
     let res = o2_enterprise::enterprise::status_pages::domain_verifier::check_domain_ownership(
         status_page_custom_domains::Model {
             domain: record.domain.clone(),
@@ -99,20 +100,18 @@ pub async fn verify(mut record: Model) -> Result<i32, anyhow::Error> {
             verified_at: record.verified_at,
             ..Default::default()
         },
+        Some(DOMAIN_EXPIRY_BUFFER_SEC),
     )
     .await?;
-
-    let state = res.verification_state;
-
     record.last_checked_at = res.last_checked_at;
     record.updated_at = res.updated_at;
     record.verification_state = res.verification_state;
     record.verification_failure_reason = res.verification_failure_reason;
     record.verified_at = res.verified_at;
 
-    infra::table::org_domain_ownership::save_domain_org_record(record).await?;
+    infra::table::org_domain_ownership::save_domain_org_record(record.clone()).await?;
 
-    Ok(state)
+    Ok(record)
 }
 
 pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
@@ -122,7 +121,8 @@ pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow:
             "no mapping for domain {domain} foung for org {org_id}"
         ));
     };
-    if verify(record).await? == OwnershipState::Verfied as i32 {
+    let updated_record = verify(record).await?;
+    if updated_record.verification_state == OwnershipState::Verfied as i32 {
         let mut lock = CACHE.write().await;
         lock.insert(domain.to_owned(), org_id.to_owned());
     }

@@ -92,7 +92,7 @@ async fn run_org_domain_ownership_validation() {
             let original_state = record.verification_state;
             let org_id = record.org_id.clone();
             let domain = record.domain.clone();
-            let new_state = match org_domain_ownership::verify(record).await {
+            let updated_record = match org_domain_ownership::verify(record).await {
                 Ok(v) => v,
                 Err(e) => {
                     log::error!(
@@ -101,6 +101,7 @@ async fn run_org_domain_ownership_validation() {
                     continue;
                 }
             };
+            let new_state = updated_record.verification_state;
             if new_state != original_state {
                 log::info!(
                     "org domain ownership state for {org_id} domain {domain} changed from {original_state} to {new_state}"
