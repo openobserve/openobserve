@@ -295,8 +295,11 @@ describe("AlertContextMenu Component", () => {
       height.mockRestore();
     });
 
-    it("keeps item text on one line", () => {
+    it("keeps item text on one line, and inside a phone's width", () => {
       wrapper = createWrapper();
+      expect(wrapper.find('[data-test="alert-context-menu"]').classes()).toContain(
+        "max-w-[calc(100vw-1rem)]",
+      );
       expect(
         wrapper.find('[data-test="alert-context-menu-above"] span.select-none').classes(),
       ).toContain("whitespace-nowrap");

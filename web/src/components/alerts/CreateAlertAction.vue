@@ -128,7 +128,7 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const { openAlertCreation } = useAlertCreation();
-// The toolbar label is visible from md up, where a tooltip would only repeat it.
+// The tooltip names the button only where its label is hidden.
 const { isMobile } = useBreakpoint();
 
 const source_ = computed(() => getAlertSource(props.source));

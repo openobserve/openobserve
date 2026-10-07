@@ -19,12 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
     >
-      <span
+      <label
+        :for="directionId"
         class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-        >{{ t("alerts.forecast.alertWhen") }} *</span
+        >{{ t("alerts.forecast.alertWhen") }} *</label
       >
       <div class="flex flex-wrap items-start gap-2">
         <OFormSelect
+          :id="directionId"
           name="_ui.forecast.direction"
           :options="directionOptions"
           :searchable="false"
@@ -72,12 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
     >
-      <span
+      <label
+        :for="windowId"
         class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
-        >{{ t("alerts.forecast.basedOn") }}</span
+        >{{ t("alerts.forecast.basedOn") }}</label
       >
       <div class="flex flex-col gap-1">
         <OFormSelect
+          :id="windowId"
           name="_ui.forecast.W"
           :options="windowOptions"
           :searchable="false"
@@ -132,6 +136,8 @@ const forecast = form?.useStore?.((s: any) => s.values?._ui?.forecast);
 
 const thresholdId = useId();
 const horizonId = useId();
+const directionId = useId();
+const windowId = useId();
 
 // The form validates only after the first save, so a bad horizon would otherwise stay silent until then.
 const horizonBlurred = ref(false);

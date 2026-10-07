@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-70 border px-0 py-1 shadow-sm dark:shadow-sm"
+      class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 max-w-[calc(100vw-1rem)] min-w-70 border px-0 py-1 shadow-sm dark:shadow-sm"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-forecast"
       >
         <OIcon name="trending-up" size="sm" class="me-2" />
-        <span class="whitespace-nowrap select-none">{{
+        <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
           t("dashboard.alertContextMenu.forecastReaches", { value: forecastText })
         }}</span>
       </div>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-above"
       >
         <OIcon name="arrow-upward" size="sm" class="me-2" />
-        <span class="whitespace-nowrap select-none">{{
+        <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
           t("dashboard.alertContextMenu.thresholdAbove", { value: valueText })
         }}</span>
       </div>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-below"
       >
         <OIcon name="arrow-downward" size="sm" class="me-2" />
-        <span class="whitespace-nowrap select-none">{{
+        <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
           t("dashboard.alertContextMenu.thresholdBelow", { value: valueText })
         }}</span>
       </div>

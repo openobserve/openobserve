@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
     :data-test="dataTest"
   >
-    <span class="inline-flex items-center gap-1.5 max-md:hidden">
+    <span class="inline-flex items-center gap-1.5">
       <span class="w-4 border-t-2 border-current" aria-hidden="true" />
       {{ t("metrics.explorer.detail.overlay.current") }}
     </span>

@@ -917,7 +917,7 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
-                // The shared colour leaves the line style as the cue; the Explorer also tells a past period from a forecast.
+                // Twins share their primary's colour, so the line style is what tells them apart.
                 ...(nameSuffixes[index]
                   ? {
                       lineStyle: {
@@ -1377,6 +1377,8 @@ export const convertPromQLData = async (
 
   // A twin is drawn in its primary's colour and named in the Explorer's key, so its legend entry would repeat the primary's.
   if (explorerOverlays && shiftedTwins.length) {
+    for (const [twin, metric] of shiftedTwins)
+      twin._legendFollows = primaryByMetric.get(metric)?.name;
     const twins = new Set(shiftedTwins.map(([twin]) => twin));
     legendConfig.data = options.series
       .filter((series: any) => series?.name && !twins.has(series))

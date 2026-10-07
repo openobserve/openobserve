@@ -1027,6 +1027,18 @@ describe("QueryConfig.vue", () => {
       }
     });
 
+    it("labels the direction and history selects with their visible captions", () => {
+      for (const [dt, key] of [
+        ["alert-forecast-direction", "alerts.forecast.alertWhen"],
+        ["alert-forecast-window", "alerts.forecast.basedOn"],
+      ]) {
+        const trigger = host.find(`[data-test="${dt}"] [id]`);
+        const id = trigger.attributes("id");
+        expect(id).toBeTruthy();
+        expect(host.find(`label[for="${id}"]`).text()).toContain(t(key));
+      }
+    });
+
     it("shows an out-of-range horizon as soon as the field loses focus", async () => {
       const input = host.find('[data-test="alert-forecast-horizon"] input');
       await input.setValue("45");

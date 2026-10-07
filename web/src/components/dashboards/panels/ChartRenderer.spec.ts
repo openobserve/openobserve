@@ -782,4 +782,49 @@ describe("ChartRenderer", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+
+  describe("legend isolation", () => {
+    it("toggles a series left out of the legend together with the series it follows", async () => {
+      const echarts = await import("echarts/core");
+      wrapper.unmount();
+      vi.clearAllMocks();
+      wrapper = mount(ChartRenderer, {
+        props: {
+          data: {
+            ...mockChartData,
+            options: {
+              ...mockChartData.options,
+              series: [
+                { name: "api-1", type: "line", data: [] },
+                { name: "api-2", type: "line", data: [] },
+                { name: "api-1 (1 day ago)", type: "line", data: [], _legendFollows: "api-1" },
+              ],
+            },
+          },
+          renderType: "canvas",
+          height: "100%",
+        },
+        global: {
+          plugins: [i18n],
+          provide: { store, hoveredSeriesState: mockHoveredSeriesState },
+        },
+      });
+      await flushPromises();
+      const chart = (echarts.init as any).mock.results.at(-1).value;
+      const onLegend = chart.on.mock.calls.find(
+        ([event]: any[]) => event === "legendselectchanged",
+      )[1];
+      chart.getOption.mockReturnValue({ legend: [{}] });
+
+      onLegend({ name: "api-2", selected: { "api-1": false, "api-2": true } });
+
+      const legend = chart.setOption.mock.calls.findLast(([option]: any[]) => option?.legend)[0]
+        .legend[0];
+      expect(legend.selected).toEqual({
+        "api-1": false,
+        "api-2": true,
+        "api-1 (1 day ago)": false,
+      });
+    });
+  });
 });

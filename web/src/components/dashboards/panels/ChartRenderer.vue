@@ -292,6 +292,13 @@ export default defineComponent({
         });
       }
 
+      // A series left out of the legend has no entry to toggle, so it follows the series it overlays.
+      for (const series of props.data?.options?.series ?? []) {
+        if (series?._legendFollows !== undefined) {
+          params.selected[series.name] = params.selected[series._legendFollows] !== false;
+        }
+      }
+
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
 

@@ -406,6 +406,8 @@ describe("convertPromQLData with time-shifted results", () => {
       const data = [twoPods(), twoPods(DAY_S)];
       const inExplorer = await convert(explorer(), data, oneDay, stepMeta(2, 60));
       expect(inExplorer.options.legend.data).toEqual(["api-1", "api-2"]);
+      const [, twin] = pair(inExplorer, "api-1");
+      expect(twin._legendFollows).toBe("api-1");
       const onDashboard = await convert(panel("line"), data, oneDay, stepMeta(2, 60));
       expect(onDashboard.options.legend.data).toBeUndefined();
     });
