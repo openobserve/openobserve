@@ -445,20 +445,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-tabs-links"
           class="font-normal! capitalize"
         />
-        <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+        <!-- Correlation Tabs (visible whenever service streams are enabled; locked without an enterprise license) -->
         <OTab
-          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          v-if="serviceStreamsEnabled"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
+          :disable="!correlationAccess.allowed"
+          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
         />
+        <LockedFeatureTooltip
+          v-if="serviceStreamsEnabled && !correlationAccess.allowed"
+          :message="correlationAccess.message"
+          :title="t('correlation.correlatedLogs')"
+        />
         <OTab
-          v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
+          v-if="serviceStreamsEnabled"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
+          :disable="!correlationAccess.allowed"
+          :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
+        />
+        <LockedFeatureTooltip
+          v-if="serviceStreamsEnabled && !correlationAccess.allowed"
+          :message="correlationAccess.message"
+          :title="t('correlation.correlatedMetrics')"
         />
       </OTabs>
     </div>
@@ -990,6 +1004,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import {
@@ -1189,6 +1205,7 @@ export default defineComponent({
     OTruncatedText,
     OCollapsible,
     OEmptyState,
+    LockedFeatureTooltip,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -2729,8 +2746,11 @@ export default defineComponent({
       });
     };
 
+    const correlationAccess = useLockedAffordance("correlation");
+
     return {
       t,
+      correlationAccess,
       activeTabModel,
       filterActions,
       closeSidebar,
