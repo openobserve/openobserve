@@ -367,6 +367,13 @@ jobs:
           - label: sqlite_meta_invalid_utf8
             env: ""
             target: tests/regression/test_sqlite_invalid_utf8_meta_startup.py
+
+          # Cross-tenant gRPC ingest (o2-enterprise#2821). Needs no server env:
+          # the gRPC listener is on by default and the test uses the existing
+          # `_meta` org as its second tenant rather than creating one.
+          - label: grpc_ingest_org_binding
+            env: ""
+            target: tests/regression/test_grpc_ingest_org_binding.py
     steps:
       - uses: actions/checkout@v5
 
