@@ -34,7 +34,7 @@ use config::{
             DowntimeRequest, DowntimeWindow, MoveDowntimesRequest, PreviewMatch, PreviewRequest,
             PreviewResponse, ResourcesRequest, ResourcesResponse, TargetModule,
         },
-        folder::{DEFAULT_FOLDER, FolderType},
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
     utils::time::now_micros,
 };
@@ -367,6 +367,19 @@ pub async fn banners_for_org(
         combined_banner(&active).into_iter().collect(),
         next_banner_boundary(&live, now),
     ))
+}
+
+/// The downtime folders the user may LIST; the folder list route lets every caller through.
+pub async fn listable_folders(org: &str, user_id: &str, folders: Vec<Folder>) -> Vec<Folder> {
+    let ids = folders
+        .iter()
+        .map(|f| f.folder_id.clone())
+        .collect::<Vec<_>>();
+    let allowed = access::retain_listable_folders(org, user_id, ids).await;
+    folders
+        .into_iter()
+        .filter(|f| allowed.contains(&f.folder_id))
+        .collect()
 }
 
 async fn load(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
@@ -966,5 +979,36 @@ mod tests {
         let cancelled = list_item(&d, &MatchCounts::default(), 11 * HOUR);
         assert!(cancelled.current_window.is_none());
         assert!(cancelled.next_window.is_none());
+    }
+
+    fn folder(id: &str) -> Folder {
+        Folder {
+            folder_id: id.to_string(),
+            name: id.to_string(),
+            description: String::new(),
+            icon: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn root_lists_every_downtime_folder() {
+        let root = "root-downtime-folders@example.com";
+        crate::common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        let kept =
+            listable_folders("acme", root, vec![folder("default"), folder("payments")]).await;
+        let ids: Vec<_> = kept.iter().map(|f| f.folder_id.as_str()).collect();
+        assert_eq!(ids, ["default", "payments"]);
+        assert!(listable_folders("acme", root, vec![]).await.is_empty());
     }
 }

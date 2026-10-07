@@ -86,7 +86,16 @@ pub async fn listable_downtime_folders(
     user_id: &str,
 ) -> Result<HashSet<String>, DowntimeError> {
     let candidates = listable_folders(org, user_id, FolderType::Downtimes).await?;
-    let checks = candidates.into_iter().map(|folder_id| async move {
+    Ok(retain_listable_folders(org, user_id, candidates).await)
+}
+
+/// Keeps the downtime folders the user may LIST, each checked on its own.
+pub async fn retain_listable_folders(
+    org: &str,
+    user_id: &str,
+    folder_ids: impl IntoIterator<Item = String>,
+) -> HashSet<String> {
+    let checks = folder_ids.into_iter().map(|folder_id| async move {
         check_permissions(
             &folder_id,
             org,
@@ -101,11 +110,11 @@ pub async fn listable_downtime_folders(
         .await
         .then_some(folder_id)
     });
-    Ok(futures::future::join_all(checks)
+    futures::future::join_all(checks)
         .await
         .into_iter()
         .flatten()
-        .collect())
+        .collect()
 }
 
 /// Moves the folder tuple; writing a tuple that exists fails, so an unchanged folder is skipped.

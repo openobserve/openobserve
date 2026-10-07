@@ -199,8 +199,16 @@ pub async fn list_folders(
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
 
-    match folders::list_folders(&org_id, user_id, folder_type.into()).await {
+    let folder_type = folder_type.into();
+    match folders::list_folders(&org_id, user_id, folder_type).await {
         Ok(folders) => {
+            #[cfg(feature = "enterprise")]
+            let folders = if folder_type == config::meta::folder::FolderType::Downtimes {
+                openobserve_core::downtimes::listable_folders(&org_id, &user_email.user_id, folders)
+                    .await
+            } else {
+                folders
+            };
             let body: ListFoldersResponseBody = folders.into();
             MetaHttpResponse::json(body)
         }
@@ -272,11 +280,29 @@ pub async fn get_folder(
         ("x-o2-mcp" = json!({"description": "Get folder by name", "category": "folders"}))
     ),
 )]
+#[allow(unused_variables)]
 pub async fn get_folder_by_name(
     Path((org_id, folder_type, folder_name)): Path<(String, FolderType, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match folders::get_folder_by_name(&org_id, &folder_name, folder_type.into()).await {
+    let folder_type = folder_type.into();
+    match folders::get_folder_by_name(&org_id, &folder_name, folder_type).await {
         Ok(folder) => {
+            #[cfg(feature = "enterprise")]
+            let folder = if folder_type == config::meta::folder::FolderType::Downtimes {
+                let listed = openobserve_core::downtimes::listable_folders(
+                    &org_id,
+                    &user_email.user_id,
+                    vec![folder],
+                )
+                .await;
+                match listed.into_iter().next() {
+                    Some(folder) => folder,
+                    None => return MetaHttpResponse::forbidden("Unauthorized Access"),
+                }
+            } else {
+                folder
+            };
             let body: CreateFolderResponseBody = folder.into();
             MetaHttpResponse::json(body)
         }
