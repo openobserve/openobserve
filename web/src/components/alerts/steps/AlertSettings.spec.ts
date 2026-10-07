@@ -20,12 +20,13 @@
 // hosts below mirror that wiring with a schema composed from
 // makeAlertSettingsShape / createAlertSettingsSchema.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, nextTick } from "vue";
 import { createStore } from "vuex";
 import { z } from "zod";
 import i18n from "@/locales";
+import config from "@/aws-exports";
 import AlertSettings from "./AlertSettings.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import {
@@ -59,12 +60,12 @@ vi.mock("@/services/workflows", async (importOriginal) => {
   });
 });
 
-function makeStore() {
+function makeStore(zoConfig: Record<string, any> = {}) {
   return createStore({
     state: {
       theme: "light",
       selectedOrganization: { identifier: "test-org" },
-      zoConfig: { min_auto_refresh_interval: 60 },
+      zoConfig: { min_auto_refresh_interval: 60, ...zoConfig },
     },
   });
 }
@@ -268,10 +269,48 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       "alert-destinations-select",
       "alert-settings-refresh-destinations-btn",
       "create-destination-btn",
-      "alert-creates-incident-toggle",
     ]) {
       expect(host.find(`[data-test="${dt}"]`).exists()).toBe(true);
     }
+  });
+});
+
+// ── Creates Incident: enterprise/cloud + incidents_enabled only ─────────────
+// Incidents is an enterprise feature: the OSS backend always reports
+// `incidents_enabled: false`, and the enterprise one only correlates when it
+// is on. The toggle follows the same gate as the Incidents menu.
+describe("AlertSettings — Creates Incident toggle visibility", () => {
+  const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+  afterEach(() => {
+    config.isEnterprise = original.isEnterprise;
+    config.isCloud = original.isCloud;
+  });
+
+  it.each([
+    ["hidden in OSS with the flag off", "false", "false", false, false],
+    ["hidden in OSS even with the flag on", "false", "false", true, false],
+    ["hidden in enterprise with Incidents disabled", "true", "false", false, false],
+    ["hidden in enterprise before /config loads", "true", "false", undefined, false],
+    ["shown in enterprise with Incidents enabled", "true", "false", true, true],
+    ["shown in cloud with Incidents enabled", "false", "true", true, true],
+  ])("%s", (_label, isEnterprise, isCloud, incidentsEnabled, visible) => {
+    config.isEnterprise = isEnterprise;
+    config.isCloud = isCloud;
+    const host = mount(makeDescendantHost("false"), {
+      global: { plugins: [makeStore({ incidents_enabled: incidentsEnabled }), i18n] },
+    });
+    expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(visible);
+  });
+
+  it("appears once /config reports incidents enabled", async () => {
+    config.isEnterprise = "true";
+    const store = makeStore();
+    const host = mount(makeDescendantHost("true"), { global: { plugins: [store, i18n] } });
+    expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(false);
+
+    store.state.zoConfig.incidents_enabled = true;
+    await nextTick();
+    expect(host.find('[data-test="alert-creates-incident-toggle"]').exists()).toBe(true);
   });
 });
 
