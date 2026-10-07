@@ -993,5 +993,28 @@ export default defineComponent({
   :deep(.q-virtual-scroll__padding) {
     display: none !important;
   }
+
+  /* A page break under the panel title pushes in-flow content to the next page while the cell stays fixed, clipping the table footer; out-of-flow boxes split in place instead. */
+  :deep(.grid-stack-item-content .table-wrapper) {
+    position: absolute !important;
+    inset: 0;
+  }
+
+  /* Reserve the dense footer's min-height so rows end above the pinned footer. */
+  :deep(.grid-stack-item-content .table-wrapper .q-table__container) {
+    padding-bottom: 33px;
+  }
+
+  :deep(.grid-stack-item-content .table-wrapper .q-table__bottom) {
+    position: absolute !important;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  /* The table now splits in place, so a repeated header would print twice when only the header fits above the break. */
+  :deep(.grid-stack-item-content .table-wrapper thead) {
+    display: table-row-group !important;
+  }
 }
 </style>
