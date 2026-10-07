@@ -14,67 +14,41 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     time::{Duration, Instant},
 };
 
 use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
+use hashlink::LruCache;
 use rquickjs::{Context, Runtime};
 
 thread_local! {
     /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
     static JS_DEADLINE: Cell<Option<Instant>> = const { Cell::new(None) };
-}
 
-/// Per-context memory ceiling (10MB); protects against unbounded allocation in a single eval.
-const JS_MEMORY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
-/// Per-context stack ceiling (512KB); prevents stack overflow and runaway recursion.
-const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
+    // a function can change its context's globals, so an org never runs in another org's context
+    static JS_ORG_CONTEXTS: RefCell<LruCache<String, Context>> =
+        RefCell::new(LruCache::new(JS_ORG_CONTEXTS_PER_THREAD));
+}
 
 /// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
 const DEFAULT_JS_EXEC_TIMEOUT_SECS: u64 = 5;
 
-/// Build a fresh, security-hardened JS runtime + context.
-///
-/// A new context is created for every [`compile_js_function`] and [`apply_js_fn`] call rather
-/// than reusing one per thread. A JS function runs against the context's shared global object,
-/// so anything it leaves behind — a replaced builtin such as `JSON.parse`, an implicit global,
-/// or any other mutation of a global — would otherwise persist to the next call on that worker
-/// thread. Ingest workers process records from more than one organization, so a persisted
-/// mutation lets one record's function observe or reinterpret the next record, including another
-/// organization's data (#14868). A fresh context per call gives each record a clean global
-/// object, which the denylist in `compile_js_function` cannot guarantee on its own.
-///
-/// Both the `Runtime` and the `Context` are returned so the caller holds the runtime for the
-/// whole eval: bind them as `let (_rt, ctx) = new_js_context()?;`. The context drops before the
-/// runtime (reverse declaration order), which is the order QuickJS requires. Dropping them also
-/// discards any pending microtask jobs the function queued, so memory stays bounded across
-/// records (a shared runtime accumulated those jobs until it hit its memory limit).
-///
-/// Hardening carried over from the previous thread-local runtime:
-/// - memory limit (see [`JS_MEMORY_LIMIT_BYTES`]),
-/// - max stack size (see [`JS_MAX_STACK_SIZE_BYTES`]),
-/// - an interrupt handler that enforces the per-eval deadline (see `JS_DEADLINE`).
-fn new_js_context() -> Result<(Runtime, Context), std::io::Error> {
+const JS_ORG_CONTEXTS_PER_THREAD: usize = 8;
+
+/// Builds a new runtime for each context, so every org has a memory limit of its own.
+fn new_js_context() -> Result<Context, std::io::Error> {
     let rt = Runtime::new()
         .map_err(|e| std::io::Error::other(format!("Failed to create JS runtime: {e}")))?;
-
-    // This prevents unbounded memory allocation attacks.
-    rt.set_memory_limit(JS_MEMORY_LIMIT_BYTES);
-    // Prevents stack overflow attacks and excessive recursion.
-    rt.set_max_stack_size(JS_MAX_STACK_SIZE_BYTES);
+    rt.set_memory_limit(10 * 1024 * 1024);
+    rt.set_max_stack_size(512 * 1024);
     // A non-yielding function (e.g. `while(true){}`) would otherwise pin the thread forever.
     rt.set_interrupt_handler(Some(Box::new(|| {
         JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
     })));
-
-    // Use Context::full() for JSON, Math, String, Array, Object, which are safe; dangerous
-    // globals (eval, Function, setTimeout, etc.) are blocked by the denylist in
-    // compile_js_function and bounded by the memory/stack/time limits above. rquickjs does not
-    // expose individual global registration, so a narrower base context is not an option here.
-    let ctx = Context::full(&rt)
-        .map_err(|e| std::io::Error::other(format!("Failed to create JS context: {e}")))?;
-    Ok((rt, ctx))
+    // rquickjs can't register globals one by one, so dangerous ones are kept out by the denylist
+    Context::full(&rt)
+        .map_err(|e| std::io::Error::other(format!("Failed to create JS context: {e}")))
 }
 
 /// Compiled JS function configuration
@@ -113,13 +87,9 @@ impl Drop for JsDeadlineGuard {
     }
 }
 
-/// Verify that a hardened JS runtime + context can be created on this build.
-/// A fresh context is built per function call (see [`new_js_context`]); this only checks that
-/// construction succeeds, so callers can fail fast at startup rather than on the first record.
+/// Only checks that a runtime and context can be created; each org builds its own on first use.
 pub fn init_js_runtime() -> Result<(), String> {
-    new_js_context()
-        .map(|(_rt, _ctx)| ())
-        .map_err(|e| e.to_string())
+    new_js_context().map(|_| ()).map_err(|e| e.to_string())
 }
 
 /// Compile and validate a JS function
@@ -138,9 +108,6 @@ fn compile_js_function_inner(
         return Err(std::io::Error::other("JavaScript function cannot be empty"));
     }
 
-    // Phase 1 + Phase 2 Security: Comprehensive pattern blocking
-    // Use centrally-defined security patterns from o2-enterprise
-    // These patterns are statically initialized and reused across all compilations
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::auth::js_security;
@@ -205,10 +172,9 @@ fn compile_js_function_inner(
     let var_name = if is_result_array { "rows" } else { "row" };
     let test_value = if is_result_array { "[]" } else { "{}" };
 
+    // not on the hot path, so the function is validated in a context of its own, not its org's
+    let ctx = new_js_context()?;
     // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
-    // A fresh context keeps validation from leaking state into (or observing state from) other
-    // calls.
-    let (_rt, ctx) = new_js_context()?;
     ctx.with(|ctx| {
         let test_code = format!(
             r#"
@@ -286,10 +252,18 @@ pub fn apply_js_fn(
     org_id: &str,
     stream_name: &[String],
 ) -> (json::Value, Option<String>) {
-    // A fresh context per call so a function cannot leave globals behind for the next record,
-    // which may belong to another organization (#14868).
-    let (_rt, ctx) = match new_js_context() {
-        Ok(pair) => pair,
+    // an org may see leftovers of its own earlier records, never another org's (#14868)
+    let ctx = JS_ORG_CONTEXTS.with(|contexts| -> Result<Context, std::io::Error> {
+        let mut contexts = contexts.borrow_mut();
+        if let Some(ctx) = contexts.get(org_id) {
+            return Ok(ctx.clone());
+        }
+        let ctx = new_js_context()?;
+        contexts.insert(org_id.to_string(), ctx.clone());
+        Ok(ctx)
+    });
+    let ctx = match ctx {
+        Ok(ctx) => ctx,
         Err(e) => {
             log::error!(
                 "{}/{:?} failed to create JS context: {}",
@@ -301,10 +275,8 @@ pub fn apply_js_fn(
         }
     };
     ctx.with(|ctx| {
-        // Set up the execution environment
         let globals = ctx.globals();
 
-        // Inject input data as JSON string
         let input_json = match serde_json::to_string(&row) {
             Ok(json) => json,
             Err(e) => {
@@ -315,7 +287,6 @@ pub fn apply_js_fn(
             }
         };
 
-        // Set global variables
         if let Err(e) = globals.set("inputJson", input_json.as_str()) {
             return (row.clone(), Some(format!("Failed to set input: {}", e)));
         }
@@ -337,19 +308,9 @@ pub fn apply_js_fn(
         // Strip #ResultArray# marker for execution (invalid JS syntax)
         let func_for_execution = strip_result_array_marker(&js_config.function);
 
-        // Detect if this is a ResultArray function to use appropriate variable name
-        // #ResultArray# functions use 'rows' (array), regular functions use 'row' (single
-        // object)
-        // Only match #ResultArray# at the start of the function (not in comments)
         let is_result_array = RESULT_ARRAY.is_match(&js_config.function);
         let var_name = if is_result_array { "rows" } else { "row" };
 
-        // Create execution wrapper that catches errors and returns them as structured data
-        // Use 'rows' for #ResultArray# functions (consistent with VRL), 'row' for regular
-        // functions The function's return value is captured; if undefined, use the
-        // input variable Wrap user function to capture return value or mutated
-        // input For #ResultArray# functions, use 'rows' variable (array input)
-        // For regular functions, use 'row' variable (single object input)
         let exec_code = format!(
             r#"
                 (function() {{
@@ -372,7 +333,6 @@ pub fn apply_js_fn(
             var_name, func_for_execution, var_name
         );
 
-        // Execute the function
         let guard = JsDeadlineGuard::new(exec_timeout());
         let eval_result = ctx.eval::<String, _>(exec_code);
         if guard.expired() {
@@ -381,59 +341,53 @@ pub fn apply_js_fn(
             return (row, Some(msg));
         }
         match eval_result {
-            Ok(result_json) => {
-                // Parse the result to check if there was an error
-                match serde_json::from_str::<json::Value>(&result_json) {
-                    Ok(result_obj) => {
-                        if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
-                            && success
-                        {
-                            // Extract the actual data
-                            if let Some(data) = result_obj.get("data") {
-                                (data.clone(), None)
-                            } else {
-                                (row.clone(), Some("No data returned".to_string()))
-                            }
-                        } else if let Some(success) =
-                            result_obj.get("success").and_then(|v| v.as_bool())
-                            && !success
-                        {
-                            // Extract error details
-                            let error_msg = result_obj
-                                .get("error")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("Unknown error");
-                            let line = result_obj
-                                .get("line")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| *s != "unknown");
-                            let column = result_obj
-                                .get("column")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| *s != "unknown");
-
-                            // Only append line/column if we have valid values
-                            let error_message = match (line, column) {
-                                (Some(l), Some(c)) => {
-                                    format!("{} (line: {}, column: {})", error_msg, l, c)
-                                }
-                                (Some(l), None) => format!("{} (line: {})", error_msg, l),
-                                (None, Some(c)) => format!("{} (column: {})", error_msg, c),
-                                (None, None) => error_msg.to_string(),
-                            };
-
-                            log::error!("{}/{:?} {}", org_id, stream_name, error_message);
-                            (row, Some(error_message))
+            Ok(result_json) => match serde_json::from_str::<json::Value>(&result_json) {
+                Ok(result_obj) => {
+                    if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
+                        && success
+                    {
+                        if let Some(data) = result_obj.get("data") {
+                            (data.clone(), None)
                         } else {
-                            (row.clone(), Some("Unexpected response format".to_string()))
+                            (row.clone(), Some("No data returned".to_string()))
                         }
+                    } else if let Some(success) =
+                        result_obj.get("success").and_then(|v| v.as_bool())
+                        && !success
+                    {
+                        let error_msg = result_obj
+                            .get("error")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown error");
+                        let line = result_obj
+                            .get("line")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| *s != "unknown");
+                        let column = result_obj
+                            .get("column")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| *s != "unknown");
+
+                        let error_message = match (line, column) {
+                            (Some(l), Some(c)) => {
+                                format!("{} (line: {}, column: {})", error_msg, l, c)
+                            }
+                            (Some(l), None) => format!("{} (line: {})", error_msg, l),
+                            (None, Some(c)) => format!("{} (column: {})", error_msg, c),
+                            (None, None) => error_msg.to_string(),
+                        };
+
+                        log::error!("{}/{:?} {}", org_id, stream_name, error_message);
+                        (row, Some(error_message))
+                    } else {
+                        (row.clone(), Some("Unexpected response format".to_string()))
                     }
-                    Err(e) => (
-                        row.clone(),
-                        Some(format!("Failed to parse JS output: {}", e)),
-                    ),
                 }
-            }
+                Err(e) => (
+                    row.clone(),
+                    Some(format!("Failed to parse JS output: {}", e)),
+                ),
+            },
             Err(e) => {
                 let error_msg = format!("JS execution failed: {}", e);
                 log::error!("{}/{:?} {}", org_id, stream_name, error_msg);
@@ -526,9 +480,7 @@ mod tests {
         for src in payloads {
             let start = Instant::now();
             let _guard = JsDeadlineGuard::new(Duration::from_millis(100));
-            // A per-call context still enforces the deadline: its runtime carries the interrupt
-            // handler, so interruption does not depend on a shared thread-local runtime.
-            let (_rt, ctx) = new_js_context().expect("context");
+            let ctx = new_js_context().expect("context");
             let result: Result<String, _> = ctx.with(|ctx| ctx.eval(src));
             assert!(result.is_err(), "infinite loop must be interrupted: {src}");
             assert!(
@@ -540,17 +492,7 @@ mod tests {
 
     #[test]
     fn js_builtin_mutation_does_not_survive_the_next_call() {
-        // #14868: a function can replace a builtin such as JSON.parse. The wrapper parses the
-        // next record's input with JSON.parse *before* user code runs, so a replacement left on
-        // a shared context would capture the following record — which, on an ingest worker, can
-        // be another organization's data. With a fresh context per call the replacement cannot
-        // survive, so the third call must not see the second (other-org) row.
-        //
-        // The hook stashes what it is given on a `JSON` property, not on an implicit global:
-        // the eval runs in strict mode, where an implicit global (`x = []`) throws, which would
-        // turn the leak into a per-call error and make the leak assertion below unreachable.
-        // Assigning a property of an existing object is allowed in strict mode, so on a shared
-        // context the leak is actually observable (and this assertion actually fails).
+        // the wrapper JSON.parses each input first; implicit globals throw, so the hook uses JSON
         let attacker = r#"
             var _orig = JSON.parse;
             if (!JSON.hooked) {
@@ -565,7 +507,6 @@ mod tests {
         let attacker_cfg = compile_js_function(attacker, "org_a").unwrap();
         let benign_cfg = compile_js_function(benign, "org_b").unwrap();
 
-        // 1) org A installs the hook. Its own row has captured nothing yet.
         let (out1, err1) = apply_js_fn(
             &attacker_cfg,
             json!({"org": "a", "n": 1}),
@@ -578,7 +519,6 @@ mod tests {
             "positive control: the function must have run"
         );
 
-        // 2) org B's record flows through the same worker thread.
         let (_out2, err2) = apply_js_fn(
             &benign_cfg,
             json!({"org": "b", "secret": "ORG_B_SECRET_42"}),
@@ -587,7 +527,6 @@ mod tests {
         );
         assert!(err2.is_none(), "call 2 should succeed: {err2:?}");
 
-        // 3) org A runs again and reports what its hook captured.
         let (out3, err3) = apply_js_fn(
             &attacker_cfg,
             json!({"org": "a", "n": 2}),
@@ -605,32 +544,90 @@ mod tests {
             !leaked.contains("ORG_B_SECRET_42"),
             "org A's function saw org B's row across calls: {leaked:?}"
         );
-        // And the third call started from a clean global, so nothing was stashed at all.
-        assert_eq!(
-            leaked, "",
-            "a fresh context must not carry a prior call's globals"
+        // org A keeps its context, so its hook is still installed and saw org A's next row
+        assert!(
+            leaked.contains("\"n\":2"),
+            "positive control: org A's hook must have seen org A's own row: {leaked:?}"
         );
     }
 
     #[test]
-    fn js_global_object_mutation_does_not_leak_between_calls() {
-        // A property added to a shared global object (here `JSON`) is allowed even in strict
-        // mode. On a reused context it would persist to the next call; with a per-call context
-        // it must not — the next record starts from a clean set of globals.
+    fn js_global_object_mutation_does_not_leak_to_another_org() {
+        // adding a property to a global object is allowed in strict mode
         let writer = "JSON.stash = 'leaked'; row.saw = (typeof JSON.stash !== 'undefined');";
         let reader = "row.saw = (typeof JSON.stash !== 'undefined');";
-        let writer_cfg = compile_js_function(writer, "test_org").unwrap();
-        let reader_cfg = compile_js_function(reader, "test_org").unwrap();
+        let writer_cfg = compile_js_function(writer, "writer_org").unwrap();
+        let reader_cfg = compile_js_function(reader, "reader_org").unwrap();
 
-        let (w, we) = apply_js_fn(&writer_cfg, json!({}), "test_org", &["s".to_string()]);
+        let (w, we) = apply_js_fn(&writer_cfg, json!({}), "writer_org", &["s".to_string()]);
         assert!(we.is_none(), "writer should succeed: {we:?}");
         assert_eq!(w["saw"], true, "the writer sees the property it just added");
 
-        let (r, re) = apply_js_fn(&reader_cfg, json!({}), "test_org", &["s".to_string()]);
+        let (r, re) = apply_js_fn(&reader_cfg, json!({}), "reader_org", &["s".to_string()]);
         assert!(re.is_none(), "reader should succeed: {re:?}");
         assert_eq!(
             r["saw"], false,
-            "a global-object property set by a prior call must not be visible to the next"
+            "a global-object property set by one org must not be visible to another"
+        );
+    }
+
+    const COUNT_CALLS: &str = "JSON.calls = (JSON.calls || 0) + 1; row.calls = JSON.calls;";
+
+    /// How many times `org`'s current context has run `cfg`, this call included.
+    fn count_calls(cfg: &JSRuntimeConfig, org: &str) -> json::Value {
+        let (out, err) = apply_js_fn(cfg, json!({}), org, &["s".to_string()]);
+        assert!(err.is_none(), "{org}: {err:?}");
+        out["calls"].clone()
+    }
+
+    #[test]
+    fn js_context_is_reused_by_its_org_and_not_seen_by_another() {
+        let cfg = compile_js_function(COUNT_CALLS, "reuse_a").unwrap();
+        assert_eq!(count_calls(&cfg, "reuse_a"), 1);
+        assert_eq!(
+            count_calls(&cfg, "reuse_b"),
+            1,
+            "org B must not see org A's changes"
+        );
+        assert_eq!(
+            count_calls(&cfg, "reuse_a"),
+            2,
+            "org A's context must be reused, not rebuilt"
+        );
+    }
+
+    #[test]
+    fn js_context_of_the_least_recently_used_org_is_rebuilt() {
+        let cfg = compile_js_function(COUNT_CALLS, "lru_0").unwrap();
+        for org in 0..JS_ORG_CONTEXTS_PER_THREAD {
+            count_calls(&cfg, &format!("lru_{org}"));
+        }
+        assert_eq!(count_calls(&cfg, "lru_0"), 2);
+        let extra = format!("lru_{JS_ORG_CONTEXTS_PER_THREAD}");
+        assert_eq!(count_calls(&cfg, &extra), 1);
+        assert_eq!(
+            count_calls(&cfg, "lru_1"),
+            1,
+            "the least recently used org starts over"
+        );
+        assert_eq!(
+            count_calls(&cfg, "lru_0"),
+            3,
+            "an org used since it was added keeps its context"
+        );
+    }
+
+    #[test]
+    fn js_memory_limit_applies_to_each_org_on_its_own() {
+        // two orgs keep 6 MiB each, which fits only if each has a 10 MiB runtime of its own
+        let keep = "(JSON.keep = JSON.keep || []).push('x'.repeat(6 << 20)); row.kept = true;";
+        let cfg = compile_js_function(keep, "mem_a").unwrap();
+        let apply = |org: &str| apply_js_fn(&cfg, json!({}), org, &["s".to_string()]).1;
+        assert_eq!(apply("mem_a"), None, "org A's first 6 MiB must fit");
+        assert_eq!(apply("mem_b"), None, "org B must not share org A's limit");
+        assert!(
+            apply("mem_a").is_some(),
+            "a second 6 MiB must go over org A's own limit"
         );
     }
 
@@ -993,10 +990,6 @@ for (var i = 0; i < filtered.length; i++) {
         assert_eq!(output_array[1]["value"], 80);
     }
 
-    // ============================================================================
-    // Phase 2 Security Hardening Tests
-    // ============================================================================
-
     #[test]
     fn test_security_block_globalthis() {
         let func = r#"globalThis.escape = function() { return "hacked"; };"#;
@@ -1183,7 +1176,6 @@ for (var i = 0; i < filtered.length; i++) {
     #[test]
     fn test_security_context_base_removes_dangerous_globals() {
         // Test that dangerous globals are not available in Context::base()
-        // This test verifies Phase 2 security: Context::base() removes eval, Function, etc.
 
         // Try to use eval (should fail at runtime if not caught by pattern blocking)
         let func_eval = r#"

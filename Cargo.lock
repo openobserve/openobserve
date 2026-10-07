@@ -13376,6 +13376,7 @@ dependencies = [
  "async-trait",
  "config",
  "enrichment",
+ "hashlink 0.11.1",
  "log",
  "o2_enterprise",
  "regex",
