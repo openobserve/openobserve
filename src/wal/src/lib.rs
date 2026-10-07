@@ -59,9 +59,26 @@ pub fn build_file_path(
     path
 }
 
+/// Whether a live [`Writer`] (in any process) still holds the wal file at `path`.
+pub fn is_held_by_writer(path: &std::path::Path) -> bool {
+    std::fs::File::open(path)
+        .is_ok_and(|f| matches!(f.try_lock(), Err(std::fs::TryLockError::WouldBlock)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_wal_file_is_held_exactly_while_its_writer_lives() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = build_file_path(dir.path(), "org", "logs", "1".to_string());
+        let (writer, _) = Writer::new(path.clone(), 0, 1024, None).unwrap();
+        assert!(is_held_by_writer(&path));
+        drop(writer);
+        assert!(!is_held_by_writer(&path));
+        assert!(!is_held_by_writer(&dir.path().join("missing.wal")));
+    }
 
     #[test]
     fn test_build_file_path_basic() {
