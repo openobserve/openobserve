@@ -97,15 +97,24 @@ impl IndexCache {
         self.entries.is_empty()
     }
 
-    pub fn get(&mut self, key: &CacheKey) -> Option<Arc<CachedIndex>> {
+    pub fn lookup(
+        &mut self,
+        key: &CacheKey,
+        labels: &[String],
+    ) -> Result<(Option<Arc<CachedIndex>>, bool)> {
         if self.limit == 0 {
-            return None;
+            return Ok((None, false));
         }
-        let entry = self.entries.get(key).map(|entry| Arc::clone(&entry.0));
-        if entry.is_some() {
-            self.metrics.hits.inc();
+        let Some(entry) = self.entries.get(key).map(|entry| Arc::clone(&entry.0)) else {
+            self.metrics.misses.inc();
+            return Ok((None, false));
+        };
+        self.metrics.hits.inc();
+        let complete = entry.index.missing_labels(labels)?.is_empty();
+        if !complete {
+            self.metrics.partial_hits.inc();
         }
-        entry
+        Ok((Some(entry), complete))
     }
 
     pub fn remove(&mut self, key: &CacheKey) {
