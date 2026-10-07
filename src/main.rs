@@ -191,6 +191,21 @@ async fn run() -> Result<(), anyhow::Error> {
                 panic!("infra init failed: {e}");
             }
 
+            // Must precede every cipher_keys read or write, including default-org creation.
+            #[cfg(feature = "enterprise")]
+            let master_key = Some(
+                o2_enterprise::enterprise::common::config::get_config()
+                    .encryption
+                    .master_key
+                    .clone(),
+            );
+            #[cfg(not(feature = "enterprise"))]
+            let master_key: Option<String> = None;
+            if let Err(e) = infra::table::cipher::boot(master_key.as_deref()).await {
+                job_init_tx.send(false).ok();
+                panic!("cipher master key boot failed: {e}");
+            }
+
             if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");

@@ -139,6 +139,10 @@ const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
 /// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
 const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
 
+/// Longest destination response body kept in the alert-history error column.
+#[cfg(feature = "enterprise")]
+const REJECTION_BODY_MAX_CHARS: usize = 512;
+
 #[cfg(feature = "enterprise")]
 type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
 
@@ -1438,7 +1442,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         if !outcome.claim_lost && !outcome.ineligible {
             let record = AnomalyRunRecord {
                 status: anomaly_run_status(&outcome),
-                error: None,
+                error: outcome.notify_error.clone(),
                 success_response: Some(
                     serde_json::json!({ "anomalies_found": outcome.anomaly_count }).to_string(),
                 ),
@@ -1474,6 +1478,8 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             "message": message,
             "claim_lost": outcome.claim_lost,
             "ineligible": outcome.ineligible,
+            "notify_failed": outcome.notify_failed,
+            "notify_error": outcome.notify_error,
             "anomaly_id": anomaly_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
@@ -3120,8 +3126,9 @@ fn anomaly_alert_payload(
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
 /// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
-/// send (2xx); a skip or a non-2xx rejection returns `Ok(false)` so the caller never arms
-/// a cooldown, or records a run as delivered, on a send nobody actually received.
+/// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
+/// error, so the caller never arms a cooldown, or records a run as delivered, on a send
+/// nobody actually received, and the history row can name the rejection.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
@@ -3202,7 +3209,15 @@ pub async fn send_anomaly_alert(
             status,
             body
         );
-        return Ok(false);
+        // The body lands in the alert-history error column, so a long HTML error page is cut.
+        let body = body.chars().take(REJECTION_BODY_MAX_CHARS).collect();
+        return Err(
+            o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
+                status: status.as_u16(),
+                body,
+            }
+            .into(),
+        );
     }
 
     log::info!(
