@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod loads;
-
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     hash::Hasher,
     ops::Range,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicU64, Ordering},
     },
     time::Instant,
@@ -44,7 +42,7 @@ use hashbrown::{HashMap, HashSet};
 use itertools::Either;
 use metrics_index::{
     block::{BlockDecoder, DecodedBlockRef, Index},
-    block_cache::{CacheKey, CachedIndex, INDEX_CACHE, IndexCache, ParentIdentity, cache_limit},
+    block_cache::{INDEX_CACHE, Sidecar},
 };
 use promql_parser::label::Matchers;
 use tokio::task::JoinSet;
@@ -55,106 +53,6 @@ use crate::series_loader::label_interner::LabelInterner;
 const PREFLIGHT_YIELD_INTERVAL: usize = 1024;
 const PREFETCH_BLOCKS: usize = 512;
 const PREFETCH_BYTES: usize = 16 * 1024 * 1024;
-
-struct MetadataLoad<'a> {
-    file: &'a FileKey,
-    labels: &'a [String],
-    key: CacheKey,
-    sidecar: String,
-    limit: usize,
-    cache: &'a Mutex<IndexCache>,
-    flights: &'a Arc<loads::LoadRegistry>,
-}
-
-impl MetadataLoad<'_> {
-    async fn run(self, mut seed: Option<Arc<CachedIndex>>) -> Result<Arc<LoadedFile>> {
-        let Self {
-            file,
-            labels,
-            key,
-            sidecar,
-            limit,
-            cache,
-            flights,
-        } = self;
-        loop {
-            if seed
-                .as_ref()
-                .map(|entry| entry.index.missing_labels(labels))
-                .transpose()?
-                .is_some_and(|missing| missing.is_empty())
-            {
-                let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
-                let entry = match loaded {
-                    Ok(value) => value,
-                    Err(error) => {
-                        cache
-                            .lock()
-                            .unwrap_or_else(|e| e.into_inner())
-                            .remove_bound(&key, binding.as_ref());
-                        return Err(error);
-                    }
-                };
-                return Ok(Arc::new(LoadedFile {
-                    account: file.account.clone(),
-                    sidecar,
-                    index: Arc::new(entry.index.project(labels)?),
-                }));
-            }
-            match flights.claim(key.clone()) {
-                loads::Claim::Waiter(flight) => {
-                    if let Some(loaded) = flight.wait().await? {
-                        seed = Some(loaded);
-                    }
-                }
-                loads::Claim::Owner(owner) => {
-                    if limit > 0
-                        && let Some(current) =
-                            cache.lock().unwrap_or_else(|e| e.into_inner()).peek(&key)
-                    {
-                        seed = Some(current);
-                    }
-                    let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                    let prior = seed.clone();
-                    let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
-                    match loaded {
-                        Ok(entry) => {
-                            let admitted = if prior
-                                .as_ref()
-                                .is_some_and(|prior| Arc::ptr_eq(prior, &entry))
-                            {
-                                Ok(entry)
-                            } else {
-                                cache.lock().unwrap_or_else(|e| e.into_inner()).insert(
-                                    key.clone(),
-                                    entry,
-                                    limit,
-                                )
-                            };
-                            owner.complete(&admitted);
-                            let entry = admitted?;
-                            return Ok(Arc::new(LoadedFile {
-                                account: file.account.clone(),
-                                sidecar,
-                                index: Arc::new(entry.index.project(labels)?),
-                            }));
-                        }
-                        Err(error) => {
-                            cache
-                                .lock()
-                                .unwrap_or_else(|e| e.into_inner())
-                                .remove_bound(&key, binding.as_ref());
-                            let failed = Err(anyhow::anyhow!("{error:#}"));
-                            owner.complete(&failed);
-                            return Err(error);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct ReadStats {
     trace_id: String,
@@ -366,7 +264,7 @@ impl SeriesStream for BlockSeriesStream {
             let head = (Arc::clone(&first.file.index), first.head().unwrap());
             self.samples.clear();
             if self.decoder.is_none() {
-                self.decoder = Some(BlockDecoder::new().map_err(external)?);
+                self.decoder = Some(BlockDecoder::default());
             }
             let decoder = self.decoder.as_mut().expect("decoder initialized");
             let mut file_id = first_file;
@@ -713,78 +611,13 @@ async fn load_metadata(
 }
 
 async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
-    let limit = cache_limit();
-    load_index_cached(file, labels, &INDEX_CACHE, &loads::FILE_LOADS, limit).await
-}
-
-async fn load_index_cached(
-    file: &FileKey,
-    labels: &[String],
-    cache: &Mutex<IndexCache>,
-    flights: &Arc<loads::LoadRegistry>,
-    limit: usize,
-) -> Result<Arc<LoadedFile>> {
-    let parent = ParentIdentity {
-        object_key: file.key.clone(),
-        rows: u64::try_from(file.meta.records)?,
-        compressed_size: u64::try_from(file.meta.compressed_size)?,
-    };
-    ensure!(
-        parent.rows > 0 && parent.compressed_size > 0,
-        "invalid block parent identity"
-    );
-    ensure!(
-        file.meta.mindex_size > 0,
-        "block sidecar size is not recorded"
-    );
-    let sidecar = config::meta::promql::index::metrics_index_path(&file.key)
-        .context("unsupported block parent layout")?;
-    let key = CacheKey {
-        account: file.account.clone(),
-        parent: parent.clone(),
-    };
-    let cached = {
-        let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
-        cache.trim(limit);
-        cache.get(&key)
-    };
-    MetadataLoad {
-        file,
-        labels,
-        key,
-        sidecar,
-        limit,
-        cache,
-        flights,
-    }
-    .run(cached)
-    .await
-}
-
-async fn load_entry(
-    file: &FileKey,
-    labels: &[String],
-    parent: &ParentIdentity,
-    sidecar: &str,
-    cached: Option<Arc<CachedIndex>>,
-) -> Result<Arc<CachedIndex>> {
-    if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty())
-    {
-        return Ok(cached.unwrap());
-    }
-    Ok(metrics_index::fetch_parsed_index(
-        &file.account,
-        sidecar,
-        parent.metadata(),
-        file.meta.mindex_size,
-        labels,
-        cached,
-    )
-    .await?)
+    let sidecar = Sidecar::of(file)?;
+    let index = metrics_index::block_cache::load_index(&sidecar, labels).await?;
+    Ok(Arc::new(LoadedFile {
+        account: sidecar.account,
+        sidecar: sidecar.path,
+        index: Arc::new(index),
+    }))
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -943,7 +776,10 @@ async fn validate_partition(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, AtomicUsize},
+    };
 
     use async_trait::async_trait;
     use config::{
@@ -964,7 +800,9 @@ mod tests {
     use futures::stream::BoxStream;
     use metrics_index::{
         block::{BlockWriter, ParentMetadata},
-        block_cache::{CacheWeight, SidecarBinding},
+        block_cache::{
+            CacheKey, CacheWeight, CachedIndex, IndexCache, ParentIdentity, SidecarBinding,
+        },
     };
     use object_store::{
         CopyOptions, GetOptions, GetRange, GetResult, ListResult, MultipartUpload, ObjectMeta,
@@ -1261,7 +1099,7 @@ mod tests {
         .unwrap()
     }
     fn file(rows: &[Row]) -> (FileKey, Vec<u8>) {
-        file_batch(batch(rows), vec!["group".into()])
+        file_batch(batch(rows))
     }
 
     #[tokio::test]
@@ -1302,7 +1140,7 @@ mod tests {
         );
     }
 
-    fn file_batch(batch: RecordBatch, label_columns: Vec<String>) -> (FileKey, Vec<u8>) {
+    fn file_batch(batch: RecordBatch) -> (FileKey, Vec<u8>) {
         let records = batch.num_rows();
         let timestamps = batch
             .column_by_name("_timestamp")
@@ -1321,16 +1159,11 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            batch.schema(),
-            label_columns,
-            parent.metadata(),
-            2,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), batch.schema(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.finish().unwrap();
+        let bytes = writer
+            .finish_for_vortex(parent.metadata(), batch.schema())
+            .unwrap();
         let mut file = FileKey::new(
             0,
             String::new(),
@@ -1836,16 +1669,20 @@ mod tests {
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
         let file = fixture.scan([data.0]).files.remove(0);
         let cache = Mutex::new(IndexCache::default());
-        let flights = Arc::new(loads::LoadRegistry::default());
-        let loaded = load_index_cached(&file, &["group".into()], &cache, &flights, 0)
-            .await
-            .unwrap();
+        let loaded = metrics_index::block_cache::load_index_in(
+            &cache,
+            0,
+            &Sidecar::of(&file).unwrap(),
+            &["group".into()],
+        )
+        .await
+        .unwrap();
         assert!(cache.lock().unwrap().is_empty());
         let reads = fixture.metadata_calls.load(Ordering::SeqCst);
         assert!(reads > 0);
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "group", "x")]);
         assert_eq!(
-            metrics_index::matching_blocks(&loaded.index, &matchers).unwrap(),
+            metrics_index::matching_blocks(&loaded, &matchers).unwrap(),
             vec![0]
         );
         assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), reads);
@@ -1890,10 +1727,7 @@ mod tests {
         fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
         let mut arrays = source.columns().to_vec();
         arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
-        let new = file_batch(
-            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
-            vec!["group".into(), "env".into()],
-        );
+        let new = file_batch(RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap());
         let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
         let prepared = prepare(
@@ -2394,7 +2228,7 @@ mod tests {
             original.columns()[..3].to_vec(),
         )
         .unwrap();
-        let absent = file_batch(absent, vec![]);
+        let absent = file_batch(absent);
         let null = file(&[(1, 30, 3.0, None), (1, 40, 4.0, None)]);
         let empty = file(&[(1, 30, 3.0, Some("")), (1, 40, 4.0, Some(""))]);
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;
@@ -2613,21 +2447,15 @@ mod tests {
         c.account = "c".into();
         cache.trim(weight.total * 2);
         assert!(cache.get(&a).is_none());
-        cache
-            .insert(a.clone(), Arc::clone(&entry), weight.total * 2)
-            .unwrap();
+        cache.insert(a.clone(), Arc::clone(&entry), weight.total * 2);
         let first = cache_snapshot(&registry);
         assert_eq!(first["used_bytes"], weight.total as f64);
-        cache
-            .insert(b.clone(), Arc::clone(&entry), weight.total * 2)
-            .unwrap();
+        cache.insert(b.clone(), Arc::clone(&entry), weight.total * 2);
         assert!(cache.get(&a).is_some());
-        cache
-            .insert(c.clone(), Arc::clone(&entry), weight.total * 2)
-            .unwrap();
+        cache.insert(c.clone(), Arc::clone(&entry), weight.total * 2);
         assert!(cache.get(&b).is_none());
         assert!(cache.get(&a).is_some());
-        cache.insert(a.clone(), entry, weight.total * 2).unwrap();
+        cache.insert(a.clone(), entry, weight.total * 2);
         assert_eq!(
             cache_snapshot(&registry)["used_bytes"],
             (weight.total * 2) as f64
@@ -2650,15 +2478,13 @@ mod tests {
         let (key, entry, weight) = cache_entry();
         cache.trim(0);
         assert!(cache.get(&key).is_none());
-        cache.insert(key.clone(), Arc::clone(&entry), 0).unwrap();
+        cache.insert(key.clone(), Arc::clone(&entry), 0);
         cache.trim(weight.total - 1);
         assert!(cache.get(&key).is_none());
-        cache
-            .insert(key.clone(), Arc::clone(&entry), weight.total - 1)
-            .unwrap();
+        cache.insert(key.clone(), Arc::clone(&entry), weight.total - 1);
         let values = cache_snapshot(&registry);
         assert!(values.values().all(|value| *value == 0.0));
-        cache.insert(key, entry, weight.total).unwrap();
+        cache.insert(key, entry, weight.total);
         cache.trim(0);
         let reset = cache_snapshot(&registry);
         assert_eq!(reset["used_bytes"], 0.0);
@@ -2686,9 +2512,7 @@ mod tests {
                     for iteration in 0..100 {
                         let mut cache = cache.lock().unwrap();
                         cache.trim(weight.total * 3);
-                        cache
-                            .insert(key.clone(), Arc::clone(&entry), weight.total * 3)
-                            .unwrap();
+                        cache.insert(key.clone(), Arc::clone(&entry), weight.total * 3);
                         assert!(cache.get(&key).is_some());
                         if iteration % 5 == 0 {
                             cache.remove(&key);
@@ -2712,7 +2536,7 @@ mod tests {
         let (mut cache, registry) = observed_cache();
         let (key, entry, weight) = cache_entry();
         let weak = Arc::downgrade(&entry.index);
-        cache.insert(key.clone(), entry, weight.total).unwrap();
+        cache.insert(key.clone(), entry, weight.total);
         let cache = Arc::new(Mutex::new(cache));
         let worker_cache = Arc::clone(&cache);
         let (started, entered) = tokio::sync::oneshot::channel();
@@ -2760,9 +2584,7 @@ mod tests {
             .unwrap(),
         });
         let mut cache = IndexCache::default();
-        cache
-            .insert(key.clone(), Arc::clone(&index), usize::MAX)
-            .unwrap();
+        cache.insert(key.clone(), Arc::clone(&index), usize::MAX);
         assert!(cache.bytes >= expected_heap + std::mem::size_of::<CachedIndex>());
         assert!(cache.get(&key).is_some());
         let mut other = key.clone();
@@ -2771,7 +2593,7 @@ mod tests {
         cache.trim(cache.bytes - 1);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
-        cache.insert(key.clone(), index, usize::MAX).unwrap();
+        cache.insert(key.clone(), index, usize::MAX);
         cache.trim(0);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);

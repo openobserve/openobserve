@@ -22,19 +22,16 @@ mod matcher;
 mod pruner;
 mod reader;
 
-pub use layout::{
-    METRICS_INDEX_ROW_COUNT, MetricsFileLayout, metrics_index_enabled, metrics_index_stream,
-};
+pub use layout::{MetricsFileLayout, metrics_index_enabled, metrics_index_stream};
 pub use matcher::{matcher_predicates, matcher_residual_field};
 pub use pruner::{matching_blocks, search};
-pub use reader::fetch_parsed_index;
 
 #[cfg(test)]
 mod tests {
     use std::{ops::Range, sync::Arc};
 
     use arrow::{
-        array::{Array, RecordBatch, StringViewArray, UInt32Array},
+        array::{Array, RecordBatch, StringViewArray},
         datatypes::{DataType, Field, Schema},
     };
     use config::{
@@ -44,12 +41,9 @@ mod tests {
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
-        METRICS_INDEX_ROW_COUNT,
-        pruner::{
-            create_physical_filter, metrics_index_labels, residual_matchers_covered, search,
-            sidecar_covers_labels,
-        },
-        reader::{MetricsIndexData, evaluate_metrics_index, load_metrics_index_file},
+        block::Index,
+        block_cache::{Sidecar, load_index},
+        pruner::{metrics_index_labels, residual_matchers_covered, search, select_rows},
     };
 
     #[tokio::test]
@@ -102,75 +96,43 @@ mod tests {
         assert_eq!(metrics_index_labels(&schema, &only_hash_excluded), None);
     }
 
-    #[test]
-    fn evaluates_and_coalesces_selected_ranges() {
-        // run starts are the prefix sums of the counts: 0, 2, 4, 5
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false),
-            Field::new("path", DataType::Utf8View, false),
-        ]));
-        let batch = RecordBatch::try_new(
-            Arc::clone(&schema),
-            vec![
-                Arc::new(UInt32Array::from(vec![2, 2, 1, 3])),
-                Arc::new(StringViewArray::from(vec!["a", "b", "a", "a"])),
-            ],
+    #[tokio::test]
+    async fn selects_and_coalesces_matching_row_ranges() {
+        // series start at rows 0, 2, 4 and 5
+        let labels = vec!["path".to_string()];
+        let index = sidecar_data(
+            &[("path", vec!["a", "b", "a", "a"])],
+            vec![2, 2, 1, 3],
+            &labels,
         )
-        .unwrap();
-        let data = MetricsIndexData {
-            schema: Arc::clone(&schema),
-            batches: vec![batch],
-            parent_records: 8,
-            row_group_size: None,
+        .await;
+        let select = |matchers: Vec<Matcher>| {
+            select_rows(&index, &labels, &Matchers::new(matchers))
+                .unwrap()
+                .0
         };
-        let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
-        let filter = create_physical_filter(&schema, &matchers).unwrap();
-        assert!(filter.is_some());
-
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
+            select(vec![Matcher::new(MatchOp::Equal, "path", "a")]),
             vec![0..2, 4..8]
         );
-
         // no evaluable matcher: every series is selected
+        assert_eq!(select(vec![]), vec![Range { start: 0, end: 8 }]);
+        // regex matchers go through regexp_like on the dictionary label column
         assert_eq!(
-            evaluate_metrics_index(&data, None, 8).unwrap(),
-            vec![Range { start: 0, end: 8 }]
-        );
-
-        // regex matchers go through regexp_like on the (Utf8View) label column
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::NotRe(regex::Regex::new("a").unwrap()),
-            name: "path".to_string(),
-            value: "a".to_string(),
-        }]);
-        let filter = create_physical_filter(&schema, &matchers).unwrap();
-        assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
+            select(vec![Matcher {
+                op: MatchOp::NotRe(regex::Regex::new("a").unwrap()),
+                name: "path".to_string(),
+                value: "a".to_string(),
+            }]),
             vec![Range { start: 2, end: 4 }]
         );
-    }
-
-    #[tokio::test]
-    async fn rejects_sidecars_that_do_not_tile_the_parent_file() {
-        let mut data = sidecar_data(&[], vec![2, 3], &[]).await;
-        data.parent_records = 4;
-        let too_long = evaluate_metrics_index(&data, None, 4).unwrap_err();
-        assert!(
-            too_long
-                .to_string()
-                .contains("beyond the parent file's 4 records")
-        );
-        data.parent_records = 6;
-        let too_short = evaluate_metrics_index(&data, None, 6).unwrap_err();
-        assert!(too_short.to_string().contains("covers 5 rows"));
     }
 
     async fn sidecar_data(
         labels: &[(&str, Vec<&str>)],
         counts: Vec<u32>,
         requested: &[String],
-    ) -> MetricsIndexData {
+    ) -> Index {
         use arrow::array::{Float64Array, Int64Array, UInt64Array};
         use object_store::{ObjectStore, PutOptions};
         let rows = counts.iter().map(|n| *n as usize).sum::<usize>();
@@ -199,7 +161,7 @@ mod tests {
         }
         let schema = Arc::new(Schema::new(fields));
         let batch = RecordBatch::try_new(schema.clone(), columns).unwrap();
-        let mut writer = crate::block::BlockWriter::new_pending(
+        let mut writer = crate::block::BlockWriter::new(
             Vec::new(),
             schema.clone(),
             crate::block::MAX_BLOCK_ROWS,
@@ -229,23 +191,17 @@ mod tests {
             .await
             .unwrap();
         infra::storage::add_account(&id, Box::new(store)).await;
-        load_metrics_index_file(
-            &account,
-            &data_path,
-            &path,
-            config::FileFormat::Vortex,
-            crate::block::ParentMetadata {
+        let sidecar = Sidecar {
+            account,
+            data_path,
+            path,
+            parent: crate::block::ParentMetadata {
                 rows: rows as u64,
                 compressed_size: 123,
             },
-            0,
-            crate::reader::IndexLabels {
-                requested: Arc::new(requested.to_vec()),
-                flat: Arc::new(Vec::new()),
-            },
-        )
-        .await
-        .unwrap()
+            size: 0,
+        };
+        load_index(&sidecar, requested).await.unwrap()
     }
 
     #[tokio::test]
@@ -274,15 +230,13 @@ mod tests {
             &labels,
         )
         .await;
-        for (name, data, expected_rows, expected) in [
-            ("f1", file1, 9, vec![Range { start: 0, end: 3 }]),
-            ("f2", file2, 8, vec![Range { start: 7, end: 8 }]),
+        for (name, index, expected) in [
+            ("f1", file1, vec![Range { start: 0, end: 3 }]),
+            ("f2", file2, vec![Range { start: 7, end: 8 }]),
         ] {
-            assert_eq!(data.schema.fields().len(), 3, "{name}");
-            let filter = create_physical_filter(&data.schema, &matchers).unwrap();
             assert_eq!(
-                evaluate_metrics_index(&data, filter.as_deref(), expected_rows).unwrap(),
-                expected,
+                select_rows(&index, &labels, &matchers).unwrap(),
+                (expected, true),
                 "{name}"
             );
         }
@@ -325,15 +279,15 @@ mod tests {
             &matcher_labels
         ));
 
-        let data = sidecar_data(
+        let index = sidecar_data(
             &[("path", vec!["a"]), ("instance", vec!["i1"])],
             vec![3],
             &matcher_labels,
         )
         .await;
-        assert!(sidecar_covers_labels(&data.schema, &matcher_labels));
-        let data = sidecar_data(&[("path", vec!["a"])], vec![3], &matcher_labels).await;
-        assert!(!sidecar_covers_labels(&data.schema, &matcher_labels));
+        assert!(select_rows(&index, &matcher_labels, &covered).unwrap().1);
+        let index = sidecar_data(&[("path", vec!["a"])], vec![3], &matcher_labels).await;
+        assert!(!select_rows(&index, &matcher_labels, &covered).unwrap().1);
     }
 
     #[tokio::test]
@@ -345,23 +299,17 @@ mod tests {
         ]);
 
         // sidecar without `instance`: only the `path` matcher is evaluated
-        let data = sidecar_data(&[("path", vec!["a", "b", "a"])], vec![2, 4, 1], &labels).await;
-        assert_eq!(data.schema.fields().len(), 2);
-        let filter = create_physical_filter(&data.schema, &matchers).unwrap();
-        assert!(filter.is_some());
+        let index = sidecar_data(&[("path", vec!["a", "b", "a"])], vec![2, 4, 1], &labels).await;
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref(), 7).unwrap(),
-            vec![0..2, 6..7]
+            select_rows(&index, &labels, &matchers).unwrap(),
+            (vec![0..2, 6..7], false)
         );
 
         // sidecar with none of the matched labels: the whole file is selected
-        let data = sidecar_data(&[("job", vec!["j", "j"])], vec![4, 2], &labels).await;
-        assert_eq!(data.schema.fields().len(), 1);
-        let filter = create_physical_filter(&data.schema, &matchers).unwrap();
-        assert!(filter.is_none());
+        let index = sidecar_data(&[("job", vec!["j", "j"])], vec![4, 2], &labels).await;
         assert_eq!(
-            evaluate_metrics_index(&data, filter.as_deref(), 6).unwrap(),
-            vec![Range { start: 0, end: 6 }]
+            select_rows(&index, &labels, &matchers).unwrap(),
+            (vec![Range { start: 0, end: 6 }], false)
         );
     }
 }

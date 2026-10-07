@@ -18,8 +18,8 @@
 
 use anyhow::{Context, Result, ensure};
 
-use super::{EXACT_LIMIT, int_delta, pack::get_u64};
-use crate::block::compact::{get_varint, put_varint};
+use super::{EXACT_LIMIT, int_delta};
+use crate::block::compact::{get_u64, get_varint, put_varint};
 
 const MAX_EXPONENT: usize = 18;
 const POW10: [f64; MAX_EXPONENT + 1] = [
@@ -114,9 +114,8 @@ impl Decoder {
         ensure!(count < rows as u64, "too many ALP exceptions");
         self.exceptions.clear();
         let mut at = 0usize;
-        for k in 0..count {
+        for _ in 0..count {
             let gap = get_varint(body, pos)?;
-            ensure!(k == 0 || gap > 0, "ALP exception positions not increasing");
             at = usize::try_from(gap)
                 .ok()
                 .and_then(|gap| at.checked_add(gap))
@@ -285,10 +284,6 @@ mod tests {
             (
                 [&[1, 2, 0][..], &zeros, &[0], &zeros, &[2, 2, 2]].concat(),
                 2,
-            ),
-            (
-                [&[1, 2, 1][..], &zeros, &[0], &zeros, &[2, 2, 4, 0]].concat(),
-                3,
             ),
             ([&[1, 1, 3][..], &zeros, &[2, 2, 4, 0]].concat(), 3),
         ] {

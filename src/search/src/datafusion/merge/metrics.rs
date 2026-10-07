@@ -663,7 +663,7 @@ mod tests {
         let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
         let schema = builder.schema().clone();
         let metadata = builder.metadata().as_ref().clone();
-        let mut writer = metrics_index::block::BlockWriter::new_pending(
+        let mut writer = metrics_index::block::BlockWriter::new(
             Vec::new(),
             schema.clone(),
             metrics_index::block::MAX_BLOCK_ROWS,
@@ -799,9 +799,9 @@ mod tests {
             assert_eq!(encoded, reference, "file {position}");
             let index =
                 metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
-            assert_eq!(index.parent.rows, meta.records as u64);
+            assert_eq!(index.header.parent.rows, meta.records as u64);
             assert_eq!(
-                index.row_group_size,
+                index.header.row_group_size,
                 Some(meta.records.min(PARQUET_MAX_ROW_GROUP_SIZE as i64) as u32)
             );
             let mut decoded = Vec::new();
@@ -1117,8 +1117,8 @@ mod tests {
             compressed_size: data.len() as u64,
         };
         let index = metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
-        assert_eq!(index.row_group_size, None);
-        assert_eq!(index.source_schema.as_ref(), schema.as_ref());
+        assert_eq!(index.header.row_group_size, None);
+        assert_eq!(index.header.source_schema.as_ref(), schema.as_ref());
         let mut native_rows = Vec::new();
         for block in &index.blocks {
             let range = block.block_range();
@@ -1202,7 +1202,7 @@ mod tests {
             };
             let index =
                 metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
-            assert_eq!(index.row_group_size, None);
+            assert_eq!(index.header.row_group_size, None);
             let mut native = Vec::new();
             for block in &index.blocks {
                 let range = block.block_range();
