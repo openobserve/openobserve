@@ -565,21 +565,21 @@ async fn dispatch_per_group(
 /// exactly what allows the next evaluation through. Best-effort: failing to
 /// confirm costs at most one duplicate notification, while failing the
 /// evaluation over it would cost the alert.
-async fn confirm_dedup_reservations(fingerprints: &[String], delivered: bool) {
-    if !delivered || fingerprints.is_empty() {
+async fn confirm_dedup_reservations(org_id: &str, fingerprints: &[String]) {
+    if fingerprints.is_empty() {
         return;
     }
     #[cfg(feature = "enterprise")]
     {
         let db = infra::db::get_orm_client_rw().await;
         if let Err(e) =
-            crate::alerts::deduplication::confirm_notification_sent(db, fingerprints).await
+            crate::alerts::deduplication::confirm_notification_sent(db, org_id, fingerprints).await
         {
             log::warn!("[SCHEDULER] could not confirm dedup reservations: {e}");
         }
     }
     #[cfg(not(feature = "enterprise"))]
-    let _ = fingerprints;
+    let _ = (org_id, fingerprints);
 }
 
 pub async fn handle_triggers(
@@ -3349,7 +3349,7 @@ async fn handle_alert_triggers(
                 })
                 .map(|(_, fingerprint)| fingerprint.clone())
                 .collect();
-            confirm_dedup_reservations(&confirmable, !confirmable.is_empty()).await;
+            confirm_dedup_reservations(&alert.org_id, &confirmable).await;
             record_delivery(&mut trigger_data);
             episode_delivered = true;
             trigger_data.period_end_time = if should_store_last_end_time {
@@ -3398,7 +3398,7 @@ async fn handle_alert_triggers(
                         .iter()
                         .map(|(_, fingerprint)| fingerprint.clone())
                         .collect();
-                    confirm_dedup_reservations(&fingerprints, true).await;
+                    confirm_dedup_reservations(&alert.org_id, &fingerprints).await;
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {

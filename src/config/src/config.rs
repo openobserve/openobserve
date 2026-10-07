@@ -94,7 +94,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 95: add band settings to anomaly_detection_config.
 // 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
 // 97: create query_history.
-pub const DB_SCHEMA_VERSION: u64 = 97;
+// 98: key alert_dedup_state by (org_id, fingerprint).
+pub const DB_SCHEMA_VERSION: u64 = 98;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
