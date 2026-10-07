@@ -192,9 +192,9 @@ export default defineComponent({
       if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
-      if (isEnterpriseOrCloud) {
-        tabs.push({ id: "overview", label: t("home.tabOverview") });
-      }
+      // Always reachable — Incidents/Services inside render locked (not
+      // hidden) in a build that doesn't unlock them (see OverviewTab.vue).
+      tabs.push({ id: "overview", label: t("home.tabOverview") });
       tabs.push({ id: "usage", label: t("home.tabUsage") });
       // Append the org home dashboard as a single tab (if set).
       if (homeDashboard.value) {
