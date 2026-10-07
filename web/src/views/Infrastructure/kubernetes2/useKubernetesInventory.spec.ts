@@ -15,6 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
+import * as objects from "./kubernetesObjects";
 import searchService from "@/services/search";
 import { queryClient } from "@/composables/query/queryClient";
 import * as queries from "@/services/kubernetes.queries";
@@ -27,6 +28,10 @@ const getStream = vi.fn();
 
 vi.mock("@/services/search", () => ({ default: { metrics_query: vi.fn(), search: vi.fn() } }));
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams, getStream }) }));
+vi.mock("./kubernetesObjects", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, parseObjects: vi.fn(actual.parseObjects) };
+});
 
 const metricsQuery = vi.mocked(searchService.metrics_query);
 const search = vi.mocked(searchService.search);
@@ -747,6 +752,36 @@ describe("useKubernetesInventory", () => {
       await inv.load();
       expect(inv.detailEvents.value).toBeNull();
       expect(inv.detailEventsFailed.value).toBe(true);
+    });
+
+    it("parses each object result once, however many computeds read it", async () => {
+      fixture = { ...CL(), ...pods };
+      sqlHits = (sql) =>
+        sql.endsWith("LIMIT 1") || sql.includes("k8s_resource_name = 'pods'")
+          ? [objectFor("u1")]
+          : [];
+      const { inv } = await setup({ view: "pods", details: "pod/prod/a/p" });
+      vi.mocked(objects.parseObjects).mockClear();
+      await inv.load();
+      void inv.inventory.value;
+      void inv.banners.value;
+      void inv.detailObserved.value;
+      expect(vi.mocked(objects.parseObjects)).toHaveBeenCalledTimes(2);
+    });
+
+    it("keeps the inventory built for the drawer object when its events arrive", async () => {
+      fixture = { ...CL(), ...pods };
+      let beforeEvents: unknown = null;
+      let inv: ReturnType<typeof useKubernetesInventory>;
+      sqlHits = (sql) => {
+        if (sql.endsWith("LIMIT 100")) beforeEvents = inv.inventory.value;
+        return sql.endsWith("LIMIT 1") ? [objectFor("u1")] : [];
+      };
+      ({ inv } = await setup({ view: "pods", details: "pod/prod/a/p" }));
+      await inv.load();
+      expect(inv.detailObserved.value).toBe(true);
+      expect(beforeEvents).not.toBeNull();
+      expect(inv.inventory.value).toBe(beforeEvents);
     });
 
     it("treats a latest DELETED record as not observed", async () => {

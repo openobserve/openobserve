@@ -69,6 +69,7 @@ import {
   objectDetailSql,
   objectListSql,
   parseObjects,
+  type ObjectRecord,
 } from "./kubernetesObjects";
 import { encodeDetails, type DetailsRef, type K8sUrlState } from "./kubernetesUrlState";
 
@@ -132,6 +133,8 @@ export function useKubernetesInventory(
   const fallbackClusters = ref<string[]>([]);
   const results = shallowRef<QueryResults>(new Map());
   const sql = shallowRef<Map<string, any[]>>(new Map());
+  // Kept apart from sql so the drawer events landing does not rebuild the inventory.
+  const detailEventHits = shallowRef<any[] | null>(null);
   const failed = shallowRef<Map<string, number | null>>(new Map());
   const pageError = ref<string | null>(null);
   const loading = ref(false);
@@ -253,6 +256,7 @@ export function useKubernetesInventory(
     fallbackClusters.value = [];
     results.value = new Map();
     sql.value = new Map();
+    detailEventHits.value = null;
     failed.value = new Map();
     pageError.value = null;
     loading.value = false;
@@ -489,7 +493,8 @@ export function useKubernetesInventory(
         detailRequests(s, t, cluster, enriched, "events"),
       );
       if (gen !== generation) return;
-      mergeSql(events);
+      detailEventHits.value = events.sql.get("DE") ?? null;
+      if (events.failed.size) failed.value = new Map([...failed.value, ...events.failed]);
     }
     detailLoading.value = false;
   };
@@ -498,6 +503,7 @@ export function useKubernetesInventory(
     pageError.value = error;
     results.value = new Map();
     sql.value = new Map();
+    detailEventHits.value = null;
     failed.value = new Map();
     loading.value = false;
     detailLoading.value = false;
@@ -507,6 +513,7 @@ export function useKubernetesInventory(
     pageError.value = null;
     results.value = main.results;
     sql.value = main.sql;
+    detailEventHits.value = null;
     failed.value = main.failed;
     loadedFor.value = {
       cluster,
@@ -542,16 +549,28 @@ export function useKubernetesInventory(
     return { rows: [...seen.values()], truncated };
   });
 
+  // Parsed once per hits array: the inventory, banners and drawer all read them, across drawer merges.
+  const parsed = new WeakMap<any[], ObjectRecord[]>();
+  const objectRecords = computed(() => {
+    const out = new Map<string, ObjectRecord[]>();
+    for (const [name, hits] of sql.value) {
+      if (!name.startsWith("O:") && name !== "O1obj") continue;
+      let records = parsed.get(hits);
+      if (!records) parsed.set(hits, (records = parseObjects(hits)));
+      out.set(name, records);
+    }
+    return out;
+  });
+
   const inventory = computed(() => {
     const inv = buildInventory(results.value);
     const cluster = loadedFor.value?.cluster ?? "";
-    for (const [name, hits] of sql.value) {
-      if (name.startsWith("O:"))
-        joinObjects(inv, name.slice(2) as DetailKind, cluster, parseObjects(hits));
+    for (const [name, records] of objectRecords.value) {
+      if (name.startsWith("O:")) joinObjects(inv, name.slice(2) as DetailKind, cluster, records);
     }
     const detailKind = loadedFor.value?.details?.kind;
-    const one = sql.value.get("O1obj");
-    if (detailKind && one) joinObjects(inv, detailKind, cluster, parseObjects(one));
+    const one = objectRecords.value.get("O1obj");
+    if (detailKind && one) joinObjects(inv, detailKind, cluster, one);
     attachWarningEvents(inv, warnings.value.rows);
     return inv;
   });
@@ -568,7 +587,7 @@ export function useKubernetesInventory(
   });
 
   const detailEvents = computed<EventRow[] | null>(() => {
-    const hits = sql.value.get("DE");
+    const hits = detailEventHits.value;
     return hits && detailCurrent.value ? parseEvents(hits) : null;
   });
 
@@ -582,7 +601,7 @@ export function useKubernetesInventory(
   const detailEventsFailed = computed(() => detailCurrent.value && failed.value.has("DE"));
 
   const detailObserved = computed(
-    () => detailCurrent.value && parseObjects(sql.value.get("O1obj") ?? []).some((r) => !r.deleted),
+    () => detailCurrent.value && (objectRecords.value.get("O1obj") ?? []).some((r) => !r.deleted),
   );
 
   const namespaceOptions = computed(() => {
@@ -637,8 +656,8 @@ export function useKubernetesInventory(
       });
     }
     const kind = LIST_VIEW_KIND[s.view];
-    const objects = kind ? sql.value.get(`O:${kind}`) : undefined;
-    if (objects && parseObjects(objects).every((r) => r.deleted)) {
+    const objects = kind ? objectRecords.value.get(`O:${kind}`) : undefined;
+    if (objects && objects.every((r) => r.deleted)) {
       out.push({
         id: "objects-not-observed",
         key: "infra.k8s2.objectsNotObserved",
