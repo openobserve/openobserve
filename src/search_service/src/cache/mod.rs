@@ -20,7 +20,7 @@ use common::utils::http::get_work_group;
 use config::meta::projections::ProjectionColumnMapping;
 #[cfg(any(feature = "vectorscan", test))]
 use config::meta::self_reporting::redaction::{
-    DataWindow, EvidenceScope, FailPosture, RedactionEvidence,
+    DataWindow, EvidenceScope, FailPosture, RedactionEvidence, is_self_reporting_stream,
 };
 use config::{
     TIMESTAMP_COL_NAME,
@@ -72,6 +72,58 @@ pub mod result_utils;
 
 // Define cache version
 const CACHE_VERSION: &str = "v3";
+
+/// The hits a search was about to return when redaction could not run on them.
+#[cfg(any(feature = "vectorscan", test))]
+struct SkippedHits<'a> {
+    org_id: &'a str,
+    stream_type: StreamType,
+    all_streams: &'a str,
+    hits: &'a [json::Value],
+}
+
+#[cfg(any(feature = "vectorscan", test))]
+impl<'a> SkippedHits<'a> {
+    fn new(
+        org_id: &'a str,
+        stream_type: StreamType,
+        all_streams: &'a str,
+        hits: &'a [json::Value],
+    ) -> Self {
+        Self {
+            org_id,
+            stream_type,
+            all_streams,
+            hits,
+        }
+    }
+
+    /// One row per stream the query read, since a join exposes the fields of each.
+    fn evidence(&self, posture: FailPosture, reason: &str) -> Vec<RedactionEvidence> {
+        let data = DataWindow::from_timestamps(
+            self.hits
+                .iter()
+                .filter_map(|hit| hit.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)),
+        );
+        self.all_streams
+            .split(',')
+            .map(str::trim)
+            .filter(|stream| {
+                !stream.is_empty()
+                    && !is_self_reporting_stream(self.org_id, stream, self.stream_type)
+            })
+            .map(|stream| {
+                RedactionEvidence::search_scan_unavailable(
+                    &EvidenceScope::new(self.org_id, stream, self.stream_type),
+                    posture,
+                    self.hits.len() as u64,
+                    data,
+                    reason,
+                )
+            })
+            .collect()
+    }
+}
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
@@ -1257,7 +1309,8 @@ pub async fn apply_regex_to_response(
         },
         &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
         "a configured pattern failed to build",
-        usage_reporting::redaction_evidence::publish_search_scan_unavailable,
+        // Fail-open still redacts with the last block that built, so no hit leaves unredacted.
+        |_| {},
     )?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
@@ -1316,55 +1369,6 @@ pub async fn apply_regex_to_response(
 #[cfg(any(feature = "vectorscan", test))]
 fn any_stream(all_streams: &str, pred: impl Fn(&str) -> bool) -> bool {
     all_streams.split(',').any(|stream| pred(stream.trim()))
-}
-
-/// The hits a search was about to return when redaction could not run on them.
-#[cfg(any(feature = "vectorscan", test))]
-struct SkippedHits<'a> {
-    org_id: &'a str,
-    stream_type: StreamType,
-    all_streams: &'a str,
-    hits: &'a [json::Value],
-}
-
-#[cfg(any(feature = "vectorscan", test))]
-impl<'a> SkippedHits<'a> {
-    fn new(
-        org_id: &'a str,
-        stream_type: StreamType,
-        all_streams: &'a str,
-        hits: &'a [json::Value],
-    ) -> Self {
-        Self {
-            org_id,
-            stream_type,
-            all_streams,
-            hits,
-        }
-    }
-
-    /// One row per stream the query read, since a join exposes the fields of each.
-    fn evidence(&self, posture: FailPosture, reason: &str) -> Vec<RedactionEvidence> {
-        let data = DataWindow::from_timestamps(
-            self.hits
-                .iter()
-                .filter_map(|hit| hit.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)),
-        );
-        self.all_streams
-            .split(',')
-            .map(str::trim)
-            .filter(|stream| !stream.is_empty())
-            .map(|stream| {
-                RedactionEvidence::search_scan_unavailable(
-                    &EvidenceScope::new(self.org_id, stream, self.stream_type),
-                    posture,
-                    self.hits.len() as u64,
-                    data,
-                    reason,
-                )
-            })
-            .collect()
-    }
 }
 
 /// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
@@ -1485,6 +1489,17 @@ mod tests {
             rows.iter()
                 .all(|r| r.fail_posture.as_deref() == Some("closed"))
         );
+    }
+
+    #[test]
+    fn test_search_evidence_skips_self_reporting_streams() {
+        let skipped = SkippedHits::new("org_a", StreamType::Logs, "app_logs, usage", &[]);
+        let streams: Vec<String> = skipped
+            .evidence(FailPosture::Open, "pattern manager unavailable")
+            .into_iter()
+            .map(|row| row.stream_name)
+            .collect();
+        assert_eq!(streams, ["app_logs"]);
     }
 
     #[test]
