@@ -770,6 +770,23 @@ describe("AnomalyDetectionConfig", () => {
       expect((config as any).band_width).toBeNull();
     });
 
+    // The reverse switch (band -> budget) already worked; this pins the direction
+    // that silently kept the stale budget and blanked the band width on reopen.
+    it("switching sensitivity_mode to band clears the stored budget", async () => {
+      const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("sensitivity_mode", "band");
+      form.setFieldValue("band_width", 5);
+      await flushPromises();
+      await nextTick();
+
+      expect((config as any).band_width).toBe(5);
+      expect(config.alert_budget_per_day).toBeUndefined();
+    });
+
     it("an invalid count blocks submit and does not clobber the stored budget", async () => {
       const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
       wrapper = w;

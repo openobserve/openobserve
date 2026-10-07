@@ -13,6 +13,10 @@
 //   K9 — the editor Save button has a tooltip overlay that intercepts pointer events; we click it
 //        via evaluate() to bypass the interception.
 //   K10 — the workflows list GET is slow (~16-20s); readiness/list helpers use generous timeouts.
+//   K11 — node-drawer dropdowns (column/operator selects) can take longer than 15s to open under
+//         CI parallel load, even though their options (e.g. condition columns) are static, synchronous
+//         data — it's render/animation contention from several canvases+drawers opening at once, not
+//         a slow fetch. Seen timing out on COND-02's column pick (meta_alert_name) on retry too.
 
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -20,7 +24,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 const LIST_TIMEOUT_MS = 45000;   // K10: list load is slow
-const DRAWER_TIMEOUT_MS = 15000;
+const DRAWER_TIMEOUT_MS = 25000; // K11: bumped from 15s — drawer dropdowns under CI parallel load
 
 // Availability is a property of the build, not of a test — probe it once per worker.
 let workflowsEnabled;

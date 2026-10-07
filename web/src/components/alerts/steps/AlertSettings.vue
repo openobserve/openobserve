@@ -296,8 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="mb-4! flex items-start max-md:gap-3">
+        <!-- Creates Incident toggle — all alert types, enterprise/cloud with Incidents on -->
+        <div v-if="incidentsEnabled" class="mb-4! flex items-start max-md:gap-3">
           <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
@@ -384,6 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, inject, ref, type PropType } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -465,6 +466,14 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+
+    // Same gate as the Incidents menu: enterprise/cloud build AND the backend
+    // /config flag. `=== true` keeps it hidden while /config is still loading.
+    const incidentsEnabled = computed(
+      () =>
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        store.state.zoConfig?.incidents_enabled === true,
+    );
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
@@ -696,6 +705,7 @@ export default defineComponent({
       hasChatRecovery,
       t,
       store,
+      incidentsEnabled,
       handlePeriodChange,
       // Field refs for the parent focus manager
       periodFieldRef,

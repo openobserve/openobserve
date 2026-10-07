@@ -67,7 +67,11 @@ struct MetadataLoad<'a> {
 }
 
 impl MetadataLoad<'_> {
-    async fn run(self, mut seed: Option<Arc<CachedIndex>>) -> Result<Arc<LoadedFile>> {
+    async fn run(
+        self,
+        mut seed: Option<Arc<CachedIndex>>,
+        mut complete: bool,
+    ) -> Result<Arc<LoadedFile>> {
         let Self {
             file,
             labels,
@@ -78,24 +82,8 @@ impl MetadataLoad<'_> {
             flights,
         } = self;
         loop {
-            if seed
-                .as_ref()
-                .map(|entry| entry.index.missing_labels(labels))
-                .transpose()?
-                .is_some_and(|missing| missing.is_empty())
-            {
-                let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
-                let entry = match loaded {
-                    Ok(value) => value,
-                    Err(error) => {
-                        cache
-                            .lock()
-                            .unwrap_or_else(|e| e.into_inner())
-                            .remove_bound(&key, binding.as_ref());
-                        return Err(error);
-                    }
-                };
+            if complete {
+                let entry = seed.unwrap();
                 return Ok(Arc::new(LoadedFile {
                     account: file.account.clone(),
                     sidecar,
@@ -105,6 +93,7 @@ impl MetadataLoad<'_> {
             match flights.claim(key.clone()) {
                 loads::Claim::Waiter(flight) => {
                     if let Some(loaded) = flight.wait().await? {
+                        complete = loaded.index.missing_labels(labels)?.is_empty();
                         seed = Some(loaded);
                     }
                 }
@@ -747,11 +736,12 @@ async fn load_index_cached(
         account: file.account.clone(),
         parent: parent.clone(),
     };
-    let cached = {
+    let lookup = {
         let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
         cache.trim(limit);
-        cache.get(&key)
+        cache.lookup(&key)
     };
+    let (cached, complete) = lookup.classify(labels)?;
     MetadataLoad {
         file,
         labels,
@@ -761,7 +751,7 @@ async fn load_index_cached(
         cache,
         flights,
     }
-    .run(cached)
+    .run(cached, complete)
     .await
 }
 
@@ -772,14 +762,6 @@ async fn load_entry(
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty())
-    {
-        return Ok(cached.unwrap());
-    }
     Ok(metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
@@ -1878,12 +1860,18 @@ mod tests {
         ]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
         let file = fixture.scan([data.0]).files.remove(0);
-        let cache = Mutex::new(IndexCache::default());
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
         let flights = Arc::new(loads::LoadRegistry::default());
         let loaded = load_index_cached(&file, &["group".into()], &cache, &flights, 0)
             .await
             .unwrap();
         assert!(cache.lock().unwrap().is_empty());
+        assert!(
+            cache_snapshot(&registry)
+                .values()
+                .all(|value| *value == 0.0)
+        );
         let reads = fixture.metadata_calls.load(Ordering::SeqCst);
         assert!(reads > 0);
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "group", "x")]);
@@ -2648,8 +2636,204 @@ mod tests {
                 assert!(values.insert(name, value).is_none());
             }
         }
-        assert_eq!(values.len(), 3);
+        assert_eq!(values.len(), 5);
         values
+    }
+
+    #[test]
+    fn metadata_cache_lookup_classifies_full_partial_and_missing_keys() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        cache.trim(weight.total);
+        let (cached, complete) = cache.lookup(&key).classify(&["group".into()]).unwrap();
+        assert!(cached.is_none());
+        assert!(!complete);
+        let partial = Arc::new(CachedIndex {
+            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            binding: entry.binding.clone(),
+        });
+        cache.insert(key.clone(), partial, weight.total).unwrap();
+        let (cached, complete) = cache.lookup(&key).classify(&["group".into()]).unwrap();
+        assert!(cached.is_some());
+        assert!(!complete);
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        let (cached, complete) = cache
+            .lookup(&key)
+            .classify(&["group".into(), "absent_from_source".into()])
+            .unwrap();
+        assert!(cached.is_some());
+        assert!(complete);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 2.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+        assert!(cache.lookup(&key).classify(&["value".into()]).is_err());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 3.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[test]
+    fn metadata_cache_lookup_classifies_after_releasing_cache_lock() {
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
+        let (key, entry, weight) = cache_entry();
+        let partial = Arc::new(CachedIndex {
+            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            binding: entry.binding.clone(),
+        });
+        let lookup = {
+            let mut cache = cache.lock().unwrap();
+            cache.insert(key.clone(), partial, weight.total).unwrap();
+            cache.lookup(&key)
+        };
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        cache.try_lock().unwrap().trim(0);
+        let (cached, complete) = lookup.classify(&["group".into()]).unwrap();
+        assert!(cached.is_some());
+        assert!(!complete);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 0.0);
+        assert_eq!(values["used_bytes"], 0.0);
+    }
+
+    #[test]
+    fn metadata_cache_get_preserves_key_lookup_compatibility() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        assert!(cache.get(&key).is_none());
+        assert_eq!(cache_snapshot(&registry)["misses_total"], 0.0);
+        cache.trim(weight.total);
+        assert!(cache.get(&key).is_none());
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        assert!(cache.get(&key).is_some());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[test]
+    fn metadata_cache_peek_and_merge_do_not_count_lookups() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        assert!(cache.peek(&key).is_none());
+        cache
+            .insert(key.clone(), Arc::clone(&entry), weight.total)
+            .unwrap();
+        assert!(cache.peek(&key).is_some());
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        assert!(cache.peek(&key).is_some());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 0.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["misses_total"], 0.0);
+    }
+
+    #[tokio::test]
+    async fn metadata_cache_lookup_counts_incremental_label_load_once() {
+        let data = file(&[(1, 10, 1.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let file = fixture.scan([data.0]).files.remove(0);
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
+        let flights = Arc::new(loads::LoadRegistry::default());
+        load_index_cached(&file, &[], &cache, &flights, usize::MAX)
+            .await
+            .unwrap();
+        let directory_reads = fixture.metadata_calls.load(Ordering::SeqCst);
+        let labels = ["group".into()];
+        let loaded = load_index_cached(&file, &labels, &cache, &flights, usize::MAX)
+            .await
+            .unwrap();
+        assert!(loaded.index.labels.column_by_name("group").is_some());
+        let label_reads = fixture.metadata_calls.load(Ordering::SeqCst);
+        assert!(label_reads > directory_reads);
+        load_index_cached(&file, &labels, &cache, &flights, usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), label_reads);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 2.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn metadata_cache_singleflight_waiter_keeps_initial_miss() {
+        let data = file(&[(1, 10, 1.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let file = fixture.scan([data.0]).files.remove(0);
+        let key = CacheKey {
+            account: file.account.clone(),
+            parent: ParentIdentity {
+                object_key: file.key.clone(),
+                rows: file.meta.records as u64,
+                compressed_size: file.meta.compressed_size as u64,
+            },
+        };
+        let entry = Arc::new(CachedIndex {
+            index: Arc::new(
+                metrics_index::block::decode_file(
+                    &data.1,
+                    &key.parent.metadata(),
+                    &["group".into()],
+                )
+                .unwrap(),
+            ),
+            binding: SidecarBinding::parse(
+                data.1.len() as u64,
+                &data.1[data.1.len() - metrics_index::block::MIDX_TRAILER_LEN..],
+            )
+            .unwrap(),
+        });
+        let (cache, registry) = observed_cache();
+        let cache = Arc::new(Mutex::new(cache));
+        let flights = Arc::new(loads::LoadRegistry::default());
+        let loads::Claim::Owner(owner) = flights.claim(key) else {
+            panic!("first claim must own the load");
+        };
+        let worker_cache = Arc::clone(&cache);
+        let worker_flights = Arc::clone(&flights);
+        let waiting = tokio::spawn(async move {
+            load_index_cached(
+                &file,
+                &["group".into()],
+                &worker_cache,
+                &worker_flights,
+                usize::MAX,
+            )
+            .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while cache_snapshot(&registry)["misses_total"] == 0.0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(!waiting.is_finished());
+        owner.complete(&Ok(entry));
+        assert!(
+            waiting
+                .await
+                .unwrap()
+                .unwrap()
+                .index
+                .labels
+                .column_by_name("group")
+                .is_some()
+        );
+        assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), 0);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 0.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["misses_total"], 1.0);
     }
 
     #[test]
@@ -2706,7 +2890,11 @@ mod tests {
             .insert(key.clone(), Arc::clone(&entry), weight.total - 1)
             .unwrap();
         let values = cache_snapshot(&registry);
-        assert!(values.values().all(|value| *value == 0.0));
+        assert_eq!(values["misses_total"], 1.0);
+        assert_eq!(values["hits_total"], 0.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["used_bytes"], 0.0);
+        assert_eq!(values["evictions_total"], 0.0);
         cache.insert(key, entry, weight.total).unwrap();
         cache.trim(0);
         let reset = cache_snapshot(&registry);

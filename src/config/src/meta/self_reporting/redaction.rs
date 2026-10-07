@@ -37,6 +37,9 @@ pub const REDACTION_EVIDENCE_STREAM: &str = "_redaction_evidence";
 // V1 counts ingestion only; search counts would measure query access, not data.
 pub const INGESTION_APPLY_TIME: &str = "ingestion";
 
+// Marks rows about hits a search served, so they never sum into ingestion scan counts.
+pub const SEARCH_APPLY_TIME: &str = "search";
+
 // Per-(node, org) run of sequence numbers; a hole in it is how an auditor detects loss.
 static SEQUENCE: Lazy<SequenceTracker> = Lazy::new(SequenceTracker::default);
 
@@ -312,6 +315,20 @@ impl RedactionEvidence {
         row.records_scanned = records_scanned;
         row.data_min_ts = data.min_ts;
         row.data_max_ts = data.max_ts;
+        row
+    }
+
+    /// Hits a search served, or refused, because redaction could not run on them.
+    pub fn search_scan_unavailable(
+        scope: &EvidenceScope,
+        posture: FailPosture,
+        records_scanned: u64,
+        data: DataWindow,
+        reason: &str,
+    ) -> Self {
+        let mut row = Self::scan_unavailable(scope, posture, records_scanned, data);
+        row.apply_time = SEARCH_APPLY_TIME.to_string();
+        row.reason = Some(reason.to_string());
         row
     }
 
