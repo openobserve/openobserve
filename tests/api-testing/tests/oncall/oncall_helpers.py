@@ -5,12 +5,31 @@ payloads that page a team, the fixture seeding those tests need (teams, rosters,
 rotations, escalation policies, ownership rules, seeded log data, a destination
 that always delivers and one that never does), and the bounded polling that
 turns "an alert fires about a minute from now" into a value a test can assert
-on. It deliberately contains NO assertions — those live in the test files.
+on. It deliberately encodes NO test verdicts — those live in the test files.
+Where a helper raises `AssertionError`, it is fixture plumbing failing loudly
+(a seed that did not take, a gate that cannot answer), never a judgement about
+the behaviour under test.
 
 **Enterprise-gated.** Every route here exists only when `O2_ONCALL_ENABLED` is
 on in an enterprise build; the router does not even register them otherwise, so
-an OSS instance answers 404 rather than 403. `oncall_enabled()` reads the
-server's own `/config` flag so the specs skip cleanly instead of failing.
+an OSS instance answers 404 rather than 403. `oncall_enabled()` probes
+`GET {org}/oncall/teams` and skips on a 404. It does NOT read a `/config` flag:
+a current enterprise build does not publish `config.oncall_enabled` at all, and
+gating on it skipped all 104 tests against a server that was serving on-call
+perfectly well. Any status other than 200/403/404 raises rather than skips.
+
+Environment the suite reads:
+
+  * `ONCALL_TEST_ORG` (falling back to `TEST_ORG_ID`, then `default`) — which
+    org the on-call fixtures are built in;
+  * `MAILPIT_BASE_URL` (default `http://127.0.0.1:8025`) — where to read the
+    paging mail. An acknowledgement token is minted per person and exists ONLY
+    inside the delivered mail: no API exposes it. So without a reachable
+    mailbox the ack-token cases cannot run, and they SKIP with that reason
+    rather than passing emptily. Nothing starts Mailpit in CI today, so those
+    cases are a known, visible coverage gap rather than an enforced one; run
+    them locally with `mailpit` on its default ports and the server pointed at
+    it (`ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025`).
 
 Org addressing: on a multi-tenant deployment an org is addressed by its
 **identifier** (a ksuid), not by its display name. `resolve_org` maps whichever
@@ -20,8 +39,10 @@ single-node build both are `default` and it is a no-op.
 Timing: a page exists only after the alert scheduler has evaluated the rule, so
 every wait here is a bounded poll (`support.wait.wait_until`), never a sleep.
 The suite's baseline env already runs a fast scheduler
-(`ZO_ALERT_SCHEDULE_INTERVAL=3`); `fast_eval` asks for the fastest per-alert
-cadence on top of it, which puts a firing ~15-60s out.
+(`ZO_ALERT_SCHEDULE_INTERVAL=3`); on top of that `paging_alert` bakes in
+`frequency: 1`, the fastest per-alert cadence, which puts a firing ~15-60s out.
+(`fast_eval` is the equivalent helper in `multialert_helpers.py`; it is not
+re-exported here.)
 
 Two facts about the wire worth keeping in front of you, because both have
 already cost somebody an afternoon:

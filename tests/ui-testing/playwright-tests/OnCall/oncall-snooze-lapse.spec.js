@@ -3,12 +3,12 @@
  *
  * Plan: docs/test_generator/test-plans/oncall-ui-test-plan.md, Tier 1, TS-17.01.
  *
- * SEPARATE FILE ON PURPOSE, AND OUT OF THE CI LANE. Fifteen minutes is the
- * shortest snooze the product offers, so watching one LAPSE cannot be done
- * quickly: this test sleeps past the whole window plus two shortened rung
- * delays. It is registered in `ci-matrix/ci_matrix.json` under the OnCall
- * shard's `disabled` list with that reason, the way the plan keeps TS-10.07 out
- * of the fast lane, and is meant to be run deliberately:
+ * SEPARATE FILE ON PURPOSE, because it is a pure wait: it sleeps past a whole
+ * snooze window plus two shortened rung delays. Fifteen minutes is the shortest
+ * snooze the product's MENU offers, but the API's floor is one minute, which is
+ * what makes this runnable at all — `SNOOZE_MINUTES` is 2, over a 40-second
+ * ladder. It runs in CI in the enterprise `OnCall-Verbs` shard, which is the
+ * lighter of the two and absorbs the wait. To run it alone:
  *
  *   npx playwright test playwright-tests/OnCall/oncall-snooze-lapse.spec.js
  *
