@@ -18,29 +18,31 @@ use std::time::Duration;
 use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::{common::calculate_trend, functions::RangeFunc};
+use crate::{common::calculate_trend, functions::RangeFunc, scalar_param::ScalarParam};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#holt_winters
 pub(crate) fn holt_winters(
     data: Value,
-    scaling_factor: f64,
-    trend_factor: f64,
+    scaling_factor: ScalarParam,
+    trend_factor: ScalarParam,
     eval_ctx: &EvalContext,
+    pinned: Option<i64>,
 ) -> Result<Value> {
-    super::eval_range(
+    super::eval_range_at(
         data,
         HoltWintersFunc::new(scaling_factor, trend_factor),
         eval_ctx,
+        pinned,
     )
 }
 
 pub struct HoltWintersFunc {
-    scaling_factor: f64,
-    trend_factor: f64,
+    scaling_factor: ScalarParam,
+    trend_factor: ScalarParam,
 }
 
 impl HoltWintersFunc {
-    pub fn new(scaling_factor: f64, trend_factor: f64) -> Self {
+    pub fn new(scaling_factor: ScalarParam, trend_factor: ScalarParam) -> Self {
         HoltWintersFunc {
             scaling_factor,
             trend_factor,
@@ -53,8 +55,12 @@ impl RangeFunc for HoltWintersFunc {
         "holt_winters"
     }
 
-    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        holt_winters_calculation(samples, self.scaling_factor, self.trend_factor)
+    fn exec(&self, samples: &[Sample], eval_ts: i64, _range: &Duration) -> Option<f64> {
+        holt_winters_calculation(
+            samples,
+            self.scaling_factor.at(eval_ts),
+            self.trend_factor.at(eval_ts),
+        )
     }
 }
 
@@ -103,7 +109,13 @@ mod tests {
         trend_factor: f64,
     ) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        holt_winters(data, scaling_factor, trend_factor, &eval_ctx)
+        holt_winters(
+            data,
+            ScalarParam::Const(scaling_factor),
+            ScalarParam::Const(trend_factor),
+            &eval_ctx,
+            None,
+        )
     }
 
     #[test]

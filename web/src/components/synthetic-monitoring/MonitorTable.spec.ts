@@ -45,12 +45,13 @@ const OTableStub = {
           <slot name="cell-lastCheck" :row="row" />
           <slot name="cell-method" :row="row" />
           <slot name="cell-steps" :row="row" />
+          <slot name="cell-referencedBy" :row="row" />
           <slot name="cell-assertions" :row="row" />
           <slot name="cell-folder_name" :row="row" />
           <slot name="cell-actions" :row="row" />
         </div>
       </template>
-      <slot name="bottom" />
+      <slot v-if="selectedIds.length > 0" name="selection-actions" />
     </div>
   `,
   props: {
@@ -60,7 +61,6 @@ const OTableStub = {
     selectedIds: { type: Array, default: () => [] },
     rowKey: { type: String, default: "id" },
     dataTest: { type: String, default: "" },
-    footerTitle: { type: String, default: "" },
     emptyMessage: { type: String, default: "" },
   },
 };
@@ -171,7 +171,6 @@ function getOTableProps(wrapper: VueWrapper) {
     data: stub.props("data") as any[],
     loading: stub.props("loading") as boolean,
     selectedIds: stub.props("selectedIds") as string[],
-    footerTitle: stub.props("footerTitle") as string,
   };
 }
 
@@ -237,6 +236,7 @@ describe("MonitorTable", () => {
         "name",
         "url",
         "steps",
+        "referencedBy",
         "history",
         "responseTime",
         "uptime",
@@ -275,18 +275,6 @@ describe("MonitorTable", () => {
       const { columns } = getOTableProps(wrapper);
       const ids = columns.map((c) => c.id);
       expect(ids).not.toContain("folder_name");
-    });
-
-    it("should pass default footerTitle when not provided", () => {
-      wrapper = mountMonitorTable();
-      const { footerTitle } = getOTableProps(wrapper);
-      expect(footerTitle).toBe("Checks");
-    });
-
-    it("should pass custom footerTitle when provided", () => {
-      wrapper = mountMonitorTable({ footerTitle: "Monitors" });
-      const { footerTitle } = getOTableProps(wrapper);
-      expect(footerTitle).toBe("Monitors");
     });
   });
 
@@ -361,9 +349,9 @@ describe("MonitorTable", () => {
       expect(wrapper.emitted("delete")![0]).toEqual([mockMonitorList[0]]);
     });
 
-    it("should emit move with row data when move menu item is clicked", async () => {
+    it("should emit move with row data when the move action button is clicked", async () => {
       wrapper = mountMonitorTable();
-      const moveItem = wrapper.find('[data-test="monitor-table-move-item"]');
+      const moveItem = wrapper.find('[data-test="monitor-table-move-btn"]');
       expect(moveItem.exists()).toBe(true);
       await moveItem.trigger("click");
       expect(wrapper.emitted("move")).toHaveLength(1);
@@ -534,33 +522,6 @@ describe("MonitorTable", () => {
     });
   });
 
-  // ── Footer text ───────────────────────────────────────────────────────
-
-  describe("footer", () => {
-    it("should show selection count when rows are selected", () => {
-      wrapper = mountMonitorTable({
-        selectedIds: ["mon-http-1", "mon-tcp-1"],
-      });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("2 of 4 selected");
-    });
-
-    it("should show total count when no rows are selected", () => {
-      wrapper = mountMonitorTable({ selectedIds: [] });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("4 Checks");
-    });
-
-    it("should show custom footerTitle in total count", () => {
-      wrapper = mountMonitorTable({
-        selectedIds: [],
-        footerTitle: "HTTP Monitors",
-      });
-      const bottom = wrapper.find('[data-test="monitor-table"]');
-      expect(bottom.text()).toContain("4 HTTP Monitors");
-    });
-  });
-
   // ── Folder navigation ─────────────────────────────────────────────────
 
   describe("folder column", () => {
@@ -634,6 +595,74 @@ describe("MonitorTable", () => {
     });
   });
 
+  // `steps` is the server's expanded count; `referencedBy` counts checks using this one.
+  describe("steps and used-by cells", () => {
+    it("renders the expanded step count and the used-by count in browser mode", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 3 }],
+      });
+      expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("3 tests");
+    });
+
+    // The column header already says "Used by"; the cell has to agree with its count.
+    it("reads '1 test' for a single referrer", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "login", steps: 13, referencedBy: 1 }],
+      });
+      const cell = wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text();
+      expect(cell).toBe("1 test");
+      expect(cell).not.toContain("tests");
+    });
+
+    it("renders a dash for a check nothing references", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "login", steps: 13, referencedBy: 0 }],
+      });
+      expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("—");
+    });
+
+    it.each([
+      ["missing", "Subtest missing"],
+      ["nested", "Subtest holds a subtest"],
+    ])("flags a %s reference with a warning badge beside the steps", (state, text) => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 0, referenceState: state }],
+      });
+      const badge = wrapper.find('[data-test="monitor-table-reference-state"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe(text);
+      expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
+    });
+
+    it("renders no reference badge for an ok reference or a check with none", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [
+          { id: "a", name: "checkout", steps: 16, referencedBy: 0, referenceState: "ok" },
+          { id: "b", name: "plain", steps: 3, referencedBy: 0 },
+        ],
+      });
+      expect(wrapper.find('[data-test="monitor-table-reference-state"]').exists()).toBe(false);
+    });
+
+    // An unreadable journey is not zero steps, so null must not render as "0" or "NaN".
+    it("renders a dash, not 0, for a null steps count", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "unreadable", steps: null, referencedBy: 0 }],
+      });
+      const cell = wrapper.find('[data-test="monitor-table-cell-steps"]').text();
+      expect(cell).toBe("—");
+      expect(cell).not.toContain("0");
+      expect(cell).not.toContain("NaN");
+    });
+  });
+
   // ── Cell tooltips (OTooltip wrapping) ──────────────────────────────────
 
   describe("cell tooltips", () => {
@@ -642,7 +671,7 @@ describe("MonitorTable", () => {
     describe("name cell", () => {
       it("renders OTooltip wrapping the name with cursor-pointer when name is present", () => {
         wrapper = mountMonitorTable();
-        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 4 action OTooltips.
+        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 5 action OTooltips.
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         expect(tooltips.length).toBeGreaterThanOrEqual(3);
         const nameTooltip = tooltips[0];
@@ -655,8 +684,8 @@ describe("MonitorTable", () => {
           data: [{ ...mockMonitorList[0], name: undefined as any, id: "test-no-name" }],
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Only URL + locations + 4 actions = 6 OTooltips (name cell skipped)
-        expect(tooltips.length).toBe(6);
+        // Only URL + locations + 5 actions = 7 OTooltips (name cell skipped)
+        expect(tooltips.length).toBe(7);
         // The em-dash fallback should appear in the DOM
         expect(wrapper.text()).toContain("—");
       });
@@ -678,8 +707,8 @@ describe("MonitorTable", () => {
           data: [{ ...mockMonitorList[0], url: undefined as any, id: "test-no-url" }],
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Name + locations + 4 actions = 6 OTooltips (URL cell skipped)
-        expect(tooltips.length).toBe(6);
+        // Name + locations + 5 actions = 7 OTooltips (URL cell skipped)
+        expect(tooltips.length).toBe(7);
         // URL tooltip at index 1 is now the locations tooltip (shifted)
         expect(tooltips[1].props("content")).toContain("us-east-1");
         expect(wrapper.text()).toContain("—");
@@ -739,8 +768,8 @@ describe("MonitorTable", () => {
       it("does not show count badge when only one location", () => {
         wrapper = mountMonitorTable();
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Row 1 (mockMonitorTcp) has 1 location. Its locations OTooltip is at index 9.
-        const row1LocTooltip = tooltips[9];
+        // Row 1 (mockMonitorTcp) has 1 location. Its locations OTooltip is at index 10.
+        const row1LocTooltip = tooltips[10];
         const row1LocText = row1LocTooltip.text();
         expect(row1LocText).toContain("us-east-1");
         expect(row1LocText).not.toContain("+");
@@ -751,8 +780,8 @@ describe("MonitorTable", () => {
           data: [{ ...mockMonitorList[0], locations: [] as any, id: "test-no-loc" }],
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Name + URL + 4 actions = 6 OTooltips (locations cell skipped)
-        expect(tooltips.length).toBe(6);
+        // Name + URL + 5 actions = 7 OTooltips (locations cell skipped)
+        expect(tooltips.length).toBe(7);
         expect(wrapper.text()).toContain("—");
       });
 
@@ -776,8 +805,8 @@ describe("MonitorTable", () => {
           },
         });
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        // Row 2 (mockMonitorBrowser) has 3 locations, its loc OTooltip is at index 16
-        const row2LocTooltip = tooltips[16];
+        // Row 2 (mockMonitorBrowser) has 3 locations, its loc OTooltip is at index 18
+        const row2LocTooltip = tooltips[18];
         expect(row2LocTooltip.props("content")).toBe(
           "US East (N. Virginia)\nEU (Ireland)\nAsia Pacific (Singapore)",
         );
@@ -790,7 +819,7 @@ describe("MonitorTable", () => {
         const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
         // Row 2 has ["us-east-1", "eu-west-1", "ap-southeast-1"]
         // Only us-east-1 is mapped; eu-west-1 and ap-southeast-1 fall back to raw IDs
-        const row2LocTooltip = tooltips[16];
+        const row2LocTooltip = tooltips[18];
         expect(row2LocTooltip.props("content")).toBe("US East\neu-west-1\nap-southeast-1");
       });
     });

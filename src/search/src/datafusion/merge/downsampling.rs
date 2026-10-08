@@ -29,13 +29,8 @@ use datafusion::{
     error::{DataFusionError, Result},
 };
 use vortex::{
-    VortexSessionDefault,
-    array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
-    dtype::DType,
-    file::VortexWriteOptions,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
+    VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
+    io::session::RuntimeSessionExt, session::VortexSession,
 };
 
 use crate::datafusion::{
@@ -158,10 +153,10 @@ async fn write_downsampled_vortex(
             let mut last_min_ts = 0;
 
             let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
+            let dtype = session.arrow().from_arrow_schema(schema.as_ref())?;
 
             // Reuse the strategy across files; write options are recreated for each writer.
-            let strategy = vortex_write_strategy();
+            let strategy = vortex_write_strategy(&session);
 
             let write_options =
                 VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
@@ -199,11 +194,14 @@ async fn write_downsampled_vortex(
                 last_min_ts = get_min_timestamp(&batch_result);
 
                 // Write batch to current file (convert to Vortex array)
-                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch_result, schema.as_ref())
+                    .map_err(|e| {
+                        DataFusionError::Execution(format!(
+                            "Failed to convert arrow array to vortex array: {e}"
+                        ))
+                    })?;
                 writer.push(array).await?;
             }
 
@@ -257,7 +255,7 @@ pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule
     };
 
     let sql = format!(
-        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
+        "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('{origin}'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
         HASH_LABEL,
         step,
         TIMESTAMP_COL_NAME,
@@ -266,6 +264,7 @@ pub(super) fn generate_downsampling_sql(schema: &Schema, rule: &DownsamplingRule
         fun_str,
         HASH_LABEL,
         TIMESTAMP_ALIAS,
+        origin = config::meta::histogram_origin::ORIGIN_LITERAL,
     );
 
     let fields = schema

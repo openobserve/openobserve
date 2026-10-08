@@ -13,22 +13,25 @@ import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 
 // Mock dependencies
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    create_enrichment_table: vi.fn(() =>
-      Promise.resolve({
-        data: { message: "Enrichment table created successfully" },
-      }),
-    ),
-    create_enrichment_table_from_url: vi.fn(() =>
-      Promise.resolve({
-        data: { message: "Enrichment table job started" },
-      }),
-    ),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create_enrichment_table: vi.fn(() =>
+        Promise.resolve({
+          data: { message: "Enrichment table created successfully" },
+        }),
+      ),
+      create_enrichment_table_from_url: vi.fn(() =>
+        Promise.resolve({
+          data: { message: "Enrichment table job started" },
+        }),
+      ),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },

@@ -72,7 +72,7 @@ use crate::common::meta::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn organizations(
@@ -92,7 +92,8 @@ pub async fn organizations(
 
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
     let is_root_user = is_root_user(user_id);
@@ -172,6 +173,9 @@ pub async fn organizations(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn all_organizations(
@@ -187,7 +191,8 @@ pub async fn all_organizations(
     let mut org_names = HashSet::new();
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
 
@@ -249,6 +254,8 @@ pub async fn all_organizations(
             browser_steps_limit: synthetics.browser_limit,
             protocol_steps_used: synthetics.protocol_used,
             protocol_steps_limit: synthetics.protocol_limit,
+            status_steps_used: synthetics.status_used,
+            status_steps_limit: synthetics.status_limit,
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -316,7 +323,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
     tag = "Organizations",
     operation_id = "GetOrganizationUserIngestToken",
     summary = "Get user's ingestion token",
-    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints.",
+    description = "Retrieves the current ingestion token (passcode) for the authenticated user within the specified organization. This token is used to authenticate data ingestion requests and can be used with various ingestion endpoints. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -325,6 +332,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -338,6 +346,12 @@ pub async fn get_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "read the organization ingestion token")
+            .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -357,7 +371,7 @@ pub async fn get_user_passcode(
     tag = "Organizations",
     operation_id = "UpdateOrganizationUserIngestToken",
     summary = "Update user's ingestion token",
-    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token.",
+    description = "Generates a new ingestion token (passcode) for the authenticated user within the specified organization. The old token will be invalidated and all ingestion processes using the old token will need to be updated with the new token. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -366,6 +380,7 @@ pub async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -379,6 +394,12 @@ pub async fn update_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    if let Err(resp) =
+        super::require_credential_access(&org, user_id, "rotate the organization ingestion token")
+            .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -531,7 +552,7 @@ pub async fn create_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create an organization", "category": "organizations"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_org(
@@ -670,7 +691,7 @@ async fn set_pool_limit(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps | synthetics_status_protocol (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(
@@ -695,6 +716,162 @@ pub async fn set_quota_usage_limit(
     match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
         Ok(usage) => MetaHttpResponse::json(usage),
         Err(response) => response,
+    }
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PaidOverageUpdateRequest {
+    pub enabled: bool,
+}
+
+#[cfg(feature = "cloud")]
+fn paid_overage_pool(
+    feature: &str,
+) -> Result<openobserve_core::trial_quota::TrialQuotaPool, Response> {
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    let Some(pool) = TrialQuotaPool::from_key(feature) else {
+        return Err(MetaHttpResponse::bad_request(unknown_quota_pool_message(
+            feature,
+        )));
+    };
+    if pool != TrialQuotaPool::AiCredits {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "paid overage is not supported for quota feature '{feature}'"
+        )));
+    }
+    Ok(pool)
+}
+
+#[cfg(feature = "cloud")]
+fn paid_overage_unavailable(error: impl std::fmt::Display) -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(MetaHttpResponse::error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            error.to_string(),
+        )),
+    )
+        .into_response()
+}
+
+/// GetPaidOverageStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/quota/{feature}/paid_overage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "GetPaidOverageStatus",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("feature" = String, Path, description = "Cumulative quota feature; currently ai_credits"),
+    ),
+    responses(
+        (status = 200, description = "Cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 400, description = "Unknown or unsupported quota feature"),
+        (status = 503, description = "Billing or quota state unavailable"),
+    ),
+)]
+pub async fn get_paid_overage_status(
+    Path((org_id, feature)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let pool = match paid_overage_pool(&feature) {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
+        .await
+    {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(error) => paid_overage_unavailable(error),
+    }
+}
+
+/// SetPaidOverageStatus
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/quota/{feature}/paid_overage",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetPaidOverageStatus",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("feature" = String, Path, description = "Cumulative quota feature; currently ai_credits"),
+    ),
+    request_body(content = PaidOverageUpdateRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Updated cumulative paid-overage state", body = openobserve_core::trial_quota::PaidOverageStatus),
+        (status = 400, description = "Unknown or unsupported quota feature"),
+        (status = 403, description = "Only organization administrators may change consent"),
+        (status = 409, description = "Organization is not eligible for paid overage"),
+        (status = 503, description = "Billing or quota state unavailable"),
+    ),
+)]
+pub async fn set_paid_overage_status(
+    Path((org_id, feature)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(request): Json<PaidOverageUpdateRequest>,
+) -> Response {
+    use config::meta::user::UserRole;
+    use openobserve_core::trial_quota::PaidOverageBillingStatus;
+
+    let pool = match paid_overage_pool(&feature) {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let is_admin = is_root_user(&user_email.user_id)
+        || matches!(
+            openobserve_core::users::get_user(Some(&org_id), &user_email.user_id).await,
+            Some(user) if matches!(user.role, UserRole::Admin | UserRole::Root)
+        );
+    if !is_admin {
+        return MetaHttpResponse::forbidden(
+            "Only organization administrators can change paid usage consent",
+        );
+    }
+
+    let current = match openobserve_core::trial_quota::get_paid_overage_status(
+        &org_id,
+        pool,
+        &user_email.user_id,
+    )
+    .await
+    {
+        Ok(status) => status,
+        Err(error) => return paid_overage_unavailable(error),
+    };
+    if request.enabled && current.billing_status != PaidOverageBillingStatus::Eligible {
+        return (
+            StatusCode::CONFLICT,
+            Json(MetaHttpResponse::error(
+                StatusCode::CONFLICT,
+                "organization is not eligible for paid overage",
+            )),
+        )
+            .into_response();
+    }
+    // One cumulative flag: the pool owns its backing rows, the API never names them.
+    if let Err(error) = openobserve_core::trial_quota::set_paid_overage_enabled_for_pool(
+        &org_id,
+        pool,
+        request.enabled,
+    )
+    .await
+    {
+        return paid_overage_unavailable(error);
+    }
+    match openobserve_core::trial_quota::get_paid_overage_status(&org_id, pool, &user_email.user_id)
+        .await
+    {
+        Ok(status) => MetaHttpResponse::json(status),
+        Err(error) => paid_overage_unavailable(error),
     }
 }
 
@@ -1570,7 +1747,7 @@ mod tests {
     use openobserve_core::trial_quota::TrialQuotaPool;
 
     #[cfg(feature = "cloud")]
-    use super::unknown_quota_pool_message;
+    use super::*;
 
     /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
     /// typos the pool they want reading a 400 that never names it.
@@ -1591,5 +1768,50 @@ mod tests {
                 "the message lists a key the route would itself reject",
             );
         }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn paid_overage_api_only_accepts_the_cumulative_ai_feature() {
+        assert_eq!(
+            paid_overage_pool("ai_credits").unwrap(),
+            TrialQuotaPool::AiCredits
+        );
+        assert_eq!(
+            paid_overage_pool("synthetics_browser_steps")
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            paid_overage_pool("ai_chat").unwrap_err().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn paid_overage_update_payload_rejects_extra_fields() {
+        assert!(
+            serde_json::from_value::<PaidOverageUpdateRequest>(
+                serde_json::json!({"enabled": true, "feature": "ai_chat"})
+            )
+            .is_err()
+        );
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn non_admin_cannot_change_paid_overage() {
+        let response = set_paid_overage_status(
+            Path(("missing-org".to_string(), "ai_credits".to_string())),
+            Headers(UserEmail {
+                user_id: "not-an-admin@example.invalid".to_string(),
+            }),
+            Json(PaidOverageUpdateRequest { enabled: true }),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 }

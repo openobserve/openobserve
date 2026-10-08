@@ -18,7 +18,7 @@
 // run-history wiring. The canvas / node forms / drawers are stubbed — the real
 // useWorkflowCanvas singleton (workflowObj) is kept, since that IS the contract.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockRouter, mockToast, uuidState } = vi.hoisted(() => ({
   mockRouter: {
@@ -55,16 +55,19 @@ vi.mock("@vue-flow/core", () => ({
   }),
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    listWorkflows: vi.fn(),
-    createWorkflow: vi.fn(),
-    updateWorkflow: vi.fn(),
-    promoteWorkflow: vi.fn(),
-    getWorkflowRun: vi.fn(),
-    testWorkflow: vi.fn(),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listWorkflows: vi.fn(),
+      createWorkflow: vi.fn(),
+      updateWorkflow: vi.fn(),
+      promoteWorkflow: vi.fn(),
+      getWorkflowRun: vi.fn(),
+      testWorkflow: vi.fn(),
+    },
+  });
+});
 
 const { stub } = vi.hoisted(() => ({
   stub: (name: string, opts: any = {}) => ({
@@ -72,6 +75,7 @@ const { stub } = vi.hoisted(() => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
 vi.mock("./WorkflowTestDialog.vue", () => stub("WorkflowTestDialog"));
@@ -93,13 +97,13 @@ vi.mock("@/components/flow/NodePalette.vue", () =>
   }),
 );
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowEditor from "./WorkflowEditor.vue";
 import workflowService from "@/services/workflows";
+import analytics from "@/services/product_analytics";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
@@ -136,7 +140,7 @@ const globalStubs = {
       '<button class="header-back" @click="back && back.onClick()" />' +
       '<div class="header-title"><slot name="title" /></div>' +
       '<div class="header-subtitle"><slot name="subtitle" /></div>' +
-      '<slot name="title-trail" /><slot name="actions" /></div>',
+      '<slot name="title-trail" /><slot name="actions-overflow" /><slot name="actions" /></div>',
   },
   OButton: {
     name: "OButton",
@@ -388,7 +392,7 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(listWorkflows).toHaveBeenCalledWith("default");
+      expect(listWorkflows).toHaveBeenCalledWith("default", undefined, true);
       expect(workflowObj.isEditWorkflow).toBe(true);
       expect(wf().name).toBe("my workflow");
       // hydrate derives the VueFlow render template from node_type
@@ -1053,7 +1057,7 @@ describe("WorkflowEditor", () => {
       expect(linkDialog(wrapper).exists()).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1069,7 +1073,7 @@ describe("WorkflowEditor", () => {
       expect(linkDialog(wrapper).exists()).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1084,7 +1088,7 @@ describe("WorkflowEditor", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1100,7 +1104,7 @@ describe("WorkflowEditor", () => {
       expect(linkDialog(wrapper).exists()).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1165,7 +1169,7 @@ describe("WorkflowEditor", () => {
       expect(wrapper.emitted("saved")).toHaveLength(1);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
       // no link-alerts prompt on update
       expect(linkDialog(wrapper).exists()).toBe(false);
@@ -1209,6 +1213,23 @@ describe("WorkflowEditor", () => {
         message: t("workflow.saveError"),
         variant: "error",
       });
+    });
+
+    it("tracks workflow_updated (published) only after the PUT succeeds", async () => {
+      await openSaved();
+
+      await clickSave(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("workflow_updated", { draft: false });
+    });
+
+    it("does not track workflow_updated when the PUT fails", async () => {
+      await openSaved();
+      updateWorkflow.mockRejectedValue(new Error("network"));
+
+      await clickSave(wrapper);
+
+      expect(analytics.track).not.toHaveBeenCalledWith("workflow_updated", expect.anything());
     });
 
     it("re-enables the Save button after a failure", async () => {
@@ -1514,6 +1535,23 @@ describe("WorkflowEditor", () => {
         expect(promoteWorkflow).not.toHaveBeenCalled();
       });
 
+      it("tracks workflow_updated (draft) when re-saving an existing draft", async () => {
+        await openDraft();
+
+        await clickSaveDraft(wrapper);
+
+        expect(analytics.track).toHaveBeenCalledWith("workflow_updated", { draft: true });
+      });
+
+      it("does not track workflow_updated when the draft save fails", async () => {
+        await openDraft();
+        updateWorkflow.mockRejectedValue(new Error("network"));
+
+        await clickSaveDraft(wrapper);
+
+        expect(analytics.track).not.toHaveBeenCalledWith("workflow_updated", expect.anything());
+      });
+
       it("Publish on the SAME incomplete new graph is blocked by validation", async () => {
         wrapper = mountEditor();
         await flushPromises();
@@ -1552,6 +1590,15 @@ describe("WorkflowEditor", () => {
           variant: "success",
         });
         expect(wrapper.emitted("saved")).toHaveLength(1);
+      });
+
+      it("does not count the pre-promote draft flush as workflow_updated", async () => {
+        await openDraft();
+
+        await publishBtn(wrapper).trigger("click");
+        await flushPromises();
+
+        expect(analytics.track).not.toHaveBeenCalledWith("workflow_updated", expect.anything());
       });
 
       it("blocks promote when the draft graph is still invalid", async () => {
@@ -1600,7 +1647,7 @@ describe("WorkflowEditor", () => {
       // before push) so the unsaved-changes route guard can still read dirtyFlag.
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
 
       wrapper.unmount();
@@ -1616,7 +1663,7 @@ describe("WorkflowEditor", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1808,6 +1855,7 @@ describe("WorkflowEditor", () => {
           id: "wf-1",
           name: "my workflow",
           org_identifier: "default",
+          folder: "default",
         },
       });
     });

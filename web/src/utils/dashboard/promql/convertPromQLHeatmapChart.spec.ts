@@ -787,6 +787,32 @@ describe("HeatmapConverter", () => {
         expect(formatted).toContain("75.00");
       });
 
+      it("should escape HTML in the series name", () => {
+        const processedData: ProcessedPromQLData[] = [
+          {
+            series: [{ name: "<img src=x onerror=alert(1)>", values: [], data: { "1": "1" } }],
+            timestamps: [[1, "00:00:00"]],
+            queryIndex: 0,
+          },
+        ];
+
+        const result = converter.convert(
+          processedData,
+          { type: "heatmap", config: {} },
+          mockStore,
+          mockExtras,
+        );
+        const formatted = result.tooltip.formatter({
+          value: [0, 0, 1],
+          name: "00:00:00",
+          marker: "",
+          seriesName: "<img src=x onerror=alert(1)>",
+        });
+
+        expect(formatted).not.toContain("<img");
+        expect(formatted).toContain("&lt;img src=x onerror=alert(1)&gt;");
+      });
+
       it("should format tooltip with unit", () => {
         const processedData: ProcessedPromQLData[] = [
           {
@@ -1223,6 +1249,18 @@ describe("HeatmapConverter", () => {
       // Exponent 0.5 is pre-warped into the stop positions, so the midpoint
       // stop is sampled from the ramp well past its middle.
       expect(result.visualMap.inRange.color[16]).not.toBe(result.visualMap.inRange.color[15]);
+    });
+
+    it("takes a given colour range over its own, so several heatmaps share one scale", () => {
+      const result: any = converter.convert(
+        histogramData(),
+        histogramSchema({ visual_map_range: { min: 0, max: 40 } }),
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.visualMap.min).toBe(0);
+      expect(result.visualMap.max).toBe(40);
     });
 
     it("keeps config.unit as the cell-intensity unit in the tooltip", () => {

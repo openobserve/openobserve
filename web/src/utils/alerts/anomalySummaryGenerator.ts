@@ -4,7 +4,25 @@
  * Generates human-readable summaries of anomaly detection configurations
  */
 
-import { raw, type TranslateFn } from "@/types/i18n";
+import { type TranslateFn } from "@/types/i18n";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyExpectedGroupingKey,
+  anomalyTrainedK,
+  anomalyIntervalSeconds,
+  anomalyWindowShareEffective,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+
+// Escape user-controlled strings before embedding in HTML (XSS prevention) —
+// mirrors alertSummaryGenerator.ts's esc(), so both generators emit HTML that
+// is already safe rather than leaving escaping to whoever calls v-html.
+const esc = (s: string) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 export function generateAnomalySummary(
   config: any,
@@ -18,7 +36,8 @@ export function generateAnomalySummary(
 
   // The markup stays here rather than in en-US.json: translators get whole
   // sentences with {placeholders} and never have to preserve a tag.
-  const chip = (value: string | number) => `<span class="summary-clickable">${value}</span>`;
+  const chip = (value: string | number) =>
+    `<span class="summary-clickable">${esc(String(value))}</span>`;
 
   // Step 1+: Stream & query info
   if (wizardStep >= 1) {
@@ -54,10 +73,14 @@ export function generateAnomalySummary(
     const win = `${config.detection_window_value}${config.detection_window_unit}`;
     parts.push(t("alerts.anomaly.summaryDetectionWindow", { window: chip(win) }));
 
-    const seasonality =
-      (config.training_window_days || 14) >= 7
-        ? t("alerts.anomaly.seasonalityWeekly")
-        : raw("hour-of-day");
+    const seasonality = t(
+      anomalyExpectedGroupingKey(
+        anomalyIntervalSeconds(
+          Number(config.histogram_interval_value),
+          String(config.histogram_interval_unit),
+        ),
+      ) as any,
+    );
     parts.push(
       t("alerts.anomaly.summaryTraining", {
         days: chip(t("alerts.anomaly.summaryTrainingDays", { days: config.training_window_days })),
@@ -71,15 +94,29 @@ export function generateAnomalySummary(
         : t("alerts.anomaly.summaryRetrainEveryDays", { days: config.retrain_interval_days });
     parts.push(t("alerts.anomaly.summaryRetrain", { retrain: chip(retrain) }));
 
-    // A cleared field reaches here as "", and 100 - "" is 100 — "flag everything".
-    // Number("") and Number(null) are both 0, so blanks need excluding first.
-    const stored = config.threshold;
-    const percentile =
-      stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
-    if (Number.isFinite(percentile)) {
+    const budget = Number(config.alert_budget_per_day);
+    if (Number.isFinite(budget) && budget > 0) {
+      // Budget mode: the enforced cap IS the sensitivity statement.
+      const round = (n: number) => Math.round(n * 1e6) / 1e6;
+      const label =
+        budget < 1
+          ? t("alerts.anomaly.summaryBudgetPerWeek", { count: round(budget * 7) })
+          : t("alerts.anomaly.summaryBudgetPerDay", { count: round(budget) });
+      parts.push(t("alerts.anomaly.summaryThreshold", { threshold: chip(label) }));
+    } else {
+      // A cleared field reaches here as "", and Number("")/Number(null) are
+      // both 0, so blanks need excluding before any number is shown.
+      const blankToNaN = (v: unknown) =>
+        v === null || v === undefined || v === "" ? NaN : Number(v);
+      const bandWidth = blankToNaN(config.band_width);
+      const trainedK = anomalyTrainedK(config);
+      const auto =
+        trainedK === null
+          ? t("alerts.anomaly.sensitivityAuto")
+          : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK });
       parts.push(
         t("alerts.anomaly.summaryThreshold", {
-          threshold: chip(t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })),
+          threshold: chip(Number.isFinite(bandWidth) ? `${bandWidth}σ` : auto),
         }),
       );
     }
@@ -115,6 +152,15 @@ export function generateAnomalySummary(
         );
       }
     }
+    // The gates are configured whether or not notifications are on, so they show either way.
+    const directionKey =
+      ANOMALY_DIRECTION_KEYS[config.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both;
+    parts.push(t("alerts.anomaly.summaryDirection", { direction: chip(t(directionKey as any)) }));
+    parts.push(
+      t("alerts.anomaly.summaryWindowShare", {
+        rule: chip(t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(config))),
+      }),
+    );
   }
 
   const bulletPoints = parts.join("\n");
@@ -130,14 +176,14 @@ export function generateAnomalySummary(
 function generatePlainEnglish(config: any, wizardStep: number, t: TranslateFn): string {
   if (!config.stream_name) return "";
 
-  const stream = config.stream_name;
-  const fn = config.detection_function || "count";
-  const schedule = `${config.schedule_interval_value}${config.schedule_interval_unit}`;
-  const trainingDays = config.training_window_days || 14;
+  const stream = esc(config.stream_name);
+  const fn = esc(config.detection_function || "count");
+  const schedule = esc(`${config.schedule_interval_value}${config.schedule_interval_unit}`);
+  const trainingDays = config.training_window_days || 28;
 
   if (wizardStep < 2) {
     return t("alerts.anomaly.summaryConfiguring", {
-      streamType: config.stream_type || "logs",
+      streamType: esc(config.stream_type || "logs"),
       stream,
     });
   }

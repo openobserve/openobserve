@@ -73,12 +73,12 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     training_window_days: z.coerce.number().min(1, t("alerts.validation.minimumOneDay")),
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
-    // The server clamps to 50–99.9 then truncates with `as i32`, so 99 is the real ceiling.
-    threshold: z.coerce
-      .number()
-      .int(t("alerts.anomaly.sensitivityRange"))
-      .min(50, t("alerts.anomaly.sensitivityRange"))
-      .max(99, t("alerts.anomaly.sensitivityRange")),
+    // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
+    sensitivity_mode: z.enum(["band", "budget"]),
+    // Blank (null or a cleared "") is Auto; raw so superRefine judges it, not coerced to 0.
+    band_width: z.union([z.string(), z.number(), z.null()]),
+    budget_count: z.coerce.number(),
+    budget_period: z.enum(["day", "week"]),
   });
 
 export type AnomalyDetectionConfigForm = z.infer<ReturnType<typeof makeAnomalyDetectionConfigBase>>;
@@ -91,14 +91,109 @@ export const hasTimestampAliasInSql = (sql: string, timestampColumn: string): bo
   return new RegExp(`\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`, "i").test(sql);
 };
 
+export type AnomalyIntervalUnit = "s" | "m" | "h" | "d";
+
+const INTERVAL_UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+
+/** Seconds for one interval value + unit pair; null when either part is not a positive s/m/h/d interval. */
+export const anomalyIntervalSeconds = (value: number, unit: string): number | null => {
+  const mult = INTERVAL_UNIT_SECONDS[unit];
+  if (!mult || !Number.isFinite(value) || value <= 0) return null;
+  return value * mult;
+};
+
+/** One governing interval as stored on the server: the raw wire value plus the form state it seeded. */
+export interface AnomalyStoredInterval {
+  raw: string | number | null;
+  value: number;
+  unit: string;
+  parsed: boolean;
+}
+
+/** The stored governing triple, captured once from the edit-fetch response (D4). */
+export interface AnomalyStoredIntervals {
+  histogram: AnomalyStoredInterval;
+  schedule: AnomalyStoredInterval;
+  window: AnomalyStoredInterval;
+}
+
+export type AnomalyBandGrouping = "weekend_hour" | "global";
+
+// The two retired groupings stay labelled: a row keeps its value until it retrains.
+export const ANOMALY_BAND_GROUPING_KEYS: Record<string, string> = {
+  weekend_hour: "alerts.anomaly.bandGroupingWeekendHour",
+  global: "alerts.anomaly.bandGroupingGlobal",
+  hour_of_week: "alerts.anomaly.bandGroupingHourOfWeek",
+  hour_of_day: "alerts.anomaly.bandGroupingHourOfDay",
+};
+
+/** The trainer fetches at least this many days of history, whatever the configured window. */
+export const ANOMALY_MIN_TRAINING_DAYS = 21;
+
+/** The grouping the trainer picks (absence.rs `slot_resolution_for`): weekday/weekend × hour, unless a bucket is coarser than 1h. */
+export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
+  intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "weekend_hour";
+
+/** Pre-training label key: the trainer groups by the data the stream returns, so the label names every outcome. */
+export const anomalyExpectedGroupingKey = (intervalSeconds: number | null): string =>
+  anomalyBandGrouping(intervalSeconds) === "global"
+    ? ANOMALY_BAND_GROUPING_KEYS.global
+    : "alerts.anomaly.bandGroupingWeekendHourIfData";
+
+/** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
+export const lookBackWindowFloorSeconds = (
+  scheduleValue: number,
+  scheduleUnit: string,
+  histogramValue: number,
+  histogramUnit: string,
+): number | null => {
+  const schedule = anomalyIntervalSeconds(scheduleValue, scheduleUnit);
+  const histogram = anomalyIntervalSeconds(histogramValue, histogramUnit);
+  if (schedule === null || histogram === null) return null;
+  return schedule + histogram;
+};
+
+/** Compact human form for a seconds count, e.g. 3900 → "1h 5m". */
+export const formatAnomalySeconds = (secs: number): string => {
+  const units: Array<[number, AnomalyIntervalUnit]> = [
+    [86400, "d"],
+    [3600, "h"],
+    [60, "m"],
+    [1, "s"],
+  ];
+  const parts: string[] = [];
+  let rest = Math.max(0, Math.floor(secs));
+  for (const [size, label] of units) {
+    const n = Math.floor(rest / size);
+    if (n > 0) {
+      parts.push(`${n}${label}`);
+      rest -= n * size;
+    }
+  }
+  return parts.length ? parts.join(" ") : "0s";
+};
+
+const isBlankNumber = (v: unknown): boolean => v === "" || v === null || v === undefined;
+
+/** Balanced: the same k the trainer never goes below. */
+export const ANOMALY_BALANCED_BAND_WIDTH = 3;
+
+// Mirrors the server's band_width rule: finite and within [1, 10].
+const isBandWidth = (n: number): boolean => Number.isFinite(n) && n >= 1 && n <= 10;
+
+const sameInterval = (stored: AnomalyStoredInterval, value: unknown, unit: unknown): boolean =>
+  Number(value) === stored.value && unit === stored.unit;
+
 /**
  * Schema factory — takes a getter for the org's timestamp column
  * (store.state.zoConfig.timestamp_column) so the alias rule stays live without
- * the schema file importing the store.
+ * the schema file importing the store, and one for the stored governing triple
+ * so legacy rows are grandfathered by value, not by touched-flags (spec §4.5).
  */
 export const createAnomalyDetectionConfigSchema = (
   t: Translator,
   getTimestampColumn: () => string = () => "_timestamp",
+  getStoredIntervals: () => AnomalyStoredIntervals | null = () => null,
 ) =>
   makeAnomalyDetectionConfigBase(t).superRefine((value, ctx) => {
     if (value.query_mode === "custom_sql") {
@@ -137,7 +232,177 @@ export const createAnomalyDetectionConfigSchema = (
         });
       }
     }
+
+    if (value.sensitivity_mode === "band") {
+      if (!isBlankNumber(value.band_width) && !isBandWidth(Number(value.band_width))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["band_width"],
+          message: t("alerts.anomaly.bandWidthRange"),
+        });
+      }
+    } else if (!Number.isFinite(value.budget_count) || value.budget_count <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["budget_count"],
+        message: t("alerts.anomaly.budgetRange"),
+      });
+    }
+
+    const stored = getStoredIntervals();
+    const histogramUntouched =
+      stored !== null &&
+      sameInterval(stored.histogram, value.histogram_interval_value, value.histogram_interval_unit);
+    const scheduleUntouched =
+      stored !== null &&
+      sameInterval(stored.schedule, value.schedule_interval_value, value.schedule_interval_unit);
+    const windowUntouched =
+      stored !== null &&
+      sameInterval(stored.window, value.detection_window_value, value.detection_window_unit);
+    // D4 grandfathering: an untouched stored triple round-trips verbatim, so the floor judges only edits.
+    const grandfathered =
+      stored !== null && histogramUntouched && scheduleUntouched && windowUntouched;
+    // D9 tolerance: an unparsable stored value the user has not replaced yields no floor computation.
+    const scheduleReliable = stored === null || stored.schedule.parsed || !scheduleUntouched;
+    const histogramReliable = stored === null || stored.histogram.parsed || !histogramUntouched;
+    if (!grandfathered && scheduleReliable && histogramReliable) {
+      const floor = lookBackWindowFloorSeconds(
+        value.schedule_interval_value,
+        value.schedule_interval_unit,
+        value.histogram_interval_value,
+        value.histogram_interval_unit,
+      );
+      const windowSecs = anomalyIntervalSeconds(
+        value.detection_window_value,
+        value.detection_window_unit,
+      );
+      if (floor !== null && windowSecs !== null && windowSecs < floor) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["detection_window_value"],
+          message: t("alerts.anomaly.lookBackWindowFloor", { min: formatAnomalySeconds(floor) }),
+        });
+      }
+    }
   });
+
+/** Badge copy keys for a config's `notice_class` (§4.8); the class is the ONLY key — never error-string prefixes. */
+export const anomalyNoticeBadgeKeys = (
+  noticeClass: unknown,
+): { labelKey: string; tooltipKeys: string[] } | null => {
+  switch (noticeClass) {
+    case "window_floor":
+      return {
+        labelKey: "alerts.anomaly.noticeWindowFloor",
+        tooltipKeys: ["alerts.anomaly.noticeWindowFloorTooltip"],
+      };
+    case "window_skip":
+      // One class carries two server message constants (§4.8) — the tooltip names both causes.
+      return {
+        labelKey: "alerts.anomaly.noticeWindowSkip",
+        tooltipKeys: ["alerts.anomaly.noticeSkipScored", "alerts.anomaly.noticeSkipAbsence"],
+      };
+    case "retrain":
+      return {
+        labelKey: "alerts.anomaly.noticeRetrain",
+        tooltipKeys: ["alerts.anomaly.noticeRetrainTooltip"],
+      };
+    default:
+      return null;
+  }
+};
+
+/** The stored per-day budget, or null; absent/invalid = percentile mode — the only wire contract assumed. */
+export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined): number | null => {
+  const budget = Number(cfg?.alert_budget_per_day);
+  return Number.isFinite(budget) && budget > 0 ? budget : null;
+};
+
+/** Band width to show on edit: a stored override, else null (Auto) — never the trained k, which saving would pin. */
+export const anomalyBandWidthPrefill = (
+  cfg: Record<string, any> | null | undefined,
+): number | null => {
+  if (anomalyBudgetPerDay(cfg) !== null) return null;
+  if (!isBlankNumber(cfg?.band_width) && Number.isFinite(Number(cfg?.band_width))) {
+    return Number(cfg?.band_width);
+  }
+  return null;
+};
+
+/** The trained k rounded for display, or null before training. */
+export const anomalyTrainedK = (cfg: Record<string, any> | null | undefined): number | null => {
+  const k = isBlankNumber(cfg?.band_k) ? NaN : Number(cfg?.band_k);
+  return Number.isFinite(k) ? Math.round(k * 100) / 100 : null;
+};
+
+export const ANOMALY_DIRECTION_KEYS: Record<string, string> = {
+  both: "alerts.anomaly.directionBoth",
+  above: "alerts.anomaly.directionAbove",
+  below: "alerts.anomaly.directionBelow",
+};
+
+/** Window share as the server applies it: blank buckets mean 1, blank fire 100%, blank recover = fire. */
+export const anomalyWindowShareEffective = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: number; fire: number; recover: number } => {
+  const fire = isBlankNumber(cfg?.alert_window_fire_pct) ? 100 : Number(cfg?.alert_window_fire_pct);
+  return {
+    buckets: isBlankNumber(cfg?.alert_window_buckets) ? 1 : Number(cfg?.alert_window_buckets),
+    fire,
+    recover: isBlankNumber(cfg?.alert_window_recover_pct)
+      ? fire
+      : Number(cfg?.alert_window_recover_pct),
+  };
+};
+
+/** Locale keys for the window-share inputs that break the server's rules; null where the value is valid. */
+export const anomalyWindowShareErrors = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: string | null; fire: string | null; recover: string | null } => {
+  const buckets = cfg?.alert_window_buckets;
+  const fireRaw = cfg?.alert_window_fire_pct;
+  const recoverRaw = cfg?.alert_window_recover_pct;
+  const bucketsOk =
+    isBlankNumber(buckets) || (Number.isInteger(Number(buckets)) && Number(buckets) >= 1);
+  const fire = isBlankNumber(fireRaw) ? 100 : Number(fireRaw);
+  const fireOk = Number.isFinite(fire) && fire > 0 && fire <= 100;
+  const interval = anomalyIntervalSeconds(
+    Number(cfg?.histogram_interval_value),
+    String(cfg?.histogram_interval_unit),
+  );
+  // Mirrors the server rule: N > 1 buckets × resolution must fit in 24h; one looks back nowhere.
+  const spanOk =
+    !bucketsOk ||
+    isBlankNumber(buckets) ||
+    Number(buckets) <= 1 ||
+    interval === null ||
+    Number(buckets) * interval <= 86400;
+  const recover = Number(recoverRaw);
+  const recoverOk =
+    isBlankNumber(recoverRaw) ||
+    (Number.isFinite(recover) && recover > 0 && recover <= (fireOk ? fire : 100));
+  return {
+    buckets: !bucketsOk
+      ? "alerts.anomaly.windowBucketsRange"
+      : spanOk
+        ? null
+        : "alerts.anomaly.windowBucketsSpan",
+    fire: fireOk ? null : "alerts.anomaly.windowFireRange",
+    recover: recoverOk ? null : "alerts.anomaly.windowRecoverRange",
+  };
+};
+
+/** A stored per-day budget below 1 is surfaced as alerts/week. */
+export const budgetFieldsFromPerDay = (
+  perDay: number | null,
+): { budget_count: number; budget_period: "day" | "week" } => {
+  if (perDay === null) return { budget_count: 1, budget_period: "day" };
+  // Rounds only the DISPLAY decimals float noise introduces (1/7*7 = 0.9999…), never the magnitude.
+  const round = (n: number) => Math.round(n * 1e6) / 1e6;
+  return perDay < 1
+    ? { budget_count: round(perDay * 7), budget_period: "week" }
+    : { budget_count: round(perDay), budget_period: "day" };
+};
 
 /**
  * Typed defaults, projected from the parent-owned config object
@@ -163,9 +428,12 @@ export const anomalyDetectionConfigDefaults = (
   histogram_interval_unit: cfg?.histogram_interval_unit ?? "m",
   schedule_interval_value: cfg?.schedule_interval_value ?? 1,
   schedule_interval_unit: cfg?.schedule_interval_unit ?? "h",
-  detection_window_value: cfg?.detection_window_value ?? 1,
+  // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
+  detection_window_value: cfg?.detection_window_value ?? 3,
   detection_window_unit: cfg?.detection_window_unit ?? "h",
-  training_window_days: cfg?.training_window_days ?? 14,
+  training_window_days: cfg?.training_window_days ?? 28,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
-  threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
+  sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "band",
+  band_width: isBlankNumber(cfg?.band_width) ? null : Number(cfg?.band_width),
+  ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

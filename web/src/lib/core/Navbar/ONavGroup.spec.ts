@@ -7,6 +7,7 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ONavGroup from "./ONavGroup.vue";
 import type { SubnavChild } from "./ONavbar.types";
+import { NAV_GROUPS } from "./navGroups";
 
 // Hover debounce delays — keep in sync with OPEN_DELAY / CLOSE_DELAY in
 // ONavGroup.vue. The tests drive them with fake timers.
@@ -298,6 +299,169 @@ describe("ONavGroup", () => {
     });
   });
 
+  // Anchor-child tile link (4.7/§6): the child resolving to parentLink wins; gated out ⇒ first visible child.
+  describe("Infra tile with workload children (Hosts first)", () => {
+    // Exposes the resolved tile link so the anchor-child rule is assertable.
+    const linkedTileStub = {
+      template:
+        '<a data-test="tile" href="#" :data-link="link" @click.prevent="$emit(\'click\')">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+      emits: ["click", "keydown"],
+    };
+
+    const infraChildren = (): SubnavChild[] => [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
+      {
+        titleKey: "menu.databases",
+        icon: "database",
+        name: "dbmDatabases",
+        gate: "databaseMonitoring",
+      },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
+    ];
+
+    function infraRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/infra/hosts", name: "infraHosts", component: { template: "<div />" } },
+          { path: "/infra/databases", name: "dbmDatabases", component: { template: "<div />" } },
+          {
+            path: "/infra/kubernetes",
+            name: "infraKubernetes",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/infra/kubernetes-2",
+            name: "infraKubernetes2",
+            component: { template: "<div />" },
+          },
+          { path: "/streams", name: "logstreams", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    function infraStore(dbmEnabled: boolean, hiddenMenus = "") {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: {
+            database_monitoring_enabled: dbmEnabled,
+            custom_hide_menus: hiddenMenus,
+          },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    function mountInfraTile(
+      dbmEnabled: boolean,
+      { hiddenMenus = "", children = infraChildren(), parentLink = "/infra/databases" } = {},
+    ) {
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children,
+          parentItem: { link: parentLink, title: "Infra", icon: "dns", name: "infra" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    const tileLink = () => wrapper.find('[data-test="tile"]').attributes("data-link");
+
+    async function hoverOpenInfra() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+    }
+
+    it("keeps the Infra tile with the ungated children when DBM is off", async () => {
+      wrapper = mountInfraTile(false);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      await hoverOpenInfra();
+      const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+      expect(fly.find('[data-test="nav-group-item-infraHosts"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes2"]').exists()).toBe(true);
+      // Databases stays behind its runtime gate.
+      expect(fly.find('[data-test="nav-group-item-dbmDatabases"]').exists()).toBe(false);
+    });
+
+    it("lands the tile on /infra/hosts when the anchor child gates out (DBM off)", () => {
+      // The static parentLink would bounce off the DBM route guard onto Traces.
+      wrapper = mountInfraTile(false);
+      expect(tileLink()).toBe("/infra/hosts");
+    });
+
+    it("keeps /infra/databases as the tile link when DBM is on, despite Hosts being declared first", () => {
+      // Ungated Hosts always survives, so keying on "first declared" would re-break DBM-off.
+      wrapper = mountInfraTile(true);
+      expect(tileLink()).toBe("/infra/databases");
+    });
+
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
+      "custom_hide_menus can hide %s by route name",
+      async (name) => {
+        wrapper = mountInfraTile(true, { hiddenMenus: name });
+        await hoverOpenInfra();
+        const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+        expect(fly.find(`[data-test="nav-group-item-${name}"]`).exists()).toBe(false);
+      },
+    );
+
+    it("keeps parentLink verbatim for a group with no child resolving to it", () => {
+      wrapper = mountInfraTile(true, { parentLink: "/somewhere-else" });
+      expect(tileLink()).toBe("/somewhere-else");
+    });
+
+    it("retargets a NON-infra tile to its first visible child when its anchor child is hidden", () => {
+      // The anchor-child rule applies to every group: hiding the child that resolves
+      // to parentLink (custom_hide_menus) retargets the tile — release-noted behavior change.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true, "logstreams"), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/pipelines");
+    });
+
+    it("leaves every other group's tile link byte-identical to its parentLink", () => {
+      // The anchor child survives in every existing group, so they render bit-identically.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/streams");
+    });
+  });
+
   it("renders only children whose routes are registered", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({
@@ -467,6 +631,28 @@ describe("ONavGroup", () => {
     await wrapper.find('[data-test="tile"]').trigger("click");
     await flushPromises();
     expect(flyout().exists()).toBe(true);
+  });
+
+  it("stays open through a resize event a page dispatches without the window changing size", async () => {
+    wrapper = mountGroup();
+    await hoverOpen();
+    window.dispatchEvent(new Event("resize"));
+    await flushPromises();
+    expect(flyout().exists()).toBe(true);
+  });
+
+  it("closes when the window really changes size", async () => {
+    const width = window.innerWidth;
+    wrapper = mountGroup();
+    await hoverOpen();
+    try {
+      window.innerWidth = width + 200;
+      window.dispatchEvent(new Event("resize"));
+      await flushPromises();
+      expect(flyout().exists()).toBe(false);
+    } finally {
+      window.innerWidth = width;
+    }
   });
 
   it("closes the flyout after the pointer leaves the tile", async () => {
@@ -744,6 +930,119 @@ describe("ONavGroup", () => {
       expect(query.get("query")).toBe("c2VydmljZQ==");
     });
   });
+  describe("Experience flyout", () => {
+    const view = { template: "<div />" };
+    const experienceChildren = NAV_GROUPS.find((g) => g.key === "experience")!.children;
+    const tileStub = {
+      template: '<a data-test="tile" :data-active="String(active)" :href="link">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+    };
+
+    async function mountAt(path: string, hidden = "") {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: view },
+          { path: "/rum", name: "RUM", component: view },
+          { path: "/synthetics", name: "synthetics", component: view },
+          {
+            path: "/product-analytics",
+            name: "productAnalytics",
+            component: { template: "<router-view />" },
+            children: [
+              { path: "overview", name: "productAnalyticsOverview", component: view },
+              { path: "funnels", name: "productAnalyticsFunnels", component: view },
+              { path: "funnels/build", name: "productAnalyticsFunnelBuilder", component: view },
+              { path: "paths", name: "productAnalyticsPaths", component: view },
+              { path: "retention", name: "productAnalyticsRetention", component: view },
+              { path: "events", name: "productAnalyticsEvents", component: view },
+            ],
+          },
+          {
+            path: "/product-analytics/events/new",
+            name: "productAnalyticsEventNew",
+            component: view,
+          },
+          {
+            path: "/product-analytics/events/:id/edit",
+            name: "productAnalyticsEventEdit",
+            component: view,
+          },
+        ],
+      });
+      router.push(path);
+      await router.isReady();
+      const pageStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { custom_hide_menus: hidden },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "experience",
+          title: "Experience",
+          icon: "devices",
+          children: experienceChildren,
+          parentItem: { link: "/rum", title: "Experience", icon: "devices", name: "experience" },
+        },
+        global: {
+          plugins: [router, pageStore, i18n],
+          stubs: { MenuLink: tileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    const items = (w: VueWrapper) =>
+      w.findAll('[data-test^="nav-group-item-"]').map((el) => el.attributes("data-test"));
+    const active = (w: VueWrapper) =>
+      w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test"));
+
+    it("lists RUM, Synthetics and Product Analytics in that order", async () => {
+      wrapper = await mountAt("/");
+      expect(items(wrapper)).toEqual([
+        "nav-group-item-RUM",
+        "nav-group-item-synthetics",
+        "nav-group-item-productAnalytics",
+      ]);
+      expect(wrapper.get('[data-test="nav-group-item-productAnalytics"]').attributes("href")).toBe(
+        "/product-analytics?org_identifier=default",
+      );
+    });
+
+    it.each([
+      "/product-analytics",
+      "/product-analytics/overview",
+      "/product-analytics/paths",
+      "/product-analytics/funnels/build",
+      "/product-analytics/events/new",
+      "/product-analytics/events/abc/edit",
+    ])("on %s lights the tile and only Product Analytics", async (path) => {
+      wrapper = await mountAt(path);
+      expect(wrapper.get('[data-test="tile"]').attributes("data-active")).toBe("true");
+      expect(active(wrapper)).toEqual(["nav-group-item-productAnalytics"]);
+    });
+
+    it("lights only RUM on the RUM page", async () => {
+      wrapper = await mountAt("/rum");
+      expect(active(wrapper)).toEqual(["nav-group-item-RUM"]);
+    });
+
+    it("drops only Product Analytics when custom_hide_menus names it", async () => {
+      wrapper = await mountAt("/", "productAnalytics");
+      expect(items(wrapper)).toEqual(["nav-group-item-RUM", "nav-group-item-synthetics"]);
+    });
+  });
+
   // A child with no top-level rail entry of its own (Alert Library, Destinations,
   // Enrichment Tables…) is unreachable by MainLayout's linksList filter, and
   // `requires` only tracks its PARENT. Matching custom_hide_menus against the

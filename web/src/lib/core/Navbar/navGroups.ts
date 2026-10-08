@@ -15,6 +15,7 @@
 
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
 import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -43,6 +44,10 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Pipelines: the Stream Pipelines tab hides when custom_hide_menus lists
   // "pipelines" — mirrors PipelineSectionTabs.vue exactly.
   streamPipelines: (c) => !c.hiddenMenus.has("pipelines"),
+  // On-call: backend /config flag `oncall_enabled` (enterprise
+  // O2_ONCALL_ENABLED). `!== false`, matching oncallRouteGuard, so the flyout
+  // does not blink out while /config is still in flight on a cold load.
+  oncall: (c) => c.oncallEnabled,
   // The runtime flag is the whole gate for the MENU ENTRY, which is not
   // enterprise-only. Three of Database Monitoring's seven tabs (deadlocks,
   // blocked queries, table health) ARE enterprise-only, but they are gated
@@ -129,7 +134,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.reliability",
     icon: "shield",
     parentLink: "/alerts",
-    absorbs: ["alertList", "sloList", "incidentList"],
+    absorbs: ["alertList", "sloList", "incidentList", "onCallResponses"],
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
@@ -190,6 +195,34 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "incidentList",
         requires: "incidentList",
       },
+      // A page is where an alert escalates to a person, so On-Call sits in the
+      // same workflow tile rather than as its own rail entry. Pages, Teams and
+      // Routing share the "On-Call" category header so the flyout reads as one
+      // module with three destinations, not three unrelated reliability
+      // entries. `gate: "oncall"` is the single place the O2_ONCALL_ENABLED
+      // flag is read for navigation, and `router.hasRoute` already limits this
+      // to the enterprise/cloud build.
+      {
+        titleKey: "oncall.pagesNav",
+        icon: "notifications-active",
+        name: "onCallResponses",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.teams",
+        icon: "group-work",
+        name: "onCallTeams",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.routingNav",
+        icon: "alt-route",
+        name: "onCallRouting",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
+      },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where
       // Incidents is enabled, matching the enterprise/cloud + incidents_enabled
@@ -206,9 +239,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     key: "infra",
     titleKey: "menu.infra",
     icon: "dns",
-    // The tile lands on Database Monitoring — today its only destination, and
-    // the one that stays correct as the section grows, since a new Infra page
-    // would be added after it rather than in front of it.
+    // DBM-off orgs don't land here: ONavGroup's anchor-child fallback retargets the tile (tileLink).
     parentLink: "/infra/databases",
     // Nothing to absorb: Infra is a NEW rail section, not a fold of existing
     // tiles. Database Monitoring only ever lived inside the Traces flyout, so
@@ -227,12 +258,12 @@ export const NAV_GROUPS: NavGroupDef[] = [
     // it immediately below the Reliability tile. Moving it back below Data here
     // would silently drop it one slot.
     placeAfter: "reliability",
+    // Hosts leads the flyout; the workload children are ungated on purpose — detection changes page state, never existence.
     children: [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
       // Moved here from the Traces flyout. The routes are always registered
       // (the guard redirects when the feature is off), so the `gate` is what
-      // keeps the link out of the menu — and, because it is Infra's only child,
-      // what keeps the Infra TILE off the rail entirely (ONavGroup renders
-      // nothing when no child survives gating).
+      // keeps the link out of the menu.
       //
       // ONE entry, not two: Databases and Top queries are two views of the same
       // dataset over the same scope, so they are in-page tabs (DbmSectionTabs)
@@ -258,6 +289,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         // one list for both builds; the gate lives in the route, as it does for
         // the section itself.
         activeOnRoutes: [
+          "dbmMetrics",
           "dbmQueries",
           "dbmSamples",
           "dbmQueryDetail",
@@ -267,6 +299,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
           "dbmTableHealth",
         ],
       },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
     ],
   },
   {
@@ -327,10 +361,19 @@ export const NAV_GROUPS: NavGroupDef[] = [
     icon: "devices",
     // RUM's route always exists; Synthetics is feature-gated, so land on RUM.
     parentLink: "/rum",
-    absorbs: ["rum", "synthetics"],
+    absorbs: ["rum", "synthetics", "productAnalytics"],
     children: [
       { titleKey: "menu.rum", title: "RUM", icon: "devices", name: "RUM", requires: "rum" },
       { titleKey: "menu.synthetic", icon: "radar", name: "synthetics", requires: "synthetics" },
+      // The event editors sit outside the shell route, so name every PA route rather than rely on the path prefix.
+      {
+        titleKey: "menu.productAnalytics",
+        icon: "insights",
+        name: PA_ROUTES.shell,
+        requires: PA_ROUTES.shell,
+        activeOnRoutes: Object.values(PA_ROUTES),
+        beta: true,
+      },
     ],
   },
 ];
@@ -397,7 +440,23 @@ export function groupNavLinks(
   links: NavItem[],
   // `raw` brands the key unchanged — the identity fallback for callers with no translator.
   t: TranslateFn = raw,
+  /**
+   * Evaluates a child's `gate` (see GATE_PREDICATES). It has to be applied HERE
+   * and not only in the flyout: a child that a gate will remove must not count
+   * towards "is this group worth existing", or a single ungated survivor ends
+   * up inside a one-item flyout instead of staying a plain rail link.
+   * Defaults to open, matching the component's own "an unknown gate shows".
+   */
+  gateOpen: (gate: string) => boolean = () => true,
 ): RailEntry[] {
+  // An empty input means the caller isn't ready yet (e.g. MainLayout holds
+  // `linksList` back to `[]` until `menuReady`, specifically to avoid tiles
+  // popping in). A `standalone` group's children never carry `requires`, so
+  // without this guard it would still qualify and render alone — the one rail
+  // entry that doesn't depend on any item being present — until the real list
+  // arrives a beat later.
+  if (links.length === 0) return [];
+
   const presentNames = new Set(links.map((l) => l.name));
 
   // Activate a COLLAPSING group only when it has ≥1 present absorbed item AND
@@ -413,7 +472,9 @@ export function groupNavLinks(
   const groupChildren = new Map<string, SubnavChild[]>();
   const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
-    const children = def.children.filter((c) => !c.requires || presentNames.has(c.requires));
+    const children = def.children.filter(
+      (c) => (!c.requires || presentNames.has(c.requires)) && (!c.gate || gateOpen(c.gate)),
+    );
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
     if (def.standalone) {
       if (children.length === 0) continue;

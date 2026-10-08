@@ -34,6 +34,7 @@ use config::{
             VALUE_LABEL,
         },
         stream::{StreamSettings, StreamType},
+        traces::ALL_INFER_FIELDS,
     },
     metrics,
     utils::{
@@ -59,6 +60,17 @@ pub use watcher::{
 };
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
+/// Shared by both ingestion-window discard messages and the test for them.
+const WINDOW_DISCARD_MARKER: &str = " data can be ingested. Data discarded.";
+
+/// True when this error is an ingestion-window POLICY drop rather than a record
+/// that could not be prepared.
+///
+/// The window drops by design on every route, so a caller must be able to keep
+/// reporting success for the rest of the batch instead of failing all of it.
+pub fn is_window_discard_error(e: &anyhow::Error) -> bool {
+    e.to_string().contains(WINDOW_DISCARD_MARKER)
+}
 
 pub fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
@@ -75,10 +87,35 @@ pub fn get_future_discard_error() -> anyhow::Error {
 }
 
 pub fn get_request_columns_limit_error(stream_name: &str, num_fields: usize) -> anyhow::Error {
-    anyhow::anyhow!(
+    infra::errors::Error::ColumnsLimitExceeded(format!(
         "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_columns>",
         get_config().limit.req_cols_per_record_limit
-    )
+    ))
+    .into()
+}
+
+/// The `ZO_COLS_PER_RECORD_LIMIT` rule, with the ingest-error counter the rejection is counted by.
+pub fn check_request_columns_limit(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    num_fields: usize,
+) -> Result<(), anyhow::Error> {
+    if num_fields <= get_config().limit.req_cols_per_record_limit {
+        return Ok(());
+    }
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            stream_type.as_str(),
+            stream_name,
+            SCHEMA_CONFORMANCE_FAILED,
+        ])
+        .inc();
+    Err(get_request_columns_limit_error(
+        &format!("{org_id}/{stream_type}/{stream_name}"),
+        num_fields,
+    ))
 }
 
 #[derive(Debug)]
@@ -107,9 +144,10 @@ pub struct SavedStreamSettings {
 
 /// Validate, normalize, and persist stream settings stored in schema metadata.
 ///
-/// This is the canonical settings write path for both the stream service and schema
-/// auto-evolution. Callers should only publish the returned settings to local caches after this
-/// function succeeds.
+/// This is the canonical settings write path outside schema auto-evolution, which persists through
+/// `save_stream_settings_with_schema` and publishes to the caches itself. On success it also
+/// refreshes this node's latest-schema and settings caches, so callers need not publish the
+/// returned settings themselves.
 pub async fn save_stream_settings(
     org_id: &str,
     stream_name: &str,
@@ -120,7 +158,48 @@ pub async fn save_stream_settings(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .map_err(|_| StreamSettingsError::NotFound("stream not found".to_string()))?;
-    persist_stream_settings(org_id, stream_name, stream_type, &schema, settings).await
+    let saved =
+        persist_stream_settings(org_id, stream_name, stream_type, &schema, settings).await?;
+    refresh_local_stream_cache(org_id, stream_name, stream_type).await;
+    Ok(saved)
+}
+
+/// Reload this node's latest-schema and settings caches for a stream from the DB after a settings
+/// write. The schema versions cache (`STREAM_SCHEMAS`) is left to the watcher.
+///
+/// The schema watcher refreshes these caches too, but asynchronously, so without this a read on
+/// this node right after the write can still be served the previous settings, and a following
+/// settings update would start from them. Reading back from the DB, rather than caching the
+/// settings just written, picks up whatever a concurrent writer committed before the read. As with
+/// the unconditional cache insert in `handle_diff_schema`, the read and the insert are not atomic:
+/// a write or delete that commits in between, and that the watcher has already applied, can be
+/// overwritten here until the stream's next write. Other nodes catch up only through the watcher.
+async fn refresh_local_stream_cache(org_id: &str, stream_name: &str, stream_type: StreamType) {
+    let schema = match infra::schema::get_from_db(org_id, stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::warn!(
+                "refresh stream cache after settings write [{org_id}/{stream_type}/{stream_name}]: {e}"
+            );
+            return;
+        }
+    };
+    if schema.fields().is_empty() && schema.metadata().is_empty() {
+        return;
+    }
+    let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+    let settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if (settings.store_original_data || settings.index_original_data)
+        && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone())
+    {
+        entry.insert(SnowflakeIdGenerator::new(
+            LOCAL_NODE_ID.load(Ordering::Relaxed),
+        ));
+    }
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.insert(cache_key.clone(), SchemaCache::new(schema));
+    drop(w);
+    infra::schema::put_stream_settings(cache_key, Arc::new(settings)).await;
 }
 
 async fn save_stream_settings_with_schema(
@@ -419,7 +498,6 @@ pub async fn check_for_schema(
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
-    let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
 
     // get infer schema
@@ -437,20 +515,12 @@ pub async fn check_for_schema(
         ));
     }
 
-    if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit {
-        metrics::INGEST_ERRORS
-            .with_label_values(&[
-                org_id,
-                stream_type.as_str(),
-                stream_name,
-                SCHEMA_CONFORMANCE_FAILED,
-            ])
-            .inc();
-        return Err(get_request_columns_limit_error(
-            &format!("{org_id}/{stream_type}/{stream_name}"),
-            inferred_schema.fields.len(),
-        ));
-    }
+    check_request_columns_limit(
+        org_id,
+        stream_type,
+        stream_name,
+        inferred_schema.fields.len(),
+    )?;
 
     let mut need_insert_new_latest = false;
     let is_new = schema.schema().fields().is_empty();
@@ -594,6 +664,8 @@ pub async fn handle_diff_schema(
     if let Some(updated_schema) = read_cache.get(&cache_key)
         && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
     {
+        // the caller still holds the schema it started from, empty for a just-created stream
+        stream_schema_map.insert(stream_name.to_string(), updated_schema.clone());
         return Ok(None);
     }
     drop(read_cache);
@@ -884,6 +956,8 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("end_time".to_string());
             fields.insert("duration".to_string());
             fields.insert("events".to_string());
+            // ingest-derived join keys are not user attributes, so UDS keeps them
+            fields.extend(ALL_INFER_FIELDS.iter().map(|f| f.to_string()));
             // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
             for field in schema.fields() {
                 let name = field.name();
@@ -991,6 +1065,24 @@ mod tests {
 
     use super::*;
 
+    /// The predicate that lets a caller keep reporting success for the rest of a
+    /// batch when only the ingestion window rejected some events.
+    #[test]
+    fn window_discards_are_told_apart_from_real_failures() {
+        assert!(is_window_discard_error(&get_upto_discard_error()));
+        assert!(is_window_discard_error(&get_future_discard_error()));
+
+        assert!(!is_window_discard_error(&get_request_columns_limit_error(
+            "s", 9999
+        )));
+        assert!(!is_window_discard_error(&anyhow::anyhow!(
+            "Can't parse timestamp"
+        )));
+        assert!(!is_window_discard_error(&anyhow::anyhow!(
+            "Record flattening error"
+        )));
+    }
+
     #[test]
     fn test_normalize_stream_settings_index_fields_updated_at() {
         let mut settings = StreamSettings {
@@ -1064,6 +1156,48 @@ mod tests {
         assert!(names.contains(&"field0".to_string()));
         assert!(names.contains(&"field1".to_string()));
         assert!(!names.contains(&"field2".to_string()));
+    }
+
+    #[test]
+    fn test_generate_schema_for_defined_schema_fields_keeps_infer_columns_for_traces() {
+        let mut fields = vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true)];
+        for name in ALL_INFER_FIELDS {
+            fields.push(Field::new(name, DataType::Utf8, true));
+        }
+        for i in 0..15 {
+            fields.push(Field::new(format!("field{i}"), DataType::Utf8, true));
+        }
+        let schema = SchemaCache::new(Schema::new(fields));
+        let defined_fields = vec!["field0".to_string()];
+
+        let names = |stream_type| {
+            generate_schema_for_defined_schema_fields(
+                stream_type,
+                &schema,
+                &defined_fields,
+                false,
+                false,
+                false,
+            )
+            .schema()
+            .fields()
+            .iter()
+            .map(|field| field.name().to_string())
+            .collect::<HashSet<_>>()
+        };
+
+        let traces = names(StreamType::Traces);
+        for name in ALL_INFER_FIELDS {
+            assert!(
+                traces.contains(name),
+                "{name} dropped from the traces UDS schema"
+            );
+        }
+        assert!(traces.contains("field0"));
+        assert!(!traces.contains("field1"));
+
+        let logs = names(StreamType::Logs);
+        assert!(ALL_INFER_FIELDS.iter().all(|name| !logs.contains(*name)));
     }
 
     #[test]
@@ -1199,6 +1333,98 @@ mod tests {
         .await
         .unwrap();
         assert!(!result.is_schema_changed);
+    }
+
+    /// The loser of a create race must adopt the winner's schema, not keep its empty one.
+    #[tokio::test]
+    async fn test_check_for_schema_adopts_schema_another_writer_created() {
+        let org_name = "nexus";
+        let stream_name = "race_created_by_peer";
+        let record: json::Value =
+            json::from_str(r#"{"city": "Athens", "_timestamp": 1234234234234}"#).unwrap();
+
+        let peer_schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_name}/{}/{stream_name}", StreamType::Logs),
+            SchemaCache::new(peer_schema),
+        );
+
+        let mut map: HashMap<String, SchemaCache> = HashMap::new();
+        map.insert(stream_name.to_string(), SchemaCache::new(Schema::empty()));
+        check_for_schema(
+            org_name,
+            stream_name,
+            StreamType::Logs,
+            &mut map,
+            vec![record.as_object().unwrap()],
+            1234234234234,
+            false,
+        )
+        .await
+        .unwrap();
+
+        let adopted = map.get(stream_name).unwrap().schema();
+        assert_eq!(adopted.fields().len(), 2);
+        assert!(adopted.field_with_name("city").is_ok());
+    }
+
+    /// A settings save must be visible to this node's next read, without waiting for the watcher.
+    /// The watcher is not running in unit tests, so only the synchronous refresh can update the
+    /// caches here.
+    #[tokio::test]
+    async fn test_save_stream_settings_refreshes_local_cache() {
+        let org_id = "cache_refresh_org";
+        let stream_name = "settings_read_after_write";
+        let stream_type = StreamType::Logs;
+        let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        infra::db::create_table().await.unwrap();
+        let old_settings = StreamSettings {
+            enable_distinct_fields: false,
+            ..Default::default()
+        };
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&old_settings).unwrap(),
+        );
+        infra::schema::update_setting(org_id, stream_name, stream_type, metadata)
+            .await
+            .unwrap();
+
+        // Prime both caches with the old settings, as an earlier read would.
+        infra::schema::get_cache(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        let before = infra::schema::get_settings(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        assert!(!before.enable_distinct_fields);
+
+        let settings = StreamSettings {
+            enable_distinct_fields: true,
+            ..Default::default()
+        };
+        save_stream_settings(org_id, stream_name, stream_type, settings)
+            .await
+            .unwrap();
+
+        let schema = infra::schema::get(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        assert!(
+            unwrap_stream_settings(&schema)
+                .unwrap()
+                .enable_distinct_fields
+        );
+        assert!(
+            infra::schema::get_stream_settings_atomic(&cache_key)
+                .unwrap()
+                .enable_distinct_fields
+        );
     }
 
     #[tokio::test]

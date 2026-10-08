@@ -38,7 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`alert-section-tab-${section.key}`"
     >
       <OIcon :name="section.icon" size="sm" class="shrink-0" />
-      <span>{{ section.label }}</span>
+      <span :class="section.key === activeSectionKey ? '' : 'max-md:hidden'">{{
+        section.label
+      }}</span>
     </OTab>
   </OTabs>
 </template>

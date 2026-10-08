@@ -5,7 +5,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -99,6 +99,7 @@ describe("Custom Component", () => {
       expect(Array.isArray(wrapper.vm.rumRoutes)).toBe(true);
       expect(Array.isArray(wrapper.vm.traceRoutes)).toBe(true);
       expect(Array.isArray(wrapper.vm.metricRoutes)).toBe(true);
+      expect(Array.isArray(wrapper.vm.profileRoutes)).toBe(true);
 
       expect(wrapper.vm.metricRoutes).toEqual([
         "prometheus",
@@ -111,6 +112,7 @@ describe("Custom Component", () => {
       ]);
 
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP", "ingestTracesFromOtel"]);
+      expect(wrapper.vm.profileRoutes).toEqual(["profilesOtelCollector"]);
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
     });
   });
@@ -180,6 +182,28 @@ describe("Custom Component", () => {
       });
 
       expect(wrapper.vm.tabs).toBe("ingestTraces");
+    });
+
+    it("should set tabs to 'ingestProfiles' for profiles routes", () => {
+      mockRouter.currentRoute.value.name = "profilesOtelCollector";
+
+      wrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            },
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.tabs).toBe("ingestProfiles");
     });
 
     it("should handle custom route by redirecting to curl", () => {
@@ -260,11 +284,11 @@ describe("Custom Component", () => {
       });
     });
 
-    it("should track segment analytics for copy action", async () => {
+    it("should track product analytics for copy action", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       const mockContent = {
         innerText: "test content",
@@ -272,7 +296,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: mockRouter.currentRoute.value.name,
         user_org: store.state.selectedOrganization.identifier,
@@ -794,12 +818,12 @@ describe("Custom Component", () => {
     });
   });
 
-  describe("Segment Analytics", () => {
+  describe("Product Analytics", () => {
     it("should track analytics with correct parameters for different routes", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       // Test with different route
       mockRouter.currentRoute.value.name = "prometheus";
@@ -810,7 +834,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "prometheus",
         user_org: store.state.selectedOrganization.identifier,
@@ -823,7 +847,7 @@ describe("Custom Component", () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("Copy failed"));
 
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       const mockContent = {
         innerText: "test analytics content",
@@ -835,8 +859,8 @@ describe("Custom Component", () => {
         // Expected error
       }
 
-      // segment.track is only called on success, so it should NOT be called on failure
-      expect(segment.default.track).not.toHaveBeenCalled();
+      // analytics.track is only called on success, so it should NOT be called on failure
+      expect(analytics.default.track).not.toHaveBeenCalled();
     });
   });
 

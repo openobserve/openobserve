@@ -25,29 +25,32 @@ let shouldSearchThrow = false;
 let shouldPartitionThrow = false;
 let shouldMetricsThrow = false;
 
-vi.mock("../../services/search", () => ({
-  default: {
-    partition: vi.fn().mockImplementation(() => {
-      if (shouldPartitionThrow) {
-        return Promise.reject(new Error("Partition service error"));
-      }
-      return Promise.resolve(mockPartitionResults);
-    }),
-    search: vi.fn().mockImplementation(() => {
-      if (shouldSearchThrow) {
-        return Promise.reject(new Error("Search service error"));
-      }
-      return Promise.resolve({ data: mockSearchResults });
-    }),
-    metrics_query_range: vi.fn().mockImplementation(() => {
-      if (shouldMetricsThrow) {
-        return Promise.reject(new Error("Metrics service error"));
-      }
-      return Promise.resolve(mockMetricsResults);
-    }),
-    delete_running_queries: vi.fn().mockResolvedValue({ status: "success" }),
-  },
-}));
+vi.mock("../../services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      partition: vi.fn().mockImplementation(() => {
+        if (shouldPartitionThrow) {
+          return Promise.reject(new Error("Partition service error"));
+        }
+        return Promise.resolve(mockPartitionResults);
+      }),
+      search: vi.fn().mockImplementation(() => {
+        if (shouldSearchThrow) {
+          return Promise.reject(new Error("Search service error"));
+        }
+        return Promise.resolve({ data: mockSearchResults });
+      }),
+      metrics_query_range: vi.fn().mockImplementation(() => {
+        if (shouldMetricsThrow) {
+          return Promise.reject(new Error("Metrics service error"));
+        }
+        return Promise.resolve(mockMetricsResults);
+      }),
+      delete_running_queries: vi.fn().mockResolvedValue({ status: "success" }),
+    },
+  });
+});
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -70,7 +73,8 @@ vi.mock("@/utils/query/sqlUtils", () => ({
   getStreamFromQuery: vi.fn(() => Promise.resolve("test_stream")),
 }));
 
-vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
+vi.mock("@/utils/dashboard/variables/variablesUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/dashboard/variables/variablesUtils")>()),
   formatInterval: vi.fn(() => ({ value: 5, unit: "m" })),
   formatRateInterval: vi.fn(() => "5m"),
   getTimeInSecondsBasedOnUnit: vi.fn(() => 300),
@@ -161,10 +165,12 @@ vi.mock("./useAnnotations", () => ({
 
 // Enhanced HTTP Streaming mocking
 let shouldStreamingThrow = false;
+let streamOverride: ((payload: any, callbacks: any) => any) | null = null;
 
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi.fn().mockImplementation((payload, callbacks) => {
+      if (streamOverride) return streamOverride(payload, callbacks);
       if (shouldStreamingThrow) {
         callbacks?.error?.(payload, { message: "Streaming error" });
         return "error-stream-id";
@@ -261,6 +267,7 @@ const resetAllMocks = () => {
 
   // Reset streaming mocks
   shouldStreamingThrow = false;
+  streamOverride = null;
 
   // Reset cache mocks
   mockCacheData = null;
@@ -1496,6 +1503,52 @@ describe("usePanelDataLoader", () => {
 
         expect(loader.errorDetail.value.message).toBeDefined();
       });
+    });
+  });
+
+  describe("superseded runs", () => {
+    it("a stream completing while the rerun is debounced writes nothing", async () => {
+      const streams: any[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema(),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+      expect(streams).toHaveLength(1);
+      const cacheWritesBefore = cacheOperationCount;
+
+      const rerun = loader.loadData();
+      const [{ payload, callbacks }] = streams;
+      callbacks.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ value: "stale" }] } },
+      });
+      callbacks.data(payload, { type: "end" });
+      await callbacks.complete(payload, { type: "end" });
+
+      expect(JSON.stringify(loader.data.value)).not.toContain("stale");
+      expect(loader.loading.value).toBe(true);
+      expect(cacheOperationCount).toBe(cacheWritesBefore);
+      await rerun;
     });
   });
 

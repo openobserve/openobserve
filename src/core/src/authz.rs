@@ -106,6 +106,70 @@ pub async fn check_stream_permissions(
     }
 }
 
+/// Requires GET permission on every cipher key the SQL references; `None` means allowed.
+#[cfg(feature = "enterprise")]
+pub async fn check_cipher_key_permissions(
+    org_id: &str,
+    user_id: &str,
+    sql: &str,
+) -> Option<Response> {
+    check_cipher_key_permissions_multi(org_id, user_id, std::slice::from_ref(&sql)).await
+}
+
+/// [`check_cipher_key_permissions`] over several statements, checking each distinct key once.
+#[cfg(feature = "enterprise")]
+pub async fn check_cipher_key_permissions_multi(
+    org_id: &str,
+    user_id: &str,
+    sqls: &[&str],
+) -> Option<Response> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let mut keys_used = Vec::new();
+    for sql in sqls {
+        match search::sql::visitor::cipher_key::get_cipher_key_names(sql) {
+            Ok(v) => keys_used.extend(v),
+            Err(e) => return Some(MetaHttpResponse::bad_request(e.to_string())),
+        }
+    }
+    keys_used.sort_unstable();
+    keys_used.dedup();
+    if keys_used.is_empty() || is_root_user(user_id) {
+        return None;
+    }
+    log::info!("keys used : {keys_used:?}");
+
+    let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+        return Some(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+    };
+    let key_model = OFGA_MODELS
+        .get("cipher_keys")
+        .map_or("cipher_keys", |model| model.key);
+    for key in keys_used {
+        let allowed = check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: "GET".to_string(),
+                o2_type: format!("{key_model}:{key}"),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: true,
+            },
+            user.role.clone(),
+            user.is_external,
+        )
+        .await;
+        if !allowed {
+            return Some(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+        }
+    }
+    None
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn check_permissions(
     user_id: &str,
@@ -119,7 +183,7 @@ pub async fn check_permissions(
         return true;
     }
 
-    if o2_enterprise::enterprise::license::block_feature_for_report_failure().await {
+    if report_failure_lifts_rbac().await {
         return true;
     }
 
@@ -172,4 +236,27 @@ pub async fn list_objects_for_user(
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
+}
+
+/// Never before the first usage report: an unloaded license also reads as a reporting failure.
+#[cfg(feature = "enterprise")]
+pub async fn report_failure_lifts_rbac() -> bool {
+    use o2_enterprise::enterprise::license::{
+        block_feature_for_report_failure, last_reported_timestamp,
+    };
+    block_feature_for_report_failure().await && last_reported_timestamp().await > 0
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn report_failure_does_not_lift_rbac_before_any_report() {
+        assert_eq!(
+            o2_enterprise::enterprise::license::last_reported_timestamp().await,
+            0
+        );
+        assert!(!report_failure_lifts_rbac().await);
+    }
 }

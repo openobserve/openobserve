@@ -120,6 +120,8 @@ impl PricingTier {
 pub struct ModelPricing {
     /// Pattern to match model names (supports regex)
     pub pattern: String,
+    /// Plain model id the pattern stands for; the display name, never regex text
+    pub canonical: String,
     /// Pricing tiers (evaluated in order, first matching tier is used)
     pub tiers: Vec<PricingTier>,
     /// Pre-compiled regex for efficient matching in the hot path.
@@ -128,9 +130,10 @@ pub struct ModelPricing {
 
 impl ModelPricing {
     /// Create a simple model pricing with a single tier
-    pub fn simple(pattern: &str, input_price: f64, output_price: f64) -> Self {
+    pub fn simple(pattern: &str, canonical: &str, input_price: f64, output_price: f64) -> Self {
         Self {
             pattern: pattern.to_string(),
+            canonical: canonical.to_string(),
             tiers: vec![PricingTier {
                 input_price_per_million: input_price,
                 output_price_per_million: output_price,
@@ -141,9 +144,10 @@ impl ModelPricing {
     }
 
     /// Create a tiered pricing model (e.g., for Claude Sonnet with extended context)
-    pub fn tiered(pattern: &str, tiers: Vec<PricingTier>) -> Self {
+    pub fn tiered(pattern: &str, canonical: &str, tiers: Vec<PricingTier>) -> Self {
         Self {
             pattern: pattern.to_string(),
+            canonical: canonical.to_string(),
             tiers,
             compiled: Regex::new(pattern).expect("invalid regex in model pricing pattern"),
         }
@@ -154,6 +158,7 @@ impl ModelPricing {
     /// rate; everything else falls through to the off-peak rate.
     pub fn peak_off_peak(
         pattern: &str,
+        canonical: &str,
         peak_windows: Vec<UtcTimeWindow>,
         peak_input: f64,
         peak_output: f64,
@@ -162,6 +167,7 @@ impl ModelPricing {
     ) -> Self {
         Self::tiered(
             pattern,
+            canonical,
             vec![
                 PricingTier {
                     utc_windows: peak_windows,
@@ -218,39 +224,55 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
     vec![
         // OpenAI Models
         // Reference: https://developers.openai.com/api/docs/pricing/
-        ModelPricing::simple("gpt-5\\.2-pro", 21.00, 168.00),
-        ModelPricing::simple("gpt-5\\.2", 1.75, 14.00),
-        ModelPricing::simple("gpt-5\\.1", 1.25, 10.00),
-        ModelPricing::simple("gpt-5-pro", 15.00, 120.00),
-        ModelPricing::simple("gpt-5-mini", 0.25, 2.00),
-        ModelPricing::simple("gpt-5-nano", 0.05, 0.40),
-        ModelPricing::simple("gpt-5", 1.25, 10.00),
-        ModelPricing::simple("gpt-4\\.1-mini", 0.40, 1.60),
-        ModelPricing::simple("gpt-4\\.1", 2.00, 8.00),
-        ModelPricing::simple("gpt-4o-mini", 0.15, 0.60),
-        ModelPricing::simple("gpt-4o", 2.50, 10.00),
-        ModelPricing::simple("o1-pro", 150.00, 600.00),
-        ModelPricing::simple("o1", 15.00, 60.00),
-        ModelPricing::simple("o3-pro", 20.00, 80.00),
-        ModelPricing::simple("o3-mini", 1.10, 4.40),
-        ModelPricing::simple("o3", 2.00, 8.00),
-        ModelPricing::simple("o4-mini", 1.10, 4.40),
-        ModelPricing::simple("gpt-image-1\\.5", 8.00, 32.00),
-        ModelPricing::simple("gpt-image-1-mini", 2.50, 8.00),
-        ModelPricing::simple("gpt-image-1", 10.00, 40.00),
-        ModelPricing::simple("gpt-4-turbo", 10.00, 30.00),
-        ModelPricing::simple("gpt-4-32k", 60.00, 120.00),
-        ModelPricing::simple("gpt-4-0125-preview", 10.00, 30.00),
-        ModelPricing::simple("gpt-4-1106-preview", 10.00, 30.00),
-        ModelPricing::simple("gpt-4", 30.00, 60.00),
-        ModelPricing::simple("gpt-3\\.5-turbo", 0.50, 1.50),
-        ModelPricing::simple("gpt-3\\.5", 0.50, 1.50),
-        ModelPricing::simple("text-embedding-3-large", 0.13, 0.0),
-        ModelPricing::simple("text-embedding-3-small", 0.02, 0.0),
-        ModelPricing::simple("text-embedding-ada-002", 0.10, 0.0),
+        ModelPricing::simple("gpt-5\\.2-pro", "gpt-5.2-pro", 21.00, 168.00),
+        ModelPricing::simple("gpt-5\\.2", "gpt-5.2", 1.75, 14.00),
+        ModelPricing::simple("gpt-5\\.1", "gpt-5.1", 1.25, 10.00),
+        ModelPricing::simple("gpt-5-pro", "gpt-5-pro", 15.00, 120.00),
+        ModelPricing::simple("gpt-5-mini", "gpt-5-mini", 0.25, 2.00),
+        ModelPricing::simple("gpt-5-nano", "gpt-5-nano", 0.05, 0.40),
+        ModelPricing::simple("gpt-5", "gpt-5", 1.25, 10.00),
+        ModelPricing::simple("gpt-4\\.1-mini", "gpt-4.1-mini", 0.40, 1.60),
+        ModelPricing::simple("gpt-4\\.1", "gpt-4.1", 2.00, 8.00),
+        ModelPricing::simple("gpt-4o-mini", "gpt-4o-mini", 0.15, 0.60),
+        ModelPricing::simple("gpt-4o", "gpt-4o", 2.50, 10.00),
+        ModelPricing::simple("o1-pro", "o1-pro", 150.00, 600.00),
+        ModelPricing::simple("o1", "o1", 15.00, 60.00),
+        ModelPricing::simple("o3-pro", "o3-pro", 20.00, 80.00),
+        ModelPricing::simple("o3-mini", "o3-mini", 1.10, 4.40),
+        ModelPricing::simple("o3", "o3", 2.00, 8.00),
+        ModelPricing::simple("o4-mini", "o4-mini", 1.10, 4.40),
+        ModelPricing::simple("gpt-image-1\\.5", "gpt-image-1.5", 8.00, 32.00),
+        ModelPricing::simple("gpt-image-1-mini", "gpt-image-1-mini", 2.50, 8.00),
+        ModelPricing::simple("gpt-image-1", "gpt-image-1", 10.00, 40.00),
+        ModelPricing::simple("gpt-4-turbo", "gpt-4-turbo", 10.00, 30.00),
+        ModelPricing::simple("gpt-4-32k", "gpt-4-32k", 60.00, 120.00),
+        ModelPricing::simple("gpt-4-0125-preview", "gpt-4-0125-preview", 10.00, 30.00),
+        ModelPricing::simple("gpt-4-1106-preview", "gpt-4-1106-preview", 10.00, 30.00),
+        ModelPricing::simple("gpt-4", "gpt-4", 30.00, 60.00),
+        ModelPricing::simple("gpt-3\\.5-turbo", "gpt-3.5-turbo", 0.50, 1.50),
+        ModelPricing::simple("gpt-3\\.5", "gpt-3.5", 0.50, 1.50),
+        ModelPricing::simple(
+            "text-embedding-3-large",
+            "text-embedding-3-large",
+            0.13,
+            0.0,
+        ),
+        ModelPricing::simple(
+            "text-embedding-3-small",
+            "text-embedding-3-small",
+            0.02,
+            0.0,
+        ),
+        ModelPricing::simple(
+            "text-embedding-ada-002",
+            "text-embedding-ada-002",
+            0.10,
+            0.0,
+        ),
         // Anthropic Models
         // Reference: https://platform.claude.com/docs/en/about-claude/pricing
         ModelPricing::tiered(
+            "claude-opus-4-6",
             "claude-opus-4-6",
             vec![
                 PricingTier {
@@ -269,6 +291,7 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         ),
         ModelPricing::tiered(
             "claude-sonnet-4-6",
+            "claude-sonnet-4-6",
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
@@ -285,6 +308,7 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
             ],
         ),
         ModelPricing::tiered(
+            "claude-sonnet-4-5",
             "claude-sonnet-4-5",
             vec![
                 PricingTier {
@@ -303,6 +327,7 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         ),
         ModelPricing::tiered(
             "claude-sonnet-4",
+            "claude-sonnet-4",
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
@@ -318,21 +343,22 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
                 },
             ],
         ),
-        ModelPricing::simple("claude-opus-4-5", 5.00, 25.00),
-        ModelPricing::simple("claude-haiku-4-5", 1.00, 5.00),
-        ModelPricing::simple("claude-opus-4-1", 15.00, 75.00),
-        ModelPricing::simple("claude-opus-4", 15.00, 75.00),
-        ModelPricing::simple("claude-3-opus", 15.00, 75.00),
-        ModelPricing::simple("claude-3-7-sonnet", 3.00, 15.00),
-        ModelPricing::simple("claude-3-5-sonnet", 3.00, 15.00),
-        ModelPricing::simple("claude-3-sonnet", 3.00, 15.00),
-        ModelPricing::simple("claude-haiku-3-5", 0.80, 4.00),
-        ModelPricing::simple("claude-3-5-haiku", 0.80, 4.00),
-        ModelPricing::simple("claude-3-haiku", 0.25, 1.25),
+        ModelPricing::simple("claude-opus-4-5", "claude-opus-4-5", 5.00, 25.00),
+        ModelPricing::simple("claude-haiku-4-5", "claude-haiku-4-5", 1.00, 5.00),
+        ModelPricing::simple("claude-opus-4-1", "claude-opus-4-1", 15.00, 75.00),
+        ModelPricing::simple("claude-opus-4", "claude-opus-4", 15.00, 75.00),
+        ModelPricing::simple("claude-3-opus", "claude-3-opus", 15.00, 75.00),
+        ModelPricing::simple("claude-3-7-sonnet", "claude-3-7-sonnet", 3.00, 15.00),
+        ModelPricing::simple("claude-3-5-sonnet", "claude-3-5-sonnet", 3.00, 15.00),
+        ModelPricing::simple("claude-3-sonnet", "claude-3-sonnet", 3.00, 15.00),
+        ModelPricing::simple("claude-haiku-3-5", "claude-haiku-3-5", 0.80, 4.00),
+        ModelPricing::simple("claude-3-5-haiku", "claude-3-5-haiku", 0.80, 4.00),
+        ModelPricing::simple("claude-3-haiku", "claude-3-haiku", 0.25, 1.25),
         // Google Gemini Models
         // Reference: https://ai.google.dev/pricing
         ModelPricing::tiered(
             "gemini-3\\.1-pro",
+            "gemini-3.1-pro",
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
@@ -348,10 +374,16 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
                 },
             ],
         ),
-        ModelPricing::simple("gemini-3\\.1-flash-lite", 0.25, 1.50),
-        ModelPricing::simple("gemini-3-flash", 0.50, 3.00),
+        ModelPricing::simple(
+            "gemini-3\\.1-flash-lite",
+            "gemini-3.1-flash-lite",
+            0.25,
+            1.50,
+        ),
+        ModelPricing::simple("gemini-3-flash", "gemini-3-flash", 0.50, 3.00),
         ModelPricing::tiered(
             "gemini-2\\.5-pro",
+            "gemini-2.5-pro",
             vec![
                 PricingTier {
                     min_input_tokens: Some(200_000),
@@ -367,14 +399,24 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
                 },
             ],
         ),
-        ModelPricing::simple("gemini-2\\.5-flash-lite", 0.10, 0.40),
-        ModelPricing::simple("gemini-2\\.5-flash", 0.30, 2.50),
-        ModelPricing::simple("gemini-2\\.0-flash-lite", 0.075, 0.30),
-        ModelPricing::simple("gemini-2\\.0-flash", 0.10, 0.40),
-        ModelPricing::simple("gemini-1\\.5-pro", 1.25, 5.00),
-        ModelPricing::simple("gemini-1\\.5-flash", 0.075, 0.30),
-        ModelPricing::simple("gemini-pro", 0.50, 1.50),
-        ModelPricing::simple("gemini-embedding-001", 0.15, 0.0),
+        ModelPricing::simple(
+            "gemini-2\\.5-flash-lite",
+            "gemini-2.5-flash-lite",
+            0.10,
+            0.40,
+        ),
+        ModelPricing::simple("gemini-2\\.5-flash", "gemini-2.5-flash", 0.30, 2.50),
+        ModelPricing::simple(
+            "gemini-2\\.0-flash-lite",
+            "gemini-2.0-flash-lite",
+            0.075,
+            0.30,
+        ),
+        ModelPricing::simple("gemini-2\\.0-flash", "gemini-2.0-flash", 0.10, 0.40),
+        ModelPricing::simple("gemini-1\\.5-pro", "gemini-1.5-pro", 1.25, 5.00),
+        ModelPricing::simple("gemini-1\\.5-flash", "gemini-1.5-flash", 0.075, 0.30),
+        ModelPricing::simple("gemini-pro", "gemini-pro", 0.50, 1.50),
+        ModelPricing::simple("gemini-embedding-001", "gemini-embedding-001", 0.15, 0.0),
         // DeepSeek Models
         // Reference: https://api-docs.deepseek.com/quick_start/pricing
         //
@@ -384,6 +426,7 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         // priced through user-defined `cache_read_input_tokens` entries.
         ModelPricing::peak_off_peak(
             "(?i)deepseek-v4-flash",
+            "deepseek-v4-flash",
             deepseek_peak_windows(),
             0.44,
             1.32,
@@ -392,6 +435,7 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         ),
         ModelPricing::peak_off_peak(
             "(?i)deepseek-v4-pro",
+            "deepseek-v4-pro",
             deepseek_peak_windows(),
             1.32,
             3.96,
@@ -400,12 +444,34 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
         ),
         // Legacy DeepSeek model names, kept for historical spans — these are no longer
         // on the published price list and are not peak/off-peak split.
-        ModelPricing::simple("(?i)deepseek-(?:v3|chat)(?:$|-)", 0.27, 1.10),
-        ModelPricing::simple("(?i)deepseek-(?:r1|reasoner)(?:-\\d[\\d-]*)?$", 0.55, 2.19),
-        ModelPricing::simple("(?i)deepseek-r1-distill-llama-8b", 0.04, 0.04),
-        ModelPricing::simple("(?i)deepseek-r1-distill-qwen-32b", 0.29, 0.29),
+        ModelPricing::simple("(?i)deepseek-(?:v3|chat)(?:$|-)", "deepseek-v3", 0.27, 1.10),
+        ModelPricing::simple(
+            "(?i)deepseek-(?:r1|reasoner)(?:-\\d[\\d-]*)?$",
+            "deepseek-r1",
+            0.55,
+            2.19,
+        ),
+        ModelPricing::simple(
+            "(?i)deepseek-r1-distill-llama-8b",
+            "deepseek-r1-distill-llama-8b",
+            0.04,
+            0.04,
+        ),
+        ModelPricing::simple(
+            "(?i)deepseek-r1-distill-qwen-32b",
+            "deepseek-r1-distill-qwen-32b",
+            0.29,
+            0.29,
+        ),
     ]
 });
+
+/// `(pattern, canonical)` pairs in match priority order; only `canonical` is safe to display.
+pub fn model_canonical_names() -> impl Iterator<Item = (&'static str, &'static str)> {
+    MODEL_PRICING
+        .iter()
+        .map(|p| (p.pattern.as_str(), p.canonical.as_str()))
+}
 
 #[cfg(test)]
 mod tests {
@@ -457,6 +523,28 @@ mod tests {
     }
 
     #[test]
+    fn test_canonical_names_are_plain_ids_matching_their_own_pattern() {
+        let pairs: Vec<_> = model_canonical_names().collect();
+        assert_eq!(pairs.len(), MODEL_PRICING.len());
+        for (p, (pattern, canonical)) in MODEL_PRICING.iter().zip(&pairs) {
+            assert_eq!(p.pattern, *pattern);
+            assert_eq!(p.canonical, *canonical);
+            assert!(!canonical.is_empty(), "{pattern}");
+            assert_eq!(*canonical, canonical.to_lowercase(), "{pattern}");
+            assert!(
+                !canonical.contains(['\\', '(', ')', '[', ']', '?', '*', '+', '^', '$', '|', '\'']),
+                "{pattern} -> {canonical}"
+            );
+            assert!(p.matches(canonical), "{pattern} does not match {canonical}");
+        }
+        assert!(pairs.contains(&("gpt-5\\.2-pro", "gpt-5.2-pro")));
+        assert!(pairs.contains(&("(?i)deepseek-v4-pro", "deepseek-v4-pro")));
+        assert!(pairs.contains(&("(?i)deepseek-(?:v3|chat)(?:$|-)", "deepseek-v3")));
+        assert!(pairs.contains(&("claude-3-5-haiku", "claude-3-5-haiku")));
+        assert!(pairs.contains(&("claude-haiku-3-5", "claude-haiku-3-5")));
+    }
+
+    #[test]
     fn test_calculate_cost_gpt4() {
         let (input_cost, output_cost, total_cost) =
             calculate_cost("gpt-4o", 1000, 500, None).unwrap();
@@ -501,7 +589,7 @@ mod tests {
 
     #[test]
     fn test_model_pricing_matches() {
-        let pricing = ModelPricing::simple("gpt-4", 30.0, 60.0);
+        let pricing = ModelPricing::simple("gpt-4", "gpt-4", 30.0, 60.0);
         assert!(pricing.matches("gpt-4"));
         assert!(pricing.matches("gpt-4-0613"));
         assert!(!pricing.matches("gpt-3.5-turbo"));
@@ -518,7 +606,7 @@ mod tests {
     #[test]
     fn test_dot_escape_matches_exact_version() {
         // gpt-5.2 pattern uses \\. to match literal dot — should NOT match "gpt-512"
-        let pricing = ModelPricing::simple("gpt-5\\.2", 1.75, 14.00);
+        let pricing = ModelPricing::simple("gpt-5\\.2", "gpt-5.2", 1.75, 14.00);
         assert!(pricing.matches("gpt-5.2"));
         assert!(pricing.matches("gpt-5.2-something"));
         assert!(!pricing.matches("gpt-512"));
@@ -528,7 +616,7 @@ mod tests {
     #[test]
     fn test_dot_escape_gemini_versions() {
         // Gemini patterns use \\. for version dots
-        let pricing = ModelPricing::simple("gemini-2\\.5-flash", 0.30, 2.50);
+        let pricing = ModelPricing::simple("gemini-2\\.5-flash", "gemini-2.5-flash", 0.30, 2.50);
         assert!(pricing.matches("gemini-2.5-flash"));
         assert!(pricing.matches("gemini-2.5-flash-001"));
         assert!(!pricing.matches("gemini-225-flash"));
@@ -538,7 +626,7 @@ mod tests {
     #[test]
     fn test_dot_escape_gpt_3_5() {
         // gpt-3.5 uses \\. — should not match gpt-315 or gpt-3X5
-        let pricing = ModelPricing::simple("gpt-3\\.5-turbo", 0.50, 1.50);
+        let pricing = ModelPricing::simple("gpt-3\\.5-turbo", "gpt-3.5-turbo", 0.50, 1.50);
         assert!(pricing.matches("gpt-3.5-turbo"));
         assert!(pricing.matches("gpt-3.5-turbo-0125"));
         assert!(!pricing.matches("gpt-315-turbo"));

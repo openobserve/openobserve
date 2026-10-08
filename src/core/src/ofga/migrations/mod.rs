@@ -2,8 +2,10 @@ use infra::db::get_orm_client_rw;
 
 pub(super) mod alert_folders;
 pub(super) mod anomaly_detection;
+pub(super) mod prompt_folders;
 pub(super) mod report_folders;
 pub(super) mod stream_name_migration;
+pub(super) mod workflow_folders;
 
 pub async fn migrate_alert_folders() -> Result<(), anyhow::Error> {
     let db = get_orm_client_rw().await;
@@ -15,6 +17,11 @@ pub async fn migrate_anomaly_detection() -> Result<(), anyhow::Error> {
     anomaly_detection::migrate_anomaly_detection(db).await
 }
 
+pub async fn migrate_prompt_folders() -> Result<(), anyhow::Error> {
+    let db = get_orm_client_rw().await;
+    prompt_folders::migrate_prompt_folders(db).await
+}
+
 pub async fn migrate_report_folders() -> Result<(), anyhow::Error> {
     let db = get_orm_client_rw().await;
     report_folders::migrate_report_folders(db).await
@@ -23,4 +30,9 @@ pub async fn migrate_report_folders() -> Result<(), anyhow::Error> {
 pub async fn migrate_stream_names() -> Result<(), anyhow::Error> {
     let db = get_orm_client_rw().await;
     stream_name_migration::migrate_stream_names(db).await
+}
+
+pub async fn migrate_workflow_folders() -> Result<(), anyhow::Error> {
+    let db = get_orm_client_rw().await;
+    workflow_folders::migrate_workflow_folders(db).await
 }

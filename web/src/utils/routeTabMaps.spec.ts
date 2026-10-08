@@ -267,6 +267,14 @@ describe("resolveTab", () => {
       expect(resolveTab("ingestLogs", "vector", "curl")).toBe("vector");
     });
 
+    it("ingestLogs – kinesisfirehose", () => {
+      expect(resolveTab("ingestLogs", "kinesisfirehose", "curl")).toBe("kinesisfirehose");
+    });
+
+    it("ingestLogs – gcpLogs", () => {
+      expect(resolveTab("ingestLogs", "gcpLogs", "curl")).toBe("gcpLogs");
+    });
+
     it("ingestLogs – ingestLogsFromOtel", () => {
       expect(resolveTab("ingestLogs", "ingestLogsFromOtel", "curl")).toBe("ingestLogsFromOtel");
     });
@@ -453,8 +461,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.others)).toHaveLength(4);
     });
 
-    it("recommended has 10 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(10);
+    it("recommended has 11 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(11);
     });
 
     it("security has 7 entries", () => {
@@ -469,12 +477,12 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(7);
     });
 
-    it("ingestLogs has 9 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(9);
+    it("ingestLogs has 12 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(12);
     });
 
-    it("billings has 4 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(4);
+    it("billings has 5 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.billings)).toHaveLength(5);
     });
 
     it("iam has 9 entries", () => {

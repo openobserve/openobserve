@@ -348,12 +348,15 @@ pub async fn update_function(
         return Ok(MetaHttpResponse::json(func));
     }
 
+    // An explicit "transType": null deserialises to None, which the field default cannot cover.
+    func.trans_type = Some(func.trans_type.unwrap_or(0));
+
     // Only append "." for VRL functions, not JS
-    if func.trans_type.unwrap() == 0 && !func.function.ends_with('.') {
+    if func.trans_type == Some(0) && !func.function.ends_with('.') {
         func.function = format!("{} \n .", func.function);
     }
     // Validate function based on type
-    match func.trans_type.unwrap() {
+    match func.trans_type.unwrap_or(0) {
         0 => {
             // VRL function
             if let Err(e) = compile_vrl_function(&func.function, org_id) {
@@ -460,7 +463,8 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
     }
     let pipeline_dep = get_dependencies(org_id, fn_name).await;
     if !pipeline_dep.is_empty() {
-        let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
+        let pipeline_data =
+            serde_json::to_string(&pipeline_dep).unwrap_or_else(|_| "[]".to_string());
         return Err(FunctionDeleteError::PipelineDependencies(format!(
             "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
             fn_name,

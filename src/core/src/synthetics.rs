@@ -55,6 +55,8 @@ pub struct CheckNotification {
     /// `sftp_degraded`, `flaky`. `None` from a probe too old to report one, in
     /// which case the message stays generic rather than guessing.
     pub status_reason: Option<String>,
+    /// `config` means the journey could not be assembled, so the text says misconfigured.
+    pub error_source: String,
     pub degraded: bool,
     /// Locations that did not pass, worst first.
     ///
@@ -70,6 +72,8 @@ pub struct CheckNotification {
     /// a partial recovery is expressible too: "2 of 3 recovered, the third is
     /// still down".
     pub passing_locations: Vec<String>,
+    /// Environments that did not pass, worst first.
+    pub failing_environments: Vec<String>,
 }
 
 /// Fires once per run (when all jobs have completed) for non-passing runs.
@@ -223,6 +227,13 @@ fn status_headline(n: &CheckNotification) -> String {
     }
     match n.status.as_str() {
         "warning" => format!("{} passed only after retries (flaky)", n.check_name),
+        "error" if n.error_source == "config" => format!(
+            "{} is misconfigured — {}",
+            n.check_name,
+            n.error
+                .as_deref()
+                .unwrap_or("its subtest references cannot be expanded")
+        ),
         "error" => format!(
             "{} could not be checked — probe infrastructure error",
             n.check_name
@@ -257,6 +268,15 @@ fn run_url(n: &CheckNotification) -> String {
         "{web_url}{base_uri}/web/synthetic/{}/results?org_identifier={}",
         n.check_id, n.org_id
     )
+}
+
+#[cfg(feature = "enterprise")]
+/// The environments a message should name, or None when there is nothing to add.
+fn environments_line(n: &CheckNotification) -> Option<String> {
+    if n.failing_environments.is_empty() {
+        return None;
+    }
+    Some(n.failing_environments.join(", "))
 }
 
 #[cfg(feature = "enterprise")]
@@ -320,6 +340,9 @@ fn build_slack_json(n: &CheckNotification) -> String {
         format!("*Target:* {}", n.target),
         format!("*Locations:* {}", locations_line(n)),
     ];
+    if let Some(envs) = environments_line(n) {
+        lines.push(format!("*Environments:* {envs}"));
+    }
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("*Error:* ```{e}```"));
     }
@@ -341,6 +364,9 @@ fn build_plain_text(n: &CheckNotification) -> String {
         format!("Status: {}", n.status),
         format!("Locations: {}", locations_line(n)),
     ];
+    if let Some(envs) = environments_line(n) {
+        lines.push(format!("Environments: {envs}"));
+    }
     if let Some(e) = n.error.as_deref().filter(|e| !e.is_empty()) {
         lines.push(format!("Error: {e}"));
     }
@@ -588,9 +614,11 @@ mod tests {
             consecutive_failures: 3,
             flaky: false,
             status_reason: None,
+            error_source: "probe".into(),
             degraded: false,
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
+            failing_environments: vec![],
         }
     }
 
@@ -669,6 +697,19 @@ mod tests {
     }
 
     #[test]
+    fn a_config_error_reads_as_misconfigured_not_as_probe_infrastructure() {
+        let mut n = firing();
+        n.status = "error".into();
+        n.error_source = "config".into();
+        n.error =
+            Some("'Login (shared)' grew and this test now needs 51 steps; the limit is 50".into());
+        let headline = status_headline(&n);
+        assert!(headline.contains("misconfigured"), "{headline}");
+        assert!(headline.contains("51 steps"), "{headline}");
+        assert!(!headline.contains("probe infrastructure"), "{headline}");
+    }
+
+    #[test]
     fn degraded_outranks_flaky_exactly_as_the_headline_does() {
         // Both arrive as `warning`. The order matters: a degrading target needs
         // action, a flaky one already fixed itself.
@@ -713,6 +754,7 @@ mod tests {
         let n = CheckNotification {
             recovery: true,
             passing_locations: vec![],
+            failing_environments: vec![],
             failing_locations: vec![],
             ..recovered()
         };

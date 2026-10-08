@@ -5,10 +5,14 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/services/iam", () => ({
-  getResources: vi.fn(),
-  updateRole: vi.fn(),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getResources = vi.fn();
+  return overlayServiceMock(await importOriginal(), {
+    getResources,
+    updateRole: vi.fn(),
+  });
+});
 
 import { getResources, updateRole } from "@/services/iam";
 import { buildReadonlyPermissions, seedReadonlyRolePermissions } from "./readonlyPreset";
@@ -54,6 +58,15 @@ describe("buildReadonlyPermissions", () => {
     );
     // settings: AllowList hidden; logs_cache: both read perms hidden.
     expect(perms).toEqual([{ object: "settings:_all_default", permission: "AllowGet" }]);
+  });
+
+  it("grants no reads on rum_analytics, whose OpenFGA type has no GET or LIST", () => {
+    const perms = buildReadonlyPermissions(
+      [{ key: "rum_analytics", visible: true }],
+      "default",
+      false,
+    );
+    expect(perms).toEqual([]);
   });
 
   it("excludes the org resource outside the meta org (mirrors EditRole's setPermission guard)", () => {

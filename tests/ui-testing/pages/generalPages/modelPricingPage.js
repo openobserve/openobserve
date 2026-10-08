@@ -1,5 +1,5 @@
 // modelPricingPage.js — Page object for Settings > Model Pricing
-// Feature: OSS (no enterprise flag required, but gated by model_pricing_enabled config)
+// Feature: Enterprise/Cloud only — the route isn't registered on the OSS build (see useManagementRoutes.ts).
 // Routes:
 //   List:   /web/settings/model_pricing?org_identifier={org}
 //   Editor: /web/settings/model_pricing/edit?org_identifier={org}&id={id}

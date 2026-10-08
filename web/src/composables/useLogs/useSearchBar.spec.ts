@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
@@ -61,15 +61,18 @@ vi.mock("@/composables/useSearchWebSocket", () => ({
 const { mockDeleteRunningQueries } = vi.hoisted(() => ({
   mockDeleteRunningQueries: vi.fn(),
 }));
-vi.mock("@/services/search", () => ({
-  default: {
-    delete_running_queries: mockDeleteRunningQueries,
-    get_regions: vi.fn().mockResolvedValue({ data: {} }),
-    search: vi.fn(),
-    partition: vi.fn(),
-    result_schema: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete_running_queries: mockDeleteRunningQueries,
+      get_regions: vi.fn().mockResolvedValue({ data: {} }),
+      search: vi.fn(),
+      partition: vi.fn(),
+      result_schema: vi.fn(),
+    },
+  });
+});
 
 const { mockGetAllFunctions } = vi.hoisted(() => ({
   mockGetAllFunctions: vi.fn(),
@@ -115,9 +118,12 @@ vi.mock("@/aws-exports", () => ({
 const { mockSavedViewsGet } = vi.hoisted(() => ({
   mockSavedViewsGet: vi.fn(),
 }));
-vi.mock("@/services/saved_views", () => ({
-  default: { get: mockSavedViewsGet },
-}));
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { get: mockSavedViewsGet },
+  });
+});
 
 vi.mock("@/utils/query/sqlIdentifiers", () => ({
   quoteSqlIdentifierIfNeeded: vi.fn((s: string) => `"${s}"`),
@@ -314,6 +320,25 @@ describe("useSearchBar Composable", () => {
       wrapper.vm.getSavedViews();
       // Loading state is set before the async call
     });
+
+    it("lists only logs views: untyped ones and view_type logs", async () => {
+      mockSavedViewsGet.mockResolvedValue({
+        data: {
+          views: [
+            { view_id: "1", view_name: "legacy" },
+            { view_id: "2", view_name: "logs", view_type: "logs" },
+            { view_id: "3", view_name: "traces", view_type: "traces" },
+            { view_id: "4", view_name: "grid", view_type: "metrics_explorer" },
+          ],
+        },
+      });
+
+      wrapper.vm.getSavedViews(true);
+      await flushPromises();
+
+      const ids = searchState().searchObj.data.savedViews.map((v: any) => v.view_id);
+      expect(ids).toEqual(["1", "2"]);
+    });
   });
 
   describe("getFunctions", () => {
@@ -325,14 +350,16 @@ describe("useSearchBar Composable", () => {
       expect(mockGetAllFunctions).toHaveBeenCalled();
     });
 
-    it("should not call getAllFunctions when already loaded", async () => {
+    /// Asking every time is the point: the query answers from cache while it is
+    /// fresh, so a populated store must not be what decides.
+    it("still calls getAllFunctions when the store already holds a list", async () => {
       store.state.organizationData.functions = [
         { name: "existing", num_args: 1, function: "fn() {}" },
       ];
       mockGetAllFunctions.mockResolvedValue(undefined);
 
       await wrapper.vm.getFunctions();
-      expect(mockGetAllFunctions).not.toHaveBeenCalled();
+      expect(mockGetAllFunctions).toHaveBeenCalled();
     });
 
     it("should show error notification on failure", async () => {

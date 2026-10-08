@@ -6,8 +6,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -19,6 +22,14 @@ const props = defineProps<{
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
+  /** Member email being assigned to a role (from the "Assign a role" quick-link).
+   *  Presence alone turns on the Assign column — not gated separately. */
+  assignTarget?: string;
+  /** Role currently in flight for an assign click, so only that row spins. */
+  assigningRoleName?: string | null;
+  /** Roles assignTarget already belongs to — rendered as "Assigned" instead of
+   *  an actionable button. */
+  assignedRoleNames?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -28,6 +39,7 @@ const emit = defineEmits<{
   delete: [row: any];
   "bulk-delete": [];
   create: [];
+  assign: [row: any];
 }>();
 
 const onEmptyStateAction = (id?: string) => {
@@ -68,6 +80,17 @@ const columns = computed<OTableColumnDef[]>(() => {
     });
   }
 
+  if (props.assignTarget) {
+    cols.push({
+      id: "assign",
+      header: t("iam.rolesPage.assignColumn"),
+      sortable: false,
+      resizable: false,
+      size: 130,
+      meta: { align: "center" },
+    });
+  }
+
   cols.push({
     id: "actions",
     header: t("common.actions"),
@@ -86,6 +109,8 @@ const columns = computed<OTableColumnDef[]>(() => {
 // fault. No summary strip: the count is already in the footer and "unused" is just
 // this column sorted ascending, so a strip would restate what the rows already say.
 const isUnusedRole = (row: any): boolean => row?.user_count === 0;
+
+const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
 
 <template>
@@ -101,7 +126,6 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     pagination="client"
     :page-size="20"
     :page-size-options="[20, 50, 100, 250, 500]"
-    :footer-title="t('iam.roles')"
     sorting="client"
     selection="multiple"
     row-key="role_name"
@@ -112,7 +136,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     @update:global-filter="emit('update:globalFilter', $event)"
   >
     <template #toolbar>
-      <div class="flex w-full items-center gap-2">
+      <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
@@ -135,6 +159,26 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     <template #toolbar-trailing>
       <slot name="toolbar-trailing" />
     </template>
+
+    <!-- Rendered only when a member (?member=<email>) is being assigned via the token popup's link. -->
+    <template #cell-assign="{ row }">
+      <div class="flex items-center justify-center">
+        <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+          {{ t("iam.rolesPage.assignedBadge") }}
+        </OBadge>
+        <OButton
+          v-else
+          :data-test="`iam-roles-assign-${row.role_name}-btn`"
+          variant="outline"
+          size="sm"
+          :loading="assigningRoleName === row.role_name"
+          @click="emit('assign', row)"
+        >
+          {{ t("iam.rolesPage.assignBtn") }}
+        </OButton>
+      </div>
+    </template>
+
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center">
@@ -143,6 +187,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           data-row-action="edit"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('common.edit')"
           @click="emit('edit', row)"
         >
@@ -153,11 +198,41 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           data-row-action="delete"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('common.delete')"
           @click="emit('delete', row)"
         >
           <OIcon name="delete" size="sm" />
         </OButton>
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="iam-roles-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="edit"
+            class="md:hidden"
+            :data-test="`iam-roles-edit-${row.role_name}-role-icon-menu`"
+            @select="emit('edit', row)"
+          >
+            <span>{{ t("common.edit") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="delete"
+            variant="destructive"
+            class="md:hidden"
+            :data-test="`iam-roles-delete-${row.role_name}-role-icon-menu`"
+            @select="emit('delete', row)"
+          >
+            <span>{{ t("common.delete") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </template>
 
@@ -170,10 +245,8 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
       />
     </template>
 
-    <template #bottom>
-      <span class="text-xs font-normal">{{ data.length }} {{ t("iam.roles") }}</span>
+    <template #selection-actions>
       <OButton
-        v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"
         variant="outline-destructive"
         size="sm"

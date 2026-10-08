@@ -24,10 +24,16 @@ import AddRole from "@/components/iam/roles/AddRole.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/iam", () => ({
-  createRole: vi.fn(),
-  updateRole: vi.fn(),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    createRole: vi.fn(),
+    updateRole: vi.fn(),
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
@@ -140,12 +146,36 @@ describe("AddRole", () => {
       w.unmount();
     });
 
+    it("offers every start-from preset in one dropdown, the RUM presets included", () => {
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.exists()).toBe(true);
+      expect(wrapper.findAll('[type="radio"], [role="radio"]')).toHaveLength(0);
+      expect((select.props("options") as { value: string }[]).map((o) => o.value)).toEqual([
+        "custom",
+        "readonly",
+        "dbm",
+        "k8s",
+        "rum_viewer",
+        "rum_editor",
+      ]);
+      const labels = (select.props("options") as { label: string }[]).map((o) => o.label);
+      expect(labels).toContain(i18n.global.t("iam.role.startFrom.rum_viewer"));
+      expect(labels).toContain(i18n.global.t("iam.role.startFrom.rum_editor"));
+    });
+
     it("preserves the maxlength attribute on the input", () => {
       expect(getNameInput(wrapper).attributes("maxlength")).toBe("100");
     });
 
     it("shows the start-from presets", () => {
       expect(wrapper.find('[data-test="add-role-start-from-section"]').exists()).toBe(true);
+    });
+
+    it("starts the dropdown on the custom preset", () => {
+      expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe("custom");
+      expect(wrapper.find('[data-test="add-role-start-from-select"]').text()).toContain(
+        i18n.global.t("iam.role.startFrom.custom"),
+      );
     });
 
     it("keeps Save enabled (R3 — no disabled gate)", () => {
@@ -238,6 +268,28 @@ describe("AddRole", () => {
   });
 
   describe("role creation behavior", () => {
+    it("tracks role_created once the role is created", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("test_role");
+      await submitForm(wrapper);
+
+      expect(analytics.track).toHaveBeenCalledWith("role_created");
+    });
+
+    it("does not track role_created when creation fails", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockRejectedValue({ response: { status: 400, data: {} } });
+      vi.mocked(analytics.track).mockClear();
+
+      await getNameInput(wrapper).setValue("test_role");
+      await submitForm(wrapper);
+
+      expect(createRole).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("emits update:open(false) + added:role and shows success toast on success", async () => {
       const { createRole } = await import("@/services/iam");
       vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
@@ -253,6 +305,49 @@ describe("AddRole", () => {
         variant: "success",
       });
     });
+
+    it("emits startFrom: custom by default", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("test_role");
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("added:role")[0]).toEqual([
+        { role_name: "test_role", startFrom: "custom" },
+      ]);
+    });
+
+    it("emits startFrom: k8s when the Kubernetes-viewer preset is selected", async () => {
+      const { createRole } = await import("@/services/iam");
+      vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+      await getNameInput(wrapper).setValue("k8s_role");
+      getForm(wrapper).vm.form.setFieldValue("startFrom", "k8s");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(wrapper.emitted("added:role")[0]).toEqual([
+        { role_name: "k8s_role", startFrom: "k8s" },
+      ]);
+    });
+
+    it.each(["k8s", "rum_viewer", "rum_editor"])(
+      "emits startFrom: %s when it is picked from the dropdown",
+      async (preset) => {
+        const { createRole } = await import("@/services/iam");
+        vi.mocked(createRole).mockResolvedValue({ data: {} } as any);
+
+        await getNameInput(wrapper).setValue("picked");
+        wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", preset);
+        await flushPromises();
+        await submitForm(wrapper);
+
+        expect(wrapper.emitted("added:role")[0]).toEqual([
+          { role_name: "picked", startFrom: preset },
+        ]);
+      },
+    );
 
     it("shows an error toast on a non-403 failure and does not emit added:role", async () => {
       const { createRole } = await import("@/services/iam");

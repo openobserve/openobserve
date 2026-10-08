@@ -30,7 +30,7 @@ use datafusion::{
 use hashbrown::HashSet;
 
 use crate::datafusion::optimizer::physical_optimizer::{
-    index_optimizer::utils::is_complex_plan,
+    index_optimizer::utils::{aggregate_input_drops_rows, is_complex_plan},
     utils::{get_column_name, is_column, is_only_timestamp_filter},
 };
 
@@ -104,6 +104,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
             // only one group by field, no aggregate function
             if aggregate.group_expr().expr().len() == 1
                 && aggregate.aggr_expr().is_empty()
+                && !aggregate_input_drops_rows(aggregate)
                 && let Some((group_expr, _)) = aggregate.group_expr().expr().first()
             {
                 let column_name = get_column_name(group_expr);
@@ -136,13 +137,15 @@ impl<'n> TreeNodeVisitor<'n> for SimpleDistinctVisitor {
         } else if let Some(filter) = node.downcast_ref::<FilterExec>() {
             let predicate = filter.predicate();
             let exprs = split_conjunction(predicate);
-            if exprs.len() == 2 && is_only_timestamp_filter(&exprs) {
-                return Ok(TreeNodeRecursion::Continue);
-            }
-            if exprs.len() == 3
-                && is_only_timestamp_filter(&exprs[1..])
-                && let Some(column_name) = is_simple_str_match(exprs[0])
-                && self.index_fields.contains(&column_name)
+            // DataFusion may reorder predicates, so identify timestamp bounds independently.
+            let (timestamp_filters, other_filters): (Vec<_>, Vec<_>) = exprs
+                .into_iter()
+                .partition(|expr| is_only_timestamp_filter(&[*expr]));
+            if timestamp_filters.len() == 2
+                && (other_filters.is_empty()
+                    || (other_filters.len() == 1
+                        && is_simple_str_match(other_filters[0])
+                            .is_some_and(|column| self.index_fields.contains(&column))))
             {
                 return Ok(TreeNodeRecursion::Continue);
             }
@@ -239,6 +242,18 @@ mod tests {
                     true,
                 )),
             ),
+            (
+                "select name from t where _timestamp >= 175256100000000 and str_match(name, 'a') and _timestamp < 17525610000000000 and status = 'success' group by name order by name asc limit 10",
+                None,
+            ),
+            (
+                "select name from (select * from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 limit 100) group by name order by name asc limit 10",
+                None,
+            ),
+            (
+                "select name from (select * from t where _timestamp >= 175256100000000 and _timestamp < 17525610000000000 order by _timestamp desc limit 100) group by name order by name asc limit 10",
+                None,
+            ),
             ("SELECT count(*) from t", None),
         ];
 
@@ -247,7 +262,12 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
-            assert_eq!(expected, is_simple_distinct(physical_plan, index_fields));
+            assert_eq!(
+                expected,
+                is_simple_distinct(physical_plan.clone(), index_fields),
+                "{sql}: {:?}",
+                datafusion::physical_plan::get_plan_string(&physical_plan)
+            );
         }
     }
 

@@ -63,12 +63,15 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocation: mockServiceGetLocation,
-    getAgentSetup: mockServiceGetAgentSetup,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocation: mockServiceGetLocation,
+      getAgentSetup: mockServiceGetAgentSetup,
+    },
+  });
+});
 
 vi.mock("@/utils/synthetics/format", () => ({
   formatTimeAgoUs: vi.fn(() => "2 hours ago"),
@@ -128,9 +131,6 @@ const baseStubs = {
     template: '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
     props: ["preset", "size", "title"],
     inheritAttrs: true,
-  },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
   },
   AgentSetupDrawer: {
     template: '<div data-test="synthetics-private-location-agent-setup-drawer" />',
@@ -193,11 +193,6 @@ describe("PrivateLocationDetail", () => {
     it("should render the page shell", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render the Beta badge in the page title", () => {
-      wrapper = mountPage();
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render the status badge when detail is loaded", async () => {

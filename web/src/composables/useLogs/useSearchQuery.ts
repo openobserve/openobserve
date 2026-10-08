@@ -31,6 +31,11 @@ import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusi
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { raw, type TranslateFn } from "@/types/i18n";
+import {
+  STREAM_NAME_FIELD,
+  referencesStreamName,
+  replaceStreamNameRefsInWhere,
+} from "@/utils/logs/streamNameColumn";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -116,11 +121,11 @@ export const useSearchQuery = (t: TranslateFn) => {
 
     const queryReq: SearchRequestPayload | null = buildSearch();
 
-    // Update highlight query on run-query
+    // Keep the query's case: str_match and re_match highlight case-sensitively.
     if (searchObj.meta.sqlMode) {
-      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase().split("where")?.[1] || "";
+      searchObj.data.highlightQuery = searchObj.data.query.split(/where/i)?.[1] || "";
     } else {
-      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase();
+      searchObj.data.highlightQuery = searchObj.data.query;
     }
 
     if (queryReq === null) {
@@ -619,10 +624,10 @@ export const useSearchQuery = (t: TranslateFn) => {
       let finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
 
       // Per-stream WHERE rewrite: if this stream has equivalent field names
-      // for any filter fields (reverse semantic group mapping), swap them in.
-      if (multiStreamFieldMapping?.has(item)) {
-        const mapping = multiStreamFieldMapping.get(item)!;
-
+      // for any filter fields (reverse semantic group mapping), swap them in,
+      // and turn a _stream_name filter into this stream's name.
+      const mapping = multiStreamFieldMapping?.get(item);
+      if (mapping || referencesStreamName(whereClause)) {
         // Build a parsable SQL by temporarily replacing template placeholders
         const hasFieldListPlaceholder = finalQuery.includes("[FIELD_LIST]");
         if (hasFieldListPlaceholder) {
@@ -631,7 +636,8 @@ export const useSearchQuery = (t: TranslateFn) => {
 
         const parsed = fnParsedSQL(finalQuery);
         if (parsed?.where) {
-          replaceColumnRefsInWhere(parsed.where, mapping);
+          if (mapping) replaceColumnRefsInWhere(parsed.where, mapping);
+          parsed.where = replaceStreamNameRefsInWhere(parsed.where, item);
           finalQuery = fnUnparsedSQL(parsed);
 
           finalQuery = finalQuery.replace(/`/g, '"');
@@ -714,6 +720,8 @@ export const useSearchQuery = (t: TranslateFn) => {
 
     for (const fieldObj of searchObj.data.stream.filteredField) {
       const fieldName = fieldObj.expr.value;
+      // Not a stored field: handleMultiStream resolves it per stream.
+      if (fieldName === STREAM_NAME_FIELD) continue;
       const filteredFields: any = searchObj.data.stream.selectedStreamFields.filter(
         (field: any) => field.name === fieldName,
       );

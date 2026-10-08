@@ -8,6 +8,7 @@ class FunctionsPage {
 
     // Main page elements
     this.addFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
+    this.jsTypeBadge = this.page.locator('[data-test="function-list-type-badge-js"]');
     // OInput wrapper for the list-page search field
     this.searchInputWrapper = this.page.locator('[data-test="functions-list-search-input"]');
     // OInput's auto-derived inner native input
@@ -432,6 +433,42 @@ class FunctionsPage {
 
     await this.searchFunction(functionName);
     await this.deleteFirstFunction();
+  }
+
+  /**
+   * Click a function row's delete button and wait for the confirm dialog.
+   * @param {string} functionName
+   */
+  async openDeleteConfirmFor(functionName) {
+    const deleteButton = this.getRowByName(functionName).locator(this.rowDeleteButtonSelector);
+    await deleteButton.waitFor({ state: 'visible', timeout: 30000 });
+    await deleteButton.click();
+    await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  /** Title + body text of the open confirm dialog. */
+  async getConfirmDialogText() {
+    await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
+    return ((await this.confirmDialog.textContent()) ?? '').trim();
+  }
+
+  async cancelDeleteConfirm() {
+    await this.confirmDialogSecondaryBtn.click();
+    await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  async acceptDeleteConfirm() {
+    await this.confirmDialogPrimaryBtn.click();
+    await this.confirmDialog.waitFor({ state: 'hidden', timeout: 10000 });
+  }
+
+  /** Assert the list shows a function as JavaScript rather than VRL. */
+  async expectFunctionTypeIsJavaScript() {
+    await expect(this.jsTypeBadge.first()).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectFunctionAbsent(functionName) {
+    await expect(this.getFunctionNameCell(functionName)).toHaveCount(0, { timeout: 30000 });
   }
 
   /**

@@ -20,6 +20,8 @@
 //! request-time callers. The public serving path reads only
 //! [`get_page_by_slug`] and [`get_snapshot`].
 
+use std::collections::HashSet;
+
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, prelude::Expr,
@@ -959,4 +961,110 @@ pub async fn get_domain_claim_by_host<C: ConnectionTrait>(
         .filter(status_page_custom_domains::Column::ReleasedAt.is_null())
         .one(conn)
         .await?)
+}
+
+/// The check ids attached to a status page, narrowed to the ids the caller asks about.
+///
+/// `Some(&[])` answers with nothing rather than falling back to an unfiltered read: reading the
+/// whole join table would hand every check in the cluster the status allowance.
+pub async fn mapped_check_ids<C: ConnectionTrait>(
+    conn: &C,
+    filter: Option<&[String]>,
+) -> Result<HashSet<String>, errors::Error> {
+    if filter.is_some_and(<[String]>::is_empty) {
+        return Ok(HashSet::new());
+    }
+    let mut query = status_page_component_checks::Entity::find()
+        .select_only()
+        .column(status_page_component_checks::Column::SyntheticsId)
+        .distinct();
+    if let Some(ids) = filter {
+        query = query.filter(
+            status_page_component_checks::Column::SyntheticsId
+                .is_in(ids.iter().map(String::as_str)),
+        );
+    }
+    let ids: Vec<String> = query.into_tuple().all(conn).await?;
+    Ok(ids.into_iter().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ActiveValue, ConnectOptions, Database, DatabaseConnection, Schema};
+
+    use super::*;
+
+    /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
+    async fn db() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(
+            backend.build(&schema.create_table_from_entity(status_page_component_checks::Entity)),
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn map_check(db: &DatabaseConnection, id: &str, component_id: &str, check_id: &str) {
+        status_page_component_checks::ActiveModel {
+            id: ActiveValue::Set(id.to_string()),
+            component_id: ActiveValue::Set(component_id.to_string()),
+            synthetics_id: ActiveValue::Set(check_id.to_string()),
+            org_id: ActiveValue::Set("acme".to_string()),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn mapped_check_ids_filters_to_the_given_ids() {
+        let db = db().await;
+        map_check(&db, "m1", "c1", "chk_1").await;
+        map_check(&db, "m2", "c1", "chk_2").await;
+
+        let asked = ["chk_1".to_string(), "chk_9".to_string()];
+        let found = mapped_check_ids(&db, Some(&asked)).await.unwrap();
+
+        assert_eq!(found, HashSet::from(["chk_1".to_string()]));
+    }
+
+    #[tokio::test]
+    async fn mapped_check_ids_deduplicates_a_check_on_two_components() {
+        let db = db().await;
+        map_check(&db, "m1", "c1", "chk_1").await;
+        map_check(&db, "m2", "c2", "chk_1").await;
+
+        let asked = ["chk_1".to_string()];
+        assert_eq!(
+            mapped_check_ids(&db, Some(&asked)).await.unwrap(),
+            HashSet::from(["chk_1".to_string()]),
+        );
+    }
+
+    #[tokio::test]
+    async fn mapped_check_ids_of_an_empty_filter_returns_nothing() {
+        let db = db().await;
+        map_check(&db, "m1", "c1", "chk_1").await;
+
+        assert!(
+            mapped_check_ids(&db, Some(&[])).await.unwrap().is_empty(),
+            "an empty ask must not degrade into reading the whole table",
+        );
+    }
+
+    #[tokio::test]
+    async fn mapped_check_ids_reads_every_row_when_nothing_is_asked_for() {
+        let db = db().await;
+        map_check(&db, "m1", "c1", "chk_1").await;
+        map_check(&db, "m2", "c1", "chk_2").await;
+
+        let found = mapped_check_ids(&db, None).await.unwrap();
+
+        assert_eq!(found.len(), 2);
+    }
 }

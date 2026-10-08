@@ -174,6 +174,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-prompts": {
+    illustration: "function",
+    variant: "create",
+    titleKey: "emptyState.noPrompts.title",
+    descriptionKey: "emptyState.noPrompts.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noPrompts.action",
+        descriptionKey: "emptyState.noPrompts.actionDesc",
+      },
+    ],
+  },
   "no-pipelines": {
     illustration: "pipeline",
     variant: "create",
@@ -326,6 +340,12 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noTraces.title",
     descriptionKey: "emptyState.noTraces.description",
   },
+  "no-profiles": {
+    illustration: "wave-bars",
+    variant: "no-results",
+    titleKey: "emptyState.noProfiles.title",
+    descriptionKey: "emptyState.noProfiles.description",
+  },
   "no-dataset-items": {
     illustration: "box",
     variant: "create",
@@ -468,6 +488,98 @@ export const emptyStatePresets = {
         icon: "dashboard-customize",
         titleKey: "emptyState.noDashboardsInFolder.templates",
         descriptionKey: "emptyState.noDashboardsInFolder.templatesDesc",
+      },
+    ],
+  },
+  "no-oncall-teams": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noOncallTeams.title",
+    descriptionKey: "emptyState.noOncallTeams.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallTeams.action",
+        descriptionKey: "emptyState.noOncallTeams.actionDesc",
+      },
+    ],
+  },
+  "no-oncall-members": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noOncallMembers.title",
+    descriptionKey: "emptyState.noOncallMembers.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallMembers.action",
+        descriptionKey: "emptyState.noOncallMembers.actionDesc",
+      },
+    ],
+  },
+  // Nothing open is the GOOD state here, so this is neutral rather than a
+  // create prompt - a responder should not be nudged to make a page exist.
+  "no-oncall-responses": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noOncallResponses.title",
+    descriptionKey: "emptyState.noOncallResponses.description",
+  },
+  // Ownership is claimed by path, so the prompt is about the path rather than
+  // about a list of services somebody has to enumerate.
+  "no-oncall-rules": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noOncallRules.title",
+    descriptionKey: "emptyState.noOncallRules.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallRules.action",
+        descriptionKey: "emptyState.noOncallRules.actionDesc",
+      },
+    ],
+  },
+  // This team has no ownership rules yet. The catch-all row below still
+  // answers "where do alerts go meanwhile" — this preset only owns the
+  // "nothing pages this team" fact and the one way to fix it.
+  "no-team-routing": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noTeamRouting.title",
+    descriptionKey: "emptyState.noTeamRouting.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noTeamRouting.action",
+        descriptionKey: "emptyState.noTeamRouting.actionDesc",
+      },
+    ],
+  },
+  // No lanes on the calendar. A blank rotation and a preset ladder are two
+  // equally valid ways in, so both get a card rather than one being the
+  // button and the other a smaller afterthought beside it.
+  "no-oncall-schedule": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noOncallSchedule.title",
+    descriptionKey: "emptyState.noOncallSchedule.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallSchedule.action",
+        descriptionKey: "emptyState.noOncallSchedule.actionDesc",
+      },
+      {
+        id: "presets",
+        icon: "rocket-launch",
+        titleKey: "emptyState.noOncallSchedule.presetsAction",
+        descriptionKey: "emptyState.noOncallSchedule.presetsActionDesc",
       },
     ],
   },
@@ -723,6 +835,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-named-events": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noNamedEvents.title",
+    descriptionKey: "emptyState.noNamedEvents.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noNamedEvents.action",
+        descriptionKey: "emptyState.noNamedEvents.actionDesc",
+      },
+    ],
+  },
   "no-storage-config": {
     illustration: "box",
     variant: "create",
@@ -869,6 +995,20 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noPipelineHistory.title",
     descriptionKey: "emptyState.noPipelineHistory.description",
   },
+  "no-saved-funnels": {
+    illustration: "board",
+    variant: "create",
+    titleKey: "emptyState.noSavedFunnels.title",
+    descriptionKey: "emptyState.noSavedFunnels.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noSavedFunnels.action",
+        descriptionKey: "emptyState.noSavedFunnels.actionDesc",
+      },
+    ],
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -881,11 +1021,13 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
   "no-workflows": "emptyState.nouns.workflows",
+  "no-prompts": "emptyState.nouns.prompts",
   "no-functions": "emptyState.nouns.functions",
   "no-streams": "emptyState.nouns.streams",
   "no-alerts": "emptyState.nouns.alerts",
   "no-incidents": "emptyState.nouns.incidents",
   "no-traces": "emptyState.nouns.traces",
+  "no-profiles": "emptyState.nouns.profiles",
   "no-discovery-items": "emptyState.nouns.discoveryItems",
   "no-dataset-items": "emptyState.nouns.datasetItems",
   "no-search-history": "emptyState.nouns.searches",
@@ -908,6 +1050,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alert-sources": "emptyState.nouns.alertSources",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
+  "no-named-events": "emptyState.nouns.namedEvents",
   "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
@@ -923,4 +1066,5 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
   "no-synthetic-monitors": "emptyState.nouns.monitors",
   "no-model-pricing": "emptyState.nouns.modelPricing",
+  "no-saved-funnels": "emptyState.nouns.savedFunnels",
 };

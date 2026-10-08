@@ -21,27 +21,18 @@ use crate::functions::RangeFunc;
 
 pub struct LastOverTimeFunc;
 
-impl LastOverTimeFunc {
-    pub fn new() -> Self {
-        LastOverTimeFunc {}
-    }
-}
-
 impl RangeFunc for LastOverTimeFunc {
     fn name(&self) -> &'static str {
         "last_over_time"
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
         // NOTE: Comment taken from prometheus golang source.
         // The last_over_time function acts like offset; thus, it
         // should keep the metric name.  For all the other range
         // vector functions, the only change needed is to drop the
         // metric name in the output.
-        Some(samples.last().unwrap().value)
+        samples.last().map(|sample| sample.value)
     }
 }
 
@@ -55,7 +46,7 @@ mod tests {
     use super::*;
 
     fn last_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, LastOverTimeFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, LastOverTimeFunc, eval_ctx)
     }
 
     // Test helper
@@ -78,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_last_over_time_exec_empty_samples_returns_none() {
-        let func = LastOverTimeFunc::new();
+        let func = LastOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

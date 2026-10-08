@@ -30,11 +30,29 @@
         v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
-        :disabled="acting"
+        :disabled="acting || slotRetryActive"
         data-test="ai-experiment-detail-retry"
         @click="retryExperiment"
       >
         {{ t("aiObservability.experiments.detail.retryFailed") }}
+      </OButton>
+      <OButton
+        v-if="detail?.experiment.task.type === 'inline_prompt'"
+        size="sm"
+        variant="outline"
+        data-test="ai-experiment-detail-save-prompt"
+        @click="savePromptOpen = true"
+      >
+        {{ t("aiObservability.experiments.detail.saveAsPrompt") }}
+      </OButton>
+      <OButton
+        v-else-if="detail?.experiment.task.type === 'prompt_ref'"
+        size="sm"
+        variant="outline"
+        data-test="ai-experiment-detail-open-prompt"
+        @click="openManagedPrompt"
+      >
+        {{ t("aiObservability.experiments.detail.openPrompt") }}
       </OButton>
       <OButton
         size="sm"
@@ -156,7 +174,7 @@
           @row-click="openRow"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-md:contents">
               <OInput
                 v-model="rowSearch"
                 class="min-w-0 flex-1"
@@ -172,7 +190,7 @@
               />
               <OSelect
                 v-model="statusFilter"
-                class="shrink-0"
+                class="shrink-0 max-md:w-36"
                 width="sm"
                 :options="statusOptions"
                 :placeholder="t('aiObservability.experiments.detail.statusFilterAll')"
@@ -291,12 +309,23 @@
       @navigate="loadRowDetail"
       @retry="retryRowSlot"
       @trace="openTrace"
+      @score-trace="openScoreTrace"
+    />
+
+    <SaveAsPromptDialog
+      v-if="inlinePromptTask"
+      v-model:open="savePromptOpen"
+      :org-id="orgId"
+      :payload="inlinePromptTask.messages"
+      :config="inlinePromptConfig"
+      type="chat"
+      source="ui"
     />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -319,6 +348,15 @@ import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
 import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
+import {
+  cancelExperimentMutation,
+  cloneExperimentMutation,
+  retryExperimentMutation,
+  retryExperimentSlotMutation,
+} from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
@@ -328,6 +366,9 @@ import llmExperimentsService, {
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
+import SaveAsPromptDialog from "@/views/AIObservability/SaveAsPromptDialog.vue";
+import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
+import type { PromptConfig } from "@/services/llm-prompts.service";
 import {
   aiExperimentCompareRoute,
   aiExperimentCreateRoute,
@@ -356,6 +397,17 @@ const loading = ref(false);
 const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
+const savePromptOpen = ref(false);
+const inlinePromptTask = computed(() => {
+  const task = detail.value?.experiment.task;
+  return task?.type === "inline_prompt" ? task : null;
+});
+const inlinePromptConfig = computed<PromptConfig>(() => ({
+  model: inlinePromptTask.value?.model ?? null,
+  params: inlinePromptTask.value?.params ?? null,
+  tools: null,
+  responseFormat: null,
+}));
 const RESULTS_PAGE_SIZE = 100;
 const resultRows = ref<ExperimentResultRow[]>([]);
 const rowSearch = ref("");
@@ -364,7 +416,11 @@ const sortByDispersion = ref(false);
 const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
+const slotRetryActive = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
+const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
+let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
+let slotRetryPollGeneration = 0;
 
 // Real browser back when there's history to pop — returns to the Experiments
 // list with whatever filter (e.g. a dataset) the user actually arrived
@@ -505,6 +561,17 @@ const visibleRows = computed(() => {
 const failedSlotCount = computed(
   () => detail.value?.results.aggregateSummary?.incompleteTaskSlots ?? 0,
 );
+
+function openManagedPrompt() {
+  const task = detail.value?.experiment.task;
+  if (task?.type !== "prompt_ref") return;
+  router.push(
+    aiPromptsRoute(orgId.value, {
+      entityId: task.id,
+      version: task.version,
+    }),
+  );
+}
 
 // Built as parts rather than one interpolated sentence so a task without a
 // model simply drops that segment instead of rendering a dash.
@@ -775,6 +842,11 @@ async function refreshRows() {
     rowsLoading.value = false;
   }
 }
+// `refresh` only re-reads this page; the list's run status comes from the mutations' scope drop.
+const cancelWrite = useMutation(() => cancelExperimentMutation(orgId.value));
+const retryWrite = useMutation(() => retryExperimentMutation(orgId.value));
+const retrySlotWrite = useMutation(() => retryExperimentSlotMutation(orgId.value));
+const cloneWrite = useMutation(() => cloneExperimentMutation(orgId.value));
 
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
@@ -832,15 +904,30 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   if (slot.taskStatus !== "error") return;
   retryingRow.value = true;
   try {
-    await llmExperimentsService.retrySlot(
-      orgId.value,
-      experimentId.value,
-      slot.rowId,
-      slot.trialIndex,
-      globalThis.crypto.randomUUID(),
-    );
-    await loadRowDetail(slot.rowId);
-    await refresh();
+    const queued = await retrySlotWrite.mutateAsync({
+      experimentId: experimentId.value,
+      rowId: slot.rowId,
+      trialIndex: slot.trialIndex,
+      idempotencyKey: globalThis.crypto.randomUUID(),
+    });
+    if (selectedRowDetail.value?.rowId === slot.rowId) {
+      selectedRowDetail.value = {
+        ...selectedRowDetail.value,
+        trials: selectedRowDetail.value.trials.map((trial) =>
+          trial.trialIndex === slot.trialIndex
+            ? {
+                ...trial,
+                status: "pending",
+                taskStatus: "queued",
+                execution: queued,
+                scores: [],
+              }
+            : trial,
+        ),
+      };
+    }
+    startSlotRetryPolling(slot.rowId);
+    slotRetryActive.value = true;
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch (error: any) {
     toast({
@@ -852,15 +939,84 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   }
 }
 
+function stopSlotRetryPolling() {
+  slotRetryPollGeneration += 1;
+  slotRetryActive.value = false;
+  if (slotRetryPollTimer !== null) {
+    globalThis.clearTimeout(slotRetryPollTimer);
+    slotRetryPollTimer = null;
+  }
+}
+
+function startSlotRetryPolling(rowId: string) {
+  stopSlotRetryPolling();
+  scheduleSlotRetryPoll(rowId, slotRetryPollGeneration);
+}
+
+function scheduleSlotRetryPoll(rowId: string, generation: number) {
+  slotRetryPollTimer = globalThis.setTimeout(() => {
+    slotRetryPollTimer = null;
+    void pollSlotRetry(rowId, generation);
+  }, SLOT_RETRY_POLL_INTERVAL_MS);
+}
+
+async function pollSlotRetry(rowId: string, generation: number) {
+  const refreshSelectedRow = selectedRowDetail.value?.rowId === rowId;
+
+  try {
+    const [nextDetail, rows, nextRowDetail] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+      refreshSelectedRow
+        ? llmExperimentsService.getRow(orgId.value, experimentId.value, rowId)
+        : Promise.resolve(null),
+    ]);
+
+    if (generation !== slotRetryPollGeneration) return;
+
+    detail.value = nextDetail;
+    resultRows.value = rows;
+    if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
+      selectedRowDetail.value = nextRowDetail;
+    }
+  } catch {
+    // Keep polling durable queued work after a transient refresh failure.
+  }
+
+  if (generation !== slotRetryPollGeneration) return;
+
+  const rowStillPending =
+    selectedRowDetail.value?.rowId === rowId &&
+    selectedRowDetail.value.trials.some(
+      (trial) =>
+        ["queued", "pending", "in_progress"].includes(trial.taskStatus) ||
+        trial.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
+    );
+  if (rowStillPending) {
+    scheduleSlotRetryPoll(rowId, generation);
+  } else {
+    slotRetryActive.value = false;
+    // The retry settled after the mutation expired the list, so a list read meanwhile still shows it running.
+    void queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+  }
+}
+
+function openScoreTrace(target: { traceId: string; timestamp: number }) {
+  openExperimentTrace(orgId.value, target, (location) => router.resolve(location), globalThis.open);
+}
+
 async function cancelExperiment() {
-  await runAction(() => llmExperimentsService.cancel(orgId.value, experimentId.value), {
+  await runAction(() => cancelWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.cancelSuccess"),
     error: t("aiObservability.experiments.cancelError"),
   });
 }
 
 async function retryExperiment() {
-  await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value), {
+  await runAction(() => retryWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.retrySuccess"),
     error: t("aiObservability.experiments.retryError"),
   });
@@ -884,7 +1040,7 @@ async function cloneExperiment() {
   }
   acting.value = true;
   try {
-    const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);
+    const clone = await cloneWrite.mutateAsync({ experimentId: experimentId.value });
     toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
     void router.push(aiExperimentDetailRoute(orgId.value, clone.id));
   } catch (error: any) {
@@ -919,4 +1075,6 @@ async function runAction(
 watch([orgId, experimentId], refresh, { immediate: true });
 watch([sortByDispersion, highDispersionOnly], refreshRows);
 watch(orgId, loadScoreConfigs, { immediate: true });
+watch([orgId, experimentId], stopSlotRetryPolling);
+onUnmounted(stopSlotRetryPolling);
 </script>

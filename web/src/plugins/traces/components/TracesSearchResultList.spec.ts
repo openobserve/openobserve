@@ -653,5 +653,20 @@ describe("TracesSearchResultList", () => {
       await cellActions.vm.$emit("add-search-term", "service_name", "null", "include");
       expect(sharedSearchObj.data.stream.addToFilter).toBe("service_name is null");
     });
+
+    it("should double an embedded single quote instead of backslash-escaping it", async () => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      expect(cellActions.exists()).toBe(true);
+      await cellActions.vm.$emit(
+        "add-search-term",
+        "service_name",
+        "notificationHandling's",
+        "include",
+      );
+      expect(sharedSearchObj.data.stream.addToFilter).toBe(
+        "service_name = 'notificationHandling''s'",
+      );
+    });
   });
 });

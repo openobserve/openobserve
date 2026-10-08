@@ -145,17 +145,7 @@ pub(crate) async fn decrypt_synthetic_secrets(
         .iter()
         .any(|v| v.value.starts_with("AESenc:"));
     let has_encrypted_cookies = check.cookies.iter().any(|c| c.value.starts_with("AESenc:"));
-    // Extracted config secrets live in config_secrets; legacy rows may still
-    // carry AESenc: values in-place inside config.
-    let mut has_encrypted_config = !check.config_secrets.is_empty();
-    for path in check.check_type.secret_config_paths() {
-        let _ = for_each_string_at_path(&mut check.config, path, &mut |s: &mut String| {
-            if s.starts_with("AESenc:") {
-                has_encrypted_config = true;
-            }
-            Ok::<(), ()>(())
-        });
-    }
+    let has_encrypted_config = has_encrypted_config(check);
 
     if !has_encrypted_auth && !has_encrypted_vars && !has_encrypted_cookies && !has_encrypted_config
     {
@@ -192,23 +182,40 @@ pub(crate) async fn decrypt_synthetic_secrets(
         }
     }
 
-    // Rehydrate extracted config secrets back into config for the edit form.
+    rehydrate_config_secrets(check, &dek)
+}
+
+/// Extracted `config_secrets`, or legacy `AESenc:` values still in place inside `config`.
+pub(crate) fn has_encrypted_config(check: &mut Synthetic) -> bool {
+    if !check.config_secrets.is_empty() {
+        return true;
+    }
+    let mut found = false;
+    for path in check.check_type.secret_config_paths() {
+        let _ = for_each_string_at_path(&mut check.config, path, &mut |s: &mut String| {
+            found |= s.starts_with("AESenc:");
+            Ok::<(), ()>(())
+        });
+    }
+    found
+}
+
+/// Restores config-embedded secrets (SSH password, headers, recorded secrets) into `config`.
+pub(crate) fn rehydrate_config_secrets(check: &mut Synthetic, dek: &[u8]) -> anyhow::Result<()> {
     for (pointer, encrypted) in std::mem::take(&mut check.config_secrets) {
         if let Some(slot) = check.config.pointer_mut(&pointer) {
-            *slot = serde_json::Value::String(decrypt_secret(&dek, &encrypted)?);
+            *slot = serde_json::Value::String(decrypt_secret(dek, &encrypted)?);
         }
     }
-
-    // Legacy rows: decrypt AESenc: values still stored in-place inside config.
+    // Legacy rows: AESenc: values still stored in-place inside config.
     for path in check.check_type.secret_config_paths() {
         for_each_string_at_path(&mut check.config, path, &mut |s: &mut String| {
             if s.starts_with("AESenc:") {
-                *s = decrypt_secret(&dek, s)?;
+                *s = decrypt_secret(dek, s)?;
             }
             Ok::<(), anyhow::Error>(())
         })?;
     }
-
     Ok(())
 }
 
@@ -224,6 +231,14 @@ pub(crate) fn decrypt_secret(dek: &[u8], stored: &str) -> anyhow::Result<String>
 pub(crate) fn encrypt_secret(dek: &[u8], value: &str) -> anyhow::Result<String> {
     config::utils::encryption::encrypt_secret_value(dek, value)
         .map_err(|e| anyhow::anyhow!("AES encrypt failed: {e}"))
+}
+
+/// Encrypts a value for storage, keeping an empty one empty.
+pub(crate) fn store_value(dek: &[u8], value: &str) -> anyhow::Result<String> {
+    if value.is_empty() {
+        return Ok(String::new());
+    }
+    encrypt_secret(dek, value)
 }
 
 #[cfg(test)]
@@ -252,5 +267,20 @@ mod dek_tests {
         let stored = encrypt_secret(&dek, "s3cret").unwrap();
         assert!(stored.starts_with("AESenc:"));
         assert_eq!(decrypt_secret(&dek, &stored).unwrap(), "s3cret");
+    }
+
+    #[test]
+    fn an_empty_value_is_stored_empty_not_as_ciphertext() {
+        let dek = vec![3u8; 64];
+        assert_eq!(store_value(&dek, "").unwrap(), "");
+        assert!(!encrypt_secret(&dek, "").unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_non_empty_value_still_round_trips_through_store_value() {
+        let dek = vec![3u8; 64];
+        let stored = store_value(&dek, "hunter2").unwrap();
+        assert!(stored.starts_with("AESenc:"));
+        assert_eq!(decrypt_secret(&dek, &stored).unwrap(), "hunter2");
     }
 }

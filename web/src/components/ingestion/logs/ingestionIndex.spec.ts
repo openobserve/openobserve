@@ -24,7 +24,7 @@ import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
 // Mock services and utilities
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -110,8 +110,11 @@ describe("IngestLogs Index Component", () => {
         "curl",
         "fluentbit",
         "fluentd",
+        "kinesisfirehose",
         "vector",
+        "gcpLogs",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
@@ -179,16 +182,16 @@ describe("IngestLogs Index Component", () => {
       }).not.toThrow();
     });
 
-    it("should track segment analytics on copy", async () => {
+    it("should track product analytics on copy", async () => {
       const mockContent = { innerText: "test content" };
 
-      // Get the mocked segment analytics module
-      const segmentModule = await import("@/services/segment_analytics");
-      const mockSegmentAnalytics = segmentModule.default;
+      // Get the mocked product analytics module
+      const analyticsModule = await import("@/services/product_analytics");
+      const mockAnalytics = analyticsModule.default;
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith("Button Click", {
+      expect(mockAnalytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: wrapper.vm.router.currentRoute.value.name,
         user_org: "default",
@@ -261,13 +264,13 @@ describe("IngestLogs Index Component", () => {
       const mockContent = { innerText: "test" };
       wrapper.vm.router.currentRoute.value.name = "fluentbit";
 
-      // Get the mocked segment analytics module
-      const segmentModule = await import("@/services/segment_analytics");
-      const mockSegmentAnalytics = segmentModule.default;
+      // Get the mocked product analytics module
+      const analyticsModule = await import("@/services/product_analytics");
+      const mockAnalytics = analyticsModule.default;
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(mockSegmentAnalytics.track).toHaveBeenCalledWith(
+      expect(mockAnalytics.track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({
           ingestion: "fluentbit",
@@ -305,8 +308,11 @@ describe("IngestLogs Index Component", () => {
         "curl",
         "fluentbit",
         "fluentd",
+        "kinesisfirehose",
         "vector",
+        "gcpLogs",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ];
 

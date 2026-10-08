@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { savedViewsQuery } from "@/services/saved_views.queries";
+import { viewTypeOf } from "@/services/saved_views";
+import { queryClient } from "@/composables/query/queryClient";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
-import savedviewsService from "@/services/saved_views";
 import searchService from "@/services/search";
 
 import { arraysMatch } from "@/utils/zincutils";
@@ -58,9 +60,7 @@ export const useSearchBar = (t: TranslateFn) => {
 
   const getFunctions = async () => {
     try {
-      if (store.state.organizationData.functions.length == 0) {
-        await getAllFunctions();
-      }
+      await getAllFunctions();
 
       store.state.organizationData.functions.map((data: any) => {
         const itemObj: {
@@ -84,14 +84,25 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
-  const getSavedViews = async () => {
+  // `force` for the reloads that follow a create/update/delete; a plain call on
+  // Logs entry is a cache hit.
+  const getSavedViews = async (force = false) => {
     try {
       searchObj.loadingSavedView = true;
-      savedviewsService
-        .get(store.state.selectedOrganization.identifier)
-        .then((res) => {
+      const org = store.state.selectedOrganization.identifier;
+      (force
+        ? queryClient
+            .invalidateQueries({
+              queryKey: savedViewsQuery(org).queryKey,
+              exact: true,
+              refetchType: "none",
+            })
+            .then(() => queryClient.fetchQuery(savedViewsQuery(org)))
+        : queryClient.fetchQuery(savedViewsQuery(org))
+      )
+        .then((views: any[]) => {
           searchObj.loadingSavedView = false;
-          searchObj.data.savedViews = res.data.views;
+          searchObj.data.savedViews = views.filter((v) => viewTypeOf(v) === "logs");
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;

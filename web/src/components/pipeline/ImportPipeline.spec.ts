@@ -24,25 +24,36 @@ import ImportPipeline from "@/components/pipeline/ImportPipeline.vue";
 // Module mocks
 // --------------------------------------------------------------------------
 
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    createPipeline: vi.fn(),
-    getPipelineStreams: vi.fn(),
-    getPipelines: vi.fn(),
-  },
-}));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createPipeline: vi.fn(),
+      getPipelineStreams: vi.fn(),
+      getPipelines: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -89,6 +100,7 @@ vi.mock("vue-router", () => ({
 // --------------------------------------------------------------------------
 
 import pipelinesService from "@/services/pipelines";
+import analytics from "@/services/product_analytics";
 import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
 
@@ -427,6 +439,51 @@ describe("ImportPipeline.vue", () => {
       it(`exposes ${name} as a function`, () => {
         expect(typeof (wrapper.vm as any)[name]).toBe("function");
       });
+    });
+  });
+
+  describe("pipeline_imported analytics", () => {
+    const pipeline = (name: string) => ({
+      name,
+      stream_type: "logs",
+      org: store.state.selectedOrganization.identifier,
+      source: {
+        source_type: "realtime",
+        stream_type: "logs",
+        stream_name: `src_${name}`,
+        org_id: store.state.selectedOrganization.identifier,
+      },
+      nodes: [],
+      edges: [],
+    });
+
+    beforeEach(() => {
+      wrapper = createWrapper();
+    });
+
+    it("tracks one pipeline_imported counting the pipelines created", async () => {
+      vi.mocked(pipelinesService.createPipeline)
+        .mockResolvedValueOnce({ data: {} } as any)
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce({ data: {} } as any);
+
+      await (wrapper.vm as any).importJson({
+        jsonStr: JSON.stringify([pipeline("a"), pipeline("b"), pipeline("c")]),
+      });
+
+      expect(pipelinesService.createPipeline).toHaveBeenCalledTimes(3);
+      expect(
+        vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "pipeline_imported"),
+      ).toEqual([["pipeline_imported", { count: 2 }]]);
+    });
+
+    it("does not track pipeline_imported when no pipeline was created", async () => {
+      vi.mocked(pipelinesService.createPipeline).mockRejectedValue(new Error("boom"));
+
+      await (wrapper.vm as any).importJson({ jsonStr: JSON.stringify([pipeline("a")]) });
+
+      expect(pipelinesService.createPipeline).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("pipeline_imported", expect.anything());
     });
   });
 

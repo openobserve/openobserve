@@ -6,6 +6,9 @@ import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock external dependencies
 vi.mock("@/utils/commons", async () => {
@@ -17,11 +20,14 @@ vi.mock("@/utils/commons", async () => {
   };
 });
 
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    create: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useNotifications", () => ({
   default: vi.fn(() => ({
@@ -937,6 +943,103 @@ describe("ImportDashboard.vue", () => {
       const panels = sentDashboard.tabs[0].panels;
       expect(new Set(panels.map((p: any) => p.id)).size).toBe(panels.length);
       expect(new Set(panels.map((p: any) => p.layout.i)).size).toBe(panels.length);
+    });
+  });
+
+  describe("product analytics", () => {
+    const dashboard = { title: "Imported", tabs: [{ tabId: "t1", panels: [] }] };
+
+    it("tracks one dashboard_imported with source json for pasted JSON", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockResolvedValue({ data: {} });
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.jsonStr = JSON.stringify(dashboard);
+
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_imported", {
+        source: "json",
+        count: 1,
+      });
+    });
+
+    it("tracks one dashboard_imported counting every dashboard of a URL import", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any)
+        .mockResolvedValueOnce({ data: {} })
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce({ data: {} });
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.activeTab = "import_json_url";
+      wrapper.vm.form.setFieldValue("url", "https://example.com/d.json");
+      await flushPromises();
+      wrapper.vm.jsonStr = JSON.stringify([dashboard, dashboard, dashboard]);
+
+      await wrapper.vm.importFromUrl();
+      await flushPromises();
+
+      const imported = vi
+        .mocked(analytics.track)
+        .mock.calls.filter((c) => c[0] === "dashboard_imported");
+      expect(imported).toEqual([["dashboard_imported", { source: "url", count: 2 }]]);
+    });
+
+    it("tracks one dashboard_imported counting every dashboard across uploaded files", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockResolvedValue({ data: {} });
+      const content = JSON.stringify([[dashboard, dashboard], dashboard]);
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.form.setFieldValue("jsonFiles", [
+        new File([content], "a.json", { type: "application/json" }),
+        new File([content], "b.json", { type: "application/json" }),
+      ]);
+      await flushPromises();
+      wrapper.vm.jsonStr = content;
+
+      await wrapper.vm.importFiles();
+      await flushPromises();
+
+      const imported = vi
+        .mocked(analytics.track)
+        .mock.calls.filter((c) => c[0] === "dashboard_imported");
+      expect(imported).toEqual([["dashboard_imported", { source: "file", count: 3 }]]);
+      expect(analytics.track).toHaveBeenCalledTimes(4);
+    });
+
+    it("still tracks dashboard_imported when the refresh after a confirmed create fails", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      const { getAllDashboards } = await import("@/utils/commons");
+      (dashboardService.create as any).mockResolvedValue({ data: {} });
+      (getAllDashboards as any).mockRejectedValueOnce(new Error("refresh failed"));
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.jsonStr = JSON.stringify(dashboard);
+
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_imported", {
+        source: "json",
+        count: 1,
+      });
+    });
+
+    it("does not track dashboard_imported when create rejects", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(new Error("boom"));
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.jsonStr = JSON.stringify(dashboard);
+
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

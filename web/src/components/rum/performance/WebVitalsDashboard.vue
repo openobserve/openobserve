@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onActivated, nextTick, onMounted, type Ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
 import {
@@ -102,7 +102,6 @@ import {
   getDurationObjectFromParams,
   getQueryParamsForDuration,
 } from "@/utils/date";
-import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import webVitalsDashboard from "@/utils/rum/web_vitals.json";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

@@ -106,6 +106,8 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import { addDatasetTelemetryItemMutation } from "@/services/llm-datasets.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   addToDatasetDefaults,
   makeAddToDatasetSchema,
@@ -174,16 +176,22 @@ watch(
   { immediate: true },
 );
 
+// The dataset now holds one more item, and its list row carries that count.
+const addTelemetryItem = useMutation(() => addDatasetTelemetryItemMutation(props.orgId));
+
 /** Runs only once the Zod schema passes. */
 async function save(values: AddToDatasetForm) {
   try {
-    await llmDatasetsService.addTelemetryItem(props.orgId, values.datasetId, {
-      refType: props.refType,
-      refId: props.refId,
-      sourceStream: props.sourceStream,
-      refTraceStartTime: props.refTraceStartTime,
-      expectedOutput: values.expectedOutput.trim() || undefined,
-      tags: values.tags,
+    await addTelemetryItem.mutateAsync({
+      datasetId: values.datasetId,
+      payload: {
+        refType: props.refType,
+        refId: props.refId,
+        sourceStream: props.sourceStream,
+        refTraceStartTime: props.refTraceStartTime,
+        expectedOutput: values.expectedOutput.trim() || undefined,
+        tags: values.tags,
+      },
     });
     toast({ variant: "success", message: t("aiObservability.traceActions.dataset.success") });
     emit("added", values.datasetId);

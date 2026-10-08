@@ -187,6 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ formatTraceTimestamp(row.metadata?.start_time) }}
             </span>
           </template>
+          <template #cell-page="{ row }">
+            <span class="block truncate font-mono text-xs" :title="pageRoute(row)">
+              {{ pageRoute(row) }}
+            </span>
+          </template>
           <template #cell-route="{ row }">
             <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
               {{ traceDisplayName(row) }}
@@ -207,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
@@ -221,9 +226,14 @@ import {
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
-import { traceQueryWindow } from "@/utils/rum/traceWindow";
+import {
+  arrivalTraceWindowUs,
+  TRACE_RANGE_PADDING_US,
+  traceQueryWindow,
+} from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -256,6 +266,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
+  },
 });
 
 const emit = defineEmits(["event-emitted"]);
@@ -271,6 +285,7 @@ const traceDetailsRef = ref<any>(null);
 const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
+const traceSearchWindow = ref<{ start: number; end: number } | null>(null);
 
 const totalErrorCount = computed(
   () => correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
@@ -290,6 +305,16 @@ const traceColumns = computed(() => [
     size: 100,
     minSize: 100,
     maxSize: 200,
+    meta: { align: "left" },
+  },
+  {
+    // The browser page each request was made from; the route column names the request itself.
+    id: "page",
+    header: t("rum.errorDetail.facetPage"),
+    accessorFn: (row: any) => pageRoute(row),
+    size: 160,
+    minSize: 80,
+    maxSize: 400,
     meta: { align: "left" },
   },
   {
@@ -329,10 +354,16 @@ function traceRowClass(row: any): string {
 function shortRoute(url: string): string {
   try {
     const u = new URL(url);
+    // Hash-routed SPAs keep the route after `#`, so the pathname alone is `/` for every page.
+    if (u.hash.startsWith("#/")) return u.pathname + u.search + u.hash;
     return u.pathname + u.search || "/";
   } catch {
     return url;
   }
+}
+
+function pageRoute(trace: any): string {
+  return trace.route ? shortRoute(trace.route) : "";
 }
 
 function traceDisplayName(trace: any): string {
@@ -407,11 +438,8 @@ async function fetchTraceMetadata(
   const searchEndTime = window?.endTime ?? (props.endTime || nowMs) * 1000;
 
   // Build filter for multiple trace IDs
-  const safeTraceIds = traceIds.map((id) => id.replace(/'/g, "''"));
   const filter =
-    safeTraceIds.length === 1
-      ? `trace_id='${safeTraceIds[0]}'`
-      : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
+    traceIds.length === 1 ? sqlEquals("trace_id", traceIds[0]) : sqlIn("trace_id", traceIds);
 
   const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
@@ -511,6 +539,7 @@ async function fetchTraces() {
 
   loading.value = true;
   error.value = null;
+  traceSearchWindow.value = null;
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -545,7 +574,11 @@ async function fetchTraces() {
       aggOrNull("max", "type", "_type"),
       aggOrNull("min", "date", "_date"),
     ];
-    const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
+    if (props.rumWindowUs) {
+      const ts = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+      selectParts.push(`min(${ts}) as _first_ts`, `max(${ts}) as _last_ts`);
+    }
+    const whereParts = [sqlEquals("session_id", props.sessionId), traceIdSet];
     const having = has("resource_url")
       ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
       : "";
@@ -553,8 +586,11 @@ async function fetchTraces() {
     const rumQuery = {
       query: {
         sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
-        start_time: searchStartTime,
-        end_time: searchEndTime,
+        start_time: props.rumWindowUs?.start ?? searchStartTime,
+        // Rows keep arriving after the last device-clock event, so a re-fetch must reach "now".
+        end_time: props.rumWindowUs
+          ? Math.max(props.rumWindowUs.end, Date.now() * 1000)
+          : searchEndTime,
         from: 0,
         size: 250,
       },
@@ -575,6 +611,17 @@ async function fetchTraces() {
       correlatedViews.value = [];
       return;
     }
+
+    const deviceWindow = { start: searchStartTime, end: searchEndTime };
+    const arrival = props.rumWindowUs ? arrivalTraceWindowUs(rumHits) : null;
+    // Arrival can trail a span by more than the pad (offline buffering), so keep the device window too.
+    const searchWindow = arrival
+      ? {
+          start: Math.min(arrival.start, deviceWindow.start - TRACE_RANGE_PADDING_US),
+          end: Math.max(arrival.end, deviceWindow.end),
+        }
+      : deviceWindow;
+    if (props.rumWindowUs) traceSearchWindow.value = searchWindow;
 
     // Deduplicate by trace_id, keep first occurrence for view context.
     // Canonicalize the id: SDK 0.4.x stored it zero-stripped, while the traces
@@ -611,8 +658,8 @@ async function fetchTraces() {
         // the default correlation stream — today's behavior.
         const locationById = await resolveTraceLocationsBulk(
           views.map((v) => v.traceId),
-          searchStartTime,
-          searchEndTime,
+          searchWindow.start,
+          searchWindow.end,
         );
         for (const view of views as any[]) {
           const location = locationById[view.traceId];
@@ -637,8 +684,8 @@ async function fetchTraces() {
               stream,
               unionTraceWindow(
                 ids.map((id) => rangeById.get(id)),
-                searchStartTime,
-                searchEndTime,
+                searchWindow.start,
+                searchWindow.end,
               ),
             ),
           ),
@@ -679,8 +726,9 @@ function openTraceDetail(view: any) {
   selectedTrace.value = view;
 
   const nowMs = Date.now();
-  const fallbackStart = (props.startTime || nowMs - 86400000) * 1000;
-  const fallbackEnd = (props.endTime || nowMs) * 1000;
+  const fallbackStart =
+    traceSearchWindow.value?.start ?? (props.startTime || nowMs - 86400000) * 1000;
+  const fallbackEnd = traceSearchWindow.value?.end ?? (props.endTime || nowMs) * 1000;
 
   const meta = traceMetadata.value[view.traceId];
   if (meta?.start_time && meta?.end_time) {

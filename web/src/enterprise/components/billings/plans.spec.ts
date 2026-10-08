@@ -19,6 +19,7 @@ import Plans from "./plans.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
+import paidOverage from "@/services/paidOverage";
 import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
 
@@ -35,13 +36,23 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock BillingService
-vi.mock("@/services/billings", () => ({
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_subscription: vi.fn(),
+      resume_subscription: vi.fn(),
+      get_hosted_url: vi.fn(),
+      get_session_url: vi.fn(),
+      retrieve_hosted_page: vi.fn(),
+      get_ai_usage: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/paidOverage", () => ({
   default: {
-    list_subscription: vi.fn(),
-    resume_subscription: vi.fn(),
-    get_hosted_url: vi.fn(),
-    get_session_url: vi.fn(),
-    retrieve_hosted_page: vi.fn(),
+    get: vi.fn(),
   },
 }));
 
@@ -116,6 +127,24 @@ describe("Plans Component", () => {
     });
     (BillingService.retrieve_hosted_page as any).mockResolvedValue({
       data: { data: { hosted_page: { state: "succeeded" } } },
+    });
+    (BillingService.get_ai_usage as any).mockResolvedValue({
+      data: {
+        credits_used: 0,
+        credits_limit: 100,
+        credits_remaining: 100,
+        mode: "free",
+        requires_additional_credits: false,
+      },
+    });
+    (paidOverage.get as any).mockResolvedValue({
+      data: {
+        feature: "ai_credits",
+        organization: { org_id: "default", enabled: false, can_manage: true },
+        payer: null,
+        effective: false,
+        billing_status: "eligible",
+      },
     });
 
     (zincutils.useLocalOrganization as any).mockReturnValue({
@@ -647,5 +676,47 @@ describe("Plans Component", () => {
     await flushPromises();
 
     expect(BillingService.resume_subscription).toHaveBeenCalledTimes(2);
+  });
+
+  it("links consent-required AI usage to Paid Usage settings", async () => {
+    wrapper.vm.aiUsage = {
+      credits_used: 100,
+      credits_limit: 100,
+      credits_remaining: 0,
+      mode: "consent_required",
+      requires_additional_credits: false,
+    };
+    await nextTick();
+
+    expect(wrapper.text()).toContain(
+      "Free AI credits are depleted. Authorize paid usage to continue.",
+    );
+    await wrapper.get('[data-test="billing-open-paid-usage-settings"]').trigger("click");
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      name: "paidUsage",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
+  it("names the payer billing cycle for metered AI usage", async () => {
+    wrapper.vm.aiUsage = {
+      credits_used: 100,
+      credits_limit: 100,
+      credits_remaining: 0,
+      mode: "pay_as_you_go",
+      requires_additional_credits: false,
+    };
+    wrapper.vm.paidOverageStatus = {
+      feature: "ai_credits",
+      organization: { org_id: "member", enabled: true, can_manage: true },
+      payer: { org_id: "payer", enabled: true, can_manage: false },
+      effective: true,
+      billing_status: "eligible",
+    };
+    await nextTick();
+
+    expect(wrapper.text()).toContain(
+      "Paid AI usage is added to the payer organization’s current billing cycle.",
+    );
   });
 });

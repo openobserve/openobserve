@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const copyMock = vi.fn();
@@ -26,7 +26,10 @@ const mountBlock = (props: Record<string, unknown>) =>
   mount(OCodeBlock, { props: props as any, global: { stubs } });
 
 describe("OCodeBlock", () => {
-  beforeEach(() => copyMock.mockClear());
+  beforeEach(() => {
+    copyMock.mockReset();
+    copyMock.mockResolvedValue(true);
+  });
 
   it("renders the code and the language label", () => {
     const wrapper = mountBlock({ code: "echo hello", lang: "bash" });
@@ -45,7 +48,16 @@ describe("OCodeBlock", () => {
   it("emits copy after copying", async () => {
     const wrapper = mountBlock({ code: "x", lang: "bash" });
     await wrapper.find('[data-test="code-block-copy-btn"]').trigger("click");
+    await flushPromises();
     expect(wrapper.emitted("copy")).toBeTruthy();
+  });
+
+  it("does not emit copy when the clipboard write fails", async () => {
+    copyMock.mockResolvedValue(false);
+    const wrapper = mountBlock({ code: "x", lang: "bash" });
+    await wrapper.find('[data-test="code-block-copy-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("copy")).toBeUndefined();
   });
 
   it("falls back to 'text' label when no language is given", () => {

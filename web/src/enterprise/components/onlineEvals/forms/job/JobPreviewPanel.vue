@@ -34,7 +34,7 @@
 
     <section class="border-dialog-header-border rounded-default mb-0 border px-4 py-3.5">
       <header class="text-text-secondary mb-1.5 flex items-center gap-1.5">
-        <OIcon name="info" size="xs" />
+        <OIcon name="fact-check" size="xs" />
         <span class="text-compact text-text-heading m-0 font-semibold">{{
           t("onlineEvals.job.preview.summaryTitle")
         }}</span>

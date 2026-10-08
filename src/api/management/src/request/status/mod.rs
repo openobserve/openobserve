@@ -123,6 +123,11 @@ macro_rules! enterprise_value {
     }};
 }
 
+#[cfg(feature = "enterprise")]
+const LOGIN_STATE_COOKIE: &str = "o2_login_state";
+#[cfg(feature = "enterprise")]
+const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
+
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
     status: String,
@@ -213,11 +218,15 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    oncall_enabled: bool,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
     /// UI hides the private-locations views, the agent-setup drawer and the
     /// public/private selector on this rather than on `synthetics_enabled`.
     synthetics_private_locations_enabled: bool,
+    synthetics_subtests_enabled: bool,
+    /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
+    synthetics_browser_max_steps: usize,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
     /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
@@ -237,6 +246,7 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    profiling_enabled: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -444,7 +454,7 @@ pub async fn zo_config(
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
+    let rbac_enabled = enterprise_value!(false, rbac_enabled_for_config(openfga_cfg.enabled).await);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -464,7 +474,8 @@ pub async fn zo_config(
     let logo_dark = enterprise_value!(None, get_logo_dark().await);
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
+    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
@@ -475,6 +486,7 @@ pub async fn zo_config(
     // is not running super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
+    let synthetics_subtests_enabled = cfg.synthetics.subtests_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     // Read straight from the config in every build: synthetics is OSS now, and
     // reporting `false` here is what hid the whole feature from the UI.
@@ -485,6 +497,8 @@ pub async fn zo_config(
     // cannot serve.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
+    let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
+    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -598,13 +612,17 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        oncall_enabled,
         synthetics_private_locations_enabled,
+        synthetics_subtests_enabled,
+        synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        profiling_enabled: cfg.common.profiling_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]
@@ -648,6 +666,12 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
         user.is_external,
     )
     .await
+}
+
+/// Same rule as `check_permissions`, so the UI never hides RBAC the backend enforces.
+#[cfg(feature = "enterprise")]
+async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
+    openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -1074,7 +1098,10 @@ async fn get_stream_schema_status() -> (usize, usize) {
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn redirect(Query(query): Query<std::collections::HashMap<String, String>>) -> Response {
+pub async fn redirect(
+    cookies: CookieJar,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
@@ -1106,32 +1133,15 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
         },
     };
 
-    match query.get("state") {
-        Some(code) => match openobserve_core::kv::get(PKCE_STATE_ORG, code).await {
-            Ok(_) => {
-                let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, code).await;
-            }
-            Err(_) => {
-                // Bad Request
-                audit_message.response_meta.http_response_code = 400;
-                audit(audit_message).await;
-                return Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::from("invalid state in request"))
-                    .unwrap();
-            }
-        },
-
-        None => {
-            // Bad Request
-            audit_message.response_meta.http_response_code = 400;
-            audit(audit_message).await;
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("no state in request"))
-                .unwrap();
-        }
-    };
+    let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
+    if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
+        audit_message.response_meta.http_response_code = 400;
+        audit(audit_message).await;
+        return Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(Body::from(msg))
+            .unwrap();
+    }
 
     log::info!("entering exchange_code: {code}");
 
@@ -1267,7 +1277,8 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(cfg.auth.cookie_secure_only);
@@ -1285,6 +1296,10 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
                 .status(StatusCode::FOUND)
                 .header(header::LOCATION, login_url)
                 .header(header::SET_COOKIE, auth_cookie.to_string())
+                .header(
+                    header::SET_COOKIE,
+                    login_state_cookie("", 0, &cfg).to_string(),
+                )
                 .body(Body::empty())
                 .unwrap()
         }
@@ -1315,7 +1330,23 @@ pub async fn dex_login() -> impl IntoResponse {
     let state = login_data.state.clone();
     let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
-    common::meta::http::HttpResponse::json(login_data.url)
+    with_login_state_cookie(
+        common::meta::http::HttpResponse::json(login_data.url),
+        &state,
+    )
+}
+
+/// Binds the login `state` to this browser so `/config/redirect` rejects a code started elsewhere.
+#[cfg(feature = "enterprise")]
+pub fn with_login_state_cookie(mut resp: Response, state: &str) -> Response {
+    let cookie = login_state_cookie(state, LOGIN_STATE_MAX_AGE_SECS, &get_config());
+    match header::HeaderValue::from_str(&cookie.to_string()) {
+        Ok(v) => {
+            resp.headers_mut().append(header::SET_COOKIE, v);
+        }
+        Err(e) => log::error!("failed to set login state cookie: {e}"),
+    }
+    resp
 }
 
 #[cfg(feature = "enterprise")]
@@ -1425,7 +1456,9 @@ pub async fn refresh_token_with_dex(
                     let mut auth_cookie = Cookie::new("auth_tokens", cleared);
                     auth_cookie.set_expires(
                         time::OffsetDateTime::now_utc()
-                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                            + time::Duration::seconds(
+                                db::password_policy::cookie_max_age_secs().await,
+                            ),
                     );
                     auth_cookie.set_http_only(true);
                     auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1466,7 +1499,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1490,7 +1524,8 @@ pub async fn refresh_token_with_dex(
 
             let mut auth_cookie = Cookie::new("auth_tokens", tokens);
             auth_cookie.set_expires(
-                time::OffsetDateTime::now_utc() + time::Duration::seconds(conf.auth.cookie_max_age),
+                time::OffsetDateTime::now_utc()
+                    + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
             );
             auth_cookie.set_http_only(true);
             auth_cookie.set_secure(conf.auth.cookie_secure_only);
@@ -1511,15 +1546,18 @@ pub async fn refresh_token_with_dex(
     }
 }
 
+/// `max_age_secs` is passed in rather than read here: the policy read is async and this is not, and
+/// logout builds two cookies from the one answer.
 fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
     cookie_name: &'a str,
     token_struct: &T,
     conf: &Arc<Config>,
+    max_age_secs: i64,
 ) -> Cookie<'a> {
     let tokens = json::to_string(token_struct).unwrap();
     let tokens = base64::encode(&tokens);
     let mut auth_cookie = Cookie::new(cookie_name, tokens);
-    auth_cookie.set_max_age(time::Duration::seconds(conf.auth.cookie_max_age));
+    auth_cookie.set_max_age(time::Duration::seconds(max_age_secs));
     auth_cookie.set_http_only(true);
     auth_cookie.set_secure(conf.auth.cookie_secure_only);
     auth_cookie.set_path("/");
@@ -1529,6 +1567,56 @@ fn prepare_empty_cookie<'a, T: Serialize + ?Sized>(
         auth_cookie.set_same_site(SameSite::None);
     }
     auth_cookie
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_cookie(state: &str, max_age_secs: i64, conf: &Config) -> Cookie<'static> {
+    let mut cookie = Cookie::new(LOGIN_STATE_COOKIE, state.to_string());
+    cookie.set_max_age(time::Duration::seconds(max_age_secs));
+    cookie.set_http_only(true);
+    cookie.set_secure(conf.auth.cookie_secure_only);
+    cookie.set_path("/");
+    // Must ride the top-level GET back from dex, so never Strict.
+    if conf.auth.cookie_same_site_lax {
+        cookie.set_same_site(SameSite::Lax);
+    } else {
+        cookie.set_same_site(SameSite::None);
+    }
+    cookie
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_matches(cookie: Option<&str>, state: &str) -> bool {
+    let Some(cookie) = cookie else {
+        return false;
+    };
+    if cookie.is_empty() || cookie.len() != state.len() {
+        return false;
+    }
+    cookie
+        .bytes()
+        .zip(state.bytes())
+        .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+        == 0
+}
+
+#[cfg(feature = "enterprise")]
+async fn consume_login_state(
+    state: Option<&String>,
+    cookie: Option<&str>,
+) -> Result<(), &'static str> {
+    let Some(state) = state else {
+        return Err("no state in request");
+    };
+    if !login_state_matches(cookie, state)
+        || openobserve_core::kv::get(PKCE_STATE_ORG, state)
+            .await
+            .is_err()
+    {
+        return Err("invalid state in request");
+    }
+    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
+    Ok(())
 }
 
 pub async fn logout(
@@ -1562,8 +1650,11 @@ pub async fn logout(
             .await;
         }
     };
-    let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
-    let auth_ext_cookie = prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf);
+    let max_age_secs = db::password_policy::cookie_max_age_secs().await;
+    let auth_cookie =
+        prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf, max_age_secs);
+    let auth_ext_cookie =
+        prepare_empty_cookie("auth_ext", &AuthTokensExt::default(), &conf, max_age_secs);
 
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
@@ -1833,6 +1924,15 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
+        assert!(block_feature_for_report_failure().await);
+        assert_eq!(last_reported_timestamp().await, 0);
+        assert!(rbac_enabled_for_config(true).await);
+        assert!(!rbac_enabled_for_config(false).await);
+    }
+
     #[test]
     fn test_healthz_response_different_status() {
         let response = HealthzResponse {
@@ -1945,7 +2045,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("test_cookie", &test_token, &config);
+        let cookie = prepare_empty_cookie(
+            "test_cookie",
+            &test_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.starts_with("test_cookie="));
@@ -1964,7 +2069,12 @@ mod tests {
 
         let empty_token = EmptyToken {};
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("auth_cookie", &empty_token, &config);
+        let cookie = prepare_empty_cookie(
+            "auth_cookie",
+            &empty_token,
+            &config,
+            config.auth.cookie_max_age,
+        );
         let cookie_str = cookie.to_string();
 
         assert!(cookie_str.contains("HttpOnly"));
@@ -1986,8 +2096,10 @@ mod tests {
         let test_data = TestData { id: 42 };
         let config = Arc::new(Config::default());
 
-        let cookie1 = prepare_empty_cookie("cookie1", &test_data, &config);
-        let cookie2 = prepare_empty_cookie("cookie2", &test_data, &config);
+        let cookie1 =
+            prepare_empty_cookie("cookie1", &test_data, &config, config.auth.cookie_max_age);
+        let cookie2 =
+            prepare_empty_cookie("cookie2", &test_data, &config, config.auth.cookie_max_age);
         let cookie1_str = cookie1.to_string();
         let cookie2_str = cookie2.to_string();
 
@@ -2101,7 +2213,12 @@ mod tests {
         };
 
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("complex_cookie", &complex_data, &config);
+        let cookie = prepare_empty_cookie(
+            "complex_cookie",
+            &complex_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "complex_cookie");
         assert!(!cookie.value().is_empty());
@@ -2185,7 +2302,12 @@ mod tests {
 
         let empty_data = EmptyStruct;
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("empty_cookie", &empty_data, &config);
+        let cookie = prepare_empty_cookie(
+            "empty_cookie",
+            &empty_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         assert_eq!(cookie.name(), "empty_cookie");
         assert!(!cookie.value().is_empty()); // Even empty struct gets base64 encoded
@@ -2213,7 +2335,12 @@ mod tests {
             value: "test".to_string(),
         };
         let config = Arc::new(Config::default());
-        let cookie = prepare_empty_cookie("valid_cookie", &valid_data, &config);
+        let cookie = prepare_empty_cookie(
+            "valid_cookie",
+            &valid_data,
+            &config,
+            config.auth.cookie_max_age,
+        );
 
         // Should not panic and should produce valid cookie
         assert_eq!(cookie.name(), "valid_cookie");
@@ -2248,5 +2375,63 @@ mod tests {
         assert!(!rum.version.is_empty());
         assert!(!rum.organization_identifier.is_empty());
         assert!(!rum.api_version.is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_matches() {
+        let state = "AbCdEfGhIjKlMnOpQrStUvWxYz012345";
+        assert!(login_state_matches(Some(state), state));
+        assert!(!login_state_matches(None, state));
+        assert!(!login_state_matches(Some(""), state));
+        assert!(!login_state_matches(Some(""), ""));
+        assert!(!login_state_matches(
+            Some("AbCdEfGhIjKlMnOpQrStUvWxYz012346"),
+            state
+        ));
+        assert!(!login_state_matches(Some(&state[..31]), state));
+        assert!(!login_state_matches(Some(&format!("{state}x")), state));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_cookie_attributes() {
+        let mut conf = Config::default();
+        conf.auth.cookie_secure_only = true;
+        conf.auth.cookie_same_site_lax = true;
+        let cookie = login_state_cookie("abc", LOGIN_STATE_MAX_AGE_SECS, &conf);
+        assert_eq!(cookie.name(), LOGIN_STATE_COOKIE);
+        assert_eq!(cookie.value(), "abc");
+        assert_eq!(cookie.http_only(), Some(true));
+        assert_eq!(cookie.secure(), Some(true));
+        assert_eq!(cookie.same_site(), Some(SameSite::Lax));
+        assert_eq!(cookie.path(), Some("/"));
+        assert_eq!(cookie.max_age(), Some(time::Duration::seconds(600)));
+
+        conf.auth.cookie_secure_only = false;
+        conf.auth.cookie_same_site_lax = false;
+        let cleared = login_state_cookie("", 0, &conf);
+        assert_eq!(cleared.secure(), Some(false));
+        assert_eq!(cleared.same_site(), Some(SameSite::None));
+        assert_eq!(cleared.max_age(), Some(time::Duration::ZERO));
+        assert!(cleared.to_string().contains("Max-Age=0"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_consume_login_state_rejects_without_kv_lookup() {
+        assert_eq!(
+            consume_login_state(None, Some("abc")).await,
+            Err("no state in request")
+        );
+        let state = "abc".to_string();
+        assert_eq!(
+            consume_login_state(Some(&state), None).await,
+            Err("invalid state in request")
+        );
+        assert_eq!(
+            consume_login_state(Some(&state), Some("abd")).await,
+            Err("invalid state in request")
+        );
     }
 }

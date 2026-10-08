@@ -175,6 +175,7 @@ impl TantivyMultiResultBuilder {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum TantivyMultiResult {
     RowNums(u64),
     Count(u64),

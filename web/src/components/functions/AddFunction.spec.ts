@@ -9,14 +9,17 @@ import { createRouter, createWebHistory } from "vue-router";
 import config from "@/aws-exports";
 
 // Mock dependencies
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
-    update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
+      update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
+    },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },

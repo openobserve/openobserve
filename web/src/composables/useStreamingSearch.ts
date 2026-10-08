@@ -20,6 +20,7 @@ import authService from "@/services/auth";
 import store from "@/stores";
 import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import { attemptTokenRefresh } from "@/services/http";
+import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
@@ -37,12 +38,14 @@ type StreamHandler = (data: any, traceId: string) => void;
 type ErrorHandler = (error: any, traceId: string) => void;
 type CompleteHandler = (traceId: string) => void;
 type ResetHandler = (data: any, traceId: string) => void;
+type ActivityHandler = () => void;
 
 type TraceRecord = {
   data: StreamHandler[];
   error: ErrorHandler[];
   complete: CompleteHandler[];
   reset: ResetHandler[];
+  activity: ActivityHandler[];
   isInitiated: boolean;
   streamId: string | null;
   abortController: AbortController | null;
@@ -78,7 +81,7 @@ const useHttpStreaming = () => {
     }
 
     if (typeof response === "string") {
-      response = JSON.parse(response);
+      response = JSON.parse(patchLargeNumbersInJson(response));
     }
 
     const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
@@ -117,7 +120,9 @@ const useHttpStreaming = () => {
       data: (data: any, response: any) => void;
       error: (data: any, response: any) => void;
       complete: (data: any, response: any) => void;
-      reset: (data: any, response: any) => void;
+      reset?: (data: any, response: any) => void;
+      // Fires on every raw chunk read, before any parsing, so a caller can time out a silent stream.
+      onActivity?: () => void;
     },
   ) => {
     const { traceId } = data;
@@ -128,6 +133,7 @@ const useHttpStreaming = () => {
         error: [],
         complete: [],
         reset: [],
+        activity: [],
         isInitiated: false,
         streamId: null,
         abortController: null,
@@ -139,7 +145,8 @@ const useHttpStreaming = () => {
     traceMap.value[traceId].data.push((res) => handlers.data(data, res));
     traceMap.value[traceId].error.push((err) => handlers.error(data, err));
     traceMap.value[traceId].complete.push((_) => handlers.complete(data, _));
-    traceMap.value[traceId].reset.push((res) => handlers.reset(data, res));
+    traceMap.value[traceId].reset.push((res) => handlers.reset?.(data, res));
+    if (handlers.onActivity) traceMap.value[traceId].activity.push(handlers.onActivity);
 
     // If the stream connection is already initiated for this trace, exit early
     if (traceMap.value[traceId].isInitiated) {
@@ -376,6 +383,8 @@ const useHttpStreaming = () => {
               }
 
               const { done, value } = await reader.read();
+
+              for (const handler of traceMap.value[traceId]?.activity ?? []) handler();
 
               if (done) {
                 worker.postMessage({

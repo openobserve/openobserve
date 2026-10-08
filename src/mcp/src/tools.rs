@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Ok, Result};
 use config::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build};
 use serde::Deserialize;
+use serde_json::Value;
 use tantivy::{
     Index, IndexWriter, TantivyDocument,
     collector::TopDocs,
@@ -75,6 +76,33 @@ fn default_enabled() -> bool {
 /// Extension key for MCP configuration
 const MCP_EXTENSION_KEY: &str = "x-o2-mcp";
 
+/// Build the schema exposed to MCP clients from the schema retained for HTTP execution.
+fn public_tool_schema(http_path: &str, mut execution_schema: Value) -> Value {
+    if !http_path.contains("{org_id}") {
+        return execution_schema;
+    }
+
+    let Some(schema) = execution_schema.as_object_mut() else {
+        return execution_schema;
+    };
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        properties.remove("org_id");
+    }
+
+    let required_is_empty =
+        if let Some(required) = schema.get_mut("required").and_then(Value::as_array_mut) {
+            required.retain(|field| field.as_str() != Some("org_id"));
+            required.is_empty()
+        } else {
+            false
+        };
+    if required_is_empty {
+        schema.remove("required");
+    }
+
+    execution_schema
+}
+
 /// Extract MCP extensions from OpenAPI spec
 ///
 /// Returns a map of operation_id -> McpExtension
@@ -120,7 +148,10 @@ fn extract_mcp_extensions(api: &OpenApi) -> HashMap<String, McpExtension> {
     extensions
 }
 
-static TOOLS_CACHE: OnceCell<Vec<MCPTool>> = OnceCell::const_new();
+/// All MCP tools, each behind an `Arc` so the tool -- most of its weight is
+/// its JSON input schema -- is stored once and shared with the search index
+/// instead of being cloned per lookup structure.
+static TOOLS_CACHE: OnceCell<Vec<Arc<MCPTool>>> = OnceCell::const_new();
 static PINNED_TOOLS_CACHE: OnceCell<Vec<MCPTool>> = OnceCell::const_new();
 /// Store only ToolMetadata instead of full Tool to avoid creating 200+ HTTP clients
 static TOOL_METADATA_CACHE: OnceCell<HashMap<String, rmcp_openapi::ToolMetadata>> =
@@ -140,12 +171,13 @@ struct ToolSearchIndex {
     description_field: Field,
     category_field: Field,
     tool_name_field: Field,
-    /// Pre-built name→tool map to avoid rebuilding on every search
-    tools_by_name: HashMap<String, MCPTool>,
+    /// Pre-built name→tool map to avoid rebuilding on every search; shares the
+    /// tools in `TOOLS_CACHE` rather than holding a second copy of every schema
+    tools_by_name: HashMap<String, Arc<MCPTool>>,
 }
 
 /// Build the tantivy search index from the list of MCP tools.
-fn build_search_index(tools: &[MCPTool]) -> Result<()> {
+fn build_search_index(tools: &[Arc<MCPTool>]) -> Result<()> {
     // Idempotent: skip if already initialized (e.g., by test init)
     if TOOL_SEARCH_INDEX.get().is_some() {
         log::debug!("Tool search index already initialized; skipping rebuild");
@@ -206,8 +238,10 @@ fn build_search_index(tools: &[MCPTool]) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to create index reader: {e}"))?;
 
     // Pre-build name→tool map (avoids per-query HashMap allocation)
-    let tools_by_name: HashMap<String, MCPTool> =
-        tools.iter().map(|t| (t.name.clone(), t.clone())).collect();
+    let tools_by_name: HashMap<String, Arc<MCPTool>> = tools
+        .iter()
+        .map(|t| (t.name.clone(), Arc::clone(t)))
+        .collect();
 
     TOOL_SEARCH_INDEX
         .set(ToolSearchIndex {
@@ -312,7 +346,7 @@ pub fn tool_search(query: &str, limit: usize) -> Vec<MCPTool> {
             && let Some(tool_name) = tool_name_value.as_str()
             && let Some(tool) = search_index.tools_by_name.get(tool_name)
         {
-            results.push(tool.clone());
+            results.push(tool.as_ref().clone());
         } else {
             log::warn!(
                 "tool_search: failed to retrieve tool from document at {:?}",
@@ -362,17 +396,30 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     let zo_config = config::get_config();
     // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
     let base_url = url::Url::parse(&format!(
-        "http://localhost:{}{}",
-        zo_config.http.port, zo_config.common.base_uri
+        "{}://localhost:{}{}",
+        config::cluster::get_http_schema(),
+        zo_config.http.port,
+        zo_config.common.base_uri
     ))
     .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
 
-    // Set default headers including x-o2-mcp for MCP-initiated calls
+    let mut mcp_marker =
+        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    mcp_marker.set_sensitive(true);
     let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", "true".parse().unwrap());
+    default_headers.insert("x-o2-mcp", mcp_marker);
+
+    let mut client_builder = reqwest::Client::builder()
+        .user_agent(format!("openobserve/{}", config::VERSION))
+        .timeout(std::time::Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none());
+    if zo_config.http.tls_enabled {
+        // Loopback to our own listener, whose cert is issued for the service name, not localhost
+        client_builder = client_builder.danger_accept_invalid_certs(true);
+    }
 
     // Create a single shared HTTP client instead of 200+ clients
-    let shared_client = rmcp_openapi::HttpClient::new()
+    let shared_client = rmcp_openapi::HttpClient::with_client(client_builder.build()?)
         .with_base_url(base_url)?
         .with_default_headers(default_headers);
 
@@ -380,7 +427,7 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     // We skip generate_openapi_tools which creates 200+ HTTP clients (~19.5s)
     let tools_metadata = spec.to_tool_metadata(None, false, false)?;
 
-    let mut tools: Vec<MCPTool> = Vec::with_capacity(tools_metadata.len());
+    let mut tools: Vec<Arc<MCPTool>> = Vec::with_capacity(tools_metadata.len());
     let mut metadata_map: HashMap<String, rmcp_openapi::ToolMetadata> =
         HashMap::with_capacity(tools_metadata.len());
 
@@ -398,11 +445,10 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
         }
 
         // rmcp-openapi handles Draft 2020-12 compatibility, but has a bug where it doesn't
-        // deduplicate the `required` array when merging path + query parameters
-        let mut input_schema = metadata.parameters.clone();
-
-        // Deduplicate the required array
-        if let Some(obj) = input_schema.as_object_mut()
+        // deduplicate the `required` array when merging path + query parameters.
+        // Keep this complete schema for validation and HTTP path construction.
+        let mut execution_schema = metadata.parameters.clone();
+        if let Some(obj) = execution_schema.as_object_mut()
             && let Some(required) = obj.get_mut("required")
             && let Some(required_arr) = required.as_array_mut()
         {
@@ -410,8 +456,9 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
             required_arr.retain(|item| seen.insert(item.clone()));
         }
 
-        // Simplify schema for tools with large versioned schemas (e.g., Dashboard v1-v8)
-        let input_schema = simplify_schema(&metadata.name, input_schema);
+        // Simplify schemas for tools with large versioned schemas (e.g., Dashboard v1-v8).
+        let execution_schema = simplify_schema(&metadata.name, execution_schema);
+        let input_schema = public_tool_schema(&metadata.path, execution_schema.clone());
 
         // Get description from x-o2-mcp extension or fall back to OpenAPI description
         let description = if let Some(mcp_ext) = mcp_extensions.get(&metadata.name) {
@@ -463,13 +510,13 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
             pinned,
         };
 
-        // IMPORTANT: Also update the metadata's parameters with simplified schema
-        // to avoid oneOf validation errors when rmcp-openapi validates arguments
+        // Validation and HTTP execution retain private path parameters that are
+        // intentionally absent from the MCP-facing input schema.
         let mut updated_metadata = metadata;
-        updated_metadata.parameters = input_schema;
+        updated_metadata.parameters = execution_schema;
 
         metadata_map.insert(updated_metadata.name.clone(), updated_metadata);
-        tools.push(mcp_tool);
+        tools.push(Arc::new(mcp_tool));
     }
     tools.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -491,7 +538,7 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
         .unwrap()
         .iter()
         .filter(|t| t.pinned)
-        .cloned()
+        .map(|t| t.as_ref().clone())
         .collect();
     log::info!(
         "Pinned {} MCP tools for direct tools/list exposure",
@@ -534,7 +581,9 @@ pub fn get_mcp_tools() -> Vec<MCPTool> {
     TOOLS_CACHE
         .get()
         .expect("MCP tools should've been set at this point")
-        .clone()
+        .iter()
+        .map(|t| t.as_ref().clone())
+        .collect()
 }
 
 /// Get tools marked as pinned — always exposed in tools/list without tool_search
@@ -589,11 +638,11 @@ pub async fn init_test_tools() {
             let tools_metadata = spec.to_tool_metadata(None, false, false).unwrap();
 
             // Convert to MCPTool format with simplified schemas
-            let mut tools: Vec<MCPTool> = tools_metadata
+            let mut tools: Vec<Arc<MCPTool>> = tools_metadata
                 .into_iter()
                 .map(|metadata| {
                     let input_schema = simplify_schema(&metadata.name, metadata.parameters);
-                    MCPTool {
+                    Arc::new(MCPTool {
                         name: metadata.name,
                         title: None,
                         description: metadata.description,
@@ -605,7 +654,7 @@ pub async fn init_test_tools() {
                         category: None,
                         requires_confirmation: false,
                         pinned: false,
-                    }
+                    })
                 })
                 .collect();
 
@@ -680,4 +729,57 @@ pub async fn init_test_tools() {
             }
         })
         .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::public_tool_schema;
+
+    #[test]
+    fn organization_path_parameter_is_private() {
+        let execution_schema = json!({
+            "type": "object",
+            "properties": {
+                "org_id": {
+                    "type": "string",
+                    "description": "Organization name"
+                },
+                "stream_name": {"type": "string"}
+            },
+            "required": ["org_id", "stream_name"]
+        });
+
+        let public_schema =
+            public_tool_schema("/api/{org_id}/{stream_name}", execution_schema.clone());
+
+        assert!(public_schema["properties"].get("org_id").is_none());
+        assert_eq!(public_schema["required"], json!(["stream_name"]));
+        assert!(execution_schema["properties"].get("org_id").is_some());
+        assert_eq!(
+            execution_schema["required"],
+            json!(["org_id", "stream_name"])
+        );
+    }
+
+    #[test]
+    fn body_organization_field_is_not_removed() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "request_body": {
+                    "type": "object",
+                    "properties": {
+                        "org_id": {"type": "string"}
+                    }
+                }
+            }
+        });
+
+        assert_eq!(
+            public_tool_schema("/api/organizations", schema.clone()),
+            schema
+        );
+    }
 }

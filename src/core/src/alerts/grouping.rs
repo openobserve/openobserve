@@ -18,14 +18,16 @@
 //! Implements wait-and-collect logic to batch multiple alerts with the same
 //! fingerprint before sending a single grouped notification.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use chrono::Utc;
 use config::{meta::alerts::alert::Alert, utils::json};
 use dashmap::DashMap;
 
-/// In-memory cache of pending alert batches
-/// Key: fingerprint, Value: PendingBatch
+/// Keyed by [`batch_key`]: a fingerprint carries no org, so it alone would merge two orgs' batches.
 static PENDING_BATCHES: Lazy<Arc<DashMap<String, PendingBatch>>> =
     Lazy::new(|| Arc::new(DashMap::new()));
 
@@ -114,6 +116,10 @@ impl PendingBatch {
     }
 }
 
+fn batch_key(org_id: &str, fingerprint: &str) -> String {
+    format!("{org_id}/{fingerprint}")
+}
+
 /// Add alert to pending batch or create new batch
 /// Returns true if batch is ready to send (expired or full)
 #[allow(clippy::too_many_arguments)]
@@ -130,15 +136,10 @@ pub fn add_to_batch(
     // fingerprint — so this is set once, when the batch is created.
     group_labels: Option<std::collections::BTreeMap<String, String>>,
 ) -> bool {
-    let mut batch_ready = false;
-    let mut is_new_batch = false;
-    let mut batch_size = 0;
-
     PENDING_BATCHES
-        .entry(fingerprint.clone())
+        .entry(batch_key(&org_id, &fingerprint))
         .and_modify(|batch| {
             if batch.add_alert(alert.clone(), rows.clone()) {
-                batch_size = batch.alerts.len();
                 log::debug!(
                     "[grouping] Added alert '{}' to existing batch {} (count: {}/{})",
                     alert.name,
@@ -147,7 +148,6 @@ pub fn add_to_batch(
                     batch.max_group_size
                 );
                 if batch.is_full() {
-                    batch_ready = true;
                     log::info!(
                         "[grouping] Batch {} reached max size ({}), ready to send",
                         fingerprint,
@@ -156,15 +156,14 @@ pub fn add_to_batch(
                 }
             } else {
                 log::warn!(
-                    "[grouping] Failed to add alert '{}' to batch {} (already full)",
+                    "[grouping] Failed to add alert '{}' to batch {} (already full), org_id: {}",
                     alert.name,
-                    fingerprint
+                    fingerprint,
+                    org_id
                 );
             }
         })
         .or_insert_with(|| {
-            is_new_batch = true;
-            batch_size = 1;
             log::info!(
                 "[grouping] Created new batch for fingerprint {}, alert: '{}', org: {}, wait_seconds: {}, max_size: {}",
                 fingerprint,
@@ -183,62 +182,60 @@ pub fn add_to_batch(
                 level,
                 group_labels,
             )
-        });
-
-    if is_new_batch {
-        let batch_count = PENDING_BATCHES.len();
-        log::debug!("[grouping] Current pending batches count: {batch_count}");
-
-        // Update gauge metric for pending batches
-        // Use org_id from the batch we just inserted
-        if let Some(batch) = PENDING_BATCHES.get(&fingerprint) {
-            config::metrics::ALERT_GROUPING_BATCHES_PENDING
-                .with_label_values(&[batch.org_id.as_str()])
-                .set(batch_count as i64);
-        }
-    }
-
-    batch_ready
+        })
+        .is_full()
 }
 
 /// Get and remove a batch if it's ready (expired or full)
-pub fn get_ready_batch(fingerprint: &str) -> Option<PendingBatch> {
-    if let Some(entry) = PENDING_BATCHES.get(fingerprint)
-        && (entry.is_expired() || entry.is_full())
-    {
-        let batch = PENDING_BATCHES.remove(fingerprint).map(|(_, batch)| batch);
-        if let Some(ref b) = batch {
+pub fn get_ready_batch(org_id: &str, fingerprint: &str) -> Option<PendingBatch> {
+    // Checked inside `remove_if`: a `get` guard held across `remove` deadlocks the shard.
+    PENDING_BATCHES
+        .remove_if(&batch_key(org_id, fingerprint), |_, batch| {
+            batch.is_expired() || batch.is_full()
+        })
+        .map(|(_, batch)| batch)
+        .inspect(|batch| {
             log::debug!(
                 "[grouping] Retrieved ready batch for fingerprint {} ({} alerts)",
                 fingerprint,
-                b.alerts.len()
+                batch.alerts.len()
             );
-        }
-        return batch;
-    }
-    None
+        })
 }
 
-/// Get all expired batches
+/// Take every expired batch out of the map, and report each org's remaining pending batches.
 pub fn get_expired_batches() -> Vec<PendingBatch> {
     let mut expired = Vec::new();
+    let mut pending_per_org: HashMap<String, i64> = HashMap::new();
     let now = Utc::now().timestamp_micros();
 
-    PENDING_BATCHES.retain(|fingerprint, batch| {
+    PENDING_BATCHES.retain(|key, batch| {
         if batch.is_expired() {
             let elapsed_seconds = (now - batch.timer_started_at) / 1_000_000;
             log::info!(
                 "[grouping] Batch {} expired after {}s with {} alerts",
-                fingerprint,
+                key,
                 elapsed_seconds,
                 batch.alerts.len()
             );
             expired.push(batch.clone());
             false // Remove from map
         } else {
+            if let Some(count) = pending_per_org.get_mut(&batch.org_id) {
+                *count += 1;
+            } else {
+                pending_per_org.insert(batch.org_id.clone(), 1);
+            }
             true // Keep in map
         }
     });
+    // Recounted here, off the scheduler path; reset drops orgs whose batches drained.
+    config::metrics::ALERT_GROUPING_BATCHES_PENDING.reset();
+    for (org_id, count) in &pending_per_org {
+        config::metrics::ALERT_GROUPING_BATCHES_PENDING
+            .with_label_values(&[org_id.as_str()])
+            .set(*count);
+    }
 
     if !expired.is_empty() {
         log::debug!(
@@ -411,6 +408,7 @@ pub async fn send_grouped_notification(
             // part of that fingerprint, so the whole batch is one group.
             batch.group_labels.as_ref(),
             &[],
+            None,
         )
         .await
     {
@@ -418,7 +416,8 @@ pub async fn send_grouped_notification(
             let (success_msg, err_msg) = (outcome.success_message, outcome.error_message);
             if !err_msg.is_empty() {
                 log::error!(
-                    "[alert_grouping_worker] Some destinations failed for grouped notification (fingerprint: {}): {}",
+                    "[alert_grouping_worker] Some destinations failed for grouped notification (org_id: {}, fingerprint: {}): {}",
+                    batch.org_id,
                     batch.fingerprint,
                     err_msg
                 );
@@ -454,7 +453,8 @@ pub async fn send_grouped_notification(
         }
         Err(e) => {
             log::error!(
-                "[alert_grouping_worker] Failed to send grouped notification (fingerprint: {}): {}",
+                "[alert_grouping_worker] Failed to send grouped notification (org_id: {}, fingerprint: {}): {}",
+                batch.org_id,
                 batch.fingerprint,
                 e
             );
@@ -473,6 +473,19 @@ mod tests {
 
     fn make_alert() -> Alert {
         serde_json::from_value(serde_json::json!({})).unwrap()
+    }
+
+    fn add_one(fp: &str, org: &str, max_group_size: usize) -> bool {
+        add_to_batch(
+            fp.to_string(),
+            org.to_string(),
+            make_alert(),
+            vec![],
+            3600,
+            max_group_size,
+            None,
+            None,
+        )
     }
 
     #[test]
@@ -544,112 +557,130 @@ mod tests {
 
     #[test]
     fn test_add_to_batch_creates_new_batch() {
-        let fp = "grouping_test_add_creates_new_batch_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let (fp, org) = ("grouping_test_add_creates_new_batch_unique", "org-test-add");
 
-        let ready = add_to_batch(
-            fp.clone(),
-            "org-test-add".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
-        );
-        assert!(!ready);
-        assert!(PENDING_BATCHES.contains_key(&fp));
+        assert!(!add_one(fp, org, 10));
+        assert!(PENDING_BATCHES.contains_key(&batch_key(org, fp)));
 
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&batch_key(org, fp));
     }
 
     #[test]
     fn test_add_to_batch_returns_true_when_full() {
-        let fp = "grouping_test_add_batch_full_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let (fp, org) = ("grouping_test_add_batch_full_unique", "org-test-full");
 
-        let ready1 = add_to_batch(
-            fp.clone(),
-            "org-test-full".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            2,
-            None,
-            None,
-        );
-        assert!(!ready1); // new batch, 1 alert, not full
+        assert!(!add_one(fp, org, 2)); // new batch, 1 alert, not full
+        assert!(add_one(fp, org, 2)); // 2nd alert fills batch, ready=true
 
-        let ready2 = add_to_batch(
-            fp.clone(),
-            "org-test-full".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            2,
-            None,
-            None,
-        );
-        assert!(ready2); // 2nd alert fills batch, ready=true
-
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&batch_key(org, fp));
     }
 
     #[test]
     fn test_get_ready_batch_returns_none_when_not_expired() {
-        let fp = "grouping_test_get_ready_not_expired_unique".to_string();
-        PENDING_BATCHES.remove(&fp);
+        let (fp, org) = ("grouping_test_get_ready_not_expired_unique", "org-test-get");
+        add_one(fp, org, 10);
 
-        add_to_batch(
-            fp.clone(),
-            "org-test-get".to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
-        );
+        assert!(get_ready_batch(org, fp).is_none()); // 3600s wait, not expired
 
-        let batch = get_ready_batch(&fp);
-        assert!(batch.is_none()); // 3600s wait, not expired
-
-        PENDING_BATCHES.remove(&fp);
+        PENDING_BATCHES.remove(&batch_key(org, fp));
     }
 
     #[test]
     fn test_get_pending_batch_count_counts_org_batches() {
-        let fp1 = "grouping_count_fp1_unique_org".to_string();
-        let fp2 = "grouping_count_fp2_unique_org".to_string();
+        let (fp1, fp2) = (
+            "grouping_count_fp1_unique_org",
+            "grouping_count_fp2_unique_org",
+        );
         let org = "org-count-unique-test";
-        PENDING_BATCHES.remove(&fp1);
-        PENDING_BATCHES.remove(&fp2);
+        add_one(fp1, org, 10);
+        add_one(fp2, org, 10);
 
-        add_to_batch(
-            fp1.clone(),
-            org.to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
-        );
-        add_to_batch(
-            fp2.clone(),
-            org.to_string(),
-            make_alert(),
-            vec![],
-            3600,
-            10,
-            None,
-            None,
-        );
+        assert!(get_pending_batch_count(org) >= 2);
 
-        let count = get_pending_batch_count(org);
-        assert!(count >= 2);
+        PENDING_BATCHES.remove(&batch_key(org, fp1));
+        PENDING_BATCHES.remove(&batch_key(org, fp2));
+    }
 
-        PENDING_BATCHES.remove(&fp1);
-        PENDING_BATCHES.remove(&fp2);
+    #[test]
+    fn test_add_to_batch_keeps_orgs_with_same_fingerprint_apart() {
+        let fp = "grouping_test_same_fp_two_orgs";
+        let (org_a, org_b) = ("org-isolation-a", "org-isolation-b");
+
+        assert!(!add_one(fp, org_a, 2));
+        assert!(!add_one(fp, org_b, 2));
+        for org in [org_a, org_b] {
+            let batch = PENDING_BATCHES.get(&batch_key(org, fp)).unwrap();
+            assert_eq!(batch.org_id, org);
+            assert_eq!(batch.alerts.len(), 1);
+        }
+
+        PENDING_BATCHES.remove(&batch_key(org_a, fp));
+        PENDING_BATCHES.remove(&batch_key(org_b, fp));
+    }
+
+    #[test]
+    fn test_get_ready_batch_takes_full_batch() {
+        let fp = "grouping_test_get_ready_full";
+        let org = "org-ready-full";
+        assert!(!add_one(fp, org, 2));
+        assert!(add_one(fp, org, 2));
+
+        // Run on another thread so a deadlock fails the test instead of hanging it.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || tx.send(get_ready_batch(org, fp)));
+        let batch = rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("get_ready_batch deadlocked")
+            .expect("a full batch is ready");
+
+        assert_eq!(batch.alerts.len(), 2);
+        assert!(!PENDING_BATCHES.contains_key(&batch_key(org, fp)));
+    }
+
+    #[test]
+    fn test_get_ready_batch_ignores_other_org() {
+        let fp = "grouping_test_get_ready_other_org";
+        let (owner, other) = ("org-ready-owner", "org-ready-other");
+        assert!(!add_one(fp, owner, 2));
+        assert!(add_one(fp, owner, 2));
+
+        assert!(get_ready_batch(other, fp).is_none());
+        assert!(PENDING_BATCHES.contains_key(&batch_key(owner, fp)));
+
+        PENDING_BATCHES.remove(&batch_key(owner, fp));
+    }
+
+    #[test]
+    fn test_add_to_batch_ready_when_max_size_is_one() {
+        let fp = "grouping_test_max_size_one";
+        let org = "org-max-size-one";
+
+        assert!(add_one(fp, org, 1));
+        assert_eq!(get_ready_batch(org, fp).unwrap().alerts.len(), 1);
+    }
+
+    #[test]
+    fn test_expiry_sweep_reports_pending_batches_per_org() {
+        let (busy, drained) = ("org-gauge-busy", "org-gauge-drained");
+        let (fp1, fp2) = ("grouping_gauge_fp1", "grouping_gauge_fp2");
+        let gauge = |org: &str| {
+            config::metrics::ALERT_GROUPING_BATCHES_PENDING
+                .with_label_values(&[org])
+                .get()
+        };
+        add_one(fp1, busy, 10);
+        add_one(fp2, busy, 10);
+        add_one(fp1, drained, 2);
+
+        get_expired_batches();
+        assert_eq!((gauge(busy), gauge(drained)), (2, 1));
+
+        assert!(add_one(fp1, drained, 2));
+        assert!(get_ready_batch(drained, fp1).is_some());
+        get_expired_batches();
+        assert_eq!((gauge(busy), gauge(drained)), (2, 0));
+
+        PENDING_BATCHES.remove(&batch_key(busy, fp1));
+        PENDING_BATCHES.remove(&batch_key(busy, fp2));
     }
 }

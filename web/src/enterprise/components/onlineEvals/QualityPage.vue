@@ -3,9 +3,7 @@
     class="quality-page flex min-h-0 flex-1 flex-col gap-3.5 pt-3.5 pb-4"
     data-test="quality-page"
   >
-    <!-- Agent filter — right-aligned at the top of the content container so it
-         sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="px-page-edge flex items-center justify-end">
+    <div class="px-page-edge flex items-center">
       <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
@@ -34,7 +32,7 @@
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
     <KpiCardRow
       v-else
-      gap="gap-2"
+      gap="gap-2 max-lg:gap-1.5"
       class="quality-page__kpis px-page-edge"
       :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
     >
@@ -56,7 +54,7 @@
         :rows="configRows"
         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
         @select="selectConfig"
-        @refresh="refreshAll"
+        @refresh="refreshAll(true)"
       />
     </div>
 
@@ -178,6 +176,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** Re-read the score-configs list, which this page receives as a prop. */
+  (e: "reload-configs"): void;
   (e: "update:agentKey", value: string): void;
   // Fired once after mount so the parent can run the agents-first reload. The
   // parent owns every reload trigger (mount / refresh / date / agent) — this
@@ -273,7 +273,13 @@ const numericRange = computed(() => {
   return { min: Number(r.min), max: Number(r.max) };
 });
 
-async function refreshAll() {
+async function refreshAll(reloadConfigs = false) {
+  // The score-configs list arrives as a prop, so refreshing only the derived
+  // aggregates leaves it untouched — and each of those bails out early when the
+  // list is empty, which is why the button appeared to do nothing at all. Ask
+  // the parent to re-read the list first, then recompute from it.
+  // Only a user refresh asks; mount, date and agent reloads reuse the list the parent holds.
+  if (reloadConfigs) emit("reload-configs");
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
 }
 

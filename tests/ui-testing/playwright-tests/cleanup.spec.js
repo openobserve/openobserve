@@ -35,6 +35,7 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_alert_11167_',        // alerts-query-editor-search-endpoint.spec.js (#11167)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite destinations)
         'test_fv_alerts_dest_',    // alerts-form-validation.spec.js (custom destinations created by the test cases)
@@ -64,6 +65,7 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
+        'e2e_alert_11167_',        // alerts-query-editor-search-endpoint.spec.js (#11167)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
         'test_fv_alerts_tmpl_',    // alerts-form-validation.spec.js (templates created by the test cases)
@@ -82,6 +84,26 @@ test.describe("Pre-Test Cleanup", () => {
     const activeOrg = getOrgIdentifier();
     await pm.apiCleanup.cleanupFunctionsInOrg(activeOrg, [/^wf_auto_fn_/, /^wf_auto_/]);
     await pm.apiCleanup.cleanupStreams([/^wf_auto_stream_/, /^wf_auto_sink_/], ['default']);
+
+    // metrics-14238-stale-nodata.spec.js seeds one METRICS stream per run, named with a
+    // timestamp so parallel runs cannot collide — which also means nothing ever reuses
+    // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
+    await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
+
+    // The logs coverage specs for #15086 each seed their own log stream, suffixed per run
+    // so parallel workers cannot collide — which also means nothing ever reuses them.
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream.
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^e2e_hl_filters_/,
+        /^e2e_svc_cols_/,
+        /^e2e_svc_none_/,
+        /^e2e_sa_one_/,
+        /^e2e_sa_two_/,
+      ],
+      ['default'],
+    );
+
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -130,6 +152,8 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Pipeline name patterns to match
       [
+        /^e2e-12647-/,                 // pipeline-preview-bounds.spec.js (#12647)
+        /^e2e7030/,                    // pipeline-export.spec.js (#7030)
         /^validation-precedence-\d+$/,
         /^validation-multiple-or-\d+$/,
         /^validation-nested-or-\d+$/,
@@ -152,7 +176,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^traces-pipeline-/,            // traces-pipeline-* (scheduled pipeline tests)
         /^condition-pipeline-/,         // condition-pipeline-* (scheduled pipeline tests)
         /^metrics-condition-pipeline-/,  // metrics-condition-pipeline-* (scheduled pipeline tests)
-        /^e2e_backfill_test_\d+$/       // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^e2e_backfill_test_\d+$/,      // e2e_backfill_test_<timestamp> (pipeline-backfill.spec.js)
+        /^fn_e2e_pl_/                   // functions-import-export.spec.js (pipeline holding an imported function)
       ]
     );
 
@@ -164,6 +189,7 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up functions matching test patterns
     // Patterns from sanity/pipeline tests (default org only)
     const sanityFunctionPatterns = [
+      /^e2e_2812_/,                  // function-delete-confirm.spec.js (#2812)
       /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
@@ -186,6 +212,17 @@ test.describe("Pre-Test Cleanup", () => {
       /^default_vrl_fn_/             // Default org VRL function tests
     ];
 
+    // Patterns from the function import/export specs
+    // (Functions/functions-import-export.spec.js and
+    //  RegressionSet/Pipelines/function-import-non-object-entry.spec.js)
+    const importExportFunctionPatterns = [
+      /^fn_e2e_/,                    // imported, round-tripped and renamed functions
+      /^fn_export_/,                 // single, bulk and narrow-viewport export fixtures
+      /^fn_clash_/,                  // seeded functions used to provoke a name clash
+      /^fn_regr_nonobj_/,            // non-object entry repaired by the inline fixers
+      /^fn_regr_reject_/,            // rejections that cannot be fixed inline (#15069)
+    ];
+
     // Patterns from Functions folder tests (row-expansion.spec.js)
     const rowExpansionPatterns = [
       /^vrl_row_expand_/,            // VRL row expansion tests
@@ -205,7 +242,8 @@ test.describe("Pre-Test Cleanup", () => {
     const defaultOrgPatterns = [
       ...sanityFunctionPatterns,
       ...jsFunctionPatterns,         // default_vrl_fn_* created in default org
-      ...rowExpansionPatterns        // vrl_* patterns created in default org
+      ...rowExpansionPatterns,       // vrl_* patterns created in default org
+      ...importExportFunctionPatterns // fn_* patterns from the import/export specs
     ];
     await pm.apiCleanup.cleanupFunctionsInOrg('default', defaultOrgPatterns);
 
@@ -219,6 +257,9 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up file-based enrichment tables matching test patterns
     // These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
     await pm.apiCleanup.cleanupFileEnrichmentTables([
+      /^e2e_2937_/,                                                                          // enrichment-lifecycle.spec.js (#2937)
+      /^e2e_2067_/,                                                                          // enrichment-lifecycle.spec.js (#2067)
+      /^e2e_enrich_/,                                                                        // enrichment-explore-context.spec.js (#7346, #6645)
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
@@ -284,6 +325,16 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up streams matching test patterns
     await pm.apiCleanup.cleanupStreams(
       [
+        /^e2e_slo_14269_/,             // slo-error-messages.spec.js (#14269) seeded stream
+        /^e2e_13354_/,                 // logs-field-value-rendering.spec.js (#13354)
+        /^e2e_13896_/,                 // logs-result-display.spec.js (#13896)
+        /^e2e_13990_other_/,           // logs-bugs.spec.js (#13990)
+        /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
+        /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
+        /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
+        /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
+        /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
+        /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
@@ -309,6 +360,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_4level_(src|dest)_\d+$/,        // Test 10: 4-level nested test streams
         /^stream\d{13}$/,                     // stream1765164273471, etc. (timestamp-based test streams)
         /^e2e_http_patterns/,                 // Pattern tests stream (searchPatterns.spec.js) — prefix covers the unique per-run e2e_http_patterns_<token> names
+        /^e2e_multi_patterns/,                // Multi-stream patterns guard streams (searchPatternsMultiStream.spec.js)
         /^e2e_stream_(a|b)_\d+$/,             // Regression test streams (e2e_stream_a_*, e2e_stream_b_*)
         /^join_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams (join_<testId>_requests, etc.)
         /^join_[a-z0-9]+_[a-z0-9]+_(requests|users|sessions)$/,  // Dashboard joins test streams with extra segment (join_<id1>_<id2>_requests, etc.)
@@ -322,6 +374,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^severity_test_\d+$/,                         // Severity test streams (severity_test_<timestamp>)
         /^alert_e2e_/,                                 // Alert e2e test streams (alert_e2e_*)
         /^alert_import_/,                              // Alert import test streams (alert_import_*)
+        /^alert_chart_missing_/,                       // Alert chart error-state test streams (alerts-chart-error-state.spec.js #14519)
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
@@ -417,6 +470,20 @@ test.describe("Pre-Test Cleanup", () => {
       'E2E Pricing Verifier ',              // cost-verification models (Journeys 12/13)
       /^.+\s\(Copy\)$/                      // cloned built-in models (source=org, name ends with " (Copy)")
     ]);
+
+    // IAM leftovers from a CRASHED run: roles, groups, users and service accounts under
+    // the `ui_auto` prefix the IAM specs use.
+    //
+    // This is the ONLY place that sweeps them. Each IAM spec now deletes exactly what it
+    // created (makeTracker in IAM/iam-fixtures.js) rather than everything matching the
+    // prefix — doing the latter in every spec's beforeAll is what had them deleting each
+    // other's fixtures mid-test and flaking the ENT crosscheck gate. A sweep is still
+    // needed for artifacts an aborted run orphaned, but it belongs here, once, before
+    // anything else starts.
+    //
+    // Enterprise-only (rbac_enabled): on an OSS build /roles answers 4xx, so this skips
+    // quietly rather than failing the cleanup every other suite depends on.
+    await pm.apiCleanup.cleanupIamArtifacts('ui_auto');
 
     testLogger.info('Pre-test cleanup completed successfully');
   });

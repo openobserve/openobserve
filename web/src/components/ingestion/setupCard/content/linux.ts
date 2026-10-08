@@ -27,6 +27,7 @@ import {
   EC2_IAM_NOTE_KEY,
   agentCode,
   agentUninstall,
+  dashboardReadyStep,
   envIcons,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
@@ -41,6 +42,7 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
   const icon = envIcons();
   return {
     provider: {
+      id: "linux",
       name: raw("Linux"),
       tagline: t("ingestion.setupCard.taglineLinux"),
       logo: getImageURL("images/common/linux.svg"),
@@ -91,6 +93,7 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
           t("common.network"),
         ],
       },
+      dashboardReadyStep(t),
     ],
     detect: hostMetricsDetect,
     extras: {

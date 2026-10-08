@@ -7,22 +7,28 @@ import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 
 // Mock the services
-vi.mock("@/services/users", () => ({
-  default: {
-    orgUsers: vi.fn(),
-    invitedUsers: vi.fn(),
-    getRoles: vi.fn(),
-    getUserGroups: vi.fn(),
-    getUserRoles: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      orgUsers: vi.fn(),
+      invitedUsers: vi.fn(),
+      getRoles: vi.fn(),
+      getUserGroups: vi.fn(),
+      getUserRoles: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    update_member_role: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      update_member_role: vi.fn(),
+    },
+  });
+});
 
 // Mock vue-i18n. Resolve keys against the real app locale so migrated t()
 // calls produce the actual English text the notification assertions expect.
@@ -364,7 +370,7 @@ describe("User Component", () => {
             QTd: true,
             QTh: true,
             RouterLink: true,
-            MemberInvitation: true, // Add this stub
+            InviteMembersDialog: true,
           },
         },
       });
@@ -375,9 +381,9 @@ describe("User Component", () => {
       config.isCloud = "false";
     });
 
-    it("shows member invitation component in cloud mode", async () => {
-      const memberInvitation = wrapper.findComponent({ name: "MemberInvitation" });
-      expect(memberInvitation.exists()).toBe(true);
+    it("mounts the invite members dialog in cloud mode", async () => {
+      const inviteDialog = wrapper.findComponent({ name: "InviteMembersDialog" });
+      expect(inviteDialog.exists()).toBe(true);
     });
 
     it("shows correct UI elements in cloud mode", () => {

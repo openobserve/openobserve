@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 // Mock the useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(),
@@ -35,6 +35,7 @@ vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
 });
 
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -286,6 +287,94 @@ describe("ConfigPanel", () => {
       const descriptionInput = wrapper.find('[data-test="dashboard-config-description"]');
       // Check if the component has autogrow prop
       expect(descriptionInput.exists()).toBe(true);
+    });
+  });
+
+  describe("Show exemplars switch", () => {
+    const promqlPanel = (type: string, queryType = "range", showExemplars?: boolean) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        queryType: "promql",
+        queries: [{ query: "rate(x_bucket[5m])", config: { query_type: queryType } }],
+        config: { ...mockDashboardPanelData.data.config, show_exemplars: showExemplars },
+      },
+    });
+
+    it("appears off by default for an eligible PromQL panel and binds config.show_exemplars", async () => {
+      const panel = promqlPanel("line");
+      wrapper = createWrapper({ dashboardPanelData: panel }, { promqlMode: true });
+      const toggle = wrapper.findComponent('[data-test="dashboard-config-show-exemplars"]');
+      expect(toggle.exists()).toBe(true);
+      expect(toggle.props("modelValue")).toBeFalsy();
+      await toggle.vm.$emit("update:modelValue", true);
+      expect(panel.data.config.show_exemplars).toBe(true);
+    });
+
+    it.each([
+      ["h-bar", "range"],
+      ["stacked", "range"],
+      ["table", "range"],
+      ["heatmap", "range"],
+      ["line", "instant"],
+    ])("is absent for %s (%s)", (type, queryType) => {
+      wrapper = createWrapper(
+        { dashboardPanelData: promqlPanel(type, queryType) },
+        { promqlMode: true },
+      );
+      expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+
+    it("is absent outside PromQL mode", () => {
+      wrapper = createWrapper({ dashboardPanelData: promqlPanel("line") }, { promqlMode: false });
+      expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Time shift (Comparison against)", () => {
+    const shiftedPanel = (queryType: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "line",
+        queries: [
+          {
+            query: "rate(x[5m])",
+            fields: { breakdown: [] },
+            config: { query_type: queryType, time_shift: [{ offSet: "1d" }] },
+          },
+        ],
+      },
+    });
+
+    const offsetPickers = () =>
+      wrapper
+        .findAllComponents(CustomDateTimePicker)
+        .filter((picker: any) => picker.props("isFirstEntry") === false);
+
+    it("offers the section for a PromQL range query, without the month unit", () => {
+      wrapper = createWrapper({ dashboardPanelData: shiftedPanel("range") }, { promqlMode: true });
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-time-shift-add-btn"]').exists(),
+      ).toBe(true);
+      expect(offsetPickers()).toHaveLength(1);
+      expect(offsetPickers()[0].props("excludeMonths")).toBe(true);
+    });
+
+    it("hides the section for a PromQL instant query", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: shiftedPanel("instant") },
+        { promqlMode: true },
+      );
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-time-shift-add-btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("keeps the month unit for SQL", () => {
+      wrapper = createWrapper({ dashboardPanelData: shiftedPanel("range") }, { promqlMode: false });
+      expect(offsetPickers()[0].props("excludeMonths")).toBe(false);
     });
   });
 
@@ -900,6 +989,64 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Locale Format in the Unit dropdown", () => {
+    const makePanel = (config: Record<string, unknown>) =>
+      reactive({
+        ...mockDashboardPanelData,
+        data: {
+          ...mockDashboardPanelData.data,
+          config: { ...mockDashboardPanelData.data.config, ...config },
+        },
+      });
+    const unitSelect = () =>
+      wrapper
+        .findAllComponents({ name: "OSelect" })
+        .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-config-unit");
+    const trigger = () => wrapper.find('[data-test="dashboard-config-unit-trigger"]');
+
+    it("nests the locales under the expandable Other Locale row", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: null }) });
+      const select = unitSelect();
+      expect(select.props("collapsibleGroups")).toBe(false);
+      const options = select.props("options");
+      expect(options).toContainEqual(
+        expect.objectContaining({ label: "Locale Format (Auto)", value: "locale" }),
+      );
+      expect(options).toContainEqual(
+        expect.objectContaining({ label: "Other Locale", value: "other-locale", expandable: true }),
+      );
+      expect(options).toContainEqual(
+        expect.objectContaining({
+          label: "Czech - CZ (cs_CZ)",
+          value: "locale:cs-CZ",
+          parentValue: "other-locale",
+        }),
+      );
+      expect(options.some((o: any) => o.header)).toBe(false);
+    });
+
+    it("saves a picked locale in the unit and leaves unit_custom alone", async () => {
+      const panel = makePanel({ unit: "locale", unit_custom: "req/s" });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      await unitSelect().vm.$emit("update:modelValue", "locale:cs-CZ");
+      expect(panel.data.config.unit).toBe("locale:cs-CZ");
+      expect(panel.data.config.unit_custom).toBe("req/s");
+      await flushPromises();
+      expect(trigger().attributes("data-test-selected-label")).toBe("Czech - CZ (cs_CZ)");
+    });
+
+    it("shows Auto for the plain Locale Format unit", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale" }) });
+      expect(trigger().attributes("data-test-selected-label")).toBe("Locale Format (Auto)");
+    });
+
+    it("keeps an unlisted pinned locale selectable", () => {
+      wrapper = createWrapper({ dashboardPanelData: makePanel({ unit: "locale:sl-SI" }) });
+      expect(unitSelect().props("options")).toContainEqual(
+        expect.objectContaining({ value: "locale:sl-SI" }),
+      );
+    });
+  });
   describe("Table Configuration Options", () => {
     it("should initialize table_transpose as false by default", () => {
       wrapper = createWrapper();

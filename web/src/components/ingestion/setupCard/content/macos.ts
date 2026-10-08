@@ -34,6 +34,7 @@ import {
   AGENTS_REPO,
   agentCode,
   agentUninstall,
+  dashboardReadyStep,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
 } from "./osAgent";
@@ -46,6 +47,7 @@ const install = `curl -O ${AGENTS_REPO}/mac/install.sh \\
 export default function macosCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "macos",
       name: raw("macOS"),
       tagline: t("ingestion.setupCard.taglineMacos"),
       logo: getImageURL("images/common/macos.png"),
@@ -81,6 +83,7 @@ export default function macosCard(subs: CardSubstitutions, t: TranslateFn): Rich
           t("common.network"),
         ],
       },
+      dashboardReadyStep(t),
     ],
     detect: hostMetricsDetect,
     extras: {

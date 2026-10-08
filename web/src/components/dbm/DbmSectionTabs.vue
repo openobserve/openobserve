@@ -180,6 +180,7 @@ const ENTERPRISE_ONLY_TABS = ["deadlocks", "blocked", "tableHealth"];
  */
 const ROUTE_TO_TAB: Record<string, string> = {
   dbmDatabases: "overview",
+  dbmMetrics: "metrics",
   dbmQueries: "queries",
   dbmQueryDetail: "queries",
   dbmSamples: "samples",
@@ -273,10 +274,7 @@ const overlapBadge = (
     };
   }
   if (vantage === "client") {
-    return {
-      vantageLabel: t("dbm.list.overlap.clientObserved"),
-      hint: t("dbm.page.tabs.samplesHintClient"),
-    };
+    return { hint: t("dbm.page.tabs.samplesHintClient") };
   }
   // No vantage travelled with the count, so nothing about its source can be
   // claimed. The hint says what the tab is FOR and asserts no population.
@@ -287,7 +285,6 @@ const overlapBadge = (
 const queriesVantageLabel = computed<I18nText | undefined>(() => {
   const vantage = countVantage(props.queryCount);
   if (vantage === "server") return t("dbm.list.overlap.serverCounted");
-  if (vantage === "client") return t("dbm.list.overlap.clientObserved");
   return undefined;
 });
 
@@ -320,6 +317,14 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.overview"),
     to: { name: "dbmDatabases", query: carriedQuery.value },
     count: badgeCount(props.databaseCount),
+  },
+  {
+    // Beside Overview: the fleet's vital signs, before any per-query view.
+    // No badge — a chart grid has no one population to count.
+    key: "metrics",
+    label: t("dbm.page.tabs.metrics"),
+    to: { name: "dbmMetrics", query: carriedQuery.value },
+    hint: t("dbm.page.tabs.metricsHint"),
   },
   {
     key: "queries",

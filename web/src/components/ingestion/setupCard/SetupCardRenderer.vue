@@ -33,6 +33,7 @@ import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
+import analytics from "@/services/product_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -73,6 +74,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** A step's action button was clicked; carries RichCardStepAction.id. */
   (e: "step-action", actionId: string): void;
+  /** Detection transitioned to connected; carries the detected stream count. */
+  (e: "detected", count: number): void;
 }>();
 
 const router = useRouter();
@@ -250,6 +253,17 @@ const detect = useStreamDetect({
 });
 const detected = computed(() => detect.connected.value);
 
+// Fires once per false→true transition — a remount starts idle and stays silent.
+watch(detected, (connected, was) => {
+  if (connected && !was) {
+    analytics.track("data_source_connected", {
+      provider: props.content.provider.id,
+      stream_type: streamKind.value ?? "logs",
+    });
+    emit("detected", detect.count.value);
+  }
+});
+
 // Don't surface the "most likely fix" hint on the first miss — the user may
 // simply not have run their app yet. Only after a few failed Tests does an
 // instrumentation-ordering problem become the likely cause.
@@ -354,6 +368,7 @@ const scrollToStep = (i: number) => {
     });
 };
 const onStepCopy = (step: RichCardStep, index: number) => {
+  analytics.track("snippet_copied", { route: router.currentRoute.value.name });
   if (step.completeOn === "copy") copied.value = { ...copied.value, [step.id]: true };
   scrollToStep(index + 1);
 };
@@ -707,7 +722,7 @@ function fireConfetti() {
 
             <!-- Action button — for steps performed in a cloud console rather
                  than by copying a command. -->
-            <div v-if="step.action" class="step-action">
+            <div v-if="step.action && (!step.action.showOnDetect || detected)" class="step-action">
               <OButton
                 :variant="step.action.variant || 'primary'"
                 size="sm-action"
@@ -1116,6 +1131,16 @@ function fireConfetti() {
 .step-inputs :deep(label) {
   margin-bottom: 0.125rem;
 }
+@media (max-width: 47.9375rem) {
+  .step-inputs > *,
+  .step-inputs :deep(.w-field-width-md) {
+    max-width: 100%;
+  }
+  .variant-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
 
 /* ---- steps (lib OStepper in expanded mode) — only the per-step body content
    is styled here; the rail (indicator/connector/title) comes from OStepper. ---- */
@@ -1418,6 +1443,7 @@ function fireConfetti() {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   font-size: var(--text-compact);

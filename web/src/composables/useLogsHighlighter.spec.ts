@@ -70,9 +70,11 @@ vi.mock("@/utils/html", () => ({
 
 // Mock textHighlighter composable
 vi.mock("@/composables/useTextHighlighter", () => ({
+  scopeHighlightQuery: vi.fn((query: string) => query),
   useTextHighlighter: () => ({
     processTextWithHighlights: vi.fn((text) => `<span class="log-string">${text}</span>`),
     extractKeywords: vi.fn((query) => (query ? ["test"] : [])),
+    extractHighlightPatterns: vi.fn(() => []),
     splitTextByKeywords: vi.fn((text, keywords) =>
       keywords.length
         ? [{ text: text, isHighlighted: true }]

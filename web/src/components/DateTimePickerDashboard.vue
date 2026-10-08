@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :initialTimezone="initialTimezone"
     :disable="disable"
     :hide-relative-timezone="hideRelativeTimezone"
+    :hide-range-shift="hideRangeShift"
     :menu-align="menuAlign"
     :variant="variant"
     @hide="onHide"
@@ -68,6 +69,11 @@ export default defineComponent({
       default: false,
     },
     hideRelativeTimezone: {
+      required: false,
+      default: false,
+      type: Boolean,
+    },
+    hideRangeShift: {
       required: false,
       default: false,
       type: Boolean,
@@ -114,6 +120,11 @@ export default defineComponent({
       return dateTimePicker.value.getConsumableDateTime();
     };
 
+    // The picker reads its v-model only on mount; this moves an already-mounted one.
+    const setSavedDate = (dateObj: any) => {
+      dateTimePicker.value.setSavedDate(dateObj);
+    };
+
     const onHide = () => {
       emit("hide");
     };
@@ -139,6 +150,7 @@ export default defineComponent({
       dateTimePicker,
       setCustomDate,
       getConsumableDateTime,
+      setSavedDate,
       onShow,
       onHide,
     };

@@ -20,7 +20,10 @@ use config::{
     cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
     utils::inverted_index::to_tantivy_name,
 };
-use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
+use infra::cache::{
+    file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk},
+    file_downloader::DownloadFile,
+};
 use opentelemetry::global;
 use proto::cluster_rpc::{
     EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList, event_server::Event,
@@ -100,23 +103,7 @@ impl Event for Eventer {
 
             // Try batch download first
             if get_config().cache_latest_files.download_from_node {
-                let mut failed_files = Vec::new();
-
-                // Try batch download files
-                if !files_to_download.is_empty() {
-                    match infra::cache::file_downloader::download_from_node(
-                        &grpc_addr,
-                        &files_to_download,
-                    )
-                    .await
-                    {
-                        Ok(failed) => failed_files = failed,
-                        Err(e) => {
-                            log::error!("[gRPC:Event] Failed to get files from notifier: {e}");
-                            failed_files = files_to_download;
-                        }
-                    }
-                }
+                let failed_files = download_from_peer(&grpc_addr, files_to_download).await;
 
                 // Fallback to individual downloads for failed files
                 for (id, account, file, size, ts) in failed_files {
@@ -216,6 +203,32 @@ impl Event for Eventer {
     }
 }
 
+/// Downloads from the notifying node and returns the files it did not serve.
+async fn download_from_peer(node_addr: &str, files: Vec<DownloadFile>) -> Vec<DownloadFile> {
+    if files.is_empty() {
+        return files;
+    }
+    let Some(peer) = resolve_peer(node_addr).await else {
+        log::warn!("[gRPC:Event] {node_addr} is not a registered peer, downloading from storage");
+        return files;
+    };
+    match infra::cache::file_downloader::download_from_node(&peer, &files).await {
+        Ok(failed) => failed,
+        Err(e) => {
+            log::error!("[gRPC:Event] Failed to get files from notifier: {e}");
+            files
+        }
+    }
+}
+
+// the download carries the internal token, so only dial nodes that produce files
+async fn resolve_peer(node_addr: &str) -> Option<String> {
+    infra::cluster::get_node_by_addr(node_addr)
+        .await
+        .filter(|node| node.is_ingester() || node.is_compactor())
+        .map(|node| node.grpc_addr)
+}
+
 async fn handle_file_chunked(
     path: &str,
     tx: tokio::sync::mpsc::Sender<Result<FileContentResponse, Status>>,
@@ -273,9 +286,34 @@ async fn handle_file_chunked(
 
 #[cfg(test)]
 mod tests {
+    use config::meta::cluster::{Node, Role};
     use proto::cluster_rpc::{FileKey, FileList, FileMeta};
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_resolve_peer_only_returns_registered_file_producers() {
+        for (uuid, addr, role) in [
+            ("peer-ingester", "http://10.9.0.1:5081", Role::Ingester),
+            ("peer-compactor", "http://10.9.0.2:5081", Role::Compactor),
+            ("peer-querier", "http://10.9.0.3:5081", Role::Querier),
+        ] {
+            infra::cluster::add_node_to_cache(Node {
+                uuid: uuid.to_string(),
+                grpc_addr: addr.to_string(),
+                role: vec![role],
+                ..Default::default()
+            })
+            .await;
+        }
+
+        for addr in ["http://10.9.0.1:5081", "http://10.9.0.2:5081"] {
+            assert_eq!(resolve_peer(addr).await.as_deref(), Some(addr));
+        }
+        for addr in ["http://10.9.0.3:5081", "http://unlisted.example:5081", ""] {
+            assert_eq!(resolve_peer(addr).await, None, "{addr}");
+        }
+    }
 
     #[test]
     fn test_file_content_response_creation() {
@@ -305,6 +343,7 @@ mod tests {
             meta: Some(FileMeta {
                 compressed_size: 1024,
                 index_size: 512,
+                mindex_size: 0,
                 max_ts: 1234567890,
                 ..Default::default()
             }),
@@ -328,6 +367,7 @@ mod tests {
                 meta: Some(FileMeta {
                     compressed_size: 1024,
                     index_size: 512,
+                    mindex_size: 0,
                     max_ts: 1234567890,
                     ..Default::default()
                 }),
@@ -341,6 +381,7 @@ mod tests {
                 meta: Some(FileMeta {
                     compressed_size: 2048,
                     index_size: 1024,
+                    mindex_size: 0,
                     max_ts: 1234567891,
                     ..Default::default()
                 }),
@@ -354,6 +395,7 @@ mod tests {
                 meta: Some(FileMeta {
                     compressed_size: 3072,
                     index_size: 1536,
+                    mindex_size: 0,
                     max_ts: 1234567892,
                     ..Default::default()
                 }),
@@ -410,6 +452,7 @@ mod tests {
         let valid_meta = FileMeta {
             compressed_size: 1024,
             index_size: 512,
+            mindex_size: 0,
             max_ts: 1234567890,
             ..Default::default()
         };
@@ -422,6 +465,7 @@ mod tests {
         let zero_meta = FileMeta {
             compressed_size: 0,
             index_size: 0,
+            mindex_size: 0,
             max_ts: 0,
             ..Default::default()
         };

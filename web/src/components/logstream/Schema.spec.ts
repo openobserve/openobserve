@@ -54,16 +54,22 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: mockStreamServiceSchema,
-    list: mockStreamServiceList,
-    deleteFields: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-    updateSettings: mockUpdateSettings,
-    nameList: vi.fn().mockResolvedValue({ data: [] }),
-    getStreamStats: vi.fn().mockResolvedValue({ data: {} }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: mockStreamServiceSchema,
+      list: mockStreamServiceList,
+      deleteFields: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+      updateSettings: mockUpdateSettings,
+      nameList: vi.fn().mockResolvedValue({ data: [] }),
+      getStreamStats: vi.fn().mockResolvedValue({ data: {} }),
+    },
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 import LogStream from "@/components/logstream/schema.vue";
 
@@ -2887,6 +2893,43 @@ describe("Schema Component Tests", () => {
           }),
         }),
       );
+    });
+
+    it("tracks cross_link_saved once a save with changed cross-links succeeds", async () => {
+      wrapper.vm.streamCrossLinks = [
+        { name: "new-link", url: "https://example.com", fields: ["_timestamp"] },
+      ];
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("cross_link_saved", { scope: "stream" });
+    });
+
+    it("does not track cross_link_saved when the cross-links are unchanged", async () => {
+      vi.mocked(analytics.track).mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("cross_link_saved", expect.anything());
+    });
+
+    it("does not track cross_link_saved when the save fails", async () => {
+      vi.mocked(analytics.track).mockClear();
+      wrapper.vm.streamCrossLinks = [
+        { name: "new-link", url: "https://example.com", fields: ["_timestamp"] },
+      ];
+      mockUpdateSettings.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).toHaveBeenCalled();
+      expect(analytics.track).not.toHaveBeenCalledWith("cross_link_saved", expect.anything());
     });
   });
 

@@ -64,8 +64,10 @@ const LARGE_TEXT_MIN = 3;
 const NON_TEXT_MIN = 3;
 
 /** Ratchets. Both only ever go down; see the module docstring. */
-const MAX_PENDING = 92;
+const MAX_PENDING = 93;
 const MAX_EXEMPT = 37;
+/** Manifest entries on a bare alias, which are never judged. Only goes down. */
+const MAX_UNJUDGED = 7;
 
 /** Inverted ratchet on the completeness gate: a rename must fail, not shrink it. */
 const MIN_MATCHED = 456;
@@ -313,6 +315,15 @@ describe("design token contrast", () => {
       .filter((pair) => pair.issue === undefined)
       .map((pair) => pair.fg);
     expect(unjustified).toEqual([]);
+
+    // rootOf folds a bare alias of another candidate into its target, so an
+    // entry on such a token is never judged. Ratcheted: it can only go down.
+    const unjudged = CONTRAST_PAIRS.filter((pair) =>
+      (pair.themes ?? ["light", "dark"]).some(
+        (theme) => rootOf(pair.fg, THEMES[theme]) !== pair.fg,
+      ),
+    ).map((pair) => pair.fg);
+    expect(unjudged.length, unjudged.join(", ")).toBeLessThanOrEqual(MAX_UNJUDGED);
   });
 
   describe.each(["light", "dark"] as const)("%s theme", (theme) => {

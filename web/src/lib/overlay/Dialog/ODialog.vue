@@ -22,6 +22,8 @@ import {
   useAttrs,
   inject,
   provide,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
@@ -86,6 +88,35 @@ watch(
     if (v !== undefined) internalOpen.value = v;
   },
 );
+
+// A kept-alive view's portal stays in <body> when the view is away, so it hides then and returns open.
+const hostAway = ref(false);
+const shown = computed(() => internalOpen.value && !hostAway.value);
+
+// Remounting on return re-records focus from wherever navigation left it, so keep the opener.
+let openedFrom: HTMLElement | null = null;
+let awaySinceOpen = false;
+watch(
+  internalOpen,
+  (open) => {
+    if (!open) return;
+    openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    awaySinceOpen = false;
+  },
+  { immediate: true },
+);
+onDeactivated(() => {
+  hostAway.value = true;
+  if (internalOpen.value && !shown.value) awaySinceOpen = true;
+});
+onActivated(() => (hostAway.value = false));
+
+function handleCloseAutoFocus(event: Event) {
+  if (hostAway.value || awaySinceOpen) event.preventDefault();
+  if (hostAway.value || !awaySinceOpen) return;
+  awaySinceOpen = false;
+  if (openedFrom?.isConnected) openedFrom.focus();
+}
 
 function handleOpenChange(v: boolean) {
   internalOpen.value = v;
@@ -264,7 +295,7 @@ function handleOpenAutoFocus(event: Event) {
 // move focus to the first field of the newly added content — unless the user
 // is still focused in a field that survived the swap.
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
   const body = bodyRef.value;
   if (!body) return;
 
@@ -307,7 +338,7 @@ watchEffect((cleanup) => {
 // document-level handlers never fire when focus moves to/from a portaled
 // reka-ui element (ODropdown, OSelect listbox, etc.).
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
 
   function isPortalElement(el: Element | null): boolean {
     return !!el?.closest("[data-reka-popper-content-wrapper]");
@@ -342,7 +373,8 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
-watch(internalOpen, (open) => {
+// The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
+watch(shown, (open) => {
   if (open) {
     nextTick(() => {
       attachShadow();
@@ -355,7 +387,7 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling exclusively via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -412,6 +444,7 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
         @keydown="handleContentKeydown"
       >
         <!--
@@ -549,8 +582,9 @@ watch(internalOpen, (open) => {
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
           <div v-if="!slots.footer" class="flex items-center justify-between gap-2">
-            <!-- Left: neutral button -->
-            <div>
+            <!-- Left: optional footer-left content, then neutral button -->
+            <div class="flex items-center gap-2">
+              <slot name="footer-left" />
               <OButton
                 v-if="neutralButtonLabel"
                 data-test="o-dialog-neutral-btn"

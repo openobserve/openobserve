@@ -3,7 +3,7 @@ import type { I18nText } from "@/types/i18n";
 import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-interface Props {
+export interface Props {
   variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft" | "promo";
   content?: I18nText;
   icon?: string;
@@ -120,11 +120,15 @@ const barVariantClass = computed(() => {
       bar ? (dense ? 'py-1' : 'py-2') : '',
       bar ? (center ? 'justify-center' : 'justify-between') : '',
       bar ? '' : 'rounded-default',
-      bar ? '' : inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
+      bar ? '' : inlineActions ? 'flex-row items-center gap-3 max-md:flex-wrap' : 'flex-col gap-2',
       bar ? '' : dense ? 'p-2' : 'p-4',
       bar ? barVariantClass : variantClass,
     ]"
   >
+    <!-- `inlineActions` is the one-line layout — the outer row already centres,
+         so the icon centres against the whole content block with it. Stacked
+         banners keep `items-start`, where the icon belongs beside the first
+         line of a paragraph rather than halfway down it. -->
     <div
       :class="[
         'flex flex-row gap-3',
@@ -132,13 +136,22 @@ const barVariantClass = computed(() => {
           ? center
             ? 'min-w-0 items-center'
             : 'min-w-0 flex-1 items-center'
-          : preserveWhitespace
-            ? 'min-w-0 items-start'
-            : 'items-start',
-        inlineActions && !bar ? 'flex-1' : '',
+          : inlineActions
+            ? 'min-w-0 flex-1 items-center max-md:min-w-48'
+            : preserveWhitespace
+              ? 'min-w-0 items-start'
+              : 'items-start',
       ]"
     >
-      <div v-if="showIconArea" :class="['flex shrink-0', bar ? 'items-center' : 'items-start']">
+      <!-- Aligned to the FIRST LINE of the content, not the top of the box:
+           `items-start` anchored a 1rem icon to the top of a 1.25rem line box,
+           which reads as the icon sitting a hair high beside its own label.
+           `min-h-5` is that line box, so a taller slotted icon still grows the
+           wrapper and keeps its old top alignment instead of overflowing. -->
+      <div
+        v-if="showIconArea"
+        :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']"
+      >
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>
@@ -146,7 +159,7 @@ const barVariantClass = computed(() => {
 
       <div
         :class="[
-          bar ? 'text-compact' : 'flex-1 text-sm',
+          bar ? 'text-compact' : inlineActions ? 'min-w-0 flex-1 text-sm' : 'flex-1 text-sm',
           preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
         ]"
       >
@@ -155,7 +168,8 @@ const barVariantClass = computed(() => {
       </div>
     </div>
 
-    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : ''">
+    <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
+    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : ''">
       <slot name="actions" />
     </div>
   </div>

@@ -15,7 +15,7 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
-    sea_query::{Expr, Func, OnConflict},
+    sea_query::{CaseStatement, Expr, Func, OnConflict},
 };
 
 use crate::{
@@ -25,11 +25,17 @@ use crate::{
 
 pub const SYNTHETICS_BROWSER_FEATURE: &str = "synthetics_browser_steps";
 pub const SYNTHETICS_PROTOCOL_FEATURE: &str = "synthetics_protocol_steps";
+pub const SYNTHETICS_STATUS_FEATURE: &str = "synthetics_status_protocol";
 
-/// One settled window's free steps per pool.
+/// The `YYYYMM` a lifetime row carries, meaning the count belongs to no month.
+pub const LIFETIME_PERIOD: i32 = 0;
+
+/// One settled window's free steps per pool. `month` scopes the status pool alone.
 pub struct SyntheticsDeltas {
     pub browser: i64,
     pub protocol: i64,
+    pub status: i64,
+    pub month: i32,
 }
 
 /// Additively upsert one `(org_id, feature, delta)` triple per record.
@@ -172,6 +178,9 @@ async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
         usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        // A raised limit belongs to no month; the monthly row keeps its own period.
+        period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -205,6 +214,72 @@ async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
             .await?;
     }
     txn.commit().await
+}
+
+/// Set paid-overage consent on every exact backing row in one transaction.
+///
+/// Inserts missing rows with zero usage and updates only consent and `updated_at`
+/// on existing rows, so quota accounting and administrator limits survive.
+pub async fn set_paid_overage_enabled_for_features(
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+) -> Result<(), sea_orm::DbErr> {
+    set_paid_overage_enabled_for_features_in(get_orm_client_rw().await, org_id, features, enabled)
+        .await
+}
+
+async fn set_paid_overage_enabled_for_features_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+    enabled: bool,
+) -> Result<(), sea_orm::DbErr> {
+    if features.is_empty() {
+        return Ok(());
+    }
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    for feature in features {
+        let active_model = trial_quota_usage::ActiveModel {
+            org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+            feature: sea_orm::ActiveValue::Set((*feature).to_string()),
+            usage_count: sea_orm::ActiveValue::Set(0),
+            usage_limit: sea_orm::ActiveValue::NotSet,
+            paid_overage_enabled: sea_orm::ActiveValue::Set(enabled),
+            updated_at: sea_orm::ActiveValue::Set(now),
+            notified_checkpoint: sea_orm::ActiveValue::Set(0),
+            period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        };
+        trial_quota_usage::Entity::insert(active_model)
+            .on_conflict(
+                OnConflict::columns([
+                    trial_quota_usage::Column::OrgId,
+                    trial_quota_usage::Column::Feature,
+                ])
+                .value(
+                    trial_quota_usage::Column::PaidOverageEnabled,
+                    Expr::value(enabled),
+                )
+                .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+                .to_owned(),
+            )
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await
+}
+
+/// Load every exact consent row for startup and periodic reconciliation.
+pub async fn load_all_paid_overage() -> Result<Vec<(String, String, bool)>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .select_only()
+        .column(trial_quota_usage::Column::OrgId)
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::PaidOverageEnabled)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await
 }
 
 /// Get quota record for a specific org and feature.
@@ -383,6 +458,59 @@ pub async fn apply_synthetics_deltas_in<C: ConnectionTrait>(
             increment_lifetime_row(txn, org_id, feature, delta, now).await?;
         }
     }
+    if deltas.status != 0 {
+        increment_monthly_row(txn, org_id, deltas.status, deltas.month, now).await?;
+    }
+    Ok(())
+}
+
+/// The reset rides the increment, so no pass adds to a month and a later one zeroes it.
+///
+/// A row from an older month starts the new month at this window's draw. A row from a NEWER month
+/// only accumulates: a late replay of an old window must never rewind the period it settled into.
+async fn increment_monthly_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    delta: i64,
+    month: i32,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let period = Expr::col((trial_quota_usage::Entity, trial_quota_usage::Column::Period));
+    let stale = period.clone().lt(month);
+    let count = CaseStatement::new().case(stale.clone(), delta).finally(
+        Expr::col((
+            trial_quota_usage::Entity,
+            trial_quota_usage::Column::UsageCount,
+        ))
+        .add(delta),
+    );
+    // Stands in for `GREATEST`, which SQLite lacks and Postgres spells as an aggregate.
+    let advance = CaseStatement::new().case(stale, month).finally(period);
+
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set(SYNTHETICS_STATUS_FEATURE.to_string()),
+        usage_count: sea_orm::ActiveValue::Set(delta),
+        usage_limit: sea_orm::ActiveValue::NotSet,
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(month),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(trial_quota_usage::Column::UsageCount, count)
+            .value(trial_quota_usage::Column::Period, advance)
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(conn)
+        .await?;
     Ok(())
 }
 
@@ -400,6 +528,8 @@ async fn increment_lifetime_row<C: ConnectionTrait>(
         usage_limit: sea_orm::ActiveValue::NotSet,
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(LIFETIME_PERIOD),
+        paid_overage_enabled: sea_orm::ActiveValue::Set(false),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -433,6 +563,8 @@ mod tests {
 
     use super::*;
 
+    const ORG: &str = "acme";
+    const STATUS: &str = SYNTHETICS_STATUS_FEATURE;
     const AI: &str = "ai_chat";
     const BROWSER: &str = "synthetics_browser_steps";
     const PROTOCOL: &str = "synthetics_protocol_steps";
@@ -471,8 +603,10 @@ mod tests {
             feature: ActiveValue::Set(feature.to_string()),
             usage_count: ActiveValue::Set(usage_count),
             usage_limit: ActiveValue::Set(usage_limit),
+            paid_overage_enabled: ActiveValue::Set(false),
             updated_at: ActiveValue::Set(0),
             notified_checkpoint: ActiveValue::Set(notified_checkpoint),
+            period: ActiveValue::Set(LIFETIME_PERIOD),
         }
     }
 
@@ -502,11 +636,31 @@ mod tests {
     }
 
     fn deltas(browser: i64, protocol: i64) -> SyntheticsDeltas {
-        SyntheticsDeltas { browser, protocol }
+        SyntheticsDeltas {
+            browser,
+            protocol,
+            status: 0,
+            month: LIFETIME_PERIOD,
+        }
+    }
+
+    fn status_deltas(status: i64, month: i32) -> SyntheticsDeltas {
+        SyntheticsDeltas {
+            browser: 0,
+            protocol: 0,
+            status,
+            month,
+        }
     }
 
     async fn apply(db: &DatabaseConnection, org_id: &str, d: SyntheticsDeltas, now: i64) {
         apply_synthetics_deltas_in(db, org_id, &d, now)
+            .await
+            .unwrap();
+    }
+
+    async fn apply_status(db: &DatabaseConnection, org_id: &str, status: i64, month: i32) {
+        apply_synthetics_deltas_in(db, org_id, &status_deltas(status, month), 0)
             .await
             .unwrap();
     }
@@ -571,6 +725,71 @@ mod tests {
             .await
             .unwrap()
             .is_none()
+    }
+
+    #[tokio::test]
+    async fn paid_overage_bundle_is_atomic_and_preserves_quota_fields() {
+        let db = db().await;
+        seed_row(&db, ORG, AI, 340, Some(10_000)).await;
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+        let ai = row_of(&db, ORG, AI).await;
+        assert_eq!(ai.usage_count, 340);
+        assert_eq!(ai.usage_limit, Some(10_000));
+    }
+
+    #[tokio::test]
+    async fn revoking_paid_overage_disables_every_backing_row_without_resetting_usage() {
+        let db = db().await;
+        seed_row(&db, ORG, AI, 340, Some(10_000)).await;
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, false)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert!(!row_of(&db, ORG, feature).await.paid_overage_enabled);
+        }
+        let ai = row_of(&db, ORG, AI).await;
+        assert_eq!(ai.usage_count, 340);
+        assert_eq!(ai.usage_limit, Some(10_000));
+    }
+    #[tokio::test]
+    async fn ordinary_usage_upsert_preserves_paid_overage() {
+        let db = db().await;
+        set_paid_overage_enabled_for_features_in(&db, ORG, &[AI], true)
+            .await
+            .unwrap();
+
+        increment_lifetime_row(&db, ORG, AI, 7, 42).await.unwrap();
+
+        let row = row_of(&db, ORG, AI).await;
+        assert_eq!(row.usage_count, 7);
+        assert!(row.paid_overage_enabled);
+    }
+
+    #[tokio::test]
+    async fn paid_overage_bundle_uses_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, AI_FEATURES.len());
+
+        set_paid_overage_enabled_for_features_in(&db, ORG, AI_FEATURES, true)
+            .await
+            .unwrap();
+
+        assert_one_transaction(
+            &db.into_transaction_log(),
+            AI_FEATURES.len(),
+            "set_paid_overage_enabled_for_features_in",
+        );
     }
 
     /// A leaked org or a leaked feature is a grant spent against the wrong pool.
@@ -866,5 +1085,86 @@ mod tests {
 
         assert!(has_no_row(&db, "acme", BROWSER).await, "browser");
         assert!(has_no_row(&db, "acme", PROTOCOL).await, "protocol");
+    }
+
+    #[tokio::test]
+    async fn status_upsert_inserts_with_the_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 40, 202610).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!((row.usage_count, row.period), (40, 202610));
+    }
+
+    #[tokio::test]
+    async fn status_upsert_adds_within_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 12_480, 202609).await;
+        apply_status(&db, ORG, 410, 202609).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!((row.usage_count, row.period), (12_890, 202609));
+    }
+
+    #[tokio::test]
+    async fn status_upsert_resets_on_a_newer_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 12_890, 202609).await;
+        apply_status(&db, ORG, 90, 202610).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!(
+            (row.usage_count, row.period),
+            (90, 202610),
+            "a new month starts the count again instead of adding to the old one",
+        );
+    }
+
+    #[tokio::test]
+    async fn status_upsert_adds_a_late_older_month_to_the_current_month() {
+        let db = db().await;
+        apply_status(&db, ORG, 90, 202610).await;
+        apply_status(&db, ORG, 5, 202609).await;
+
+        let row = row_of(&db, ORG, STATUS).await;
+        assert_eq!(
+            (row.usage_count, row.period),
+            (95, 202610),
+            "a late replay counts against the current month and never rewinds the period",
+        );
+    }
+
+    #[tokio::test]
+    async fn status_upsert_never_touches_usage_limit() {
+        let db = db().await;
+        seed_row(&db, ORG, STATUS, 0, Some(1_000)).await;
+
+        for (draw, month) in [(40, 202609), (10, 202609), (7, 202610), (1, 202608)] {
+            apply_status(&db, ORG, draw, month).await;
+            assert_eq!(
+                row_of(&db, ORG, STATUS).await.usage_limit,
+                Some(1_000),
+                "an administrator override outlives every reset",
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn lifetime_rows_keep_period_at_zero() {
+        let db = db().await;
+        apply(&db, ORG, deltas(10, 20), 0).await;
+        apply(&db, ORG, deltas(5, 5), 1).await;
+
+        for feature in [BROWSER, PROTOCOL] {
+            assert_eq!(row_of(&db, ORG, feature).await.period, LIFETIME_PERIOD);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_zero_status_delta_writes_no_row() {
+        let db = db().await;
+        apply_status(&db, ORG, 0, 202609).await;
+
+        assert!(has_no_row(&db, ORG, STATUS).await);
     }
 }

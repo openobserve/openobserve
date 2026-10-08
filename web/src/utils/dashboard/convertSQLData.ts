@@ -27,6 +27,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { calculateMetricFontSize, METRIC_SPARKLINE } from "./sql/charts/convertSQLMetricChart";
 import { calculateGridPositions, getTrellisGrid } from "./calculateGridForSubPlot";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Re-applies trellis layout on merged multi-query data.
@@ -680,7 +681,7 @@ export const convertMultiSQLData = async (
                 panelSchema?.config?.decimals,
               ),
             ) || rawVal;
-          return `${yLabel} <br/> ${params?.marker ?? ""} ${params?.name ?? ""} : ${formatted}`;
+          return `${escapeHtml(yLabel)} <br/> ${params?.marker ?? ""} ${escapeHtml(params?.name ?? "")} : ${escapeHtml(formatted)}`;
         } catch {
           return "";
         }

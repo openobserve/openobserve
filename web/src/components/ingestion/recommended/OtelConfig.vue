@@ -4,7 +4,7 @@
       <div class="text-base font-bold font-medium">{{ t("ingestion.otlpHttp") }}</div>
       <ContentCopy class="mt-2" :content="raw(getOtelHttpConfig)" />
     </div>
-    <div class="p-3" v-if="config.isCloud == 'false'">
+    <div class="p-3" v-if="showOtlpGrpc">
       <div class="text-base font-bold font-medium">{{ t("ingestion.otlpGrpc") }}</div>
       <ContentCopy :content="raw(getOtelGrpcConfig)" />
     </div>
@@ -15,10 +15,12 @@
 import { computed, ref } from "vue";
 import ContentCopy from "@/components/CopyContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import config from "@/aws-exports";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useOtlpGrpcVisibility from "@/composables/useOtlpGrpcVisibility";
+import { getOtelCollectorGrpcYaml } from "@/utils/otelCollectorConfig";
 
 const { t } = useI18nTyped();
+const { isPrimaryCloud, showOtlpGrpc } = useOtlpGrpcVisibility();
 
 const props = defineProps({
   currOrgIdentifier: {
@@ -40,22 +42,13 @@ const endpoint: any = ref({
 const ingestionURL = getIngestionURL();
 endpoint.value = getEndPoint(ingestionURL);
 
-const getOtelGrpcConfig = computed(() => {
-  return `exporters:
-  otlp/openobserve:
-      endpoint: ${endpoint.value.host}:5081
-      headers:
-        Authorization: "Basic [BASIC_PASSCODE]"
-        organization: ${props.currOrgIdentifier}
-        stream-name: default
-      tls:
-        insecure: true
-
-service:
-  telemetry:
-    logs:
-      level: warn`;
-});
+const getOtelGrpcConfig = computed(() =>
+  getOtelCollectorGrpcYaml({
+    orgIdentifier: props.currOrgIdentifier,
+    selfHostedHost: endpoint.value.host,
+    isPrimaryCloud: isPrimaryCloud.value,
+  }),
+);
 
 const getOtelHttpConfig = computed(() => {
   return `exporters:

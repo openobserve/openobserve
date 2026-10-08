@@ -20,6 +20,8 @@
 
 use axum::response::Response as HttpResponse;
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use config::utils::sql::{quote_identifier, quote_sql_string};
 use serde::Deserialize;
 
 /// Query parameters for service graph API
@@ -32,6 +34,8 @@ pub struct ServiceGraphQuery {
     pub agent_id: Option<String>,
     pub agent_name: Option<String>,
     pub agent_env: Option<String>,
+    /// `v1` or `v4` pins the engine for side-by-side checks; ignored once v1 is stopped.
+    pub source: Option<String>,
 }
 
 /// GetCurrentTopology
@@ -49,6 +53,7 @@ pub struct ServiceGraphQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
+        ("source" = Option<String>, Query, description = "Force the engine: v1 (edge stream) or v4 (metrics); default follows O2_SERVICE_GRAPH_SOURCE, and v4 is forced once O2_SERVICE_GRAPH_V1_STOP is on"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -64,8 +69,6 @@ pub async fn get_current_topology(
     axum::extract::Path(org_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<ServiceGraphQuery>,
 ) -> HttpResponse {
-    use config::meta::service_graph::ServiceGraphData;
-
     // Resolve the current window boundaries
     let (start_time, end_time) =
         if let (Some(start), Some(end)) = (query.start_time, query.end_time) {
@@ -76,19 +79,77 @@ pub async fn get_current_topology(
             (now - window_micros, now)
         };
 
+    let use_v4 = super::use_v4_source(&org_id, query.source.as_deref()).await;
+    if use_v4 {
+        let filter = v4_read_filter(&query);
+        if let Err(e) = filter.validate() {
+            return MetaHttpResponse::bad_request(e);
+        }
+        return match topology_v4(&org_id, &filter, start_time, end_time).await {
+            Ok(data) => MetaHttpResponse::json(data),
+            Err(e) => {
+                log::warn!("[ServiceGraph] v4 topology read failed for org '{org_id}': {e}");
+                MetaHttpResponse::internal_error(e)
+            }
+        };
+    }
+    MetaHttpResponse::json(topology_v1(&org_id, &query, start_time, end_time).await)
+}
+
+#[cfg(feature = "enterprise")]
+async fn topology_v4(
+    org_id: &str,
+    filter: &super::v4::read::ReadFilter,
+    start_time: i64,
+    end_time: i64,
+) -> Result<config::meta::service_graph::ServiceGraphData, anyhow::Error> {
+    use config::meta::service_graph::ServiceGraphData;
+
+    use super::v4::read::fetch_topology;
+
+    let (input, meta) = fetch_topology(org_id, filter, start_time, end_time).await?;
+    let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
+    Ok(ServiceGraphData {
+        nodes,
+        edges,
+        meta: Some(meta),
+    })
+}
+
+/// `stream_name=all` is the front end's "every stream" choice, not a stream.
+#[cfg(feature = "enterprise")]
+fn v4_read_filter(query: &ServiceGraphQuery) -> super::v4::read::ReadFilter {
+    super::v4::read::ReadFilter {
+        trace_stream: query
+            .stream_name
+            .clone()
+            .filter(|s| !s.is_empty() && s != "all"),
+        agent_env: query.agent_env.clone().filter(|s| !s.is_empty()),
+    }
+}
+
+/// Stream-backed topology (`_o2_service_graph`); removed together with v1 in the next major
+/// version.
+#[cfg(feature = "enterprise")]
+async fn topology_v1(
+    org_id: &str,
+    query: &ServiceGraphQuery,
+    start_time: i64,
+    end_time: i64,
+) -> config::meta::service_graph::ServiceGraphData {
     // Build the optional agent predicate (ENV-ONLY, version-agnostic).
     // When no env is selected, `agent_pred` is None and the emitted SQL is
     // byte-identical to the pre-B4 query (backward compatible). The
     // `_o2_service_graph` stream has NO `agent_version` column, so we never
     // reference version here.
-    let agent_pred: Option<String> = query.agent_env.as_deref().map(|env| {
-        let escaped = env.replace('\'', "''");
-        format!("agent_env = '{escaped}'")
-    });
+    let agent_pred: Option<String> = query
+        .agent_env
+        .as_deref()
+        .map(|env| format!("agent_env = {}", quote_sql_string(env)));
 
     // 1. Query current window
     let edges = match query_edges_from_stream_internal(
-        &org_id,
+        org_id,
         query.stream_name.as_deref(),
         Some(start_time),
         Some(end_time),
@@ -102,22 +163,13 @@ pub async fn get_current_topology(
                 "[ServiceGraph] Stream query failed (likely stream doesn't exist yet): {}",
                 e
             );
-            return MetaHttpResponse::json(ServiceGraphData {
-                nodes: vec![],
-                edges: vec![],
-            });
+            return empty_graph("v1");
         }
     };
 
     if edges.is_empty() {
-        log::debug!(
-            "[ServiceGraph] No edges found for org '{}'",
-            org_id.as_str()
-        );
-        return MetaHttpResponse::json(ServiceGraphData {
-            nodes: vec![],
-            edges: vec![],
-        });
+        log::debug!("[ServiceGraph] No edges found for org '{org_id}'");
+        return empty_graph("v1");
     }
 
     // 2. Query previous slot (same duration, one slot older) for baselines
@@ -133,7 +185,7 @@ pub async fn get_current_topology(
     );
 
     let prev_edges = query_edges_from_stream_internal(
-        &org_id,
+        org_id,
         query.stream_name.as_deref(),
         Some(prev_start),
         Some(prev_end),
@@ -169,7 +221,25 @@ pub async fn get_current_topology(
 
     let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges, baselines);
 
-    MetaHttpResponse::json(ServiceGraphData { nodes, edges })
+    config::meta::service_graph::ServiceGraphData {
+        nodes,
+        edges,
+        ..empty_graph("v1")
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn empty_graph(source: &str) -> config::meta::service_graph::ServiceGraphData {
+    use config::meta::service_graph::{ServiceGraphData, TopologyMeta};
+
+    ServiceGraphData {
+        nodes: vec![],
+        edges: vec![],
+        meta: Some(TopologyMeta {
+            source: source.to_string(),
+            ..Default::default()
+        }),
+    }
 }
 
 /// Aggregate raw edge records from a slot into a per-(client,server) weighted-average
@@ -243,22 +313,23 @@ fn build_edges_sql(
     let agent_clause = agent_pred
         .map(|p| format!("\n             AND {p}"))
         .unwrap_or_default();
+    let table = quote_identifier(stream_name);
+    let org = quote_sql_string(org_id);
     if let Some(stream) = stream_filter {
+        let stream = quote_sql_string(stream);
         format!(
-            "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {} AND _timestamp < {}
-             AND org_id = '{}'
-             AND trace_stream_name = '{}'{}
-             LIMIT 10000",
-            stream_name, start_time, end_time, org_id, stream, agent_clause
+            "SELECT * FROM {table}
+             WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+             AND org_id = {org}
+             AND trace_stream_name = {stream}{agent_clause}
+             LIMIT 10000"
         )
     } else {
         format!(
-            "SELECT * FROM \"{}\"
-             WHERE _timestamp >= {} AND _timestamp < {}
-             AND org_id = '{}'{}
-             LIMIT 10000",
-            stream_name, start_time, end_time, org_id, agent_clause
+            "SELECT * FROM {table}
+             WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+             AND org_id = {org}{agent_clause}
+             LIMIT 10000"
         )
     }
 }
@@ -421,24 +492,36 @@ pub async fn get_edge_history(
         };
 
     let mut filters = format!(
-        "_timestamp >= {} AND _timestamp < {} AND org_id = '{}'",
-        start_time, end_time, org_id
+        "_timestamp >= {} AND _timestamp < {} AND org_id = {}",
+        start_time,
+        end_time,
+        quote_sql_string(&org_id)
     );
     if let Some(ref client) = query.client_service {
-        filters.push_str(&format!(" AND client_service = '{}'", client));
+        filters.push_str(&format!(
+            " AND client_service = {}",
+            quote_sql_string(client)
+        ));
     }
     if let Some(ref server) = query.server_service {
-        filters.push_str(&format!(" AND server_service = '{}'", server));
+        filters.push_str(&format!(
+            " AND server_service = {}",
+            quote_sql_string(server)
+        ));
     }
     if let Some(ref stream) = query.stream_name {
-        filters.push_str(&format!(" AND trace_stream_name = '{}'", stream));
+        filters.push_str(&format!(
+            " AND trace_stream_name = {}",
+            quote_sql_string(stream)
+        ));
     }
 
     let sql = format!(
         "SELECT _timestamp, p50_latency_ns, p95_latency_ns, p99_latency_ns, \
          total_requests, failed_requests \
-         FROM \"{}\" WHERE {} ORDER BY _timestamp ASC LIMIT 10000",
-        stream_name, filters
+         FROM {} WHERE {} ORDER BY _timestamp ASC LIMIT 10000",
+        quote_identifier(stream_name),
+        filters
     );
 
     let req = config::meta::search::Request {
@@ -701,6 +784,18 @@ mod tests {
     }
 
     #[test]
+    fn test_build_edges_sql_escapes_org_and_stream_filter() {
+        let sql = build_edges_sql("_o2_service_graph", Some("a'b"), 1, 2, "o'rg", None);
+        assert!(sql.contains("org_id = 'o''rg'"));
+        assert!(sql.contains("trace_stream_name = 'a''b'"));
+        assert!(!sql.contains("'o'rg'"));
+        // org_id is interpolated in the unfiltered branch too; a partial fix would miss it.
+        let sql = build_edges_sql("_o2_service_graph", None, 1, 2, "o'rg", None);
+        assert!(sql.contains("org_id = 'o''rg'"));
+        assert_eq!(sql.matches('\'').count() % 2, 0);
+    }
+
+    #[test]
     fn test_aggregate_baselines_null_client_service() {
         let records = vec![make_record(None, "svc-b", 50, 100, 150, 5)];
         let result = aggregate_baselines(records);
@@ -710,5 +805,28 @@ mod tests {
         assert_eq!(p50, 50);
         assert_eq!(p95, 100);
         assert_eq!(p99, 150);
+    }
+
+    #[test]
+    fn test_v4_read_filter_maps_stream_and_env_only() {
+        let query = |stream: Option<&str>, env: Option<&str>| ServiceGraphQuery {
+            start_time: None,
+            end_time: None,
+            filter: None,
+            stream_name: stream.map(str::to_string),
+            agent_id: Some("id".to_string()),
+            agent_name: Some("name".to_string()),
+            agent_env: env.map(str::to_string),
+            source: None,
+        };
+        let f = v4_read_filter(&query(None, None));
+        assert!(f.is_empty());
+        let f = v4_read_filter(&query(Some("all"), Some("")));
+        assert!(f.is_empty());
+        let f = v4_read_filter(&query(Some(""), None));
+        assert!(f.is_empty());
+        let f = v4_read_filter(&query(Some("default"), Some("prod")));
+        assert_eq!(f.trace_stream.as_deref(), Some("default"));
+        assert_eq!(f.agent_env.as_deref(), Some("prod"));
     }
 }

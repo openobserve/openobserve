@@ -22,7 +22,8 @@ use infra::{
     coordinator::get_coordinator,
     db::Event,
     errors::{self, DbError},
-    table::source_maps::SourceMap,
+    storage,
+    table::source_maps::{SourceMap, get_file_path},
 };
 use parquet::data_type::AsBytes;
 use serde::Serialize;
@@ -186,8 +187,12 @@ pub async fn delete_group(
     env: Option<String>,
     version: Option<String>,
 ) -> Result<(), errors::Error> {
-    infra::table::source_maps::delete_group(org, service.clone(), env.clone(), version.clone())
-        .await?;
+    let deleted =
+        infra::table::source_maps::delete_group(org, service.clone(), env.clone(), version.clone())
+            .await?;
+    if let Err(e) = delete_stored_files(&deleted).await {
+        log::error!("error deleting sourcemap files from storage for org_id {org} : {e}");
+    }
 
     {
         let mut cache = CACHE.write().await;
@@ -258,6 +263,16 @@ pub async fn delete_group(
     }
 
     Ok(())
+}
+
+pub async fn delete_stored_files(files: &[SourceMap]) -> Result<(), errors::Error> {
+    let paths: Vec<String> = files
+        .iter()
+        .map(|f| get_file_path(&f.org, &f.file_store_id))
+        .collect();
+    storage::del(paths.iter().map(|p| ("", p.as_str())).collect())
+        .await
+        .map_err(Into::into)
 }
 
 pub async fn update_file_cluster(entry: SourceMap) -> Result<(), anyhow::Error> {

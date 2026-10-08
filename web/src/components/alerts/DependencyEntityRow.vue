@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="!deleting"
-      class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100"
+      class="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 max-md:opacity-100"
     >
       <OButton
         v-if="!node.missing"

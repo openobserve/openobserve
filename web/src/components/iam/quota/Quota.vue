@@ -28,8 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ marginTop: 0 }" class="app-table-container flex min-h-0 flex-1 flex-col">
       <div class="bg-card-glass-bg mt-2.5 mb-2.5">
         <div class="px-3 py-2">
-          <div class="mb-2 flex w-full items-center justify-between">
-            <div class="flex items-center">
+          <div
+            class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
+          >
+            <div class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5">
               <OSelect
                 :loading="isOrgLoading"
                 :model-value="selectedOrganization?.value"
@@ -67,8 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="mb-2 flex w-full items-center justify-between">
-            <div v-if="selectedOrganization && activeType == 'table'" class="flex items-center">
+          <div
+            class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
+          >
+            <div
+              v-if="selectedOrganization && activeType == 'table'"
+              class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5"
+            >
               <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
@@ -94,7 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="handleApiCategorySelect"
               />
             </div>
-            <div v-if="selectedOrganization" class="float-right ms-auto flex items-center">
+            <div
+              v-if="selectedOrganization"
+              class="float-right ms-auto flex items-center max-md:flex-wrap max-md:justify-end max-md:gap-y-1.5"
+            >
               <div class="app-tabs-container me-3 h-9 w-fit">
                 <AppTabs
                   data-test="time-unit-tabs"
@@ -148,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (searchQuery = '')"
             />
           </template>
-          <template #bottom />
           <template
             v-for="col in apiLimitCrudColumnIds"
             :key="col"
@@ -236,7 +245,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (searchQuery = '')"
             />
           </template>
-          <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
           </template>
@@ -396,6 +404,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { rolesQuery } from "@/services/iam.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   computed,
@@ -419,7 +429,6 @@ import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
@@ -452,7 +461,6 @@ export default defineComponent({
     const { isDark } = useTheme();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
-    const resultTotal = ref<number>(0);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
@@ -724,18 +732,14 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           //here we are getting the role limits for the selected organization
           await getRolesByOrganization();
         }
-        //these are the modules that are displayed in the dropdown
-        //to select the api category that user can use to filter the api limits
-        if (!store.state.modulesToDisplay[selectedOrganization.value.value]) {
-          apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
-        } else {
-          apiCategories.value = store.state.modulesToDisplay[selectedOrganization.value.value];
-        }
+        // The module dropdown is loaded by the `selectedOrganization` watcher
+        // below, which the assignment above has already triggered. Loading it
+        // here too raced that watcher — the store guard cannot help, since
+        // neither call has resolved yet — and fetched the list twice.
       }
     });
 
@@ -798,10 +802,8 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
-          resultTotal.value = apiLimitsRows.value.length;
         }
       } else if (activeTab.value === "role-limits") {
         await getRolesByOrganization();
@@ -876,7 +878,6 @@ export default defineComponent({
         } else {
           apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
         }
-        resultTotal.value = apiLimitsRows.value.length;
       }
     };
     //this is used to save the changes and switch the tab
@@ -914,8 +915,10 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await getRoles(selectedOrganization.value?.value);
-        rolesLimitRows.value = response.data.map((role: any) => ({
+        const response = await queryClient.fetchQuery(
+          rolesQuery(selectedOrganization.value?.value),
+        );
+        rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),
           list: 10,
@@ -924,7 +927,6 @@ export default defineComponent({
           update: 10,
           delete: 10,
         }));
-        resultTotal.value = rolesLimitRows.value.length;
         isRolesLoading.value = false;
       } catch (error) {
         isRolesLoading.value = false;
@@ -1022,7 +1024,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else if (activeTab.value === "role-limits") {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1092,7 +1093,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1472,7 +1472,6 @@ export default defineComponent({
             newTimeUnit,
           );
         }
-        resultTotal.value = apiLimitsRows.value.length;
       } else if (activeTab.value === "role-limits" && openedRole.value) {
         const storeKey = `${openedRole.value}_${newTimeUnit}`;
         if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
@@ -1510,7 +1509,6 @@ export default defineComponent({
       typeTabs,
       editTable,
       searchQuery,
-      resultTotal,
       rolesLimitRows,
       rolesColumns,
       apiLimitsRows,

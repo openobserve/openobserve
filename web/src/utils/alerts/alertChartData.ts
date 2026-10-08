@@ -1,4 +1,5 @@
 import { toZonedTime } from "date-fns-tz";
+import { dataZoomBrushStyle } from "@/utils/chartTheme";
 
 export const getChartData = (
   x: any,
@@ -88,6 +89,7 @@ export const getChartData = (
       bottom: "100%",
       feature: {
         dataZoom: {
+          brushStyle: dataZoomBrushStyle(),
           show: true,
           yAxisIndex: "none",
         },

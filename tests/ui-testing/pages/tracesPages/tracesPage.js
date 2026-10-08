@@ -1,9 +1,17 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
 
+
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
+// Rate and Errors come from web/src/plugins/traces/metrics/metrics.json; Duration is the latency heatmap.
+const TRACES_METRICS_PANELS = ['Rate', 'Errors', 'Duration'];
+const CHART_ZOOM_START_RATIO = 0.35;
+const CHART_ZOOM_END_RATIO = 0.75;
+const CHART_DRAG_STEPS = 20;
+const QUERY_CLEAR_ATTEMPTS = 10;
 
 export class TracesPage {
   constructor(page) {
@@ -75,6 +83,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsViewSessionReplayButton = '[data-test="trace-details-view-session-replay-btn"]';
 
     // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
     // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
@@ -100,44 +109,34 @@ export class TracesPage {
     // Standalone Service Graph page (rail-flyout route /traces/service-graph).
     this.serviceGraphPage = '[data-test="service-graph-page"]';
 
-    // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-    // TracesMetricsDashboard.vue: data-test="insights-button"
+    // ===== DRILL DOWN AND RED CHART SELECTORS (VERIFIED against Vue source) =====
     this.insightsButton = '[data-test="insights-button"]';
     // SearchResult.vue: error-count badge doubles as the error-only toggle
     this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
-    // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // TracesAnalysisDashboard.vue was migrated to ODrawer
-    // (data-test="traces-analysis-dashboard-drawer"). The legacy
-    // `analysis-dashboard-close` data-test and `.analysis-dashboard-card`
-    // template class were removed — `.analysis-dashboard-card` only survives
-    // in CSS rules now, no element actually carries the class. Scope all
-    // selectors via the ODrawer slug instead.
-    this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
-    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
-    // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
-    this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
-    this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
-    this.dimensionSearchInput = '[data-test="dimension-search-input"]';
-    // OInput inner native <input> — fill the -field variant per §4 OInput convention
-    this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
-    // TracesAnalysisDashboard.vue: data-test="percentile-refresh-button"
-    this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
-    // Analysis dashboard card (container) — alias to the drawer slug for backwards-compat
-    this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
     // Metrics dashboard container
     // Source: web/src/plugins/traces/metrics/TracesMetricsDashboard.vue
     this.tracesMetricsDashboard = '[data-test="traces-metrics-dashboard"]';
-    // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
-    // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
-    this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
-    this.rateTab = '[data-test="traces-analysis-dashboard-volume-tab"]';
-    this.latencyTab = '[data-test="traces-analysis-dashboard-duration-tab"]';
-    this.errorsTab = '[data-test="traces-analysis-dashboard-error-tab"]';
-    // Analysis dashboard states — scope inside the drawer
-    this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-    this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-error"]';
-    this.analysisDashboardRetryBtn = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-retry-btn"]';
+    // No-stream prompt rendered before a stream is selected
+    // Source: web/src/plugins/traces/TracesNoStreamState.vue
+    this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
+    // Duration latency heatmap — source: web/src/plugins/traces/metrics/TracesLatencyHeatmap.vue
+    this.latencyHeatmap = '[data-test="traces-latency-heatmap"]';
+    // Auto Run (live mode) toggle in the Run Query dropdown — source: web/src/plugins/traces/SearchBar.vue
+    this.liveModeToggleItem = '[data-test="traces-search-bar-live-mode-toggle-btn"]';
+
+    // ===== DRILL DOWN COMPARISON (web/src/plugins/traces/metrics/TracesComparison.vue) =====
+    this.comparisonPage = '[data-test="traces-comparison"]';
+    this.comparisonNoSelection = '[data-test="traces-comparison-no-selection"]';
+    this.comparisonError = '[data-test="traces-comparison-error"]';
+    this.comparisonEmptySelection = '[data-test="traces-comparison-empty-selection"]';
+    this.comparisonEmptyBaseline = '[data-test="traces-comparison-empty-baseline"]';
+    this.comparisonSummary = '[data-test="traces-comparison-summary"]';
+    this.comparisonSampleNote = '[data-test="traces-comparison-sample-note"]';
+    this.comparisonBaselineBefore = '[data-test="traces-comparison-baseline-toggle-before"]';
+    this.comparisonBaselineOutside = '[data-test="traces-comparison-baseline-toggle-outside"]';
+    this.comparisonFieldCards = '[data-test^="traces-comparison-field-"]';
+    this.drillDownBackButton = '[data-test="traces-drill-down-back-btn"]';
 
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
@@ -377,6 +376,32 @@ export class TracesPage {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
   }
 
+  /** `fromUs` / `toUs` are microsecond epoch bounds (traceDetails.utils.ts resolveUrlTimeRange). */
+  async navigateToTraceDetailsUrl({ traceId, fromUs, toUs, stream = 'default', org = process.env['ORGNAME'] || 'default' }) {
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    const url = `${baseUrl}/web/traces/trace-details?trace_id=${traceId}&stream=${stream}&from=${fromUs}&to=${toUs}&org_identifier=${org}`;
+    await this.page.goto(url);
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  async expectTraceTreeSpanOperationName(spanId, operationName) {
+    await expect(this.page.locator(`[data-test="trace-tree-span-operation-name-${spanId}"]`)).toHaveText(operationName, { timeout: 30000 });
+  }
+
+  async expectSessionReplayButtonVisible() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+  }
+
+  /** Callers must first prove the RUM bridge span rendered, or an absent button proves nothing. */
+  async expectSessionReplayButtonHidden() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toHaveCount(0);
+  }
+
+  async clickSessionReplayButton() {
+    await expect(this.page.locator(this.traceDetailsViewSessionReplayButton)).toBeVisible({ timeout: 15000 });
+    await this.page.locator(this.traceDetailsViewSessionReplayButton).click();
+  }
+
   async navigateBackFromTraceDetails() {
     // Try to click back button if visible
     const backButton = this.page.locator(this.traceDetailsBackButton);
@@ -427,7 +452,9 @@ export class TracesPage {
   }
 
   async toggleMetricsDashboard() {
+    await this.getMoreMenuButton().click();
     await this.page.locator(this.showMetricsToggle).click();
+    await this.page.keyboard.press('Escape');
   }
 
   async switchToServiceMaps() {
@@ -467,6 +494,18 @@ export class TracesPage {
 
   async switchToSearchView() {
     await this.page.locator(this.searchToggle).click();
+  }
+
+  // Verify the toggle flipped, so a silently-failed click cannot green downstream assertions.
+  async switchToSpansMode() {
+    await this.page.locator(this.spansToggle).click();
+    await this.expectSpansModeActive();
+  }
+
+  // The active search-mode toggle carries data-state="on" (OToggleGroupItem).
+  async expectSpansModeActive() {
+    await expect(this.page.locator(this.spansToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
   }
 
   async expectServiceGraphVisible() {
@@ -567,6 +606,11 @@ export class TracesPage {
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
 
+  // Guards that a time-range change took effect before asserting downstream re-renders.
+  async getTimeRangeLabel() {
+    return (await this.page.locator(this.dateTimeButton).textContent().catch(() => '')) || '';
+  }
+
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.locator(this.dateTimeButton).click();
@@ -629,9 +673,7 @@ export class TracesPage {
   }
 
   async expectQueryError() {
-    const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('[data-test="traces-search-error-message"]').isVisible({ timeout: 5000 }).catch(() => false) ||
-                    await this.page.locator('[data-test="traces-search-error-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+    const hasError = await this.page.locator(this.queryErrorMessage).isVisible({ timeout: 5000 }).catch(() => false);
     expect(hasError).toBeTruthy();
   }
 
@@ -1555,6 +1597,53 @@ export class TracesPage {
   /**
    * Click share link button
    */
+  /**
+   * Click Share and return the short URL from the clipboard.
+   *
+   * Deliberately self-contained rather than reusing logsPage's version: that one
+   * is depended on by 10 green share-link tests and is not worth destabilising.
+   * The button is the same shared ShareButton component (it even carries the
+   * logs data-test), so the toast wait and origin re-pointing below mirror it.
+   *
+   * Requires a deployment with `web_url` set — ShareButton is disabled outright
+   * without it (components/common/ShareButton.vue).
+   */
+  async clickShareLinkAndGetUrl() {
+    const shareBtn = this.page.locator(this.shareLinkButton);
+    await expect(shareBtn, 'Share button must be enabled — needs web_url configured').toBeEnabled({ timeout: 10000 });
+    await shareBtn.click();
+
+    // Wait for the copy-success toast specifically: a preceding refresh can
+    // leave an unrelated info toast on screen and trip strict mode.
+    await this.page
+      .locator('[data-test-variant="success"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+
+    let sharedUrl = await this.page.evaluate(() => navigator.clipboard.readText());
+
+    // Re-point the short URL at the host the tests authenticated against: a
+    // deployed app builds share links from its PUBLIC base URL, and navigating
+    // cross-origin drops the auth cookies. The /short/<id> id resolves the same
+    // on any ingress, so swapping only the origin keeps the session valid.
+    const baseUrl = process.env.ZO_BASE_URL;
+    if (baseUrl && sharedUrl && !sharedUrl.includes('localhost')) {
+      try {
+        const shared = new URL(sharedUrl);
+        const base = new URL(baseUrl);
+        if (shared.origin !== base.origin) {
+          shared.protocol = base.protocol;
+          shared.host = base.host;
+          sharedUrl = shared.toString();
+        }
+      } catch {
+        // leave the URL as-is; the navigation below will surface any problem
+      }
+    }
+    testLogger.info('Traces share URL captured', { url: sharedUrl });
+    return sharedUrl;
+  }
+
   async clickShareLinkButton() {
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);
@@ -1682,6 +1771,26 @@ export class TracesPage {
     return true;
   }
 
+  // The detail opens on the flame graph and the last tab persists per-browser (#13347), so select explicitly.
+  /** Open the first search result's trace details on the waterfall tab. */
+  async openFirstTraceWaterfall() {
+    const firstResult = this.getTraceResultItems().first();
+    await firstResult.waitFor({ state: 'visible', timeout: 30000 });
+    await firstResult.click();
+    await this.openTraceDetailsTab('waterfall');
+    await this.page.locator(this.traceDetailsTree).waitFor({ state: 'visible', timeout: 20000 });
+  }
+
+  /**
+   * How many spans in the open trace tree carry the given span-kind badge.
+   * @param {string} kind - e.g. 'server', 'client'
+   */
+  async countSpanKindBadges(kind) {
+    return await this.page
+      .locator(`[data-test="trace-tree-span-kind-badge-${kind}"]`)
+      .count();
+  }
+
   /**
    * Check if trace details tree is visible
    * @returns {Promise<boolean>}
@@ -1742,22 +1851,13 @@ export class TracesPage {
   }
 
   /**
-   * Get error message element text (if visible). Source: traces Index.vue
-   * exposes both `traces-search-error-message` and the legacy
-   * `logs-search-error-message` data-tests.
+   * Get the traces error state text (if visible).
    * @returns {Promise<string>}
    */
   async getVisibleErrorMessage() {
-    const candidates = [
-      this.errorMessage,
-      '[data-test="traces-search-error-message"]',
-      '[data-test="traces-search-error-text"]',
-    ];
-    for (const sel of candidates) {
-      const el = this.page.locator(sel).first();
-      if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
-        return (await el.textContent().catch(() => '')) || '';
-      }
+    const el = this.page.locator(this.errorMessage).first();
+    if (await el.isVisible({ timeout: 1000 }).catch(() => false)) {
+      return (await el.textContent().catch(() => '')) || '';
     }
     return '';
   }
@@ -1888,99 +1988,54 @@ export class TracesPage {
   // ===== ANALYZE DIMENSIONS POM METHODS =====
   // Selectors verified against actual Vue source code
 
-  // --- Insights Button (TracesMetricsDashboard.vue) ---
+  // --- Drill down button (Traces SearchBar.vue) ---
 
   /**
-   * Check if Insights button is visible.
-   * The Insights button is ALWAYS visible when metrics dashboard shows
-   * (does NOT require brush selection).
+   * Check if the Drill down button is visible.
+   * It shows in Spans/Traces mode once a search is applied without error.
    * @returns {Promise<boolean>}
    */
   async isInsightsButtonVisible() {
     return await this.page.locator(this.insightsButton).isVisible({ timeout: 5000 }).catch(() => false);
   }
 
-  /**
-   * Click Insights button to open the Analysis Dashboard
-   */
-  async clickInsightsButton() {
+  async openComparison() {
     await this.page.locator(this.insightsButton).click();
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    return await this.waitForComparisonState();
+  }
+
+  // Returns the data-test of the terminal state reached, loaded or empty, so callers branch instead of timing out.
+  async waitForComparisonState() {
+    const states = [
+      this.comparisonPage,
+      this.comparisonNoSelection,
+      this.comparisonError,
+      this.comparisonEmptySelection,
+      this.comparisonEmptyBaseline,
+    ];
+    await this.page.locator(states.join(', ')).first().waitFor({ state: 'visible', timeout: 120000 });
+    for (const state of states) {
+      if (await this.page.locator(state).isVisible().catch(() => false)) return state;
+    }
+    return '';
+  }
+
+  /** @returns {Promise<{ name: string, score: number }[]>} the comparison cards in render order */
+  async getComparisonCards() {
+    return await this.page.locator(this.comparisonFieldCards).evaluateAll((cards) =>
+      cards.map((c) => ({
+        name: (c.getAttribute('data-test') || '').replace('traces-comparison-field-', ''),
+        score: Number(c.getAttribute('data-score')),
+      })),
+    );
+  }
+
+  /** Click "Filter to this value" on the first value of a comparison card. */
+  async includeFirstComparisonValue(field) {
+    await this.page.locator(`[data-test="traces-comparison-include-${field}-0"]`).click();
   }
 
   // --- Analysis Dashboard (TracesAnalysisDashboard.vue) ---
-
-  /**
-   * Check if Analysis Dashboard is visible
-   * @returns {Promise<boolean>}
-   */
-  async isAnalysisDashboardVisible() {
-    return await this.page.locator(this.analysisDashboardCard).isVisible({ timeout: 10000 }).catch(() => false);
-  }
-
-  /**
-   * Close Analysis Dashboard via close button
-   */
-  async closeAnalysisDashboard() {
-    const closeBtn = this.page.locator(this.analysisDashboardClose);
-    if (await closeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await closeBtn.click();
-      await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    }
-  }
-
-  /**
-   * Wait for Analysis Dashboard to fully load (spinner gone + content visible)
-   */
-  async waitForAnalysisDashboardLoad() {
-    const spinner = this.page.locator(this.analysisDashboardLoading);
-    try {
-      if (await spinner.isVisible({ timeout: 2000 })) {
-        await spinner.waitFor({ state: 'hidden', timeout: 30000 });
-      }
-    } catch {
-      // Spinner might not appear or already hidden
-    }
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-  }
-
-  /**
-   * Check if the analysis dashboard is in loading state
-   * @returns {Promise<boolean>}
-   */
-  async isAnalysisDashboardLoading() {
-    return await this.page.locator(this.analysisDashboardLoading).isVisible({ timeout: 2000 }).catch(() => false);
-  }
-
-  /**
-   * Check if the analysis dashboard shows an error state
-   * @returns {Promise<boolean>}
-   */
-  async isAnalysisDashboardError() {
-    return await this.page.locator(this.analysisDashboardError).isVisible({ timeout: 2000 }).catch(() => false);
-  }
-
-  /**
-   * Click the Retry button when analysis dashboard shows an error
-   */
-  async clickAnalysisDashboardRetry() {
-    const retryBtn = this.page.locator(this.analysisDashboardRetryBtn);
-    if (await retryBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await retryBtn.click();
-      await this.page.waitForTimeout(2000);
-    }
-  }
-
-  /**
-   * Check if analysis dashboard has chart panels rendered (actual content loaded)
-   * @returns {Promise<boolean>}
-   */
-  async hasAnalysisDashboardCharts() {
-    const chartPanel = this.page.locator(
-      `${this.analysisDashboardDrawer} canvas, ${this.analysisDashboardDrawer} [data-test*="chart"]`
-    );
-    return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
-  }
 
   // --- Error Only Toggle (SearchResult.vue — error-count badge) ---
 
@@ -2025,6 +2080,23 @@ export class TracesPage {
     await this.page.waitForTimeout(1000);
   }
 
+  /**
+   * Whether the error-only filter is currently active. The badge (SearchResult.vue)
+   * swaps its fill class when showErrorOnly is true, so this reads that class as the
+   * state guard for the toggle.
+   * @returns {Promise<boolean>}
+   */
+  async isErrorOnlyFilterActive() {
+    const badge = this.page.locator(this.errorOnlyToggle);
+    const shown = await badge
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!shown) return false;
+    const cls = (await badge.getAttribute('class').catch(() => '')) || '';
+    return cls.includes('bg-badge-error-solid-bg');
+  }
+
   // --- Metrics Dashboard ---
 
   /**
@@ -2035,264 +2107,367 @@ export class TracesPage {
     return await this.page.locator(this.tracesMetricsDashboard).isVisible({ timeout: 10000 }).catch(() => false);
   }
 
+  // --- RED Metrics Charts (TracesMetricsDashboard.vue + PanelContainer.vue) ---
+
   /**
-   * Perform brush selection on metrics chart (simulated via click and drag)
-   * @returns {Promise<boolean>} true if brush selection triggered a UI change
+   * Locator for a RED metrics panel by its title.
+   * @param {string} title - Panel title: 'Rate', 'Errors' or 'Duration'
    */
-  async performBrushSelectionOnChart() {
-    const chartSelectors = [
-      this.page.locator(this.tracesMetricsDashboard).locator('canvas').first(),
-      this.page.locator('[data-test="chart-renderer"] canvas').first(),
-    ];
-
-    let chart = null;
-    for (const selector of chartSelectors) {
-      if (await selector.isVisible({ timeout: 3000 }).catch(() => false)) {
-        chart = selector;
-        break;
-      }
+  metricsPanelLocator(title) {
+    if (title === 'Duration') {
+      return this.page.locator(`${this.tracesMetricsDashboard} ${this.latencyHeatmap}`);
     }
+    return this.page.locator(
+      `${this.tracesMetricsDashboard} [data-test-panel-title="${title}"]`
+    );
+  }
 
-    if (!chart) return false;
+  /**
+   * Wait for every RED metrics panel to finish rendering its ECharts canvas.
+   * @returns {Promise<string[]>} Titles of the panels that rendered a canvas
+   */
+  async waitForMetricsPanels(timeout = 30000) {
+    await this.page
+      .locator(this.tracesMetricsDashboard)
+      .waitFor({ state: 'visible', timeout })
+      .catch(() => {});
 
-    const box = await chart.boundingBox();
+    const rendered = [];
+    for (const title of TRACES_METRICS_PANELS) {
+      const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+      const ok = await canvas.waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+      if (ok) rendered.push(title);
+    }
+    return rendered;
+  }
+
+  /**
+   * Assert the no-stream prompt is absent, i.e. a stream was auto-selected.
+   * @param {string} message - Assertion message
+   */
+  async expectNoStreamCardHidden(message) {
+    await expect(this.page.locator(this.tracesNoStreamCard), message)
+      .toBeHidden({ timeout: 15000 });
+  }
+
+  /**
+   * Bounding box of a metrics panel's ECharts canvas.
+   * @param {string} title - Panel title
+   */
+  async getMetricsPanelCanvasBox(title) {
+    const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+    if (!(await canvas.isVisible({ timeout: 10000 }).catch(() => false))) return null;
+    return await canvas.boundingBox();
+  }
+
+  /**
+   * Drag-select a band on a panel's chart, which ECharts treats as a zoom because
+   * ChartRenderer arms `dataZoomSelect` on every render.
+   * @param {string} title - Panel title
+   * @param {{ startRatio?: number, endRatio?: number, yStartRatio?: number, yEndRatio?: number }} [range]
+   * @returns {Promise<boolean>} true when the drag was performed
+   */
+  async zoomOnMetricsPanel(title, range = {}) {
+    const {
+      startRatio = CHART_ZOOM_START_RATIO,
+      endRatio = CHART_ZOOM_END_RATIO,
+      yStartRatio = 0.5,
+      yEndRatio = 0.5,
+    } = range;
+    const box = await this.getMetricsPanelCanvasBox(title);
     if (!box) return false;
 
-    await this.page.waitForTimeout(2000);
+    // Coordinates only after this point — ECharts re-renders detach the canvas element.
+    const startX = box.x + box.width * startRatio;
+    const endX = box.x + box.width * endRatio;
+    const startY = box.y + box.height * yStartRatio;
+    const endY = box.y + box.height * yEndRatio;
 
-    // Use coordinate-based mouse operations only — no element references after
-    // bounding box capture, since ECharts may re-render and detach the element
-    const startX = box.x + box.width * 0.25;
-    const endX = box.x + box.width * 0.75;
-    const y = box.y + box.height / 2;
-
-    await this.page.mouse.move(startX, y);
-    await this.page.waitForTimeout(100);
+    await this.page.mouse.move(startX, startY);
     await this.page.mouse.down();
-    await this.page.waitForTimeout(100);
-
-    const steps = 20;
-    for (let i = 1; i <= steps; i++) {
-      const currentX = startX + (endX - startX) * (i / steps);
-      await this.page.mouse.move(currentX, y);
+    for (let i = 1; i <= CHART_DRAG_STEPS; i++) {
+      const p = i / CHART_DRAG_STEPS;
+      await this.page.mouse.move(startX + (endX - startX) * p, startY + (endY - startY) * p);
       await this.page.waitForTimeout(20);
     }
-
-    await this.page.waitForTimeout(100);
     await this.page.mouse.up();
     await this.page.waitForTimeout(1500);
-
-    // Verify the page is still functional after brush interaction
-    const insightsVisible = await this.isInsightsButtonVisible();
-    return insightsVisible;
-  }
-
-  // --- Dimension Selector Sidebar (TracesAnalysisDashboard.vue) ---
-
-  /**
-   * Check if dimension selector sidebar is visible in Analysis Dashboard
-   * @returns {Promise<boolean>}
-   */
-  async isDimensionSidebarVisible() {
-    return await this.page.locator(this.dimensionSelectorSidebar).isVisible().catch(() => false);
+    return true;
   }
 
   /**
-   * Toggle dimension selector sidebar via collapse button
+   * Drag across both axes of the Duration panel so the selection carries a real
+   * duration band; a flat horizontal drag collapses it to a single value.
+   * @returns {Promise<boolean>} true when the drag was performed
    */
-  async toggleDimensionSidebar() {
-    const sidebar = this.page.locator(this.dimensionSelectorSidebar);
-    const sidebarVisible = await sidebar.isVisible().catch(() => false);
-    if (sidebarVisible) {
-      // Sidebar is open — click the collapse btn inside it
-      const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
-      await btn.click();
-      await sidebar.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    } else {
-      // Sidebar is collapsed — click the collapsed bar to expand
-      const collapsedBar = this.page.locator('[data-test="dimension-selector-collapsed-bar"]');
-      await collapsedBar.click();
-      await sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+  async zoomDurationBand() {
+    return await this.zoomOnMetricsPanel('Duration', {
+      startRatio: 0.25,
+      endRatio: 0.8,
+      yStartRatio: 0.15,
+      yEndRatio: 0.85,
+    });
+  }
+
+  /**
+   * Click a chart without dragging, which must not register as a zoom selection.
+   * @param {string} title - Panel title
+   * @returns {Promise<boolean>} true when the click landed
+   */
+  async clickMetricsPanelWithoutDrag(title) {
+    const box = await this.getMetricsPanelCanvasBox(title);
+    if (!box) return false;
+    await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1500);
+    return true;
+  }
+
+  /**
+   * Composite every ECharts layer of a panel into one offscreen canvas and keep the
+   * pixels under `slot`; canvas pixels exclude the DOM tooltip that floats over the chart.
+   * @param {string} title - Panel title
+   * @param {string} slot - Key to store the snapshot under
+   * @returns {Promise<boolean>} true when a snapshot was taken
+   */
+  async snapshotMetricsPanelPixels(title, slot) {
+    return await this.page.evaluate(
+      ({ title, slot }) => {
+        const panel = document.querySelector(
+          `[data-test="traces-metrics-dashboard"] [data-test-panel-title="${title}"]`
+        );
+        const canvases = panel ? [...panel.querySelectorAll('canvas')] : [];
+        if (!canvases.length) return false;
+        const w = canvases[0].width;
+        const h = canvases[0].height;
+        const off = document.createElement('canvas');
+        off.width = w;
+        off.height = h;
+        const ctx = off.getContext('2d');
+        for (const c of canvases) ctx.drawImage(c, 0, 0, w, h);
+        const win = window;
+        win.__o2ChartSnaps = win.__o2ChartSnaps || {};
+        win.__o2ChartSnaps[slot] = ctx.getImageData(0, 0, w, h);
+        return true;
+      },
+      { title, slot }
+    );
+  }
+
+  /**
+   * Compare the two stored snapshots inside the zoom selection rectangle, which is
+   * located from the flat fill the drag paints rather than from drag coordinates.
+   * @returns {Promise<{ rect: object, beforeInk: number, duringInk: number, inkRatio: number } | null>}
+   */
+  async measureChartInkUnderSelection() {
+    return await this.page.evaluate(() => {
+      const snaps = window.__o2ChartSnaps || {};
+      const before = snaps.before;
+      const during = snaps.during;
+      if (!before || !during) return null;
+
+      const { width: w, height: h } = during;
+      const key = (d, i) => `${d[i]},${d[i + 1]},${d[i + 2]},${d[i + 3]}`;
+      const tally = (img) => {
+        const counts = new Map();
+        for (let i = 0; i < img.data.length; i += 4) {
+          const k = key(img.data, i);
+          counts.set(k, (counts.get(k) || 0) + 1);
+        }
+        return counts;
+      };
+
+      const beforeCounts = tally(before);
+      const duringCounts = tally(during);
+      let beforeBg = '';
+      let beforeBgN = 0;
+      for (const [k, n] of beforeCounts) if (n > beforeBgN) [beforeBg, beforeBgN] = [k, n];
+
+      // The fill is whatever the drag added: most common colour that barely existed before.
+      let fill = '';
+      let fillN = 0;
+      for (const [k, n] of duringCounts) {
+        if (n > fillN && n > (beforeCounts.get(k) || 0) * 2) [fill, fillN] = [k, n];
+      }
+      if (!fill || fillN < 200) return null;
+
+      let x0 = w;
+      let x1 = -1;
+      let y0 = h;
+      let y1 = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (key(during.data, (y * w + x) * 4) !== fill) continue;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+      // Inset past the selection border, which is drawn in its own colour.
+      x0 += 3;
+      x1 -= 3;
+      y0 += 3;
+      y1 -= 3;
+      if (x1 - x0 < 10 || y1 - y0 < 10) return null;
+
+      let beforeInk = 0;
+      let duringInk = 0;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const i = (y * w + x) * 4;
+          if (key(before.data, i) !== beforeBg) beforeInk++;
+          const d = key(during.data, i);
+          if (d !== fill && d !== beforeBg) duringInk++;
+        }
+      }
+      return {
+        rect: { x0, y0, x1, y1 },
+        beforeInk,
+        duringInk,
+        inkRatio: beforeInk ? duringInk / beforeInk : 1,
+      };
+    });
+  }
+
+  /**
+   * Hold a zoom drag open on a panel, snapshotting its canvas before and during, then release.
+   * @param {string} title - Panel title
+   * @returns {Promise<boolean>} true when both snapshots were taken
+   */
+  async zoomWithCanvasSnapshots(title) {
+    const box = await this.getMetricsPanelCanvasBox(title);
+    if (!box) return false;
+
+    const startX = box.x + box.width * CHART_ZOOM_START_RATIO;
+    const endX = box.x + box.width * CHART_ZOOM_END_RATIO;
+    const y = box.y + box.height / 2;
+
+    // Hover first so the axis pointer is already painted into the baseline snapshot.
+    await this.page.mouse.move(startX, y);
+    await this.page.waitForTimeout(600);
+    const before = await this.snapshotMetricsPanelPixels(title, 'before');
+
+    await this.page.mouse.down();
+    for (let i = 1; i <= CHART_DRAG_STEPS; i++) {
+      await this.page.mouse.move(startX + (endX - startX) * (i / CHART_DRAG_STEPS), y);
+      await this.page.waitForTimeout(20);
     }
+    await this.page.waitForTimeout(400);
+    const during = await this.snapshotMetricsPanelPixels(title, 'during');
+
+    await this.page.mouse.up();
+    await this.page.waitForTimeout(1000);
+    return before && during;
   }
 
   /**
-   * Check if dimension search input is visible in sidebar
-   * @returns {Promise<boolean>}
+   * Clear the traces query editor with real keystrokes, retrying until Monaco is empty.
+   * @returns {Promise<boolean>} true once the editor holds no text
    */
-  async isDimensionSearchInputVisible() {
-    return await this.page.locator(this.dimensionSearchInput).isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Search for a dimension in the sidebar
-   * @param {string} searchText - text to type in dimension search
-   */
-  async searchDimension(searchText) {
-    // OInput: fill the -field native <input>, not the wrapper <div>
-    const input = this.page.locator(this.dimensionSearchInputField);
-    await input.click();
-    await input.fill(searchText);
-    // Deterministic wait: matching checkbox must be visible AND the visible checkbox
-    // count must converge (debounced filter has settled).
-    await this.page.locator(`[data-test="dimension-checkbox-${searchText}"]`).waitFor({ state: 'visible', timeout: 5000 });
-    let lastCount = -1;
-    await expect.poll(async () => {
-      const current = await this.page.locator('[data-test^="dimension-checkbox-"]').count();
-      const stable = current === lastCount;
-      lastCount = current;
-      return stable;
-    }, { intervals: [100, 150, 200, 250], timeout: 5000 }).toBe(true);
-  }
-
-  /**
-   * Get the count of dimension checkboxes visible in sidebar
-   * @returns {Promise<number>}
-   */
-  async getDimensionCheckboxCount() {
-    return await this.page.locator('[data-test^="dimension-checkbox-"]').count();
-  }
-
-  /**
-   * Toggle a specific dimension checkbox by its value
-   * @param {string} dimensionValue - the dimension value (used in data-test="dimension-checkbox-{value}")
-   * @returns {Promise<boolean>} true if toggled
-   */
-  async toggleDimensionCheckbox(dimensionValue) {
-    const checkbox = this.page.locator(`[data-test="dimension-checkbox-${dimensionValue}"]`);
-    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await checkbox.click();
-      await this.page.waitForTimeout(500);
-      return true;
+  async clearTraceQueryByKeyboard() {
+    const input = this.page
+      .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
+      .first();
+    for (let attempt = 0; attempt < QUERY_CLEAR_ATTEMPTS; attempt++) {
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
+      await input.click({ force: true });
+      await this.page.waitForTimeout(250);
+      await this.page.keyboard.press('ControlOrMeta+A');
+      await this.page.waitForTimeout(200);
+      await this.page.keyboard.press('Delete');
+      await this.page.waitForTimeout(400);
+      if ((await this.getQueryEditorContent()).trim() === '') return true;
     }
     return false;
   }
 
   /**
-   * Get the first dimension checkbox value that is visible
-   * @returns {Promise<string|null>}
+   * Type a query with real keystrokes. Monaco's setValue() never reaches the app's
+   * search state, so a programmatically set query is dropped from the request.
+   * @param {string} query - Query text to type
+   * @returns {Promise<boolean>} true when the editor holds exactly this query
    */
-  async getFirstDimensionValue() {
-    const firstCheckbox = this.page.locator('[data-test^="dimension-checkbox-"]').first();
-    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const testAttr = await firstCheckbox.getAttribute('data-test');
-      return testAttr ? testAttr.replace('dimension-checkbox-', '') : null;
+  async typeTraceQuery(query) {
+    if (!(await this.clearTraceQueryByKeyboard())) return false;
+    if (query) {
+      const input = this.page
+        .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
+        .first();
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
+      await input.click({ force: true });
+      await this.page.keyboard.type(query, { delay: 25 });
+      await this.page.waitForTimeout(600);
     }
-    return null;
+    return (await this.getQueryEditorContent()).trim() === query.trim();
   }
+
+  /**
+   * Whether the traces search error banner is on screen.
+   * @returns {Promise<boolean>}
+   */
+  async isSearchErrorVisible(timeout = 10000) {
+    return await this.page
+      .locator(this.errorMessage)
+      .isVisible({ timeout })
+      .catch(() => false);
+  }
+
+  /**
+   * Error text surfaced by any RED metrics panel, or '' when every panel is clean.
+   * @returns {Promise<string>}
+   */
+  async getMetricsPanelErrorText() {
+    const errors = this.page.locator(
+      `${this.tracesMetricsDashboard} [data-test="panel-schema-renderer-error-message"]`
+    );
+    if (!(await errors.first().isVisible({ timeout: 2000 }).catch(() => false))) return '';
+    return (await errors.first().textContent().catch(() => '')) || '';
+  }
+
+  /**
+   * Whether any RED metrics panel reports no data for the current query.
+   * @returns {Promise<boolean>}
+   */
+  async hasMetricsPanelNoData() {
+    return await this.page
+      .locator(`${this.tracesMetricsDashboard} [data-test="no-data"]`)
+      .first()
+      .isVisible({ timeout: 10000 })
+      .catch(() => false);
+  }
+
+  // --- Auto Run (live mode) ---
+
+  /** Switch Auto Run on or off; resolves false when auto_query_enabled is off, so live mode cannot be turned on. */
+  async setLiveMode(on) {
+    const enabled = await this.page.evaluate(async () => {
+      try {
+        const org = new URLSearchParams(location.search).get('org_identifier') || 'default';
+        const res = await fetch(`/api/${org}/config`, { credentials: 'include' });
+        return res.ok && (await res.json())?.auto_query_enabled === true;
+      } catch {
+        return false;
+      }
+    });
+    if (!enabled) return !on;
+    await this.page.locator(this.refreshButton).locator('xpath=following::button[1]').click();
+    const item = this.page.locator(this.liveModeToggleItem);
+    await expect(item).toBeVisible({ timeout: 5000 });
+    const wanted = on ? 'Turn on' : 'Turn off';
+    if (((await item.textContent()) || '').includes(wanted)) await item.click();
+    else await this.page.keyboard.press('Escape');
+    await item.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    return true;
+  }
+
+  // --- Dimension Selector Sidebar (TracesAnalysisDashboard.vue) ---
 
   // --- Tab Navigation (TracesAnalysisDashboard.vue) ---
   // Tab labels from i18n: "Rate" (volume), "Latency" (latency), "Errors" (error)
 
-  /**
-   * Check if Rate tab is visible
-   * @returns {Promise<boolean>}
-   */
-  async isRateTabVisible() {
-    return await this.page.locator(this.rateTab).first().isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Check if Latency tab is visible
-   * @returns {Promise<boolean>}
-   */
-  async isLatencyTabVisible() {
-    return await this.page.locator(this.latencyTab).first().isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Check if Errors tab is visible
-   * @returns {Promise<boolean>}
-   */
-  async isErrorsTabVisible() {
-    return await this.page.locator(this.errorsTab).first().isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Click Rate tab
-   */
-  async clickRateTab() {
-    await this.page.locator(this.rateTab).first().click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Click Latency tab
-   */
-  async clickLatencyTab() {
-    await this.page.locator(this.latencyTab).first().click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Click Errors tab
-   */
-  async clickErrorsTab() {
-    await this.page.locator(this.errorsTab).first().click();
-    await this.page.waitForTimeout(1000);
-  }
-
-  /**
-   * Check if a specific tab is active in Analysis Dashboard
-   * @param {string} tabLabel - 'Rate', 'Latency'/'Duration', or 'Errors'
-   * @returns {Promise<boolean>}
-   */
-  async isTabActive(tabLabel) {
-    // Each OTab carries data-test="traces-analysis-dashboard-${name}-tab"; map
-    // the labels used by callers (Rate/Latency/Errors) to internal names
-    // (volume/duration/error) and rely on data-state for active.
-    // OTab wraps the Reka TabsTrigger in a <span> for disabled-tooltip support,
-    // so the consumer's data-test lands on the wrapper while data-state="active"
-    // is on the inner button. Poll the DOM for active state on either the
-    // wrapper itself OR a descendant (mirrors the metricsBuilderPage pattern
-    // for OToggleGroupItem).
-    const labelToName = { rate: 'volume', latency: 'duration', duration: 'duration', errors: 'error', error: 'error' };
-    const name = labelToName[tabLabel.toLowerCase()] || tabLabel.toLowerCase();
-    const testId = `traces-analysis-dashboard-${name}-tab`;
-    const drawerSel = this.analysisDashboardDrawer;
-    const isActive = await this.page.waitForFunction(
-      ({ drawerSel, testId }) => {
-        const drawer = document.querySelector(drawerSel);
-        if (!drawer) return null;
-        const el = drawer.querySelector(`[data-test="${testId}"]`);
-        if (!el) return null;
-        if (el.getAttribute('data-state') === 'active') return true;
-        const inner = el.querySelector('[data-state="active"]');
-        return inner ? true : null;
-      },
-      { drawerSel, testId },
-      { timeout: 3000 }
-    ).then(h => h.jsonValue()).catch(() => null);
-    return Boolean(isActive);
-  }
-
-  /**
-   * Get the count of visible tabs in Analysis Dashboard
-   * @returns {Promise<number>}
-   */
-  async getVisibleTabCount() {
-    return await this.page
-      .locator(`${this.analysisDashboardDrawer} [data-test^="traces-analysis-dashboard-"][data-test$="-tab"]`)
-      .count();
-  }
-
   // --- Percentile Refresh (Latency tab only) ---
-
-  /**
-   * Check if percentile refresh button is visible (only on latency tab after percentile change)
-   * @returns {Promise<boolean>}
-   */
-  async isPercentileRefreshVisible() {
-    return await this.page.locator(this.percentileRefreshButton).isVisible({ timeout: 3000 }).catch(() => false);
-  }
-
-  /**
-   * Click percentile refresh button
-   */
-  async clickPercentileRefresh() {
-    await this.page.locator(this.percentileRefreshButton).click();
-    await this.page.waitForTimeout(2000);
-  }
 
   // --- Composite Helper Methods ---
 
@@ -2327,32 +2502,6 @@ export class TracesPage {
       visible = await this.isTracesMetricsDashboardVisible();
     }
     return visible;
-  }
-
-  /**
-   * Open insights dashboard from traces metrics.
-   * Sets up search, ensures metrics visible, clicks insights button, waits for load.
-   * @returns {Promise<boolean>} true if dashboard opened successfully
-   */
-  async openInsightsDashboard() {
-    await this.setupTraceSearch();
-    await this.waitForTraceSearchResults();
-    const metricsVisible = await this.ensureMetricsDashboardVisible();
-    if (!metricsVisible) return false;
-
-    const insightsVisible = await this.isInsightsButtonVisible();
-    if (!insightsVisible) return false;
-
-    await this.clickInsightsButton();
-    await this.waitForAnalysisDashboardLoad();
-    return await this.isAnalysisDashboardVisible();
-  }
-
-  /**
-   * Wait for dashboard close to complete
-   */
-  async waitForDashboardClose() {
-    await this.page.locator(this.analysisDashboardCard).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
 
   // ============================================
@@ -2825,6 +2974,140 @@ export class TracesPage {
     await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
   }
 
+  async getResultCountBadgeText() {
+    return ((await this.page.locator(this.tracesCountBadge).first().textContent().catch(() => '')) || '').trim();
+  }
+
+  // The first run can fire before the editor commits a typed filter, and fresh spans lag ingestion.
+  async searchUntilResultCount(expected, timeout = 90000) {
+    await expect(async () => {
+      await this.runTraceSearch();
+      expect(await this.getResultCountBadgeText()).toContain(expected);
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
+  // A stream seconds old can answer the UI search with a transient error even after the API poll sees the span.
+  async searchUntilTraceResultVisible(timeout = 60000) {
+    const firstRow = this.page.locator(this.searchResultItem).first();
+    await expect(async () => {
+      await this.runTraceSearch();
+      if (await this.page.locator(this.errorMessage).isVisible()) {
+        const detail = await this.page.locator(this.errorMessage).textContent({ timeout: 2000 }).catch(() => '');
+        testLogger.warn('Trace search returned an error; re-running', { detail: (detail || '').trim() });
+      }
+      await expect(firstRow).toBeVisible({ timeout: 5000 });
+    }).toPass({ timeout, intervals: [2000, 3000, 5000] });
+  }
+
+  async getResultOperationNames() {
+    return await this.page.locator(`${this.searchResultList} [data-test="trace-row-operation-name"]`).allInnerTexts();
+  }
+
+  async getResultSpanStatuses() {
+    return await this.page.locator(`${this.searchResultList} [data-test="span-row-status-pill"]`).allInnerTexts();
+  }
+
+  async getResultPageCount() {
+    return await this.page.locator('[data-test^="traces-search-result-pagination-page-"]').count();
+  }
+
+  async goToResultPage(pageNumber) {
+    await this.page.locator(`[data-test="traces-search-result-pagination-page-${pageNumber}"]`).click();
+  }
+
+  async clickResultPaginationNext() {
+    await this.page.locator('[data-test="traces-search-result-pagination-next"]').click();
+  }
+
+  async clickResultPaginationPrev() {
+    await this.page.locator('[data-test="traces-search-result-pagination-prev"]').click();
+  }
+
+  async setResultRecordsPerPage(size) {
+    await this.page.locator('[data-test="traces-search-result-records-per-page-trigger"]').click();
+    await this.page.getByRole('option', { name: String(size), exact: true }).click();
+  }
+
+  // ----- Search windows, saved views and the shared error state (#15130) -----
+
+  // Records every traces search the page sends; `panel` is the RED chart name or 'results'.
+  captureSearchRequests() {
+    const requests = [];
+    const onRequest = (request) => {
+      if (!request.url().includes('/_search')) return;
+      let query = {};
+      try { query = JSON.parse(request.postData() || '{}').query || {}; } catch { /* non-JSON body */ }
+      const panel = (request.url().match(/panel_name=([^&]+)/) || [])[1]
+        || (request.url().includes('search_type=ui') ? 'results' : 'other');
+      // The results search sends its SQL base64-encoded; panels send it as plain text.
+      let sql = String(query.sql || '');
+      if (/^[A-Za-z0-9+/=_.-]+$/.test(sql)) sql = Buffer.from(sql, 'base64').toString();
+      requests.push({ panel, startTime: query.start_time, endTime: query.end_time, from: query.from, sql });
+    };
+    this.page.on('request', onRequest);
+    return { requests, stop: () => this.page.off('request', onRequest) };
+  }
+
+  async applySavedView(viewName) {
+    await this.page.locator('[data-test="traces-search-bar-saved-views-btn"]').click();
+    const view = this.page.locator('[data-test^="traces-saved-view-apply-"]').filter({ hasText: viewName }).first();
+    await view.waitFor({ state: 'visible', timeout: 10000 });
+    await view.click();
+  }
+
+  // enterTraceQuery appends to existing text, so clear first and confirm the editor holds only `query`.
+  async replaceTraceQuery(query) {
+    expect(await this.clearTraceQueryByKeyboard(), 'query editor must clear').toBe(true);
+    await this.enterTraceQuery(query);
+    await expect.poll(async () => (await this.getQueryEditorContent()).trim(), { timeout: 5000 }).toBe(query);
+  }
+
+  async clickResultColumnHeader(columnId) {
+    await this.page.locator(`${this.searchResultList} th[data-test="o2-table-th-${columnId}"]`).first().click();
+  }
+
+  async switchToTracesMode() {
+    await this.page.locator('[data-test="traces-search-mode-traces-btn"]').click();
+    await expect(this.page.locator('[data-test="traces-search-mode-traces-btn"]'))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  async expectGenericQueryError() {
+    const errorState = this.page.locator(this.errorMessage);
+    await expect(errorState).toBeVisible({ timeout: 15000 });
+    await expect(errorState).toContainText('An error occurred while processing your query.');
+  }
+
+  async toggleQueryErrorDetail() {
+    await this.page.locator(`${this.errorMessage} [data-test="error-detail-toggle-btn"]`).click();
+  }
+
+  // The raw DataFusion planner message, which must stay behind "Show details".
+  queryErrorPlannerText() {
+    return this.page.getByText('Error during planning');
+  }
+
+  async expectQueryErrorCleared() {
+    await expect(this.page.locator(this.errorMessage)).toBeHidden({ timeout: 15000 });
+  }
+
+  queryErrorDetailBody() {
+    return this.page.locator(`${this.errorMessage} [data-test="error-detail-body"]`);
+  }
+
+  servicesCatalogServiceLink(serviceName) {
+    return this.page.locator(`[data-test="services-catalog-service-link-${serviceName}"]`);
+  }
+
+  async expectServicesCatalogServiceVisible(serviceName) {
+    await expect(this.servicesCatalogServiceLink(serviceName)).toBeVisible({ timeout: 30000 });
+  }
+
+  async clickServicesCatalogService(serviceName) {
+    await this.servicesCatalogServiceLink(serviceName).click();
+  }
+
+  async expectServiceSidePanelVisible() {
+    await expect(this.page.locator('[data-test="service-graph-side-panel"]')).toBeVisible({ timeout: 15000 });
+  }
 }
-
-

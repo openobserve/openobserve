@@ -80,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Search stretches so the queue filter and the column toggle OTable
              injects after this slot both sit at the right edge. -->
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
             <OSearchInput
               v-model="search"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-24"
               :placeholder="t('aiObservability.discovery.searchPlaceholder')"
               data-test="ai-discovery-search-input"
               clearable
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value-key="value"
               :searchable="false"
               width="sm"
-              class="shrink-0"
+              class="shrink-0 max-md:w-36"
               data-test="ai-discovery-in-queue-filter"
               @update:model-value="onQueueStatusChange"
             />
@@ -127,6 +127,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
             <span v-if="row.traceId" class="text-text-secondary text-2xs truncate">
               {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
+            </span>
+          </div>
+        </template>
+
+        <template #cell-trace="{ row }">
+          <div class="flex min-w-0 flex-col">
+            <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
+            <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
+            <span
+              v-if="row.traceId || row.targetId"
+              class="text-text-secondary text-2xs truncate font-mono"
+            >
+              {{ raw(row.traceId || row.targetId) }}
             </span>
           </div>
         </template>
@@ -195,47 +208,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <!-- Selection + bulk action live in the table footer, the same shape the
-             Alerts list uses. -->
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between gap-2">
-            <span class="text-xs font-normal">
-              <template v-if="selectedIds.length">
-                {{
-                  t("aiObservability.discovery.selectedCount", {
-                    selected: selectedIds.length,
-                    total,
-                  })
-                }}
-              </template>
-              <!-- Search runs over the loaded page, so say so rather than let a
-                   filtered count read like a whole-result-set count. -->
-              <template v-else-if="search">
-                {{
-                  t("aiObservability.discovery.searchFooter", {
-                    matched: visibleItems.length,
-                    loaded: items.length,
-                  })
-                }}
-              </template>
-              <template v-else>
-                {{ t("aiObservability.discovery.footerTitle", { scope: scopeNoun }) }}
-              </template>
-            </span>
-            <AddToQueueMenu
-              v-if="selectedIds.length"
-              :scope="scope"
-              :queues="queues"
-              :loading="queuesLoading"
-              :busy="addingId === BULK"
-              side="top"
-              variant="primary"
-              :label="t('aiObservability.discovery.bulkAdd', { count: selectedIds.length })"
-              data-test="ai-discovery-bulk-add"
-              @open="loadQueues"
-              @select="(queue) => addToQueue(queue, selectedRows)"
-            />
-          </div>
+        <template #selection-actions>
+          <AddToQueueMenu
+            :scope="scope"
+            :queues="queues"
+            :loading="queuesLoading"
+            :busy="addingId === BULK"
+            side="top"
+            variant="primary"
+            size="sm"
+            :label="t('aiObservability.discovery.addToQueue')"
+            data-test="ai-discovery-bulk-add"
+            @open="loadQueues"
+            @select="(queue) => addToQueue(queue, selectedRows)"
+          />
+        </template>
+
+        <!-- Search runs over the loaded page only, which the pager's whole-result total cannot say. -->
+        <template v-if="search" #footer-note>
+          <span>
+            {{
+              t("aiObservability.discovery.searchFooter", {
+                matched: visibleItems.length,
+                loaded: items.length,
+              })
+            }}
+          </span>
         </template>
       </OTable>
     </div>
@@ -333,8 +331,6 @@ const scopeTabs = computed(() => [
   { id: "session" as DiscoveryScope, label: t("aiObservability.discovery.scope.session") },
 ]);
 
-const scopeNoun = computed(() => t(`aiObservability.discovery.scopeNoun.${scope.value}`));
-
 const queueStatusOptions = computed(() => [
   { label: t("aiObservability.discovery.inQueueFilter.notEnqueued"), value: "not_enqueued" },
   { label: t("aiObservability.discovery.inQueueFilter.enqueued"), value: "enqueued" },
@@ -360,6 +356,8 @@ const visibleItems = computed(() => {
       item.serviceName,
       item.operationName,
       item.genAiOperationName,
+      item.traceId,
+      item.targetId,
       item.sessionId,
       item.userEmail,
       item.quality,
@@ -506,12 +504,12 @@ const columns = computed(() => {
   return [
     timestamp,
     {
-      id: "genAiOperationName",
-      header: t("aiObservability.discovery.columns.type"),
-      accessorKey: "genAiOperationName",
-      hideable: true,
+      // Trace-level identity, not the first span's gen-ai operation: that value reads as a span kind.
+      id: "trace",
+      header: t("aiObservability.discovery.columns.trace"),
+      accessorKey: "operationName",
       sortable: false,
-      size: 180,
+      size: 240,
       meta: { align: "left" },
     },
     {

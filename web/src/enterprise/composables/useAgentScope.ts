@@ -28,7 +28,8 @@ import { raw } from "@/types/i18n";
 import { computed, ref, watch } from "vue";
 import type { ComputedRef, Ref } from "vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
   buildAgentSelectOptions,
@@ -348,7 +349,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     if (!org || !startTime || !endTime) return;
     agentsLoaded.value = false;
     try {
-      const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
+      const res = await queryClient.fetchQuery(genAiAgentsQuery(org, startTime, endTime));
       agents.value = res.agents ?? [];
       if (allAgents) {
         // Sentinel shape: keep All-Agents; only clamp a now-invalid selection.

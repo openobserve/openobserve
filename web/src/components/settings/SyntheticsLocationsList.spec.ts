@@ -37,7 +37,10 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true" },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which pulls other
+// zincutils exports — a wholesale mock leaves them undefined at import time.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((path: string) => path),
 }));
 
@@ -53,13 +56,16 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 
 // ── Mock synthetics service ────────────────────────────────────────────────────
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocations: (...args: any[]) => mockGetLocations(...args),
-    updateLocation: (...args: any[]) => mockUpdateLocation(...args),
-    deleteLocation: (...args: any[]) => mockDeleteLocation(...args),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocations: (...args: any[]) => mockGetLocations(...args),
+      updateLocation: (...args: any[]) => mockUpdateLocation(...args),
+      deleteLocation: (...args: any[]) => mockDeleteLocation(...args),
+    },
+  });
+});
 
 // ── Stubs ──────────────────────────────────────────────────────────────────────
 
@@ -95,7 +101,9 @@ const OTableStub = {
           <slot name="cell-actions" :row="row" />
         </div>
       </div>
-      <div data-test="table-bottom"><slot name="bottom" /></div>
+      <div data-test="table-bottom">
+        <slot v-if="selectedIds && selectedIds.length" name="selection-actions" />
+      </div>
     </div>
   `,
   props: [
@@ -257,8 +265,6 @@ const createMockI18n = () =>
             exportSuccess: "Locations exported successfully",
             exportFailed: "Failed to export locations",
             fetchFailed: "Failed to fetch locations",
-            bottomHeader: "locations",
-            selectedCount: "{selected} of {total} locations selected",
             bulkEnabledSuccess: "{count} locations enabled",
             bulkDisabledSuccess: "{count} locations disabled",
             bulkEnabledPartial: "{success} of {total} locations enabled",
@@ -407,7 +413,6 @@ describe("SyntheticsLocationsList", () => {
       expect(wrapper.vm.locations).toHaveLength(2);
       expect(wrapper.vm.locations[0].label).toBe("AWS US East");
       expect(wrapper.vm.locations[1].label).toBe("GCP Europe");
-      expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("filters out private locations, keeping only public ones", async () => {
@@ -426,7 +431,6 @@ describe("SyntheticsLocationsList", () => {
       expect(ids).toEqual(["pub-1", "pub-2"]);
       expect(ids).not.toContain("priv-1");
       expect(ids).not.toContain("priv-2");
-      expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("shows loading state while fetching, and clears it afterward", async () => {
@@ -483,7 +487,6 @@ describe("SyntheticsLocationsList", () => {
       await flushPromises();
 
       expect(wrapper.vm.locations).toHaveLength(0);
-      expect(wrapper.vm.resultTotal).toBe(0);
     });
   });
 
@@ -551,12 +554,6 @@ describe("SyntheticsLocationsList", () => {
       wrapper.vm.filterQuery = "nonexistent";
       await nextTick();
       expect(wrapper.vm.visibleRows).toHaveLength(0);
-    });
-
-    it("updates resultTotal after filtering", async () => {
-      wrapper.vm.filterQuery = "aws";
-      await nextTick();
-      expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("shows filtered empty state when search yields no results", async () => {
@@ -922,7 +919,6 @@ describe("SyntheticsLocationsList", () => {
 
       expect(wrapper.vm.locations).toHaveLength(1);
       expect(wrapper.vm.locations[0].id).toBe("loc-2");
-      expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("does NOT delete when the user cancels the confirmation", async () => {
@@ -1006,7 +1002,6 @@ describe("SyntheticsLocationsList", () => {
 
       expect(wrapper.vm.locations).toHaveLength(1);
       expect(wrapper.vm.locations[0].id).toBe("loc-3");
-      expect(wrapper.vm.resultTotal).toBe(1);
     });
 
     it("handles partial failures during bulk delete", async () => {
@@ -1229,11 +1224,6 @@ describe("SyntheticsLocationsList", () => {
         false,
       );
     });
-
-    it("shows count text with total when no rows selected", () => {
-      wrapper.vm.selectedLocations = [];
-      expect(wrapper.vm.resultTotal).toBe(2);
-    });
   });
 
   // ── Refresh ──────────────────────────────────────────────────────────────────
@@ -1288,7 +1278,6 @@ describe("SyntheticsLocationsList", () => {
       await flushPromises();
 
       expect(wrapper.vm.locations).toHaveLength(0);
-      expect(wrapper.vm.resultTotal).toBe(0);
     });
   });
 });

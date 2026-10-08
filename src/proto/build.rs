@@ -26,11 +26,7 @@ fn main() -> Result<()> {
 
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
-    // Stage the .proto files shipped by the `datafusion-proto` and
-    // `datafusion-proto-common` crates under a
-    // synthetic include root that mirrors the upstream source-tree layout, so
-    // that `datafusion.proto`'s `import
-    // "datafusion/proto-common/proto/datafusion_common.proto"` resolves.
+    // Mirror the upstream proto layout so DataFusion imports resolve.
     let df_include = out.join("datafusion_proto_include");
     stage_datafusion_proto_files(&df_include);
 
@@ -61,6 +57,7 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryRequest", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
         .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
+        .type_attribute("SearchEventContext", "#[derive(serde::Serialize)]")
         .type_attribute(
             "PhysicalPlanNode.plan",
             "#[allow(clippy::large_enum_variant)]",
@@ -162,9 +159,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Locate the `.proto` files distributed with `datafusion-proto` and
-/// `datafusion-proto-common` and stage them in
-/// `dest` mirroring the upstream source-tree layout.
+/// Stage the DataFusion proto crates under their upstream include paths.
 fn stage_datafusion_proto_files(dest: &Path) {
     let metadata = MetadataCommand::new()
         .exec()
@@ -175,7 +170,7 @@ fn stage_datafusion_proto_files(dest: &Path) {
         "datafusion-proto-common",
         "datafusion_common.proto",
     );
-    let df_proto = find_proto_file(&metadata, "datafusion-proto", "datafusion.proto");
+    let df_proto = find_proto_file(&metadata, "datafusion-proto-models", "datafusion.proto");
 
     stage(
         &common_proto,

@@ -11,11 +11,14 @@ import { gt } from "@/types/i18n";
 const getStartedSchema = makeGetStartedSchema(gt);
 
 // Mock billings service
-vi.mock("@/services/billings", () => ({
-  default: {
-    submit_new_user_info: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      submit_new_user_info: vi.fn(),
+    },
+  });
+});
 
 // Mock toast function
 vi.mock("@/lib/feedback/Toast/useToast", () => {
@@ -318,6 +321,19 @@ describe("GetStarted.vue", () => {
       wrapper = createWrapper();
       const buttons = wrapper.findAll("button");
       expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    it("should link the terms and privacy documents in a new tab", () => {
+      wrapper = createWrapper();
+      const terms = wrapper.find('[data-test="onboarding-get-started-terms-link"]');
+      const privacy = wrapper.find('[data-test="onboarding-get-started-privacy-link"]');
+
+      expect(terms.attributes("href")).toBe("https://openobserve.ai/legal/terms-of-service/");
+      expect(privacy.attributes("href")).toBe("https://openobserve.ai/legal/privacy-policy/");
+      for (const link of [terms, privacy]) {
+        expect(link.attributes("target")).toBe("_blank");
+        expect(link.attributes("rel")).toBe("noopener");
+      }
     });
   });
 

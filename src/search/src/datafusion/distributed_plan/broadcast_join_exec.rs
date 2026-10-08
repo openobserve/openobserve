@@ -24,7 +24,7 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
         execute_stream,
@@ -100,6 +100,13 @@ impl DisplayAs for BroadcastJoinExec {
 }
 
 impl ExecutionPlan for BroadcastJoinExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "BroadcastJoinExec"
     }

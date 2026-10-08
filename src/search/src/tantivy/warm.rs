@@ -434,10 +434,10 @@ mod tests {
         let query =
             tantivy::query::BooleanQuery::intersection(vec![Box::new(left), Box::new(right)]);
         let mut condition = IndexCondition::new();
-        condition.add_condition(Condition::And(
-            Box::new(Condition::Equal("tag".into(), "a".into())),
-            Box::new(Condition::Equal("tag".into(), "b".into())),
-        ));
+        condition.add_condition(Condition::And(vec![
+            Condition::Equal("tag".into(), "a".into()),
+            Condition::Equal("tag".into(), "b".into()),
+        ]));
         let plan = WarmPlan::build(
             &condition,
             &query,

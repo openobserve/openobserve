@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
+    ColumnTrait, Condition, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
     TransactionTrait, prelude::Expr,
 };
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,9 @@ use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
+
+// Keeps each IN list under the sqlite and postgres bind-parameter limits.
+const DELETE_ID_BATCH: usize = 1000;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum FileType {
@@ -80,60 +83,23 @@ impl From<i32> for FileType {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_file_type_to_i32() {
-        assert_eq!(i32::from(FileType::SourceMap), 0);
-    }
-
-    #[test]
-    fn test_i32_to_file_type_zero() {
-        assert!(matches!(FileType::from(0), FileType::SourceMap));
-    }
-
-    #[test]
-    fn test_i32_to_file_type_unknown_defaults_to_source_map() {
-        assert!(matches!(FileType::from(99), FileType::SourceMap));
-        assert!(matches!(FileType::from(-1), FileType::SourceMap));
-    }
-
-    #[test]
-    fn test_from_model_to_source_map() {
-        use super::super::entity::source_maps::Model;
-        let model = Model {
-            id: 42,
-            org: "myorg".to_string(),
-            service: Some("api".to_string()),
-            env: Some("prod".to_string()),
-            version: Some("1.0.0".to_string()),
-            source_file_name: "app.js".to_string(),
-            source_map_file_name: "app.js.map".to_string(),
-            file_store_id: "store-1".to_string(),
-            file_type: 0,
-            created_at: 1_000_000,
-            cluster: "us-east".to_string(),
-        };
-        let sm = SourceMap::from(model);
-        assert_eq!(sm.id, 42);
-        assert_eq!(sm.org, "myorg");
-        assert_eq!(sm.service.as_deref(), Some("api"));
-        assert_eq!(sm.env.as_deref(), Some("prod"));
-        assert_eq!(sm.version.as_deref(), Some("1.0.0"));
-        assert_eq!(sm.source_file_name, "app.js");
-        assert_eq!(sm.source_map_file_name, "app.js.map");
-        assert_eq!(sm.file_store_id, "store-1");
-        assert_eq!(sm.created_at, 1_000_000);
-        assert_eq!(sm.cluster, "us-east");
-        assert!(matches!(sm.file_type, FileType::SourceMap));
-    }
-}
-
 #[derive(FromQueryResult)]
 struct Value {
     value: Option<String>,
+}
+
+pub fn get_file_path(org_id: &str, name: &str) -> String {
+    format!("files/{org_id}/sourcemaps/{name}")
+}
+
+/// Only a sourcemap file stored under the requesting org's own prefix may be read back.
+pub fn is_sourcemap_path_for_org(org_id: &str, path: &str) -> bool {
+    use std::path::{Component, Path};
+    let prefix = format!("files/{org_id}/sourcemaps/");
+    path.starts_with(&prefix)
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
 }
 
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
@@ -179,36 +145,33 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Deletes the exact group and returns the removed rows so callers can release their files.
 pub async fn delete_group(
     org: &str,
     service: Option<String>,
     env: Option<String>,
     version: Option<String>,
-) -> Result<(), errors::Error> {
+) -> Result<Vec<SourceMap>, errors::Error> {
     let client = get_orm_client_rw().await;
 
-    let mut stmt = Entity::delete_many().filter(Column::Org.eq(org));
+    let cond = Condition::all()
+        .add(Column::Org.eq(org))
+        .add(service.map_or(Column::Service.is_null(), |s| Column::Service.eq(s)))
+        .add(env.map_or(Column::Env.is_null(), |e| Column::Env.eq(e)))
+        .add(version.map_or(Column::Version.is_null(), |v| Column::Version.eq(v)));
 
-    if let Some(s) = service {
-        stmt = stmt.filter(Column::Service.eq(s));
-    } else {
-        stmt = stmt.filter(Column::Service.is_null());
+    let txn = client.begin().await?;
+    let rows = Entity::find().filter(cond).all(&txn).await?;
+    // Delete by id: rows committed concurrently stay instead of being removed unreturned.
+    for chunk in rows.chunks(DELETE_ID_BATCH) {
+        Entity::delete_many()
+            .filter(Column::Id.is_in(chunk.iter().map(|m| m.id)))
+            .exec(&txn)
+            .await?;
     }
+    txn.commit().await?;
 
-    if let Some(e) = env {
-        stmt = stmt.filter(Column::Env.eq(e));
-    } else {
-        stmt = stmt.filter(Column::Env.is_null());
-    }
-
-    if let Some(v) = version {
-        stmt = stmt.filter(Column::Version.eq(v));
-    } else {
-        stmt = stmt.filter(Column::Version.is_null());
-    }
-
-    stmt.exec(client).await?;
-    Ok(())
+    Ok(rows.into_iter().map(|model| model.into()).collect())
 }
 
 pub async fn get_sourcemap_file(
@@ -335,4 +298,79 @@ pub async fn get_values(
         .collect();
 
     Ok((services, envs, versions))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_type_to_i32() {
+        assert_eq!(i32::from(FileType::SourceMap), 0);
+    }
+
+    #[test]
+    fn test_i32_to_file_type_zero() {
+        assert!(matches!(FileType::from(0), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_i32_to_file_type_unknown_defaults_to_source_map() {
+        assert!(matches!(FileType::from(99), FileType::SourceMap));
+        assert!(matches!(FileType::from(-1), FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_from_model_to_source_map() {
+        use super::super::entity::source_maps::Model;
+        let model = Model {
+            id: 42,
+            org: "myorg".to_string(),
+            service: Some("api".to_string()),
+            env: Some("prod".to_string()),
+            version: Some("1.0.0".to_string()),
+            source_file_name: "app.js".to_string(),
+            source_map_file_name: "app.js.map".to_string(),
+            file_store_id: "store-1".to_string(),
+            file_type: 0,
+            created_at: 1_000_000,
+            cluster: "us-east".to_string(),
+        };
+        let sm = SourceMap::from(model);
+        assert_eq!(sm.id, 42);
+        assert_eq!(sm.org, "myorg");
+        assert_eq!(sm.service.as_deref(), Some("api"));
+        assert_eq!(sm.env.as_deref(), Some("prod"));
+        assert_eq!(sm.version.as_deref(), Some("1.0.0"));
+        assert_eq!(sm.source_file_name, "app.js");
+        assert_eq!(sm.source_map_file_name, "app.js.map");
+        assert_eq!(sm.file_store_id, "store-1");
+        assert_eq!(sm.created_at, 1_000_000);
+        assert_eq!(sm.cluster, "us-east");
+        assert!(matches!(sm.file_type, FileType::SourceMap));
+    }
+
+    #[test]
+    fn test_is_sourcemap_path_for_org() {
+        assert!(is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/otherorg/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/sourcemaps/../../otherorg/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "/files/org1/sourcemaps/abc123"
+        ));
+        assert!(!is_sourcemap_path_for_org(
+            "org1",
+            "files/org1/other/abc123"
+        ));
+    }
 }

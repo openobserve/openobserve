@@ -1,6 +1,8 @@
 // Dashboard actions page
 // Methods : AddPanelName, SavePanel, ApplyDashboardBtn, AddNextPanel, GetTableRowCount, VerifyChartRenders
 
+import { SELECTORS, visibleOnly } from "./dashboard-selectors.js";
+
 export default class DashboardactionPage {
   constructor(page) {
     this.page = page;
@@ -181,6 +183,22 @@ export default class DashboardactionPage {
     return this.panelSaveBtn;
   }
 
+  // Raw discard-button locator for callers that must own the confirm dialog
+  // themselves (discardPanel() installs its own auto-accepting handler).
+  getPanelDiscardBtn() {
+    return this.discardPanelBtn;
+  }
+
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  // Scoped to the rendered layout branch: PanelEditor.vue mounts the field list
+  // twice, so the bare data-test matches 2 nodes.
+  getFieldListSearchInput() {
+    return this.page.locator(visibleOnly(SELECTORS.FIELD_LIST_SEARCH)).first();
+  }
+
   // Save panel button
   async savePanel() {
     await this.panelSaveBtn.waitFor({ state: "visible" });
@@ -199,6 +217,11 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  async getErrorToastText() {
+    await this.errorToast.first().waitFor({ state: "visible", timeout: 20000 });
+    return (await this.errorToast.first().innerText()).replace(/\s+/g, " ").trim();
   }
 
   /**
@@ -305,6 +328,35 @@ export default class DashboardactionPage {
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  /**
+   * Open a dashboard's view page directly by id.
+   */
+  async openDashboardById(dashboardId, { folderId = 'default', tabId = 'default' } = {}) {
+    const url =
+      `${process.env["ZO_BASE_URL"]}/web/dashboards/view` +
+      `?org_identifier=${process.env["ORGNAME"]}` +
+      `&dashboard=${dashboardId}&folder=${folderId}&tab=${tabId}`;
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this.page
+      .locator('[data-test="dashboard-panel-container"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 30000 });
+  }
+
+  // A single-query, single-stream panel hands straight to the alert form; only a lossy prefill asks first.
+  /** Open the panel menu and pick "Create Alert". */
+  async openCreateAlertFromPanel(panelName) {
+    const dropdown = this.getEditPanelDropdown(panelName);
+    await dropdown.waitFor({ state: "visible", timeout: 30000 });
+    await dropdown.click();
+    const createAlert = this.page.locator(
+      '[data-test="dashboard-create-alert-from-panel"]'
+    );
+    await createAlert.waitFor({ state: "visible", timeout: 10000 });
+    await createAlert.click();
   }
 
   /**
@@ -416,8 +468,8 @@ export default class DashboardactionPage {
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 2. Canvas has non-background pixels
-    const hasData = await this.page.evaluate(() => {
+    // 2. Canvas has non-background pixels; polled because a mounted canvas can still be awaiting its query.
+    const scanCanvases = () => this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
         if (canvas.width < 10 || canvas.height < 10) continue;
@@ -441,7 +493,7 @@ export default class DashboardactionPage {
       }
       return false;
     });
-    expect(hasData).toBe(true);
+    await expect.poll(scanCanvases, { timeout: 15000 }).toBe(true);
   }
 
   /**
@@ -462,6 +514,47 @@ export default class DashboardactionPage {
     // any subsequent search/filter operates on already-loaded data.
     await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     await this.page.waitForTimeout(1000);
+  }
+
+  // Legend is canvas-painted, so read series names via `_vnode` (`__vueParentComponent` is dev-only).
+  async getChartSeriesNames(scopeSelector = '[data-test="chart-renderer"]') {
+    return this.page.evaluate((scopeSel) => {
+      const scopes = Array.from(document.querySelectorAll(scopeSel));
+      const names = new Set();
+      const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            try {
+              for (const s of chart.getOption()?.series ?? []) if (s?.name) names.add(String(s.name));
+            } catch {
+              // A disposed instance throws; it draws nothing anyway.
+            }
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return [...names];
+    }, scopeSelector);
   }
 
   /**

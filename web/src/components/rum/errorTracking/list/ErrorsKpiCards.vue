@@ -16,18 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="grid h-full grid-cols-2 gap-2"
+    class="grid h-full grid-cols-2 gap-2 max-md:grid-cols-4 max-md:gap-1.5"
     data-test="rum-errors-kpi-cards"
     :aria-label="t('rum.errorKpisAria')"
   >
     <article
       v-for="card in cards"
       :key="card.key"
-      class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col items-start border px-2.5 py-1.5"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col items-start border px-2.5 py-1.5 max-md:px-1.5"
+      :title="isMobile ? card.caption : undefined"
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="text-text-label flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase"
+        class="text-text-label max-md:text-3xs flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate max-md:tracking-normal max-md:normal-case"
       >
         {{ card.label }}
         <OTag
@@ -35,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="card.badge.label"
           :variant="card.badge.variant"
           size="xs"
+          class="max-md:hidden"
           data-test="rum-errors-kpi-crash-free-badge"
         />
       </span>
@@ -42,15 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton v-if="loading" variant="title" class="w-16" />
       <span
         v-else
-        class="text-xl font-semibold tabular-nums"
+        class="text-xl font-semibold tabular-nums max-md:text-base"
         :class="card.valueClass"
         :data-test="`rum-errors-kpi-${card.key}-value`"
         >{{ card.value }}</span
       >
 
-      <small v-if="!loading" :data-test="`rum-errors-kpi-${card.key}-caption`">{{
-        card.caption
-      }}</small>
+      <small
+        v-if="!loading"
+        class="max-md:hidden"
+        :data-test="`rum-errors-kpi-${card.key}-caption`"
+        >{{ card.caption }}</small
+      >
     </article>
   </section>
 </template>
@@ -61,6 +66,9 @@ import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { addCommasToNumber, formatLargeNumber } from "@/utils/formatters";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { isMobile } = useBreakpoint();
 
 export interface ErrorKpis {
   totalErrors: number;

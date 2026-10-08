@@ -237,7 +237,7 @@ describe("DbmSectionTabs", () => {
      * It is also the only tab whose signal is Postgres-only, so it must not
      * sit where a MySQL reader meets an unexplained empty tab first.
      */
-    it("orders the tabs Overview → Top queries → Slowest calls → Activity → Deadlocks → Blocked queries → Table health", () => {
+    it("orders the tabs Overview → Metrics → Top queries → Slowest calls → Activity → Deadlocks → Blocked queries → Table health", () => {
       // Slowest calls sits beside Top queries: the two are the aggregate and
       // the per-execution view of the same client-observed data.
       const wrapper = mountAt("dbmQueries");
@@ -254,6 +254,7 @@ describe("DbmSectionTabs", () => {
         .filter((name) => !name?.startsWith("dbm-section-tab-lock-"));
       expect(labels).toEqual([
         "dbm-section-tab-overview",
+        "dbm-section-tab-metrics",
         "dbm-section-tab-queries",
         "dbm-section-tab-samples",
         "dbm-section-tab-activity",
@@ -316,10 +317,12 @@ describe("DbmSectionTabs", () => {
         .props("content") as string;
 
     /** STATE 1 — the trace rollup (`/badges → databases[].calls`). */
-    it("says client-observed when the trace rollup counted it", () => {
+    it("marks nothing on the badge when the trace rollup counted it", () => {
       const wrapper = mountWith({ count: 141984, complete: true, vantage: "client" });
       expect(wrapper.text()).toContain("141984");
-      expect(vantageOf(wrapper).text()).toBe("client-observed");
+      expect(wrapper.text()).not.toMatch(/client-observed/i);
+      expect(vantageOf(wrapper).exists()).toBe(false);
+      expect(wrapper.find("[data-test='dbm-app-source-marker']").exists()).toBe(false);
     });
 
     /** STATE 2 — the database-reported list (`server_samples`), capped. */
@@ -341,18 +344,19 @@ describe("DbmSectionTabs", () => {
     /**
      * The tooltip is the other half of D2: a fixed sentence cannot be true in
      * three states, so it is resolved WITH the count. The trace state must not
-     * claim the population — it counts instrumented callers only.
+     * claim the population — traces add to what the database reports.
      */
-    it("scopes the trace sentence to instrumented callers, never the population", () => {
+    it("frames the trace count as adding to the database's own, never the population", () => {
       const hint = samplesHint(mountWith({ count: 141984, complete: true, vantage: "client" }));
-      expect(hint).toContain("instrumented");
+      expect(hint).toContain("measured from your application's traces");
+      expect(hint).toContain("adding your apps' view to what your database reports");
       expect(hint).not.toContain("Every finished call in this window");
     });
 
     it("says the database counted it in the server state", () => {
       const hint = samplesHint(mountWith({ count: 100, complete: false, vantage: "server" }));
       expect(hint).toContain("inside the database");
-      expect(hint).not.toContain("instrumented");
+      expect(hint).not.toContain("traced");
     });
 
     /** The Top-queries badge swaps provenance the same way, and says so. */
@@ -457,8 +461,8 @@ describe("DbmSectionTabs", () => {
       mockConfig.isEnterprise = "false";
       const wrapper = mountAt("dbmDatabases");
 
-      // All seven still RENDER — disabled, not hidden.
-      expect(tabsOf(wrapper)).toHaveLength(7);
+      // All eight still RENDER — disabled, not hidden.
+      expect(tabsOf(wrapper)).toHaveLength(8);
       expect(disabledKeys(wrapper)).toEqual([
         "dbm-section-tab-deadlocks",
         "dbm-section-tab-blocked",
@@ -469,7 +473,7 @@ describe("DbmSectionTabs", () => {
     it("leaves every tab enabled on an enterprise build", () => {
       mockConfig.isEnterprise = "true";
       const wrapper = mountAt("dbmDatabases");
-      expect(tabsOf(wrapper)).toHaveLength(7);
+      expect(tabsOf(wrapper)).toHaveLength(8);
       expect(disabledKeys(wrapper)).toHaveLength(0);
     });
 

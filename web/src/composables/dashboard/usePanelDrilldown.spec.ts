@@ -20,11 +20,14 @@ import { usePanelDrilldown } from "./usePanelDrilldown";
 
 const resultSchemaMock = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    result_schema: (...args: any[]) => resultSchemaMock(...args),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      result_schema: (...args: any[]) => resultSchemaMock(...args),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,
@@ -164,6 +167,38 @@ describe("usePanelDrilldown", () => {
     expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
   });
 
+  it("hands an exemplar marker click to the exemplar handler and never opens the drilldown menu", async () => {
+    const deps = makeDeps();
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+    const params = {
+      componentType: "series",
+      seriesId: "__exemplars__",
+      event: { offsetX: 40, offsetY: 50 },
+      data: { exemplar: { id: "e1", traceId: "t1" } },
+    };
+
+    await api.onChartClick(params);
+
+    expect(onExemplarClick).toHaveBeenCalledWith(params);
+    expect(api.drilldownArray.value).toEqual([]);
+    expect(deps.drilldownPopUpRef.value.style.display).not.toBe("block");
+    expect(deps.router.push).not.toHaveBeenCalled();
+  });
+
+  it("does not treat an exemplar click as an annotation in add-annotation mode", async () => {
+    const deps = makeDeps();
+    deps.allowAnnotationsAdd.value = true;
+    deps.isAddAnnotationMode.value = true;
+    const onExemplarClick = vi.fn();
+    const api = usePanelDrilldown({ ...deps, onExemplarClick } as any);
+
+    await api.onChartClick({ seriesId: "__exemplars__", data: { exemplar: { id: "e1" } } });
+
+    expect(onExemplarClick).toHaveBeenCalledTimes(1);
+    expect(deps.handleAddAnnotation).not.toHaveBeenCalled();
+  });
+
   it("shows drilldown popup when panel drilldowns exist", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
@@ -180,6 +215,46 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.display).toBe("block");
     expect(deps.drilldownPopUpRef.value.style.top).toContain("px");
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
+  });
+
+  it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE a = '$traceid_sql' AND b = '$traceid'`,
+        },
+      } as any,
+    ];
+    deps.variablesData.value.values = [
+      { name: "traceid", type: "textbox", value: "abc123" },
+      { name: "traceid_sql", type: "textbox", value: "xyz789" },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      seriesName: "series-a",
+      value: ["x", 1],
+    });
+    await api.openDrilldown(0);
+
+    await vi.waitFor(() =>
+      expect(deps.router.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            query: `b64(SELECT * FROM "default" WHERE a = 'xyz789' AND b = 'abc123')`,
+          }),
+        }),
+      ),
+    );
   });
 
   it("fetches cross-links lazily on the first drilldown interaction, not on panel render", async () => {

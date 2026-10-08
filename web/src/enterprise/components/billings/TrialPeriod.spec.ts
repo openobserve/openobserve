@@ -25,11 +25,14 @@ vi.mock("@/constants/config", () => ({
 }));
 
 // Mock BillingService
-vi.mock("@/services/billings", () => ({
-  default: {
-    list_subscription: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_subscription: vi.fn(),
+    },
+  });
+});
 
 // Import the mocked module to access the mock function
 import BillingService from "@/services/billings";
@@ -807,6 +810,38 @@ describe("TrialPeriod.vue", () => {
         expect.any(Error),
       );
       // Should keep the default behavior (showTrialPeriodMsg should remain true)
+      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("should not log a 401 as an error — it's an expected session-expiry race already handled globally", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const unauthorizedError: any = new Error("Request failed with status code 401");
+      unauthorizedError.response = { status: 401 };
+      vi.mocked(BillingService.list_subscription).mockRejectedValue(unauthorizedError);
+
+      const testStore = {
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: "1640995200000000",
+            },
+          },
+          selectedOrganization: {
+            identifier: "test-org-401",
+          },
+        },
+      };
+
+      wrapper = createWrapper({}, testStore);
+
+      await wrapper.vm.$nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-401");
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      // Falls back to the default (unchanged) behavior, same as any other failure.
       expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
 
       consoleErrorSpy.mockRestore();

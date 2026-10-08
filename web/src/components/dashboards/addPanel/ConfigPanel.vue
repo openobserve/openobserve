@@ -122,6 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
 
+        <OSwitch
+          v-if="promqlMode && exemplarsSwitchEligible"
+          v-show="isConfigOptionVisible('general', 'show-exemplars')"
+          v-model="dashboardPanelDataModel.data.config.show_exemplars"
+          :label="t('dashboard.showExemplarsLabel')"
+          data-test="dashboard-config-show-exemplars"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.showExemplarsHelp')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
         <!-- Panel Default Time Configuration -->
         <div v-show="isConfigOptionVisible('general', 'panel-default-time')">
           <div class="flex items-center">
@@ -151,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="pickerValue"
                   :auto-apply-dashboard="true"
                   :hide-relative-timezone="true"
+                  :hide-range-shift="true"
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"
@@ -1669,7 +1683,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
         >
           <div class="flex items-center">
-            <CustomDateTimePicker v-model="picker.offSet" :picker="picker" :isFirstEntry="false" />
+            <CustomDateTimePicker
+              v-model="picker.offSet"
+              :picker="picker"
+              :isFirstEntry="false"
+              :excludeMonths="!!promqlMode"
+            />
             <OIcon
               class="ms-2 me-1 cursor-pointer"
               size="sm"
@@ -1762,6 +1781,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -1772,7 +1792,18 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
-import { computed, defineComponent, inject, nextTick, onBeforeMount, onMounted, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  ref,
+  markRaw,
+  watchEffect,
+  watch,
+} from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1799,7 +1830,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { useStore } from "vuex";
 
-import { markRaw, watchEffect, watch } from "vue";
 import {
   convertPanelTimeRangeToPicker,
   buildPanelTimeRange,
@@ -2197,7 +2227,12 @@ export default defineComponent({
     ];
     // Single source of truth — shared with the column-formatting dialog. Labels are
     // already translated; raw() only re-brands the `string` the helper widens to.
-    const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
+    const unitOptions = computed(() =>
+      getUnitOptions(t, dashboardPanelData.data.config.unit).map((o) => ({
+        ...o,
+        label: raw(o.label),
+      })),
+    );
 
     const labelPositionOptions = [
       {
@@ -2544,6 +2579,8 @@ export default defineComponent({
       };
     };
 
+    const exemplarsSwitchEligible = computed(() => isExemplarEligible(dashboardPanelData.data));
+
     const {
       searchQuery,
       expandedSections,
@@ -2671,6 +2708,7 @@ export default defineComponent({
       expandedSections,
       isExpanded,
       isSectionVisible,
+      exemplarsSwitchEligible,
       isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,

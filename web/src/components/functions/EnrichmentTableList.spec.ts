@@ -18,6 +18,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
+import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 
 // ── Hoist mocks so they can be referenced in vi.mock factories ─────────────────
 
@@ -39,25 +41,32 @@ const {
 
 // ── Service mocks ──────────────────────────────────────────────────────────────
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    get_all_enrichment_table_statuses: mockGetAllEnrichmentTableStatuses,
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_all_enrichment_table_statuses: mockGetAllEnrichmentTableStatuses,
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(async () => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),
 }));
 
-vi.mock("@/services/stream", () => ({
-  default: { delete: vi.fn() },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { delete: vi.fn() },
+  });
+});
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((v) => v + " MB"),
@@ -315,20 +324,6 @@ describe("EnrichmentTableList", () => {
       expect(vm.visibleRows.length).toBe(1);
       expect(vm.visibleRows[0].name).toBe("url_table");
     });
-
-    it("resultTotal updates when visibleRows changes", async () => {
-      const wrapper = mountComponent();
-      await flushPromises();
-
-      setupTables(wrapper);
-      const vm = wrapper.vm as any;
-      vm.selectedFilter = "uploaded";
-
-      // Allow computed + watcher to flush
-      await flushPromises();
-
-      expect(vm.resultTotal).toBe(1);
-    });
   });
 
   // ── text search ────────────────────────────────────────────────────────────
@@ -495,6 +490,67 @@ describe("EnrichmentTableList", () => {
     });
   });
 
+  describe("stream_deleted analytics", () => {
+    const trackedDeletes = () =>
+      vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "stream_deleted");
+
+    it("tracks a confirmed single delete", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 1 }],
+      ]);
+    });
+
+    it("does not track a single delete the server did not confirm", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 500 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([]);
+    });
+
+    it("tracks one event per bulk delete, counting only confirmed deletions", async () => {
+      vi.mocked(streamService.delete)
+        .mockResolvedValueOnce({ data: { code: 200 } } as any)
+        .mockRejectedValueOnce({ response: { status: 500 } })
+        .mockResolvedValueOnce({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b", "c"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 2 }],
+      ]);
+    });
+
+    it("does not track a bulk delete in which every delete failed", async () => {
+      vi.mocked(streamService.delete).mockRejectedValue({ response: { status: 500 } });
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(streamService.delete).toHaveBeenCalledTimes(2);
+      expect(trackedDeletes()).toEqual([]);
+    });
+  });
+
   // ── page persistence across editor round trip (OTable pagination-reset fix) ─
 
   describe("page persistence across editor round trip (OTable pagination-reset fix)", () => {
@@ -540,14 +596,15 @@ describe("EnrichmentTableList", () => {
       vi.useFakeTimers();
       const vm = wrapper.vm as any;
       vm.currentPage = 3;
-      const setPageIndex = vi.fn();
-      vm.oTableRef = { table: { setPageIndex } };
+      const restorePage = vi.fn();
+      vm.oTableRef = { restorePage };
 
       vm.restorePageIndex();
-      expect(setPageIndex).not.toHaveBeenCalled();
+      expect(restorePage).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(restorePage).toHaveBeenCalledWith(3);
     });
 
     it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {

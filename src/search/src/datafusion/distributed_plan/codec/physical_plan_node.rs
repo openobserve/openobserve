@@ -21,7 +21,7 @@ use datafusion::{
     execution::TaskContext,
     physical_plan::ExecutionPlan,
 };
-use datafusion_proto::physical_plan::PhysicalExtensionCodec;
+use datafusion_proto::physical_plan::{PhysicalExtensionCodec, PhysicalProtoConverterExtension};
 use prost::Message;
 use proto::cluster_rpc;
 
@@ -44,6 +44,7 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
         ctx: &TaskContext,
+        proto_converter: &dyn PhysicalProtoConverterExtension,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let proto = cluster_rpc::PhysicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -61,7 +62,7 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
                 super::aggregate_topk_exec::try_decode(node, inputs, ctx)
             }
             Some(cluster_rpc::physical_plan_node::Plan::StreamingAggs(node)) => {
-                super::streaming_aggs_exec::try_decode(node, inputs, ctx)
+                super::streaming_aggs_exec::try_decode(node, inputs, ctx, proto_converter)
             }
             Some(cluster_rpc::physical_plan_node::Plan::TmpExec(node)) => {
                 super::tmp_exec::try_decode(node, inputs, ctx)
@@ -75,7 +76,12 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         }
     }
 
-    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+    fn try_encode(
+        &self,
+        node: Arc<dyn ExecutionPlan>,
+        buf: &mut Vec<u8>,
+        proto_converter: &dyn PhysicalProtoConverterExtension,
+    ) -> Result<()> {
         if node.downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
         } else if node.downcast_ref::<DeduplicationExec>().is_some() {
@@ -83,7 +89,7 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         } else if node.downcast_ref::<AggregateTopkExec>().is_some() {
             super::aggregate_topk_exec::try_encode(node, buf)
         } else if node.downcast_ref::<StreamingAggsExec>().is_some() {
-            super::streaming_aggs_exec::try_encode(node, buf)
+            super::streaming_aggs_exec::try_encode(node, buf, proto_converter)
         } else if node.downcast_ref::<TmpExec>().is_some() {
             super::tmp_exec::try_encode(node, buf)
         } else if node.downcast_ref::<EnrichmentExec>().is_some() {
@@ -103,6 +109,52 @@ mod tests {
 
     use super::*;
     use crate::datafusion::sort_order::FileSortOrder;
+
+    #[test]
+    fn join_projection_presence_survives_roundtrip() -> Result<()> {
+        use datafusion::{
+            logical_expr::JoinType,
+            physical_expr::expressions::Column,
+            physical_plan::{
+                empty::EmptyExec,
+                joins::{HashJoinExecBuilder, NestedLoopJoinExec},
+            },
+        };
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        let ctx = datafusion::prelude::SessionContext::new();
+        let codec = super::super::get_physical_extension_codec();
+        // COUNT(*) needs an empty projection to remain distinct from an absent projection.
+        for projection in [None, Some(vec![]), Some(vec![0])] {
+            let hash_join = HashJoinExecBuilder::new(
+                input.clone(),
+                input.clone(),
+                vec![(Arc::new(Column::new("a", 0)), Arc::new(Column::new("a", 0)))],
+                JoinType::Inner,
+            )
+            .with_projection(projection.clone())
+            .build()?;
+            let nested_loop = NestedLoopJoinExec::try_new(
+                input.clone(),
+                input.clone(),
+                None,
+                &JoinType::Inner,
+                projection,
+            )?;
+            for plan in [
+                Arc::new(hash_join) as Arc<dyn ExecutionPlan>,
+                Arc::new(nested_loop),
+            ] {
+                let bytes = physical_plan_to_bytes_with_extension_codec(plan.clone(), &codec)?;
+                let decoded =
+                    physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &codec)?;
+                assert_eq!(decoded.schema(), plan.schema());
+                assert_eq!(decoded.name(), plan.name());
+            }
+        }
+        Ok(())
+    }
 
     #[tokio::test]
     async fn test_datafusion_codec() -> Result<()> {

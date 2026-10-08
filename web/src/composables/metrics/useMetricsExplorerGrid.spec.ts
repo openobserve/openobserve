@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { effectScope, type EffectScope } from "vue";
 
 /**
  * The two bugs covered here are both SELF-SEALING — the grid ends up in a state
@@ -128,6 +129,15 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: getStreamsMock }),
 }));
 
+// Hoisted (unlike a fresh vi.fn() per `cacheFor(card)` call) so a test can both
+// observe what a real query persisted AND inject it back as a stale read —
+// the only way to get an exact `cacheIdentity` match without duplicating the
+// composable's own step/query-string derivation.
+const { getPanelCacheMock, savePanelCacheMock } = vi.hoisted(() => ({
+  getPanelCacheMock: vi.fn().mockResolvedValue(null),
+  savePanelCacheMock: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
@@ -143,26 +153,44 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
-vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({
-  createPromQLChunkProcessor: () => ({
+const { createPromQLChunkProcessor } = vi.hoisted(() => ({
+  createPromQLChunkProcessor: vi.fn((_options: { maxSeries: number }) => ({
     processChunk: (_acc: any, chunk: any) => chunk,
-  }),
+  })),
 }));
+vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({ createPromQLChunkProcessor }));
 
-// No IndexedDB in the test env, and the persisted cache is not what is under
-// test — every card starts with nothing cached.
+// No IndexedDB in the test env; every card starts with nothing cached unless a
+// test sets `getPanelCacheMock` itself.
 vi.mock("@/composables/dashboard/usePanelCache", () => ({
   usePanelCache: () => ({
-    getPanelCache: vi.fn().mockResolvedValue(null),
-    savePanelCache: vi.fn().mockResolvedValue(undefined),
+    getPanelCache: getPanelCacheMock,
+    savePanelCache: savePanelCacheMock,
   }),
 }));
 
 // The factory is hoisted above STREAMS, so the resolved value is set per test.
-vi.mock("@/services/stream", () => ({ default: { nameList: vi.fn() } }));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { nameList: vi.fn() } });
+});
 vi.mock("@/services/metrics", () => ({
   default: { labels: vi.fn(), labelValues: vi.fn(), metadata: vi.fn() },
 }));
+
+// Every queue the composable creates, so a test can spy on the grid's scheduler.
+const { createdQueues } = vi.hoisted(() => ({ createdQueues: [] as any[] }));
+vi.mock("./useMetricsPreviewQueue", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    createPreviewQueue: (...args: any[]) => {
+      const queue = actual.createPreviewQueue(...args);
+      createdQueues.push(queue);
+      return queue;
+    },
+  };
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => ({
   ...(await importOriginal<any>()),
@@ -177,6 +205,7 @@ import useMetricsExplorerGrid, {
 import StreamService from "@/services/stream";
 import metricsService from "@/services/metrics";
 import i18nInstance from "@/locales";
+import { PRIORITY, isCancelled } from "./useMetricsPreviewQueue";
 const t = (i18nInstance.global as any).t;
 
 const SERIES = {
@@ -213,6 +242,19 @@ const landPreview = async (preview: Promise<any>, result: any) => {
 const HOUR_US = 3_600_000_000;
 const NOW_US = 1_700_000_000_000_000;
 
+// Every grid created via `createGrid` runs inside its own scope, stopped in
+// `afterEach` — otherwise its debounced sweep (`SWEEP_DEBOUNCE_MS`) outlives
+// the test that scheduled it and can fire during a LATER test, pushing
+// surprise entries into the shared `inFlight` array. Vue's own `onScopeDispose`
+// cleanup already clears that timer; it just needs a scope to run inside, since
+// these composables are otherwise called bare, outside any component.
+let activeScopes: EffectScope[] = [];
+const createGrid = (translate: typeof t) => {
+  const scope = effectScope(true);
+  activeScopes.push(scope);
+  return scope.run(() => useMetricsExplorerGrid(translate))!;
+};
+
 describe("useMetricsExplorerGrid", () => {
   beforeEach(() => {
     inFlight.length = 0;
@@ -220,10 +262,16 @@ describe("useMetricsExplorerGrid", () => {
     // The deferred `fetchSchema=true` load, which the label filters trigger.
     (StreamService.nameList as any).mockResolvedValue({ data: { list: STREAMS } });
     getStreamsMock.mockResolvedValue({ list: STREAMS });
+    getPanelCacheMock.mockReset().mockResolvedValue(null);
+    savePanelCacheMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    activeScopes.splice(0).forEach((scope) => scope.stop());
   });
 
   const setup = async () => {
-    const grid = useMetricsExplorerGrid(t);
+    const grid = createGrid(t);
     grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
     await grid.loadStreams();
     return grid;
@@ -658,7 +706,7 @@ describe("useMetricsExplorerGrid", () => {
     it("never renders more than the page size, however many come back empty", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
 
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -725,7 +773,7 @@ describe("useMetricsExplorerGrid", () => {
 
     it("showMore is how the user asks to spend more budget", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -743,7 +791,7 @@ describe("useMetricsExplorerGrid", () => {
     // grid has grown by a full increment, stepping over the no-data run.
     it("Show more steps over no-data cards so a click reveals a full page", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -909,6 +957,15 @@ describe("useMetricsExplorerGrid", () => {
       expect((metricsService.labelValues as any).mock.calls.length).toBeGreaterThan(
         callsAfterFirst,
       );
+    });
+
+    it("never offers the internal exemplars field as a label name", async () => {
+      const grid = await setup();
+      (metricsService.labels as any).mockResolvedValue({
+        data: { data: ["job", "exemplars"] },
+      });
+      await grid.loadLabelNames();
+      expect(grid.labelNames.value).toEqual(["job"]);
     });
 
     it("re-asks for the label NAMES on a new window, as it does for the values", async () => {
@@ -1295,7 +1352,7 @@ describe("useMetricsExplorerGrid", () => {
           },
         ],
       });
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -1357,6 +1414,33 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.sortedCards.value.map((c: any) => c.name)).not.toContain("lat_seconds_bucket");
     });
   });
+  describe("the detail view reads eligibility per filter", () => {
+    it("names the filters a card cannot apply, and exposes the predicate", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: {
+          list: STREAMS.map((stream) =>
+            stream.name === "lat_seconds_bucket"
+              ? { ...stream, schema: [{ name: "le", type: "Utf8" }] }
+              : { ...stream, schema: [{ name: "pod", type: "Utf8" }] },
+          ),
+        },
+      });
+      const le = { label: "le", value: "0.5", operator: "=" };
+      const pod = { label: "pod", value: "a", operator: "=" };
+      await grid.addLabelFilter(le);
+      await grid.addLabelFilter(pod);
+
+      const card = cardNamed(grid, "lat_seconds_bucket");
+      expect(grid.inapplicableLabelFilters(card)).toEqual([pod]);
+      expect(grid.isLabelEligible(card)).toBe(false);
+
+      grid.removeLabelFilter(pod);
+      expect(grid.inapplicableLabelFilters(card)).toEqual([]);
+      expect(grid.isLabelEligible(card)).toBe(true);
+    });
+  });
+
   describe("an org switch must not deadlock the deferred loads", () => {
     it("does not strand schemaLoading at true forever", async () => {
       // `ensureSchemas` early-returns while `schemaLoading` is true, and its
@@ -1521,6 +1605,347 @@ describe("useMetricsExplorerGrid", () => {
 
       const { resolved } = grid.effectiveVariant(card);
       expect(resolved.unit).toBe("celsius"); // ...and so does what the chart uses
+    });
+  });
+
+  describe("a freshly-ingested metric queried before indexing catches up gets one more chance", () => {
+    it("re-queries a settled-EMPTY card on revisit (scroll-back / mode toggle), once", async () => {
+      // Telegraf/remote-write scenario: the card's FIRST query lands milliseconds
+      // after ingestion starts, before the write is searchable yet, so it settles
+      // "done" with NO_SERIES even though the metric is genuinely being written.
+      // The user opens the card's Visualize view (a separate pipeline,
+      // usePanelDataLoader) which queries fresh and shows the data correctly.
+      // Back in Explore, the same window is still active — no setTimeRange, no
+      // skipCache — so a naive settled-cache guard would reuse the stale empty
+      // preview forever. A settled-EMPTY card instead gets exactly one real
+      // re-query on the next revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      expect(grid.previews.value["http_requests_total"].status).toBe("done");
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(false);
+
+      // Simulate: click into the card's Visualize view, then back to Explore.
+      const revisit = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // a real query DID fire
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await revisit;
+
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("does not re-query the SAME card a second time if it is still empty", async () => {
+      // The recheck is bounded: a metric that is genuinely empty must not turn
+      // into a query fired on every single revisit — that is the query storm
+      // the settled-cache guard exists to prevent in the first place.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      await landPreview(grid.requestPreview(card), NO_SERIES); // the one bounded recheck, still empty
+
+      const before = inFlight.length;
+      await grid.requestPreview(card); // a third revisit
+      await flush();
+      expect(inFlight.length).toBe(before); // no new query fired
+    });
+
+    it("does not repaint a stale empty answer straight from the persisted disk cache either", async () => {
+      // The in-memory guard above is not the only place a settled-empty answer
+      // gets served without a query — a full remount (page reload, or however
+      // Explore↔Visualize actually behaves) starts with NO in-memory `previews`
+      // entry at all and paints straight from `restoreFromCache`'s IndexedDB
+      // read instead. That path must get the SAME one-time recheck, or a metric
+      // that raced ingestion on its very first (persisted) query stays "No
+      // Data" across every future page load, not just every revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      // A real query, so `persistToCache` writes a genuine (empty) entry under
+      // the exact identity/step this card's variant actually uses — avoids
+      // having to duplicate that derivation by hand.
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      const [key, , cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      getPanelCacheMock.mockResolvedValue({
+        key,
+        value: { results: [NO_SERIES], sparse: false },
+        cacheTimeRange,
+      });
+
+      // Simulate a fresh mount: no in-memory preview, only the disk entry.
+      delete grid.previews.value["http_requests_total"];
+
+      const revisit = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // a real query DID fire
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await revisit;
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("keeps the recheck available when it is cancelled before answering", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+
+      const cancelled = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      grid.cancelPreview(card); // scrolled out of view before the recheck answered
+      inFlight.length = 0;
+      await cancelled;
+
+      const retry = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // the recheck was not spent
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await retry;
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("does not let a concurrent disk read paint the stale empty answer over the recheck", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      const [key, , cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      getPanelCacheMock.mockResolvedValue({
+        key,
+        value: { results: [NO_SERIES], sparse: false },
+        cacheTimeRange,
+      });
+
+      const reloaded = await setup();
+      const reloadedCard = cardNamed(reloaded, "http_requests_total");
+      inFlight.length = 0;
+
+      // Two requests both waiting on IndexedDB — a double visibility report, or the hide-no-data pre-fetch.
+      const first = reloaded.requestPreview(reloadedCard);
+      const second = reloaded.requestPreview(reloadedCard);
+      await flush();
+      expect(reloaded.previews.value["http_requests_total"].status).toBe("loading");
+      expect(reloaded.emptyHiddenCount.value).toBe(0); // a hidden card unmounts and cancels the recheck
+
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await Promise.all([first, second]);
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(reloaded.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("serves a rechecked empty answer from disk after a reload instead of querying again", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      await landPreview(grid.requestPreview(card), NO_SERIES); // the recheck, still empty
+      const [key, value, cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      expect(value.rechecked).toBe(true);
+
+      // A reload: fresh composable, empty in-memory state, only the disk entry.
+      getPanelCacheMock.mockResolvedValue({ key, value, cacheTimeRange });
+      const reloaded = await setup();
+      inFlight.length = 0;
+      await reloaded.requestPreview(cardNamed(reloaded, "http_requests_total"));
+      await flush();
+
+      expect(inFlight).toHaveLength(0);
+      expect(reloaded.previews.value["http_requests_total"].status).toBe("done");
+    });
+  });
+
+  describe("a refresh cancelled by a card remount still lands", () => {
+    it("re-queries on the remount instead of reusing the pre-refresh preview", async () => {
+      // Hiding a sibling as no-data reflows the grid, which remounts this card mid-refresh and cancels its query.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+
+      const refresh = grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      grid.cancelPreview(card);
+      inFlight.length = 0;
+      await refresh;
+      expect(grid.previews.value["http_requests_total"].pendingRefresh).toBe(true);
+
+      const remount = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await remount;
+
+      const preview = grid.previews.value["http_requests_total"];
+      expect(preview.pendingRefresh).toBeUndefined();
+      expect(preview.results.some((r: any) => r.result.length)).toBe(true);
+    });
+
+    it("still reuses a settled preview when no refresh was cancelled", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+
+      await grid.requestPreview(card);
+      await flush();
+      expect(inFlight).toHaveLength(0);
+      expect(grid.previews.value["http_requests_total"].pendingRefresh).toBeUndefined();
+    });
+  });
+
+  describe("exemplars on a histogram card", () => {
+    const HIST_CARD = "lat_seconds_bucket";
+
+    beforeEach(() => {
+      sessionStorage.clear();
+    });
+
+    it("draws percentiles as a line while on and returns to heatmap when off, never touching fnOverrides", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, HIST_CARD);
+      const overridesBefore = localStorage.getItem("o2.metricsExplorer.fnOverrides.default");
+      expect(grid.effectiveVariant(card).resolved.variant.id).toBe("heatmap");
+      expect(grid.exemplarSwapsVariant(card)).toBe(true);
+      expect(grid.exemplarEligible(card)).toBe(true);
+
+      grid.toggleExemplars(card);
+      expect(grid.exemplarStateOf(HIST_CARD)?.valueUnit).toBe("seconds");
+      const on = grid.effectiveVariant(card).resolved;
+      expect(on.variant.id).toBe("percentiles");
+      expect(on.chartType).toBe("line");
+      expect(grid.exemplarsEnabled(HIST_CARD)).toBe(true);
+
+      grid.toggleExemplars(card);
+      expect(grid.effectiveVariant(card).resolved.variant.id).toBe("heatmap");
+      expect(grid.overrides.value[HIST_CARD]).toBeUndefined();
+      expect(localStorage.getItem("o2.metricsExplorer.fnOverrides.default")).toBe(overridesBefore);
+    });
+
+    it("adds the exemplar jobs to the card's keys so scroll-away cancels them", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, HIST_CARD);
+      expect(grid.exemplarKeysOf(card)).toEqual([]);
+      grid.toggleExemplars(card);
+      const keys = grid.exemplarKeysOf(card);
+      expect(keys).toHaveLength(3);
+      expect(keys.every((k: string) => k.startsWith("exemplars|"))).toBe(true);
+      grid.toggleExemplars(card);
+    });
+  });
+
+  describe("the metric detail view", () => {
+    it("runs a detail query at DIALOG priority on the card's own step, under its own owner", async () => {
+      const grid = await setup();
+      const queue = createdQueues.at(-1);
+      const run = vi.spyOn(queue, "run");
+      const card = cardNamed(grid, "http_requests_total");
+
+      const pending = grid.runDetailQuery("sum(up)", card, new AbortController().signal);
+      const call = run.mock.calls.at(-1)!;
+      // Same key the card and the ⚙ dialog would use: the step is the card's.
+      expect(call[0]).toContain("|sum(up)|");
+      expect(call[1]).toBe(PRIORITY.DIALOG);
+      const owner = call[3];
+      expect(owner).toBeTruthy();
+      expect(owner).not.toBe(card.name);
+
+      // The dialog's owner is a different one: closing one never aborts the other.
+      grid.runDialogQuery("sum(up)", card).catch(() => {});
+      expect(run.mock.calls.at(-1)![3]).not.toBe(owner);
+
+      pending.catch(() => {});
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("streams a detail query under the series cap unless the caller lifts it", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const maxSeriesOf = () => createPromQLChunkProcessor.mock.calls.at(-1)![0].maxSeries;
+
+      grid.runDetailQuery("sum(capped)", card, new AbortController().signal).catch(() => {});
+      await flush();
+      expect(maxSeriesOf()).toBe(100);
+
+      grid
+        .runDetailQuery("sum(lifted)", card, new AbortController().signal, {
+          maxSeries: Infinity,
+        })
+        .catch(() => {});
+      await flush();
+      expect(maxSeriesOf()).toBe(Infinity);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("cancels its own query by the key and owner it ran under when its signal aborts", async () => {
+      const grid = await setup();
+      const queue = createdQueues.at(-1);
+      const run = vi.spyOn(queue, "run");
+      const cancel = vi.spyOn(queue, "cancel");
+      const card = cardNamed(grid, "http_requests_total");
+      const controller = new AbortController();
+
+      const pending = grid.runDetailQuery("sum(up)", card, controller.signal);
+      const [key, , , owner] = run.mock.calls.at(-1)!;
+
+      controller.abort();
+      expect(cancel).toHaveBeenCalledWith(key, owner);
+      await expect(pending).rejects.toSatisfy(isCancelled);
+      inFlight.length = 0;
+    });
+
+    it("never starts a query whose signal already aborted", async () => {
+      const grid = await setup();
+      const controller = new AbortController();
+      controller.abort();
+      await expect(
+        grid.runDetailQuery("sum(up)", cardNamed(grid, "http_requests_total"), controller.signal),
+      ).rejects.toSatisfy(isCancelled);
+      expect(inFlight).toHaveLength(0);
+    });
+
+    it("shares one request between two charts of the same query, and one cancelling leaves the other", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const outcomes: string[] = ["pending", "pending"];
+      const controllers = [new AbortController(), new AbortController()];
+      controllers.forEach((controller, i) =>
+        grid.runDetailQuery("sum(up)", card, controller.signal).then(
+          () => (outcomes[i] = "landed"),
+          (error: any) => (outcomes[i] = isCancelled(error) ? "cancelled" : "failed"),
+        ),
+      );
+      await flush();
+      expect(inFlight.filter((q) => q.query === "sum(up)")).toHaveLength(1);
+
+      // The later joiner: a shared owner would drop the first waiter, not this one.
+      controllers[1].abort();
+      await flush();
+      expect(outcomes).toEqual(["pending", "cancelled"]);
+
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+      await flush();
+      expect(outcomes).toEqual(["landed", "cancelled"]);
+    });
+
+    it("exposes what the detail view ranks and filters with", async () => {
+      const grid = await setup();
+      await grid.ensureSchemas();
+
+      expect(grid.labelsByStream.value).toEqual(expect.any(Object));
+      expect(grid.prefixOf("http_requests_total")).toEqual(expect.any(String));
+      expect(grid.prefixAssignment.value.groupOf).toBeInstanceOf(Map);
+      // The family map: a histogram's members share one family.
+      expect(grid.familyOf("lat_seconds_bucket")).toBe(grid.familyOf("lat_seconds_count"));
+      expect(grid.familyOf("http_requests_total")).not.toBe(grid.familyOf("lat_seconds_bucket"));
+      // A concrete window for the breakdown query, sized like the card's own.
+      expect(grid.rateWindowFor(cardNamed(grid, "http_requests_total"))).toMatch(/^\d+[smh]/);
     });
   });
 });

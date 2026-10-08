@@ -3,7 +3,8 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+// No `Eq`: `alert_budget_per_day` is f64, which has no total equality.
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "anomaly_detection_config")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
@@ -25,6 +26,24 @@ pub struct Model {
     pub training_window_days: i32,
     pub retrain_interval_days: i32,
     pub threshold: i32,
+    /// Alert budget (delivered alerts/day); NULL means no budget: k is the trained p99, in 3 to 6.
+    pub alert_budget_per_day: Option<f64>,
+    /// Seconds; NULL means the shipped one-day default, which is what pre-column rows mean.
+    pub level_half_width_seconds: Option<i64>,
+    /// Manual band width k in sigmas; NULL means k from the trained model.
+    pub band_width: Option<f64>,
+    /// `both`, `above` or `below`; NULL means both.
+    pub alert_direction: Option<String>,
+    /// Window-share length in buckets; NULL means 1.
+    pub alert_window_buckets: Option<i32>,
+    /// Percent of the window out of band that fires; NULL means 100.
+    pub alert_window_fire_pct: Option<f64>,
+    /// Percent of the window out of band below which it recovers; NULL means the fire percent.
+    pub alert_window_recover_pct: Option<f64>,
+    /// Written by training: `weekend_hour` or `global`; rows not yet retrained keep older values.
+    pub band_grouping: Option<String>,
+    /// The model's k: trained p99 in 3 to 6, unless a budget moved it; `band_width` overrides it.
+    pub band_k: Option<f64>,
     pub seasonality: String,
     pub is_trained: bool,
     pub training_started_at: Option<i64>,
@@ -48,6 +67,15 @@ pub struct Model {
     /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled
     pub status: i32,
     pub retries: i32,
+    /// When the last training attempt FAILED, in microseconds — the retry backoff's anchor.
+    pub last_failed_at: Option<i64>,
+    pub last_alert_fired_at: Option<i64>,
+    /// Data-time of the delivered alert still owed a recovery message, in microseconds.
+    /// NULL means none is owed — this is pending state, not a log of the last recovery sent.
+    pub last_recovery_notified_at: Option<i64>,
+    /// Start of this region's in-flight detection run; NULL or expired means free.
+    #[serde(skip)]
+    pub detection_lease_us: Option<i64>,
     pub last_updated: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -91,6 +119,15 @@ mod tests {
             training_window_days: 7,
             retrain_interval_days: 1,
             threshold: 95,
+            alert_budget_per_day: None,
+            level_half_width_seconds: None,
+            band_width: None,
+            alert_direction: None,
+            alert_window_buckets: None,
+            alert_window_fire_pct: None,
+            alert_window_recover_pct: None,
+            band_grouping: None,
+            band_k: None,
             seasonality: "none".to_string(),
             is_trained: false,
             training_started_at: None,
@@ -109,6 +146,10 @@ mod tests {
             tags: None,
             status: 0,
             retries: 0,
+            last_failed_at: None,
+            last_alert_fired_at: None,
+            last_recovery_notified_at: None,
+            detection_lease_us: None,
             last_updated: 0,
             created_at: 1000,
             updated_at: 1000,

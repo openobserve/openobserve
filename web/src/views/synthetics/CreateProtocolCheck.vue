@@ -19,9 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
+import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch, type Component } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   AgentSetup,
@@ -39,7 +44,6 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -47,7 +51,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import CheckHttpConfig from "@/components/synthetics/configure/types/CheckHttpConfig.vue";
 import CheckTcpConfig from "@/components/synthetics/configure/types/CheckTcpConfig.vue";
 import CheckTlsConfig from "@/components/synthetics/configure/types/CheckTlsConfig.vue";
@@ -62,6 +65,8 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+const orgIdForWrites = useOrgId();
+const saveMonitor = useMutation(() => saveMonitorMutation(orgIdForWrites.value));
 
 // Private locations are served by agents deployed inside the customer's network,
 // the one enterprise part of synthetics. Gated on its own /config flag so an OSS
@@ -194,8 +199,7 @@ watch(
 async function fetchLocations() {
   locationsLoading.value = true;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getLocations(org);
+    const res = await syntheticsService.getLocations(orgIdForWrites.value);
     // Protocol checks run from public locations and protocol-capable private
     // agents. Hide disabled locations, and hide private locations whose live
     // agents are browser-only (a browser agent can't run an HTTP/TCP/… check) —
@@ -233,24 +237,26 @@ async function openAgentSetup(locationId?: string) {
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getAgentSetup(org);
+    const res = await syntheticsService.getAgentSetup(orgIdForWrites.value);
     agentSetup.value = (res.data ?? null) as AgentSetup | null;
   } catch {
     agentSetup.value = null;
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations(force = false) {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    // A destination created in another tab never expires this tab's cache, so refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }
@@ -284,7 +290,7 @@ async function loadForEdit(id: string) {
 onMounted(() => {
   fetchFolders();
   fetchLocations();
-  fetchDestinations();
+  loadDestinations();
 
   if (props.editId) {
     loadForEdit(props.editId).catch(console.error);
@@ -335,14 +341,17 @@ async function saveCheck() {
     timeout: 0,
   });
   try {
-    const org = store.state.selectedOrganization.identifier;
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
-      await syntheticsService.update(org, props.editId, payload, check.value.folder);
+      await saveMonitor.mutateAsync({
+        id: props.editId,
+        payload,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
-      await syntheticsService.create(org, payload, check.value.folder);
+      await saveMonitor.mutateAsync({ payload, folderId: check.value.folder });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
@@ -373,6 +382,7 @@ async function saveCheck() {
 
 <template>
   <OPageLayout
+    :title="raw(headerTitle)"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -380,12 +390,6 @@ async function saveCheck() {
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex min-w-0 items-center gap-2">
-        <span class="truncate">{{ headerTitle }}</span>
-        <BetaBadge />
-      </span>
-    </template>
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
     <template v-else>
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -400,7 +404,7 @@ async function saveCheck() {
           :validation-errors="validationErrors"
           :allow-private-locations="privateLocationsEnabled"
           class="w-full!"
-          @refresh:destinations="fetchDestinations"
+          @refresh:destinations="loadDestinations(true)"
           @update:check="onConfigureUpdate"
           @new-location="openAgentSetup()"
           @add-agent="(id: string) => openAgentSetup(id)"

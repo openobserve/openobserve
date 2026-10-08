@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import workflows from "@/services/workflows";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -151,6 +154,40 @@ describe("workflows service", () => {
       await workflows.createWorkflow({ org_identifier: "o", data: {} });
 
       expect(mockHttpInstance.post.mock.calls[0][0]).toBe("/api/o/workflows");
+    });
+
+    it("names the destination folder", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, folder: "ops" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows?folder=ops", {});
+    });
+
+    // A folderless draft is appended to every folder's listing, so the folder has
+    // to travel with the draft save too, not only the published one.
+    it("names the destination folder on a draft save", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({
+        org_identifier: "o",
+        data: {},
+        draft: true,
+        folder: "ops",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows?draft=true&folder=ops",
+        {},
+      );
+    });
+
+    it("omits the folder query when no folder is given", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, folder: "" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows", {});
     });
   });
 
@@ -288,6 +325,36 @@ describe("workflows service", () => {
       await expect(
         workflows.promoteWorkflow({ org_identifier: "o", id: "w1", trigger_type: "AlertFired" }),
       ).rejects.toEqual(error);
+    });
+
+    it("names the folder to publish into", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "AlertFired",
+        folder: "ops",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=AlertFired&folder=ops",
+      );
+    });
+
+    // The backend then publishes into the folder the draft already sits in.
+    it("omits the folder query when none is given", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "AlertFired",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=AlertFired",
+      );
     });
   });
 
@@ -662,6 +729,91 @@ describe("workflows service", () => {
       await workflows.createWorkflow({ org_identifier: "o", data: {} });
 
       expect(http).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("product analytics", () => {
+    const cases: Array<[string, string, () => Promise<any>, string, Record<string, any>?]> = [
+      [
+        "createWorkflow",
+        "post",
+        () => workflows.createWorkflow({ org_identifier: "o", data: {} }),
+        "workflow_created",
+        { draft: false },
+      ],
+      [
+        "createWorkflow (draft)",
+        "post",
+        () => workflows.createWorkflow({ org_identifier: "o", data: {}, draft: true }),
+        "workflow_created",
+        { draft: true },
+      ],
+      [
+        "deleteWorkflow",
+        "delete",
+        () => workflows.deleteWorkflow({ org_identifier: "o", id: "w" }),
+        "workflow_deleted",
+        { draft: false, count: 1 },
+      ],
+      [
+        "promoteWorkflow",
+        "post",
+        () =>
+          workflows.promoteWorkflow({ org_identifier: "o", id: "w", trigger_type: "AlertFired" }),
+        "workflow_published",
+      ],
+      [
+        "testWorkflow",
+        "post",
+        () => workflows.testWorkflow({ org_identifier: "o", workflow: {}, inputs: [] }),
+        "workflow_test_run_completed",
+        { from_node: false },
+      ],
+      [
+        "testWorkflow (from node)",
+        "post",
+        () =>
+          workflows.testWorkflow({ org_identifier: "o", workflow: {}, inputs: [], from_node: "n" }),
+        "workflow_test_run_completed",
+        { from_node: true },
+      ],
+      [
+        "retryWorkflow",
+        "post",
+        () => workflows.retryWorkflow({ org_identifier: "o", id: "w", run_id: "r" }),
+        "workflow_run_retried",
+        { from_node: false },
+      ],
+    ];
+
+    it.each(cases)(
+      "%s tracks its event once the request resolves",
+      async (_n, verb, call, event, props) => {
+        const response = { data: {} };
+        mockHttpInstance[verb].mockResolvedValue(response);
+
+        await expect(call()).resolves.toBe(response);
+
+        expect(analytics.track).toHaveBeenCalledTimes(1);
+        if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+        else expect(analytics.track).toHaveBeenCalledWith(event);
+      },
+    );
+
+    it.each(cases)("%s does not track when the request rejects", async (_n, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track updateWorkflow, which also flushes test state in the background", async () => {
+      mockHttpInstance.put.mockResolvedValue({ data: {} });
+
+      await workflows.updateWorkflow({ org_identifier: "o", id: "w", data: {} });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

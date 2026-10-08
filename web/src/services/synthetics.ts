@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
 import store from "@/stores";
+import analytics from "./product_analytics";
 
 const STREAM_NAME = "synthetics_results";
 
@@ -35,6 +36,25 @@ function apiOrigin(): string {
   const base = store.state.API_ENDPOINT;
   if (!base || base === "/") return "";
   return base.endsWith("/") ? base.slice(0, -1) : base;
+}
+
+export interface SyntheticsVariablePayload {
+  name: string;
+  value?: string;
+  kind: "plain" | "secret";
+  description?: string;
+  example?: string;
+  tags?: string[];
+}
+
+/** A variable's kind is fixed once created, so an update may leave it out. */
+export type SyntheticsVariableUpdatePayload = Omit<SyntheticsVariablePayload, "kind"> & {
+  kind?: SyntheticsVariablePayload["kind"];
+};
+
+export interface SyntheticsEnvironmentPayload {
+  name: string;
+  description?: string;
 }
 
 export interface ListRunsPayload {
@@ -60,12 +80,26 @@ export interface GetRunPayload {
 const syntheticsService = {
   create: (orgIdentifier: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
-    return http().post(`/api/${orgIdentifier}/synthetics${params}`, payload);
+    return http()
+      .post(`/api/${orgIdentifier}/synthetics${params}`, payload)
+      .then((res) => {
+        analytics.track("synthetic_test_created", {
+          type: (payload as { type?: string } | null)?.type,
+        });
+        return res;
+      });
   },
 
   update: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload);
+    return http()
+      .put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload)
+      .then((res) => {
+        analytics.track("synthetic_test_updated", {
+          type: (payload as { type?: string } | null)?.type,
+        });
+        return res;
+      });
   },
 
   // folderId is the check's folder ID (KSUID, or "default"), passed as ?folder=
@@ -117,6 +151,15 @@ const syntheticsService = {
   getRun: (orgIdentifier: string, id: string, runId: string, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : "";
     return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`);
+  },
+
+  /** Checks that reference `id` as a subtest — used to warn before deleting or unpublishing it. */
+  referencedBy: (orgIdentifier: string, id: string, placeholders?: string[]) => {
+    // Absent means "do not evaluate breakage" — an empty value would read as an empty name list.
+    const query = placeholders?.length
+      ? `?placeholders=${encodeURIComponent(placeholders.join(","))}`
+      : "";
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}/referenced-by${query}`);
   },
 
   artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
@@ -204,6 +247,101 @@ const syntheticsService = {
 
   bulkDeleteLocations: (orgIdentifier: string, ids: string[]) =>
     http().delete(`/api/${orgIdentifier}/synthetics/locations`, { data: { ids } }),
+
+  listGlobalVariables: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/variables`),
+
+  createGlobalVariable: (orgIdentifier: string, body: SyntheticsVariablePayload) =>
+    http().post(`/api/${orgIdentifier}/synthetics/variables`, body),
+
+  updateGlobalVariable: (
+    orgIdentifier: string,
+    id: string,
+    body: SyntheticsVariableUpdatePayload,
+    force = false,
+  ) => http().put(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`, body),
+
+  deleteGlobalVariable: (orgIdentifier: string, id: string, force = false) =>
+    http().delete(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`),
+
+  listEnvironments: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/environments`),
+
+  createEnvironment: (orgIdentifier: string, body: SyntheticsEnvironmentPayload) =>
+    http().post(`/api/${orgIdentifier}/synthetics/environments`, body),
+
+  updateEnvironment: (orgIdentifier: string, env: string, body: SyntheticsEnvironmentPayload) =>
+    http().put(`/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}`, body),
+
+  deleteEnvironment: (orgIdentifier: string, env: string, force = false) =>
+    http().delete(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}?force=${force}`,
+    ),
+
+  /** Copy an environment's variables into a new one. Checks are not copied. */
+  duplicateEnvironment: (orgIdentifier: string, env: string, name: string) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/duplicate`,
+      { name },
+    ),
+
+  createEnvironmentVariable: (
+    orgIdentifier: string,
+    env: string,
+    body: SyntheticsVariablePayload,
+  ) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables`,
+      body,
+    ),
+
+  updateEnvironmentVariable: (
+    orgIdentifier: string,
+    env: string,
+    id: string,
+    body: SyntheticsVariableUpdatePayload,
+    force = false,
+  ) =>
+    http().put(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
+      body,
+    ),
+
+  deleteEnvironmentVariable: (orgIdentifier: string, env: string, id: string, force = false) =>
+    http().delete(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
+    ),
+
+  /** The merged set for one check, with the scope each name comes from. */
+  resolvedVariables: (orgIdentifier: string, checkId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables`),
+
+  /** Every environment's resolved set in one call, keyed by environment name. */
+  resolvedVariablesGrouped: (orgIdentifier: string, checkId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables?envs=all`),
+
+  promoteCheckVariable: (
+    orgIdentifier: string,
+    checkId: string,
+    name: string,
+    environment: string | null,
+  ) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/${checkId}/variables/${encodeURIComponent(name)}/promote`,
+      { environment },
+    ),
+
+  promoteEnvironmentVariable: (orgIdentifier: string, env: string, id: string) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}/promote`,
+      {},
+    ),
+
+  splitGlobalVariable: (
+    orgIdentifier: string,
+    id: string,
+    targets: { environment: string; value: string }[],
+  ) => http().post(`/api/${orgIdentifier}/synthetics/variables/${id}/split`, { targets }),
 
   listRunsPayload(monitorId: string, startTime: number, endTime: number): ListRunsPayload {
     const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;

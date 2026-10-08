@@ -167,6 +167,8 @@ pub enum PoolGate {
 pub(crate) struct GateContext {
     pub remaining: HashMap<String, crate::pool::StepRemaining>,
     pub policies: HashMap<String, PoolExhaustionPolicy>,
+    /// The claimed checks that feed a status page, read once per tick.
+    pub status_attached: std::collections::HashSet<String>,
 }
 
 /// The per-run values every slot of one fan-out shares.
@@ -180,6 +182,8 @@ struct EnqueueRun<'a> {
 /// One location slot that survived gates 2 and 3 and is about to be enqueued.
 struct PlannedSlot {
     location: String,
+    /// `None` for a check with no environments — the pre-environments shape.
+    env: Option<String>,
     pool: String,
     /// Frozen `browser_devices` JSON, `None` for a protocol check.
     browser_devices: Option<String>,
@@ -297,7 +301,7 @@ pub async fn run() {
         // due checks instead — the replicas self-shard, which is what
         // `designs/synthetics/01-server-architecture.md` §4.2 specifies. Every
         // check returned here is already ours; nothing below needs to re-check.
-        let synthetics = match synthetics_checks::claim_due(db, now_us, FETCH_LIMIT, |c| {
+        let mut synthetics = match synthetics_checks::claim_due(db, now_us, FETCH_LIMIT, |c| {
             compute_next_run_at(
                 &c.frequency,
                 c.next_run_at,
@@ -319,6 +323,8 @@ pub async fn run() {
         if synthetics.is_empty() {
             continue;
         }
+
+        expand_step_counts(db, &mut synthetics).await;
 
         // Inside the fan-out these reads would run once per claimed check.
         #[cfg(feature = "cloud")]
@@ -471,10 +477,27 @@ pub async fn run() {
             // so counting it would leave the run permanently short — never
             // complete, never alerted on. `job_count` is knowable only after the
             // gate has run.
-            let mut planned: Vec<PlannedSlot> = Vec::with_capacity(synthetic.locations.len());
+            let environments: Vec<Option<&str>> = if synthetic.environments.is_empty() {
+                vec![None]
+            } else {
+                synthetic
+                    .environments
+                    .iter()
+                    .map(|e| Some(e.as_str()))
+                    .collect()
+            };
+
+            let mut fanout: Vec<(Option<&str>, &String)> = Vec::new();
+            for env in &environments {
+                for location in &synthetic.locations {
+                    fanout.push((*env, location));
+                }
+            }
+
+            let mut planned: Vec<PlannedSlot> = Vec::with_capacity(fanout.len());
             let mut denied: Vec<String> = Vec::new();
 
-            for location in &synthetic.locations {
+            for (env, location) in fanout {
                 // ---- Gate 2 of §7.1 — the VENUE -----------------------------
                 //
                 // One registry read per location, already needed to pick the
@@ -503,10 +526,14 @@ pub async fn run() {
 
                 planned.push(PlannedSlot {
                     location: location.clone(),
+                    env: env.map(str::to_owned),
                     pool,
                     browser_devices: browser_devices_json,
                 });
             }
+
+            denied.sort();
+            denied.dedup();
 
             // Every slot denied: no run row, no jobs, no Lambda.
             if planned.is_empty() {
@@ -599,6 +626,54 @@ pub(crate) fn distinct_org_ids(checks: &[synthetics_checks::DueCheck]) -> Vec<St
         .collect()
 }
 
+/// The frozen ceiling must be the expanded count, or composed runs under-bill and clamp (§5.11).
+pub(crate) fn apply_expanded_counts(
+    due: &mut [synthetics_checks::DueCheck],
+    counts: &HashMap<String, usize>,
+) {
+    for check in due.iter_mut().filter(|c| !c.subtest_refs.is_empty()) {
+        let own = usize::try_from(check.steps_configured).unwrap_or(0);
+        let expanded = config::meta::synthetics_composition::expanded_step_count(
+            own,
+            &check.subtest_refs,
+            counts,
+        );
+        check.steps_configured = i32::try_from(expanded.max(1)).unwrap_or(i32::MAX);
+    }
+}
+
+/// One indexed read per tick, skipped entirely when no claimed check holds a reference.
+async fn expand_step_counts(
+    db: &sea_orm::DatabaseConnection,
+    due: &mut [synthetics_checks::DueCheck],
+) {
+    let child_ids: Vec<String> = due
+        .iter()
+        .flat_map(|c| c.subtest_refs.iter().cloned())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    if child_ids.is_empty() {
+        return;
+    }
+    let org_ids: HashSet<&str> = due
+        .iter()
+        .filter(|c| !c.subtest_refs.is_empty())
+        .map(|c| c.org_id.as_str())
+        .collect();
+    let mut counts = HashMap::new();
+    for org_id in org_ids {
+        match infra::table::synthetics_refs::child_step_counts(db, org_id, &child_ids).await {
+            Ok(c) => counts.extend(c),
+            Err(e) => {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+                tracing::error!("[synthetics scheduler] child_step_counts for {org_id}: {e}");
+            }
+        }
+    }
+    apply_expanded_counts(due, &counts);
+}
+
 /// SPEC §6.6's table, pure and total over every input.
 ///
 /// `None` means DO NOT GATE — no pool installed, or an org absent from the batch
@@ -607,15 +682,18 @@ pub(crate) fn distinct_org_ids(checks: &[synthetics_checks::DueCheck]) -> Vec<St
 pub(crate) fn gate_decision(
     gate: Option<(PoolExhaustionPolicy, crate::pool::StepRemaining)>,
     is_browser: bool,
+    is_status_attached: bool,
 ) -> PoolGate {
     let Some((policy, remaining)) = gate else {
         return PoolGate::Run;
     };
 
+    // A status check reaches the monthly allowance only after the shared one-time pool is spent,
+    // so either pool having room is enough to run it. Browser has no monthly allowance at all.
     let has_room = if is_browser {
         remaining.browser > 0
     } else {
-        remaining.protocol > 0
+        remaining.protocol > 0 || (is_status_attached && remaining.status > 0)
     };
 
     match policy {
@@ -639,6 +717,7 @@ pub(crate) fn slot_verdict(
     if is_private {
         return PoolGate::Run;
     }
+    let is_status_attached = ctx.is_some_and(|c| c.status_attached.contains(&check.id));
     gate_decision(
         ctx.and_then(|c| {
             Some((
@@ -647,6 +726,7 @@ pub(crate) fn slot_verdict(
             ))
         }),
         check.check_type == SyntheticType::Browser,
+        is_status_attached,
     )
 }
 
@@ -727,6 +807,7 @@ async fn enqueue_planned(
             synthetics_name: &synthetic.name,
             org_id: &synthetic.org_id,
             location: &slot.location,
+            env: slot.env.as_deref(),
             pool: &slot.pool,
             scheduled_ts: run.scheduled_ts,
             valid_until: run.valid_until,
@@ -745,6 +826,7 @@ async fn enqueue_planned(
                     run_id = %run.run_id,
                     job_id = %job_id,
                     location = %slot.location,
+                    env = slot.env.as_deref().unwrap_or("-"),
                     "[synthetics scheduler] job enqueued"
                 );
             }
@@ -779,9 +861,29 @@ async fn resolve_gate_context(checks: &[synthetics_checks::DueCheck]) -> Option<
 
     let remaining = (hooks.remaining_for_orgs)(org_ids).await;
 
+    // One read for the whole tick: inside the fan-out it would run once per claimed check.
+    let claimed: Vec<String> = checks.iter().map(|check| check.id.clone()).collect();
+    let status_attached = infra::table::status_pages::mapped_check_ids(
+        infra::db::get_orm_client_ro().await,
+        Some(&claimed),
+    )
+    .await
+    .unwrap_or_else(|e| {
+        // A check billed as regular is the safe answer: it draws no allowance it did not earn.
+        tracing::error!("[synthetics scheduler] status page mapping unreadable: {e}");
+        std::collections::HashSet::new()
+    });
+
+    tracing::debug!(
+        claimed = claimed.len(),
+        status_attached = status_attached.len(),
+        "[synthetics scheduler] status page membership for this tick"
+    );
+
     Some(GateContext {
         remaining,
         policies,
+        status_attached,
     })
 }
 
@@ -956,7 +1058,7 @@ fn quota_trigger_record(
 /// A non-2xx is checked explicitly: `send()` resolves to `Ok` for a 401 as
 /// readily as for a 200, so treating the transport error as the only failure
 /// drops every record from a mis-scoped token and logs nothing.
-async fn post_json(
+pub(crate) async fn post_json(
     client: &reqwest::Client,
     url: &str,
     token: &str,
@@ -2135,6 +2237,8 @@ mod trial_gate_tests {
 /// SPEC §6 / §7.3 — the free step pool gate, items **2.3** and **2.4**.
 #[cfg(test)]
 mod pool_gate_tests {
+    use std::collections::HashMap;
+
     use config::meta::{
         self_reporting::usage::{RunOutcome, TriggerDataType},
         synthetics::{SyntheticFrequency, SyntheticFrequencyType, SyntheticType},
@@ -2142,8 +2246,8 @@ mod pool_gate_tests {
     use infra::table::synthetics_checks::DueCheck;
 
     use super::{
-        ERROR_SOURCE_QUOTA, GateContext, PoolExhaustionPolicy, PoolGate, gate_decision,
-        quota_result_record, quota_trigger_record, slot_verdict,
+        ERROR_SOURCE_QUOTA, GateContext, PoolExhaustionPolicy, PoolGate, apply_expanded_counts,
+        gate_decision, quota_result_record, quota_trigger_record, slot_verdict,
     };
     use crate::pool::StepRemaining;
 
@@ -2154,7 +2258,11 @@ mod pool_gate_tests {
     const A_LOCATION: &str = "us-east-1";
 
     fn remaining(browser: u64, protocol: u64) -> StepRemaining {
-        StepRemaining { browser, protocol }
+        StepRemaining {
+            browser,
+            protocol,
+            status: 0,
+        }
     }
 
     fn due_check() -> DueCheck {
@@ -2164,6 +2272,7 @@ mod pool_gate_tests {
             org_id: "acme".to_string(),
             check_type: SyntheticType::Browser,
             locations: vec![A_LOCATION.to_string()],
+            environments: Vec::new(),
             frequency: SyntheticFrequency {
                 frequency_type: SyntheticFrequencyType::Minutes,
                 interval: 5,
@@ -2174,6 +2283,7 @@ mod pool_gate_tests {
             next_run_at: SLOT,
             browser_devices: Vec::new(),
             steps_configured: 14,
+            subtest_refs: Vec::new(),
             tags: vec!["checkout".to_string()],
         }
     }
@@ -2191,6 +2301,7 @@ mod pool_gate_tests {
         rows: &[(&str, StepRemaining)],
     ) -> GateContext {
         GateContext {
+            status_attached: std::collections::HashSet::new(),
             remaining: rows
                 .iter()
                 .map(|(org, r)| ((*org).to_string(), *r))
@@ -2228,7 +2339,7 @@ mod pool_gate_tests {
         for (is_browser, r, has_room) in rows {
             let case = format!("browser={is_browser} remaining={r:?}");
             assert_eq!(
-                gate_decision(Some((SubscriptionRequired, *r)), *is_browser),
+                gate_decision(Some((SubscriptionRequired, *r)), *is_browser, false),
                 if *has_room {
                     PoolGate::Run
                 } else {
@@ -2237,7 +2348,7 @@ mod pool_gate_tests {
                 "T30/E15, a Free org's slot is skipped only when the grant is spent: {case}",
             );
             assert_eq!(
-                gate_decision(Some((MeteredOverage, *r)), *is_browser),
+                gate_decision(Some((MeteredOverage, *r)), *is_browser, false),
                 if *has_room {
                     PoolGate::Run
                 } else {
@@ -2246,7 +2357,7 @@ mod pool_gate_tests {
                 "T31/E16, a Rate or Enterprise org is never skipped: {case}",
             );
             assert_eq!(
-                gate_decision(Some((AdditionalCreditsRequired, *r)), *is_browser),
+                gate_decision(Some((AdditionalCreditsRequired, *r)), *is_browser, false),
                 PoolGate::RunAndNotify,
                 "T36/E18, a contract org is never pool-gated: {case}",
             );
@@ -2266,6 +2377,119 @@ mod pool_gate_tests {
                 );
             }
         }
+    }
+
+    /// The reason the gate learned about the status pool at all: a free org whose one-time pool is
+    /// spent must keep the checks its status page is built on.
+    #[test]
+    fn a_status_check_runs_on_the_monthly_pool_when_the_one_time_pool_is_empty() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 43_200,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                false,
+                true
+            ),
+            PoolGate::Run,
+        );
+    }
+
+    #[test]
+    fn a_regular_check_ignores_the_monthly_pool() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 43_200,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                false,
+                false
+            ),
+            PoolGate::Skip,
+        );
+    }
+
+    /// There is no monthly browser allowance, so attachment must not rescue a browser check.
+    #[test]
+    fn a_browser_check_on_a_status_page_reads_only_the_browser_grant() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 500,
+            status: 43_200,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                true,
+                true
+            ),
+            PoolGate::Skip,
+        );
+    }
+
+    #[test]
+    fn an_exhausted_monthly_pool_skips_a_status_check_again() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 0,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::SubscriptionRequired, spent)),
+                false,
+                true
+            ),
+            PoolGate::Skip,
+        );
+    }
+
+    /// A metered org is never blocked, whichever pool is empty.
+    #[test]
+    fn a_metered_org_runs_a_status_check_as_overage() {
+        let spent = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 0,
+        };
+
+        assert_eq!(
+            gate_decision(
+                Some((PoolExhaustionPolicy::MeteredOverage, spent)),
+                false,
+                true
+            ),
+            PoolGate::RunAsOverage,
+        );
+    }
+
+    #[test]
+    fn slot_verdict_reads_status_membership_off_the_check_id() {
+        let check = protocol_check();
+        let with_monthly_room = StepRemaining {
+            browser: 0,
+            protocol: 0,
+            status: 10,
+        };
+        let mut ctx = ctx(
+            &[(&check.org_id, PoolExhaustionPolicy::SubscriptionRequired)],
+            &[(&check.org_id, with_monthly_room)],
+        );
+
+        assert_eq!(slot_verdict(Some(&ctx), &check, false), PoolGate::Skip);
+
+        ctx.status_attached.insert(check.id.clone());
+        assert_eq!(slot_verdict(Some(&ctx), &check, false), PoolGate::Run);
     }
 
     /// T17/E13 — the customer's own hardware ran it, so we never paid and must never stop it.
@@ -2440,6 +2664,20 @@ mod pool_gate_tests {
             "an alert rule matches the SERIALIZED value, and `RunOutcome::Error` writes `error` \
              where this row writes `failed` today",
         );
+    }
+
+    #[test]
+    fn steps_configured_becomes_the_expanded_count_for_parents_only() {
+        let mut parent = due_check();
+        parent.steps_configured = 4;
+        parent.subtest_refs = vec!["login".to_string()];
+        let mut plain = due_check();
+        plain.steps_configured = 14;
+        let mut due = vec![parent, plain];
+        let counts = HashMap::from([("login".to_string(), 13usize)]);
+        apply_expanded_counts(&mut due, &counts);
+        assert_eq!(due[0].steps_configured, 16);
+        assert_eq!(due[1].steps_configured, 14);
     }
 }
 

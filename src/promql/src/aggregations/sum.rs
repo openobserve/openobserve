@@ -13,65 +13,98 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
 use crate::{
-    aggregations::{Accumulate, AggFunc},
+    aggregations::{Accumulate, AggFunc, group_series},
     common::kahan_sum_increment,
 };
 
+#[derive(Clone, Copy)]
 pub struct Sum;
 
 impl AggFunc for Sum {
+    type Accumulator = SumAccumulate;
+
     fn name(&self) -> &'static str {
         "sum"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(SumAccumulate::new())
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        SumAccumulate {
+            sums: vec![SumState::default(); slots],
+            present: vec![false; slots],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct SumState {
+    sum: f64,
+    compensation: f64,
+}
+
+impl SumState {
+    pub(crate) fn push(&mut self, value: f64) {
+        (self.sum, self.compensation) = kahan_sum_increment(value, self.sum, self.compensation);
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        // Fold the other partial's sum and compensation in as two
+        // separate compensated increments: a plain `c + other_c` add
+        // rounds residuals away before the main sums get to cancel.
+        self.push(other.sum);
+        self.push(other.compensation);
+    }
+
+    pub(crate) fn value(&self) -> f64 {
+        self.sum + self.compensation
     }
 }
 
 pub struct SumAccumulate {
-    sum: HashMap<i64, (f64, f64)>,
+    sums: Vec<SumState>,
+    present: Vec<bool>,
 }
 
 impl SumAccumulate {
-    fn new() -> Self {
-        SumAccumulate {
-            sum: HashMap::new(),
-        }
+    fn push(&mut self, slot: usize, value: f64) {
+        self.sums[slot].push(value);
+        self.present[slot] = true;
     }
 }
 
 impl Accumulate for SumAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
-        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, (other_sum, other_c)) in other.sum {
-            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
-            // Fold the other partial's sum and compensation in as two
-            // separate compensated increments: a plain `c + other_c` add
-            // rounds residuals away before the main sums get to cancel.
-            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
+    fn merge(&mut self, other: Self) {
+        for (slot, other_present) in other.present.into_iter().enumerate() {
+            if !other_present {
+                continue;
+            }
+            self.sums[slot].merge(other.sums[slot]);
+            self.present[slot] = true;
+        }
     }
 
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.sum
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .sums
             .into_iter()
-            .map(|(timestamp, (sum, c))| Sample::new(timestamp, sum + c))
-            .collect()
+            .zip(self.present)
+            .enumerate()
+            .filter(|(_, (_, present))| *present)
+            .map(|(slot, (sum, _))| Sample::new(timestamps[slot], sum.value()))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
@@ -84,6 +117,36 @@ mod tests {
 
     use super::*;
     use crate::aggregations::eval_aggregate;
+
+    #[test]
+    fn test_sum_state_preserves_compensation_and_special_values() {
+        for (values, expected) in [
+            (vec![], 0.0_f64),
+            (vec![-0.0], 0.0),
+            (vec![1e16, 1.0, -1e16], 1.0),
+            (vec![f64::MAX, f64::MAX], f64::INFINITY),
+            (vec![f64::NEG_INFINITY, 1.0], f64::NEG_INFINITY),
+            (vec![f64::INFINITY, f64::NEG_INFINITY], f64::NAN),
+            (vec![f64::NAN, 1.0], f64::NAN),
+        ] {
+            for split in 0..=values.len() {
+                let mut sum = SumState::default();
+                for &value in &values[..split] {
+                    sum.push(value);
+                }
+                let mut partial = SumState::default();
+                for &value in &values[split..] {
+                    partial.push(value);
+                }
+                sum.merge(partial);
+                if expected.is_nan() {
+                    assert!(sum.value().is_nan());
+                } else {
+                    assert_eq!(sum.value().to_bits(), expected.to_bits());
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_sum_value_none_input() {

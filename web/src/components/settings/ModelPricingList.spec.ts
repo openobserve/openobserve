@@ -22,18 +22,21 @@ import ModelPricingList from "./ModelPricingList.vue";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock("@/services/model_pricing", () => ({
-  default: {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    getBuiltIn: vi.fn(),
-    refreshBuiltIn: vi.fn(),
-    test: vi.fn(),
-  },
-}));
+vi.mock("@/services/model_pricing", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      getBuiltIn: vi.fn(),
+      refreshBuiltIn: vi.fn(),
+      test: vi.fn(),
+    },
+  });
+});
 
 const mockToastFn = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -253,9 +256,6 @@ const mockI18n = createI18n({
         newModel: "New Model",
         noModels: "No model pricing",
         noModelsDesc: "Add a custom model pricing",
-        modelsCount: "{count} Models",
-        exportSelected: "Export ({count})",
-        deleteSelected: "Delete ({count})",
         tabAll: "All",
         tabCustom: "Custom",
         tabSystem: "System",
@@ -621,14 +621,6 @@ describe("ModelPricingList.vue", () => {
       wrapper.vm.selectedIds = ["org-1", "meta-1"];
       wrapper.vm.selectedIds = ["meta-1"];
       expect(wrapper.vm.selectedIds).toEqual(["meta-1"]);
-    });
-
-    it("selectedCount reflects selectedIds length", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedIds = ["a", "b", "c"];
-      await nextTick();
-      expect(wrapper.vm.selectedCount).toBe(3);
     });
 
     it("selectedIdsOnlyContainsOwn is false when nothing is selected", async () => {

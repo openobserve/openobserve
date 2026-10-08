@@ -1,5 +1,16 @@
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
+export const VARIABLE_FORMATS = ["csv", "pipe", "doublequote", "singlequote"] as const;
+
+export type VariableFormat = (typeof VARIABLE_FORMATS)[number];
+
+export interface VariablePlaceholder {
+  name: string;
+  format?: VariableFormat;
+  /** True when the placeholder sits directly inside single quotes, e.g. `'$name'`. */
+  quoted: boolean;
+}
+
 export const formatInterval = (interval: any) => {
   switch (true) {
     // 0.01s
@@ -223,6 +234,25 @@ const resolveVariablesWithPrecedence = (
   return resolvedVariables;
 };
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildPlaceholderRegex = (names: Iterable<string>): RegExp | null => {
+  const unique = [...new Set(names)].filter((name) => typeof name === "string" && name !== "");
+  if (!unique.length) return null;
+  // Longest first: alternation takes the first branch that matches, so $traceid_sql never resolves as $traceid + "_sql".
+  const alternation = unique
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join("|");
+  const format = `(?::\\s*(${VARIABLE_FORMATS.join("|")})\\s*)?`;
+  return new RegExp(
+    `\\{\\{\\s*(${alternation})\\s*${format}\\}\\}` +
+      `|\\$\\{\\s*(${alternation})\\s*${format}\\}` +
+      `|\\$(${alternation})`,
+    "g",
+  );
+};
+
 /**
  * Normalize variable syntax by stripping whitespace inside {{ }}, ${ }, and around format specifiers.
  * e.g., "{{ hello }}" → "{{hello}}", "${ hello : csv }" → "${hello:csv}"
@@ -239,12 +269,70 @@ export const normalizeVariableSyntax = (str: string): string => {
   return str;
 };
 
+/**
+ * Replaces `{{name}}`, `${name}` and `$name` placeholders of the given variable names in one pass; a `resolve` result of undefined leaves the placeholder untouched.
+ */
+export const replaceVariablePlaceholders = (
+  text: string,
+  names: Iterable<string>,
+  resolve: (placeholder: VariablePlaceholder) => string | undefined,
+): string => {
+  const regex = typeof text === "string" ? buildPlaceholderRegex(names) : null;
+  if (!regex) return text;
+
+  return text.replace(
+    regex,
+    (match, mustacheName, mustacheFormat, bracedName, bracedFormat, bareName, offset: number) => {
+      const replacement = resolve({
+        name: mustacheName ?? bracedName ?? bareName,
+        format: mustacheFormat ?? bracedFormat,
+        quoted: text[offset - 1] === "'" && text[offset + match.length] === "'",
+      });
+      return replacement ?? match;
+    },
+  );
+};
+
+export const getReferencedVariableNames = (
+  texts: (string | null | undefined)[],
+  names: Iterable<string>,
+): Set<string> => {
+  const referenced = new Set<string>();
+  const regex = buildPlaceholderRegex(names);
+  if (!regex) return referenced;
+
+  texts.forEach((text) => {
+    if (typeof text !== "string") return;
+    for (const match of text.matchAll(regex)) {
+      referenced.add(match[1] ?? match[3] ?? match[5]);
+    }
+  });
+  return referenced;
+};
+
+/**
+ * Returns the non ad hoc variables whose placeholders appear in any of the panel queries.
+ */
+export const getVariablesReferencedInQueries = (
+  variables: any[] | undefined,
+  queries: any[] | undefined,
+) => {
+  if (!variables) return undefined;
+  // ad hoc filters are not considered as dependent filters as they are globally applied
+  const candidates = variables.filter((it: any) => it.type != "dynamic_filters");
+  const referenced = getReferencedVariableNames(
+    (queries ?? []).map((q: any) => q?.query),
+    candidates.map((it: any) => it.name),
+  );
+  return candidates.filter((it: any) => referenced.has(it.name));
+};
+
 export const processVariableContent = (
   content: string,
   variablesData: any,
   context?: { tabId?: string; panelId?: string },
 ) => {
-  let processedContent: string = normalizeVariableSyntax(content);
+  const processedContent: string = normalizeVariableSyntax(content);
 
   if (!variablesData || !variablesData.values) {
     return processedContent;
@@ -253,70 +341,33 @@ export const processVariableContent = (
   // Build a map of resolved variable values with scope precedence
   const resolvedVariables = resolveVariablesWithPrecedence(variablesData, context);
 
-  // Process each variable for replacement
+  const valuesByName = new Map<string, any>();
   variablesData.values.forEach((variable: any) => {
-    if (!variable.name) return;
-
-    // Get effective value based on context or use direct value
-    let effectiveValue =
+    if (!variable.name || valuesByName.has(variable.name)) return;
+    valuesByName.set(
+      variable.name,
       context && Object.prototype.hasOwnProperty.call(resolvedVariables, variable.name)
         ? resolvedVariables[variable.name]
-        : variable.value;
-
-    const placeholders = [
-      // Mustache forms
-      "{{" + variable.name + "}}",
-      "{{" + variable.name + ":csv}}",
-      "{{" + variable.name + ":pipe}}",
-      "{{" + variable.name + ":doublequote}}",
-      "{{" + variable.name + ":singlequote}}",
-      // Dollar-sign forms (existing)
-      "${" + variable.name + "}",
-      "${" + variable.name + ":csv}",
-      "${" + variable.name + ":pipe}",
-      "${" + variable.name + ":doublequote}",
-      "${" + variable.name + ":singlequote}",
-      "$" + variable.name,
-    ];
-
-    placeholders.forEach((placeholder) => {
-      // Check if value is null or empty array (use sentinel value)
-      const isNullValue =
-        effectiveValue === null ||
-        effectiveValue === undefined ||
-        (Array.isArray(effectiveValue) && effectiveValue.length === 0);
-
-      let value = isNullValue ? SELECT_ALL_VALUE : effectiveValue;
-
-      // Handle array formatting (only if not null)
-      if (!isNullValue && Array.isArray(value)) {
-        if (placeholder.includes(":csv")) {
-          value = value.join(",");
-        } else if (placeholder.includes(":pipe")) {
-          value = value.join("|");
-        } else if (placeholder.includes(":doublequote")) {
-          value = value.map((v) => `"${v}"`).join(",");
-        } else if (placeholder.includes(":singlequote")) {
-          value = value.map((v) => `'${v}'`).join(",");
-        } else {
-          value = value.join(",");
-        }
-      }
-
-      processedContent = processedContent.replace(
-        new RegExp(
-          placeholder
-            .replace(/\\/g, "\\\\")
-            .replace(/\$/g, "\\$")
-            .replace(/\{/g, "\\{")
-            .replace(/\}/g, "\\}")
-            .replace(/\|/g, "\\|"),
-          "g",
-        ),
-        String(value),
-      );
-    });
+        : variable.value,
+    );
   });
 
-  return processedContent;
+  return replaceVariablePlaceholders(processedContent, valuesByName.keys(), ({ name, format }) => {
+    const value = valuesByName.get(name);
+    if (value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+      return SELECT_ALL_VALUE;
+    }
+    if (!Array.isArray(value)) return String(value);
+
+    switch (format) {
+      case "pipe":
+        return value.join("|");
+      case "doublequote":
+        return value.map((v) => `"${v}"`).join(",");
+      case "singlequote":
+        return value.map((v) => `'${v}'`).join(",");
+      default:
+        return value.join(",");
+    }
+  });
 };

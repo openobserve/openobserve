@@ -85,6 +85,17 @@ impl CacheBuf {
     }
 
     pub(crate) fn get_final_result(&mut self, stream_id: &str) -> Result<Vec<RecordBatch>> {
+        self.merge_cached_states(
+            stream_id,
+            config::get_config().search.feature_partial_reduce_enabled,
+        )
+    }
+
+    fn merge_cached_states(
+        &mut self,
+        stream_id: &str,
+        partial_reduce_enabled: bool,
+    ) -> Result<Vec<RecordBatch>> {
         if self.cached_buf.is_empty() {
             return Ok(Vec::new());
         }
@@ -98,10 +109,6 @@ impl CacheBuf {
             .collect();
         let total_batch_len = record_batchs.len();
         let partition_num = std::cmp::max(2, self.cached_buf.target_partitions);
-
-        // When partial_reduce is enabled each follower has already sent pre-merged data, so
-        // phase-1 (parallel chunked aggregation) would double-aggregate already-reduced values.
-        let partial_reduce_enabled = config::get_config().search.feature_partial_reduce_enabled;
 
         let mut merged_batches: Vec<RecordBatch> = if partial_reduce_enabled {
             // Phase 1 skipped — use follower results directly.
@@ -183,5 +190,173 @@ impl CacheBuf {
         );
 
         Ok(merged_batches)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use arrow::{
+        array::{Int64Array, StringArray},
+        datatypes::{DataType, Field, Schema},
+        ipc::{reader::FileReader, writer::FileWriter},
+    };
+    use datafusion::{
+        common::tree_node::TreeNode,
+        datasource::{MemTable, memory::MemorySourceConfig},
+        physical_plan::{
+            ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
+            aggregates::AggregateMode, collect,
+        },
+        prelude::{SessionConfig, SessionContext},
+    };
+
+    use super::*;
+    use crate::datafusion::optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate;
+
+    fn find_aggregate(plan: &Arc<dyn ExecutionPlan>, partial: bool) -> Arc<AggregateExec> {
+        if let Some(agg) = plan.downcast_ref::<AggregateExec>()
+            && (*agg.mode() == AggregateMode::Partial) == partial
+        {
+            return Arc::new(agg.clone());
+        }
+        for child in plan.children() {
+            if child
+                .exists(|node| Ok(node.downcast_ref::<AggregateExec>().is_some()))
+                .unwrap()
+            {
+                return find_aggregate(child, partial);
+            }
+        }
+        panic!("expected aggregate in {plan:?}");
+    }
+
+    fn sorted_result(batches: &[RecordBatch]) -> Vec<String> {
+        let mut rows = batches
+            .iter()
+            .flat_map(|batch| {
+                (0..batch.num_rows()).map(|row| {
+                    let values = batch
+                        .columns()
+                        .iter()
+                        .map(|column| {
+                            datafusion::common::ScalarValue::try_from_array(column, row).unwrap()
+                        })
+                        .collect::<Vec<_>>();
+                    format!("{values:?}")
+                })
+            })
+            .collect::<Vec<_>>();
+        rows.sort();
+        rows
+    }
+
+    #[tokio::test]
+    async fn test_streaming_cache_state_merge_matches_uncached_aggregation() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("g", DataType::Utf8, true),
+            Field::new("v", DataType::Int64, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec![
+                    Some("a"),
+                    Some("b"),
+                    Some("a"),
+                    None,
+                    Some("b"),
+                    None,
+                    Some("a"),
+                    Some("b"),
+                ])),
+                Arc::new(Int64Array::from(vec![
+                    Some(2),
+                    Some(4),
+                    None,
+                    Some(8),
+                    Some(4),
+                    Some(12),
+                    Some(10),
+                    None,
+                ])),
+            ],
+        )?;
+        let config = SessionConfig::new()
+            .with_target_partitions(2)
+            .set_bool("datafusion.execution.enable_migration_aggregate", false);
+        let ctx = SessionContext::new_with_config(config);
+        ctx.register_table(
+            "t",
+            Arc::new(MemTable::try_new(
+                schema,
+                vec![vec![batch.slice(0, 3)], vec![batch.slice(3, 5)]],
+            )?),
+        )?;
+        for grouped in [false, true] {
+            let query = if grouped {
+                "SELECT g, COUNT(*), COUNT(v), SUM(v), AVG(v), MIN(v), MAX(v), COUNT(DISTINCT v), SUM(v) FILTER (WHERE v > 4) FROM t GROUP BY g"
+            } else {
+                "SELECT COUNT(*), COUNT(v), SUM(v), AVG(v), MIN(v), MAX(v), COUNT(DISTINCT v), SUM(v) FILTER (WHERE v > 4) FROM t"
+            };
+            let plan = ctx.sql(query).await?.create_physical_plan().await?;
+            let expected = collect(plan.clone(), ctx.task_ctx()).await?;
+            let final_agg = find_aggregate(&plan, false);
+            let partial = find_aggregate(final_agg.input(), true);
+            for reduced in [false, true] {
+                let input: Arc<dyn ExecutionPlan> = if reduced {
+                    wrap_partial_reduce_for_aggregate(true, &partial, partial.clone())?
+                } else {
+                    partial.clone()
+                };
+                let states = collect(input, ctx.task_ctx()).await?;
+                for cached_prefix in [0, 1, states.len()] {
+                    let mut cache = CacheBuf {
+                        total_partition_num: 2,
+                        cached_partition_num: 0,
+                        cached_buf: CacheStream::new(grouped, 2, final_agg.clone()),
+                    };
+                    for state in &states[..cached_prefix] {
+                        cache.append_data(Arc::new(state.clone()));
+                    }
+                    let merged = cache.merge_cached_states("state-compatibility", reduced)?;
+                    let mut bytes = Vec::new();
+                    {
+                        let mut writer =
+                            FileWriter::try_new(&mut bytes, &final_agg.input().schema())?;
+                        for batch in &merged {
+                            writer.write(batch)?;
+                        }
+                        writer.finish()?;
+                    }
+                    let replay = FileReader::try_new(Cursor::new(bytes), None)?
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+                    for state in replay
+                        .into_iter()
+                        .chain(states[cached_prefix..].iter().cloned())
+                    {
+                        cache.append_data(Arc::new(state));
+                    }
+                    let replay = cache.merge_cached_states("state-compatibility", reduced)?;
+                    let input = MemorySourceConfig::try_new_exec(
+                        &[replay],
+                        final_agg.input().schema(),
+                        None,
+                    )?;
+                    let final_plan = final_agg.clone().replace_children(
+                        vec![input],
+                        ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                    )?;
+                    let actual = collect(final_plan, ctx.task_ctx()).await?;
+                    assert_eq!(
+                        sorted_result(&actual),
+                        sorted_result(&expected),
+                        "grouped={grouped}, reduced={reduced}, cached_prefix={cached_prefix}"
+                    );
+                }
+            }
+        }
+        Ok(())
     }
 }

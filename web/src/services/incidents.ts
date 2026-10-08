@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 import type { TranslateFn } from "@/types/i18n";
 import serviceStreamsApi, {
   type CorrelationRequest,
@@ -42,6 +43,8 @@ export interface Incident {
   alert_count: number;
   title?: string;
   assigned_to?: string;
+  acknowledged_by?: string;
+  acknowledged_at?: number;
   created_at: number;
   updated_at: number;
 }
@@ -196,10 +199,14 @@ const incidents = {
     incident_id: string,
     status: "open" | "acknowledged" | "resolved",
   ) => {
-    return http().patch<Incident>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
-      { status },
-    );
+    return http()
+      .patch<Incident>(`/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`, {
+        status,
+      })
+      .then((res) => {
+        analytics.track("incident_status_updated", { status });
+        return res;
+      });
   },
 
   /**
@@ -210,10 +217,18 @@ const incidents = {
     incident_id: string,
     updates: { title?: string; severity?: string },
   ) => {
-    return http().patch<Incident | UpdateSeverityResponse>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
-      updates,
-    );
+    return http()
+      .patch<Incident | UpdateSeverityResponse>(
+        `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
+        updates,
+      )
+      .then((res) => {
+        analytics.track("incident_updated", {
+          severity_changed: updates.severity !== undefined,
+          title_changed: updates.title !== undefined,
+        });
+        return res;
+      });
   },
 
   /**
@@ -232,11 +247,18 @@ const incidents = {
     params: { reanalysis?: boolean; build_on_previous?: boolean } = {},
     config: { signal?: AbortSignal } = {},
   ) => {
-    return http().post<{ rca_content: string }>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
-      null,
-      { params, signal: config.signal },
-    );
+    return http()
+      .post<{ rca_content: string }>(
+        `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
+        null,
+        { params, signal: config.signal },
+      )
+      .then((res) => {
+        analytics.track("incident_rca_requested", {
+          build_on_previous: params.build_on_previous === true,
+        });
+        return res;
+      });
   },
 
   /**
@@ -347,9 +369,14 @@ const incidents = {
    * Post a comment on an incident
    */
   postComment: (org_identifier: string, incident_id: string, comment: string) => {
-    return http().post(`/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events/comment`, {
-      comment,
-    });
+    return http()
+      .post(`/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events/comment`, {
+        comment,
+      })
+      .then((res) => {
+        analytics.track("incident_comment_added");
+        return res;
+      });
   },
 
   /**

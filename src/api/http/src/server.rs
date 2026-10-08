@@ -15,7 +15,8 @@
 
 use std::{cmp::max, net::SocketAddr, time::Duration};
 
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use axum_tracing_opentelemetry::middleware::OtelAxumLayer;
+use tower_http::compression::CompressionLayer;
 
 use crate::handler::http::router::create_app_router;
 
@@ -42,7 +43,7 @@ pub async fn run(ui_routes: fn(&str) -> axum::Router) -> Result<(), anyhow::Erro
     {
         app
     } else {
-        app.layer(TraceLayer::new_for_http())
+        app.layer(otel_layer())
     };
 
     serve(haddr, app).await
@@ -119,6 +120,10 @@ pub async fn serve(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::E
     Ok(())
 }
 
+fn otel_layer() -> OtelAxumLayer {
+    OtelAxumLayer::default().filter(config::meta::logger::otel_middleware_enabled)
+}
+
 async fn shutdown_signal() {
     #[cfg(unix)]
     {
@@ -156,4 +161,49 @@ async fn shutdown_signal() {
         log::error!("set offline failed: {e}");
     }
     log::info!("Node is offline");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use tower::ServiceExt;
+    use tracing_subscriber::{Layer, filter::LevelFilter, layer::Context, prelude::*};
+
+    use super::*;
+
+    struct WarnRecorder(Arc<Mutex<usize>>);
+
+    impl<S: tracing::Subscriber> Layer<S> for WarnRecorder {
+        fn on_event(&self, event: &tracing::Event<'_>, _: Context<'_, S>) {
+            if *event.metadata().level() == tracing::Level::WARN {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+    }
+
+    async fn warnings_per_request(layer: OtelAxumLayer, level: LevelFilter) -> usize {
+        let app = axum::Router::new()
+            .route("/", axum::routing::get(|| async {}))
+            .layer(layer);
+        let warnings = Arc::new(Mutex::new(0));
+        let subscriber = tracing_subscriber::registry()
+            .with(WarnRecorder(Arc::clone(&warnings)).with_filter(level));
+        // a lone dispatcher lets parallel tests cache the WARN callsite as disabled
+        let _second = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let _guard = tracing::subscriber::set_default(subscriber);
+        let request = http::Request::get("/")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        app.oneshot(request).await.unwrap();
+        *warnings.lock().unwrap()
+    }
+
+    #[tokio::test]
+    async fn otel_layer_is_silent_when_tracing_is_off() {
+        for level in [LevelFilter::INFO, LevelFilter::TRACE] {
+            assert!(warnings_per_request(OtelAxumLayer::default(), level).await > 0);
+            assert_eq!(warnings_per_request(otel_layer(), level).await, 0);
+        }
+    }
 }

@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="iam-group-users"
         :show-global-filter="false"
-        :footer-title="t('iam.basicUsers')"
         dense
       >
         <template #cell-select="{ row }">
@@ -142,9 +141,8 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { computed, watch } from "vue";
+import { computed, watch, ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { ref, onBeforeMount } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

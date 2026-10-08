@@ -19,11 +19,43 @@ import {
   formatInterval,
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
+  getVariablesReferencedInQueries,
   normalizeVariableSyntax,
+  replaceVariablePlaceholders,
+  type VariableFormat,
 } from "@/utils/dashboard/variables/variablesUtils";
 import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
+
+const formatPanelVariableValue = (
+  variable: any,
+  format: VariableFormat | undefined,
+  queryType: any,
+): string => {
+  const escape = (value: any) => escapeSingleQuotes(String(value));
+
+  if (!Array.isArray(variable.value)) {
+    // If no data found (null value), use SELECT_ALL_VALUE
+    return `${escape(variable.value === null ? SELECT_ALL_VALUE : variable.value)}`;
+  }
+
+  // If no data found (empty array), use SELECT_ALL_VALUE
+  const values = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
+  const singleQuoted = values.map((value: any) => `'${escape(value)}'`).join(",") || "''";
+  switch (format) {
+    case "csv":
+      return values.join(",");
+    case "pipe":
+      return values.join("|");
+    case "doublequote":
+      return values.map((value: any) => `"${value}"`).join(",") || '""';
+    case "singlequote":
+      return singleQuoted;
+    default:
+      return queryType === "sql" ? singleQuoted : values.join("|");
+  }
+};
 
 /**
  * Composable that encapsulates all panel-level variable substitution logic.
@@ -44,23 +76,12 @@ export const usePanelVariableSubstitution = ({
   log: (...args: any[]) => void;
 }) => {
   // currently dependent variables data snapshot (mirrors the initialisation in usePanelDataLoader)
-  let currentDependentVariablesData = variablesData?.value?.values
-    ? JSON.parse(
-        JSON.stringify(
-          variablesData.value?.values
-            ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-            ?.filter((it: any) => {
-              const regexForVariable = new RegExp(
-                `(?:\\$\\{?\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
-              );
-
-              return panelSchema.value.queries
-                ?.map((q: any) => regexForVariable.test(q?.query))
-                ?.includes(true);
-            }),
-        ),
-      )
-    : [];
+  let currentDependentVariablesData = JSON.parse(
+    JSON.stringify(
+      getVariablesReferencedInQueries(variablesData?.value?.values, panelSchema.value.queries) ??
+        [],
+    ),
+  );
 
   let currentDynamicVariablesData = variablesData?.value?.values
     ? JSON.parse(
@@ -83,17 +104,7 @@ export const usePanelVariableSubstitution = ({
   // Data accessors
 
   const getDependentVariablesData = () =>
-    variablesData.value?.values
-      ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-      ?.filter((it: any) => {
-        const regexForVariable = new RegExp(
-          `(?:\\$\\{?\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${it.name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
-        );
-
-        return panelSchema.value.queries
-          ?.map((q: any) => regexForVariable.test(q?.query))
-          ?.includes(true);
-      });
+    getVariablesReferencedInQueries(variablesData.value?.values, panelSchema.value.queries);
 
   const getDynamicVariablesData = () => {
     const adHocVariables = variablesData.value?.values
@@ -461,141 +472,39 @@ export const usePanelVariableSubstitution = ({
       },
     ];
 
-    // replace fixed variables with its values
-    fixedVariables?.forEach((variable: any) => {
-      // replace $VARIABLE_NAME, ${VARIABLE_NAME}, or {{VARIABLE_NAME}} with its value
-      const variableName = `$${variable.name}`;
-      const variableNameWithBrackets = `\${${variable.name}}`;
-      const mustachePlaceholder = `{{${variable.name}}}`;
-      const variableValue = variable.value;
-      if (
-        query.includes(variableName) ||
-        query.includes(variableNameWithBrackets) ||
-        query.includes(mustachePlaceholder)
-      ) {
-        metadata.push({
-          type: "fixed",
-          name: variable.name,
-          value: variable.value,
-        });
-      }
-      query = query.replaceAll(mustachePlaceholder, variableValue);
-      query = query.replaceAll(variableNameWithBrackets, variableValue);
-      query = query.replaceAll(variableName, variableValue);
+    const fixedValues = new Map<string, string>(fixedVariables.map((it) => [it.name, it.value]));
+    const dependentVariables = new Map<string, any>();
+    currentDependentVariablesData?.forEach((variable: any) => {
+      if (!dependentVariables.has(variable.name)) dependentVariables.set(variable.name, variable);
     });
 
-    if (currentDependentVariablesData?.length) {
-      currentDependentVariablesData?.forEach((variable: any) => {
-        // replace $VARIABLE_NAME or ${VARIABLE_NAME} with its value
-        const variableName = `$${variable.name}`;
-        const variableNameWithBrackets = `\${${variable.name}}`;
+    const reported = new Set<string>();
+    const report = (type: string, name: string, value: any) => {
+      if (reported.has(`${type}:${name}`)) return;
+      reported.add(`${type}:${name}`);
+      metadata.push({ type, name, value });
+    };
 
-        let variableValue = "";
-        if (Array.isArray(variable.value)) {
-          // If no data found (empty array), use SELECT_ALL_VALUE
-          const valueToUse = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
-          const value =
-            valueToUse
-              .map(
-                (value: any) =>
-                  `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
-              )
-              .join(",") || "''";
-          const possibleVariablesPlaceHolderTypes = [
-            // Mustache forms
-            {
-              placeHolder: `{{${variable.name}:csv}}`,
-              value: valueToUse.join(","),
-            },
-            {
-              placeHolder: `{{${variable.name}:pipe}}`,
-              value: valueToUse.join("|"),
-            },
-            {
-              placeHolder: `{{${variable.name}:doublequote}}`,
-              value: valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
-            },
-            {
-              placeHolder: `{{${variable.name}:singlequote}}`,
-              value: value,
-            },
-            {
-              placeHolder: `{{${variable.name}}}`,
-              value: queryType === "sql" ? value : valueToUse.join("|"),
-            },
-            // Dollar-sign forms (existing)
-            {
-              placeHolder: `\${${variable.name}:csv}`,
-              value: valueToUse.join(","),
-            },
-            {
-              placeHolder: `\${${variable.name}:pipe}`,
-              value: valueToUse.join("|"),
-            },
-            {
-              placeHolder: `\${${variable.name}:doublequote}`,
-              value: valueToUse.map((value: any) => `"${value}"`).join(",") || '""',
-            },
-            {
-              placeHolder: `\${${variable.name}:singlequote}`,
-              value: value,
-            },
-            {
-              placeHolder: `\${${variable.name}}`,
-              value: queryType === "sql" ? value : valueToUse.join("|"),
-            },
-            {
-              placeHolder: `$${variable.name}`,
-              value: queryType === "sql" ? value : valueToUse.join("|"),
-            },
-          ];
-
-          possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
-            if (query.includes(placeHolderObj.placeHolder)) {
-              metadata.push({
-                type: "variable",
-                name: variable.name,
-                value: placeHolderObj.value,
-              });
-            }
-            query = query.replaceAll(placeHolderObj.placeHolder, placeHolderObj.value);
-          });
-        } else {
-          // If no data found (null value), use SELECT_ALL_VALUE
-          const valueToUse = variable.value === null ? SELECT_ALL_VALUE : variable.value;
-          variableValue = `${variable.escapeSingleQuotes ? escapeSingleQuotes(valueToUse) : valueToUse}`;
-          const mustachePlaceholder = `{{${variable.name}}}`;
-          if (
-            query.includes(variableName) ||
-            query.includes(variableNameWithBrackets) ||
-            query.includes(mustachePlaceholder)
-          ) {
-            metadata.push({
-              type: "variable",
-              name: variable.name,
-              value: valueToUse,
-            });
-          }
-
-          // Replace all forms of the variable placeholder in the query,
-          // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc.
-          // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively.
-          // For doublequote form, the variable value will be wrapped with double quotes.
-          // For singlequote form, the variable value will be wrapped with single quotes.
-          query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
-          query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
-          query = query.replaceAll(`{{${variable.name}:doublequote}}`, variableValue);
-          query = query.replaceAll(`{{${variable.name}:singlequote}}`, variableValue);
-          query = query.replaceAll(mustachePlaceholder, variableValue);
-          query = query.replaceAll(variableNameWithBrackets, variableValue);
-          query = query.replaceAll(variableName, variableValue);
+    query = replaceVariablePlaceholders(
+      query,
+      [...fixedValues.keys(), ...dependentVariables.keys()],
+      ({ name, format }) => {
+        // fixed variables shadow a dashboard variable of the same name
+        if (fixedValues.has(name)) {
+          if (format) return undefined;
+          report("fixed", name, fixedValues.get(name));
+          return fixedValues.get(name);
         }
-      });
 
-      return { query, metadata };
-    } else {
-      return { query, metadata };
-    }
+        const variable = dependentVariables.get(name);
+        const value = formatPanelVariableValue(variable, format, queryType);
+        const isScalar = !Array.isArray(variable.value);
+        report("variable", name, isScalar ? (variable.value ?? SELECT_ALL_VALUE) : value);
+        return value;
+      },
+    );
+
+    return { query, metadata };
   };
 
   const applyDynamicVariables = async (query: any, queryType: any) => {

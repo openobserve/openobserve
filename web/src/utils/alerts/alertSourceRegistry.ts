@@ -116,6 +116,15 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  rumfunnel: {
+    id: "rumfunnel",
+    labelKey: "alerts.prefill.sources.rumfunnel.label",
+    toastKey: "alerts.prefill.sources.rumfunnel.toast",
+    icon: "shield-alert-outline",
+    // The conversion row filter is the whole condition, so any returned row fires.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+  },
 };
 
 export const getAlertSource = (id: string | undefined): AlertSourceDefinition => {

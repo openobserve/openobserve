@@ -129,6 +129,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             stream_summary.total_storage_size += stream.stats.storage_size;
             stream_summary.total_compressed_size += stream.stats.compressed_size;
             stream_summary.total_index_size += stream.stats.index_size;
+            stream_summary.total_mindex_size += stream.stats.mindex_size;
         }
     }
 
@@ -199,19 +200,6 @@ pub async fn get_passcode(
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
     get_passcode_inner(org_id, user_id, false).await
-}
-
-/// Read a service account's own API token.
-///
-/// Unlike [`get_passcode`], this never returns the org-level "default"
-/// ingestion token (`o2oi_`-prefixed). A service account authenticates as
-/// itself and is authorized by its assigned role/group — its token is its own
-/// credential, not the org-wide ingestion token.
-pub async fn get_service_account_passcode(
-    org_id: Option<&str>,
-    user_id: &str,
-) -> Result<IngestionPasscode, anyhow::Error> {
-    get_passcode_inner(org_id, user_id, true).await
 }
 
 async fn get_passcode_inner(
@@ -1001,6 +989,7 @@ pub async fn generate_invitation(
             None => return Err(anyhow::anyhow!("Unauthorized access")),
         }
     }
+
     for invitee in &invites.invites {
         match get_user(Some(org_id), invitee).await {
             None => {}
@@ -1142,6 +1131,19 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
+        // if already part of org, one way or other, mark as accepted
+        log::info!(
+            "user {user_email} is already part of {org_id} but tried to accept invite, marking it as accepted"
+        );
+        if let Err(e) = org_invites::update_invite_status(
+            invite_token,
+            &user_email.to_lowercase(),
+            OrgInviteStatus::Accepted,
+        )
+        .await
+        {
+            log::error!("Error updating the invite status in the db: {e}");
+        }
         return Ok(()); // User is already part of the org
     }
 

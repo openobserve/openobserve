@@ -16,6 +16,7 @@
 import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { chartColor } from "@/utils/chartTheme";
+import { escapeHtml } from "@/utils/html";
 import { deaccumulateHistogramSeries, HistogramSeriesInput } from "./shared/histogramBuckets";
 import {
   HEATMAP_SPLIT_AREA,
@@ -342,7 +343,7 @@ export class HeatmapConverter implements PromQLChartConverter {
                   config?.decimals,
                 ),
               ) || params?.value?.[2];
-            return `${seriesName} <br/> ${params?.marker} ${params?.name} : ${value}`;
+            return `${escapeHtml(seriesName)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
           } catch (error) {
             return "";
           }
@@ -426,9 +427,8 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
-    // De-accumulated counts are clamped at zero, so this resolves to [0, max];
-    // routed through the shared helper so the empty-data case is handled in one place.
-    const visualMapRange = visualMapRangeOf(minValue, maxValue);
+    // [0, max] for clamped counts, unless heatmaps drawn side by side share a range so colours compare.
+    const visualMapRange = config?.visual_map_range ?? visualMapRangeOf(minValue, maxValue);
 
     const xAxisData = buildXAxisData(timestamps);
 
@@ -503,7 +503,7 @@ export class HeatmapConverter implements PromQLChartConverter {
                   config?.decimals,
                 ),
               ) || params?.value?.[2];
-            return `le ${bucketLabel} <br/> ${params?.marker} ${params?.name} : ${value}`;
+            return `le ${escapeHtml(bucketLabel)} <br/> ${params?.marker} ${escapeHtml(params?.name)} : ${escapeHtml(value)}`;
           } catch (error) {
             return "";
           }

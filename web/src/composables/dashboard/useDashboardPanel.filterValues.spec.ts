@@ -66,7 +66,10 @@ vi.mock("./useValuesWebSocket", () => ({
 vi.mock("../useNotifications", () => ({
   default: () => ({ showErrorNotification, showPositiveNotification: vi.fn() }),
 }));
-vi.mock("@/services/stream", () => ({ default: { schema: vi.fn() } }));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { schema: vi.fn() } });
+});
 vi.mock("@/services/metrics", () => ({ default: { get_promql_series: vi.fn() } }));
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),

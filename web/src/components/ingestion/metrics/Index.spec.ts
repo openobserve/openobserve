@@ -5,7 +5,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -358,16 +358,16 @@ describe("IngestMetrics Component", () => {
       });
     });
 
-    it("should track segment analytics on successful copy", async () => {
+    it("should track product analytics on successful copy", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValueOnce(true);
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "otelCollector";
       wrapper.vm.copyToClipboardFn({ innerText: "otel snippet" });
       await flushPromises();
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "otelCollector",
         user_org: store.state.selectedOrganization.identifier,
@@ -376,28 +376,28 @@ describe("IngestMetrics Component", () => {
       });
     });
 
-    it("should NOT track segment analytics when copy fails", async () => {
+    it("should NOT track product analytics when copy fails", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("fail"));
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "telegraf";
       wrapper.vm.copyToClipboardFn({ innerText: "telegraf snippet" });
       await flushPromises();
 
-      expect(segment.default.track).not.toHaveBeenCalled();
+      expect(analytics.default.track).not.toHaveBeenCalled();
     });
 
-    it("should NOT track segment analytics when copy resolves false", async () => {
+    it("should NOT track product analytics when copy resolves false", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValueOnce(false);
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       mockRouter.currentRoute.value.name = "prometheus";
       wrapper.vm.copyToClipboardFn({ innerText: "some snippet" });
       await flushPromises();
 
-      expect(segment.default.track).not.toHaveBeenCalled();
+      expect(analytics.default.track).not.toHaveBeenCalled();
     });
 
     it("should handle empty innerText gracefully", async () => {

@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-else-if="isDetailView"
             id="o2-page-actions"
-            class="flex items-center gap-2"
+            class="flex items-center gap-2 max-md:max-w-full max-md:flex-wrap max-md:justify-end max-md:gap-y-1"
             data-test="pipeline-detail-actions"
           />
         </template>
@@ -190,6 +190,7 @@ export default defineComponent({
       pipelineHistory: "streamPipelines",
       pipelineBackfill: "streamPipelines",
       functionList: "functions",
+      importFunction: "functions",
       enrichmentTables: "enrichmentTables",
     };
 
@@ -238,7 +239,10 @@ export default defineComponent({
     // Tables). They're rendered directly instead of nested inside the shell's
     // OPageLayout, so their header sits flush at the top like any normal page.
     const sectionOwnsHeader = computed(
-      () => routeName.value === "functionList" || routeName.value === "enrichmentTables",
+      () =>
+        routeName.value === "functionList" ||
+        routeName.value === "enrichmentTables" ||
+        routeName.value === "importFunction",
     );
 
     // Responsive: collapse secondary actions into an overflow menu when narrow.

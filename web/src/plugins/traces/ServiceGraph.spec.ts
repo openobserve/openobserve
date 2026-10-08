@@ -79,11 +79,14 @@ const mockSearchObj = reactive({
 });
 
 // Mock dependencies
-vi.mock("@/services/service_graph", () => ({
-  default: {
-    getCurrentTopology: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_graph", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getCurrentTopology: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -106,17 +109,23 @@ vi.mock("vue-router", () => ({
 // fetchDatabaseEdges (called inside loadServiceGraph) hits streamService.schema
 // and searchService.search. Mock them so the call completes quickly without real
 // HTTP requests that never resolve in the test environment.
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: vi.fn().mockRejectedValue(new Error("No MSW handler for schema")),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: vi.fn().mockRejectedValue(new Error("No MSW handler for schema")),
+    },
+  });
+});
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 // Mock @/utils/date so getEffectiveTimeRange returns deterministic values.
 // Must be declared before the component import so Vitest hoisting applies.
@@ -2264,6 +2273,36 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       // The controls live inside a dropdown; only the trigger is always in the
       // toolbar (keeps it compact). The mode/kind setters are covered above.
       expect(wrapper.find('[data-test="service-graph-density-btn"]').exists()).toBe(true);
+    });
+  });
+
+  describe("node side panel time range", () => {
+    it("resolves the range when the panel opens instead of passing stored start/end", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const resolvedNow = { startTime: 3000000, endTime: 4000000 };
+      mockGetEffectiveTimeRange.mockReturnValueOnce(resolvedNow);
+
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      await flushPromises();
+
+      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
+      expect(panel.props("timeRange")).toEqual(resolvedNow);
+      expect(mockGetEffectiveTimeRange).toHaveBeenLastCalledWith(mockSearchObj.data.datetime);
+    });
+
+    it("passes an absolute range through unchanged", async () => {
+      mockSearchObj.data.datetime.type = "absolute";
+      mockSearchObj.data.datetime.startTime = 1000;
+      mockSearchObj.data.datetime.endTime = 2000;
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.handleNodeClick({ dataType: "node", data: wrapper.vm.graphData.nodes[0] });
+      await flushPromises();
+
+      const panel = wrapper.findComponent({ name: "ServiceGraphSidePanel" });
+      expect(panel.props("timeRange")).toEqual({ startTime: 1000, endTime: 2000 });
     });
   });
 });

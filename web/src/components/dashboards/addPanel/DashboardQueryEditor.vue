@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b"
+      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b max-md:h-auto max-md:flex-wrap max-md:gap-y-1 max-md:px-2 max-md:py-1"
       @click.stop
     >
       <div
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ multiQueryWarning }}
         </OTag>
       </div>
-      <div class="flex shrink-0 items-center gap-3">
+      <div class="flex shrink-0 items-center gap-3 max-md:max-w-full max-md:flex-wrap">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="flex flex-1 flex-col overflow-hidden"
+    class="flex flex-1 flex-col overflow-clip max-md:h-80 max-md:flex-none"
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0; flex: none;' : ''"
     data-test="dashboard-query"
   >
@@ -188,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full">
           <OSplitter
             class="h-full w-full"
+            after-class="overflow-clip!"
             v-model="splitterModel"
             :disable="promqlMode || !dashboardPanelData.layout.vrlFunctionToggle"
             :limits="[30, promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70]"
@@ -230,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #after>
               <div class="flex h-full w-full flex-col">
-                <div class="min-h-0 w-full flex-1">
+                <div class="relative min-h-0 w-full flex-1">
                   <UnifiedQueryEditor
                     class="h-full w-full"
                     v-if="!promqlMode && dashboardPanelData.layout.vrlFunctionToggle"
@@ -268,32 +269,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </div>
                 </div>
-                <div class="w-full shrink-0">
-                  <div class="flex items-center">
-                    <OSelect
-                      v-model="selectedFunction"
-                      :label="t('dashboard.useSavedFunction')"
-                      :options="functionSelectOptions"
-                      label-position="inside"
-                      data-test="dashboard-use-saved-vrl-function"
-                      labelKey="name"
-                      valueKey="function"
-                      @search="onFunctionSearch"
-                      @update:model-value="onFunctionSelect"
-                      class="flex-1"
+                <div
+                  class="border-border-default bg-surface-subtle sticky bottom-0 z-10 flex w-full shrink-0 items-center gap-1 border-t px-2 py-1.5"
+                  data-test="dashboard-vrl-function-toolbar"
+                >
+                  <OSelect
+                    v-model="selectedFunction"
+                    :label="t('dashboard.useSavedFunction')"
+                    :options="functionSelectOptions"
+                    label-position="inside"
+                    data-test="dashboard-use-saved-vrl-function"
+                    labelKey="name"
+                    valueKey="function"
+                    @search="onFunctionSearch"
+                    @update:model-value="onFunctionSelect"
+                    class="min-w-0 flex-1"
+                  />
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    data-test="dashboard-addpanel-config-drilldown-info"
+                  >
+                    <template #icon-left><OIcon name="info-outline" size="sm" /></template>
+                    <OTooltip
+                      :content="t('dashboard.vrlExtractionTooltip')"
+                      max-width="15.625rem"
                     />
-                    <OButton
-                      variant="ghost"
-                      size="icon"
-                      data-test="dashboard-addpanel-config-drilldown-info"
-                    >
-                      <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                      <OTooltip
-                        :content="t('dashboard.vrlExtractionTooltip')"
-                        max-width="15.625rem"
-                      />
-                    </OButton>
-                  </div>
+                  </OButton>
                 </div>
               </div>
             </template>
@@ -311,14 +313,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
-import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  computed,
+  onMounted,
+  nextTick,
+  onUnmounted,
+  inject,
+  type Ref,
+  onBeforeMount,
+} from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import { inject, type Ref } from "vue";
-import { onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
@@ -393,9 +404,7 @@ export default defineComponent({
 
     const getFunctions = async () => {
       try {
-        if (store.state.organizationData.functions.length == 0) {
-          await getAllFunctions();
-        }
+        await getAllFunctions();
 
         store.state.organizationData.functions.map((data: any) => {
           functionList.value.push({

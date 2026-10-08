@@ -14,28 +14,55 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const workflows = {
-  // List all workflows for the org .
-  listWorkflows: (org_identifier: string) => {
-    const url = `/api/${org_identifier}/workflows`;
-    return http().get(url);
+  // List the org's workflows in one folder. Omitting `folder` lets the backend
+  // fall back to the default folder, which is what pre-folders clients sent.
+  // `allFolders` lists across every folder the caller may see and takes
+  // precedence over `folder`. `searchSubstring` is matched against name and
+  // description in the database, so a cross-folder search does not require
+  // loading every workflow first.
+  listWorkflows: (
+    org_identifier: string,
+    folder?: string,
+    allFolders = false,
+    searchSubstring?: string,
+  ) => {
+    const params = new URLSearchParams();
+    if (allFolders) params.set("all_folders", "true");
+    else if (folder) params.set("folder", folder);
+    if (searchSubstring) params.set("search_substring", searchSubstring);
+    const qs = params.toString();
+    return http().get(`/api/${org_identifier}/workflows${qs ? `?${qs}` : ""}`);
   },
 
   // Save a new workflow. `draft=true` saves to the drafts table WITHOUT the
   // backend graph validation (no terminating node / orphan checks) — a draft can
   // be an incomplete graph. Omit or false for a validated, published workflow.
+  // `folder` is the destination folder's id and applies to drafts too: a draft
+  // without one lands in the default folder rather than the one being viewed.
   createWorkflow: ({
     org_identifier,
     data,
     draft = false,
+    folder,
   }: {
     org_identifier: string;
     data: object;
     draft?: boolean;
+    folder?: string;
   }) => {
-    const url = `/api/${org_identifier}/workflows${draft ? "?draft=true" : ""}`;
-    return http().post(url, data);
+    const params = new URLSearchParams();
+    if (draft) params.set("draft", "true");
+    if (folder) params.set("folder", folder);
+    const qs = params.toString();
+    return http()
+      .post(`/api/${org_identifier}/workflows${qs ? `?${qs}` : ""}`, data)
+      .then((res) => {
+        analytics.track("workflow_created", { draft: !!draft });
+        return res;
+      });
   },
 
   // Update an existing workflow by id. `draft=true` updates the drafts-table row
@@ -66,25 +93,39 @@ const workflows = {
     draft?: boolean;
   }) => {
     const url = `/api/${org_identifier}/workflows/${id}${draft ? "?draft=true" : ""}`;
-    return http().delete(url);
+    return http()
+      .delete(url)
+      .then((res) => {
+        analytics.track("workflow_deleted", { draft: !!draft, count: 1 });
+        return res;
+      });
   },
 
   // Promote a draft into a proper (published) workflow. The backend re-validates
   // the graph and returns 400 if it's still incomplete; on success it moves the
   // row from the drafts table to the workflows table KEEPING the same id.
   // `trigger_type` (AlertFired | IncidentEvent) mirrors the create payload's
-  // trigger_type and drives the incident association.
+  // trigger_type and drives the incident association. Omitting `folder` publishes
+  // the draft into the folder it already sits in.
   promoteWorkflow: ({
     org_identifier,
     id,
     trigger_type,
+    folder,
   }: {
     org_identifier: string;
     id: string;
     trigger_type: string;
+    folder?: string;
   }) => {
-    const url = `/api/${org_identifier}/workflows/promote/${id}?trigger_type=${trigger_type}`;
-    return http().post(url);
+    const params = new URLSearchParams({ trigger_type });
+    if (folder) params.set("folder", folder);
+    return http()
+      .post(`/api/${org_identifier}/workflows/promote/${id}?${params.toString()}`)
+      .then((res) => {
+        analytics.track("workflow_published");
+        return res;
+      });
   },
 
   // Enable/disable (pause/resume) a workflow.
@@ -124,7 +165,12 @@ const workflows = {
     suppress_destinations?: boolean;
   }) => {
     const url = `/api/${org_identifier}/workflows/test${draft ? "?draft=true" : ""}`;
-    return http().post(url, { workflow, inputs, from_node, suppress_destinations });
+    return http()
+      .post(url, { workflow, inputs, from_node, suppress_destinations })
+      .then((res) => {
+        analytics.track("workflow_test_run_completed", { from_node: !!from_node });
+        return res;
+      });
   },
 
   // Run history for a workflow. `start_time`/`end_time` are Unix microseconds;
@@ -180,7 +226,12 @@ const workflows = {
     from_node?: string;
   }) => {
     const url = `/api/${org_identifier}/workflows/${id}/retry`;
-    return http().post(url, { run_id, from_node });
+    return http()
+      .post(url, { run_id, from_node })
+      .then((res) => {
+        analytics.track("workflow_run_retried", { from_node: !!from_node });
+        return res;
+      });
   },
 };
 

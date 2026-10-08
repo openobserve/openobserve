@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -46,7 +48,7 @@ import type {
   TestResult,
   PrebuiltTypeId,
 } from "@/utils/prebuilt-templates/types";
-import type { Destination } from "@/ts/interfaces/alert";
+import type { Destination, Template } from "@/ts/interfaces/alert";
 
 // Store
 import { useStore } from "vuex";
@@ -164,6 +166,13 @@ export function usePrebuiltDestinations() {
 
   // Computed properties
   const organizationIdentifier = computed(() => store.state.selectedOrganization.identifier);
+
+  const createDestinationWrite = useMutation(() =>
+    saveDestinationMutation(organizationIdentifier.value, () => false),
+  );
+  const updateDestinationWrite = useMutation(() =>
+    saveDestinationMutation(organizationIdentifier.value, () => true),
+  );
 
   /**
    * Get all available prebuilt destination types
@@ -302,6 +311,18 @@ export function usePrebuiltDestinations() {
       }
     }
 
+    return fillSampleData(templateBody, credentials);
+  }
+
+  /**
+   * Replace `{placeholder}` tokens in a template body with sample alert data,
+   * overridden by the given credentials. Unknown tokens are left as written,
+   * and so is `{rows}`, which is never faked (see useTemplatePreview). Every
+   * built-in sample value is JSON-string-safe (no quote, backslash or newline),
+   * so a JSON template stays valid JSON once filled; credential overrides are
+   * user text and are inserted as given.
+   */
+  function fillSampleData(templateBody: string, credentials?: Record<string, any>): string {
     // Generate realistic alert URL using current browser context
     const baseUrl = window.location.origin;
     const orgId = organizationIdentifier.value;
@@ -311,11 +332,12 @@ export function usePrebuiltDestinations() {
     // Sample alert data with realistic context
     const sampleData: Record<string, string> = {
       alert_name: "Test Alert - High CPU Usage",
+      alert_status: "firing",
       stream_name: "system-metrics",
       stream_type: "logs",
       alert_count: "15",
       alert_operator: "greater than",
-      alert_threshold: "80%",
+      alert_threshold: "80", // a bare number, as the server sends it
       alert_time: new Date().toLocaleString(),
       alert_trigger_time_str: new Date().toLocaleString(),
       // Use actual OpenObserve instance URL instead of fake example
@@ -327,6 +349,20 @@ export function usePrebuiltDestinations() {
       severity: "error",
       assignment_group: "IT Operations",
       api_key: "sample-api-key",
+      // The rest of the template variable guide. The numeric values are bare
+      // digits, so a template may use them unquoted as JSON numbers.
+      org_name: orgId,
+      alert_type: "scheduled",
+      episode_id: "sample-episode-id",
+      alert_period: "10",
+      alert_agg_value: "92.5",
+      alert_description: "Sample alert sent to test this destination",
+      // The server's %Y-%m-%dT%H:%M:%S format
+      alert_start_time: new Date(oneHourAgo / 1000).toISOString().slice(0, 19),
+      alert_end_time: new Date(now / 1000).toISOString().slice(0, 19),
+      alert_trigger_time: String(now),
+      alert_trigger_time_millis: String(now / 1000),
+      alert_trigger_time_seconds: String(Math.floor(now / 1000 / 1000)),
     };
 
     // Override with actual credentials if provided
@@ -347,14 +383,14 @@ export function usePrebuiltDestinations() {
       }
     }
 
-    // Replace placeholders in fetched template with sample data
-    let preview = templateBody;
+    // Replace placeholders in the template with sample data
+    let filled = templateBody;
     for (const [key, value] of Object.entries(sampleData)) {
       const regex = new RegExp(`{${key}}`, "g");
-      preview = preview.replace(regex, value);
+      filled = filled.replace(regex, value);
     }
 
-    return preview;
+    return filled;
   }
 
   /**
@@ -420,46 +456,7 @@ export function usePrebuiltDestinations() {
       const testHeaders = generateDestinationHeaders(type, credentials);
 
       // Generate preview using fetched template
-      const baseUrl = window.location.origin;
-      const orgId = organizationIdentifier.value;
-      const now = Date.now() * 1000; // microseconds
-      const oneHourAgo = now - 60 * 60 * 1000 * 1000;
-
-      const sampleData: Record<string, string> = {
-        alert_name: "Test Alert - High CPU Usage",
-        stream_name: "system-metrics",
-        stream_type: "logs",
-        alert_count: "15",
-        alert_operator: "greater than",
-        alert_threshold: "80%",
-        alert_time: new Date().toLocaleString(),
-        alert_trigger_time_str: new Date().toLocaleString(),
-        alert_url: `${baseUrl}/web/logs?org_identifier=${orgId}&stream_type=logs&stream=system-metrics&from=${oneHourAgo}&to=${now}&type=alert_destination_test`,
-        integration_key: "sample-integration-key",
-        routing_key: "sample-integration-key",
-        source: "openobserve",
-        severity: "error",
-        assignment_group: "IT Operations",
-        api_key: "sample-api-key",
-      };
-
-      // Override with actual credentials
-      if (credentials) {
-        if (credentials.integrationKey) {
-          sampleData.integration_key = credentials.integrationKey;
-          sampleData.routing_key = credentials.integrationKey;
-        }
-        if (credentials.severity) sampleData.severity = credentials.severity;
-        if (credentials.apiKey) sampleData.api_key = credentials.apiKey;
-        if (credentials.assignmentGroup) sampleData.assignment_group = credentials.assignmentGroup;
-      }
-
-      // Replace placeholders in fetched template
-      let testBody = templateBody;
-      for (const [key, value] of Object.entries(sampleData)) {
-        const regex = new RegExp(`{${key}}`, "g");
-        testBody = testBody.replace(regex, value);
-      }
+      const testBody = fillSampleData(templateBody, credentials);
 
       // For email type, send email-specific test request to backend
       if (type === "email") {
@@ -509,6 +506,94 @@ export function usePrebuiltDestinations() {
           error instanceof Error && error.message
             ? error.message
             : t("alerts.prebuilt.testFailedUnknownError"),
+        timestamp: Date.now(),
+      };
+
+      return publishTestResult(requestVersion, result);
+    } finally {
+      if (requestVersion === testRequestVersion) isTestInProgress.value = false;
+    }
+  }
+
+  /**
+   * Render a user template the way a custom Web Hook destination sends it. The
+   * template is always fetched by name, so a recent edit is used rather than a
+   * cached copy. A content template is rendered by the backend for the webhook
+   * channel; a raw body gets sample values. Errors propagate to the caller.
+   */
+  async function renderTemplateBody(name: string): Promise<string> {
+    const response = await templatesService.get_by_name({
+      org_identifier: organizationIdentifier.value,
+      template_name: name,
+    });
+    const template: Template = response.data;
+    if (template.kind === "content") {
+      const preview = await templatesService.preview({
+        org_identifier: organizationIdentifier.value,
+        data: { definition: JSON.parse(template.body), channel: "webhook" },
+      });
+      return JSON.stringify(preview.data.payload, null, 2);
+    }
+    return fillSampleData(String(template.body ?? ""));
+  }
+
+  /**
+   * Test a custom Web Hook destination by sending its selected template,
+   * filled with sample data, to the URL the user entered
+   */
+  async function testCustomDestination(input: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    skipTlsVerify: boolean;
+    template?: string;
+  }): Promise<TestResult> {
+    const requestVersion = ++testRequestVersion;
+    const missingField = (field: I18nText): TestResult =>
+      publishTestResult(requestVersion, {
+        success: false,
+        error: t("alerts.prebuilt.validationError", {
+          error: t("alerts.validation.credentialFieldRequired", { field }),
+        }),
+        timestamp: Date.now(),
+      });
+    try {
+      isTestInProgress.value = true;
+
+      if (!input.url.trim()) return missingField(t("alert_destinations.url"));
+      if (!input.template) return missingField(t("alert_destinations.template"));
+
+      const body = await renderTemplateBody(input.template);
+
+      // A real alert send adds a JSON content type when the destination has none.
+      const headers = { ...input.headers };
+      if (!Object.keys(headers).some((key) => /^content-type$/i.test(key))) {
+        headers["Content-Type"] = "application/json";
+      }
+
+      const testResult = await alertDestinationService.test({
+        org_identifier: organizationIdentifier.value,
+        data: {
+          url: input.url.trim(),
+          method: input.method,
+          headers,
+          body,
+          skipTlsVerify: input.skipTlsVerify,
+        },
+      });
+
+      const result: TestResult = {
+        success: testResult.data.success || false,
+        timestamp: Date.now(),
+        error: testResult.data.error,
+        statusCode: testResult.data.statusCode,
+        responseBody: testResult.data.responseBody,
+      };
+      return publishTestResult(requestVersion, result);
+    } catch (error: unknown) {
+      const result: TestResult = {
+        success: false,
+        error: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
         timestamp: Date.now(),
       };
 
@@ -602,11 +687,7 @@ export function usePrebuiltDestinations() {
       }
 
       // Create the destination
-      await alertDestinationService.create({
-        org_identifier: organizationIdentifier.value,
-        destination_name: name,
-        data: destinationData,
-      });
+      await createDestinationWrite.mutateAsync({ destination_name: name, data: destinationData });
 
       toast({
         variant: "success",
@@ -709,9 +790,9 @@ export function usePrebuiltDestinations() {
       }
 
       // Update the destination
-      await alertDestinationService.update({
-        org_identifier: organizationIdentifier.value,
-        destination_name: originalName, // Use original name for lookup
+      // Original name for lookup: a rename must still address the old row.
+      await updateDestinationWrite.mutateAsync({
+        destination_name: originalName,
         data: destinationData,
       });
 
@@ -802,8 +883,7 @@ export function usePrebuiltDestinations() {
         },
       };
 
-      await alertDestinationService.update({
-        org_identifier: organizationIdentifier.value,
+      await updateDestinationWrite.mutateAsync({
         destination_name: destinationName,
         data: updatedData,
       });
@@ -847,6 +927,8 @@ export function usePrebuiltDestinations() {
     validateCredentials,
     generatePreview,
     testDestination,
+    renderTemplateBody,
+    testCustomDestination,
     createDestination,
     updateDestination,
     detectPrebuiltType,

@@ -16,7 +16,10 @@
       @submit="saveOrgSettings"
       v-slot="{ isSubmitting }"
     >
-      <div data-test="add-role-rolename-input-btn" class="trace-id-field-name o2-input mb-2 w-100">
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="trace-id-field-name o2-input mb-2 w-100 max-md:w-full"
+      >
         <OFormInput
           data-test="settings-org-trace-id-input"
           name="traceIdFieldName"
@@ -27,7 +30,10 @@
         />
       </div>
 
-      <div data-test="add-role-rolename-input-btn" class="span-id-field-name o2-input w-100">
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="span-id-field-name o2-input w-100 max-md:w-full"
+      >
         <OFormInput
           data-test="settings-org-span-id-input"
           name="spanIdFieldName"
@@ -41,7 +47,7 @@
       <div
         v-if="config.isCloud !== 'true'"
         data-test="add-toggle-ingestion"
-        class="span-id-field-name o2-input w-100"
+        class="span-id-field-name o2-input w-100 max-md:w-full"
       >
         <OFormSwitch
           data-test="add-toggle-ingestion-btn"
@@ -60,6 +66,22 @@
         />
       </div>
 
+      <div v-if="showRedInsights" data-test="settings-red-insights" class="o2-input">
+        <div data-test="settings-traces-heading" class="pt-4 pb-1 text-base font-bold">
+          {{ t("settings.tracesHeading") }}
+        </div>
+        <OFormSwitch
+          data-test="settings-red-insights-btn"
+          name="redInsightsEnabled"
+          :label="t('settings.redInsightsEnabledLabel')"
+          class="mt-2"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('settings.redInsightsEnabledHelp')" />
+          </template>
+        </OFormSwitch>
+      </div>
+
       <!-- Cross-Linking Configuration -->
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
@@ -69,6 +91,12 @@
           :subtitle="t('crossLinks.orgConfigSubtitle')"
           @change="formDirty = true"
         />
+      </template>
+
+      <!-- Domain -> organization mappings: cloud-only, and stored on the meta org. -->
+      <template v-if="showDomainOrgMappings">
+        <OSeparator class="mt-6 mb-4" />
+        <DomainOrgMappings v-model="domainOrgMappings" @change="formDirty = true" />
       </template>
 
       <div class="mt-3 flex gap-2">
@@ -93,17 +121,24 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
-import organizations from "@/services/organizations";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
+import DomainOrgMappings from "./DomainOrgMappings.vue";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import type { DomainOrgMapping } from "./DomainOrgMappings.schema";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import {
   makeOrganizationSettingsSchema,
   type OrganizationSettingsForm,
@@ -112,6 +147,8 @@ import {
 const { t } = useI18nTyped();
 
 const store = useStore();
+const orgId = useOrgId();
+const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
 
 // Schema-driven validation replaces the hand-rolled validate()/error refs.
 const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
@@ -120,6 +157,15 @@ const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 // and merged at submit (the documented exception).
 const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
 const formDirty = ref(false);
+
+// Domain mappings are read and written on the meta org only, and the backend
+// ignores the field outside cloud — so the section renders under both conditions.
+const { isMetaOrg } = useIsMetaOrg();
+const showDomainOrgMappings = computed(() => config.isCloud === "true" && isMetaOrg.value);
+const showRedInsights = config.isEnterprise == "true";
+const domainOrgMappings = ref<DomainOrgMapping[]>(
+  store.state?.organizationData?.organizationSettings?.domain_org_mappings || [],
+);
 
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
 // span/toggle values are form-owned (OFormInput / OFormSwitch).
@@ -130,6 +176,7 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     spanIdFieldName: s?.span_id_field_name ?? "",
     toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
+    redInsightsEnabled: s?.red_insights_enabled ?? true,
   };
 });
 
@@ -138,6 +185,15 @@ watch(
   (newVal) => {
     if (!formDirty.value) {
       crossLinks.value = newVal || [];
+    }
+  },
+);
+
+watch(
+  () => store.state?.organizationData?.organizationSettings?.domain_org_mappings,
+  (newVal) => {
+    if (!formDirty.value) {
+      domainOrgMappings.value = newVal || [];
     }
   },
 );
@@ -155,10 +211,22 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
-    await organizations.post_organization_settings(
-      store.state.selectedOrganization.identifier,
-      payload,
-    );
+    // Only sent when the section rendered: an org that never showed it must not
+    // post an empty list and wipe mappings another admin saved.
+    if (showDomainOrgMappings.value) {
+      payload.domain_org_mappings = domainOrgMappings.value;
+    }
+    // Same rule for the enterprise-only switch: a hidden field must not overwrite the stored one.
+    if (showRedInsights) {
+      payload.red_insights_enabled = value.redInsightsEnabled;
+    }
+
+    const crossLinksChanged =
+      JSON.stringify(crossLinks.value) !==
+      JSON.stringify(store.state?.organizationData?.organizationSettings?.cross_links || []);
+
+    await updateOrgSettings.mutateAsync(payload);
+    if (crossLinksChanged) analytics.track("cross_link_saved", { scope: "org" });
 
     const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,
@@ -167,6 +235,8 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
+      ...(showDomainOrgMappings.value ? { domain_org_mappings: domainOrgMappings.value } : {}),
+      ...(showRedInsights ? { red_insights_enabled: value.redInsightsEnabled } : {}),
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);
@@ -179,7 +249,10 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
     });
   } catch (e: any) {
     toast({
-      message: e?.message || t("settings.organizationSettings.settingsSaveError"),
+      message:
+        raw(e?.response?.data?.message) ||
+        raw(e?.message) ||
+        t("settings.organizationSettings.settingsSaveError"),
       variant: "error",
     });
   }
@@ -188,6 +261,8 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
 // Exposed for unit tests that exercise the submit handler directly.
 defineExpose({
   crossLinks,
+  domainOrgMappings,
+  showDomainOrgMappings,
   formDirty,
   saveOrgSettings,
   organizationSettingsSchema,

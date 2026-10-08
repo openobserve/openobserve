@@ -59,13 +59,34 @@ test.describe('Alert Library', () => {
       pack: 'observability', category: 'absent-signals', stream: missingStream,
       required_streams: [missingStream],
     });
+    // Manifest entry is well-formed (readiness passes, stream is "ready"), but
+    // the FILE served for it is malformed: stream_type is blank. The manifest
+    // schema requires stream_type (assertManifestEntries), but the per-alert
+    // FILE body only has to be a bare object (assertAlertFile) — so a
+    // corrupted/hand-edited library file can reach the drawer with no usable
+    // stream info. Regression for the production 400: PreviewAlert used to
+    // fire /result_schema with an empty stream_type anyway.
+    const malformed = makeEntry(3, {
+      name: `pw_lib_malformed_${rand}`, title: 'PW Malformed Alert', severity: 'warning',
+      pack: 'observability', category: 'malformed-signals', stream: readyStream,
+      required_streams: [readyStream],
+    });
     const bulk = makeEntries(51, {
       namePrefix: `pw_lib_bulk_${rand}`, pack: 'infrastructure', category: 'bulk-signals',
       severity: 'warning', stream: readyStream, required_streams: [readyStream],
     });
-    entries = [ready, missing, ...bulk];
+    // Appended, not inserted — other tests in this file index into `entries`
+    // by position (ready=0, missing=1, bulk=2..) and must keep seeing those.
+    entries = [ready, missing, ...bulk, malformed];
 
-    await routeLibrary(page, { manifest: buildManifest(entries), entries });
+    await routeLibrary(page, {
+      manifest: buildManifest(entries),
+      entries,
+      fileFor: (entry) =>
+        entry.id === malformed.id
+          ? { ...buildAlertFile(entry), stream_type: '', stream_name: '' }
+          : buildAlertFile(entry),
+    });
   });
 
   test('browse, filter, preview and install a single curated alert', async () => {
@@ -131,7 +152,7 @@ test.describe('Alert Library', () => {
   test('bulk select via select-all-in-view triggers the >50 large-batch guard', async () => {
     await lib.openViaUrl();
 
-    // Select every card in view (1 ready + 1 missing + 51 bulk = 53 > 50).
+    // Select every card in view (1 ready + 1 missing + 51 bulk + 1 malformed = 54 > 50).
     await lib.selectAllInViewToggle();
     expect(await lib.selectedCountInBar()).toBeGreaterThan(50);
 
@@ -182,6 +203,36 @@ test.describe('Alert Library', () => {
     // which is covered deterministically by the useAlertLibrary unit tests.)
     await lib.openCard(ready.id);
     await lib.expectDrawerPreviewVisible();
+  });
+
+  // Regression: a library file with a blank stream_type/stream_name used to
+  // reach PreviewAlert, which fired /result_schema anyway — a 400 captured by
+  // RUM as "Failed to fetch query schema", 62 hits in production across
+  // /web/alerts?action=add on both prod and eu1cloud. PreviewAlert.refreshData
+  // now skips the schema request until the form actually has a stream.
+  test('previewing a library file with no stream info does not fire a malformed schema request', async ({ page }) => {
+    const malformed = entries[entries.length - 1];
+
+    const schemaRequests = [];
+    page.on('request', (req) => {
+      if (req.url().includes('/result_schema')) schemaRequests.push(req.url());
+    });
+    const consoleErrors = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+    page.on('pageerror', (err) => consoleErrors.push(err.message));
+
+    await lib.openViaUrl();
+    await lib.openCard(malformed.id);
+    // Give the (would-be) schema fetch a beat to fire before asserting its absence.
+    await page.waitForTimeout(1500);
+
+    expect(schemaRequests, `Unexpected /result_schema calls: ${JSON.stringify(schemaRequests)}`)
+      .toHaveLength(0);
+    const schemaErrors = consoleErrors.filter((e) => /Failed to fetch query schema/.test(e));
+    expect(schemaErrors, `Unexpected schema-fetch console errors: ${JSON.stringify(schemaErrors)}`)
+      .toHaveLength(0);
   });
 
   test('a broken manifest shows a recovery state, not an empty gallery', async ({ page }) => {

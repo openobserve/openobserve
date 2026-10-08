@@ -17,7 +17,7 @@
 //!
 //! Stores service registry entries. Keyed by (org_id, service_name, disambiguation).
 //! `disambiguation` is a JSONB object of distinguish_by field values.
-//! Streams are split into three typed columns.
+//! Streams are split into four typed columns.
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter, Schema, Set,
@@ -77,6 +77,10 @@ pub struct Model {
     #[sea_orm(column_type = "Json")]
     pub metrics_streams: Json,
 
+    /// JSONB array of profile stream names
+    #[sea_orm(column_type = "Json")]
+    pub profiles_streams: Json,
+
     /// JSONB object mapping semantic group ID → raw field name that produced it.
     /// E.g., {"service": "kubernetes_labels_app", "k8s-cluster": "cluster_name"}
     /// Nullable: absent for records written before this column was added.
@@ -115,6 +119,8 @@ pub struct ServiceRecord {
     pub traces_streams: serde_json::Value,
     /// JSONB array of metric stream names
     pub metrics_streams: serde_json::Value,
+    /// JSONB array of profile stream names
+    pub profiles_streams: serde_json::Value,
     /// JSONB object mapping semantic group ID → raw field name.
     /// None for records written before this column was added.
     pub field_name_mapping: Option<serde_json::Value>,
@@ -148,6 +154,7 @@ impl ServiceRecord {
             logs_streams: serde_json::json!([]),
             traces_streams: serde_json::json!([]),
             metrics_streams: serde_json::json!([]),
+            profiles_streams: serde_json::json!([]),
             field_name_mapping: None,
             last_seen: 0,
         }
@@ -253,12 +260,18 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             &record.metrics_streams,
             max_streams_per_type,
         );
+        let profiles = union_stream_array(
+            &existing_model.profiles_streams,
+            &record.profiles_streams,
+            max_streams_per_type,
+        );
 
         let mut active: ActiveModel = existing_model.into();
         let mut dirty = false;
         set_if_dirty(&mut active.logs_streams, logs, &mut dirty);
         set_if_dirty(&mut active.traces_streams, traces, &mut dirty);
         set_if_dirty(&mut active.metrics_streams, metrics, &mut dirty);
+        set_if_dirty(&mut active.profiles_streams, profiles, &mut dirty);
         set_if_dirty(&mut active.all_dimensions, merged_dims, &mut dirty);
         if let Some(fnm) = record.field_name_mapping {
             set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
@@ -340,6 +353,11 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 &record.metrics_streams,
                 max_streams_per_type,
             );
+            let profiles = union_stream_array(
+                &existing_model.profiles_streams,
+                &record.profiles_streams,
+                max_streams_per_type,
+            );
 
             // Keep whichever disambiguation is richer (more keys wins)
             let existing_map: std::collections::HashMap<String, String> = existing_model
@@ -374,6 +392,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
             set_if_dirty(&mut active.logs_streams, logs, &mut dirty);
             set_if_dirty(&mut active.traces_streams, traces, &mut dirty);
             set_if_dirty(&mut active.metrics_streams, metrics, &mut dirty);
+            set_if_dirty(&mut active.profiles_streams, profiles, &mut dirty);
             set_if_dirty(&mut active.all_dimensions, merged_dims, &mut dirty);
             if let Some(fnm) = record.field_name_mapping {
                 set_if_dirty(&mut active.field_name_mapping, Some(fnm), &mut dirty);
@@ -408,6 +427,7 @@ pub async fn put_with<C: sea_orm::ConnectionTrait>(
                 logs_streams: Set(record.logs_streams),
                 traces_streams: Set(record.traces_streams),
                 metrics_streams: Set(record.metrics_streams),
+                profiles_streams: Set(record.profiles_streams),
                 field_name_mapping: Set(record.field_name_mapping),
                 last_seen: Set(record.last_seen),
             };
@@ -683,6 +703,7 @@ fn model_to_record(r: Model) -> ServiceRecord {
         logs_streams: r.logs_streams,
         traces_streams: r.traces_streams,
         metrics_streams: r.metrics_streams,
+        profiles_streams: r.profiles_streams,
         field_name_mapping: r.field_name_mapping,
         last_seen: r.last_seen,
     }
@@ -776,12 +797,13 @@ mod tests {
     }
 
     // Nothing enforces this list — keep it in sync manually when adding a mutable column.
-    const MUTABLE_COLUMNS: [&str; 7] = [
+    const MUTABLE_COLUMNS: [&str; 8] = [
         "disambiguation",
         "all_dimensions",
         "logs_streams",
         "traces_streams",
         "metrics_streams",
+        "profiles_streams",
         "field_name_mapping",
         "last_seen",
     ];
@@ -854,6 +876,7 @@ mod tests {
         r.logs_streams = serde_json::json!(["checkout-service-logs"]);
         r.traces_streams = serde_json::json!(["checkout-service-traces"]);
         r.metrics_streams = serde_json::json!(["checkout-service-metrics"]);
+        r.profiles_streams = serde_json::json!(["checkout-service-profiles"]);
         r.field_name_mapping = Some(serde_json::json!({"service": "kubernetes_labels_app"}));
         r.last_seen = last_seen;
         r
@@ -889,6 +912,7 @@ mod tests {
             "logs_streams",
             "traces_streams",
             "metrics_streams",
+            "profiles_streams",
             "field_name_mapping",
         ] {
             assert_eq!(
@@ -1770,6 +1794,7 @@ mod tests {
             logs_streams: Set(serde_json::json!([])),
             traces_streams: Set(serde_json::json!([])),
             metrics_streams: Set(serde_json::json!([])),
+            profiles_streams: Set(serde_json::json!([])),
             field_name_mapping: Set(None),
             last_seen: Set(500),
         };
@@ -1827,6 +1852,7 @@ mod tests {
             logs_streams: Set(serde_json::json!([])),
             traces_streams: Set(serde_json::json!([])),
             metrics_streams: Set(serde_json::json!([])),
+            profiles_streams: Set(serde_json::json!([])),
             field_name_mapping: Set(None),
             last_seen: Set(500),
         };

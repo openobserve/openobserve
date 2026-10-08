@@ -27,52 +27,54 @@ use config::{
 };
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{Result, internal_err},
+    common::{Result, internal_err, tree_node::TreeNodeRecursion},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
         memory::MemoryStream,
-        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricsSet},
-        stream::RecordBatchStreamAdapter,
+        metrics::{BaselineMetrics, ExecutionPlanMetricsSet, MetricBuilder, MetricsSet},
     },
 };
-use futures::TryStreamExt;
 
-use crate::{index::IndexCondition, tantivy::tantivy_search, types::QueryParams};
+use crate::tantivy::{TantivyMultiResult, aggregate::IndexAggregate};
 
 #[derive(Debug)]
 pub struct TantivyOptimizeExec {
-    query: Arc<QueryParams>,
-    schema: SchemaRef,                       // The schema for the produced row
-    file_list: Vec<FileKey>,                 // The list of files to read
-    index_condition: Option<IndexCondition>, // The condition to filter the rows
-    cache: Arc<PlanProperties>,              // Cached properties of this plan
-    index_optimize_mode: IndexOptimizeMode,  // Type of query the ttv index optimizes
+    schema: SchemaRef,       // The schema for the produced row
+    file_list: Vec<FileKey>, // The list of files to read
+    batches: Vec<RecordBatch>,
+    cache: Arc<PlanProperties>, // Cached properties of this plan
+    index_optimize_mode: IndexOptimizeMode, // Type of query the ttv index optimizes
     metrics: ExecutionPlanMetricsSet,
 }
 
 impl TantivyOptimizeExec {
-    /// Create a new TantivyOptimizeExec
-    pub fn new(
-        query: Arc<QueryParams>,
-        schema: SchemaRef,
-        file_list: Vec<FileKey>,
-        index_condition: Option<IndexCondition>,
-        index_optimize_mode: IndexOptimizeMode,
-    ) -> Self {
+    /// Create a TantivyOptimizeExec that emits the index `aggregate` converted to `schema`.
+    pub fn try_new(schema: SchemaRef, aggregate: IndexAggregate) -> Result<Self> {
+        let IndexAggregate {
+            mode,
+            files,
+            result,
+            search_time,
+        } = aggregate;
+        let batches = tantivy_result_batches(result, &schema, &mode)?;
         let cache = Self::compute_properties(Arc::clone(&schema));
-        TantivyOptimizeExec {
-            query,
+        let metrics = ExecutionPlanMetricsSet::new();
+        // The search runs while planning, so EXPLAIN ANALYZE would not see it otherwise.
+        MetricBuilder::new(&metrics)
+            .subset_time("index_search_time", 0)
+            .add_duration(search_time);
+        Ok(TantivyOptimizeExec {
             schema,
-            file_list,
-            index_condition,
+            file_list: files,
+            batches,
             cache,
-            index_optimize_mode,
-            metrics: ExecutionPlanMetricsSet::new(),
-        }
+            index_optimize_mode: mode,
+            metrics,
+        })
     }
 
     fn compute_properties(schema: SchemaRef) -> Arc<PlanProperties> {
@@ -107,6 +109,13 @@ impl DisplayAs for TantivyOptimizeExec {
 }
 
 impl ExecutionPlan for TantivyOptimizeExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "TantivyOptimizeExec"
     }
@@ -138,19 +147,12 @@ impl ExecutionPlan for TantivyOptimizeExec {
         }
 
         let metrics = BaselineMetrics::new(&self.metrics, partition);
-        let fut = adapt_tantivy_result(
-            self.query.clone(),
-            self.file_list.clone(),
-            self.index_condition.clone(),
+        metrics.record_output(self.batches.iter().map(RecordBatch::num_rows).sum());
+        Ok(Box::pin(MemoryStream::try_new(
+            self.batches.clone(),
             self.schema.clone(),
-            self.index_optimize_mode.clone(),
-            metrics,
-        );
-        let stream = futures::stream::once(fut).try_flatten();
-        Ok(Box::pin(RecordBatchStreamAdapter::new(
-            self.schema.clone(),
-            stream,
-        )))
+            None,
+        )?))
     }
 
     fn metrics(&self) -> Option<MetricsSet> {
@@ -158,37 +160,11 @@ impl ExecutionPlan for TantivyOptimizeExec {
     }
 }
 
-async fn adapt_tantivy_result(
-    query: Arc<QueryParams>,
-    mut file_list: Vec<FileKey>,
-    index_condition: Option<IndexCondition>,
-    schema: SchemaRef,
-    idx_optimize_mode: IndexOptimizeMode,
-    metrics: BaselineMetrics,
-) -> Result<SendableRecordBatchStream> {
-    let timer = metrics.elapsed_compute().timer();
-    let (idx_took, error, result) = tantivy_search(
-        query.clone(),
-        &mut file_list,
-        index_condition,
-        Some(idx_optimize_mode.clone()),
-    )
-    .await
-    .map_err(|e| DataFusionError::External(Box::new(e)))?;
-
-    if error {
-        return internal_err!("Error while filtering file list by Tantivy index");
-    }
-
-    log::info!(
-        "[trace_id {}] search->storage: stream {}/{}/{}, TantivyOptimizeExec execution time {} ms",
-        query.trace_id,
-        query.org_id,
-        query.stream_type,
-        query.stream_name,
-        idx_took
-    );
-
+fn tantivy_result_batches(
+    result: TantivyMultiResult,
+    schema: &SchemaRef,
+    idx_optimize_mode: &IndexOptimizeMode,
+) -> Result<Vec<RecordBatch>> {
     // first level is for each record batch
     // second level is each array in record batch
     let array: Vec<Vec<Arc<dyn Array>>> = match idx_optimize_mode {
@@ -199,22 +175,22 @@ async fn adapt_tantivy_result(
         }
         IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, _ts_offset) => {
             vec![create_histogram_arrow_array(
-                &schema,
+                schema,
                 result.histogram(),
-                min_value,
-                bucket_width,
-                num_buckets,
+                *min_value,
+                *bucket_width,
+                *num_buckets,
             )?]
         }
         IndexOptimizeMode::SimpleMultiHistogram(..) => {
             vec![create_multi_histogram_arrow_array(
-                &schema,
+                schema,
                 &result.multi_histogram(),
             )?]
         }
-        IndexOptimizeMode::SimpleTopN(..) => create_top_n_arrow_array(&schema, result.top_n())?,
+        IndexOptimizeMode::SimpleTopN(..) => create_top_n_arrow_array(schema, result.top_n())?,
         IndexOptimizeMode::SimpleDistinct(_field, _limit, _ascend) => {
-            vec![create_distinct_arrow_array(&schema, result.distinct())?]
+            vec![create_distinct_arrow_array(schema, result.distinct())?]
         }
         _ => {
             return internal_err!(
@@ -223,7 +199,7 @@ async fn adapt_tantivy_result(
         }
     };
 
-    let record_batches = array
+    array
         .into_iter()
         .map(|array| {
             RecordBatch::try_new(schema.clone(), array).map_err(|e| {
@@ -232,17 +208,7 @@ async fn adapt_tantivy_result(
                 ))
             })
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    // record output metrics
-    metrics.record_output(record_batches.iter().map(|b| b.num_rows()).sum());
-    timer.done();
-
-    Ok(Box::pin(MemoryStream::try_new(
-        record_batches,
-        schema,
-        None,
-    )?))
+        .collect()
 }
 
 /// Creates a RecordBatch containing histogram data with timestamps and counts
@@ -642,10 +608,12 @@ fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusio
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema, TimeUnit};
-    use config::meta::stream::{FileMeta, StreamType};
-    use datafusion::sql::TableReference;
+    use config::meta::stream::FileMeta;
+    use datafusion::physical_plan::{ChildrenPropertiesMode, ReplaceChildrenOptions};
 
     use super::*;
 
@@ -1070,19 +1038,9 @@ mod tests {
 
     #[test]
     fn test_tantivy_optimize_exec_new() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org".to_string(),
-            stream: TableReference::from("test"),
-            stream_type: StreamType::Logs,
-            stream_name: "test".to_string(),
-            time_range: (0, 1000),
-            work_group: None,
-            use_inverted_index: false,
-        });
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1094,37 +1052,29 @@ mod tests {
             selection: None,
             row_group_size: None,
         }];
-        let index_condition = None;
+        let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = TantivyOptimizeExec::new(
-            query.clone(),
+        let exec = TantivyOptimizeExec::try_new(
             schema.clone(),
-            file_list.clone(),
-            index_condition.clone(),
-            index_optimize_mode.clone(),
-        );
+            IndexAggregate {
+                mode: index_optimize_mode.clone(),
+                files: file_list.clone(),
+                result: result.clone(),
+                search_time: Duration::ZERO,
+            },
+        )
+        .unwrap();
 
-        assert_eq!(exec.query.trace_id, "test");
         assert_eq!(exec.file_list.len(), 1);
         assert_eq!(exec.index_optimize_mode, index_optimize_mode);
     }
 
     #[test]
     fn test_tantivy_optimize_exec_display() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org".to_string(),
-            stream: TableReference::from("test"),
-            stream_name: "test".to_string(),
-            stream_type: StreamType::Logs,
-            time_range: (0, 1000),
-            work_group: None,
-            use_inverted_index: false,
-        });
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![
@@ -1183,16 +1133,21 @@ mod tests {
                 row_group_size: None,
             },
         ];
-        let index_condition = None;
+        let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = Arc::new(TantivyOptimizeExec::new(
-            query,
-            schema,
-            file_list,
-            index_condition,
-            index_optimize_mode,
-        ));
+        let exec = Arc::new(
+            TantivyOptimizeExec::try_new(
+                schema,
+                IndexAggregate {
+                    mode: index_optimize_mode,
+                    files: file_list,
+                    result,
+                    search_time: Duration::ZERO,
+                },
+            )
+            .unwrap(),
+        );
 
         let display = format!(
             "{}",
@@ -1207,19 +1162,9 @@ mod tests {
 
     #[test]
     fn test_tantivy_optimize_exec_execution_plan() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org".to_string(),
-            stream: TableReference::from("test"),
-            stream_type: StreamType::Logs,
-            stream_name: "test".to_string(),
-            time_range: (0, 1000),
-            work_group: None,
-            use_inverted_index: false,
-        });
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1231,16 +1176,19 @@ mod tests {
             selection: None,
             row_group_size: None,
         }];
-        let index_condition = None;
+        let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = TantivyOptimizeExec::new(
-            query,
+        let exec = TantivyOptimizeExec::try_new(
             schema,
-            file_list,
-            index_condition,
-            index_optimize_mode,
-        );
+            IndexAggregate {
+                mode: index_optimize_mode,
+                files: file_list,
+                result,
+                search_time: Duration::ZERO,
+            },
+        )
+        .unwrap();
 
         assert_eq!(exec.name(), "TantivyOptimizeExec");
         assert!(exec.children().is_empty());
@@ -1249,19 +1197,9 @@ mod tests {
 
     #[test]
     fn test_tantivy_optimize_exec_with_new_children() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org".to_string(),
-            stream: TableReference::from("test"),
-            stream_type: StreamType::Logs,
-            stream_name: "test".to_string(),
-            time_range: (0, 1000),
-            work_group: None,
-            use_inverted_index: false,
-        });
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1273,18 +1211,26 @@ mod tests {
             selection: None,
             row_group_size: None,
         }];
-        let index_condition = None;
+        let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = Arc::new(TantivyOptimizeExec::new(
-            query,
-            schema,
-            file_list,
-            index_condition,
-            index_optimize_mode,
-        ));
+        let exec = Arc::new(
+            TantivyOptimizeExec::try_new(
+                schema,
+                IndexAggregate {
+                    mode: index_optimize_mode,
+                    files: file_list,
+                    result,
+                    search_time: Duration::ZERO,
+                },
+            )
+            .unwrap(),
+        );
 
-        let result = exec.with_new_children(vec![]);
+        let result = exec.replace_children(
+            vec![],
+            ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+        );
         assert!(result.is_ok());
         let new_exec = result.unwrap();
         assert_eq!(new_exec.name(), "TantivyOptimizeExec");
@@ -1292,19 +1238,9 @@ mod tests {
 
     #[test]
     fn test_tantivy_optimize_exec_statistics() {
-        let query = Arc::new(QueryParams {
-            trace_id: "test".to_string(),
-            org_id: "org".to_string(),
-            stream: TableReference::from("test"),
-            stream_type: StreamType::Logs,
-            stream_name: "test".to_string(),
-            time_range: (0, 1000),
-            work_group: None,
-            use_inverted_index: false,
-        });
         let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Utf8,
+            "count",
+            DataType::Int64,
             false,
         )]));
         let file_list = vec![FileKey {
@@ -1316,23 +1252,86 @@ mod tests {
             selection: None,
             row_group_size: None,
         }];
-        let index_condition = None;
+        let result = TantivyMultiResult::Count(0);
         let index_optimize_mode = IndexOptimizeMode::SimpleCount;
 
-        let exec = TantivyOptimizeExec::new(
-            query,
+        let exec = TantivyOptimizeExec::try_new(
             schema,
-            file_list,
-            index_condition,
-            index_optimize_mode,
-        );
+            IndexAggregate {
+                mode: index_optimize_mode,
+                files: file_list,
+                result,
+                search_time: Duration::ZERO,
+            },
+        )
+        .unwrap();
 
-        let stats = exec.partition_statistics(None);
+        let stats = datafusion::physical_plan::StatisticsContext::new()
+            .compute(&exec, &datafusion::physical_plan::StatisticsArgs::new());
         assert!(stats.is_ok());
         let stats = stats.unwrap();
         assert!(matches!(
             stats.num_rows,
             datafusion::common::stats::Precision::Absent
         ));
+    }
+
+    #[tokio::test]
+    async fn test_tantivy_optimize_exec_replays_prepared_result() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "count",
+            DataType::Int64,
+            false,
+        )]));
+        let exec = Arc::new(
+            TantivyOptimizeExec::try_new(
+                schema,
+                IndexAggregate {
+                    mode: IndexOptimizeMode::SimpleCount,
+                    files: vec![],
+                    result: TantivyMultiResult::Count(7),
+                    search_time: Duration::from_millis(1500),
+                },
+            )
+            .unwrap(),
+        );
+
+        for _ in 0..2 {
+            let batches =
+                datafusion::physical_plan::collect(exec.clone(), Arc::new(TaskContext::default()))
+                    .await
+                    .unwrap();
+            let counts = batches[0]
+                .column(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap();
+            assert_eq!(counts.value(0), 7);
+        }
+        let search_time = exec
+            .metrics()
+            .unwrap()
+            .sum_by_name("index_search_time")
+            .unwrap();
+        assert_eq!(search_time.as_usize(), 1_500_000_000);
+    }
+
+    #[test]
+    fn test_tantivy_optimize_exec_rejects_result_not_matching_schema() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Utf8,
+            false,
+        )]));
+        let exec = TantivyOptimizeExec::try_new(
+            schema,
+            IndexAggregate {
+                mode: IndexOptimizeMode::SimpleCount,
+                files: vec![],
+                result: TantivyMultiResult::Count(7),
+                search_time: Duration::ZERO,
+            },
+        );
+        assert!(exec.is_err());
     }
 }

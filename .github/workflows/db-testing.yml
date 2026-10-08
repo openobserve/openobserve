@@ -20,6 +20,7 @@ env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_EXT_AUTH_SALT: ci-only-ext-auth-salt-0123456789abcdef
   ZO_BASE_URL: http://localhost:5080/
   ZO_INTERNAL_GRPC_TOKEN: fake_token_for_testing
   ZO_MEM_PERSIST_INTERVAL: 1
@@ -93,7 +94,7 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
         with:
           toolchain: nightly-2026-05-20
 

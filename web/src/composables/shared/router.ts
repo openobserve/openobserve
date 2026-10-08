@@ -18,6 +18,7 @@ import {
   useLocalUserInfo,
   useLocalCurrentUser,
   invalidateLoginData,
+  getPath,
 } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
@@ -30,6 +31,7 @@ import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
 import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
@@ -38,6 +40,7 @@ const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.v
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
+const AppProfiles = () => import("@/plugins/profiles/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
@@ -69,6 +72,7 @@ import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
 
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
+const DbmMetricsPage = () => import("@/views/DatabaseMonitoring/MetricsPage.vue");
 const DbmSamplesPage = () => import("@/views/DatabaseMonitoring/SamplesPage.vue");
 const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
 const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
@@ -142,6 +146,7 @@ const AlertLibrary = () => import("@/views/AlertLibrary/AlertLibrary.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
+const ImportFunction = () => import("@/components/functions/ImportFunction.vue");
 const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
@@ -149,6 +154,15 @@ const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
 const AppPerformance = () => import("@/views/RUM/AppPerformance.vue");
 const AppErrors = () => import("@/views/RUM/AppErrors.vue");
 const AppSessions = () => import("@/views/RUM/AppSessions.vue");
+const AppAnalytics = () => import("@/views/RUM/AppAnalytics.vue");
+const AnalyticsOverview = () => import("@/components/rum/productAnalytics/AnalyticsOverview.vue");
+const AnalyticsFunnels = () => import("@/components/rum/productAnalytics/AnalyticsFunnels.vue");
+const SavedFunnelsPage = () => import("@/components/rum/productAnalytics/SavedFunnelsPage.vue");
+const AnalyticsPaths = () => import("@/components/rum/productAnalytics/AnalyticsPaths.vue");
+const AnalyticsRetention = () => import("@/components/rum/productAnalytics/AnalyticsRetention.vue");
+const NamedEventsListPage = () =>
+  import("@/components/rum/productAnalytics/NamedEventsListPage.vue");
+const NamedEventEditor = () => import("@/views/RUM/NamedEventEditor.vue");
 const SourceMaps = () => import("@/views/RUM/SourceMaps.vue");
 const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 
@@ -179,14 +193,27 @@ const useRoutes = () => {
       },
     },
     {
+      // A redirect record resolves before the auth guard runs, so the guard only ever sees /login.
+      path: "/signup",
+      redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
+    },
+    {
       path: "/logout",
+      // vue-router drops a record with no component/children/redirect, which
+      // made this deep link a 404 — the component never renders (the guard
+      // hard-navigates first), it only keeps the record registrable.
+      component: Login,
       beforeEnter(_to: any, _from: any, _next: any) {
-        // Clear backend auth cookies before redirecting to login
-        invalidateLoginData();
-        useLocalCurrentUser("", true);
-        useLocalUserInfo("", true);
-
-        window.location.href = "/login";
+        // Clear backend auth cookies before redirecting to login. The redirect
+        // must run even if a clear throws, and must respect the app base —
+        // a bare "/login" 404s when the app is served under /web/.
+        try {
+          invalidateLoginData();
+          useLocalCurrentUser("", true);
+          useLocalUserInfo("", true);
+        } finally {
+          window.location.href = `${getPath()}login`;
+        }
       },
     },
     {
@@ -365,6 +392,18 @@ const useRoutes = () => {
       },
     },
     {
+      path: "profiles",
+      name: "profiles",
+      component: AppProfiles,
+      meta: {
+        keepAlive: true,
+        titleKey: "menu.profiles",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "traces/service-graph",
       redirect: redirectToTraceTab("service-graph"),
     },
@@ -387,6 +426,15 @@ const useRoutes = () => {
           path: "",
           name: "dbmDatabases",
           component: DbmDatabasesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "metrics",
+          name: "dbmMetrics",
+          component: DbmMetricsPage,
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -478,6 +526,29 @@ const useRoutes = () => {
         path: `/infra/databases${to.params.dbmPath?.length ? `/${[to.params.dbmPath].flat().join("/")}` : ""}`,
         query: to.query,
       }),
+    },
+    // Ungated by design (detection changes page state, not route existence) and placed past the splice(13) hazard.
+    {
+      path: "infra/hosts",
+      name: "infraHosts",
+      component: () => import("@/views/Infrastructure/HostsPage.vue"),
+      meta: { titleKey: "menu.hosts" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/kubernetes",
+      name: "infraKubernetes",
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
+      meta: { titleKey: "menu.kubernetes" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/kubernetes-2",
+      name: "infraKubernetes2",
+      component: () => import("@/views/Infrastructure/kubernetes2/KubernetesPage.vue"),
+      meta: { titleKey: "menu.kubernetes2" },
+      beforeEnter: routeGuard,
     },
     {
       path: "traces/trace-details",
@@ -614,6 +685,17 @@ const useRoutes = () => {
           path: "functions",
           name: "functionList",
           component: FunctionList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "functions/import",
+          name: "importFunction",
+          component: ImportFunction,
+          meta: {
+            titleKey: "function.import.title",
+          },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -1064,6 +1146,91 @@ const useRoutes = () => {
           ],
         },
       ],
+    },
+    {
+      path: "product-analytics",
+      name: PA_ROUTES.shell,
+      component: AppAnalytics,
+      meta: {
+        titleKey: "menu.productAnalytics",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "overview",
+          name: PA_ROUTES.overview,
+          component: AnalyticsOverview,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "funnels",
+          name: PA_ROUTES.funnels,
+          component: SavedFunnelsPage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "funnels/build",
+          name: PA_ROUTES.funnelBuilder,
+          component: AnalyticsFunnels,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "paths",
+          name: PA_ROUTES.paths,
+          component: AnalyticsPaths,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "retention",
+          name: PA_ROUTES.retention,
+          component: AnalyticsRetention,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "events",
+          name: PA_ROUTES.events,
+          component: NamedEventsListPage,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+      ],
+    },
+    // Siblings of the shell, not children, so the editor renders without its sub-tab strip.
+    {
+      path: "product-analytics/events/new",
+      name: PA_ROUTES.eventNew,
+      component: NamedEventEditor,
+      meta: {
+        titleKey: "rum.analytics.events.createTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "product-analytics/events/:id/edit",
+      name: PA_ROUTES.eventEdit,
+      component: NamedEventEditor,
+      props: true,
+      meta: {
+        titleKey: "rum.analytics.events.editTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
     },
     ...useIngestionRoutes(),
     ...useEnterpriseRoutes(),

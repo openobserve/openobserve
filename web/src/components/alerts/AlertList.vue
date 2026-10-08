@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="flex h-full flex-col">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
@@ -37,23 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
-        <!-- Import button -->
-        <OButton
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          @click="importAlert"
-          data-test="alert-import"
-          icon-left="upload-file"
-        >
-          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-          <OTooltip
-            v-if="isCompactToolbar"
-            :content="t('dashboard.import')"
-            side="bottom"
-            shortcut-id="alertsImport"
-          />
-        </OButton>
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -77,15 +61,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
+      <template #actions-overflow>
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
+          />
+        </OButton>
+      </template>
+
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- Left: FolderList -->
-        <div class="w-rail h-full shrink-0">
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
           </div>
         </div>
         <!-- Right: Table -->
-        <div class="h-full min-w-0 flex-1">
+        <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
           <div class="bg-card-glass-bg flex h-full flex-col">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
@@ -138,8 +144,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
+                <div
+                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                >
                   <OToggleGroup
+                    mobile-dropdown
                     :model-value="activeTab"
                     data-test="alert-list-tabs"
                     @update:model-value="(v) => onAlertTabChange(v as string)"
@@ -150,12 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="tab.value"
                       size="sm"
                       :icon-left="tab.icon"
+                      :title="lgUp ? undefined : tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      {{ tab.label }}
+                      <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1">
+                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
+                  <div class="min-w-0 flex-1 md:max-lg:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -182,7 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
+                              t("alerts.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -190,7 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
+                              t("alerts.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>
@@ -199,20 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #toolbar-trailing>
-                <OButton
+                <ORefreshButton
+                  layout="inline"
                   variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :loading="loading"
+                  :last-run-at="lastUpdatedAt"
+                  :loading="fetching"
+                  shortcut-id="alertsRefresh"
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="t('alerts.reloadAlertsTooltip')"
-                    shortcut-id="alertsRefresh"
-                  />
-                </OButton>
+                />
               </template>
 
               <template #cell-name="{ row }">
@@ -327,34 +338,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at_raw"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
+                />
+              </template>
+
+              <template #cell-last_satisfied_at="{ row }">
                 <span class="inline-flex min-w-0 items-center gap-1.5">
                   <span
-                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_triggered_at_raw))"
+                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_satisfied_at_raw))"
                     class="h-1.5 w-1.5 shrink-0 rounded-full"
                     :class="
-                      recencyLevel(row.last_triggered_at_raw) === 'hot'
+                      recencyLevel(row.last_satisfied_at_raw) === 'hot'
                         ? 'bg-warning-500 motion-safe:animate-pulse'
                         : 'bg-text-muted'
                     "
                   />
                   <OTimeCell
-                    :value="row.last_triggered_at_raw"
-                    unit="us"
-                    mode="relative"
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
-              </template>
-
-              <template #cell-last_satisfied_at="{ row }">
-                <OTimeCell
-                  :value="row.last_satisfied_at"
-                  unit="iso"
-                  mode="absolute"
-                  :timezone="store.state.timezone"
-                  :empty-label="t('alerts.anomaly.retrainNever')"
-                />
               </template>
 
               <template #cell-status="{ row }">
@@ -379,6 +390,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`alert-list-${row.name}-priority`"
                 />
                 <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <!-- Which team this alert pages. Only an alert that NAMES a team
+                   can be answered here: every other one is routed from the
+                   identity dimensions of the row that fires, which an alert
+                   definition does not carry, so it is resolved at fire time and
+                   says so rather than guessing. -->
+              <template #cell-oncall_team="{ row }">
+                <OTag
+                  v-if="row.oncall_team"
+                  type="exampleChip"
+                  value="dim"
+                  :label="oncallTeamName(row.oncall_team)"
+                  :data-test="`alert-list-${row.name}-oncall-team`"
+                />
+                <OTooltip v-else :content="t('alerts.oncallTeamFromRules')">
+                  <span class="text-text-secondary text-2xs">
+                    {{ t("alerts.oncallTeamAtFireTime") }}
+                  </span>
+                </OTooltip>
               </template>
 
               <!-- Tags (PT-6). Three visible + overflow count, so an alert
@@ -475,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ms-1 flex items-center justify-center"
+                    class="ms-1 flex items-center justify-center max-md:hidden"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -484,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ms-1"
+                    class="ms-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -502,6 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     icon-left="edit"
+                    class="max-md:hidden"
                     @click.stop="editAlert(row)"
                   >
                     <OTooltip
@@ -515,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        button receives no pointer events, so a tooltip anchored
                        to it would never open — leaving a greyed-out control
                        with no way to find out why. -->
-                  <span class="inline-flex">
+                  <span class="inline-flex max-md:hidden">
                     <OTooltip
                       v-if="isSloRow(row)"
                       side="bottom"
@@ -568,6 +600,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="!!alertStateLoadingMap[row.uuid]"
+                      :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
+                      @select="toggleAlertState(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
+                      </template>
+                      {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :data-test="`alert-list-${row.name}-update-alert-menu`"
+                      @select="editAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="edit" size="sm" />
+                      </template>
+                      {{ t("alerts.edit") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="isSloRow(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert-menu`"
+                      @select="duplicateAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="content-copy" size="sm" />
+                      </template>
+                      {{ t("alerts.clone") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
@@ -668,63 +733,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between gap-1">
-                  <div class="flex min-w-25 items-center text-xs font-normal">
-                    <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
-                      {{ t("alerts.selectedLabel") }}</template
-                    >
-                    <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
-                  </div>
-
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-move-across-folders-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="drive-file-move"
-                    @click="moveMultipleAlerts"
-                    >{{ t("common.move") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-export-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="download"
-                    @click="multipleExportAlert"
-                    >{{ t("common.export") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-pause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="pause"
-                    @click="bulkToggleAlerts('pause')"
-                    >{{ t("alerts.pause") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-unpause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="play-arrow"
-                    @click="bulkToggleAlerts('resume')"
-                    >{{ t("alerts.resume") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-delete-alerts-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    >{{ t("common.delete") }}</OButton
-                  >
-                </div>
+              <template #selection-actions>
+                <OButton
+                  data-test="alert-list-move-across-folders-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="drive-file-move"
+                  @click="moveMultipleAlerts"
+                  >{{ t("common.move") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-export-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="download"
+                  @click="multipleExportAlert"
+                  >{{ t("common.export") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-pause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="pause"
+                  @click="bulkToggleAlerts('pause')"
+                  >{{ t("alerts.pause") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-unpause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="play-arrow"
+                  @click="bulkToggleAlerts('resume')"
+                  >{{ t("alerts.resume") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-delete-alerts-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  icon-left="delete"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                  >{{ t("common.delete") }}</OButton
+                >
               </template>
             </OTable>
           </div>
@@ -741,7 +791,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
-        @refresh:templates="getTemplates"
+        @refresh:templates="refreshTemplates"
       />
     </template>
     <template v-else>
@@ -792,7 +842,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('alerts.cloneTitle')"
         :secondary-button-label="t('alerts.cancel')"
         :primary-button-label="t('alerts.save')"
-        :primary-button-disabled="isSubmitting"
+        :primary-button-disabled="isSubmitting || !toBeCloneAlertName.trim()"
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
@@ -853,6 +903,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { alertDetailQuery } from "@/services/alerts.queries";
+import { alertsListQuery } from "@/services/alerts.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  cloneAnomalyAlertMutation,
+  retrainAnomalyMutation,
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
+} from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import {
   defineComponent,
   ref,
@@ -864,6 +928,7 @@ import {
   onMounted,
   computed,
   reactive,
+  nextTick,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
@@ -876,6 +941,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
 import {
   isSloAlert,
   isUnplaceableSloAlert,
@@ -884,29 +950,30 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import sloService from "@/services/slos";
-import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
 import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
-import { nextTick } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -930,6 +997,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -948,6 +1016,7 @@ export default defineComponent({
     OTooltip,
     SelectFolderDropDown,
     OButton,
+    ORefreshButton,
     OIcon,
     ODialog,
     ODropdown,
@@ -968,6 +1037,29 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
+    const { lgUp } = useBreakpoint();
+
+    // On-call is separately gated, so the column and its lookup vanish with it
+    // rather than showing a header nothing can ever fill.
+    const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const oncallTeams = ref<OnCallTeam[]>([]);
+
+    /// The alert stores a team id; a woken engineer needs the name. Falls back
+    /// to the id when the team list could not be read, because an opaque id is
+    /// still better than an empty cell that reads as "routed from rules".
+    const oncallTeamName = (teamId: string): I18nText =>
+      raw(oncallTeams.value.find((team) => team.id === teamId)?.name ?? teamId);
+
+    async function fetchOnCallTeams() {
+      if (!oncallEnabled.value) return;
+      try {
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
+      } catch {
+        oncallTeams.value = [];
+      }
+    }
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -1005,6 +1097,10 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // A request in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
@@ -1013,7 +1109,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          oTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },
@@ -1114,6 +1210,7 @@ export default defineComponent({
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);
+      void fetchOnCallTeams();
     });
 
     onBeforeUnmount(() => {
@@ -1142,9 +1239,7 @@ export default defineComponent({
     const filteredResults: Ref<any[]> = ref([]);
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
-    // Recency of the last trigger, bucketed for the trigger-time dot + the
-    // recently-fired row highlight. Derived from the RAW microsecond timestamp
-    // (last_triggered_at_raw) so it stays correct regardless of display timezone.
+    // Keyed on firing time, not run time; raw µs keeps it timezone-independent.
     const RECENT_TRIGGER_MS = 15 * 60 * 1000; // "hot" — fired in the last 15 min
     const RECENT_TRIGGER_DAY_MS = 24 * 60 * 60 * 1000; // "warm" — within a day
     const triggerAgeMs = (rawMicros: unknown): number | null => {
@@ -1314,7 +1409,7 @@ export default defineComponent({
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
-        if (recencyLevel(r.last_triggered_at_raw) === "hot") recent += 1;
+        if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
       return { active, paused, failed, recent, total: rows.length };
     });
@@ -1393,7 +1488,7 @@ export default defineComponent({
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "recent")
-        return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
+        return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
         return rows.filter(
           (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
@@ -1508,6 +1603,24 @@ export default defineComponent({
           size: 170,
           meta: { align: "left" },
         },
+        // "oncall_team" — which team this alert would page. Only present on a
+        // build with on-call enabled, and hidden by default: it is an audit
+        // column, not something every alerts list needs open.
+        ...(oncallEnabled.value
+          ? [
+              {
+                id: "oncall_team",
+                accessorKey: "oncall_team",
+                header: t("alerts.oncallTeam"),
+                cell: " ",
+                sortable: true,
+                resizable: true,
+                hideable: true,
+                size: 200,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
         // no meaningful order and sorting by it would imply one.
         {
@@ -1654,6 +1767,19 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
     // Normalizes an anomaly-detection item returned by the merged alerts list API
     // (alert_type === "anomaly_detection") into the standard alert row shape.
+    // A row's uuid keys `alertStateLoadingMap` and the enable/disable match, so
+    // it has to survive a re-paint of the same list — a fresh getUUID() per map
+    // would hand the same alert a new identity on every revalidation.
+    const rowUuids = new Map<string, string>();
+    const stableUuid = (identity: string) => {
+      let uuid = rowUuids.get(identity);
+      if (!uuid) {
+        uuid = getUUID();
+        rowUuids.set(identity, uuid);
+      }
+      return uuid;
+    };
+
     const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
@@ -1670,7 +1796,7 @@ export default defineComponent({
       filters: anomaly.filters || [],
       histogram_interval: anomaly.histogram_interval || "",
       description: anomaly.description || "",
-      uuid: getUUID(),
+      uuid: stableUuid(anomaly.alert_id || anomaly.anomaly_id || anomaly.id || anomaly.name),
       owner: anomaly.owner || "",
       period: anomaly.trigger_condition?.period ?? "",
       frequency: anomaly.trigger_condition?.frequency ?? "",
@@ -1678,9 +1804,8 @@ export default defineComponent({
       last_triggered_at: anomaly.last_triggered_at
         ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
-      // Raw microsecond epoch — drives the relative-time cell, recency dot and
-      // recently-fired row highlight (timezone-independent).
       last_triggered_at_raw: anomaly.last_triggered_at ?? null,
+      last_satisfied_at_raw: anomaly.last_satisfied_at ?? null,
       last_satisfied_at: anomaly.last_satisfied_at
         ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
@@ -1701,9 +1826,18 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Anomaly rows share the alerts table, so they share its On-call team
+      // column. This branch returns before the mapping below, so anything the
+      // column needs has to be listed here as well or the row renders as
+      // unbound whatever the API sent.
+      oncall_team: anomaly.oncall_team ?? null,
       // Built field by field: anything unlisted is invisible to the table.
       last_outcome: anomaly.last_outcome ?? null,
       last_outcome_at: anomaly.last_outcome_at ?? null,
+      // Feature 2 carries these on anomaly configs too, and the API sends them
+      // — `anomaly_priority_tag_tests` pins that. This branch returns before
+      // the mapping that reads them for scheduled alerts, so an anomaly row
+      // showed no priority and no tags however the config was set.
       priority: anomaly.priority ?? null,
       tags: anomaly.tags ?? [],
       selected: false,
@@ -1718,20 +1852,10 @@ export default defineComponent({
 
     // ---------------------------------------------------------------------------
 
+    // The folder is part of the query key, so a revisit inside the tier's
+    // staleTime resolves from cache with no request and no special loading path.
     const getAlertsByFolderId = async (store: any, folderId: any) => {
-      //this is the condition where we are fetching the alerts from the server
-      // assigning it to the allAlertsListByFolderId in the store
-      if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
-        await getAlertsFn(store, folderId);
-      } else {
-        //this is the condition where we are assigning the alerts to the filteredResults so whenever
-        // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-        allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
-        // Data is served synchronously from cache — clear the loading flag
-        // (it starts true to avoid the empty-state flash) so the table renders
-        // the cached rows instead of staying stuck on the skeleton.
-        loading.value = false;
-      }
+      await getAlertsFn(store, folderId);
     };
     const getAlertsFn = async (
       store: any,
@@ -1739,6 +1863,7 @@ export default defineComponent({
       query = "",
       refreshResults = true,
       alertType = "",
+      force = false,
     ) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
@@ -1760,35 +1885,21 @@ export default defineComponent({
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
       }
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
-        timeout: 0,
-      });
       if (query) {
         folderId = "";
       }
-      loading.value = true;
-      forbidden.value = false;
-      try {
-        const res = await alertsService.listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          store?.state?.selectedOrganization?.identifier,
-          folderId,
-          query,
-          alertType,
-        );
+
+      // Painting the same rows twice is safe: uuids are stable per alert, and
+      // the route-driven dialogs below run once, on the fresh result. Returns
+      // false when the folder changed mid-flight and the render was skipped.
+      const renderAlerts = (rows: any[]): boolean => {
         var counter = 1;
         let localAllAlerts = [];
         //this is the alerts that we use to store
-        localAllAlerts = res.data.list.map((alert: any) => {
+        localAllAlerts = rows.map((alert: any) => {
           return {
             ...alert,
-            uuid: getUUID(),
+            uuid: stableUuid(alert.alert_id || alert.name),
           };
         });
 
@@ -1828,6 +1939,7 @@ export default defineComponent({
               is_real_time: "composite",
               last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
               last_triggered_at_raw: data.last_triggered_at ?? null,
+              last_satisfied_at_raw: data.last_satisfied_at ?? null,
               last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             };
           }
@@ -1855,9 +1967,8 @@ export default defineComponent({
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
             last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
-            // Raw microsecond epoch — drives the relative-time cell, recency dot
-            // and recently-fired row highlight (timezone-independent).
             last_triggered_at_raw: data.last_triggered_at ?? null,
+            last_satisfied_at_raw: data.last_satisfied_at ?? null,
             last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
@@ -1871,6 +1982,12 @@ export default defineComponent({
             // what the API returns.
             priority: data.priority ?? null,
             tags: data.tags ?? [],
+            // The team this alert names, for the On-call team column. Same
+            // reason as the two above: the column, the name resolver and the
+            // team fetch all existed, and the field was carried by neither the
+            // API nor this mapping — so every alert rendered "From ownership",
+            // including ones deliberately pinned to a team.
+            oncall_team: data.oncall_team ?? null,
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,
@@ -1923,8 +2040,7 @@ export default defineComponent({
         //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
         //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         if (folderId != activeFolderId.value && !query) {
-          dismiss();
-          return;
+          return false;
         }
         //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         allAlerts.value = localAllAlerts;
@@ -1944,25 +2060,53 @@ export default defineComponent({
         //here we are filtering the alerts by the activeTab
         //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
         filterAlertsByTab(refreshResults);
-        if (router.currentRoute.value.query.action == "import") {
-          showImportAlertDialog.value = true;
-        }
-        if (router.currentRoute.value.query.action == "add") {
-          showAddUpdateFn({ row: undefined });
-        }
-        if (router.currentRoute.value.query.action == "update") {
-          const alertId = router.currentRoute.value.query.alert_id as string;
-          const alert = await getAlertById(alertId);
+        return true;
+      };
 
-          // Same diversion as the edit button. This path is reached by a hard
-          // reload, a bookmark or the back button, so guarding only the button
-          // would leave the generic editor reachable for an SLO alert.
-          if (!(await divertSloAlert(alert))) {
-            showAddUpdateFn({
-              row: alert,
-            });
-          }
+      const org = store?.state?.selectedOrganization?.identifier;
+
+      // Stale-while-revalidate: the rows already on screen stay put while the
+      // folder revalidates, so only a cold cache spins and toasts.
+      // renderAlerts reports whether it rendered — the folder can change
+      // mid-flight — so the paint is driven here rather than through `apply`.
+      // Painted even on a manual refresh: the rows stay while the request runs.
+      const cachedRows = queryClient.getQueryData<any[]>(
+        alertKeys.list(org, folderId, query, alertType),
+      );
+      const painted = cachedRows ? renderAlerts(cachedRows) : false;
+      const opts = alertsListQuery(org, folderId, query, alertType);
+      const pending = force
+        ? queryClient
+            .invalidateQueries({
+              queryKey: opts.queryKey,
+              exact: true,
+              refetchType: "none",
+            })
+            .then(() => queryClient.fetchQuery(opts))
+        : queryClient.fetchQuery(opts);
+
+      loading.value = !painted;
+      fetching.value = true;
+      forbidden.value = false;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
+            timeout: 0,
+          });
+
+      try {
+        if (!renderAlerts(await pending)) {
+          dismiss();
+          return;
         }
+        // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+        lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
+        // `?action=…` deep links are handled by the immediate watcher on
+        // `query.action` below. Handling them here too re-opened a blank form
+        // after every save: the post-save refresh reads the route before
+        // hideForm's cleanup push lands, so it still sees the stale `action`.
         dismiss();
       } catch (error: any) {
         console.error(error);
@@ -1977,6 +2121,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        fetching.value = false;
       }
     };
     /** Send an SLO alert to its SLO page instead of the generic editor.
@@ -2021,12 +2166,14 @@ export default defineComponent({
         timeout: 0,
       });
       try {
-        const res = await alertsService.get_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          id,
+        // Cached for the editor-open path only. The read-modify-write in
+        // WorkflowLinkAlertsDialog deliberately still goes straight to the
+        // service — a stale alert there would overwrite someone else's edit.
+        const data = await queryClient.fetchQuery(
+          alertDetailQuery(store.state.selectedOrganization.identifier, id),
         );
         dismiss();
-        return res.data;
+        return data;
       } catch (error) {
         dismiss();
         throw error;
@@ -2079,11 +2226,17 @@ export default defineComponent({
 
     const refreshAlerts = async () => {
       if (searchAcrossFolders.value && searchQuery.value) {
-        await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+        await getAlertsFn(store, activeFolderId.value, searchQuery.value, true, "", true);
       } else {
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, "", true);
       }
       filterAlertsByTab();
+      // Re-apply the in-folder search too. Without it a refresh handed back the
+      // whole folder while the search box still showed the term — the same
+      // shape every other reload path here already guards against.
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
     };
 
     onMounted(async () => {
@@ -2116,6 +2269,8 @@ export default defineComponent({
           loading.value = false;
           return;
         }
+        // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
+        currentPage.value = 1;
         if (searchAcrossFolders.value) {
           searchAcrossFolders.value = false;
           searchQuery.value = "";
@@ -2190,14 +2345,12 @@ export default defineComponent({
           });
         }
         addAlert();
-        if (config.enableAnalytics == "true") {
-          segment.track("Button Click", {
-            button: action,
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Alerts",
-          });
-        }
+        analytics.track("Button Click", {
+          button: action,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Alerts",
+        });
         track("Button Click", {
           button: action,
           page: "Add Alert",
@@ -2206,52 +2359,61 @@ export default defineComponent({
         console.error("Navigation failed:", error);
       }
     };
+    // The one handler for `?action=…` deep links (hard reload, bookmark, Back).
+    // Named so tests can drive it without racing the router.
+    const handleActionQuery = async (action: unknown) => {
+      if (!action) {
+        showAddAlertDialog.value = false;
+        showImportAlertDialog.value = false;
+        return;
+      }
+
+      // Handle update action
+      if (action === "update" && router.currentRoute.value.query.alert_id) {
+        const alertId = router.currentRoute.value.query.alert_id as string;
+        try {
+          const alert = await getAlertById(alertId);
+          if (!(await divertSloAlert(alert))) {
+            showAddUpdateFn({ row: alert });
+          }
+        } catch (error) {
+          console.error("AlertList: Failed to load alert", error);
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
+          });
+        }
+      }
+
+      // Handle add action
+      if (action === "add") {
+        showAddUpdateFn({ row: undefined });
+      }
+
+      // Handle import action
+      if (action === "import") {
+        showImportAlertDialog.value = true;
+      }
+    };
     watch(
       () => router.currentRoute.value.query.action,
-      async (action) => {
-        if (!action) {
-          showAddAlertDialog.value = false;
-          showImportAlertDialog.value = false;
-          return;
-        }
-
-        // Handle update action
-        if (action === "update" && router.currentRoute.value.query.alert_id) {
-          const alertId = router.currentRoute.value.query.alert_id as string;
-          try {
-            const alert = await getAlertById(alertId);
-            if (!(await divertSloAlert(alert))) {
-              showAddUpdateFn({ row: alert });
-            }
-          } catch (error) {
-            console.error("AlertList: Failed to load alert", error);
-            toast({
-              variant: "error",
-              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
-            });
-          }
-        }
-
-        // Handle add action
-        if (action === "add") {
-          showAddUpdateFn({ row: undefined });
-        }
-
-        // Handle import action
-        if (action === "import") {
-          showImportAlertDialog.value = true;
-        }
-      },
+      handleActionQuery,
       { immediate: true }, // Run immediately to handle direct navigation
     );
-    const getDestinations = async () => {
-      destinationService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        })
-        .then((res) => {
-          destinations.value = res.data;
+    const getDestinations = async (force = false) => {
+      const options = destinationsQuery(store.state.selectedOrganization.identifier, "alert");
+      // A destination created in the form's new tab never expires this tab's cache, so refresh forces.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      void ready
+        .then(() => queryClient.fetchQuery(options))
+        .then((list: any) => {
+          destinations.value = list as any;
         })
         .catch(() =>
           toast({
@@ -2261,13 +2423,20 @@ export default defineComponent({
         );
     };
 
-    const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => {
-          templates.value = res.data;
+    const getTemplates = (force = false) => {
+      const options = templatesQuery(store.state.selectedOrganization.identifier);
+      // The mount read stays cache-first; only the form's refresh button forces a server read.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      void ready
+        .then(() => queryClient.fetchQuery(options))
+        .then((list: any) => {
+          templates.value = list;
         })
         .catch(() =>
           toast({
@@ -2276,6 +2445,8 @@ export default defineComponent({
           }),
         );
     };
+    // The form's refresh event carries no payload, so a bare `getTemplates` handler would never see `force`.
+    const refreshTemplates = () => getTemplates(true);
     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
     // Restored the same way as pageSize above, so returning from add/edit/detail lands back on the page the user was viewing instead of resetting to page 1.
@@ -2283,10 +2454,6 @@ export default defineComponent({
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
-    const resultTotal = computed(function () {
-      return displayedAlerts.value?.length;
-    });
-
     // No timezone suffix in this table, unlike the other lists.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
@@ -2310,15 +2477,49 @@ export default defineComponent({
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
-      toBeClonestreamName.value = "";
-      toBeClonestreamType.value = "";
+      // Pre-fill from the original alert's row — composite rows carry no
+      // single stream, and a row that genuinely has none renders it as the
+      // "--" placeholder (both the list table's own convention and the one
+      // anomaly rows fall back to), which must not get selected as if it
+      // were a real stream type/name.
+      toBeClonestreamType.value =
+        toBeClonedIsComposite.value || !row.stream_type || row.stream_type === "--"
+          ? ""
+          : row.stream_type;
+      toBeClonestreamName.value =
+        toBeClonedIsComposite.value || !row.stream_name || row.stream_name === "--"
+          ? ""
+          : row.stream_name;
       showForm.value = true;
+      // Load the stream-name options for the pre-filled stream type so the
+      // dialog's dropdown reflects it instead of showing an empty list. A
+      // failed load must not abort the clone itself — the dialog still opens,
+      // just with an empty stream-name list the user has to fill by hand —
+      // so the alert-to-clone fetch below always runs regardless.
+      if (toBeClonestreamType.value) {
+        try {
+          await updateStreams(false);
+        } catch {
+          // handled above: dialog stays open with an empty stream-name list
+        }
+      }
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
         toBeClonedAlert.value = await getAlertById(row.alert_id);
       }
     };
     const submitForm = async () => {
+      // #14627: neither clone endpoint rejects a blank name, and an unnamed
+      // alert is a row that cannot be searched, toggled or deleted by name. The
+      // disabled Save button is the affordance; this guard is what makes a stale
+      // handler or a keyboard submit harmless.
+      if (!toBeCloneAlertName.value.trim()) {
+        toast({
+          variant: "error",
+          message: t("alerts.nameRequired"),
+        });
+        return;
+      }
       // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
       if (toBeClonedIsAnomaly.value) {
         if (!toBeClonestreamType.value) {
@@ -2342,24 +2543,23 @@ export default defineComponent({
           timeout: 0,
         });
         try {
-          await alertsService.clone_by_id(
-            store.state.selectedOrganization.identifier,
-            toBeClonedID.value,
-            {
+          await cloneAnomalyAlert.mutateAsync({
+            alertId: toBeClonedID.value,
+            data: {
               name: toBeCloneAlertName.value,
               folder_id: (folderIdToBeCloned.value as string) || "default",
               stream_type: toBeClonestreamType.value,
               stream_name: toBeClonestreamName.value,
             },
-            folderIdToBeCloned.value,
-          );
+            folderId: folderIdToBeCloned.value,
+          });
           dismiss();
           toast({
             variant: "success",
             message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
-          await getAlertsFn(store, folderIdToBeCloned.value);
+          await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
@@ -2399,7 +2599,10 @@ export default defineComponent({
             message: t("toastMessages.alerts.alertClonedSuccessfully"),
           });
           showForm.value = false;
-          await getAlertsFn(store, folderIdToBeCloned.value);
+          // force (#14626): the list this refetches is the one the clone was
+          // just added to, and an unforced fetchQuery answers from cache —
+          // leaving the new row invisible until the user refreshes by hand.
+          await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
@@ -2444,7 +2647,9 @@ export default defineComponent({
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
       toBeClonedAlert.value.stream_type = toBeClonestreamType.value;
-      toBeClonedAlert.value.folder_id = activeFolderId.value;
+      // The destination, not the folder being cloned from (#14625): the create
+      // endpoint refuses a body folder_id that disagrees with its ?folder=.
+      toBeClonedAlert.value.folder_id = folderIdToBeCloned.value;
       try {
         //removed id from the alert payload
         if (toBeClonedAlert.value?.id) {
@@ -2469,7 +2674,7 @@ export default defineComponent({
                 message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
-              await getAlertsFn(store, folderIdToBeCloned.value);
+              await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
               activeFolderId.value = folderIdToBeCloned.value;
             } else {
               toast({
@@ -2509,7 +2714,7 @@ export default defineComponent({
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
       // Always fetch the latest alerts for the folder from backend
-      await getAlertsFn(store, resolvedFolderId);
+      await getAlertsFn(store, resolvedFolderId, "", true, "", true);
       // Re-apply active search/filter on the freshly fetched data
       if (filterQuery.value) {
         filterAlertsByQuery(filterQuery.value);
@@ -2541,6 +2746,46 @@ export default defineComponent({
         page: "Add Alert",
       });
     };
+    const alertWriteOrgId = useOrgId();
+    const toggleAlertStateWrite = useMutation(() =>
+      toggleAlertStateMutation(alertWriteOrgId.value),
+    );
+    const toggleAnomalyState = useMutation(() =>
+      toggleAnomalyAlertStateMutation(alertWriteOrgId.value),
+    );
+    const cloneAnomalyAlert = useMutation(() => cloneAnomalyAlertMutation(alertWriteOrgId.value));
+    const retrainAnomalyAlert = useMutation(() => retrainAnomalyMutation(alertWriteOrgId.value));
+
+    // Only the entries that hold alert rows: the same scope also holds templates, destinations, sources and history, which a patch would re-stamp as fresh.
+    const ALERT_ROW_KEYS = ["list", "search", "dependencies"];
+    const alertRowEntries = (org: string) => ({
+      queryKey: alertKeys.all(org),
+      predicate: (q: any) => ALERT_ROW_KEYS.includes(q.queryKey[3]),
+    });
+    // Table rows are mapped copies, so a local field flip must also reach the cached raw rows every folder revisit re-renders from.
+    const patchCachedAlert = (alertId: any, patch: Record<string, any>) => {
+      if (!alertId) return;
+      const id = String(alertId);
+      const org = store.state.selectedOrganization.identifier;
+      queryClient.setQueriesData(alertRowEntries(org), (cached: any) => {
+        if (!Array.isArray(cached)) return undefined;
+        let hit = false;
+        const next = cached.map((r: any) => {
+          if (String(r?.alert_id ?? r?.anomaly_id ?? r?.id) !== id) return r;
+          hit = true;
+          return { ...r, ...patch };
+        });
+        // `undefined` leaves an entry without this alert untouched instead of re-stamping it as fresh.
+        return hit ? next : undefined;
+      });
+      // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
+      void queryClient.invalidateQueries({
+        queryKey: alertKeys.detail(org, id),
+        exact: true,
+        refetchType: "none",
+      });
+    };
+
     // A delete is one row leaving a list the server has already confirmed. Splice
     // it out — of the rows, the filtered view, the selection AND the per-folder
     // cache a folder revisit is served from — instead of refetching every alert in
@@ -2551,6 +2796,10 @@ export default defineComponent({
       if (!gone.size) return;
 
       const keep = (row: any) => !gone.has(String(row?.alert_id));
+      // Read before the splice below removes the rows this has to inspect.
+      const droppedAnomaly = allAlerts.value.some(
+        (row: any) => !keep(row) && row?.type === "anomaly",
+      );
       allAlerts.value = allAlerts.value.filter(keep);
       filteredResults.value = filteredResults.value.filter(keep);
       // Anything that failed to delete stays selected, so a bulk retry is one click.
@@ -2570,6 +2819,23 @@ export default defineComponent({
         );
         store.dispatch("setAllAlertsListByFolderId", pruned);
       }
+
+      // The store copy above is not the only cache the list is served from: the
+      // per-folder query entries are what a revisit inside staleTime reads, so
+      // splice the rows out of every one of them too, and drop each deleted
+      // alert's detail entry outright.
+      const org = store.state.selectedOrganization.identifier;
+      queryClient.setQueriesData(alertRowEntries(org), (cached: any) => {
+        if (!Array.isArray(cached)) return undefined;
+        const next = cached.filter(keep);
+        return next.length === cached.length ? undefined : next;
+      });
+      gone.forEach((id: string) =>
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
+      );
+
+      // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
+      if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });
 
       // The alert is gone from every destination and template that referenced it.
       invalidateDependencyGraphCache();
@@ -2612,15 +2878,13 @@ export default defineComponent({
             message: err?.data?.message || t("alerts.messages.deleteAlertFailed"),
           });
         });
-      if (config.enableAnalytics == "true") {
-        segment.track("Button Click", {
-          button: "Delete Alert",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          alert_name: selectedDelete.value.name,
-          page: "Alerts",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Delete Alert",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        alert_name: selectedDelete.value.name,
+        page: "Alerts",
+      });
     };
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
@@ -2678,24 +2942,30 @@ export default defineComponent({
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
 
-      alertsService
-        .toggle_state_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          row.alert_id,
-          !row?.enabled,
-          activeFolderId.value,
-        )
+      // Two mutations, not one conditional invalidation: an anomaly row is also a config Overview renders.
+      const toggle = row.type === "anomaly" ? toggleAnomalyState : toggleAlertStateWrite;
+
+      toggle
+        .mutateAsync({
+          alertId: row.alert_id,
+          enabled: !row?.enabled,
+          folderId: activeFolderId.value,
+        })
         .then((res: any) => {
           const isEnabled = res.data.enabled;
           filteredResults.value.forEach((alert: any) => {
             alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
+          patchCachedAlert(row.alert_id, { enabled: isEnabled });
           toast({
             variant: "success",
             message: isEnabled
               ? t("toastMessages.alerts.alertResumedSuccessfully")
               : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
+        })
+        .catch(() => {
+          /* the mutation handler already toasts the failure; this only keeps the rejection handled */
         })
         .finally(() => {
           alertStateLoadingMap.value[row.uuid] = false;
@@ -2714,7 +2984,7 @@ export default defineComponent({
     };
 
     const refreshDestination = async () => {
-      await getDestinations();
+      await getDestinations(true);
     };
 
     const importAlert = () => {
@@ -2826,17 +3096,24 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        await alertsService.trigger_alert(
+        const res = await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
           row.folder_name?.id,
         );
-        toast({
-          variant: "success",
-          message: t("alerts.alertTriggeredSuccess"),
-        });
+        // A lost claim or an ineligible row means nothing ran, so success would mislead.
+        toast(
+          res?.data?.claim_lost === true
+            ? { variant: "warning", message: t("alerts.anomaly.detectionAlreadyRunning") }
+            : res?.data?.ineligible === true
+              ? {
+                  variant: "warning",
+                  message: res.data.message || t("alerts.messages.triggerAlertFailed"),
+                }
+              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+        );
         if (row.type === "anomaly") {
-          await getAlertsFn(store, activeFolderId.value);
+          await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }
       } catch (error: any) {
         toast({
@@ -2848,11 +3125,10 @@ export default defineComponent({
 
     const retrainAnomaly = async (row: any) => {
       try {
-        await alertsService.retrain_by_id(
-          store.state.selectedOrganization.identifier,
-          row.alert_id,
-        );
+        await retrainAnomalyAlert.mutateAsync(row.alert_id);
         row.status = "training";
+        // Patched, not invalidated: refetching the whole folder for one cell would take the scroll with it.
+        patchCachedAlert(row.alert_id, { status: "training" });
         toast({
           variant: "success",
           message: t("toastMessages.alerts.retrainingTriggered"),
@@ -2972,15 +3248,17 @@ export default defineComponent({
 
     // A delete inside the dependency popover — reload the current folder's alerts
     // so the table drops the removed row.
-    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
+    // Forced: a cached reload would paint the deleted alert straight back.
+    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
+      // A post-write reload, so both folders force past staleTime.
       if (selectedFolderId === activeFolderId) {
-        await getAlertsFn(store, activeFolderId);
+        await getAlertsFn(store, activeFolderId, "", true, "", true);
       } else {
-        await getAlertsFn(store, selectedFolderId, "", false);
-        await getAlertsFn(store, activeFolderId);
+        await getAlertsFn(store, selectedFolderId, "", false, "", true);
+        await getAlertsFn(store, activeFolderId, "", true, "", true);
       }
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
@@ -3157,7 +3435,7 @@ export default defineComponent({
 
     //this function is used to refresh the imported alerts
     const refreshImportedAlerts = async (store: any, folderId: any) => {
-      await getAlertsFn(store, folderId);
+      await getAlertsFn(store, folderId, "", true, "", true);
     };
     const updateFolderIdToBeCloned = (folderId: any) => {
       folderIdToBeCloned.value = folderId.value;
@@ -3262,7 +3540,7 @@ export default defineComponent({
           });
         }
         // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);
@@ -3372,7 +3650,9 @@ export default defineComponent({
           );
         } else {
           selectedAlerts.value = [];
-          await getAlertsFn(store, activeFolderId.value);
+          // Forced: the point of this branch is to hear it from the server, and an
+          // unforced read inside staleTime answers from cache without asking.
+          await getAlertsFn(store, activeFolderId.value, "", true, "", true);
           if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
         }
       } catch (error: any) {
@@ -3442,6 +3722,9 @@ export default defineComponent({
     ]);
 
     return {
+      oncallEnabled,
+      oncallTeamName,
+      lgUp,
       raw,
       t,
       store,
@@ -3467,7 +3750,6 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,
@@ -3477,6 +3759,7 @@ export default defineComponent({
       addAlert,
       isUpdated,
       showAddUpdateFn,
+      handleActionQuery,
       showDeleteDialogFn,
       duplicateAlert,
       showAddAlertDialog,
@@ -3496,6 +3779,8 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       isSubmitting,
       filterQuery,
@@ -3517,6 +3802,7 @@ export default defineComponent({
       goToAlertInsights,
       goToAlertHistory,
       getTemplates,
+      refreshTemplates,
       exportAlert,
       showExportDialog,
       alertsToExport,

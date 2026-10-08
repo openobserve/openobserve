@@ -31,7 +31,7 @@ jobs:
           private_key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Slash Command Dispatch
-        uses: peter-evans/slash-command-dispatch@13bc09769d122a64f75aa5037256f6f2d78be8c4 # v4.0.0
+        uses: peter-evans/slash-command-dispatch@9bdcd7914ec1b75590b790b844aa3b8eee7c683a # v5.0.2
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}
         with:

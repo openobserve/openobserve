@@ -48,6 +48,11 @@ pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: boo
         // what lets a template branch warning vs critical wording — per-level
         // DESTINATIONS are Phase 4; v1 routing is template-side.
         .replace("{alert_level}", &ctx.alert_level)
+        // `firing` / `resolved` (openobserve#6751). One template, both states.
+        .replace("{alert_status}", &ctx.alert_status)
+        // The key that pairs a resolve with its trigger. Empty when the alert
+        // does not notify on recovery, which is when nothing will resolve.
+        .replace("{episode_id}", ctx.episode_id.as_deref().unwrap_or_default())
         // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
         // incident notifications build custom JSON and workflows carry
         // hard-coded metadata; neither is wired here in v1. Unset priority and
@@ -418,16 +423,28 @@ impl VarValue<'_> {
             self.len()
         };
         match self {
-            VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
+            VarValue::Str(v) => {
+                let s = v.chars().take(n).collect::<String>();
+                if is_email {
+                    s
+                } else {
+                    format_variable_value(s)
+                }
+            }
             VarValue::JsonArray(v) => {
                 // Convert JSON values to strings
                 let strings: Vec<String> = v[0..n]
                     .iter()
                     .map(|val| {
-                        if val.is_string() {
-                            format_variable_value(val.as_str().unwrap_or("").to_string())
+                        let s = if val.is_string() {
+                            val.as_str().unwrap_or("").to_string()
                         } else {
-                            format_variable_value(val.to_string())
+                            val.to_string()
+                        };
+                        if is_email {
+                            s
+                        } else {
+                            format_variable_value(s)
                         }
                     })
                     .collect();
@@ -463,6 +480,8 @@ mod golden {
             alert_count: "3".into(),
             alert_agg_value: "92.5".into(),
             alert_level: "critical".into(),
+            alert_status: "firing".to_string(),
+            episode_id: None,
             alert_priority: "P1".into(),
             alert_tags: "infra, prod".into(),
             alert_threshold_crit: "90".into(),
@@ -617,6 +636,15 @@ mod golden {
         ctx.row_columns = vec![("host".into(), vec!["web\"1".into()])];
         let out = apply_custom_template(r#"{"hosts":"{host}"}"#, &ctx, false);
         assert_eq!(out, GOLDEN_ESCAPE);
+    }
+
+    /// Email templates do not JSON-escape values: a raw quote lands literally.
+    #[test]
+    fn golden_email_escaping_not_applied_to_process_variable_replace_path() {
+        let mut ctx = fixture_ctx();
+        ctx.row_columns = vec![("host".into(), vec!["web\"1".into()])];
+        let out = apply_custom_template(r#"{"hosts":"{host}"}"#, &ctx, true);
+        assert_eq!(out, r#"{"hosts":"web"1"}"#);
     }
 
     /// The builder→renderer seam, end to end.

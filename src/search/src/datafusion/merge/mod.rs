@@ -13,6 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+pub mod downsampling;
+mod metrics;
+mod metrics_index;
+pub mod mode;
+mod result;
+mod single_file;
+
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
@@ -24,23 +32,15 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+pub use mode::{MergeMode, MergeOutput};
 use parquet::{
     arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
     file::metadata::KeyValue,
 };
+pub use result::{MergeResult, MergedFile};
 
 use super::table_provider::uniontable::NewUnionTable;
 use crate::datafusion::{exec::DataFusionContextBuilder, sort_order::FileSortOrder};
-
-#[cfg(feature = "enterprise")]
-pub mod downsampling;
-mod metrics;
-pub mod mode;
-mod result;
-mod single_file;
-
-pub use mode::{MergeMode, MergeOutput};
-pub use result::{MergeResult, MergedFile};
 
 /// Merge `tables` (the union of the input files) into one or more files
 /// according to `mode`, written as `output` says.
@@ -53,6 +53,7 @@ pub async fn merge_parquet_files(
     output: MergeOutput,
 ) -> Result<MergeResult> {
     let start = std::time::Instant::now();
+    let file_format = output.file_format;
     let sql = mode.sql(&schema);
     log::debug!("merge_parquet_files [{mode}] sql: {sql}");
     let (schema, rx, read_task) =
@@ -110,10 +111,7 @@ pub async fn merge_parquet_files(
         files.len(),
         start.elapsed().as_millis()
     );
-    Ok(MergeResult {
-        files,
-        file_format: output.file_format,
-    })
+    Ok(MergeResult { files, file_format })
 }
 
 /// Plan and start `sql` over the union of `tables`; the record batches arrive
@@ -146,13 +144,10 @@ async fn run_merge_query(
 
     // print the physical plan
     if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+--------------------------+");
-        println!("merge_parquet_files");
-        println!("+---------------------------+--------------------------+");
-        println!("{plan}");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
+        );
     }
 
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
@@ -178,6 +173,15 @@ async fn run_merge_query(
         Ok(())
     });
     Ok((schema, rx, read_task))
+}
+
+/// A temp file under `data_tmp_dir`, never the OS temp dir (often a RAM-backed tmpfs).
+pub(super) fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
+    // data_tmp_dir is wiped at startup, reclaiming files a crash orphaned
+    let tmp_dir = &get_config().common.data_tmp_dir;
+    std::fs::create_dir_all(tmp_dir)?;
+    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
+    Ok((tokio::fs::File::from_std(file), path))
 }
 
 pub fn append_metadata<W: AsyncFileWriter>(

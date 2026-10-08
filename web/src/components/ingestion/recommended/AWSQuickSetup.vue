@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="mb-6">
         <div
-          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
+          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2 max-md:flex-wrap max-md:gap-2"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 max-md:min-w-0">
             <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
             <div class="text-sm font-semibold" :class="stepLabelClass">
               {{ t("ingestion.selectServicesToMonitor") }}
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("ingestion.selected") }}
             </OTag>
           </div>
-          <div class="flex gap-2" @click.stop>
+          <div class="flex gap-2 max-md:ms-auto max-md:shrink-0" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll">{{
               t("ingestion.selectAll")
             }}</OButton>
@@ -136,11 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mb-6">
           <div
-            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
+            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2 max-md:flex-wrap max-md:gap-2"
             :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 max-md:min-w-0">
               <OIcon
                 :name="showTargetRegions ? 'expand-less' : 'expand-more'"
                 size="sm"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ targetRegions.length }} {{ t("ingestion.selected") }}</OTag
               >
             </div>
-            <div class="flex gap-2" @click.stop>
+            <div class="flex gap-2 max-md:ms-auto max-md:shrink-0" @click.stop>
               <OButton variant="ghost-primary" size="xs" @click="selectAllRegions">{{
                 t("ingestion.selectAll")
               }}</OButton>
@@ -335,7 +335,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -511,7 +511,7 @@ export default defineComponent({
       }
 
       window.open(url, "_blank", "noopener,noreferrer");
-      segment.track("AWS Complete Integration Started", {
+      analytics.track("AWS Complete Integration Started", {
         mode: "single",
         region: selectedRegion.value,
         services: enabledServices.value,
@@ -528,7 +528,7 @@ export default defineComponent({
       window.open(consoleUrl, "_blank", "noopener,noreferrer");
       showParamHelper.value = true;
 
-      segment.track("AWS StackSet Integration Started", {
+      analytics.track("AWS StackSet Integration Started", {
         mode: "stackset",
         model: stackSetModel.value,
         admin_region: selectedRegion.value,

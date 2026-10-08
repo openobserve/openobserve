@@ -27,6 +27,7 @@ import type {
 import { convertDateToTimestamp } from "@/utils/timezone";
 import { mapWireSteps } from "./mapRecordedStep";
 import { buildV2Steps } from "./buildV2Steps";
+import { startFromScheduleFields } from "./scheduleStart";
 import { useLocalTimezone } from "../storage";
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
@@ -61,13 +62,14 @@ function buildFrequency(s: BrowserCheckSchedule): BrowserCheckFrequency {
  */
 function computeStart(check: BrowserCheck): { start: number; tz_offset: number } {
   const { schedule, tz_offset } = check;
-  if (schedule.startType === "later" && schedule.startDate && schedule.startTime) {
+  if (startFromScheduleFields(check)) {
+    const { startDate = "", startTime = "" } = schedule;
     // Schedule Later: use the user-chosen date/time/timezone
-    const [y, m, d] = schedule.startDate.split("-");
+    const [y, m, d] = startDate.split("-");
     const dateForConversion = `${d}-${m}-${y}`; // ISO → DD-MM-YYYY
     const converted = convertDateToTimestamp(
       dateForConversion,
-      schedule.startTime,
+      startTime,
       schedule.timezone ?? "UTC",
     );
     return { start: converted.timestamp, tz_offset: converted.offset };
@@ -256,6 +258,8 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
       secure: secure ?? false,
       example: example ?? "",
     })),
+
+    environments: check.environments ?? [],
 
     frequency: buildFrequency(check.schedule),
     config: buildProtocolConfig(check),

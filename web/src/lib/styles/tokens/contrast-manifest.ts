@@ -840,6 +840,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
+    fg: "--color-schedule-band-solid-text",
+    bg: "--color-schedule-band-4-solid-bg",
+    category: "pending",
+    why: "a schedule band's own solid fill, painted on it directly, never on the page — amber falls short of AA for this shared white label",
+    issue: "WCAG-AA colour remediation (follow-up PR)",
+  },
+  {
     fg: "--color-select-border-focus",
     category: "pending",
     why: "fails the threshold against the page surface it is painted on",
@@ -990,6 +997,18 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "an error banner paints its text on the banner fill",
   },
   {
+    fg: "--color-brand-email-foreground",
+    bg: "--color-brand-email",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
+  },
+  {
+    fg: "--color-brand-email-ink-foreground",
+    bg: "--color-brand-email-ink",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
+  },
+  {
     fg: "--color-brand-msg-text",
     bg: "--color-brand-msg-bg",
     category: "text",
@@ -1008,6 +1027,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a chat-preview message renders on the mock message surface",
   },
   {
+    fg: "--color-brand-slack-foreground",
+    bg: "--color-brand-slack",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
+  },
+  {
     fg: "--color-brand-slack-link",
     bg: "--color-brand-msg-bg",
     category: "text",
@@ -1018,6 +1043,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-brand-msg-bg",
     category: "text",
     why: "the Slack preview renders on the mock message surface",
+  },
+  {
+    fg: "--color-brand-teams-foreground",
+    bg: "--color-brand-teams",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
   },
   {
     fg: "--color-brand-teams-text",
@@ -1344,6 +1375,36 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-syntax-bg",
     category: "text",
     why: "syntax colours are painted on the code block, not the page",
+  },
+  {
+    fg: "--color-query-syntax-keyword",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-function",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-string",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-number",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
+  },
+  {
+    fg: "--color-query-syntax-comment",
+    bg: "--color-surface-subtle",
+    category: "text",
+    why: "colorized queries are painted on the surface-subtle query well (DbmQueryText, SearchHistory)",
   },
   {
     fg: "--color-text-inverse",

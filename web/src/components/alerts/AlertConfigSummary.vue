@@ -64,11 +64,18 @@ import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import { alertConditionText, alertWarningConditionText } from "@/utils/alerts/alertCondition";
 import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
+import {
+  ANOMALY_BAND_GROUPING_KEYS,
+  ANOMALY_DIRECTION_KEYS,
+  anomalyTrainedK,
+  anomalyWindowShareEffective,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
 
@@ -126,40 +133,10 @@ const formatMinutesDuration = (minutes: number | null | undefined): string => {
   return t("common.minShort", { count: minutes });
 };
 
-const conditionText = computed(() => {
-  const qc = queryCondition.value;
-  // PromQL keeps its threshold on promql_condition (the expression itself is the
-  // query); render the comparison so it doesn't fall through to "—".
-  if (qc?.type === "promql") {
-    const pc = qc.promql_condition;
-    return isBlank(pc?.value) ? EMPTY : `${pc.operator || ""} ${pc.value}`.trim();
-  }
-  const agg = aggregation.value;
-  if (!agg) return qc?.sql || EMPTY;
-  const fn = agg.function || "";
-  const col = agg.having?.column || "";
-  const op = agg.having?.operator || "";
-  const val = agg.having?.value;
-  return `${fn}(${col}) ${op} ${val}`;
-});
-
-const warningText = computed(() => {
-  const qc = queryCondition.value;
-  // PromQL warning lives on promql_warning_value and shares the critical operator.
-  if (qc?.type === "promql") {
-    return isBlank(qc.promql_warning_value)
-      ? EMPTY
-      : `${qc.promql_condition?.operator || ""} ${qc.promql_warning_value}`.trim();
-  }
-  const agg = aggregation.value;
-  if (isBlank(agg?.warning_value)) {
-    return EMPTY;
-  }
-  const fn = agg.function || "";
-  const col = agg.having?.column || "";
-  const op = agg.having?.operator || "";
-  return `${fn}(${col}) ${op} ${agg.warning_value}`;
-});
+// Shared with the on-call page detail, which asks the same "what fired"
+// question of the same alert.
+const conditionText = computed(() => alertConditionText(props.alert));
+const warningText = computed(() => alertWarningConditionText(props.alert));
 
 // ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
 // This family has no stream, no SQL and no aggregation, so the generic source
@@ -256,6 +233,16 @@ const anomalyFiltersText = computed(() => {
   return parts.length ? parts.join(" AND ") : EMPTY;
 });
 
+// band_width overrides the trained k live, so it is the k in force; unset is Auto.
+const anomalyBandWidth = (a: any): string => {
+  const set = isBlank(a?.band_width) ? NaN : Number(a.band_width);
+  if (Number.isFinite(set)) return `${Math.round(set * 100) / 100}σ`;
+  const trained = anomalyTrainedK(a);
+  return trained === null
+    ? t("alerts.anomaly.sensitivityAuto")
+    : t("alerts.anomaly.sensitivityAutoTrained", { k: trained });
+};
+
 const anomalyTimestamp = (us: unknown): string => {
   const n = Number(us);
   if (!Number.isFinite(n) || n <= 0) return EMPTY;
@@ -303,14 +290,19 @@ const anomalySourceFields = computed(() => {
       },
     );
   }
-  // Stored as the percentile scored against; the form shows its complement.
-  const percentile = isBlank(a?.threshold) ? NaN : Number(a.threshold);
+  // Budget mode: the enforced cap. Otherwise the band width in force.
+  const budget = isBlank(a?.alert_budget_per_day) ? NaN : Number(a.alert_budget_per_day);
+  const roundBudget = (n: number) => Math.round(n * 1e6) / 1e6;
+  const sensitivityValue =
+    Number.isFinite(budget) && budget > 0
+      ? budget < 1
+        ? t("alerts.anomaly.summaryBudgetPerWeek", { count: roundBudget(budget * 7) })
+        : t("alerts.anomaly.summaryBudgetPerDay", { count: roundBudget(budget) })
+      : anomalyBandWidth(a);
   fields.push({
     key: "sensitivity",
     label: t("alerts.sensitivity"),
-    value: Number.isFinite(percentile)
-      ? t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })
-      : EMPTY,
+    value: sensitivityValue,
   });
   return fields;
 });
@@ -366,11 +358,30 @@ const anomalyScheduleFields = computed(() => {
           ? a.alert_destinations.join(", ")
           : EMPTY,
     },
+    {
+      key: "alert-direction",
+      label: t("alerts.anomaly.alertDirection"),
+      value: t((ANOMALY_DIRECTION_KEYS[a?.alert_direction] ?? ANOMALY_DIRECTION_KEYS.both) as any),
+    },
+    {
+      key: "window-share",
+      label: t("alerts.anomaly.windowShare"),
+      value: t("alerts.anomaly.windowShareCompact", anomalyWindowShareEffective(a)),
+    },
   ];
 });
 
+const anomalyTrainingSpan = (a: any): string => {
+  const start = anomalyTimestamp(a?.training_data_start_us);
+  const end = anomalyTimestamp(a?.training_data_end_us);
+  return start === EMPTY || end === EMPTY
+    ? EMPTY
+    : t("alerts.anomaly.trainingSpanValue", { start, end });
+};
+
 const anomalyModelFields = computed(() => {
   const a = props.alert;
+  const groupingKey = ANOMALY_BAND_GROUPING_KEYS[a?.band_grouping];
   const fields: SummaryField[] = [
     {
       key: "status",
@@ -383,6 +394,16 @@ const anomalyModelFields = computed(() => {
       key: "last-trained",
       label: t("alerts.anomaly.lastTrained"),
       value: anomalyTimestamp(a?.training_completed_at),
+    },
+    {
+      key: "training-span",
+      label: t("alerts.anomaly.trainingSpan"),
+      value: anomalyTrainingSpan(a),
+    },
+    {
+      key: "band-grouping",
+      label: t("alerts.anomaly.bandGrouping"),
+      value: groupingKey ? t(groupingKey as any) : EMPTY,
     },
     {
       key: "model-version",

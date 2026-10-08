@@ -428,7 +428,9 @@ describe("FieldList", () => {
       // With 250 page size, only 250 fields + 1 group header should be rendered
       const rows = wrapper.findAll('[data-test^="o-field-list-row-"]');
       expect(rows.length).toBeLessThanOrEqual(250);
-    });
+      // Mounting 250 rows takes ~600ms locally but overruns the 5s default under
+      // CI coverage instrumentation on a loaded runner.
+    }, 20000);
   });
 
   // ── Field Actions ───────────────────────────────────────────────────

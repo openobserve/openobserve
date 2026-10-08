@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct MaxOverTimeFunc;
 
-impl MaxOverTimeFunc {
-    pub fn new() -> Self {
-        MaxOverTimeFunc {}
-    }
-}
-
 impl RangeFunc for MaxOverTimeFunc {
     fn name(&self) -> &'static str {
         "max_over_time"
@@ -47,7 +41,7 @@ mod tests {
     use super::*;
 
     fn max_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, MaxOverTimeFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, MaxOverTimeFunc, eval_ctx)
     }
     // Test helper
     fn max_over_time_test_helper(data: Value) -> Result<Value> {
@@ -69,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_max_over_time_exec_empty_samples_returns_none() {
-        let func = MaxOverTimeFunc::new();
+        let func = MaxOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

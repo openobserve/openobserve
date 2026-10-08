@@ -1,15 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import CopyContent from "./CopyContent.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
+import { createRouter, createMemoryHistory } from "vue-router";
+import analytics from "@/services/product_analytics";
 
 // Mock clipboard utility
 const mockCopyToClipboard = vi.fn().mockResolvedValue(true);
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: (...args: any[]) => mockCopyToClipboard(...args),
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
@@ -36,6 +40,9 @@ const mockI18n = createI18n({
       common: {
         contentCopiedSuccessfully: "Content Copied Successfully!",
         copyContentError: "Error while copying content.",
+      },
+      ingestion: {
+        passcodeForbiddenMessage: "Admin or Root role required to view the ingestion token.",
       },
     },
   },
@@ -333,6 +340,100 @@ describe("CopyContent.vue Branch Coverage", () => {
           timeout: 5000,
         },
       );
+    });
+  });
+
+  describe("Passcode Forbidden Branch Coverage", () => {
+    const forbiddenStore = createStore({
+      state: {
+        userInfo: { email: "test@example.com" },
+        organizationData: {
+          organizationPasscode: "",
+          organizationPasscodeForbidden: true,
+        },
+      },
+    });
+
+    const mountWith = (content: string) =>
+      mount(CopyContent, {
+        props: { content, displayContent: content },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: forbiddenStore },
+        },
+      });
+
+    it("should hide the snippet and explain the missing role when content needs a passcode", () => {
+      const wrapper = mountWith("curl -u [EMAIL]:[PASSCODE] https://example.com");
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("Admin or Root role required to view the ingestion token.");
+    });
+
+    it("should hide the snippet for [BASIC_PASSCODE] content too", () => {
+      const wrapper = mountWith("Authorization: Basic [BASIC_PASSCODE]");
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(false);
+    });
+
+    it("should still render content that does not embed the passcode", () => {
+      const wrapper = mountWith("Endpoint: https://example.com/api/default");
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-content-text"]').text()).toBe(
+        "Endpoint: https://example.com/api/default",
+      );
+    });
+
+    it("should render the snippet normally when the passcode is readable", () => {
+      const wrapper = mount(CopyContent, {
+        props: {
+          content: "curl -u [EMAIL]:[PASSCODE] https://example.com",
+          displayContent: "curl -u [EMAIL]:[PASSCODE] https://example.com",
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+        },
+      });
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(true);
+    });
+  });
+
+  describe("Product analytics", () => {
+    const mountWithRouter = async () => {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/curl", name: "curl", component: { template: "<div />" } }],
+      });
+      await router.push("/curl");
+      return mount(CopyContent, {
+        props: { content: "curl -u [EMAIL]:[PASSCODE]" },
+        global: { plugins: [mockI18n, router], provide: { store: mockStore } },
+      });
+    };
+
+    it("tracks snippet_copied with the route name after a successful copy", async () => {
+      const wrapper = await mountWithRouter();
+
+      await wrapper.find('[data-test="rum-copy-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("snippet_copied", { route: "curl" });
+    });
+
+    it("does not track when the copy fails", async () => {
+      mockCopyToClipboard.mockResolvedValue(false);
+      const wrapper = await mountWithRouter();
+
+      await wrapper.find('[data-test="rum-copy-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

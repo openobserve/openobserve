@@ -24,7 +24,9 @@ test.describe.configure({ mode: "serial" });
 //   2. deleting a dashboard left a ghost row behind in Favorites
 //   3. bulk-deleting from Favorites left a ghost row in the source folder
 //      (folder navigation is cache-first)
-test.describe("dashboard favorites testcases", () => {
+test.describe("dashboard favorites testcases", {
+  tag: ['@bug-13224', '@dashboards', '@favorites', '@P2'],
+}, () => {
   let pm;
   let folderName;
   let dashboardName;

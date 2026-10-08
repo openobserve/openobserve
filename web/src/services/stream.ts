@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const stream = {
   nameList: (
@@ -66,7 +67,12 @@ const stream = {
       url += "?type=" + type;
     }
 
-    return http().put(url, data);
+    return http()
+      .put(url, data)
+      .then((res) => {
+        analytics.track("stream_settings_updated", { stream_type: type });
+        return res;
+      });
   },
   createStream: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}`;
@@ -74,7 +80,12 @@ const stream = {
     if (type != "") {
       url += "?type=" + type;
     }
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        analytics.track("stream_created", { stream_type: type });
+        return res;
+      });
   },
 
   fieldValues: ({
@@ -148,13 +159,23 @@ const stream = {
   },
 
   deleteFields: (org_identifier: string, stream_name: string, stream_type: string, fields: []) => {
-    return http().put(
-      `/api/${org_identifier}/streams/${stream_name}/delete_fields?type=${stream_type}`,
-      {
+    return http()
+      .put(`/api/${org_identifier}/streams/${stream_name}/delete_fields?type=${stream_type}`, {
         fields,
-      },
-    );
+      })
+      .then((res) => {
+        analytics.track("stream_fields_deleted", { stream_type, count: fields.length });
+        return res;
+      });
   },
 };
 
 export default stream;
+
+export interface StreamPageParams {
+  offset: number;
+  limit: number;
+  keyword?: string;
+  sort?: string;
+  asc?: boolean;
+}

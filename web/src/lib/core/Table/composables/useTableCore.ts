@@ -14,6 +14,7 @@ import {
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
 import { raw } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 // Register the custom "avg" fn (provided via table options below) so
@@ -58,7 +59,7 @@ export function useTableCore<TData>(
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
   },
-  _emit?: unknown,
+  emit?: (event: any, ...args: any[]) => void,
 ) {
   // ── Effective columns ───────────────────────────────────────────
   // When `showIndex` is set (and the caller hasn't already declared a `#`
@@ -66,8 +67,23 @@ export function useTableCore<TData>(
   // value is derived from the row's position so pages need not hand-roll a
   // `"#"` field in their data. Under server pagination we add the page offset
   // so numbering stays continuous across pages.
+  const MOBILE_MAX_COL_SIZE = 200;
+  const { isMobile } = useBreakpoint();
+  const responsiveColumns = computed<OTableColumnDef<TData>[]>(() => {
+    if (!isMobile.value) return props.columns;
+    return props.columns.map((c) => {
+      if (c.isAction || c.id === "actions") return c;
+      if ((c.size ?? 0) <= MOBILE_MAX_COL_SIZE && (c.minSize ?? 0) <= MOBILE_MAX_COL_SIZE) return c;
+      return {
+        ...c,
+        size: Math.min(c.size ?? MOBILE_MAX_COL_SIZE, MOBILE_MAX_COL_SIZE),
+        minSize: c.minSize != null ? Math.min(c.minSize, MOBILE_MAX_COL_SIZE) : c.minSize,
+      };
+    });
+  });
+
   const indexColumn = computed<OTableColumnDef<TData> | null>(() => {
-    if (!props.showIndex) return null;
+    if (!props.showIndex || isMobile.value) return null;
     if (props.columns.some((c) => c.id === "#")) return null;
     const isServer = props.pagination === "server";
     const offset = isServer
@@ -103,7 +119,9 @@ export function useTableCore<TData>(
   // keeps px-2; when false the actions column is last and gets the 1rem right
   // edge inset. `actionColumnWidth` reads this to budget the right padding.
   const hasTrailingSpacer = computed<boolean>(() => {
-    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
+    const base = indexColumn.value
+      ? [indexColumn.value, ...responsiveColumns.value]
+      : responsiveColumns.value;
     const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
     return (
       (props.enableColumnResize ?? false) &&
@@ -114,7 +132,9 @@ export function useTableCore<TData>(
   });
 
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
-    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
+    const base = indexColumn.value
+      ? [indexColumn.value, ...responsiveColumns.value]
+      : responsiveColumns.value;
     // An `autoWidth` column flexes permanently and absorbs leftover on its own,
     // so those tables need no spacer. Every other resizable table gets an
     // invisible trailing spacer: it sits before the pinned actions column and
@@ -153,14 +173,16 @@ export function useTableCore<TData>(
   // cell's right padding, in px. Keep in sync with the token (0.75rem = 12px).
   const PAGE_EDGE_PX = 12;
   const actionColumnWidth = (actionCount?: number): number => {
-    const n = Math.max(1, Number(actionCount) || 2);
+    // < md row actions collapse behind one overflow kebab, so the column budgets a single button.
+    const n = isMobile.value ? 1 : Math.max(1, Number(actionCount) || 2);
     // Cell padding: px-2 is 8+8=16. When the actions column is the row's last
     // cell (no trailing spacer) the edge inset replaces its right padding with
     // the page-edge inset, so budget 8 + PAGE_EDGE_PX — exact, so the buttons
     // land on the same right-edge grid line as everything else (no over-width).
     const cellPad = hasTrailingSpacer.value ? 16 : 8 + PAGE_EDGE_PX;
     const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + cellPad;
-    return Math.max(content, ACTIONS_HEADER_MIN);
+    // < md the "Actions" header floor would leave the one-kebab column mostly dead width.
+    return Math.max(content, isMobile.value ? 0 : ACTIONS_HEADER_MIN);
   };
 
   // Track column order for drag-reorder
@@ -170,7 +192,10 @@ export function useTableCore<TData>(
   const userReorderedColumns = ref(false);
 
   // Track column sizing — seeded with persisted values when provided
-  const columnSizing = ref<Record<string, number>>(props.initialColumnSizes ?? {});
+  // Persisted sizes were dragged on desktop; honouring them < md would undo the mobile column cap.
+  const columnSizing = ref<Record<string, number>>(
+    isMobile.value ? {} : (props.initialColumnSizes ?? {}),
+  );
   const columnResizeMode = "onChange";
 
   // Track sorting state for client-side
@@ -183,6 +208,19 @@ export function useTableCore<TData>(
   });
 
   const sortingState = ref<any[]>(initialSorting.value);
+
+  // The parent's sortBy/sortOrder (often the URL) is the source of truth once it changes.
+  watch([() => props.sortBy, () => props.sortOrder], () => {
+    if (props.sorting === "client") sortingState.value = initialSorting.value;
+  });
+
+  function emitClientSort(next: { id: string; desc: boolean }[]) {
+    const column = next[0]?.id ?? "";
+    const order = next[0]?.desc ? "desc" : "asc";
+    emit?.("update:sortBy", column);
+    emit?.("update:sortOrder", order);
+    emit?.("sort-change", { column, order });
+  }
 
   // Column pinning — auto-pin isAction columns to right, pivotRowColumns to left, plus explicitly pinned columns
   const pivotRowColumnIds = computed(() => {
@@ -233,11 +271,13 @@ export function useTableCore<TData>(
       // the loading skeleton and the loaded table render it at the exact same
       // width — no flash when data arrives.
       const size = isActionCol
-        ? Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
+        ? isMobile.value
+          ? actionColumnWidth((col.meta as any)?.actionCount)
+          : Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
         : (col.size ?? 150);
       const columnDef: ColumnDef<TData> = {
         id: col.id,
-        header: col.header as any,
+        header: isActionCol && isMobile.value ? "" : (col.header as any),
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
@@ -257,6 +297,7 @@ export function useTableCore<TData>(
           : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
+        sortUndefined: col.sortUndefined,
         enableColumnFilter: col.filterable ?? false,
         filterFn: col.filterable ? valueInSet : undefined,
         // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
@@ -348,6 +389,7 @@ export function useTableCore<TData>(
       const old = sortingState.value;
       const next = typeof updater === "function" ? updater(old) : updater;
       sortingState.value = next;
+      emitClientSort(next);
     },
     onColumnSizingChange: (updater: any) => {
       const old = columnSizing.value;

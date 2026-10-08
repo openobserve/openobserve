@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full px-3 py-2">
+  <div class="flex h-full flex-col px-3 py-2">
     <!-- The echarts canvas collapses to a sliver unless it resolves to an explicit box -->
-    <div class="relative h-full w-full">
+    <div class="relative min-h-0 w-full flex-1">
       <div
         v-if="!previewActive"
         class="absolute inset-0 flex flex-col items-center justify-center gap-2"
@@ -38,6 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="anomaly-data-preview-chart"
       />
     </div>
+    <!-- No model exists yet, and the score bar lives in score space, not this chart's value space -->
+    <p
+      v-if="previewActive"
+      class="text-text-secondary shrink-0 pt-1.5 text-xs"
+      data-test="anomaly-data-preview-caption"
+    >
+      {{ t("alerts.anomaly.previewCaption") }}
+    </p>
   </div>
 </template>
 

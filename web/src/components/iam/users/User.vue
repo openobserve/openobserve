@@ -19,14 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout :title="t('iam.basicUsers')" :subtitle="t('user.subtitle')" icon="person" bleed>
     <template #actions>
-      <MemberInvitation
-        v-if="config.isCloud == 'true'"
-        :key="currentUserRole"
-        v-model:currentrole="currentUserRole"
-        @invite-sent="handleInviteSent"
-      />
       <OButton
-        v-else
+        v-if="config.isCloud === 'true' && canInvite"
+        variant="primary"
+        size="sm"
+        icon-left="person-add"
+        data-test="invite-members-btn"
+        @click="openInviteDialog()"
+      >
+        {{ t("user.inviteMembers") }}
+      </OButton>
+      <OButton
+        v-else-if="config.isCloud !== 'true'"
         variant="primary"
         size="sm"
         @click="addRoutePush({})"
@@ -51,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('iam.basicUsers')"
           sorting="client"
           selection="multiple"
           :is-row-selectable="(row: any) => row.enableDelete"
@@ -85,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
@@ -95,33 +98,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="iamUsersRefresh"
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamUsersRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
               size="hero"
               preset="no-users"
               :filtered="!!(filterQuery || roleFilter)"
-              @action="
-                (id) =>
-                  id === 'clear-filters'
-                    ? ((filterQuery = ''), (roleFilter = null))
-                    : addRoutePush({})
-              "
-            />
+              @action="(id) => (id === 'clear-filters' ? clearFilters() : openAddFlow())"
+            >
+              <template v-if="searchInviteEmail" #actions>
+                <EmptyStateActionCard
+                  icon="person-add"
+                  :label="t('user.inviteSearchedEmail', { email: searchInviteEmail })"
+                  :sublabel="t('user.inviteSearchedEmailDesc')"
+                  data-test="user-list-invite-searched-email"
+                  @click="openInviteDialog(searchInviteEmail)"
+                />
+                <EmptyStateActionCard
+                  icon="filter-list"
+                  :label="t('emptyState.filtered.action')"
+                  :sublabel="t('emptyState.filtered.actionDesc')"
+                  data-test="user-list-clear-filters"
+                  @click="clearFilters()"
+                />
+              </template>
+            </OEmptyState>
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
@@ -167,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.delete')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`delete-basic-user-${row.email}`"
               data-row-action="delete"
               @click="confirmDeleteAction(row)"
@@ -178,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.revoke_invite')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`revoke-invite-${row.email}`"
               data-row-action="delete"
               @click="confirmRevokeAction(row)"
@@ -189,24 +201,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.update')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`edit-basic-user-${row.email}`"
               data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
             </OButton>
-          </template>
-          <template #bottom>
-            <span class="text-xs font-normal"
-              >{{ rows.length }}
-              {{
-                isEnterpriseOrCloud
-                  ? t("iam.organizationMembers") || t("iam.user.organizationMembers")
-                  : t("iam.basicUsers")
-              }}</span
+            <ODropdown
+              v-if="
+                (row.enableDelete && row.status != 'pending') ||
+                (row.status == 'pending' && row.token) ||
+                (row.enableEdit && row.status != 'pending')
+              "
+              side="bottom"
+              align="end"
             >
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="user-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.enableDelete && row.status != 'pending'"
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`delete-basic-user-${row.email}-menu`"
+                @select="confirmDeleteAction(row)"
+              >
+                <span>{{ t("user.delete") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status == 'pending' && row.token"
+                icon-left="cancel"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`revoke-invite-${row.email}-menu`"
+                @select="confirmRevokeAction(row)"
+              >
+                <span>{{ t("user.revoke_invite") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.enableEdit && row.status != 'pending'"
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`edit-basic-user-${row.email}-menu`"
+                @select="addRoutePush(row)"
+              >
+                <span>{{ t("user.update") }}</span>
+              </ODropdownItem>
+            </ODropdown>
+          </template>
+          <template #selection-actions>
             <OButton
-              v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
               variant="outline-destructive"
               size="sm"
@@ -237,6 +290,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :customRoles="customRoles"
       :isCloud="config.isCloud == 'true'"
       @updated="addMember"
+    />
+
+    <InviteMembersDialog
+      v-if="config.isCloud === 'true'"
+      v-model:open="showInviteDialog"
+      :initial-email="inviteInitialEmail"
+      @invite-sent="handleInviteSent"
     />
 
     <ODialog
@@ -281,9 +341,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { orgUsersQuery, assignableRolesQuery, allUserRolesQuery } from "@/services/users.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { userKeys } from "@/services/users.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -300,17 +366,17 @@ import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
-import segment from "@/services/segment_analytics";
-import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
-import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
+import analytics from "@/services/product_analytics";
+import InviteMembersDialog from "@/components/iam/users/InviteMembersDialog.vue";
+import { splitInviteEmails } from "@/components/iam/users/MemberInvitation.schema";
+import { getImageURL, verifyOrganizationStatus, maskText, validateEmail } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
-import { getRoles as getCustomRolesApi } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -323,14 +389,17 @@ export default defineComponent({
     OTable,
     UpdateUserRole,
     AddUser,
-    MemberInvitation,
+    InviteMembersDialog,
     OButton,
-    OTooltip,
+    ORefreshButton,
+    ODropdown,
+    ODropdownItem,
     OTag,
     OStatStrip,
     OIcon,
     ODialog,
     OEmptyState,
+    EmptyStateActionCard,
     OSearchInput,
   },
   emits: ["updated:fields", "deleted:fields", "updated:dates"],
@@ -694,15 +763,16 @@ export default defineComponent({
     let revokeInviteToken = "";
     const revokeInviteEmail = ref("");
 
+    // Resolves `true` either way, as it always has: callers only await it to
+    // sequence the mount, and a missing role list must not block the page.
     const getRoles = () => {
-      return new Promise((resolve) => {
-        usersService
-          .getRoles(store.state.selectedOrganization.identifier)
-          .then((res) => {
-            options.value = res.data;
-          })
-          .finally(() => resolve(true));
-      });
+      return queryClient
+        .fetchQuery(assignableRolesQuery(store.state.selectedOrganization.identifier))
+        .then((data: any) => {
+          options.value = data;
+          return true;
+        })
+        .catch(() => true);
     };
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (
@@ -711,8 +781,11 @@ export default defineComponent({
       )
         return;
       try {
-        const res = await getCustomRolesApi(store.state.selectedOrganization.identifier);
-        customRoles.value = Array.isArray(res.data) ? res.data : [];
+        // Same endpoint as the IAM roles list — one cache entry, not one per page.
+        const data = await queryClient.fetchQuery(
+          rolesQuery(store.state.selectedOrganization.identifier),
+        );
+        customRoles.value = Array.isArray(data) ? data : [];
       } catch (err: any) {
         if (!options.silent && err?.response?.status !== 403) {
           toast({
@@ -750,86 +823,121 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    // A request in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
-    const getOrgMembers = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("iam.user.pleaseWaitLoadingUsers"),
-        timeout: 0,
-      });
+    // The ?email= deep link opens the edit dialog, so it is latched — the
+    // cached paint and the fresh one must not open it twice.
+    let deepLinkOpened = false;
 
-      loading.value = true;
+    const applyUsers = (users: any[]) => {
+      currentUserRole.value = "";
+      usersState.users = users.map((data: any) => {
+        if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
+          currentUserRole.value = data.role?.toLowerCase();
+          isCurrentUserInternal.value = !data.is_external;
+        }
+
+        if (
+          data.email?.toLowerCase() ==
+          router.currentRoute.value.query.email?.toString().toLowerCase()
+        ) {
+          if (!deepLinkOpened) {
+            deepLinkOpened = true;
+            addUser({ row: data }, true);
+          }
+        }
+
+        // Normalise roles to an array. Enterprise APIs surface roles in
+        // various shapes — pull from every plausible field and dedupe.
+        const rolesSet = new Set<string>();
+        if (data?.role) rolesSet.add(String(data.role));
+        if (Array.isArray(data?.roles)) {
+          data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.custom_roles)) {
+          data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.assigned_roles)) {
+          data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
+
+        return {
+          email: maskText(data.email),
+          rawEmail: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
+          // The role options from getRoles use the lowercase value ("admin"),
+          // so this seeded "Admin" doesn't match an option — but OSelect renders
+          // the raw value as a fallback, so the field still displays "Admin"
+          // correctly. The only cosmetic quirk is that the open dropdown won't
+          // highlight the lowercase option as active.
+          role:
+            data?.status == "pending"
+              ? toCamelCase(data.role) + " (Invited)"
+              : toCamelCase(data.role),
+          roles: rolesArr,
+          auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
+          is_external: !!data?.is_external,
+          enableEdit:
+            store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
+          enableChangeRole: false,
+          enableDelete: config.isCloud == "true" ? true : false,
+          status: data?.status,
+          token: data?.token || null,
+        };
+      });
+      rows.value = usersState.users;
+      tableKey.value++;
+    };
+
+    const getOrgMembers = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Stale-while-revalidate: paint the cached members at once. On cloud the
+      // invited-members merge only happens on the fresh pass, so the cached
+      // paint is org members alone — rows on screen beat an empty table.
+      // Not gated on `force`: a manual refresh keeps the rows on screen.
+      const cached = queryClient.getQueryData<any[]>(userKeys.users(org));
+      const warm = cached !== undefined;
+      if (cached) applyUsers([...cached]);
+
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("iam.user.pleaseWaitLoadingUsers"),
+            timeout: 0,
+          });
+
+      loading.value = !warm;
+      fetching.value = true;
       forbidden.value = false;
       return new Promise((resolve, reject) => {
-        usersService
-          .orgUsers(store.state.selectedOrganization.identifier)
-          .then(async (res) => {
-            let users = [...res.data.data];
+        (force
+          ? queryClient
+              // Not `exact`: the roles list hangs off this key as a child, and a role change is exactly what a forced reload is for.
+              .invalidateQueries({
+                queryKey: orgUsersQuery(org).queryKey,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(orgUsersQuery(org)))
+          : queryClient.fetchQuery(orgUsersQuery(org))
+        )
+          .then(async (orgUsers: any[]) => {
+            let users = [...orgUsers];
 
             if (config.isCloud == "true") {
               const invitedMembers: any = await getInvitedMembers();
-              users = [...res.data.data, ...invitedMembers];
+              users = [...orgUsers, ...invitedMembers];
             }
 
-            currentUserRole.value = "";
-            usersState.users = users.map((data: any) => {
-              if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
-                currentUserRole.value = data.role?.toLowerCase();
-                isCurrentUserInternal.value = !data.is_external;
-              }
-
-              if (
-                data.email?.toLowerCase() ==
-                router.currentRoute.value.query.email?.toString().toLowerCase()
-              ) {
-                addUser({ row: data }, true);
-              }
-
-              // Normalise roles to an array. Enterprise APIs surface roles in
-              // various shapes — pull from every plausible field and dedupe.
-              const rolesSet = new Set<string>();
-              if (data?.role) rolesSet.add(String(data.role));
-              if (Array.isArray(data?.roles)) {
-                data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.custom_roles)) {
-                data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.assigned_roles)) {
-                data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
-
-              return {
-                email: maskText(data.email),
-                rawEmail: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
-                // The role options from getRoles use the lowercase value ("admin"),
-                // so this seeded "Admin" doesn't match an option — but OSelect renders
-                // the raw value as a fallback, so the field still displays "Admin"
-                // correctly. The only cosmetic quirk is that the open dropdown won't
-                // highlight the lowercase option as active.
-                role:
-                  data?.status == "pending"
-                    ? toCamelCase(data.role) + " (Invited)"
-                    : toCamelCase(data.role),
-                roles: rolesArr,
-                auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
-                is_external: !!data?.is_external,
-                enableEdit:
-                  store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()
-                    ? true
-                    : false,
-                enableChangeRole: false,
-                enableDelete: config.isCloud == "true" ? true : false,
-                status: data?.status,
-                token: data?.token || null,
-              };
-            });
-            rows.value = usersState.users;
-            tableKey.value++;
+            applyUsers(users);
+            lastUpdatedAt.value =
+              queryClient.getQueryState(orgUsersQuery(org).queryKey)?.dataUpdatedAt ?? Date.now();
             dismiss();
 
             // Resolve immediately so the caller (onBeforeMount) can run
@@ -847,11 +955,11 @@ export default defineComponent({
             if (isEnterpriseOrCloud && store.state.zoConfig.rbac_enabled) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
-              usersService
-                .getAllUserRoles(orgId)
+              queryClient
+                .fetchQuery(allUserRolesQuery(orgId))
                 .then((resp: any) => {
                   // Response is a map of user email -> role list.
-                  const roleMap: Record<string, any> = resp?.data || {};
+                  const roleMap: Record<string, any> = resp || {};
                   usersState.users.forEach((u: any) => {
                     if (u.status === "pending") return;
                     const fetched: string[] = Array.isArray(roleMap[u.rawEmail])
@@ -889,6 +997,7 @@ export default defineComponent({
           })
           .finally(() => {
             loading.value = false;
+            fetching.value = false;
           });
       });
     };
@@ -920,7 +1029,7 @@ export default defineComponent({
     // mirrors the onBeforeMount sequence).
     const refreshUsers = async () => {
       try {
-        await getOrgMembers();
+        await getOrgMembers(true);
       } finally {
         updateUserActions();
       }
@@ -1015,7 +1124,7 @@ export default defineComponent({
         // The row already stores the canonical role VALUE, so AddUser's role
         // select matches an option directly (see updateUser).
         selectedUser.value = { ...props.row };
-        segment.track("Button Click", {
+        analytics.track("Button Click", {
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
@@ -1106,7 +1215,7 @@ export default defineComponent({
     const updateMember = async (data: any) => {
       if (data.data != undefined) {
         try {
-          await getOrgMembers();
+          await getOrgMembers(true);
         } catch (error) {
           toast({
             message: t("iam.user.failedToRefreshUserList"),
@@ -1137,7 +1246,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        await getOrgMembers();
+        await getOrgMembers(true);
         updateUserActions();
         if (operationType == "created") {
           toast({
@@ -1206,7 +1315,7 @@ export default defineComponent({
               message: t("iam.user.userDeletedSuccess"),
               variant: "success",
             });
-            await getOrgMembers();
+            await getOrgMembers(true);
             updateUserActions();
           }
         })
@@ -1242,10 +1351,10 @@ export default defineComponent({
             message: t("iam.user.invitationRevokedSuccess"),
             variant: "success",
           });
-          await getOrgMembers();
+          await getOrgMembers(true);
           updateUserActions();
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Revoke Invite",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,
@@ -1262,9 +1371,43 @@ export default defineComponent({
     };
 
     const handleInviteSent = async () => {
-      await getOrgMembers();
+      await getOrgMembers(true);
       updateUserActions();
     };
+
+    const showInviteDialog = ref(false);
+    const inviteInitialEmail = ref("");
+    const canInvite = computed(
+      () => currentUserRole.value === "admin" || currentUserRole.value === "root",
+    );
+
+    const openInviteDialog = (email = "") => {
+      inviteInitialEmail.value = email;
+      showInviteDialog.value = true;
+    };
+
+    // Cloud adds people by invitation, so its add entry points open the invite dialog.
+    const openAddFlow = () => {
+      if (config.isCloud === "true" && canInvite.value) openInviteDialog();
+      else addRoutePush({});
+    };
+
+    const clearFilters = () => {
+      filterQuery.value = "";
+      roleFilter.value = null;
+    };
+
+    // A search for one well-formed address that is not a member becomes an invite offer.
+    const searchInviteEmail = computed(() => {
+      if (config.isCloud !== "true" || !canInvite.value) return "";
+      const emails = splitInviteEmails(filterQuery.value);
+      if (emails.length !== 1 || validateEmail(emails[0]) !== true) return "";
+      const email = emails[0].toLowerCase();
+      const isMember = (rows.value || []).some(
+        (row: any) => String(row.rawEmail ?? row.email ?? "").toLowerCase() === email,
+      );
+      return isMember ? "" : email;
+    });
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
@@ -1302,7 +1445,7 @@ export default defineComponent({
 
         selectedUsers.value = [];
         confirmBulkDelete.value = false;
-        await getOrgMembers();
+        await getOrgMembers(true);
         updateUserActions();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
@@ -1347,6 +1490,8 @@ export default defineComponent({
               variant: "success",
               message: t("iam.user.orgMemberUpdatedSuccess"),
             });
+            // The role lives in the cached members list; a forced reload is what repaints it.
+            getOrgMembers(true);
           }
           dismiss();
         })
@@ -1355,7 +1500,7 @@ export default defineComponent({
           console.log(error);
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -1386,7 +1531,7 @@ export default defineComponent({
       {
         id: "iamUsersAdd",
         handler: () => {
-          if (!isInputFocused()) addRoutePush({});
+          if (!isInputFocused()) openAddFlow();
         },
       },
       {
@@ -1407,12 +1552,13 @@ export default defineComponent({
       router,
       store,
       config,
-      isEnterpriseOrCloud,
       isBuiltinRole,
       toCamelCase,
       usersState,
       columns,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       orgData,
       confirmDelete,
@@ -1423,6 +1569,13 @@ export default defineComponent({
       revokeInviteEmail,
       confirmRevokeAction,
       handleInviteSent,
+      showInviteDialog,
+      inviteInitialEmail,
+      canInvite,
+      openInviteDialog,
+      openAddFlow,
+      clearFilters,
+      searchInviteEmail,
       getOrgMembers,
       refreshUsers,
       updateUser,

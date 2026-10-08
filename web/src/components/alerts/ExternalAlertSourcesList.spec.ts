@@ -6,21 +6,27 @@ import ExternalAlertSourcesList from "./ExternalAlertSourcesList.vue";
 import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
 
-vi.mock("@/services/alert_sources", () => ({
-  default: {
-    list: vi.fn(),
-    listSenders: vi.fn(),
-    setEnabled: vi.fn(),
-    rotate: vi.fn(),
-    create: vi.fn(),
-    delete: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_sources", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      listSenders: vi.fn(),
+      setEnabled: vi.fn(),
+      rotate: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: vi.fn() },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn() },
+  });
+});
 
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn(),
@@ -592,14 +598,6 @@ describe("ExternalAlertSourcesList", () => {
       await flushPromises();
       expect((wrapper.vm as any).filterQuery).toBe("");
       expect((wrapper.vm as any).visibleRows.length).toBe(2);
-    });
-
-    it("shows the row count with its noun in the footer", async () => {
-      (alertSources.list as any).mockResolvedValue(TWO_SOURCES);
-      const wrapper = await mountAndSettle();
-      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').text()).toContain(
-        "2 alert_sources.header",
-      );
     });
 
     it("gives every non-action column a resize handle, including Name↔Status", async () => {

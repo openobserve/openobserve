@@ -138,6 +138,7 @@ import jumpcloudUrl from "@/assets/images/ingestion/jumpcloud.svg";
 import openvpnUrl from "@/assets/images/ingestion/openvpn.png";
 import office365Url from "@/assets/images/ingestion/office-365.png";
 import criblUrl from "@/assets/images/ingestion/cribl.webp";
+import splunkUrl from "@/assets/images/ingestion/splunk.webp";
 import syslogUrl from "@/assets/images/ingestion/syslog.svg";
 import netflowUrl from "@/assets/images/ingestion/netflow.svg";
 import kinesisUrl from "@/assets/images/ingestion/kinesis_firehose.svg";
@@ -147,6 +148,7 @@ import loongcollectorUrl from "@/assets/images/ingestion/loongcollector.svg";
 import categrafUrl from "@/assets/images/ingestion/categraf.png";
 import nightingaleUrl from "@/assets/images/ingestion/nightingale.svg";
 import vmagentUrl from "@/assets/images/ingestion/vmagent.svg";
+import nvidiaUrl from "@/assets/images/ingestion/nvidia.svg";
 
 /** Prefix marking a stored icon value as a registry glyph rather than an emoji. */
 export const GLYPH_TOKEN_PREFIX = "o2:";
@@ -184,6 +186,7 @@ export const GLYPH_REGISTRY = {
   apache: ApacheHttp,
   cloudflare: Cloudflare,
   iis: iisUrl,
+  splunk: splunkUrl,
   syslog: syslogUrl,
   netflow: netflowUrl,
   openvpn: openvpnUrl,
@@ -233,6 +236,7 @@ export const GLYPH_REGISTRY = {
   categraf: categrafUrl,
   nightingale: nightingaleUrl,
   vmagent: vmagentUrl,
+  nvidia: nvidiaUrl,
 
   // Languages & frameworks
   java: Java,

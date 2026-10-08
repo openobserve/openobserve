@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct MinOverTimeFunc;
 
-impl MinOverTimeFunc {
-    pub fn new() -> Self {
-        MinOverTimeFunc {}
-    }
-}
-
 impl RangeFunc for MinOverTimeFunc {
     fn name(&self) -> &'static str {
         "min_over_time"
@@ -47,7 +41,7 @@ mod tests {
     use super::*;
 
     fn min_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, MinOverTimeFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, MinOverTimeFunc, eval_ctx)
     }
     // Test helper
     fn min_over_time_test_helper(data: Value) -> Result<Value> {
@@ -69,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_min_over_time_exec_empty_samples_returns_none() {
-        let func = MinOverTimeFunc::new();
+        let func = MinOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

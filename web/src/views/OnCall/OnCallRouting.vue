@@ -1,0 +1,847 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  Org-level routing: every team's claim over the identity space, on one screen.
+
+  The team tab answers "what reaches THIS team"; this page answers the org's
+  questions — which rules exist at all, which team a signal would land on,
+  whether a catch-all is nominated, and what fired and woke nobody. The
+  sections are the same components the team tab uses, hosted without a team:
+  a rule here names its team, and claiming an unrouted signal starts by
+  choosing one.
+
+  Order mirrors the team tab's rationale: the simulator leads because it is
+  the question people arrive with, the rules follow as the explanation, the
+  default team sits above the queue it exists to drain.
+-->
+<template>
+  <OPageLayout
+    bleed
+    data-test="oncall-routing-page"
+    :title="t('oncall.routingTitle')"
+    :subtitle="t('oncall.routingSubtitle')"
+    icon="alt-route"
+  >
+    <!-- All on demand: the page's own answer is the rule list, so the tester
+         opens in a drawer rather than pushing the lists down the screen, and
+         Add rule belongs to the tab that holds rules. The catch-all sits on
+         both tabs: setting one is rare, but knowing whether one exists is not. -->
+    <template #actions>
+      <OnCallDefaultTeamCard v-if="ready" :key="cardKey" :teams="teams" :dialog="true" />
+      <OButton
+        v-if="ready && !isMobile"
+        variant="outline"
+        size="sm-action"
+        :active="testerOpen"
+        data-test="oncall-routing-test-signal"
+        @click="testerOpen = !testerOpen"
+      >
+        {{ testerOpen ? t("oncall.routingHideTest") : t("oncall.routingTestSignal") }}
+      </OButton>
+      <OButton
+        v-if="ready && tab === 'rules'"
+        variant="primary"
+        size="sm-action"
+        data-test="oncall-routing-add-rule"
+        @click="openAdd"
+      >
+        {{ t("oncall.newRule") }}
+      </OButton>
+    </template>
+    <!-- Rendered twice rather than moved, so the laptop order (card, test, new rule) is unchanged. -->
+    <template #actions-overflow>
+      <OButton
+        v-if="ready && isMobile"
+        variant="outline"
+        size="sm-action"
+        :active="testerOpen"
+        data-test="oncall-routing-test-signal"
+        @click="testerOpen = !testerOpen"
+      >
+        {{ testerOpen ? t("oncall.routingHideTest") : t("oncall.routingTestSignal") }}
+      </OButton>
+    </template>
+
+    <!-- §G.8.1: the entry fetch is the capability probe. 404 (feature off) and
+         403 "Not Supported" (OSS build) both mean on-call is not available
+         here — a fact about the deployment, not a failure, so no error tone,
+         no retry, and no hint of which of the two it was. -->
+    <OEmptyState
+      v-if="unavailable"
+      size="hero"
+      icon="cloud-off"
+      :title="t('oncall.notAvailableTitle')"
+      :description="t('oncall.notAvailableDescription')"
+      data-test="oncall-routing-unavailable"
+    />
+
+    <!-- A transient 500 is not "this org has no rules" — say it failed and
+         offer the way back. -->
+    <OEmptyState
+      v-else-if="loadError"
+      size="hero"
+      variant="error"
+      illustration="broken-panel"
+      :title="t('oncall.routingLoadFailed')"
+      :description="loadError ? raw(loadError) : undefined"
+      :action-label="t('oncall.retry')"
+      data-test="oncall-routing-error"
+      @action="refreshPage"
+    />
+
+    <!-- No teams means nothing can own or be paged — routing starts at Teams. -->
+    <OEmptyState
+      v-else-if="loaded && !teams.length"
+      size="hero"
+      preset="no-oncall-teams"
+      data-test="oncall-routing-empty"
+      @action="goToTeams"
+    />
+
+    <div v-else class="flex min-h-0 flex-1 flex-col" data-test="oncall-routing-content">
+      <!-- Two lists, one question apart: what the org already owns, and what
+           nothing owns yet. One table at a time, and the tabs ride in its
+           toolbar beside the search and refresh every other table has. -->
+      <component :is="tableComponent" v-bind="tableProps" v-on="tableEvents">
+        <template #toolbar>
+          <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
+            <OToggleGroup
+              :model-value="tab"
+              type="single"
+              mobile-dropdown
+              data-test="oncall-routing-tabs"
+              @update:model-value="setTab"
+            >
+              <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+                {{ t("oncall.ownershipRules") }}
+                <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+              </OToggleGroupItem>
+              <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+                {{ t("oncall.routingTabNeedsRule") }}
+                <OTag :variant="openSignalCount ? 'error-soft' : 'default-soft'" size="sm">
+                  {{ openSignalCount }}
+                </OTag>
+              </OToggleGroupItem>
+            </OToggleGroup>
+
+            <!-- Server-side filters for the unrouted queue, folded into the same
+             bar as the tabs rather than a second row: `landing` splits the two
+             emergencies the row tags name; `include_dismissed` swaps the
+             outstanding worklist for the raw historical record. -->
+            <template v-if="tab === 'signals'">
+              <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
+
+              <OToggleGroup
+                :model-value="signalFilters.landing || 'both'"
+                mobile-dropdown
+                data-test="oncall-unrouted-filter"
+                @update:model-value="setSignalLanding"
+              >
+                <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
+                  {{ t("oncall.unroutedFilterBoth") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem
+                  value="nobody"
+                  size="sm"
+                  data-test="oncall-unrouted-filter-nobody"
+                >
+                  {{ t("oncall.unroutedPagedNobody") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem
+                  value="default_team"
+                  size="sm"
+                  data-test="oncall-unrouted-filter-default"
+                >
+                  {{ t("oncall.unroutedFilterDefault") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+
+              <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
+
+              <OSwitch
+                :model-value="signalFilters.include_dismissed"
+                :label="t('oncall.unroutedShowDismissed')"
+                data-test="oncall-unrouted-show-dismissed"
+                @update:model-value="setSignalIncludeDismissed"
+              />
+            </template>
+
+            <OSearchInput
+              v-model="search"
+              class="min-w-48 flex-1 max-md:min-w-24"
+              clearable
+              :placeholder="t('common.searchEllipsis')"
+              data-test="oncall-routing-search"
+            />
+          </div>
+        </template>
+
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="lastFetchedAt"
+            :loading="refreshing"
+            data-test="oncall-routing-refresh"
+            @click="refreshPage"
+          />
+        </template>
+      </component>
+    </div>
+
+    <!-- The tester answers a hypothetical about the rules; it should not cost
+         the reader their place in them, so it slides over the page instead of
+         inserting a panel above it. -->
+    <ODrawer
+      :open="testerOpen"
+      size="lg"
+      :title="t('oncall.simulatorTitle')"
+      :sub-title="t('oncall.simulatorHint')"
+      data-test="oncall-routing-tester-drawer"
+      @update:open="(v: boolean) => (testerOpen = v)"
+    >
+      <OnCallRoutingSimulator
+        :preview="preview"
+        :teams="teams"
+        :aliases="aliases"
+        :loading="testing"
+        :sending="sendingTest"
+        :embedded="true"
+        @run="runPreview"
+        @send-test="sendTestPage"
+      />
+    </ODrawer>
+
+    <!-- The same editor the team-level routing tab uses.
+         It was a second dialog with the same fields, which is how the two
+         drifted: the team tab learned to claim a discovered service and this
+         one still asked for a dimension and a value. One editor, both pages. -->
+    <OnCallRuleEditor
+      :open="dialogOpen"
+      :rule="editingRule"
+      :initial-dimensions="claimingDimensions"
+      :teams="teams"
+      :aliases="aliases"
+      :catalogue="catalogue"
+      :services="services"
+      :sets="sets"
+      :signals="openSignals"
+      :conflict="conflict"
+      :ladder="ladder"
+      :saving="saving"
+      :allow-remove="false"
+      @update:open="(v: boolean) => (dialogOpen = v)"
+      @save="saveRule"
+      @preview="previewConflict"
+      @team-change="fetchLadderForTeam"
+    />
+
+    <ConfirmDialog
+      :model-value="!!ruleToDelete"
+      :title="t('oncall.removeRuleTitle')"
+      :message="t('oncall.removeRuleMessage')"
+      @update:ok="deleteRule"
+      @update:cancel="ruleToDelete = null"
+    />
+  </OPageLayout>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallDefaultTeamCard from "@/components/oncall/OnCallDefaultTeamCard.vue";
+import OnCallOwnershipRules from "@/components/oncall/OnCallOwnershipRules.vue";
+import OnCallRoutingSimulator from "@/components/oncall/OnCallRoutingSimulator.vue";
+import OnCallRuleEditor from "@/components/oncall/OnCallRuleEditor.vue";
+import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
+import type { SimulatorQuery } from "@/components/oncall/OnCallRoutingSimulator.vue";
+import OnCallUnroutedQueue from "@/components/oncall/OnCallUnroutedQueue.vue";
+import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import type {
+  DimensionAnalyticsSummary,
+  FieldAlias,
+  IdentitySet,
+  ServiceIdentityConfig,
+} from "@/services/service_streams";
+import {
+  dimensionAnalyticsQuery,
+  identityConfigQuery,
+  semanticGroupsQuery,
+  servicesListQuery,
+} from "@/services/service_streams.queries";
+import oncallService from "@/services/oncall";
+import { oncallKeys } from "@/services/oncall.querykeys";
+import {
+  createOwnershipRuleMutation,
+  deleteOwnershipRuleMutation,
+  dismissUnroutedSignalMutation,
+  oncallTeamsQuery,
+  ownershipStatsQuery,
+  teamOverviewQuery,
+  testPageMutation,
+  unroutedSignalsQuery,
+  updateOwnershipRuleMutation,
+} from "@/services/oncall.queries";
+import type {
+  DimensionCatalogue,
+  DiscoveredService,
+  OnCallTeam,
+  OwnershipRuleStats,
+  OwnershipStats,
+  RoutingPreview,
+  TeamOverview,
+  TeamRungSummary,
+  UnroutedSignal,
+} from "@/ts/interfaces/oncall";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { identityDimensions, isOnCallUnavailable } from "@/utils/oncall";
+
+const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
+const store = useStore();
+const router = useRouter();
+
+const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+const teams = ref<OnCallTeam[]>([]);
+const rules = ref<OwnershipRuleStats[]>([]);
+const signals = ref<UnroutedSignal[]>([]);
+const aliases = ref<{ id: string; display?: string }[]>([]);
+const preview = ref<RoutingPreview | null>(null);
+/// Who holds the path the rule editor is drafting, as opposed to `preview`,
+/// which belongs to the tester and answers a question the reader asked.
+const conflict = ref<RoutingPreview | null>(null);
+/// The ladder for whichever team is currently picked in the rule editor's own
+/// dropdown — see `fetchLadderForTeam`. Unlike `conflict`, and unlike the
+/// team-scoped Routing tab's `ladder` (fetched once, fixed to one team), this
+/// has to change every time the dialog's in-dialog selection changes, since
+/// one editor instance here serves every team in the org.
+const ladder = ref<TeamRungSummary[]>([]);
+
+const loaded = ref(false);
+const loadError = ref("");
+const unavailable = ref(false);
+const signalsError = ref(false);
+// True from mount, not false: the content div renders before `fetchAll`'s
+// first await resolves, and a false start here would show the table's empty
+// state for a frame before the skeleton loader ever appears.
+const loadingRules = ref(true);
+const loadingSignals = ref(true);
+const testing = ref(false);
+const sendingTest = ref(false);
+const saving = ref(false);
+
+/// Which list is on screen. `signals` is the queue of paths nothing claims.
+const tab = ref<"rules" | "signals">("rules");
+/// The tester is opened from the header rather than shipped open: it answers a
+/// hypothetical, and the rules below answer what is actually configured.
+const testerOpen = ref(false);
+
+const dialogOpen = ref(false);
+const editingRule = ref<OwnershipRuleStats | null>(null);
+const claimingSignal = ref<UnroutedSignal | null>(null);
+
+/// The conditions a claim opens with: the failing path, identity only. The
+/// editor owns the draft from there.
+const claimingDimensions = computed(() =>
+  claimingSignal.value ? routableDimensions(claimingSignal.value) : null,
+);
+
+/// A dismissed row is the record, not the worklist.
+const openSignals = computed(() => signals.value.filter((signal) => !signal.dismissed_at));
+
+/// What this org emits, and the services it has seen — the editor offers both
+/// instead of the whole field vocabulary and a text box.
+const catalogue = ref<DimensionCatalogue>({ present: [], values: {} });
+const services = ref<DiscoveredService[]>([]);
+/// The org's identity sets — an ordered `distinguish_by` per set, which is also
+/// the hierarchy the rule editor offers levels from.
+const sets = ref<IdentitySet[]>([]);
+const ruleToDelete = ref<OwnershipRuleStats | null>(null);
+
+/// The header actions only make sense once the page has something to act on —
+/// not over the unavailable, error or no-teams states.
+const ready = computed(() => loaded.value && !loadError.value && !!teams.value.length);
+
+/// Dismissed rows are the historical record, not the worklist, so the tab
+/// counts what is still outstanding.
+const openSignalCount = computed(
+  () => signals.value.filter((signal) => !signal.dismissed_at).length,
+);
+
+/// A single-select toggle group can deselect its active item; this screen
+/// always shows one of the two lists, so a null round-trip keeps the tab.
+function setTab(value: unknown) {
+  if (value !== "rules" && value !== "signals") return;
+  // One search box serves both tables; a rules query means nothing against the queue.
+  if (value !== tab.value) search.value = "";
+  tab.value = value;
+}
+
+const search = ref("");
+
+const tableComponent = computed(() =>
+  tab.value === "rules" ? OnCallOwnershipRules : OnCallUnroutedQueue,
+);
+
+const tableProps = computed(() =>
+  tab.value === "rules"
+    ? {
+        rules: rules.value,
+        aliases: aliases.value,
+        loading: loadingRules.value,
+        showTeam: true,
+        showHeader: false,
+        search: search.value,
+      }
+    : {
+        signals: signals.value,
+        teams: teams.value,
+        loading: loadingSignals.value,
+        showHeader: false,
+        search: search.value,
+        // The queue's own failure must not read as "nothing is unrouted" — that is this screen's core claim (B8).
+        error: signalsError.value ? t("oncall.unroutedLoadFailed") : "",
+      },
+);
+
+const clearSearch = () => (search.value = "");
+
+const tableEvents = computed(() =>
+  tab.value === "rules"
+    ? {
+        add: openAdd,
+        edit: openEdit,
+        remove: (rule: OwnershipRuleStats) => (ruleToDelete.value = rule),
+        "clear-search": clearSearch,
+      }
+    : {
+        claim: openClaim,
+        dismiss: dismissSignal,
+        retry: retrySignals,
+        "clear-search": clearSearch,
+      },
+);
+
+function failed(err: unknown, fallback: Parameters<typeof toast>[0]["message"]) {
+  const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  toast({ variant: "error", message: raw(message) || fallback });
+}
+
+function errorText(err: unknown): string {
+  return (
+    (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+    (err instanceof Error ? err.message : "")
+  );
+}
+
+const ruleCreate = useMutation(() => createOwnershipRuleMutation(orgId.value));
+const ruleUpdate = useMutation(() => updateOwnershipRuleMutation(orgId.value));
+const ruleDelete = useMutation(() => deleteOwnershipRuleMutation(orgId.value));
+const signalDismiss = useMutation(() => dismissUnroutedSignalMutation(orgId.value));
+const testPageWrite = useMutation(() => testPageMutation(orgId.value));
+
+/// Cache-first; a force expires the entry before the fetch, so it costs one request, not two.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
+/// Teams and rules are the backbone — without them the screen cannot say what
+/// routes where, so their failure is the page's failure, with a retry (B8).
+/// The vocabulary and the queue degrade section-by-section instead.
+async function fetchAll(force = false) {
+  loadError.value = "";
+  try {
+    teams.value = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
+  } catch (err) {
+    // The probe answered "not here" — that is a deployment fact, not a failure.
+    if (isOnCallUnavailable(err)) {
+      unavailable.value = true;
+      return;
+    }
+    loadError.value = errorText(err);
+    loaded.value = true;
+    return;
+  }
+  loaded.value = true;
+  // `fetchCatalogue` and `fetchServices` were written, and nothing called them.
+  // The rule editor on this page therefore had an empty catalogue and an empty
+  // service list for its whole life — no values to pick, no services to claim,
+  // and no way to tell that from a deployment that had genuinely discovered
+  // nothing. The team page called them; this one never did.
+  await Promise.all([
+    fetchRules(force),
+    fetchSignals(force),
+    fetchAliases(force),
+    fetchCatalogue(force),
+    fetchServices(force),
+    fetchSets(force),
+  ]);
+  // The oldest of the backbone reads, so the age never claims the page is fresher than it is.
+  lastFetchedAt.value = Math.min(
+    ...[oncallTeamsQuery(orgId.value), ownershipStatsQuery(orgId.value)].map(
+      (options) => queryClient.getQueryState(options.queryKey)?.dataUpdatedAt || Date.now(),
+    ),
+  );
+}
+
+const refreshing = ref(false);
+const lastFetchedAt = ref<number | null>(null);
+// Bumped by Refresh: the default-team card reads the routing config only when it is set up.
+const cardKey = ref(0);
+
+/// Refresh and the error state's Retry. Named, so the emitted action id cannot land on `force`.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    // Sends nothing: the routing config and the rule editor's team ladders re-read on their next read.
+    await queryClient.invalidateQueries({
+      queryKey: oncallKeys.all(orgId.value),
+      refetchType: "none",
+    });
+    await fetchAll(true);
+    cardKey.value += 1;
+  } finally {
+    refreshing.value = false;
+  }
+}
+
+async function fetchRules(force = false) {
+  loadingRules.value = true;
+  try {
+    // No team_id: the org-wide answer, shadowing computed across every team.
+    const stats = await read<OwnershipStats | null>(ownershipStatsQuery(orgId.value), force);
+    rules.value = stats?.rules ?? [];
+  } catch (err) {
+    loadError.value = errorText(err);
+  } finally {
+    loadingRules.value = false;
+  }
+}
+
+/// The filtering is the endpoint's, not a client-side sieve: include_dismissed
+/// also drops entries a since-written rule would now catch, which no client
+/// can compute.
+const signalFilters = ref<UnroutedFilters>({ include_dismissed: false });
+
+function setSignalLanding(value: unknown) {
+  const landing = value === "default_team" || value === "nobody" ? value : undefined;
+  signalFilters.value = {
+    ...(landing ? { landing } : {}),
+    include_dismissed: signalFilters.value.include_dismissed,
+  };
+  fetchSignals();
+}
+
+function setSignalIncludeDismissed(value: unknown) {
+  signalFilters.value = { ...signalFilters.value, include_dismissed: !!value };
+  fetchSignals();
+}
+
+// The newest read: a slower answer for a filter the reader has already left must not overwrite the queue.
+let latestSignalsRead = 0;
+
+async function fetchSignals(force = false) {
+  loadingSignals.value = true;
+  signalsError.value = false;
+  const readId = ++latestSignalsRead;
+  try {
+    const queue = await read<UnroutedSignal[] | null>(
+      unroutedSignalsQuery(orgId.value, signalFilters.value),
+      force,
+    );
+    if (readId !== latestSignalsRead) return;
+    signals.value = queue ?? [];
+  } catch {
+    if (readId !== latestSignalsRead) return;
+    signalsError.value = true;
+    signals.value = [];
+  } finally {
+    if (readId === latestSignalsRead) loadingSignals.value = false;
+  }
+}
+
+// Same trap as `refreshPage`: the queue's own retry must decide `force`, not the event.
+const retrySignals = () => fetchSignals(true);
+
+/// The vocabulary degrades to an empty picker rather than blocking the screen:
+/// every other section here still answers its question without it.
+async function fetchAliases(force = false) {
+  try {
+    aliases.value = (await read<FieldAlias[]>(semanticGroupsQuery(orgId.value), force)) ?? [];
+  } catch {
+    aliases.value = [];
+  }
+}
+
+/// Which of those field names this org has ever emitted, and with what values.
+/// Both degrade to empty, which is what this screen did before they existed.
+/// Who holds a drafted path today, answered by the engine.
+///
+/// The draft's own conditions are replayed as if they were a signal, so this is
+/// the real decision rather than a second copy of the ordering on this side.
+/// Debounced by the editor, so this runs once per pause.
+///
+/// Never surfaces an error: a conflict line that cannot be drawn is missing
+/// context, not a reason to stop somebody writing a rule.
+async function previewConflict(dimensions: Record<string, string>) {
+  if (!Object.keys(dimensions).length) {
+    conflict.value = null;
+    return;
+  }
+  try {
+    // Uncached: a debounced dry run must answer the draft being typed, never an older one.
+    const res = await oncallService.previewRouting({
+      org_identifier: orgId.value,
+      data: { dimensions },
+    });
+    conflict.value = res.data ?? null;
+  } catch {
+    conflict.value = null;
+  }
+}
+
+/// What paging the currently-picked team runs, answered fresh per pick. There
+/// is no batched/bulk endpoint for this — `teamOverview` takes exactly one
+/// team_id — so this fires once per distinct team the user actually selects,
+/// not once per team in the org on dialog mount.
+///
+/// Guarded against out-of-order responses: a fast team A → team B pick could
+/// see A's request resolve after B's, which would otherwise show A's ladder
+/// under B's now-selected name.
+///
+/// Never surfaces an error, for the same reason `previewConflict` doesn't: a
+/// ladder note that fails to load is missing context under a select, not a
+/// reason to block the form.
+let ladderRequest = 0;
+async function fetchLadderForTeam(teamId: string) {
+  const requestId = ++ladderRequest;
+  if (!teamId) {
+    ladder.value = [];
+    return;
+  }
+  try {
+    const overview = await read<TeamOverview | null>(teamOverviewQuery(orgId.value, teamId), false);
+    if (requestId !== ladderRequest) return;
+    ladder.value = overview?.rungs ?? [];
+  } catch {
+    if (requestId === ladderRequest) ladder.value = [];
+  }
+}
+
+async function fetchSets(force = false) {
+  try {
+    const config = await read<ServiceIdentityConfig>(identityConfigQuery(orgId.value), force);
+    sets.value = config?.sets ?? [];
+  } catch {
+    sets.value = [];
+  }
+}
+
+async function fetchCatalogue(force = false) {
+  try {
+    const summary = await read<DimensionAnalyticsSummary>(
+      dimensionAnalyticsQuery(orgId.value),
+      force,
+    );
+    const dims = summary?.dimensions ?? [];
+    catalogue.value = {
+      present: summary?.recommended_priority_dimensions ?? dims.map((d) => d.dimension_name),
+      values: Object.fromEntries(dims.map((d) => [d.dimension_name, d.value_counts ?? {}])),
+    };
+  } catch {
+    catalogue.value = { present: [], values: {} };
+  }
+}
+
+async function fetchServices(force = false) {
+  try {
+    const rows = await read<Record<string, any>[]>(servicesListQuery(orgId.value), force);
+    const seen = new Map<string, DiscoveredService>();
+    for (const row of rows) {
+      const name = String(row.service_name ?? "");
+      if (!name) continue;
+      const identity = (row.disambiguation ?? {}) as Record<string, string>;
+      const existing = seen.get(name);
+      if (!existing || (!Object.keys(existing.identity).length && Object.keys(identity).length)) {
+        seen.set(name, { name, setId: String(row.set_id ?? "default"), identity });
+      }
+    }
+    services.value = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    services.value = [];
+  }
+}
+
+function goToTeams() {
+  router.push({
+    name: "onCallTeams",
+    query: { org_identifier: orgId.value },
+  });
+}
+
+function openAdd() {
+  editingRule.value = null;
+  claimingSignal.value = null;
+  dialogOpen.value = true;
+}
+
+function openEdit(rule: OwnershipRuleStats) {
+  editingRule.value = rule;
+  claimingSignal.value = null;
+  dialogOpen.value = true;
+}
+
+/// Only the org's identity dimensions belong in a rule. A signal arrives
+/// carrying everything the alert knew — pod name, node, status code — and a
+/// rule written against those matches exactly one pod until it restarts, then
+/// nothing, forever. Routable facts route; evidence stays on the signal.
+function routableDimensions(signal: UnroutedSignal): Record<string, string> {
+  const kept = identityDimensions(signal.dimensions);
+  return Object.keys(kept).length ? kept : signal.dimensions;
+}
+
+/// G4: the rule that would have caught this signal, pre-filled. The user
+/// picks the team and confirms — the dimensions are already the failing path.
+function openClaim(signal: UnroutedSignal) {
+  editingRule.value = null;
+  claimingSignal.value = signal;
+  dialogOpen.value = true;
+}
+
+/// One call, in place. An edit used to be create-then-delete, which was
+/// deliberate — the path was never owned by nobody — but the server now
+/// refuses the create while the original still holds the path, so repointing a
+/// rule to another team failed with "another team already owns this path". The
+/// update route does the same job atomically.
+async function saveRule(draft: RuleDraft) {
+  saving.value = true;
+  const data = { team_id: draft.team_id, dimensions: draft.dimensions };
+  try {
+    if (editingRule.value) {
+      await ruleUpdate.mutateAsync({ ruleId: editingRule.value.rule_id, data });
+    } else {
+      await ruleCreate.mutateAsync(data);
+    }
+    const edited = !!editingRule.value;
+    editingRule.value = null;
+    claimingSignal.value = null;
+    dialogOpen.value = false;
+    toast({
+      variant: "success",
+      message: edited ? t("oncall.ruleUpdated") : t("oncall.ruleCreated"),
+    });
+    // A claimed signal is never dismissed — the evidence stays in case the rule is wrong.
+    await Promise.all([fetchRules(), fetchSignals()]);
+  } catch (err) {
+    failed(err, t("oncall.saveRuleFailed"));
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function deleteRule() {
+  const rule = ruleToDelete.value;
+  ruleToDelete.value = null;
+  if (!rule) return;
+  try {
+    await ruleDelete.mutateAsync(rule.rule_id);
+    // A path nothing owns again is unrouted again — the queue is half of what a delete moves.
+    await Promise.all([fetchRules(), fetchSignals()]);
+  } catch (err) {
+    failed(err, t("oncall.deleteRuleFailed"));
+  }
+}
+
+async function dismissSignal(signal: UnroutedSignal) {
+  try {
+    await signalDismiss.mutateAsync(signal.id);
+    await fetchSignals();
+  } catch (err) {
+    failed(err, t("oncall.unroutedDismissFailed"));
+  }
+}
+
+async function runPreview(query: SimulatorQuery) {
+  testing.value = true;
+  try {
+    // Uncached for the same reason as the editor's dry run: the answer belongs to this query alone.
+    const res = await oncallService.previewRouting({
+      org_identifier: orgId.value,
+      data: { dimensions: query.dimensions },
+    });
+    preview.value = res.data;
+  } catch (err) {
+    failed(err, t("oncall.testRoutingFailed"));
+  } finally {
+    testing.value = false;
+  }
+}
+
+/// This one really sends. The simulator above it does not, which is why the
+/// two are separate buttons rather than one control with a mode.
+async function sendTestPage(value: { team_id: string; priority: string }) {
+  sendingTest.value = true;
+  try {
+    const res = await testPageWrite.mutateAsync({
+      teamId: value.team_id,
+      priority: Number(value.priority.replace(/^P/i, "")) || undefined,
+    });
+    // `attempts`, not `recipients` — the latter never existed on the wire.
+    const reached = (res.data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
+    toast({
+      variant: res.data?.reached_anyone ? "success" : "warning",
+      message: res.data?.reached_anyone
+        ? t("oncall.testPageSent", { count: reached }, reached)
+        : t("oncall.testPageNobody", { reason: raw(res.data?.not_sent_because ?? "") }),
+    });
+  } catch (err) {
+    failed(err, t("oncall.testPageFailed"));
+  } finally {
+    sendingTest.value = false;
+  }
+}
+
+onMounted(() => fetchAll());
+</script>

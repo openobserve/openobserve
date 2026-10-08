@@ -21,10 +21,54 @@ import { copyToClipboard } from "@/utils/clipboard";
 import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
+import {
+  DEFAULT_TRACE_SEARCH_MODE,
+  type MetricsRangeFilter,
+} from "@/ts/interfaces/traces/trace.types";
+import searchService from "@/services/search";
+import useNotifications from "@/composables/useNotifications";
+import { gt } from "@/types/i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+// Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
+const INTERNAL_LOG_STREAMS = new Set([
+  "_agent_signals",
+  "_redaction_evidence",
+  "_llm_scores",
+  "_evaluator",
+  "_llm_experiment",
+  "_anomalies",
+]);
+const VIEW_LOGS_COUNT_TIMEOUT_MS = 5000;
+// Count queries share the search work-group queue; too many at once come back as 429s.
+const VIEW_LOGS_COUNT_CONCURRENCY = 4;
+
+const settleLimited = async <T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> => {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i]) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+};
+const isInternalLogStream = (name: string) =>
+  name.startsWith("_o2_") || INTERNAL_LOG_STREAMS.has(name);
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
@@ -36,31 +80,8 @@ const defaultObject = {
     splitterModel: 20,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40],
-    refreshTimes: [
-      [
-        { label: "5 sec", value: 5 },
-        { label: "1 min", value: 60 },
-        { label: "1 hr", value: 3600 },
-      ],
-      [
-        { label: "10 sec", value: 10 },
-        { label: "5 min", value: 300 },
-        { label: "2 hr", value: 7200 },
-      ],
-      [
-        { label: "15 sec", value: 15 },
-        { label: "15 min", value: 900 },
-        { label: "1 day", value: 86400 },
-      ],
-      [
-        { label: "30 sec", value: 30 },
-        { label: "30 min", value: 1800 },
-      ],
-    ],
   },
   meta: {
-    refreshInterval: 0,
-    refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
     showHistogram: true,
@@ -85,7 +106,7 @@ const defaultObject = {
     redirectedFromLogs: false,
     searchApplied: false,
     lastRunAt: undefined as number | undefined,
-    metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
+    metricsRangeFilters: new Map<string, MetricsRangeFilter>(),
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: DEFAULT_TRACE_SEARCH_MODE,
@@ -211,6 +232,7 @@ const useTraces = () => {
   const router = useRouter();
 
   const { loadSemanticGroups } = useServiceCorrelation();
+  const { showInfoNotification } = useNotifications();
 
   const resetSearchObj = () => {
     // delete searchObj.data;
@@ -344,11 +366,14 @@ const useTraces = () => {
     const traceIdField = getTraceIdField();
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
+    const spanId = escapeSingleQuotes(String(span.spanId || span.span_id));
+    const escapedTraceId = escapeSingleQuotes(String(traceId));
+
     let query: string = isSpan
-      ? `${quoteSqlIdentifierIfNeeded(spanIdField)}='${span.spanId || span.span_id}' ${
-          traceId ? `AND ${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'` : ""
+      ? `${quoteSqlIdentifierIfNeeded(spanIdField)}='${spanId}' ${
+          traceId ? `AND ${quoteSqlIdentifierIfNeeded(traceIdField)}='${escapedTraceId}'` : ""
         }`
-      : `${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'`;
+      : `${quoteSqlIdentifierIfNeeded(traceIdField)}='${escapedTraceId}'`;
 
     if (query) query = b64EncodeStandard(query) as string;
 
@@ -477,6 +502,17 @@ const useTraces = () => {
   };
 
   const navigateToCorrelatedLogs = async (correlationProps: any) => {
+    const spanId = searchObj.data.traceDetails.selectedSpanId;
+    const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
+
+    const streamList: string[] = correlationProps.logStreams
+      .map((s: any) => s.stream_name)
+      .filter((name: string) => !isInternalLogStream(name));
+    if (!streamList.length) {
+      toast({ variant: "warning", message: gt("traces.noCorrelatedLogsFound") });
+      return;
+    }
+
     // Conditions are keyed by semantic group, not by field name, so that two
     // streams aliasing one dimension (k8s_namespace_name vs
     // service_k8s_namespace_name) collapse into a single condition.
@@ -492,33 +528,85 @@ const useTraces = () => {
         `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
       );
 
-    for (const streamInfo of correlationProps.logStreams) {
-      const filters = streamInfo.filters ?? {};
-      for (const [field, value] of Object.entries(filters)) {
-        if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
-        // First stream to claim a group wins.
-        if (conditions.has(groupIdFor(field))) continue;
-        setCondition(field, String(value));
+    // A trace id already pins the logs; dimension filters would drop rows lacking them.
+    if (!traceId) {
+      for (const streamInfo of correlationProps.logStreams) {
+        const filters = streamInfo.filters ?? {};
+        for (const [field, value] of Object.entries(filters)) {
+          if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
+          // First stream to claim a group wins.
+          if (conditions.has(groupIdFor(field))) continue;
+          setCondition(field, String(value));
+        }
       }
     }
 
     // Narrow the correlated logs down to the span the user clicked "View Logs"
     // on. Field names come from org settings and values from the current
-    // selection, same as buildQueryDetails(). These deliberately overwrite a
-    // stream filter on the same group — an exact id is the more specific match.
-    const idFilters: Array<[string, string | null | undefined]> = [
-      [getSpanIdField(), searchObj.data.traceDetails.selectedSpanId],
-      [getTraceIdField(), searchObj.data.traceDetails.selectedTrace?.trace_id],
-    ];
+    // selection, same as buildQueryDetails().
+    if (spanId) setCondition(getSpanIdField(), spanId);
+    if (traceId) setCondition(getTraceIdField(), traceId);
 
-    for (const [field, value] of idFilters) {
-      if (!value) continue;
-      setCondition(field, value);
+    let queryString = Array.from(conditions.values()).join(" and ");
+    let timeRange = correlationProps.timeRange;
+
+    // Count per stream so one failing stream stays unknown; only a complete numeric count is evidence.
+    let navStreams = streamList;
+    let showTraceFallback = false;
+    if (spanId && traceId) {
+      // A stream that has not answered in time counts as unknown, so a hung one cannot stall the click.
+      const countTimeout = new AbortController();
+      const timer = setTimeout(() => countTimeout.abort(), VIEW_LOGS_COUNT_TIMEOUT_MS);
+      const counts = await settleLimited(streamList, VIEW_LOGS_COUNT_CONCURRENCY, (name) =>
+        searchService.search({
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: {
+            query: {
+              sql: `SELECT count(*) AS zo_count FROM ${quoteSqlIdentifierIfNeeded(name)} WHERE ${queryString}`,
+              start_time: timeRange.startTime,
+              end_time: timeRange.endTime,
+              from: 0,
+              size: 1,
+            },
+          },
+          page_type: "logs",
+          signal: countTimeout.signal,
+        }),
+      );
+      clearTimeout(timer);
+      const countOf = (c: PromiseSettledResult<any>): number | null => {
+        if (c.status !== "fulfilled") return null;
+        const data = c.value?.data;
+        if (!data || data.is_partial || data.function_error) return null;
+        const raw = data.hits?.[0]?.zo_count;
+        const n = typeof raw === "number" || typeof raw === "string" ? Number(raw) : NaN;
+        return raw !== "" && Number.isFinite(n) ? n : null;
+      };
+      const known = counts.map(countOf);
+      const counted = streamList.filter((_, i) => known[i] !== null);
+
+      // Unknown (null) streams don't count against the fallback.
+      // With no stream known to hold span logs (even all throttled), only trace_id is a safe query.
+      if (known.every((n) => !n)) {
+        // trace_id alone is tolerated on streams lacking it, so every eligible stream stays in.
+        conditions.delete(groupIdFor(getSpanIdField()));
+        queryString = Array.from(conditions.values()).join(" and ");
+        // Trace-level logs span the whole trace, not the clicked span's window.
+        timeRange = correlationProps.traceTimeRange ?? timeRange;
+        showTraceFallback = counted.length > 0;
+      } else {
+        // A stream without span_id would fail the logs query, so keep only streams whose count ran.
+        navStreams = counted;
+      }
     }
 
-    const queryString = Array.from(conditions.values()).join(" and ");
+    // The user selected another span while this ran: do not navigate.
+    if (searchObj.data.traceDetails.selectedSpanId !== spanId) return;
+
+    if (showTraceFallback) showInfoNotification(gt("traces.spanHasNoLogsShowingTrace"));
+
     const encodedQuery = b64EncodeUnicode(queryString);
-    const streamNames = correlationProps.logStreams.map((s: any) => s.stream_name).join(",");
+    const streamNames = navStreams.join(",");
 
     store.dispatch("logs/setIsInitialized", false);
     await nextTick();
@@ -529,8 +617,8 @@ const useTraces = () => {
         stream: streamNames,
         sql_mode: "false",
         query: encodedQuery,
-        from: String(correlationProps.timeRange.startTime),
-        to: String(correlationProps.timeRange.endTime),
+        from: String(timeRange.startTime),
+        to: String(timeRange.endTime),
         stream_type: "logs",
         org_identifier: store.state.selectedOrganization.identifier,
         type: "trace_explorer",

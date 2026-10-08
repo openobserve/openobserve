@@ -40,6 +40,8 @@ export class MetricsExplorerPage {
         // grid modes it refreshes the card grid.
         this.refreshButton = '[data-test="metrics-explorer-refresh"]';
         this.shareButton = '[data-test="metrics-explorer-share-btn"]';
+        // Result-count label in the filter bar ("N" or "N of M").
+        this.countLabel = '[data-test="metrics-explorer-count"]';
 
         // ===== VISUALIZE PANE =====
         this.visualizeRoot = '[data-test="metrics-explorer-visualize"]';
@@ -48,9 +50,37 @@ export class MetricsExplorerPage {
         this.chartRenderer = '[data-test="chart-renderer"]';
 
         // ===== CARDS =====
-        // Card data-tests are name-suffixed (`…-card-select-cpu_usage`), so the
-        // "any card" locator matches on the stable prefix.
-        this.anyCardSelect = '[data-test^="metrics-explorer-card-select-"]';
+        // Card data-tests are name-suffixed (`…-card-details-cpu_usage`), so the
+        // "any card" locator matches on the stable prefix of the Drill down button.
+        this.anyCardSelect = '[data-test^="metrics-explorer-card-details-"]';
+        // The same suffixing is why these are prefixes rather than whole selectors:
+        // the metric name is only known at call time. Kept here so every selector
+        // string still lives in one place.
+        this.cardPrefix = 'metrics-explorer-card-';
+        this.cardNoDataPrefix = 'metrics-explorer-card-nodata-';
+        // ECharts mounts more than one canvas per instance (zrender adds layers).
+        this.cardChartCanvas = 'canvas';
+
+        // ===== SIDEBAR NAV (in-app route changes, no full page reload) =====
+        this.metricsMenuItem = '[data-test="menu-link-\\/metrics-item"]';
+        this.logsMenuItem = '[data-test="menu-link-\\/logs-item"]';
+
+        // ===== ENDPOINTS (network assertions) =====
+        // stream.nameList() builds `/api/<org>/streams?type=<type>`; the metrics
+        // name list is the request the 5-minute TanStack cache is meant to skip.
+        this.streamListUrlPart = '/streams?type=metrics';
+        this.promqlQueryUrlPart = '/prometheus/api/v1/query_range';
+
+        // ===== DETAIL VIEW (MetricDetailView / MetricBreakdown) =====
+        this.cardDetailsPrefix = 'metrics-explorer-card-details-';
+        this.detailRoot = '[data-test="metrics-detail"]';
+        this.detailTitle = '[data-test="metrics-detail-title"]';
+        this.detailClose = '[data-test="metrics-detail-close"]';
+        this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
+        this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
+        this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
+        this.breakdownBack = '[data-test="metrics-breakdown-back"]';
+        this.labelChipPrefix = 'metrics-explorer-label-chip-';
 
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
@@ -169,6 +199,11 @@ export class MetricsExplorerPage {
         await expect(this.page.locator(this.visualizeRoot)).toBeVisible({ timeout: 30000 });
     }
 
+    /** The chart renderer stays mounted — a query re-run, not a stream reload. */
+    async expectChartRendererVisible() {
+        await expect(this.page.locator(this.chartRenderer).first()).toBeVisible({ timeout: 30000 });
+    }
+
     async expectGridVisible() {
         await expect(this.page.locator(this.scrollContainer)).toBeVisible({ timeout: 30000 });
     }
@@ -235,6 +270,24 @@ export class MetricsExplorerPage {
             })
             .toBe(true);
         return this.getMetricsDataParam();
+    }
+
+    /** The decoded blob once the URL stops changing, or null if none was written. NOT expect.poll: that waits for an expectation to BECOME true and cannot assert one HOLDS, so poll(hasMetricsDataParam).toBe(false) just raced the debounced write. */
+    async settleMetricsBlob(stableMs = 2000, timeout = 15000) {
+        const deadline = Date.now() + timeout;
+        let last = this.getMetricsDataParam();
+        let stableSince = Date.now();
+        while (Date.now() < deadline) {
+            await this.page.waitForTimeout(250);
+            const now = this.getMetricsDataParam();
+            if (now !== last) {
+                last = now;
+                stableSince = Date.now();
+            } else if (Date.now() - stableSince >= stableMs) {
+                break;
+            }
+        }
+        return this.decodeMetricsBlob();
     }
 
     /** The mirror case — leaving Visualize must strip a stale blob. */
@@ -361,24 +414,18 @@ export class MetricsExplorerPage {
     }
 
     /**
-     * Drill into the first rendered card — the real path into Visualize.
-     *
-     * The card's action row (`…-card-actions-<name>`) is w-0 / opacity-0 at rest
-     * and expands only on group-hover / group-focus-within; at rest the resting
-     * "fn · unit" and freshness spans sit over it and intercept the click. So
-     * hover the card first — the same gesture a real user makes — which hides
-     * those spans and expands the row before clicking the drill-in button.
+     * Open the first rendered card in Visualize — the real path: the card's
+     * always-visible Drill down, then the detail view's Open in Visualize.
      */
     async openFirstCardInVisualize() {
-        const select = this.page.locator(this.anyCardSelect).first();
-        await select.waitFor({ state: 'attached', timeout: 30000 });
+        const drill = this.page.locator(this.anyCardSelect).first();
+        await drill.waitFor({ state: 'attached', timeout: 30000 });
+        await expect(drill).toBeVisible({ timeout: 10000 });
+        await drill.click();
 
-        const testId = await select.getAttribute('data-test');
-        const metricName = String(testId).replace('metrics-explorer-card-select-', '');
-        await this.page.locator(`[data-test="metrics-explorer-card-${metricName}"]`).hover();
-
-        await expect(select).toBeVisible({ timeout: 10000 });
-        await select.click();
+        const openVisualize = this.page.locator(this.detailOpenVisualize);
+        await expect(openVisualize).toBeVisible({ timeout: 30000 });
+        await openVisualize.click();
     }
 
     /** True once at least one card has rendered (grid is populated). */
@@ -389,6 +436,248 @@ export class MetricsExplorerPage {
                 intervals: [500, 1000, 2000],
             })
             .toBeGreaterThan(0);
+    }
+
+    /** Sampled, not polled: `expect.poll` proves a state is REACHED, not that it HOLDS. */
+    async expectCardsRemainVisible(timeout = 10000) {
+        const deadline = Date.now() + timeout;
+        // do-while: a cache-fast reload may already be idle, and the invariant must still be asserted once.
+        do {
+            const count = await this.getCardCount();
+            expect(count, 'the grid must not blank during a manual refresh').toBeGreaterThan(0);
+            await this.page.waitForTimeout(100);
+        } while (Date.now() < deadline && (await this.isRefreshButtonLoading()));
+    }
+
+    /* ------------------------------------------------- a card, by metric name */
+
+    cardRoot(metric) {
+        return this.page.locator(`[data-test="${this.cardPrefix}${metric}"]`);
+    }
+
+    /** The inline "No data" tile — MetricCard's `isEmpty` branch. */
+    cardNoData(metric) {
+        return this.page.locator(`[data-test="${this.cardNoDataPrefix}${metric}"]`);
+    }
+
+    /**
+     * A DRAWN chart, not merely a mounted card: the preview renders through
+     * PanelSchemaRenderer, which paints into a canvas only once it has series.
+     */
+    cardChart(metric) {
+        return this.cardRoot(metric).locator(this.cardChartCanvas).first();
+    }
+
+    async expectCardNoData(metric, timeout = 60000) {
+        await expect(
+            this.cardNoData(metric),
+            `${metric} should render the No-data tile`,
+        ).toBeVisible({ timeout });
+    }
+
+    /** Charted means BOTH: a canvas arrived and the No-data tile went away. */
+    async expectCardCharted(metric, timeout = 60000) {
+        await expect(this.cardChart(metric), `${metric} should render a chart`).toBeVisible({
+            timeout,
+        });
+        await expect(this.cardNoData(metric)).toBeHidden();
+    }
+
+    /* ---------------------------------------------------------------- refresh */
+
+    async clickRefresh() {
+        await this.page.locator(this.refreshButton).click();
+    }
+
+    /** OButton binds `:aria-busy="loading || undefined"` — so "true", or absent. */
+    async isRefreshButtonLoading() {
+        const state = await this.page
+            .locator(this.refreshButton)
+            .getAttribute('aria-busy', { timeout: 5000 })
+            .catch(() => null);
+        return state === 'true';
+    }
+
+    /** The refresh button is mid-reload: aria-busy AND disabled (double-click guard). */
+    async expectRefreshBusy(timeout = 10000) {
+        await expect
+            .poll(async () => await this.isRefreshButtonLoading(), {
+                timeout,
+                intervals: [50, 100, 200],
+            })
+            .toBe(true);
+        await expect(this.page.locator(this.refreshButton)).toBeDisabled({ timeout: 10000 });
+    }
+
+    /** The refresh button returned to idle: not busy and enabled again. */
+    async expectRefreshIdle(timeout = 30000) {
+        await expect
+            .poll(async () => await this.isRefreshButtonLoading(), {
+                timeout,
+                intervals: [200, 400, 800],
+            })
+            .toBe(false);
+        await expect(this.page.locator(this.refreshButton)).toBeEnabled({ timeout: 30000 });
+    }
+
+    /** The toolbar result-count label text — "N" when unfiltered, "N of M" when filtered. */
+    async getResultCountText() {
+        return (
+            (await this.page
+                .locator(this.countLabel)
+                .textContent({ timeout: 5000 })
+                .catch(() => '')) || ''
+        ).trim();
+    }
+
+    /**
+     * The FIRST number in the label — the count of cards the grid is showing.
+     *
+     * Not comparable to getCardCount(): the grid is virtualized, so the DOM only
+     * ever holds the rows in view. This is the upper bound that count sits under.
+     */
+    async getResultCount() {
+        const text = await this.getResultCountText();
+        const shown = Number(text.split(' of ')[0].replace(/,/g, ''));
+        return Number.isFinite(shown) ? shown : -1;
+    }
+
+    /** Both clicks land in ONE tick, so the second is guaranteed to hit the re-entry guard. */
+    async clickRefreshTwiceInSameTick() {
+        await this.page.locator(this.refreshButton).evaluate((el) => {
+            el.click();
+            el.click();
+        });
+    }
+
+    /** Drill down is always visible on the card. */
+    async openMetricDetails(metric) {
+        await this.page.locator(`[data-test="${this.cardDetailsPrefix}${metric}"]`).click();
+    }
+
+    async expectDetailOpen(metric) {
+        await expect(this.page.locator(this.detailTitle)).toHaveText(metric, { timeout: 30000 });
+        await expect.poll(() => this.getQueryParam('metric'), { timeout: 15000 }).toBe(metric);
+    }
+
+    /** Detail tabs carry no data-test of their own; OTab stamps its name on the trigger. */
+    detailTab(name) {
+        return this.page.locator(`${this.detailRoot} [role="tab"][data-otab-name="${name}"]`);
+    }
+
+    async selectDetailTab(name) {
+        await this.detailTab(name).click();
+        await expect.poll(() => this.getQueryParam('tab'), { timeout: 15000 }).toBe(name);
+    }
+
+    /** A label's chart card in the Breakdown grid. */
+    breakdownCard(label) {
+        return this.page.locator(`[data-test="metrics-breakdown-card-${label}"]`);
+    }
+
+    /** The card's Drill down focuses that label: its chart plus its value table. */
+    async selectBreakdownLabel(label) {
+        await this.page.locator(`[data-test="metrics-breakdown-select-${label}"]`).click();
+        await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBe(label);
+    }
+
+    /** "All labels" — back from a focused label to the Breakdown grid. */
+    async backToBreakdownGrid() {
+        await this.page.locator(this.breakdownBack).click();
+        await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBeNull();
+    }
+
+    breakdownValue(label, value) {
+        return this.page.locator(`[data-test="metrics-breakdown-value-${label}-${value}"]`);
+    }
+
+    breakdownDistinct(label) {
+        return this.page.locator(`[data-test="metrics-breakdown-distinct-${label}"]`);
+    }
+
+    /** "Add to filter" (=) on one value of the Breakdown table. */
+    async addBreakdownFilter(label, value) {
+        await this.page.locator(`[data-test="metrics-breakdown-add-${label}-${value}"]`).click();
+    }
+
+    /** The filter bar's chip for a label matcher. */
+    labelChip(label) {
+        return this.page.locator(`[data-test="${this.labelChipPrefix}${label}"]`);
+    }
+
+    /** A related metric's chart card in the Related grid. */
+    relatedCard(metric) {
+        return this.page.locator(`[data-test="metrics-detail-related-card-${metric}"]`);
+    }
+
+    async openRelated(metric) {
+        await this.page.locator(`[data-test="metrics-detail-related-open-${metric}"]`).click();
+    }
+
+    async closeDetail() {
+        await this.page.locator(this.detailClose).click();
+    }
+
+    /* ------------------------------------------------------------- network */
+
+    /**
+     * Tally matching requests from now until `stop()`.
+     *
+     * The cache contract is only observable on the wire — a served-from-cache
+     * mount looks identical in the DOM to a refetched one.
+     */
+    startRequestCounter(urlPart) {
+        const counter = { count: 0, urls: [] };
+        const handler = (request) => {
+            if (!request.url().includes(urlPart)) return;
+            counter.count += 1;
+            counter.urls.push(request.url());
+        };
+        this.page.on('request', handler);
+        counter.stop = () => {
+            this.page.off('request', handler);
+            return counter.count;
+        };
+        return counter;
+    }
+
+    startStreamListCounter() {
+        return this.startRequestCounter(this.streamListUrlPart);
+    }
+
+    /** Resolves on the next stream-list response — a reload landed, no UI-state race. */
+    waitForStreamListResponse(timeout = 30000) {
+        return this.page.waitForResponse(
+            (response) => response.url().includes(this.streamListUrlPart),
+            { timeout }
+        );
+    }
+
+    /** Resolves on the next PromQL range query — proof the chart actually re-ran. */
+    waitForPromqlQuery(timeout = 30000) {
+        return this.page.waitForResponse(
+            (response) => response.url().includes(this.promqlQueryUrlPart),
+            { timeout }
+        );
+    }
+
+    /* ------------------------------------------- in-app (SPA) navigation */
+
+    /**
+     * Leave the explorer WITHOUT a page reload.
+     *
+     * `page.goto()` tears down the whole SPA and with it the in-memory TanStack
+     * cache, so a reload can never exercise a cache hit. Routing through the
+     * sidebar unmounts the explorer (keepAlive:false) while the QueryClient lives.
+     */
+    async navigateAwayInApp() {
+        await this.page.locator(this.logsMenuItem).click();
+        await this.page.waitForURL(/\/web\/logs/, { timeout: 30000 });
+    }
+
+    async navigateToExplorerInApp() {
+        await this.page.locator(this.metricsMenuItem).click();
+        await this.page.waitForURL(/\/web\/metrics/, { timeout: 30000 });
     }
 
     /* ----------------------------------------------------------------- share */

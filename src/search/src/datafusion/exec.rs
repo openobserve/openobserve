@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -83,12 +83,16 @@ fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
+        .with_collect_statistics(true)
         .with_information_schema(true);
 
     config
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
+
+    // DF55 migrated aggregate streams regress grouped-agg perf; revisit on the next DF bump.
+    config.options_mut().execution.enable_migration_aggregate = false;
 
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
@@ -299,7 +303,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.search.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))
@@ -349,6 +353,15 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ));
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
+    ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::sequence::SequenceDepth::new(),
+    ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::sequence::SequenceStepTimes::new(),
+    ));
+    ctx.register_udwf(datafusion::logical_expr::WindowUDF::from(
+        super::udaf::sequence::SequenceStepMatch::new(),
     ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
 
@@ -515,47 +528,37 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
-/// Registers the metrics files; an all-hash-sorted set also registers the
-/// `HASH_SORTED_TABLE_SUFFIX` table with its order declared.
-pub async fn register_metrics_table(
+/// Builds the session for a metrics scan whose files carry `sort_order`.
+pub async fn metrics_session_context(
     session: &SearchSession,
-    schema: Arc<Schema>,
-    table_name: &str,
-    files: Vec<FileKey>,
     sort_order: FileSortOrder,
 ) -> Result<SessionContext> {
-    let schema = metrics_query_schema(schema);
-    let ctx = DataFusionContextBuilder::new()
+    DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
         .stream_type(StreamType::Metrics)
         .sort_order(sort_order)
         .build(session.target_partitions)
-        .await?;
+        .await
+}
 
-    let file_stat_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
-    // a separate table: declaring the order on the main table would change its file grouping
-    if sort_order.is_sorted() {
-        let tables = TableBuilder::new()
-            .sort_order(sort_order)
-            .file_stat_cache(file_stat_cache.clone())
-            .build(session.clone(), files.clone(), schema.clone())
-            .await?;
-        let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
-        ctx.register_table(
-            format!("{table_name}{HASH_SORTED_TABLE_SUFFIX}"),
-            union_table,
-        )?;
-    }
-
+/// Registers the metrics files as `table_name`, declaring `sort_order` on the table.
+pub async fn register_metrics_table(
+    ctx: &SessionContext,
+    session: &SearchSession,
+    schema: Arc<Schema>,
+    table_name: &str,
+    files: Vec<FileKey>,
+    sort_order: FileSortOrder,
+) -> Result<()> {
+    let schema = metrics_query_schema(schema);
     let tables = TableBuilder::new()
-        .file_stat_cache(file_stat_cache)
+        .sort_order(sort_order)
+        .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
         .build(session.clone(), files, schema.clone())
         .await?;
-    let union_table = Arc::new(NewUnionTable::new(schema, tables));
-    ctx.register_table(table_name, union_table)?;
-
-    Ok(ctx)
+    ctx.register_table(table_name, Arc::new(NewUnionTable::new(schema, tables)))?;
+    Ok(())
 }
 
 fn metrics_query_schema(schema: Arc<Schema>) -> Arc<Schema> {
@@ -593,7 +596,7 @@ fn metrics_query_schema_with_utf8_view(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -623,10 +626,7 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -744,9 +744,7 @@ impl TableBuilder {
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        let mut listing_options = ListingOptions::new(file_format);
 
         if self.sort_order.is_sorted() {
             // specify sort columns for parquet file
@@ -807,6 +805,7 @@ impl TableBuilder {
             self.index_condition.clone(),
             self.fst_fields.clone(),
             self.timestamp_filter,
+            target_partitions,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache.clone());
@@ -924,10 +923,14 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert!(!config.options().execution.enable_migration_aggregate);
         assert_eq!(
             config.options().execution.parquet.pushdown_filters,
             get_config().search.feature_pushdown_filter_enabled
@@ -1513,24 +1516,27 @@ mod tests {
                 row_group_size: None,
             }];
 
-            let result =
-                register_metrics_table(&session, schema, "test_table", files, FileSortOrder::None)
-                    .await;
+            let ctx = metrics_session_context(&session, FileSortOrder::None).await?;
+            register_metrics_table(
+                &ctx,
+                &session,
+                schema,
+                "test_table",
+                files,
+                FileSortOrder::None,
+            )
+            .await?;
 
-            // Should create context successfully
-            assert!(result.is_ok());
-            if let Ok(ctx) = result {
-                // Verify table is registered
-                assert!(
-                    ctx.catalog("datafusion")
-                        .unwrap()
-                        .schema("public")
-                        .unwrap()
-                        .table("test_table")
-                        .await
-                        .is_ok()
-                );
-            }
+            // Verify table is registered
+            assert!(
+                ctx.catalog("datafusion")
+                    .unwrap()
+                    .schema("public")
+                    .unwrap()
+                    .table("test_table")
+                    .await
+                    .is_ok()
+            );
 
             Ok(())
         }

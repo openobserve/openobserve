@@ -79,6 +79,7 @@ import { rangeFromQuery, periodToMinutes } from "@/composables/dbm/useDbmScope";
  */
 const CACHED_DBM_VIEWS = [
   "DbmDatabasesPage",
+  "DbmMetricsPage",
   "DbmQueriesPage",
   "DbmSamplesPage",
   "DbmActivityPage",
@@ -102,6 +103,7 @@ const CACHED_DBM_VIEWS = [
  */
 const DBM_TAB_STRIP_ROUTES = new Set([
   "dbmDatabases",
+  "dbmMetrics",
   "dbmQueries",
   "dbmSamples",
   "dbmActivity",

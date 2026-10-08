@@ -31,26 +31,37 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock external services and composables
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    createLogo: vi.fn(),
-    deleteLogo: vi.fn(),
-    updateCustomText: vi.fn(),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLogo: vi.fn(),
+      deleteLogo: vi.fn(),
+      updateCustomText: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/config", () => ({
-  default: {
-    get_config: vi.fn(),
-    get_config_full: vi.fn(),
-  },
-}));
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_config: vi.fn(),
+      get_config_full: vi.fn(),
+    },
+  });
+});
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({
@@ -76,6 +87,7 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
+import analytics from "@/services/product_analytics";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -348,6 +360,28 @@ describe("General", () => {
         variant: "error",
         message: "Server error",
       });
+    });
+
+    it("tracks org_general_settings_saved once the save succeeds", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).toHaveBeenCalledWith("org_general_settings_saved", {
+        custom_theme: false,
+      });
+    });
+
+    it("does not track org_general_settings_saved when the save fails", async () => {
+      mockOrganizations.post_organization_settings.mockRejectedValue({ message: "Server error" });
+
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
 
     it("should handle save error without message", async () => {

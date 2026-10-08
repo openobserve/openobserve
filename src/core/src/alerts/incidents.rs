@@ -31,11 +31,23 @@ use config::{
     utils::json::{Map, Value},
 };
 
+/// What `extract_service_name` returns when it finds no service.
+///
+/// Named because it is a sentinel and not a name. Routing must refuse it: an
+/// alert nobody can identify belongs in the unrouted queue, not on the pager of
+/// whichever team happens to own this string.
+const UNKNOWN_SERVICE: &str = "unknown";
+/// Window behind the alert in which a service-graph edge counts as a dependency.
+const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
+
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
     group_values: HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
     service_name: String,
+    /// `service_name` is the name of the stream this service was discovered in,
+    /// not anything about the service. Fine to show; never route on it.
+    service_name_from_stream: bool,
 }
 
 /// Result from filtered semantic extraction using distinguish_by groups
@@ -57,7 +69,9 @@ pub struct CorrelationSubject {
     pub org_id: String,
     pub kind: config::meta::alerts::incidents::AlertKind,
     pub base_destinations: Vec<String>,
-    /// Pre-mapped severity for external events; `None` → enterprise default (internal path)
+    /// Pre-mapped severity: external events carry their own; internal alerts
+    /// carry `alert.priority` mapped through `determine_severity`, when set.
+    /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
 }
 
@@ -267,8 +281,8 @@ fn extract_service_name_parallel(
     }
 
     // Priority 3: Default fallback
-    log::debug!("[incidents] No service name found in labels, using 'unknown'");
-    "unknown".to_string()
+    log::debug!("[incidents] No service name found in labels, using '{UNKNOWN_SERVICE}'");
+    UNKNOWN_SERVICE.to_string()
 }
 
 /// Collect the union of notification destinations from all alerts correlated to an incident.
@@ -291,7 +305,7 @@ async fn collect_incident_destinations(
         Ok(v) => v,
         Err(e) => {
             log::warn!(
-                "[incidents] Failed to fetch alert list for destination merge (incident {incident_id}): {e}"
+                "[incidents] Failed to fetch alert list for destination merge (incident {org_id}/{incident_id}): {e}"
             );
             return destinations;
         }
@@ -412,7 +426,7 @@ async fn send_incident_notifications_inner(
         Ok(s) => s,
         Err(e) => {
             log::error!(
-                "[incidents] Failed to serialize notification payload for {incident_id}: {e}"
+                "[incidents] Failed to serialize notification payload for {org_id}/{incident_id}: {e}"
             );
             return;
         }
@@ -443,7 +457,7 @@ async fn send_incident_notifications_inner(
                     Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
                     Err(e) => {
                         log::error!(
-                            "[incidents] Failed to notify {dest_name} for incident {incident_id}: {e}"
+                            "[incidents] Failed to notify {dest_name} for incident {org_id}/{incident_id}: {e}"
                         );
                         err_parts.push(format!("{dest_name}: {e}"));
                     }
@@ -451,7 +465,7 @@ async fn send_incident_notifications_inner(
             }
             Err(e) => {
                 log::error!(
-                    "[incidents] Destination {dest_name} not found for incident {incident_id}: {e}"
+                    "[incidents] Destination {dest_name} not found for incident {org_id}/{incident_id}: {e}"
                 );
                 err_parts.push(format!("{dest_name}: {e}"));
             }
@@ -465,7 +479,7 @@ async fn send_incident_notifications_inner(
         );
     } else {
         log::error!(
-            "[incidents] Notification partially failed for incident {incident_id} ({event}): {}",
+            "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {}",
             err_parts.join("; ")
         );
     }
@@ -480,7 +494,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
         Ok(v) => v,
         Err(e) => {
             log::warn!(
-                "[incidents] Failed to load alerts for severity notification (incident {incident_id}): {e}"
+                "[incidents] Failed to load alerts for severity notification (incident {org_id}/{incident_id}): {e}"
             );
             return;
         }
@@ -545,19 +559,7 @@ pub async fn correlate_alert_to_incident(
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
-    // Extract labels from result row as HashMap
-    let mut labels: HashMap<String, String> = result_row
-        .iter()
-        .filter_map(|(k, v)| {
-            let value_str = match v {
-                Value::String(s) => s.clone(),
-                Value::Number(n) => n.to_string(),
-                Value::Bool(b) => b.to_string(),
-                _ => return None,
-            };
-            Some((k.clone(), value_str))
-        })
-        .collect();
+    let mut labels = labels_from_row(result_row);
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
@@ -609,7 +611,8 @@ pub async fn correlate_alert_to_incident(
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] Alert {} has no group_values - isolated by alert_id",
+            "[incidents] Alert {}/{} has no group_values - isolated by alert_id",
+            alert.org_id,
             alert.name
         );
     }
@@ -632,6 +635,17 @@ pub async fn correlate_alert_to_incident(
             sem_result.group_values
         );
     }
+    // B-29: a P1 alert must open a P1 incident, not the eval_level default.
+    // `alert.priority` is the operator's stated urgency, so when it's set it
+    // wins over the Critical/Warning->P2/P3 fallback in `create_new_incident`
+    // — otherwise the incident dashboard's severity tiles silently undercount
+    // P1s for every alert that only defines a Critical tier.
+    let severity = alert.priority.and_then(|p| {
+        o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+            .parse()
+            .ok()
+    });
+
     // Build the correlation subject for the internal alert path.
     let subject = CorrelationSubject {
         id: alert.get_unique_key(),
@@ -639,7 +653,7 @@ pub async fn correlate_alert_to_incident(
         org_id: alert.org_id.to_string(),
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
-        severity: None,
+        severity,
     };
 
     // Find or create incident
@@ -655,48 +669,91 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
 
-    // AI credit deduction for incident creation (cloud only).
-    // Only deduct when a NEW incident is created — alerts joining an existing
-    // incident or repeated firings must not consume credits or post usage events.
-    #[cfg(feature = "cloud")]
-    if matches!(
-        outcome,
-        IncidentCorrelationOutcome::NewIncidentCreated { .. }
-    ) {
-        let deduction = crate::trial_quota::try_deduct(
+    // Only on creation: an alert joining an existing incident must not open a second record.
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated {
+        incident_id,
+        service_name,
+    } = &outcome
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
+        let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &alert.query_condition,
+            result_row,
+        );
+        // `is_some_and`, not `is_none_or`, or every unidentifiable alert routes on `unknown`.
+        let names_a_service = parallel_result
+            .service_discovery
+            .as_ref()
+            .is_some_and(|sd| !sd.service_name_from_stream);
+        // Belt and braces: the not-found value is a plain `String` that could reach routing.
+        if dimensions.is_empty()
+            && names_a_service
+            && !service_name.trim().is_empty()
+            && service_name != UNKNOWN_SERVICE
+        {
+            dimensions.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service_name.clone(),
+            );
+            log::debug!(
+                "[incidents] {}/{}: no identity fields in the result row; routing on the \
+                 correlated service `{service_name}`",
+                alert.org_id,
+                alert.name,
+            );
+        }
+        // Single-sourced with the alert path, or `creates_incident` changes how loudly it pages.
+        let priority = alert
+            .priority
+            .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
+        let title = alert.name.clone();
+        match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
-            crate::trial_quota::TrialQuotaFeature::NewIncident,
+            &incident_id.to_string(),
+            &title,
+            priority,
+            alert.oncall_team.as_deref(),
+            &dimensions,
         )
-        .await;
-
-        let usage_ctx = crate::trial_quota::AiUsageContext {
-            user_email: "system@openobserve.ai".to_string(),
-            incident_id: Some(outcome.incident_id().to_string()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
+        .await
+        {
+            // The blast radius hangs off whichever record actually paged, which here is this one.
+            Ok(Some(origin)) => {
+                // Without this, nothing can get from an incident to the record that paged.
+                if let Err(e) = infra::table::oncall_responses::attach_incident(
                     &alert.org_id,
-                    &usage_ctx,
-                    crate::trial_quota::TrialQuotaFeature::NewIncident,
-                );
-            }
-            Err(_) => {
-                let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                    &alert.org_id,
+                    &origin.id,
+                    &incident_id.to_string(),
                 )
-                .await;
-                if policy.allows_metered_overage() {
-                    crate::trial_quota::record_billable_ai_usage(
-                        &alert.org_id,
-                        &usage_ctx,
-                        crate::trial_quota::TrialQuotaFeature::NewIncident,
+                .await
+                {
+                    log::error!(
+                        "[incidents] could not link on-call record for {}/{incident_id}: {e}",
+                        alert.org_id
                     );
                 }
-                // Note: incident is already created at this point — we don't roll it
-                // back on quota exhaustion. The deduction failure is logged by try_deduct.
+
+                if let Err(e) = crate::alerts::scheduler::handlers::page_blast_radius(
+                    &alert.org_id,
+                    &origin,
+                    &dimensions,
+                )
+                .await
+                {
+                    log::error!(
+                        "[incidents] impacted paging failed for {}/{incident_id}: {e}",
+                        alert.org_id
+                    );
+                }
             }
+            Ok(None) => {}
+            Err(e) => log::error!(
+                "[incidents] on-call paging failed for {}/{incident_id}: {e}",
+                alert.org_id
+            ),
         }
     }
 
@@ -785,7 +842,7 @@ pub async fn correlate_external_event(
     if group_values.is_empty() {
         key_type = KeyType::AlertId;
         log::warn!(
-            "[incidents] External event '{}' has no group_values - isolated by alert_id",
+            "[incidents] External event '{}' has no group_values - isolated by alert_id, org_id: {org_id}",
             external.title
         );
     }
@@ -861,6 +918,69 @@ pub async fn correlate_external_event(
     Ok(Some(outcome))
 }
 
+/// Narrow on purpose: one member recovering is not the incident being over, and an acknowledged or
+/// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
+pub async fn resolve_alert_firing(
+    event: &config::meta::alerts::recovery::RecoveryEvent,
+) -> Result<(), anyhow::Error> {
+    let Some(incident_id) = event.incident_id.as_deref() else {
+        return Ok(());
+    };
+    infra::table::alert_incidents::resolve_alert_firings(
+        incident_id,
+        &event.alert_id,
+        event.recovered_at,
+    )
+    .await?;
+
+    // Published even when this region updated no rows: the receiver runs the same idempotent update
+    // against its own replica, which may still be behind.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && !config::get_config().common.local_mode
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_resolve_alert(
+            &event.org_id,
+            incident_id,
+            &event.alert_id,
+            event.recovered_at,
+        )
+        .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident resolve_alert: {e}");
+    }
+
+    let Some(incident) = infra::table::alert_incidents::get(&event.org_id, incident_id).await?
+    else {
+        return Ok(());
+    };
+    if incident.status == "resolved" {
+        return Ok(());
+    }
+    if incident.acknowledged_by.is_some() || incident.assigned_to.is_some() {
+        return Ok(());
+    }
+
+    let links = infra::table::alert_incidents::get_incident_alerts(incident_id).await?;
+    if links.is_empty() || links.iter().any(|l| l.resolved_at.is_none()) {
+        return Ok(());
+    }
+
+    update_status(
+        &event.org_id,
+        incident_id,
+        "resolved",
+        "system@openobserve.ai",
+    )
+    .await?;
+    log::info!(
+        "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
+        links.len()
+    );
+    Ok(())
+}
+
 /// Auto-resolve the open incident containing `external.id`, but only once every
 /// other `External`-kind alert already linked to that incident is also resolved
 /// in `external_alerts` — a single source clearing shouldn't close an incident
@@ -904,6 +1024,41 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     Ok(())
 }
 
+/// The scalar columns of a result row, as the labels correlation matches on.
+fn labels_from_row(row: &Map<String, Value>) -> HashMap<String, String> {
+    row.iter()
+        .filter_map(|(k, v)| {
+            let value_str = match v {
+                Value::String(s) => s.clone(),
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                _ => return None,
+            };
+            Some((k.clone(), value_str))
+        })
+        .collect()
+}
+
+/// The service the registry identifies this row as, when it identifies a real
+/// service.
+///
+/// For the alert path, which has no correlation of its own: an alert used to
+/// route differently depending on a checkbox about incidents, because only the
+/// incident path could reach the registry. `None` when the registry has nothing,
+/// or when the name it has is the stream a record arrived in — routing on that
+/// is routing on a table name.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn correlated_service_for_routing(
+    org_id: &str,
+    row: &Map<String, Value>,
+) -> Option<String> {
+    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    if found.service_name_from_stream || found.service_name.trim().is_empty() {
+        return None;
+    }
+    Some(found.service_name)
+}
+
 /// Query Service Discovery for group_values using the correlation API
 ///
 /// Uses ServiceStorage::correlate() for proper dimension matching
@@ -940,6 +1095,7 @@ async fn query_service_discovery_key(
                     group_values: response.matched_dimensions.clone(),
                     key_type: config::meta::alerts::incidents::KeyType::Primary,
                     service_name: response.service_name,
+                    service_name_from_stream: response.service_name_from_stream,
                 })
             }
             Ok(None) => {
@@ -1059,7 +1215,7 @@ async fn create_new_incident(
     // Initialize event timeline for new incident
     if let Err(e) = infra::table::incident_events::init(org_id, &incident.id).await {
         log::error!(
-            "[Incidents] Failed to init events for incident {}: {e}",
+            "[Incidents] Failed to init events for incident {org_id}/{}: {e}",
             incident.id
         );
     }
@@ -1100,7 +1256,7 @@ async fn create_new_incident(
     .await
     {
         log::error!(
-            "[Incidents] Failed to record alert event for incident {}: {e}",
+            "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
             incident.id
         );
     }
@@ -1144,7 +1300,9 @@ async fn create_new_incident(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident create: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish incident create: org_id: {org_id}, error: {e}"
+        );
     }
 
     spawn_topology_enrichment(
@@ -1159,56 +1317,86 @@ async fn create_new_incident(
     // Trigger immediate RCA for new incident.
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-        let o2_cfg = get_o2_config();
-
-        if o2_cfg.incidents.enabled
-            && o2_cfg.incidents.rca_enabled
-            && !o2_cfg.ai.agent_url.is_empty()
-        {
-            if let Err(e) = crate::incidents::append_event(
-                org_id,
-                &incident.id,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-            )
-            .await
-            {
-                log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {}: {e}",
-                    incident.id
-                );
-            }
-
-            let org_id_rca = org_id.to_string();
-            let incident_id_rca = incident.id.clone();
-            let handle = tokio::spawn(async move {
-                if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca.clone(),
-                    incident_id_rca.clone(),
-                    false,
-                    true,
-                    "system@openobserve.ai".to_string(),
-                    // First analysis for this incident — there is nothing to build on.
-                    false,
+        if rca_will_run(org_id, &incident.id).await {
+            #[cfg(feature = "cloud")]
+            let usage_permit = {
+                let usage_context = crate::trial_quota::AiUsageContext {
+                    user_email: "system@openobserve.ai".to_string(),
+                    incident_id: Some(incident.id.clone()),
+                    ..Default::default()
+                };
+                match crate::trial_quota::authorize_ai_usage(
+                    org_id,
+                    crate::trial_quota::TrialQuotaFeature::NewIncident,
+                    &usage_context,
                 )
                 .await
                 {
-                    log::debug!(
-                        "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
-                    );
-
-                    emit_analysis_failure(
-                        &org_id_rca,
-                        &incident_id_rca,
-                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
-                        "Background spawn failed",
-                        Some(&e),
-                    )
-                    .await;
+                    Ok(permit) => Some(permit),
+                    Err(error) => {
+                        log::info!(
+                            "[INCIDENTS::RCA] New incident {} retained without RCA: {error}",
+                            incident.id
+                        );
+                        // §6: no verdict is coming, so nothing may go on holding a page for one.
+                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                            org_id,
+                            &incident.id,
+                        )
+                        .await;
+                        None
+                    }
                 }
-                unregister_rca_task(&org_id_rca, &incident_id_rca);
-            });
-            register_rca_task(org_id, &incident.id, handle.abort_handle());
+            };
+            #[cfg(not(feature = "cloud"))]
+            let usage_permit = None;
+
+            if !cfg!(feature = "cloud") || usage_permit.is_some() {
+                if let Err(e) = crate::incidents::append_event(
+                    org_id,
+                    &incident.id,
+                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                )
+                .await
+                {
+                    log::error!(
+                        "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{}: {e}",
+                        incident.id
+                    );
+                }
+
+                let org_id_rca = org_id.to_string();
+                let incident_id_rca = incident.id.clone();
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = trigger_rca_for_incident(
+                        org_id_rca.clone(),
+                        incident_id_rca.clone(),
+                        false,
+                        true,
+                        "system@openobserve.ai".to_string(),
+                        // First analysis for this incident — there is nothing to build on.
+                        false,
+                        usage_permit,
+                    )
+                    .await
+                    {
+                        log::debug!(
+                            "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
+                        );
+
+                        emit_analysis_failure(
+                            &org_id_rca,
+                            &incident_id_rca,
+                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                            "Background spawn failed",
+                            Some(&e),
+                        )
+                        .await;
+                    }
+                    unregister_rca_task(&org_id_rca, &incident_id_rca);
+                });
+                register_rca_task(org_id, &incident.id, handle.abort_handle());
+            }
         }
     }
 
@@ -1261,7 +1449,7 @@ async fn find_or_create_incident(
             .await
             {
                 log::error!(
-                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     incident.id
                 );
             }
@@ -1294,11 +1482,20 @@ async fn find_or_create_incident(
             // silence layer explicitly let this delivery through, and
             // suppressing it here would lose the only page for the
             // escalation.
+            //
+            // B-29: `subject.severity` (alert.priority, when set) is the same
+            // precedence signal `create_new_incident` uses and takes the same
+            // priority here — otherwise a P1 alert repeating against an
+            // incident it didn't create could be capped at the eval_level
+            // default (P2) instead of escalating to the priority it's
+            // actually configured for.
             use config::meta::alerts::incidents::{IncidentEvent, IncidentSeverity};
-            let level_severity = eval_level.and_then(|l| match l {
-                config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
-                config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
-                _ => None,
+            let level_severity = subject.severity.or_else(|| {
+                eval_level.and_then(|l| match l {
+                    config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
+                    config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
+                    _ => None,
+                })
             });
             // P1 is most urgent; higher urgency = escalation.
             let urgency = |s: IncidentSeverity| match s {
@@ -1329,7 +1526,7 @@ async fn find_or_create_incident(
                 .await
                 {
                     log::error!(
-                        "[Incidents] Failed to record severity-upgrade event for incident {}: {e}",
+                        "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
                         incident.id
                     );
                 }
@@ -1402,7 +1599,7 @@ async fn find_or_create_incident(
             .await
             {
                 log::error!(
-                    "[Incidents] Failed to record alert event for incident {}: {e}",
+                    "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
                     existing.id
                 );
             }
@@ -1451,7 +1648,9 @@ async fn find_or_create_incident(
                 )
                 .await
                 {
-                    log::error!("[Incidents] Failed to record dimensions upgrade event: {e}");
+                    log::error!(
+                        "[Incidents] Failed to record dimensions upgrade event: org_id: {org_id}, error: {e}"
+                    );
                 }
             } else if dimensions_changed {
                 infra::table::alert_incidents::update_incident_metadata(
@@ -1481,7 +1680,9 @@ async fn find_or_create_incident(
                     )
                     .await
             {
-                log::error!("[SUPER_CLUSTER] Failed to publish incident add_alert: {e}");
+                log::error!(
+                    "[SUPER_CLUSTER] Failed to publish incident add_alert: org_id: {org_id}, error: {e}"
+                );
             }
 
             spawn_topology_enrichment(
@@ -1504,41 +1705,79 @@ async fn find_or_create_incident(
                     let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
                         .await
                         .unwrap_or_default();
-                    if !is_analysis_in_flight(&events, cooldown * 2) {
-                        let _ = crate::incidents::append_event(
-                            &org_id_rca,
-                            &incident_id_rca,
-                            config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                        )
-                        .await;
-                        let handle = tokio::spawn(async move {
-                            if let Err(e) = trigger_rca_for_incident(
-                                org_id_rca.clone(),
-                                incident_id_rca.clone(),
-                                true,
-                                true,
-                                "system@openobserve.ai".to_string(),
-                                // Fresh analysis: a new alert type changes the picture,
-                                // so the agent should reassess rather than extend.
-                                false,
+                    if !is_analysis_in_flight(&events, cooldown * 2)
+                        && rca_will_run(&org_id_rca, &incident_id_rca).await
+                    {
+                        #[cfg(feature = "cloud")]
+                        let usage_permit = {
+                            let usage_context = crate::trial_quota::AiUsageContext {
+                                user_email: "system@openobserve.ai".to_string(),
+                                incident_id: Some(incident_id_rca.clone()),
+                                ..Default::default()
+                            };
+                            match crate::trial_quota::authorize_ai_usage(
+                                &org_id_rca,
+                                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                                &usage_context,
                             )
                             .await
                             {
-                                log::debug!(
-                                    "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
-                                );
-
-                                emit_analysis_failure(
-                                    &org_id_rca,
-                                    &incident_id_rca,
-                                    config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
-                                    "Reanalysis trigger failed",
-                                    Some(&e),
-                                ).await;
+                                Ok(permit) => Some(permit),
+                                Err(error) => {
+                                    log::info!(
+                                        "[INCIDENTS::RCA] Skipping new-alert reanalysis for {incident_id_rca}: {error}"
+                                    );
+                                    // §6: no verdict is coming, so nothing may go on holding a page
+                                    // for one.
+                                    o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                                        &org_id_rca,
+                                        &incident_id_rca,
+                                    )
+                                    .await;
+                                    None
+                                }
                             }
-                            unregister_rca_task(&org_id_rca, &incident_id_rca);
-                        });
-                        register_rca_task(org_id, &existing.id, handle.abort_handle());
+                        };
+                        #[cfg(not(feature = "cloud"))]
+                        let usage_permit = None;
+
+                        if !cfg!(feature = "cloud") || usage_permit.is_some() {
+                            let _ = crate::incidents::append_event(
+                                &org_id_rca,
+                                &incident_id_rca,
+                                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                            )
+                            .await;
+                            let handle = tokio::spawn(async move {
+                                if let Err(e) = trigger_rca_for_incident(
+                                    org_id_rca.clone(),
+                                    incident_id_rca.clone(),
+                                    true,
+                                    true,
+                                    "system@openobserve.ai".to_string(),
+                                    // Fresh analysis: a new alert type changes the picture,
+                                    // so the agent should reassess rather than extend.
+                                    false,
+                                    usage_permit,
+                                )
+                                .await
+                                {
+                                    log::debug!(
+                                        "[INCIDENTS::RCA] Reanalysis trigger failed for {incident_id_rca}: {e}"
+                                    );
+
+                                    emit_analysis_failure(
+                                        &org_id_rca,
+                                        &incident_id_rca,
+                                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis,
+                                        "Reanalysis trigger failed",
+                                        Some(&e),
+                                    ).await;
+                                }
+                                unregister_rca_task(&org_id_rca, &incident_id_rca);
+                            });
+                            register_rca_task(org_id, &existing.id, handle.abort_handle());
+                        }
                     } else {
                         log::debug!(
                             "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping NewAlertTypeJoined trigger"
@@ -1594,7 +1833,8 @@ pub async fn get_incident_with_alerts(
     let actual_count = incident_alerts.len() as i32;
     if incident_data.alert_count != actual_count {
         log::warn!(
-            "[incidents] Incident {} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            "[incidents] Incident {}/{} alert_count mismatch: stored={}, actual={}. Using actual count.",
+            org_id,
             incident_id,
             incident_data.alert_count,
             actual_count
@@ -1651,7 +1891,8 @@ pub async fn get_incident_with_alerts(
             }
             Err(e) => {
                 log::warn!(
-                    "[incidents] Failed to fetch external alert details for incident {}: {}",
+                    "[incidents] Failed to fetch external alert details for incident {}/{}: {}",
+                    incident_org_id,
                     incident_id,
                     e
                 );
@@ -1694,14 +1935,16 @@ pub async fn get_incident_with_alerts(
                             }
                             Ok(None) => {
                                 log::warn!(
-                                    "Failed to fetch alert details for {}: {}",
+                                    "Failed to fetch alert details for {}/{}: {}",
+                                    incident_org_id,
                                     trigger.alert_id,
                                     e
                                 );
                             }
                             Err(composite_error) => {
                                 log::warn!(
-                                    "Failed to fetch composite details for {}: {}",
+                                    "Failed to fetch composite details for {}/{}: {}",
+                                    incident_org_id,
                                     trigger.alert_id,
                                     composite_error
                                 );
@@ -1778,8 +2021,6 @@ pub async fn enrich_with_topology(
     use AlertNode;
     use EdgeType;
 
-    use crate::traces::service_graph;
-
     // Get current topology or create new
     let mut topology = infra::table::alert_incidents::get_topology(org_id, incident_id)
         .await?
@@ -1855,40 +2096,13 @@ pub async fn enrich_with_topology(
             let edge_type = if is_same_service {
                 EdgeType::Temporal
             } else {
-                // Query service graph to check for a known dependency
-                let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None, None,
+                dependency_edge_type(
+                    org_id,
+                    &topology.nodes[prev_idx].service_name,
+                    &topology.nodes[current_node_index].service_name,
+                    alert_fired_at,
                 )
                 .await
-                {
-                    Ok(e) => e,
-                    Err(e) => {
-                        log::debug!(
-                            "[incidents] Service graph query failed: {e}, defaulting to temporal edge"
-                        );
-                        vec![]
-                    }
-                };
-
-                let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
-                    o2_enterprise::enterprise::service_graph::build_topology(
-                        raw_sg_edges,
-                        std::collections::HashMap::new(),
-                    )
-                } else {
-                    (vec![], vec![])
-                };
-
-                let has_sg_edge = sg_topo_edges.iter().any(|e| {
-                    e.from.as_deref() == Some(&*topology.nodes[prev_idx].service_name)
-                        && e.to == topology.nodes[current_node_index].service_name
-                });
-
-                if has_sg_edge {
-                    EdgeType::ServiceDependency
-                } else {
-                    EdgeType::Temporal
-                }
             };
 
             topology.edges.push(AlertEdge {
@@ -1915,6 +2129,67 @@ pub async fn enrich_with_topology(
     );
 
     Ok(())
+}
+
+/// Whether the service graph knows the `from -> to` dependency around `at`.
+async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
+    if crate::traces::service_graph::use_v4_source(org_id, None).await {
+        dependency_edge_type_v4(org_id, from, to, at).await
+    } else {
+        dependency_edge_type_v1(org_id, from, to).await
+    }
+}
+
+/// One forward instant query at the alert time; a name the escaper refuses is not a dependency.
+async fn dependency_edge_type_v4(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
+    use crate::traces::service_graph::v4::read::{
+        edge_type_from, instant, q_edge_exists, scalar_sum,
+    };
+
+    let Ok(forward) = q_edge_exists(from, to, INCIDENT_EDGE_RANGE_SECS) else {
+        return EdgeType::Temporal;
+    };
+    match instant(org_id, &forward, at).await {
+        Ok(rows) => edge_type_from(scalar_sum(&rows)),
+        Err(e) => {
+            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
+            EdgeType::Temporal
+        }
+    }
+}
+
+async fn dependency_edge_type_v1(org_id: &str, from: &str, to: &str) -> EdgeType {
+    // Query service graph to check for a known dependency
+    let raw_sg_edges = match crate::traces::service_graph::query_edges_from_stream_internal(
+        org_id, None, None, None, None,
+    )
+    .await
+    {
+        Ok(e) => e,
+        Err(e) => {
+            log::debug!("[incidents] Service graph query failed: {e}, defaulting to temporal edge");
+            vec![]
+        }
+    };
+
+    let (_, sg_topo_edges) = if !raw_sg_edges.is_empty() {
+        o2_enterprise::enterprise::service_graph::build_topology(
+            raw_sg_edges,
+            std::collections::HashMap::new(),
+        )
+    } else {
+        (vec![], vec![])
+    };
+
+    let has_sg_edge = sg_topo_edges
+        .iter()
+        .any(|e| e.from.as_deref() == Some(from) && e.to == to);
+
+    if has_sg_edge {
+        EdgeType::ServiceDependency
+    } else {
+        EdgeType::Temporal
+    }
 }
 
 /// Trigger RCA for a single incident immediately after creation
@@ -2091,9 +2366,27 @@ async fn emit_analysis_failure(
     .await
     {
         log::error!(
-            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {incident_id}: {e}"
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisFailed event for {org_id}/{incident_id}: {e}"
         );
     }
+}
+
+/// Whether `trigger_rca_for_incident` would reach the agent for this incident. Callers check this
+/// before authorizing AI usage so a run the trigger would skip is never charged. When it returns
+/// false no verdict is coming, so any triage hold is released here.
+#[cfg(feature = "enterprise")]
+pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
+    use o2_enterprise::enterprise::{alerts::rca_service, common::config::get_config};
+
+    let cfg = get_config();
+    let will_run = cfg.incidents.enabled
+        && cfg.incidents.rca_enabled
+        && cfg.ai.has_agent_target()
+        && !rca_service::l0_off_for_incident(org_id, incident_id).await;
+    if !will_run {
+        rca_service::skip_analysis_for_incident(org_id, incident_id).await;
+    }
+    will_run
 }
 
 #[cfg(feature = "enterprise")]
@@ -2109,12 +2402,16 @@ pub async fn trigger_rca_for_incident(
     begin_already_emitted: bool,
     // Email of the user who triggered the analysis, used for AI usage tracking.
     // For automated/system-initiated calls, use "system@openobserve.ai".
-    _user_email: String,
+    user_email: String,
     // When true, the previous report is sent to the agent so it extends that analysis.
     // Automatic triggers pass false so each run stands on its own.
     build_on_previous: bool,
+    // A caller that emits Begin before spawning must authorize synchronously and
+    // pass this one-shot proof so the spawned task cannot meter twice.
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))] usage_permit: Option<
+        crate::AiUsagePermit,
+    >,
 ) -> Result<(), anyhow::Error> {
-    use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
     };
@@ -2124,11 +2421,39 @@ pub async fn trigger_rca_for_incident(
     // Check if RCA is enabled and configured
     if !config.incidents.enabled || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Ok(()); // Not an error - just not configured
     }
 
-    if config.ai.agent_url.is_empty() {
+    if !config.ai.has_agent_target() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
+        return Ok(());
+    }
+
+    // I20: the run must be refused here — before the billable agent call below — or `Off` only
+    // stops the ladder from waiting while the agent still runs and still bills.
+    if o2_enterprise::enterprise::alerts::rca_service::l0_off_for_incident(&org_id, &incident_id)
+        .await
+    {
+        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, skipping trigger");
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Ok(());
     }
 
@@ -2146,12 +2471,26 @@ pub async fn trigger_rca_for_incident(
         // In-flight guard: always enforced, even for user-initiated reanalysis
         if is_analysis_in_flight(&events, stale_threshold) {
             log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
+            // §6: no verdict is coming, so nothing may go on holding a page for
+            // one. Every guard below reaches this same state.
+            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                &org_id,
+                &incident_id,
+            )
+            .await;
             return Ok(());
         }
 
         // Cooldown gate: skip for user-initiated reanalysis (reanalysis=true bypasses it)
         if !reanalysis && !cooldown_elapsed(&events, cooldown) {
             log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
+            // §6: no verdict is coming, so nothing may go on holding a page for
+            // one. Every guard below reaches this same state.
+            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                &org_id,
+                &incident_id,
+            )
+            .await;
             return Ok(());
         }
     }
@@ -2160,13 +2499,42 @@ pub async fn trigger_rca_for_incident(
     let incident = match infra::table::alert_incidents::get(&org_id, &incident_id).await? {
         Some(inc) => inc,
         None => {
-            log::warn!("[INCIDENTS::RCA] Incident {incident_id} not found");
+            log::warn!("[INCIDENTS::RCA] Incident {org_id}/{incident_id} not found");
             return Err(anyhow::anyhow!("Incident not found"));
         }
     };
 
     log::info!(
         "[INCIDENTS::RCA] Triggering RCA for incident {incident_id} (reanalysis={reanalysis})"
+    );
+
+    #[cfg(feature = "cloud")]
+    let usage_permit = match usage_permit {
+        Some(permit) => permit,
+        None => {
+            let feature = if reanalysis {
+                crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+            } else {
+                crate::trial_quota::TrialQuotaFeature::NewIncident
+            };
+            let usage_context = crate::trial_quota::AiUsageContext {
+                user_email: user_email.clone(),
+                incident_id: Some(incident_id.clone()),
+                ..Default::default()
+            };
+            crate::trial_quota::authorize_ai_usage(&org_id, feature, &usage_context)
+                .await
+                .map_err(|error| anyhow::anyhow!(error))?
+        }
+    };
+    #[cfg(feature = "cloud")]
+    debug_assert_eq!(
+        usage_permit.feature(),
+        if reanalysis {
+            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
+        } else {
+            crate::trial_quota::TrialQuotaFeature::NewIncident
+        }
     );
 
     // Emit AIAnalysisBegin only when the caller hasn't already done so
@@ -2178,49 +2546,13 @@ pub async fn trigger_rca_for_incident(
         )
         .await
     {
-        log::error!("[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {incident_id}: {e}");
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
+        );
     }
 
-    // AI credit check for reanalysis (cloud only)
-    #[cfg(feature = "cloud")]
-    if reanalysis {
-        let deduction = crate::trial_quota::try_deduct(
-            &org_id,
-            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-        )
-        .await;
-
-        let usage_ctx = crate::trial_quota::AiUsageContext {
-            user_email: _user_email.clone(),
-            incident_id: Some(incident_id.clone()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
-                    &org_id,
-                    &usage_ctx,
-                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                );
-            }
-            Err(e) => {
-                let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-                    &org_id,
-                )
-                .await;
-                if policy.allows_metered_overage() {
-                    crate::trial_quota::record_billable_ai_usage(
-                        &org_id,
-                        &usage_ctx,
-                        crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                    );
-                } else {
-                    log::info!("[INCIDENTS::RCA] Skipping reanalysis for org {org_id}: {e}");
-                    return Ok(());
-                }
-            }
-        }
-    }
+    // Authorization and metering happen before Begin, either synchronously in
+    // the caller or directly above. No quota work occurs after the lifecycle starts.
 
     // Create RCA agent client with SA credentials
     let (email, token) = crate::organization::get_sre_agent_credentials(&org_id).await?;
@@ -2232,34 +2564,61 @@ pub async fn trigger_rca_for_incident(
     // Quick health check
     if let Err(e) = client.health(&auth_header).await {
         log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Err(anyhow::anyhow!("RCA agent not available: {}", e));
     }
 
     // Analyze incident
-    match client
-        .analyze_incident(&incident, &auth_header, build_on_previous)
-        .await
-    {
+    // `build_on_previous` opts into continuity: the prior report is sent so the
+    // agent extends it rather than starting over. Extracted via typed
+    // `IncidentTopology` (same deserialization path used by `save_rca_result`)
+    // so field renames are caught at compile time.
+    let previous_analysis: Option<String> = if build_on_previous {
+        incident
+            .topology_context
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<IncidentTopology>(v.clone()).ok())
+            .and_then(|t| t.suggested_root_cause)
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+    // §7/C1: the single builder, so this and the manual endpoint cannot tell
+    // the agent different things about the same incident.
+    let context = o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
+        &org_id,
+        &incident_id,
+        previous_analysis,
+    )
+    .await;
+    match client.analyze_incident(context, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
                 rca_result.len()
             );
 
-            // Update topology_context with the new report, archiving the previous one
-            let mut topology = incident
-                .topology_context
-                .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx).ok())
-                .unwrap_or_default();
-
-            topology.record_rca_result(rca_result, config.incidents.rca_history_limit);
-
-            if let Err(e) =
-                infra::table::alert_incidents::update_topology(&org_id, &incident_id, &topology)
-                    .await
+            // §2.2: the report and the verdict are read once, by the single
+            // writer. Writing `topology_context` here instead is what left the
+            // autonomous run — the one that IS L0 acting — with an answer no
+            // ladder could ever see.
+            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_result(
+                &org_id,
+                &incident_id,
+                &rca_result,
+            )
+            .await
             {
-                log::error!("[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}");
-                return Err(e.into());
+                log::error!(
+                    "[INCIDENTS::RCA] Failed to save RCA result for {org_id}/{incident_id}: {e}"
+                );
+                return Err(e);
             }
 
             // Emit AIAnalysisComplete on success
@@ -2271,21 +2630,20 @@ pub async fn trigger_rca_for_incident(
             .await
             {
                 log::error!(
-                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {incident_id}: {e}"
+                    "[INCIDENTS::RCA] Failed to emit AIAnalysisComplete for {org_id}/{incident_id}: {e}"
                 );
             }
 
-            // Reanalysis usage reporting is handled by the try_deduct
-            // quota block earlier in this function (paid orgs only).
+            // Authorization and usage reporting completed before AIAnalysisBegin.
 
             Ok(())
         }
         Err(e) => {
-            log::warn!("[INCIDENTS::RCA] RCA failed for {incident_id}: {e}");
+            log::warn!("[INCIDENTS::RCA] RCA failed for {org_id}/{incident_id}: {e}");
 
             // Determine trigger type based on function context
             let trigger_type = if reanalysis {
-                if _user_email == "system@openobserve.ai" {
+                if user_email == "system@openobserve.ai" {
                     config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReanalysis
                 } else {
                     config::meta::alerts::incidents::AnalysisTriggerType::Manual
@@ -2337,6 +2695,8 @@ fn model_to_incident_with_topology(
         alert_count: db_model.alert_count,
         title: db_model.title,
         assigned_to: db_model.assigned_to,
+        acknowledged_by: db_model.acknowledged_by,
+        acknowledged_at: db_model.acknowledged_at,
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
         group_values: db_model.group_values,
@@ -2352,7 +2712,28 @@ pub async fn update_status(
     status: &str,
     user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
-    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+    // Acknowledging goes through a dedicated atomic path so the actor and
+    // timestamp land on the row itself (not just the event log) and a
+    // second/concurrent acknowledge can't silently overwrite the first
+    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    let updated = if status == "acknowledged" {
+        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
+    } else {
+        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
+    };
+
+    // Every resolution path lands here, so closing the record once covers all of them.
+    #[cfg(feature = "enterprise")]
+    if status == "resolved"
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Err(e) =
+            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
+                .await
+    {
+        log::error!("[incidents] on-call recovery failed for {org_id}/{incident_id}: {e}");
+    }
 
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
@@ -2365,7 +2746,7 @@ pub async fn update_status(
     if let Some(evt) = event
         && let Err(e) = crate::incidents::append_event(org_id, incident_id, evt).await
     {
-        log::error!("[Incidents] Failed to record status event: {e}");
+        log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
 
     // Trigger RCA reanalysis when incident is reopened — context is fresh,
@@ -2380,42 +2761,79 @@ pub async fn update_status(
         let events = infra::table::incident_events::get(&org_id_rca, &incident_id_rca)
             .await
             .unwrap_or_default();
-        if !is_analysis_in_flight(&events, cooldown * 2) {
-            // Emit Begin synchronously so the frontend sees it on the next poll
-            let _ = crate::incidents::append_event(
-                &org_id_rca,
-                &incident_id_rca,
-                config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-            )
-            .await;
-            let handle = tokio::spawn(async move {
-                // reanalysis on reopen: deduct credits and report usage;
-                // begin_already_emitted=true skips cooldown/in-flight guards
-                if let Err(e) = trigger_rca_for_incident(
-                    org_id_rca.clone(),
-                    incident_id_rca.clone(),
-                    true, // reanalysis — deduct credits and report usage
-                    true, // begin already emitted above
-                    "system@openobserve.ai".to_string(),
-                    // Reopened incidents get a fresh read of the current state.
-                    false,
+        if !is_analysis_in_flight(&events, cooldown * 2)
+            && rca_will_run(&org_id_rca, &incident_id_rca).await
+        {
+            #[cfg(feature = "cloud")]
+            let usage_permit = {
+                let usage_context = crate::trial_quota::AiUsageContext {
+                    user_email: "system@openobserve.ai".to_string(),
+                    incident_id: Some(incident_id_rca.clone()),
+                    ..Default::default()
+                };
+                match crate::trial_quota::authorize_ai_usage(
+                    &org_id_rca,
+                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+                    &usage_context,
                 )
                 .await
                 {
-                    log::debug!("[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}");
-
-                    emit_analysis_failure(
-                        &org_id_rca,
-                        &incident_id_rca,
-                        config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
-                        "Reanalysis after reopen failed",
-                        Some(&e),
-                    )
-                    .await;
+                    Ok(permit) => Some(permit),
+                    Err(error) => {
+                        log::info!(
+                            "[INCIDENTS::RCA] Reopened incident {incident_id_rca} retained without reanalysis: {error}"
+                        );
+                        // §6: no verdict is coming, so nothing may go on holding a page for one.
+                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                            &org_id_rca,
+                            &incident_id_rca,
+                        )
+                        .await;
+                        None
+                    }
                 }
-                unregister_rca_task(&org_id_rca, &incident_id_rca);
-            });
-            register_rca_task(org_id, incident_id, handle.abort_handle());
+            };
+            #[cfg(not(feature = "cloud"))]
+            let usage_permit = None;
+
+            if !cfg!(feature = "cloud") || usage_permit.is_some() {
+                // Emit Begin synchronously so the frontend sees it on the next poll.
+                let _ = crate::incidents::append_event(
+                    &org_id_rca,
+                    &incident_id_rca,
+                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+                )
+                .await;
+                let handle = tokio::spawn(async move {
+                    if let Err(e) = trigger_rca_for_incident(
+                        org_id_rca.clone(),
+                        incident_id_rca.clone(),
+                        true,
+                        true,
+                        "system@openobserve.ai".to_string(),
+                        // Reopened incidents get a fresh read of the current state.
+                        false,
+                        usage_permit,
+                    )
+                    .await
+                    {
+                        log::debug!(
+                            "[INCIDENTS::RCA] Reanalysis trigger failed after Reopened: {e}"
+                        );
+
+                        emit_analysis_failure(
+                            &org_id_rca,
+                            &incident_id_rca,
+                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticReopened,
+                            "Reanalysis after reopen failed",
+                            Some(&e),
+                        )
+                        .await;
+                    }
+                    unregister_rca_task(&org_id_rca, &incident_id_rca);
+                });
+                register_rca_task(org_id, incident_id, handle.abort_handle());
+            }
         } else {
             log::debug!(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id_rca}, skipping Reopened trigger"
@@ -2435,7 +2853,9 @@ pub async fn update_status(
         )
         .await
     {
-        log::error!("[SUPER_CLUSTER] Failed to publish incident update_status: {e}");
+        log::error!(
+            "[SUPER_CLUSTER] Failed to publish incident update_status: org_id: {org_id}, error: {e}"
+        );
     }
 
     model_to_incident(updated).await
@@ -2466,7 +2886,9 @@ pub async fn update_title(
         )
         .await
     {
-        log::error!("[Incidents] Failed to record title change event: {e}");
+        log::error!(
+            "[Incidents] Failed to record title change event: org_id: {org_id}, error: {e}"
+        );
     }
 
     model_to_incident(updated).await
@@ -2503,7 +2925,9 @@ pub async fn update_severity(
         )
         .await
         {
-            log::error!("[Incidents] Failed to record severity event: {e}");
+            log::error!(
+                "[Incidents] Failed to record severity event: org_id: {org_id}, error: {e}"
+            );
         }
         send_incident_severity_notification(org_id, incident_id).await;
     }
@@ -2514,6 +2938,66 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The incident path and the alert path page the same person about the same
+    /// alert, so an unset priority has to mean the same thing on both. They used
+    /// to differ — P2 here, P3 in `scheduler::handlers` — which made
+    /// `creates_incident` a hidden severity switch.
+    #[test]
+    fn test_the_incident_path_uses_the_shared_default_priority() {
+        assert_eq!(
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            config::meta::alerts::priority::AlertPriority::P2,
+            "the shared default must stay the louder of the two"
+        );
+    }
+
+    /// B-29: a P1 alert must map to a P1 incident severity, not the eval_level
+    /// default. This is the exact mapping `correlate_alert_to_incident` uses to
+    /// pre-populate `CorrelationSubject.severity` for the internal alert path.
+    #[test]
+    fn test_alert_priority_maps_to_incident_severity() {
+        use config::meta::alerts::{incidents::IncidentSeverity, priority::AlertPriority};
+
+        let map = |p: AlertPriority| -> Option<IncidentSeverity> {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+                .parse()
+                .ok()
+        };
+
+        assert_eq!(map(AlertPriority::P1), Some(IncidentSeverity::P1));
+        assert_eq!(map(AlertPriority::P2), Some(IncidentSeverity::P2));
+        assert_eq!(map(AlertPriority::P4), Some(IncidentSeverity::P4));
+
+        // The two that reach the mapping's default arm, and so were the two it
+        // could get wrong unnoticed. P5 mapped to P3 until 2026-08-24 — the
+        // least urgent priority opening a more severe incident than P4 does.
+        assert_eq!(map(AlertPriority::P3), Some(IncidentSeverity::P3));
+        assert_eq!(map(AlertPriority::P5), Some(IncidentSeverity::P4));
+
+        // Five priorities into four severities, and the ordering has to survive
+        // the join: a less urgent alert must never open a more severe incident.
+        let rank = |s: IncidentSeverity| match s {
+            IncidentSeverity::P1 => 4,
+            IncidentSeverity::P2 => 3,
+            IncidentSeverity::P3 => 2,
+            IncidentSeverity::P4 => 1,
+        };
+        let ranks: Vec<i32> = [
+            AlertPriority::P1,
+            AlertPriority::P2,
+            AlertPriority::P3,
+            AlertPriority::P4,
+            AlertPriority::P5,
+        ]
+        .into_iter()
+        .map(|p| rank(map(p).expect("every priority maps")))
+        .collect();
+        assert!(
+            ranks.windows(2).all(|w| w[0] >= w[1]),
+            "severity must not increase as priority falls: {ranks:?}"
+        );
+    }
 
     #[test]
     fn test_merge_dimensions_adds_new_keys() {
@@ -2620,6 +3104,7 @@ mod tests {
             group_values: [("ns".to_string(), "prod".to_string())].into(),
             key_type: KeyType::Primary,
             service_name: "svc-a".to_string(),
+            service_name_from_stream: false,
         };
         let sem = FilteredSemanticResult {
             group_values: [("region".to_string(), "us-east".to_string())].into(),
@@ -2660,6 +3145,7 @@ mod tests {
             group_values: HashMap::new(),
             key_type: KeyType::Primary,
             service_name: "payment-service".to_string(),
+            service_name_from_stream: false,
         };
         let labels = HashMap::new();
         let name = extract_service_name_parallel(&labels, &Some(sd));
@@ -2677,6 +3163,44 @@ mod tests {
     #[test]
     fn test_extract_service_name_defaults_to_unknown() {
         let name = extract_service_name_parallel(&HashMap::new(), &None);
-        assert_eq!(name, "unknown");
+        assert_eq!(name, UNKNOWN_SERVICE);
+    }
+
+    /// The not-found value is a sentinel, and routing must never treat it as a
+    /// service. It used to: an org whose registry answered nothing routed every
+    /// unidentifiable alert on this literal, so all of them landed on whichever
+    /// team owned the phantom name `unknown`.
+    ///
+    /// Two halves to the guard: `names_a_service` asks `is_some_and`, so no
+    /// discovery answer means no service, and the comparison against
+    /// `UNKNOWN_SERVICE` catches discovery answering and still finding nothing.
+    #[test]
+    fn test_the_not_found_service_never_becomes_a_routing_dimension() {
+        let absent: Option<ServiceDiscoveryResult> = None;
+        assert!(
+            !absent
+                .as_ref()
+                .is_some_and(|sd| !sd.service_name_from_stream),
+            "no discovery answer must not read as naming a service"
+        );
+
+        let from_stream = Some(ServiceDiscoveryResult {
+            group_values: HashMap::new(),
+            key_type: config::meta::alerts::incidents::KeyType::Primary,
+            service_name: "app_logs".to_string(),
+            service_name_from_stream: true,
+        });
+        assert!(
+            !from_stream
+                .as_ref()
+                .is_some_and(|sd| !sd.service_name_from_stream),
+            "a stream name is a table name, not a service"
+        );
+
+        assert_eq!(
+            extract_service_name_parallel(&HashMap::new(), &None),
+            UNKNOWN_SERVICE,
+            "the guard compares against this exact value, so the two must agree"
+        );
     }
 }

@@ -16,7 +16,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
 import { gt } from "@/types/i18n";
-import segment from "@/services/segment_analytics";
+import { openobserveRum } from "@openobserve/browser-rum";
 import config from "@/aws-exports";
 
 import userCloudRoutes from "@/enterprise/composables/router";
@@ -83,10 +83,12 @@ export default function (store: any) {
     // are module-scope, so translating where a route is declared would freeze the
     // tab title at whatever locale happened to be active at import time. Resolving
     // here — per navigation — keeps it in the current locale. `gt` (not `t`)
-    // because a navigation guard runs outside any component setup.
-    if (to.meta && to.meta.titleKey) {
+    // because a navigation guard runs outside any component setup. `title` is the
+    // English literal fallback the routes not yet migrated to `titleKey` still carry.
+    const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
+    if (routeTitle) {
       // The brand prefix is a product noun, never translated; the page name is.
-      document.title = `OpenObserve - ${gt(to.meta.titleKey)}`;
+      document.title = `OpenObserve - ${routeTitle}`;
     } else {
       document.title = "OpenObserve";
     }
@@ -133,13 +135,13 @@ export default function (store: any) {
       }
     } else {
       getDecodedUserInfo();
-
-      segment.track("page view", {
-        path: to.path,
-        referrer: from.path,
-      });
       next();
     }
+  });
+
+  // Route names keep RUM view names low-cardinality; paths embed entity ids.
+  router.afterEach((to: any, _from: any, failure: any) => {
+    if (!failure && to.name) openobserveRum.setViewName(String(to.name));
   });
   return router;
 }

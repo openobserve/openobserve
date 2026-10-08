@@ -79,11 +79,14 @@ vi.mock("../../services/search", () => {
   };
 });
 
-vi.mock("../../services/saved_views", () => ({
-  default: {
-    get: vi.fn().mockImplementation(() => Promise.resolve()),
-  },
-}));
+vi.mock("../../services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn().mockImplementation(() => Promise.resolve()),
+    },
+  });
+});
 
 // Mock getStreams and getStream functions
 const mockGetStreams = vi.fn();
@@ -2498,6 +2501,26 @@ describe("Use Logs Composable", () => {
         "user = 'alice'",
       );
     });
+
+    // Regression: the Logs page's own include/exclude filter builder (distinct
+    // from the sidebar's) must double an embedded single quote too.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "include"),
+      ).toBe("op = 'notificationHandling''s'");
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "exclude"),
+      ).toBe("op != 'notificationHandling''s'");
+    });
   });
 
   describe.skip("Utility Helper Functions", () => {
@@ -2757,5 +2780,42 @@ describe("resolveDefaultColumns", () => {
     const streamFields = [{ name: "_timestamp", ftsKey: false }];
     const result = resolveDefaultColumns(streamFields, []);
     expect(result).toEqual([]);
+  });
+
+  it("puts service_name before the fts column when the stream has it", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service_name", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service_name", "body"]);
+    expect(resolveDefaultColumns(streamFields, [])).toEqual(["service_name", "body"]);
+  });
+
+  it("prefers service over service_name", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service_name", ftsKey: false },
+      { name: "service", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service: "api", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service", "body"]);
+  });
+
+  it("skips a service field that has no values in the hits", () => {
+    const streamFields = [
+      { name: "body", ftsKey: true },
+      { name: "service", ftsKey: false },
+      { name: "service_name", ftsKey: false },
+    ];
+    const hits = [{ body: "hello", service: "", service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual(["service_name", "body"]);
+    expect(resolveDefaultColumns(streamFields, [], [{ body: "hello" }])).toEqual(["body"]);
+  });
+
+  it("adds no service column when there is no fts column", () => {
+    const streamFields = [{ name: "service_name", ftsKey: false }];
+    const hits = [{ service_name: "api" }];
+    expect(resolveDefaultColumns(streamFields, [], hits)).toEqual([]);
   });
 });

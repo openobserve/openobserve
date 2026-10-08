@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::otlp::OtlpRequestType, metrics};
+use config::meta::otlp::OtlpRequestType;
 use ingestion_common::IngestUser;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
 use tonic::{Response, Status};
 
-use crate::service::traces::handle_otlp_request;
+use crate::{
+    handler::grpc::request::otlp::{export_reply, metadata_str, observe_ok},
+    service::traces::handle_otlp_request,
+};
 
 #[derive(Default)]
 pub struct TraceServer;
@@ -39,21 +42,12 @@ impl TraceService for TraceServer {
             "Please specify organization id with header key '{}' ",
             cfg.grpc.org_header_key
         );
-        if !metadata.contains_key(&cfg.grpc.org_header_key) {
+        let Some(org_id) = metadata_str(&metadata, &cfg.grpc.org_header_key)? else {
             return Err(Status::invalid_argument(msg));
-        }
+        };
 
         let in_req = request.into_inner();
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(msg));
-        }
-
-        let stream_name = metadata.get(&cfg.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
+        let in_stream_name = metadata_str(&metadata, &cfg.grpc.stream_header_key)?;
 
         let user_email = metadata
             .get("user_id")
@@ -65,31 +59,15 @@ impl TraceService for TraceServer {
 
         let user = IngestUser::from_user_email(user_email);
 
-        let resp = handle_otlp_request(
-            org_id.unwrap().to_str().unwrap(),
-            in_req,
-            OtlpRequestType::Grpc,
-            in_stream_name,
-            user,
-        )
-        .await;
-        if resp.is_ok() {
-            // metrics
-            let time = start.elapsed().as_secs_f64();
-            metrics::GRPC_RESPONSE_TIME
-                .with_label_values(&["/otlp/v1/traces", "200", "", "", "", ""])
-                .observe(time);
-            metrics::GRPC_INCOMING_REQUESTS
-                .with_label_values(&["/otlp/v1/traces", "200", "", "", "", ""])
-                .inc();
-            return Ok(Response::new(ExportTraceServiceResponse {
-                partial_success: None,
-            }));
-        } else {
-            let err = resp.err().unwrap().to_string();
-            log::error!("handle_trace_request err {err}");
-            Err(Status::internal(err))
-        }
+        let resp = handle_otlp_request(org_id, in_req, OtlpRequestType::Grpc, in_stream_name, user)
+            .await
+            .map_err(|e| {
+                log::error!("handle_trace_request err {e}");
+                Status::internal(e.to_string())
+            })?;
+        let reply = export_reply(resp).await?;
+        observe_ok("/otlp/v1/traces", start);
+        Ok(Response::new(reply))
     }
 }
 
@@ -100,5 +78,27 @@ mod tests {
     #[test]
     fn test_trace_server_default() {
         let _server = TraceServer;
+    }
+
+    #[tokio::test]
+    async fn test_non_ascii_metadata_is_invalid_argument() {
+        let cfg = config::get_config();
+        for key in [
+            cfg.grpc.stream_header_key.as_str(),
+            cfg.grpc.org_header_key.as_str(),
+        ] {
+            let mut request = tonic::Request::new(ExportTraceServiceRequest::default());
+            request.metadata_mut().insert(
+                tonic::metadata::MetadataKey::from_bytes(cfg.grpc.org_header_key.as_bytes())
+                    .unwrap(),
+                "default".parse().unwrap(),
+            );
+            request.metadata_mut().insert(
+                tonic::metadata::MetadataKey::from_bytes(key.as_bytes()).unwrap(),
+                tonic::metadata::AsciiMetadataValue::try_from(b"\xff").unwrap(),
+            );
+            let status = TraceServer.export(request).await.unwrap_err();
+            assert_eq!(status.code(), tonic::Code::InvalidArgument, "{key}");
+        }
     }
 }

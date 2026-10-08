@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
-        :footer-title="t('serviceAccounts.header')"
         dense
       >
         <template #cell-select="{ row }">
@@ -102,9 +101,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { watch } from "vue";
+import { watch, ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { ref, onBeforeMount } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";

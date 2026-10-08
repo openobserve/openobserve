@@ -1,0 +1,371 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import router from "@/test/unit/helpers/router";
+import { http, HttpResponse } from "msw";
+import tracesMockData from "@/test/unit/mockData/traces";
+import analytics from "@/services/product_analytics";
+
+const node = document.createElement("div");
+node.setAttribute("id", "app");
+node.style.height = "1024px";
+document.body.appendChild(node);
+
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showErrorNotification: vi.fn(),
+  }),
+}));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+// Mocked because the test store's streams module is a stub that never caches a fetched list.
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStreams: vi
+      .fn()
+      .mockResolvedValue({ list: [{ name: "test-stream" }, { name: "_rumdata" }] }),
+    getStream: vi.fn().mockResolvedValue({
+      name: "_rumdata",
+      schema: [{ name: "_oo_trace_id" }, { name: "type" }],
+    }),
+  }),
+}));
+
+// Trace window in ns; every value divides by 1000 exactly so the µs assertions are exact.
+const TRACE_START_NS = 1_755_853_746_000_000_000;
+const TRACE_END_NS = 1_755_853_747_000_000_000;
+const TRACE_START_US = 1_755_853_746_000_000;
+const TRACE_END_US = 1_755_853_747_000_000;
+const ONE_MINUTE_US = 60_000_000;
+const FIVE_MINUTES_US = 300_000_000;
+// Deliberately weeks wide so a leg still driven by the details window is distinguishable.
+const WIDE_NEW_START_US = 1_753_000_000_000_000;
+const WIDE_NEW_END_US = 1_758_000_000_000_000;
+
+function makeDetailsResponse(rootParentId: string) {
+  const hits = JSON.parse(JSON.stringify(tracesMockData.tracesDetails.traceSpans.hits));
+  hits[0].reference_parent_span_id = rootParentId;
+  const windows = [
+    [TRACE_START_NS, TRACE_END_NS],
+    [TRACE_START_NS + 100_000_000, TRACE_END_NS - 100_000_000],
+    [TRACE_START_NS + 200_000_000, TRACE_END_NS - 200_000_000],
+  ];
+  windows.forEach(([start, end], i) => {
+    hits[i].start_time = start;
+    hits[i].end_time = end;
+    hits[i]._start_time_ns = String(start);
+    hits[i]._end_time_ns = String(end);
+  });
+  return { hits, new_start_time: WIDE_NEW_START_US, new_end_time: WIDE_NEW_END_US };
+}
+
+const STUBS = {
+  "chart-renderer": {
+    template: '<div data-test="chart-renderer">Chart</div>',
+    props: ["data", "id"],
+    emits: ["updated:chart"],
+  },
+  "trace-tree": {
+    template: '<div data-test="trace-tree">Trace Tree</div>',
+    props: [
+      "collapseMapping",
+      "spans",
+      "baseTracePosition",
+      "spanDimensions",
+      "spanMap",
+      "leftWidth",
+      "searchQuery",
+      "spanList",
+    ],
+    emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
+    methods: {
+      nextMatch: vi.fn(),
+      prevMatch: vi.fn(),
+    },
+  },
+  "trace-header": {
+    template: '<div data-test="trace-header">Trace Header</div>',
+    props: ["baseTracePosition", "splitterWidth"],
+    emits: ["resize-start"],
+  },
+  "trace-details-sidebar": {
+    template: '<div data-test="trace-details-sidebar">Sidebar</div>',
+    props: ["span", "baseTracePosition", "searchQuery"],
+    emits: ["view-logs", "close", "open-trace"],
+  },
+};
+
+describe("TraceDetails - RUM bridge gate and windows", () => {
+  let wrapper: any;
+  let rumRequests: any[];
+
+  function answerRumSearch(sql: string, rumRows: any[]) {
+    if (sql.includes("type = 'view'")) return rumRows.filter((r) => r.type === "view");
+    if (sql.includes("type='action'")) return rumRows.filter((r) => r.type === "action");
+    if (sql.includes("type = 'error'")) return rumRows.filter((r) => r.type !== "view");
+    return rumRows.filter((r) => r._oo_trace_id);
+  }
+
+  function mountWithDetails(details: any, rumRows: any[] = []) {
+    rumRequests = [];
+    globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/settings/v2/key_fields`,
+        () => HttpResponse.json({ setting_value: {} }),
+      ),
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(details),
+      ),
+      http.post(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+        async ({ request }) => {
+          const body: any = await request.json();
+          if (body.query?.sql?.includes("_rumdata")) {
+            rumRequests.push(body.query);
+            const hits = answerRumSearch(body.query.sql, rumRows);
+            return HttpResponse.json({ took: 0, hits, total: hits.length, from: 0, size: 0 });
+          }
+          return HttpResponse.json(details);
+        },
+      ),
+    );
+
+    return mountTraceDetails({ traceId: "test-trace-id" });
+  }
+
+  const RUM_SESSION_ID = "bf9f9e4f-34e8-4c4f-b43f-f27c17769d93";
+  const AI_CONVERSATION_ID = "01a0bb13-c247-707a-9b90-26610d52030b";
+  const REPLAY_BUTTON = '[data-test="trace-details-view-session-replay-btn"]';
+
+  function makeRumRows(sessionFlags: Record<string, unknown>) {
+    const base = {
+      session_id: RUM_SESSION_ID,
+      view_id: "view-1",
+      date: 1_755_853_746_000,
+      ...sessionFlags,
+    };
+    return [
+      {
+        ...base,
+        type: "resource",
+        _oo_trace_id: "test-trace-id",
+        _oo_span_id: "d4b07e603e2fa32f",
+        resource_url: "https://app.example/api/ai/chat_stream",
+        resource_method: "POST",
+        resource_type: "fetch",
+        resource_duration: 1_000_000,
+      },
+      { ...base, type: "view", view_url: "/web/ai", view_time_spent: 5_000_000 },
+    ];
+  }
+
+  async function mountBridge(rumRows: any[], details = makeDetailsResponse("d4b07e603e2fa32f")) {
+    wrapper = mountWithDetails(details, rumRows);
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBeGreaterThan(3), {
+      timeout: 5000,
+    });
+    await flushPromises();
+  }
+
+  function mountTraceDetails(props: Record<string, unknown>) {
+    return mount(TraceDetails, {
+      attachTo: "#app",
+      props,
+      global: {
+        plugins: [i18n, router],
+        provide: { store },
+        stubs: STUBS,
+      },
+    });
+  }
+
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+    localStorage.removeItem("o2_trace_active_tab");
+    localStorage.removeItem("o2_trace_tab_order");
+
+    vi.spyOn(router, "currentRoute", "get").mockReturnValue({
+      value: {
+        query: {
+          trace_id: "test-trace-id",
+          from: "1752490492843",
+          to: "1752490493164",
+          stream: "test-stream",
+          org_identifier: "default",
+        },
+        name: "traceDetails",
+      },
+    } as any);
+  });
+
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+    vi.clearAllTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("sends no _rumdata search when the root span has an empty parent id", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    wrapper = mountWithDetails(makeDetailsResponse(""));
+    await flushPromises();
+
+    // spanList is assigned only after the RUM leg has settled, so it is the sync point.
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBe(3), { timeout: 5000 });
+    await flushPromises();
+
+    expect(rumRequests).toHaveLength(0);
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("bounds the browser-request search by the span-derived trace window, not the details window", async () => {
+    wrapper = mountWithDetails(makeDetailsResponse("d4b07e603e2fa32f"));
+    await flushPromises();
+
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBe(3), { timeout: 5000 });
+    await flushPromises();
+
+    expect(rumRequests).toHaveLength(1);
+    expect(rumRequests[0].start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
+    expect(rumRequests[0].end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+  });
+
+  it("derives the header trace window from the spans with a usable pair of timestamps", async () => {
+    const consoleSpy = vi.spyOn(console, "error");
+    const details = makeDetailsResponse("");
+    // The earliest-starting span has no end, so it must not lower the header start.
+    details.hits[0].end_time = "";
+    wrapper = mountWithDetails(details);
+    await flushPromises();
+
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBe(3), { timeout: 5000 });
+    await flushPromises();
+
+    const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
+    expect(selected.trace_start_time).toBe(TRACE_START_US + 100_000);
+    expect(selected.trace_end_time).toBe(TRACE_END_US - 100_000);
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("floors the start and ceils the end of the embedded header window", async () => {
+    // +512 ns is exact in a double at this magnitude (granularity 256); +999 would round to +1024.
+    wrapper = mountTraceDetails({
+      mode: "embedded",
+      traceIdProp: "test-trace-id",
+      streamNameProp: "test-stream",
+      spanListProp: [
+        {
+          ...makeDetailsResponse("").hits[0],
+          start_time: TRACE_START_NS + 512,
+          end_time: TRACE_END_NS + 512,
+        },
+      ],
+    });
+    await flushPromises();
+
+    const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
+    expect(selected.trace_start_time).toBe(TRACE_START_US);
+    expect(selected.trace_end_time).toBe(TRACE_END_US + 1);
+  });
+
+  it("hides Play Session Replay when the browser session has no recording", async () => {
+    await mountBridge(makeRumRows({}));
+
+    expect(wrapper.vm.spanList.some((s: any) => s.rum_session_id === RUM_SESSION_ID)).toBe(true);
+    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(false);
+  });
+
+  it("shows Play Session Replay when the browser session has a recording", async () => {
+    await mountBridge(makeRumRows({ session_has_replay: true }));
+
+    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(true);
+  });
+
+  it("opens the RUM session, not the AI conversation, from Play Session Replay", async () => {
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+    const details = makeDetailsResponse("d4b07e603e2fa32f");
+    details.hits[0].session_id = AI_CONVERSATION_ID;
+    details.hits[0].gen_ai_conversation_id = AI_CONVERSATION_ID;
+    await mountBridge(makeRumRows({ session_has_replay: true }), details);
+
+    await wrapper.find(REPLAY_BUTTON).trigger("click");
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push.mock.calls[0][0]).toMatchObject({
+      name: "SessionViewer",
+      params: { id: RUM_SESSION_ID },
+    });
+    expect(push.mock.calls[0][0].params.id).not.toBe(AI_CONVERSATION_ID);
+  });
+
+  it("tracks trace_details_loaded once the trace details request succeeds", async () => {
+    wrapper = mountWithDetails(makeDetailsResponse(""));
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBe(3), { timeout: 5000 });
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("trace_details_loaded", { mode: "standalone" });
+  });
+
+  it("does not track trace_details_loaded when the trace details request fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/settings/v2/key_fields`,
+        () => HttpResponse.json({ setting_value: {} }),
+      ),
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json({ message: "boom" }, { status: 500 }),
+      ),
+    );
+    wrapper = mountTraceDetails({ traceId: "test-trace-id" });
+    await flushPromises();
+    await vi.waitFor(
+      () => expect(wrapper.vm.searchObj.data.traceDetails.isLoadingTraceDetails).toBe(false),
+      { timeout: 5000 },
+    );
+    await flushPromises();
+
+    expect(wrapper.vm.spanList.length).toBe(0);
+    expect(analytics.track).not.toHaveBeenCalledWith("trace_details_loaded", expect.anything());
+  });
+
+  // Regression: a page-long RUM view root must not set the waterfall's axis.
+  it("fits the waterfall axis to the trace, not to a long-lived RUM view", async () => {
+    const rows = makeRumRows({});
+    const view = rows.find((row) => row.type === "view")!;
+    view.date = 1_755_853_746_000 - 10 * 60_000; // opened ten minutes earlier
+    view.view_time_spent = 25 * 60 * 1e9; // and left open for 25 minutes
+    await mountBridge(rows);
+
+    await vi.waitFor(() => expect(wrapper.vm.baseTracePosition.durationUs).toBeGreaterThan(0), {
+      timeout: 5000,
+    });
+    expect(wrapper.vm.baseTracePosition.startTimeUs).toBe(TRACE_START_US);
+    expect(wrapper.vm.baseTracePosition.durationUs).toBe(TRACE_END_US - TRACE_START_US);
+    // The flame graph keeps the full extent.
+    expect(wrapper.vm.traceTree[0].lowestStartTime).toBe(TRACE_START_US - 10 * ONE_MINUTE_US);
+  });
+});

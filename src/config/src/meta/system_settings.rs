@@ -96,6 +96,8 @@ pub enum SettingCategory {
     Ingestion,
     /// General/miscellaneous settings
     General,
+    /// Authentication and access-control settings
+    Security,
 }
 
 impl SettingCategory {
@@ -108,6 +110,7 @@ impl SettingCategory {
             SettingCategory::Search => "search",
             SettingCategory::Ingestion => "ingestion",
             SettingCategory::General => "general",
+            SettingCategory::Security => "security",
         }
     }
 }
@@ -130,6 +133,7 @@ impl std::str::FromStr for SettingCategory {
             "search" => Ok(SettingCategory::Search),
             "ingestion" => Ok(SettingCategory::Ingestion),
             "general" => Ok(SettingCategory::General),
+            "security" => Ok(SettingCategory::Security),
             _ => Err(format!("Invalid setting category: {}", s)),
         }
     }
@@ -163,6 +167,8 @@ pub mod keys {
     pub const LIGHT_MODE_THEME_COLOR: &str = "light_mode_theme_color";
     /// Dark mode theme color
     pub const DARK_MODE_THEME_COLOR: &str = "dark_mode_theme_color";
+    /// Instance-wide authentication policy for native users
+    pub const PASSWORD_POLICY: &str = "password_policy";
 }
 
 /// A system setting record
@@ -417,6 +423,7 @@ mod tests {
         assert_eq!(SettingCategory::Search.as_str(), "search");
         assert_eq!(SettingCategory::Ingestion.as_str(), "ingestion");
         assert_eq!(SettingCategory::General.as_str(), "general");
+        assert_eq!(SettingCategory::Security.as_str(), "security");
     }
 
     #[test]
@@ -454,6 +461,10 @@ mod tests {
         assert_eq!(
             "general".parse::<SettingCategory>().unwrap(),
             SettingCategory::General
+        );
+        assert_eq!(
+            "security".parse::<SettingCategory>().unwrap(),
+            SettingCategory::Security
         );
         assert!("unknown".parse::<SettingCategory>().is_err());
     }

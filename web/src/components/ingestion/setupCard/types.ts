@@ -40,6 +40,12 @@ export interface CardSubstitutions {
   url: string;
   org: string;
   token: string;
+  /**
+   * True only on OpenObserve Cloud's primary (US) region — the one region whose
+   * public gRPC gateway (grpc.openobserve.ai) is live. Lets a builder offer a
+   * cloud-hosted gRPC variant instead of (or in addition to) the self-hosted one.
+   */
+  isPrimaryCloud?: boolean;
 }
 
 /** Context of a step → drives both the title chip and the code-block chrome. */
@@ -116,6 +122,8 @@ export interface RichCardStepAction {
   variant?: "primary" | "secondary";
   /** Greys the button out — e.g. nothing selected yet. */
   disabled?: boolean;
+  /** Render the button only once detection connects (default: always visible). */
+  showOnDetect?: boolean;
 }
 
 export interface RichCardStep {
@@ -248,6 +256,8 @@ export interface RichCardExtras {
 }
 
 export interface RichCardProvider {
+  /** Stable, non-localized key (the card's slug), safe to send to analytics. */
+  id: string;
   name: string;
   tagline: I18nText;
   /** Resolved logo asset URL for light mode (rendered on a neutral tile). */

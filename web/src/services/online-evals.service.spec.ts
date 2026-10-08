@@ -6,7 +6,7 @@
 // These tests pin that behavior so the service stops silently returning []
 // if the API contract changes.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockGet: vi.fn(),
@@ -14,6 +14,8 @@ const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
   mockPut: vi.fn(),
   mockDelete: vi.fn(),
 }));
+
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: () => ({
@@ -24,8 +26,8 @@ vi.mock("@/services/http", () => ({
   }),
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import onlineEvalsService from "./online-evals.service";
+import analytics from "./product_analytics";
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -143,6 +145,13 @@ describe("URL construction", () => {
     expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/sc-42/versions");
   });
 
+  it("scorers.versions unwraps the history from /api/{orgId}/scorers/{entityId}/versions", async () => {
+    mockGet.mockResolvedValue({ data: { versions: [{ id: "r2", version: 2 }] } });
+    const result = await onlineEvalsService.scorers.versions("acme", "sc-7");
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/scorers/sc-7/versions");
+    expect(result).toEqual([{ id: "r2", version: 2 }]);
+  });
+
   it("jobs.list appends a status query when one is provided", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.jobs.list("acme", "active");
@@ -216,5 +225,23 @@ describe("mutation endpoints return response.data directly", () => {
     mockDelete.mockResolvedValue({});
     await onlineEvalsService.providers.delete("org-1", "p1");
     expect(mockDelete).toHaveBeenCalledWith("/api/org-1/providers/p1");
+  });
+});
+
+describe("jobs.create analytics", () => {
+  beforeEach(() => vi.mocked(analytics.track).mockClear());
+
+  it("tracks llm_eval_job_created once the server confirms", async () => {
+    mockPost.mockResolvedValue({ data: { id: "job-1" } });
+    await expect(onlineEvalsService.jobs.create("org-1", {} as any)).resolves.toEqual({
+      id: "job-1",
+    });
+    expect(analytics.track).toHaveBeenCalledWith("llm_eval_job_created");
+  });
+
+  it("does not track when the create is rejected", async () => {
+    mockPost.mockRejectedValue(new Error("boom"));
+    await expect(onlineEvalsService.jobs.create("org-1", {} as any)).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

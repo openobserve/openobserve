@@ -159,7 +159,7 @@ impl FromStr for UserRole {
             "root" => Ok(UserRole::Root),
             "viewer" => Ok(UserRole::Viewer),
             "editor" => Ok(UserRole::Editor),
-            "user" => Ok(UserRole::User),
+            "user" | "allowed_user" => Ok(UserRole::User),
             "service_account" => Ok(UserRole::ServiceAccount),
             "sre_agent" => Ok(UserRole::SreAgent),
             _ => Ok(UserRole::Admin),

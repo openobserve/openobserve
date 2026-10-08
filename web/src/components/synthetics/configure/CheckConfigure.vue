@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   BrowserCheck,
   SyntheticCheckType,
@@ -29,30 +29,42 @@ import useCheckWizardUi, {
   VARIABLES_SPLITTER_LIMITS,
 } from "@/composables/synthetics/useCheckWizardUi";
 import CheckDetails from "./CheckDetails.vue";
+import type { VariableSuggestion } from "../variables/suggestions";
 import CheckAuthNetwork from "./CheckAuthNetwork.vue";
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
 import CheckSchedule from "./CheckSchedule.vue";
 import CheckRetries from "./CheckRetries.vue";
 import CheckAlerts from "./CheckAlerts.vue";
 import CheckLocations from "./CheckLocations.vue";
+import CheckEnvironments from "./CheckEnvironments.vue";
 import CheckBrowserDevices from "./CheckBrowserDevices.vue";
 import CheckCapture from "./CheckCapture.vue";
 
-const props = defineProps<{
-  check: BrowserCheck;
-  checkType?: SyntheticCheckType;
-  locations?: SyntheticsLocation[];
-  browsers?: string[];
-  devices?: SyntheticsDevice[];
-  destinations?: string[];
-  folders?: SyntheticsFolder[];
-  foldersLoading?: boolean;
-  validationErrors?: Record<string, string>;
-  /** Protocol checks show the private-locations subsection + setup CTA. */
-  allowPrivateLocations?: boolean;
-  /** When true, CheckLocations shows skeleton rows instead of the list. */
-  loadingLocations?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    check: BrowserCheck;
+    checkType?: SyntheticCheckType;
+    locations?: SyntheticsLocation[];
+    browsers?: string[];
+    devices?: SyntheticsDevice[];
+    destinations?: string[];
+    folders?: SyntheticsFolder[];
+    foldersLoading?: boolean;
+    validationErrors?: Record<string, string>;
+    /** Protocol checks show the private-locations subsection + setup CTA. */
+    allowPrivateLocations?: boolean;
+    /** When true, CheckLocations shows skeleton rows instead of the list. */
+    loadingLocations?: boolean;
+    /** Forwarded verbatim to `CheckDetails`: the hint under the Starting URL field. */
+    targetHint?: I18nText;
+    /** Rows offered on `{{` in the target field; the protocol view passes nothing. */
+    variableSuggestions?: VariableSuggestion[];
+    /** Host-owned Variables panel state; undefined keeps the panel always open. */
+    variablesPanelOpen?: boolean;
+  }>(),
+  // An explicit undefined default stops Vue casting an omitted Boolean prop to false.
+  { variablesPanelOpen: undefined },
+);
 
 const { t } = useI18nTyped();
 
@@ -73,16 +85,20 @@ const targetPlaceholder = computed(() => {
 // Basic auth + variables only make sense where the probe sends them today.
 const showAuthNetwork = computed(() => ["browser", "http"].includes(props.checkType ?? "browser"));
 
+const showVariablesPanel = computed(
+  () => showAuthNetwork.value && (props.variablesPanelOpen ?? true),
+);
+
 // Shared with the Journey page so a drag on either page carries to the other.
 // Check types with no variables pin the content pane to 100% — the panel and
 // separator disappear without duplicating the form column in the template.
 const { variablesSplitter } = useCheckWizardUi();
 const splitterValue = computed({
-  get: () => (showAuthNetwork.value ? variablesSplitter.value : 100),
+  get: () => (showVariablesPanel.value ? variablesSplitter.value : 100),
   set: (v: number) => (variablesSplitter.value = v),
 });
 const splitterLimits = computed<[number, number]>(() =>
-  showAuthNetwork.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
+  showVariablesPanel.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
 );
 const emit = defineEmits<{
   "update:check": [value: BrowserCheck];
@@ -90,6 +106,7 @@ const emit = defineEmits<{
   "new-location": [];
   "add-agent": [locationId: string];
   "refresh-locations": [];
+  "close-variables-panel": [];
 }>();
 
 function handleUpdate(value: BrowserCheck) {
@@ -101,8 +118,8 @@ function handleUpdate(value: BrowserCheck) {
   <OSplitter
     v-model="splitterValue"
     :limits="splitterLimits"
-    :disable="!showAuthNetwork"
-    :separator="showAuthNetwork"
+    :disable="!showVariablesPanel"
+    :separator="showVariablesPanel"
     class="h-full min-h-0"
   >
     <template #before>
@@ -116,6 +133,8 @@ function handleUpdate(value: BrowserCheck) {
               :validation-errors="props.validationErrors ?? {}"
               :target-label="targetLabel"
               :target-placeholder="targetPlaceholder"
+              :target-hint="targetHint"
+              :variable-suggestions="variableSuggestions"
               data-test="synthetics-check-configure-details"
               @update:check="handleUpdate"
             />
@@ -159,6 +178,11 @@ function handleUpdate(value: BrowserCheck) {
               @add-agent="(id: string) => emit('add-agent', id)"
               @refresh-locations="emit('refresh-locations')"
             />
+            <CheckEnvironments
+              :check="check"
+              data-test="synthetics-check-configure-environments"
+              @update:check="handleUpdate"
+            />
             <CheckBrowserDevices
               v-if="(checkType ?? 'browser') === 'browser'"
               :check="check"
@@ -191,7 +215,12 @@ function handleUpdate(value: BrowserCheck) {
       />
     </template>
     <template #after>
-      <CheckVariablesPanel v-if="showAuthNetwork" :check="check" @update:check="handleUpdate" />
+      <CheckVariablesPanel
+        v-if="showVariablesPanel"
+        :check="check"
+        @update:check="handleUpdate"
+        @close="emit('close-variables-panel')"
+      />
     </template>
   </OSplitter>
 </template>

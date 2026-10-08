@@ -214,7 +214,7 @@ fn validate_mcp_headers(headers: &HeaderMap, request: &MCPRequest) -> Option<Res
     ),
 )]
 pub async fn handle_mcp_post(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     headers: HeaderMap,
     Json(mcp_request): Json<MCPRequest>,
 ) -> Response {
@@ -235,7 +235,7 @@ pub async fn handle_mcp_post(
     // Process the notification but return 202.
     if mcp_request.id.is_none() && mcp_request.method != "initialize" {
         // Fire-and-forget: process notification asynchronously, don't wait
-        let _ = handle_mcp_request(mcp_request, auth_token).await;
+        let _ = handle_mcp_request(&org_id, mcp_request, auth_token).await;
         return Response::builder()
             .status(StatusCode::ACCEPTED)
             .body(Body::empty())
@@ -251,7 +251,7 @@ pub async fn handle_mcp_post(
     // Determine if client wants SSE streaming
     let wants_sse = accept_header.contains("text/event-stream");
 
-    let response = match handle_mcp_request(mcp_request, auth_token).await {
+    let response = match handle_mcp_request(&org_id, mcp_request, auth_token).await {
         Ok(r) => r,
         Err(e) => {
             log::error!("MCP handle_mcp_request error: {e}");
@@ -349,7 +349,7 @@ pub async fn handle_mcp_delete(Path(_org_id): Path<String>) -> Response {
     ),
 )]
 pub async fn handle_mcp_get(
-    Path(_org_id): Path<String>,
+    Path(org_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
@@ -403,7 +403,7 @@ pub async fn handle_mcp_get(
     };
 
     // Handle the request with streaming (returns SSE format)
-    let stream = match handle_mcp_request_stream(mcp_request, auth_token).await {
+    let stream = match handle_mcp_request_stream(&org_id, mcp_request, auth_token).await {
         Ok(s) => s,
         Err(e) => {
             return Response::builder()

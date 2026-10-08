@@ -95,8 +95,8 @@
 
       <!-- ── Body ── -->
       <div
-        class="flex min-h-0 flex-1 flex-col gap-4.5 overflow-auto pt-4.5"
-        :class="{ 'pb-4.5': activeTab !== 'runs' }"
+        class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+        :class="{ 'pb-4.5': activeTab !== 'runs', 'pt-2': activeTab !== 'versions' }"
       >
         <!-- Runs filter row — agent filter, right-aligned. The date picker +
              refresh live in the global toolbar above the cards, so they're not
@@ -235,23 +235,11 @@
         <!-- Versions -->
         <template v-else-if="activeTab === 'versions'">
           <div class="sd__tab-pad">
-            <p class="sd__tab-intro text-text-secondary">
-              {{ t("onlineEvals.scorer.detail.versionsIntro") }}
-            </p>
-            <ul class="sd-versions">
-              <li class="sd-versions__item sd-versions__item--active bg-card-bg">
-                <div class="sd-versions__head">
-                  <span class="sd-versions__label text-text-heading"
-                    >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
-                  >
-                  <OTag type="activeVersionFlag" value="active" />
-                </div>
-                <div v-if="updatedAt" class="sd-versions__meta text-text-secondary">
-                  {{ t("onlineEvals.scorer.detail.lastUpdated") }}
-                  <span>{{ formatTimestamp(updatedAt) }}</span>
-                </div>
-              </li>
-            </ul>
+            <ScorerVersionsTab
+              :versions="versions"
+              :loading="versionsLoading"
+              :active-version="row.version"
+            />
           </div>
         </template>
 
@@ -271,7 +259,6 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
-            :footer-title="t('onlineEvals.scorer.detail.tabs.runs')"
             show-index
             width="100%"
             class="w-full"
@@ -313,7 +300,7 @@
               {{ t("onlineEvals.scorer.detail.usedByIntro") }}
             </p>
             <OEmptyState
-              v-if="usedByJobs.length === 0"
+              v-if="usedByCount === 0 && !experimentsLoading"
               size="inline"
               :title="t('onlineEvals.scorer.detail.usedByEmpty')"
               data-test="scorer-detail-used-by-empty"
@@ -336,6 +323,25 @@
                   />
                 </OButton>
               </li>
+              <li v-for="experiment in usedByExperiments" :key="experiment.id">
+                <OButton
+                  variant="ghost"
+                  class="sd-used-list__item group"
+                  :data-test="`scorer-detail-used-by-experiment-${experiment.name}`"
+                  @click="router.push(aiExperimentDetailRoute(orgId, experiment.id))"
+                >
+                  <OIcon name="science" size="xs" />
+                  <span>{{ experiment.name }}</span>
+                  <span class="sd-used-list__meta text-text-secondary">{{
+                    t("onlineEvals.scorer.detail.usedByExperiment")
+                  }}</span>
+                  <OIcon
+                    name="chevron-right"
+                    size="xs"
+                    class="sd-used-list__chevron text-text-secondary group-hover:text-accent group-hover:opacity-100"
+                  />
+                </OButton>
+              </li>
             </ul>
           </div>
         </template>
@@ -348,6 +354,7 @@
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -359,8 +366,18 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
-import type { EvalJob, Provider, Scorer, ScoreConfig } from "@/services/online-evals.service";
+import ScorerVersionsTab from "./ScorerVersionsTab.vue";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { aiExperimentDetailRoute } from "@/enterprise/views/AIObservability/experimentRoutes";
+import onlineEvalsService, {
+  type EvalJob,
+  type Provider,
+  type Scorer,
+  type ScoreConfig,
+} from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { useScorerRuns, type RunRow, type ScorerRunsWindow } from "../composables/useScorerRuns";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -385,6 +402,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
 type TabId = "configuration" | "versions" | "runs" | "usedBy";
@@ -454,6 +472,52 @@ const usedByJobs = computed<EvalJob[]>(() => {
   });
 });
 
+const versions = ref<Scorer[]>([]);
+const versionsLoading = ref(false);
+
+async function loadVersions() {
+  versionsLoading.value = true;
+  try {
+    const list = await onlineEvalsService.scorers.versions(orgId.value, entityId(props.row));
+    versions.value = [...list].sort((left, right) => right.version - left.version);
+  } catch {
+    // Without history the list still shows the version the drawer was opened with.
+    versions.value = [props.row];
+  } finally {
+    versionsLoading.value = false;
+  }
+}
+watch(
+  () => [orgId.value, entityId(props.row), props.row.version],
+  () => void loadVersions(),
+  { immediate: true },
+);
+
+const experiments = ref<LlmExperiment[]>([]);
+const experimentsLoading = ref(false);
+
+// Best-effort: the jobs list still renders when the experiments request fails.
+async function loadExperiments() {
+  experimentsLoading.value = true;
+  try {
+    experiments.value = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
+  } catch {
+    experiments.value = [];
+  } finally {
+    experimentsLoading.value = false;
+  }
+}
+watch(orgId, () => void loadExperiments(), { immediate: true });
+
+const usedByExperiments = computed<LlmExperiment[]>(() => {
+  const myId = entityId(props.row);
+  return experiments.value.filter((experiment) =>
+    (experiment.scorers ?? []).some((ref) => ref.id === myId),
+  );
+});
+
+const usedByCount = computed(() => usedByJobs.value.length + usedByExperiments.value.length);
+
 const createdAt = computed<number | null>(() => {
   const v = valueOf<number>(props.row, "createdAt", "created_at");
   return typeof v === "number" ? v : null;
@@ -474,7 +538,7 @@ const tabs = computed(() => [
   {
     id: "versions" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.versions"),
-    count: 1,
+    count: versionsLoading.value ? null : versions.value.length,
   },
   {
     id: "runs" as TabId,
@@ -484,7 +548,7 @@ const tabs = computed(() => [
   {
     id: "usedBy" as TabId,
     label: t("onlineEvals.scorer.detail.tabs.usedBy"),
-    count: usedByJobs.value.length,
+    count: experimentsLoading.value ? null : usedByCount.value,
   },
 ]);
 
@@ -519,10 +583,19 @@ const selectedAgent = computed<AgentFilterSelection | null>(() => {
   return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
-async function loadAgents() {
+async function loadAgents(force = false) {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -576,6 +649,8 @@ const {
 
 async function refreshRuns() {
   syncDateWindow();
+  // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
+  void loadAgents(true);
   await refreshRunsData();
 }
 
@@ -665,7 +740,7 @@ const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(()
     },
     {
       label: t("onlineEvals.scorer.detail.kpis.usedBy"),
-      value: String(usedByJobs.value.length),
+      value: experimentsLoading.value ? "—" : String(usedByCount.value),
       unit: "",
     },
   ];
@@ -803,43 +878,6 @@ function relativeTime(timestampMs: number): string {
 
 .sd-code--mono {
   white-space: pre;
-}
-
-/* — Versions tab — */
-.sd-versions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sd-versions__item {
-  padding: 0.75rem 0.875rem;
-  border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 0.375rem;
-}
-
-.sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-card-bg));
-}
-
-.sd-versions__head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sd-versions__label {
-  font-weight: 700;
-  font-size: var(--text-compact);
-}
-
-.sd-versions__meta {
-  margin-top: 0.375rem;
-  font-size: var(--text-2xs);
 }
 
 /* — Used by tab — */

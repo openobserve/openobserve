@@ -140,6 +140,23 @@ describe("axisBuilder", () => {
         expect(result).toContain("100.00B");
       });
 
+      it("should escape HTML in series names and keep the marker", () => {
+        const tooltip = buildTooltip({ config: {} });
+        const marker = '<span style="color:red">●</span>';
+
+        const result = tooltip.formatter({
+          seriesName: '<img src=x onerror="alert(1)">',
+          value: [1609459200000, 1],
+          marker,
+          axisValue: "<b>t</b>",
+        });
+
+        expect(result).not.toContain("<img");
+        expect(result).not.toContain("<b>");
+        expect(result).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+        expect(result).toContain(marker);
+      });
+
       it("should handle array of items with axis value", () => {
         const panelSchema = {
           config: {

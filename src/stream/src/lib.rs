@@ -23,15 +23,12 @@ use common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
-// Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
-// these streams for billing); OSS / self-hosted must not block user streams.
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
-    SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
+        self_reporting::usage::AUDIT_STREAM,
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -180,7 +177,7 @@ pub fn stream_res(
     stats.created_at = unwrap_stream_created_at(&schema).unwrap_or_default();
 
     let metrics_meta = if stream_type == StreamType::Metrics {
-        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or(promql::Metadata {
+        let mut meta = get_prom_metadata_from_schema(&schema).unwrap_or_else(|| promql::Metadata {
             metric_type: promql::MetricType::Empty,
             metric_family_name: stream_name.to_string(),
             help: stream_name.to_string(),
@@ -238,19 +235,6 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-created — doing so would
-    // corrupt billing/usage accounting. The internal self-reporting job creates
-    // its schema directly (not via create_stream), so blocking here is safe.
-    // Cloud-only: OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream name '{stream_name}' is reserved and cannot be created"),
-        ));
-    }
-
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -757,15 +741,10 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-deleted — retention/
-    // compaction uses a separate internal path, so blocking this user-facing
-    // delete is safe and preserves billing/usage accounting. Cloud-only.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream '{stream_name}' is reserved and cannot be deleted"),
+    // The audit trail must not be destroyable through the same API it records.
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Ok(MetaHttpResponse::bad_request(
+            "Cannot delete the audit stream",
         ));
     }
 
@@ -939,6 +918,12 @@ pub async fn delete_stream_data_by_time_range(
     stream_name: &str,
     time_range: TimeRange,
 ) -> Result<String, infra::errors::Error> {
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Err(infra::errors::Error::Message(
+            "Cannot delete the audit stream".to_string(),
+        ));
+    }
+
     if time_range.start > time_range.end {
         return Err(infra::errors::Error::Message(
             "Start time must be less than end time".to_string(),
@@ -1017,6 +1002,7 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
+    stats.mindex_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
         && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
     {
@@ -1103,6 +1089,7 @@ pub async fn update_fields_type(
         ));
     }
 
+    let stream_schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
     // Build HashMap of field_name -> (DataType, nullable)
     let mut updates = HashMap::with_capacity(field_updates.len());
     for field_update in field_updates {
@@ -1112,6 +1099,18 @@ pub async fn update_fields_type(
                 field_update.data_type, field_update.name
             ))
         })?;
+        // handle_diff_schema would leave a non-widening change unapplied and still return Ok
+        if let Some(current) = stream_schema
+            .field_with_name(&field_update.name)
+            .map(|f| f.data_type())
+            && current != &dt
+            && !infra::schema::is_widening_conversion(current, &dt)
+        {
+            return Err(anyhow::anyhow!(
+                "field [{}] is {current} and cannot be changed to {dt}",
+                field_update.name
+            ));
+        }
         updates.insert(field_update.name.clone(), (dt, field_update.nullable));
     }
 
@@ -1328,6 +1327,7 @@ mod tests {
             storage_size: 10.0 * 1024.0 * 1024.0,   // 10MB in bytes
             compressed_size: 5.0 * 1024.0 * 1024.0, // 5MB in bytes
             index_size: 2.0 * 1024.0 * 1024.0,      // 2MB in bytes
+            mindex_size: 3.0 * 1024.0 * 1024.0,
             ..Default::default()
         };
 
@@ -1337,6 +1337,7 @@ mod tests {
         assert_eq!(stats.storage_size, 10.0);
         assert_eq!(stats.compressed_size, 5.0);
         assert_eq!(stats.index_size, 2.0);
+        assert_eq!(stats.mindex_size, 3.0);
     }
 
     #[tokio::test]
@@ -1426,6 +1427,97 @@ mod tests {
         )
         .await;
         assert!(result.is_err());
+    }
+
+    async fn create_update_fields_test_stream(name: &str) {
+        infra::db::create_table().await.unwrap();
+        let stream = StreamCreate {
+            fields: [("status_code", "Utf8"), ("count", "Int64")]
+                .into_iter()
+                .map(|(name, r#type)| StreamField {
+                    name: name.to_string(),
+                    r#type: r#type.to_string(),
+                })
+                .collect(),
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream("org1", name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn persisted_field_type(name: &str, field: &str) -> Option<String> {
+        let schema = infra::schema::get_from_db("org1", name, StreamType::Logs)
+            .await
+            .unwrap();
+        schema
+            .field_with_name(field)
+            .ok()
+            .map(|f| f.data_type().to_string())
+    }
+
+    fn field_update(name: &str, data_type: &str) -> FieldUpdate {
+        FieldUpdate {
+            name: name.to_string(),
+            data_type: data_type.to_string(),
+            nullable: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_refuses_a_change_it_cannot_apply() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("refuse_{}", now_micros());
+        create_update_fields_test_stream(name).await;
+        for requested in ["Int64", "UInt64", "Float64", "Boolean"] {
+            let err = update_fields_type(
+                "org1",
+                name,
+                Some(StreamType::Logs),
+                &[
+                    field_update("count", "Float64"),
+                    field_update("status_code", requested),
+                ],
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("field [status_code] is Utf8 and cannot be changed to {requested}")
+            );
+        }
+        // refused as a whole, so the widening change sent with it is not applied either
+        assert_eq!(
+            persisted_field_type(name, "count").await.as_deref(),
+            Some("Int64")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_accepts_the_changes_the_merge_applies() {
+        let name = &format!("accept_{}", now_micros());
+        create_update_fields_test_stream(name).await;
+        update_fields_type(
+            "org1",
+            name,
+            Some(StreamType::Logs),
+            &[
+                field_update("count", "Float64"),
+                field_update("status_code", "Utf8"),
+                field_update("new_field", "Int64"),
+            ],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            persisted_field_type(name, "count").await.as_deref(),
+            Some("Float64")
+        );
+        assert_eq!(
+            persisted_field_type(name, "new_field").await.as_deref(),
+            Some("Int64")
+        );
     }
 
     #[test]
@@ -1664,5 +1756,59 @@ mod tests {
         assert_eq!(parse_data_type("text"), None);
         assert_eq!(parse_data_type(""), None);
         assert_eq!(parse_data_type("int32"), None);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_with_cleanup_refuses_audit_stream() {
+        let res = delete_stream_with_cleanup(
+            META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            false,
+            |_, _, _| async { Ok(()) },
+            |_, _, _| async {},
+        )
+        .await
+        .expect("the guard returns a response, not an error");
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_refuses_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("the audit stream must not be time-range deletable");
+        assert!(err.to_string().contains("Cannot delete the audit stream"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_customer_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            "customer_org",
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_meta_org_non_logs_audit() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Traces,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
     }
 }

@@ -50,9 +50,24 @@ vi.mock("vuex", () => ({
   })),
 }));
 
+// The composable is setup-only in the app but called bare here, so `useMutation`
+// has no injection context. Stub it to run the declared mutationFn directly —
+// the write still reaches the mocked service, which is what the tests assert on.
+vi.mock("@tanstack/vue-query", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useMutation: (options: any) => ({
+      mutateAsync: (vars: any) =>
+        (typeof options === "function" ? options() : options).mutationFn(vars),
+    }),
+  };
+});
+
 const {
   mockGetSystemTemplates,
   mockGetByName,
+  mockTemplatePreview,
   mockDestCreate,
   mockDestUpdate,
   mockDestTest,
@@ -60,27 +75,35 @@ const {
 } = vi.hoisted(() => ({
   mockGetSystemTemplates: vi.fn(),
   mockGetByName: vi.fn(),
+  mockTemplatePreview: vi.fn(),
   mockDestCreate: vi.fn(),
   mockDestUpdate: vi.fn(),
   mockDestTest: vi.fn(),
   mockDestGetByName: vi.fn(),
 }));
 
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    get_system_templates: mockGetSystemTemplates,
-    get_by_name: mockGetByName,
-  },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_system_templates: mockGetSystemTemplates,
+      get_by_name: mockGetByName,
+      preview: mockTemplatePreview,
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: mockDestCreate,
-    update: mockDestUpdate,
-    test: mockDestTest,
-    get_by_name: mockDestGetByName,
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: mockDestCreate,
+      update: mockDestUpdate,
+      test: mockDestTest,
+      get_by_name: mockDestGetByName,
+    },
+  });
+});
 
 // The real prebuilt-templates utilities are lightweight and have no side
 // effects, so we let them run. However we need to stub out the
@@ -906,6 +929,246 @@ describe("usePrebuiltDestinations", () => {
       const preview = await generatePreview("slack", makeSlackCredentials());
       // Should return a string (fallback template), not throw
       expect(typeof preview).toBe("string");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // renderTemplateBody
+  // -------------------------------------------------------------------------
+  describe("renderTemplateBody", () => {
+    const NEW_VARIABLES = [
+      "org_name",
+      "alert_type",
+      "episode_id",
+      "alert_period",
+      "alert_agg_value",
+      "alert_description",
+      "alert_start_time",
+      "alert_end_time",
+      "alert_trigger_time",
+      "alert_trigger_time_millis",
+      "alert_trigger_time_seconds",
+    ];
+    // The template is always fetched by name; this is what the fetch returns.
+    const fetchedTemplate = (body: string, kind: "custom" | "content" = "custom") =>
+      mockGetByName.mockResolvedValue({ data: { name: "tmpl", type: "http", kind, body } });
+
+    it("fills every documented variable with a JSON-string-safe value", async () => {
+      const { renderTemplateBody } = usePrebuiltDestinations();
+      fetchedTemplate(`{${NEW_VARIABLES.map((key) => `"${key}": "{${key}}"`).join(", ")}}`);
+
+      const parsed = JSON.parse(await renderTemplateBody("tmpl"));
+
+      expect(mockGetByName).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        template_name: "tmpl",
+      });
+      for (const key of NEW_VARIABLES) expect(parsed[key]).not.toBe(`{${key}}`);
+      expect(parsed.org_name).toBe("test-org");
+      // Same shape the server sends: %Y-%m-%dT%H:%M:%S.
+      expect(parsed.alert_start_time).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+      expect(parsed.alert_end_time).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+      expect(mockTemplatePreview).not.toHaveBeenCalled();
+    });
+
+    it("fills numeric variables so an unquoted token still yields valid JSON", async () => {
+      const { renderTemplateBody } = usePrebuiltDestinations();
+      fetchedTemplate(
+        '{"ts": {alert_trigger_time}, "ms": {alert_trigger_time_millis}, ' +
+          '"s": {alert_trigger_time_seconds}, "period": {alert_period}, "value": {alert_agg_value}, ' +
+          '"threshold": {alert_threshold}, "count": {alert_count}}',
+      );
+
+      const parsed = JSON.parse(await renderTemplateBody("tmpl"));
+
+      expect(Object.values(parsed).every((value) => typeof value === "number")).toBe(true);
+    });
+
+    it("leaves unknown tokens and {rows} as written", async () => {
+      const { renderTemplateBody } = usePrebuiltDestinations();
+      fetchedTemplate("{alert_name} on {rows} with {not_a_variable}");
+
+      const body = await renderTemplateBody("tmpl");
+
+      expect(body).toContain("Test Alert - High CPU Usage");
+      // {rows} is never faked (see useTemplatePreview).
+      expect(body).toContain("{rows}");
+      expect(body).toContain("{not_a_variable}");
+    });
+
+    it("renders a content template through the webhook channel", async () => {
+      mockTemplatePreview.mockResolvedValue({ data: { payload: { text: "hello" } } });
+      fetchedTemplate(JSON.stringify({ title: "CPU" }), "content");
+      const { renderTemplateBody } = usePrebuiltDestinations();
+
+      const body = await renderTemplateBody("tmpl");
+
+      expect(mockTemplatePreview).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        data: { definition: { title: "CPU" }, channel: "webhook" },
+      });
+      expect(body).toBe(JSON.stringify({ text: "hello" }, null, 2));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // testCustomDestination
+  // -------------------------------------------------------------------------
+  describe("testCustomDestination", () => {
+    const customInput = (overrides: Record<string, unknown> = {}) => ({
+      url: "  https://hooks.example.com/in  ",
+      method: "put",
+      headers: { "X-Token": "abc" } as Record<string, string>,
+      skipTlsVerify: true,
+      template: "raw",
+      ...overrides,
+    });
+    const fetchedTemplate = (body: string, kind: "custom" | "content" = "custom") =>
+      mockGetByName.mockResolvedValue({ data: { name: "raw", type: "http", kind, body } });
+
+    beforeEach(() => {
+      fetchedTemplate('{"alert": "{alert_name}"}');
+    });
+
+    it("posts the trimmed url, method, skipTlsVerify and rendered body", async () => {
+      mockDestTest.mockResolvedValue({
+        data: { success: true, statusCode: 200, responseBody: "ok" },
+      });
+      const { testCustomDestination, lastTestResult, isTestInProgress } = usePrebuiltDestinations();
+
+      const result = await testCustomDestination(customInput());
+
+      expect(mockDestTest).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        data: {
+          url: "https://hooks.example.com/in",
+          method: "put",
+          headers: { "X-Token": "abc", "Content-Type": "application/json" },
+          body: '{"alert": "Test Alert - High CPU Usage"}',
+          skipTlsVerify: true,
+        },
+      });
+      expect(result).toEqual(
+        expect.objectContaining({ success: true, statusCode: 200, responseBody: "ok" }),
+      );
+      expect(lastTestResult.value).toEqual(result);
+      expect(isTestInProgress.value).toBe(false);
+    });
+
+    it("keeps a user content-type header in any case without adding a second", async () => {
+      mockDestTest.mockResolvedValue({ data: { success: true, statusCode: 200 } });
+      const { testCustomDestination } = usePrebuiltDestinations();
+
+      await testCustomDestination(customInput({ headers: { "content-type": "text/plain" } }));
+
+      expect(mockDestTest.mock.calls[0][0].data.headers).toEqual({
+        "content-type": "text/plain",
+      });
+    });
+
+    it("fails without a request when the url is empty", async () => {
+      const { testCustomDestination, lastTestResult } = usePrebuiltDestinations();
+
+      const result = await testCustomDestination(customInput({ url: "   " }));
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Validation error: URL is required");
+      expect(lastTestResult.value).toEqual(result);
+      expect(mockDestTest).not.toHaveBeenCalled();
+    });
+
+    it("fails without a request when no template is selected", async () => {
+      const { testCustomDestination } = usePrebuiltDestinations();
+
+      const result = await testCustomDestination(customInput({ template: undefined }));
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Validation error: Template is required");
+      expect(mockDestTest).not.toHaveBeenCalled();
+    });
+
+    it("sends the webhook payload of a content template", async () => {
+      mockTemplatePreview.mockResolvedValue({ data: { payload: { text: "hello" } } });
+      mockDestTest.mockResolvedValue({ data: { success: true, statusCode: 200 } });
+      fetchedTemplate(JSON.stringify({ title: "CPU" }), "content");
+      const { testCustomDestination } = usePrebuiltDestinations();
+
+      await testCustomDestination(customInput());
+
+      expect(mockTemplatePreview).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        data: { definition: { title: "CPU" }, channel: "webhook" },
+      });
+      expect(mockDestTest.mock.calls[0][0].data.body).toBe(
+        JSON.stringify({ text: "hello" }, null, 2),
+      );
+    });
+
+    it("reports the backend message when the template cannot be fetched", async () => {
+      mockGetByName.mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 404"), {
+          response: { status: 404, data: { message: "Template not found" } },
+        }),
+      );
+      const { testCustomDestination } = usePrebuiltDestinations();
+
+      const result = await testCustomDestination(customInput({ template: "deleted" }));
+
+      expect(result).toEqual(
+        expect.objectContaining({ success: false, error: "Template not found" }),
+      );
+      expect(mockDestTest).not.toHaveBeenCalled();
+    });
+
+    it("fails without a test request when a content template body is not valid JSON", async () => {
+      fetchedTemplate("{oops", "content");
+      const { testCustomDestination, isTestInProgress } = usePrebuiltDestinations();
+
+      const result = await testCustomDestination(customInput());
+
+      expect(result.success).toBe(false);
+      expect(mockTemplatePreview).not.toHaveBeenCalled();
+      expect(mockDestTest).not.toHaveBeenCalled();
+      expect(isTestInProgress.value).toBe(false);
+    });
+
+    it("prefers the backend message when the request fails", async () => {
+      mockDestTest.mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 400"), {
+          response: { data: { message: "Invalid destination URL" } },
+        }),
+      );
+      const { testCustomDestination } = usePrebuiltDestinations();
+
+      const result = await testCustomDestination(customInput());
+
+      expect(result).toEqual(
+        expect.objectContaining({ success: false, error: "Invalid destination URL" }),
+      );
+    });
+
+    it("does not let a superseded call overwrite the latest result", async () => {
+      let resolveFirst:
+        ((value: { data: { success: boolean; statusCode: number } }) => void) | null = null;
+      mockDestTest
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+        )
+        .mockResolvedValueOnce({ data: { success: false, statusCode: 500 } });
+      const { testCustomDestination, lastTestResult, isTestInProgress } = usePrebuiltDestinations();
+
+      const first = testCustomDestination(customInput());
+      await vi.waitFor(() => expect(mockDestTest).toHaveBeenCalledTimes(1));
+      await testCustomDestination(customInput());
+      resolveFirst?.({ data: { success: true, statusCode: 200 } });
+      await first;
+
+      expect(lastTestResult.value).toEqual(
+        expect.objectContaining({ success: false, statusCode: 500 }),
+      );
+      expect(isTestInProgress.value).toBe(false);
     });
   });
 });

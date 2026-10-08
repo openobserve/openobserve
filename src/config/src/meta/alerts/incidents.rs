@@ -369,6 +369,10 @@ pub struct Incident {
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assigned_to: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acknowledged_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acknowledged_at: Option<i64>,
 
     pub created_at: i64,
     pub updated_at: i64,
@@ -1861,6 +1865,8 @@ mod tests {
             alert_count: 1,
             title,
             assigned_to,
+            acknowledged_by: None,
+            acknowledged_at: None,
             created_at: 1000,
             updated_at: 2000,
             group_values: serde_json::Value::Null,
@@ -1878,6 +1884,8 @@ mod tests {
         assert!(!obj.contains_key("title"));
         assert!(!obj.contains_key("assigned_to"));
         assert!(!obj.contains_key("topology_context"));
+        assert!(!obj.contains_key("acknowledged_by"));
+        assert!(!obj.contains_key("acknowledged_at"));
     }
 
     #[test]
@@ -1895,6 +1903,20 @@ mod tests {
         assert!(obj.contains_key("title"));
         assert_eq!(obj["title"], serde_json::json!("High CPU"));
         assert!(obj.contains_key("assigned_to"));
+    }
+
+    #[test]
+    fn test_incident_acknowledged_by_at_present_in_json() {
+        let mut incident = make_incident(None, None, None, None);
+        incident.acknowledged_by = Some("user@example.com".to_string());
+        incident.acknowledged_at = Some(1500);
+        let json = serde_json::to_value(&incident).unwrap();
+        let obj = json.as_object().unwrap();
+        assert_eq!(
+            obj["acknowledged_by"],
+            serde_json::json!("user@example.com")
+        );
+        assert_eq!(obj["acknowledged_at"], serde_json::json!(1500_i64));
     }
 
     #[test]

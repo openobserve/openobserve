@@ -102,13 +102,7 @@
             </OButton>
           </template>
           <ODropdownItem
-            v-if="
-              !hideSearchTermActions &&
-              searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                item.name === key ? item.isSchemaField : '',
-              ) &&
-              multiStreamFields.includes(key)
-            "
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
             data-test="log-details-include-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
@@ -116,13 +110,7 @@
             {{ t("common.includeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="
-              !hideSearchTermActions &&
-              searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                item.name === key ? item.isSchemaField : '',
-              ) &&
-              multiStreamFields.includes(key)
-            "
+            v-if="!hideSearchTermActions && canFilterOnField(key)"
             data-test="log-details-exclude-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
@@ -130,7 +118,7 @@
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="key !== store.state.zoConfig.timestamp_column"
+            v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
             icon-left="visibility"
@@ -180,12 +168,12 @@
               v-if="getContentSize(value[key]) > 50000"
               :data="value[key]"
               :field-key="`json_preview_${key}`"
-              :query-string="highlightQuery"
+              :query-string="scopeHighlightQuery(highlightQuery, String(key))"
               :simple-mode="false" /><LogsHighLighting
               v-else
               :data="getDisplayValue(key, value[key])"
               :show-braces="false"
-              :query-string="highlightQuery" /></span
+              :query-string="scopeHighlightQuery(highlightQuery, String(key))" /></span
           ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
@@ -254,6 +242,7 @@ import {
 } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -283,6 +272,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
+import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 
 export default {
   name: "JsonPreview",
@@ -325,6 +315,12 @@ export default {
       default: false,
     },
     hideFieldOptions: {
+      type: Boolean,
+      default: false,
+    },
+    // Hide only the "Add field to the table" action (not the whole field menu) —
+    // used where there is no logs results table to add columns to.
+    hideAddFieldToTable: {
       type: Boolean,
       default: false,
     },
@@ -672,6 +668,12 @@ export default {
       }
     };
 
+    // `_stream_name` is in no schema; a filter on it is rewritten per stream.
+    const canFilterOnField = (key: string) =>
+      key === STREAM_NAME_FIELD ||
+      (isFilterableLogField(key, searchObj.data.stream.selectedStreamFields) &&
+        multiStreamFields.value.includes(key));
+
     const updateMultiStreamFields = () => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
         if (item.streams?.length == searchObj.data.stream.selectedStream.length) {
@@ -856,6 +858,7 @@ export default {
     };
 
     return {
+      scopeHighlightQuery,
       t,
       copyLogToClipboard,
       getImageURL,
@@ -865,6 +868,7 @@ export default {
       store,
       searchObj,
       multiStreamFields,
+      canFilterOnField,
       redirectToTraces,
       openCorrelation,
       filteredTracesStreamOptions,

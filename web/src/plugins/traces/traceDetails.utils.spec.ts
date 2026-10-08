@@ -4,7 +4,7 @@
 // session ID to display in the trace-details header.
 
 import { describe, it, expect } from "vitest";
-import { resolveSessionId } from "./traceDetails.utils";
+import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 
 describe("resolveSessionId", () => {
   // Empty / null / undefined inputs → "" so the header template hides
@@ -79,5 +79,90 @@ describe("resolveSessionId", () => {
   it("treats empty-string IDs as missing", () => {
     const spans = [{ session_id: "" }, { session_id: "real" }];
     expect(resolveSessionId(spans)).toBe("real");
+  });
+});
+
+describe("resolveUrlTimeRange", () => {
+  // 0/0 is the endpoint's "no caller range", so an absent window lets the
+  // trace time index derive it from the trace itself.
+  it.each([
+    [undefined, undefined],
+    ["", ""],
+    ["abc", "def"],
+  ])("collapses unusable bounds %j / %j to 0/0", (from, to) => {
+    expect(resolveUrlTimeRange(from, to)).toEqual({ from: 0, to: 0 });
+  });
+
+  // Half a window is its own 400 ("must be provided together" / "must both be
+  // zero or non-zero"), so one good bound must never survive on its own.
+  it.each([
+    ["1752490492843", undefined],
+    [undefined, "1752490493164"],
+    ["1752490492843", "0"],
+    ["0", "1752490493164"],
+  ])("collapses both bounds when only one is usable: %j / %j", (from, to) => {
+    expect(resolveUrlTimeRange(from, to)).toEqual({ from: 0, to: 0 });
+  });
+
+  // Inverted and non-positive pairs are 400s too.
+  it.each([
+    ["1752490493164", "1752490492843"],
+    ["-2", "-1"],
+  ])("collapses inverted or non-positive bounds %j / %j", (from, to) => {
+    expect(resolveUrlTimeRange(from, to)).toEqual({ from: 0, to: 0 });
+  });
+
+  it("passes a sane window through unchanged", () => {
+    expect(resolveUrlTimeRange("1752490492843", "1752490493164")).toEqual({
+      from: 1752490492843,
+      to: 1752490493164,
+    });
+  });
+});
+
+describe("resolveReplaySpan", () => {
+  it.each([[null], [undefined], [[]]])("returns null for %j", (input) => {
+    expect(resolveReplaySpan(input as any)).toBeNull();
+  });
+
+  it("returns null when spans carry a RUM session id but no replay flag", () => {
+    const spans = [{ span_id: "rum_view_v1", rum_session_id: "sess-1" }];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  it("returns null when the replay flag is explicitly false", () => {
+    const spans = [
+      { span_id: "rum_view_v1", rum_session_id: "sess-1", rum_session_has_replay: false },
+    ];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  it("returns null when a span has the replay flag but no RUM session id", () => {
+    const spans = [{ span_id: "rum_view_v1", rum_session_has_replay: true }];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  // Backend spans carry the AI conversation id as session_id; it is not a RUM session.
+  it("ignores backend spans that carry session_id or gen_ai_conversation_id", () => {
+    const spans = [
+      { span_id: "s-1", session_id: "conv-1", gen_ai_conversation_id: "conv-1" },
+      { span_id: "s-2", session_id: "conv-1" },
+    ];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
+
+  it("returns the first span that has both a RUM session id and the replay flag", () => {
+    const first = {
+      span_id: "rum_view_v1",
+      rum_session_id: "sess-1",
+      rum_session_has_replay: true,
+    };
+    const spans = [
+      { span_id: "s-0", session_id: "conv-1" },
+      { span_id: "rum_view_v0", rum_session_id: "sess-0", rum_session_has_replay: false },
+      first,
+      { span_id: "rum_action_a1", rum_session_id: "sess-1", rum_session_has_replay: true },
+    ];
+    expect(resolveReplaySpan(spans)).toBe(first);
   });
 });

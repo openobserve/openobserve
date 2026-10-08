@@ -28,7 +28,7 @@ use config::{
     utils::size::bytes_to_human_readable,
 };
 use db::{self, scheduler::TriggerModule::QueryRecommendations};
-use infra::runtime::{create_grpc_runtime, create_job_runtime};
+use infra::runtime::{create_grpc_runtime, create_job_runtime, create_main_runtime};
 use openobserve::{
     cli::basic::cli,
     migration,
@@ -50,7 +50,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[cfg(feature = "profiling")]
+// Apple jemalloc is always prefixed (`_rjem_`); other targets use unprefixed `malloc_conf`.
+#[cfg(all(feature = "profiling", target_vendor = "apple"))]
+#[allow(non_upper_case_globals)]
+#[unsafe(export_name = "_rjem_malloc_conf")]
+pub static malloc_conf: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:16\0";
+
+#[cfg(all(feature = "profiling", not(target_vendor = "apple")))]
 #[allow(non_upper_case_globals)]
 #[unsafe(export_name = "malloc_conf")]
 pub static malloc_conf: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:16\0";
@@ -62,8 +68,12 @@ async fn flush_reporting() {
     usage_reporting::flush().await;
 }
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), anyhow::Error> {
+    create_main_runtime()?.block_on(run())
+}
+
+// the HTTP leader parses and rewrites SQL here, so it needs the same stack as the other runtimes
+async fn run() -> Result<(), anyhow::Error> {
     // CLI provides the path to the config file (if any)
     // In case a custom path is provided, the file will be read first
     // and config variables will be loaded.
@@ -181,17 +191,39 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("infra init failed: {e}");
             }
 
+            // Must precede every cipher_keys read or write, including default-org creation.
+            #[cfg(feature = "enterprise")]
+            let master_key = Some(
+                o2_enterprise::enterprise::common::config::get_config()
+                    .encryption
+                    .master_key
+                    .clone(),
+            );
+            #[cfg(not(feature = "enterprise"))]
+            let master_key: Option<String> = None;
+            if let Err(e) = infra::table::cipher::boot(master_key.as_deref()).await {
+                job_init_tx.send(false).ok();
+                panic!("cipher master key boot failed: {e}");
+            }
+
             if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");
             }
 
             // Initialize MCP tools from the OpenAPI spec for all editions.
-            let api = openapi::ApiDoc::openapi();
-            if let Err(e) = openobserve_mcp::tools::init_mcp_tools(&api) {
-                log::error!("Failed to initialize MCP tools: {e}");
+            // Deriving the registry materialises the whole OpenAPI spec plus a
+            // tool (with its JSON schema) per operation, all retained for the
+            // process lifetime, so a node that serves no MCP client can skip it.
+            if get_config().common.mcp_enabled {
+                let api = openapi::ApiDoc::openapi();
+                if let Err(e) = openobserve_mcp::tools::init_mcp_tools(&api) {
+                    log::error!("Failed to initialize MCP tools: {e}");
+                } else {
+                    log::info!("Initialized MCP tools");
+                }
             } else {
-                log::info!("Initialized MCP tools");
+                log::info!("MCP is disabled, skipping MCP tool registry");
             }
 
             // init enterprise

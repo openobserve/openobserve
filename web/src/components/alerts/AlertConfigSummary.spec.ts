@@ -282,9 +282,19 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(value(wrapper, "query-mode")).toBe(translated("alerts.anomaly.filters"));
     expect(value(wrapper, "detection-function")).toBe("avg(took)");
     expect(value(wrapper, "filters")).toBe("service = 'checkout'");
-    // 97 is the percentile scored against; the form shows its complement.
+    // No band width and no trained k yet: Auto, never the legacy percentile.
+    expect(value(wrapper, "sensitivity")).toBe(translated("alerts.anomaly.sensitivityAuto"));
+  });
+
+  it("shows the enforced cap for a budget-mode config instead of the derived percentile", () => {
+    const wrapper = mountSummary({ ...anomalyConfig(), alert_budget_per_day: 2 });
     expect(value(wrapper, "sensitivity")).toBe(
-      translated("alerts.anomaly.summaryThresholdRate", { rate: 3 }),
+      translated("alerts.anomaly.summaryBudgetPerDay", { count: 2 }),
+    );
+
+    const weekly = mountSummary({ ...anomalyConfig(), alert_budget_per_day: 1 / 7 });
+    expect(value(weekly, "sensitivity")).toBe(
+      translated("alerts.anomaly.summaryBudgetPerWeek", { count: 1 }),
     );
   });
 
@@ -318,6 +328,75 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(value(wrapper, "last-trained")).toBe("2026-08-31 00:00:00");
     // A permanent empty row would imply a slot worth watching.
     expect(field(wrapper, "last-error").exists()).toBe(false);
+  });
+
+  it("explains the band: grouping, training span, and Auto with the trained k", () => {
+    const wrapper = mountSummary(
+      anomalyConfig({
+        band_grouping: "weekend_hour",
+        band_k: 3.4567,
+        training_data_start_us: 1786924800000000,
+        training_data_end_us: 1788134400000000,
+      }),
+    );
+
+    expect(value(wrapper, "band-grouping")).toBe(
+      translated("alerts.anomaly.bandGroupingWeekendHour"),
+    );
+    expect(value(wrapper, "training-span")).toBe(
+      translated("alerts.anomaly.trainingSpanValue", {
+        start: "2026-08-17 00:00:00",
+        end: "2026-08-31 00:00:00",
+      }),
+    );
+    expect(value(wrapper, "sensitivity")).toBe(
+      translated("alerts.anomaly.sensitivityAutoTrained", { k: 3.46 }),
+    );
+    expect(field(wrapper, "band-width").exists()).toBe(false);
+  });
+
+  it("shows the set band width as the sensitivity, over the trained k", () => {
+    const wrapper = mountSummary(anomalyConfig({ band_width: 3.5, band_k: 3.2 }));
+    expect(value(wrapper, "sensitivity")).toBe("3.5σ");
+  });
+
+  it("shows the alert direction and the window share with the server defaults filled in", () => {
+    const defaults = mountSummary(anomalyConfig());
+    expect(value(defaults, "alert-direction")).toBe(translated("alerts.anomaly.directionBoth"));
+    expect(value(defaults, "window-share")).toBe(
+      translated("alerts.anomaly.windowShareCompact", { fire: 100, buckets: 1, recover: 100 }),
+    );
+
+    const set = mountSummary(
+      anomalyConfig({
+        alert_direction: "above",
+        alert_window_buckets: 5,
+        alert_window_fire_pct: 80,
+        alert_window_recover_pct: 60,
+      }),
+    );
+    expect(value(set, "alert-direction")).toBe(translated("alerts.anomaly.directionAbove"));
+    expect(value(set, "window-share")).toBe(
+      translated("alerts.anomaly.windowShareCompact", { fire: 80, buckets: 5, recover: 60 }),
+    );
+  });
+
+  it("names every grouping the trainer writes, and the retired ones a row keeps until retrain", () => {
+    expect(
+      value(mountSummary(anomalyConfig({ band_grouping: "hour_of_week" })), "band-grouping"),
+    ).toBe(translated("alerts.anomaly.bandGroupingHourOfWeek"));
+    expect(
+      value(mountSummary(anomalyConfig({ band_grouping: "hour_of_day" })), "band-grouping"),
+    ).toBe(translated("alerts.anomaly.bandGroupingHourOfDay"));
+    expect(value(mountSummary(anomalyConfig({ band_grouping: "global" })), "band-grouping")).toBe(
+      translated("alerts.anomaly.bandGroupingGlobal"),
+    );
+  });
+
+  it("dashes the band fields for a config trained before they existed", () => {
+    const wrapper = mountSummary(anomalyConfig());
+    expect(value(wrapper, "band-grouping")).toBe("—");
+    expect(value(wrapper, "training-span")).toBe("—");
   });
 
   it("surfaces the training error when there is one", () => {

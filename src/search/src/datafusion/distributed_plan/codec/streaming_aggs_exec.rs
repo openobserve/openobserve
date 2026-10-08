@@ -21,7 +21,10 @@ use datafusion::{
     execution::TaskContext,
     physical_plan::{ExecutionPlan, aggregates::AggregateExec},
 };
-use datafusion_proto::{physical_plan::AsExecutionPlan, protobuf::PhysicalPlanNode};
+use datafusion_proto::{
+    physical_plan::{PhysicalPlanNodeExt, PhysicalProtoConverterExtension},
+    protobuf::PhysicalPlanNode,
+};
 use prost::Message;
 use proto::cluster_rpc;
 
@@ -31,12 +34,20 @@ pub fn try_decode(
     node: cluster_rpc::StreamingAggsExecNode,
     inputs: &[Arc<dyn ExecutionPlan>],
     ctx: &TaskContext,
+    proto_converter: &dyn PhysicalProtoConverterExtension,
 ) -> Result<Arc<dyn ExecutionPlan>> {
+    if inputs.len() != 1 {
+        return internal_err!("StreamingAggsExec expected 1 input, got {}", inputs.len());
+    }
     let Some(aggregate_plan) = node.aggregate_plan else {
         return internal_err!("aggregate_plan is required");
     };
     let extension_codec = super::get_physical_extension_codec();
-    let aggregate_plan = aggregate_plan.try_into_physical_plan(ctx, &extension_codec)?;
+    let aggregate_plan = aggregate_plan.try_into_physical_plan_with_converter(
+        ctx,
+        &extension_codec,
+        proto_converter,
+    )?;
     let Some(aggregate_plan) = aggregate_plan.downcast_ref::<AggregateExec>() else {
         return internal_err!("aggregate_plan is not an AggregateExec");
     };
@@ -61,15 +72,22 @@ pub fn try_decode(
     )))
 }
 
-pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+pub fn try_encode(
+    node: Arc<dyn ExecutionPlan>,
+    buf: &mut Vec<u8>,
+    proto_converter: &dyn PhysicalProtoConverterExtension,
+) -> Result<()> {
     let Some(node) = node.downcast_ref::<StreamingAggsExec>() else {
         return internal_err!("Not supported");
     };
 
     // serialize execution plan to proto
     let extension_codec = super::get_physical_extension_codec();
-    let aggregate_plan =
-        PhysicalPlanNode::try_from_physical_plan(node.aggregate_plan().clone(), &extension_codec)?;
+    let aggregate_plan = PhysicalPlanNode::try_from_physical_plan_with_converter(
+        node.aggregate_plan().clone(),
+        &extension_codec,
+        proto_converter,
+    )?;
     let plan_node = cluster_rpc::StreamingAggsExecNode {
         id: node.id().to_string(),
         start_time: node.start_time(),
@@ -274,6 +292,130 @@ mod tests {
         // The input should be a FilterExec
         assert!(input_plan.downcast_ref::<FilterExec>().is_some());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_decode_without_input_is_error() -> Result<()> {
+        use datafusion_proto::protobuf::physical_plan_node::PhysicalPlanType;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let agg_plan = AggregateExec::try_new(
+            AggregateMode::Partial,
+            PhysicalGroupBy::new(
+                vec![(col("a", &schema)?, "a".to_string())],
+                vec![],
+                vec![vec![false]],
+                false,
+            ),
+            vec![Arc::new(
+                AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
+                    .schema(Arc::clone(&schema))
+                    .alias("COUNT(1)")
+                    .build()?,
+            )],
+            vec![None],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(StreamingAggsExec::new(
+            "no_input".to_string(),
+            0,
+            1000,
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            1,
+            false,
+            Arc::new(agg_plan),
+            false,
+        ));
+        let codec = super::super::get_physical_extension_codec();
+        let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
+        let mut proto = PhysicalPlanNode::decode(bytes.as_ref()).unwrap();
+        let Some(PhysicalPlanType::Extension(ext)) = proto.physical_plan_type.as_mut() else {
+            panic!("expected an extension node");
+        };
+        ext.inputs.clear();
+        let ctx = datafusion::prelude::SessionContext::new();
+
+        let ret = physical_plan_from_bytes_with_extension_codec(
+            &proto.encode_to_vec(),
+            &ctx.task_ctx(),
+            &codec,
+        );
+
+        assert!(ret.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_decoded_cached_files_traversal_fails_closed() -> Result<()> {
+        use datafusion::{
+            arrow::{array::Int32Array, ipc::writer::FileWriter},
+            physical_plan::collect,
+        };
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let outside = tempfile::tempdir().unwrap();
+        let planted = outside.path().join("planted.arrow");
+        let batch = datafusion::arrow::array::RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(Int32Array::from(vec![42]))],
+        )?;
+        let mut writer = FileWriter::try_new(std::fs::File::create(&planted)?, &schema)?;
+        writer.write(&batch)?;
+        writer.finish()?;
+        // the OS only resolves `..` through directories that exist, as they do on a live node
+        let cache_root = infra::cache::file_data::disk::get_dir().await;
+        std::fs::create_dir_all(format!("{cache_root}aggregations"))?;
+        let escaping = format!(
+            "aggregations/{}{}",
+            "../".repeat(64),
+            planted.to_str().unwrap().trim_start_matches('/')
+        );
+
+        let agg_plan = AggregateExec::try_new(
+            AggregateMode::Partial,
+            PhysicalGroupBy::new(
+                vec![(col("a", &schema)?, "a".to_string())],
+                vec![],
+                vec![vec![false]],
+                false,
+            ),
+            vec![Arc::new(
+                AggregateExprBuilder::new(count_udaf(), vec![lit(1i32)])
+                    .schema(Arc::clone(&schema))
+                    .alias("COUNT(1)")
+                    .build()?,
+            )],
+            vec![None],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(StreamingAggsExec::new(
+            "traversal".to_string(),
+            0,
+            1000,
+            vec![Arc::new(escaping)],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            1,
+            true,
+            Arc::new(agg_plan),
+            false,
+        ));
+        let codec = super::super::get_physical_extension_codec();
+        let bytes = physical_plan_to_bytes_with_extension_codec(plan, &codec)?;
+        let ctx = datafusion::prelude::SessionContext::new();
+        let decoded =
+            physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &codec)?;
+
+        let ret = collect(decoded, ctx.task_ctx()).await;
+
+        assert!(
+            ret.is_err(),
+            "file outside the cache root was read: {:?}",
+            ret.map(|b| b.iter().map(|b| b.num_rows()).sum::<usize>())
+        );
         Ok(())
     }
 }

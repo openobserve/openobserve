@@ -196,6 +196,7 @@ export function useServiceCorrelation() {
           logs: correlationData.related_streams.logs.map((s: StreamInfo) => s.stream_name),
           traces: correlationData.related_streams.traces.map((s: StreamInfo) => s.stream_name),
           metrics: correlationData.related_streams.metrics.map((s: StreamInfo) => s.stream_name),
+          profiles: correlationData.related_streams.profiles.map((s: StreamInfo) => s.stream_name),
         },
         first_seen: 0,
         last_seen: 0,

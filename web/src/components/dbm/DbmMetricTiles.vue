@@ -94,6 +94,8 @@ export interface DbmMetricTile {
   detailTone?: string;
   /** Corner icon (OIcon name) for the KPI-card rendering of this figure. */
   icon?: IconName;
+  /** The figure came from the application's traces, so it carries the app-source marker. */
+  fromApp?: boolean;
 }
 
 const props = withDefaults(

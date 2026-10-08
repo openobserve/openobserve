@@ -211,7 +211,7 @@ pub fn generate_quick_mode_fields(
                 && let Ok(field) = schema.field_with_name(field)
             {
                 fields.push(Arc::new(field.clone()));
-                fields_name.insert(field.to_string());
+                fields_name.insert(field.name().to_string());
             }
         }
     } else if fields_name.contains(ALL_VALUES_COL_NAME) {
@@ -224,7 +224,7 @@ pub fn generate_quick_mode_fields(
             && let Ok(field) = schema.field_with_name(field)
         {
             fields.push(Arc::new(field.clone()));
-            fields_name.insert(field.to_string());
+            fields_name.insert(field.name().to_string());
         }
     }
 
@@ -503,6 +503,34 @@ mod tests {
 
         let logs = generate_quick_mode_fields(&schema, None, &[], false, false, StreamType::Logs);
         assert!(!logs.iter().any(|f| f.name() == "span_status"));
+    }
+
+    #[test]
+    fn test_generate_quick_mode_fields_no_duplicates() {
+        // A column several guards can add must appear once, or DataFusion rejects the plan.
+        let over_cutoff = get_config().limit.quick_mode_num_fields + 100;
+        let mut fields = (0..over_cutoff)
+            .map(|i| Arc::new(Field::new(format!("field{i}"), DataType::Utf8, true)))
+            .collect::<Vec<_>>();
+        for name in ["message", "service_name", "session_id", "trace_id"] {
+            fields.push(Arc::new(Field::new(name, DataType::Utf8, true)));
+        }
+        let schema = Schema::new(fields);
+
+        let result = generate_quick_mode_fields(
+            &schema,
+            None,
+            &["message".to_string(), "service_name".to_string()],
+            false,
+            true,
+            StreamType::Traces,
+        );
+
+        let mut names = HashSet::new();
+        for field in &result {
+            assert!(names.insert(field.name()), "duplicate {}", field.name());
+        }
+        assert!(result.iter().any(|f| f.name() == "session_id"));
     }
 
     #[test]

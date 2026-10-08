@@ -174,7 +174,7 @@ test.describe('Anomaly Detection', () => {
   });
 
   // ════════════════════════════════════════════════════════════════════════
-  // Sensitivity — tier toggle and percentile input share the `threshold` field
+  // Sensitivity — tier toggle and level input share the `band_width` field (k, in σ)
   // ════════════════════════════════════════════════════════════════════════
 
   test.describe('Sensitivity', () => {
@@ -188,74 +188,99 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.cancel();
     });
 
-    test('each tier writes its percentile into the shared threshold field', {
+    test('each tier writes its band width into the shared level field', {
       tag: ['@anomaly', '@P0', '@smoke', '@all'],
     }, async () => {
-      for (const [tier, percentile] of [[99, '99'], [97, '97'], [95, '95']]) {
+      for (const [tier, level] of [[4, '4'], [3, '3'], [2.5, '2.5']]) {
         await pm.anomalyDetectionPage.selectSensitivityTier(tier);
-        expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe(percentile);
+        expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe(level);
         expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(tier);
       }
     });
 
-    test('typing a tier percentile lights that tier up', {
+    test('a new alert starts at Auto, with the level blank', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setSensitivityPercentile(95);
-      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(95);
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
     });
 
-    test('an off-tier percentile is accepted with no tier selected', {
+    test('Auto clears an override back to a blank level', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setSensitivityPercentile(88);
+      await pm.anomalyDetectionPage.selectSensitivityTier(4);
+      await pm.anomalyDetectionPage.selectSensitivityTier('auto');
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+    });
+
+    test('typing a tier value lights that tier up', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setSensitivityLevel(2.5);
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe(2.5);
+    });
+
+    test('an off-tier level is accepted with no tier selected', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setSensitivityLevel(3.5);
       await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBeNull();
     });
 
-    test('the hint restates the flag rate at the current resolution', {
+    test('the hint names the band the buckets are judged against', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
-      await pm.anomalyDetectionPage.selectSensitivityTier(97);
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
 
-      // 97 flags the most unusual 3% of buckets; at 5m resolution that is
-      // 288 buckets/day * 0.03 ≈ 9 per day.
       const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
       await expect(hint).toBeVisible();
-      await expect(hint).toContainText('3%');
-      await expect(hint).toContainText('5m');
+      await expect(hint).toContainText('± 3σ');
+
+      // The number is interpolated, not baked into the string: a stale hint would keep 3.
+      await pm.anomalyDetectionPage.selectSensitivityTier(4);
+      await expect(hint).toContainText('± 4σ');
     });
 
-    test('the hint recomputes when the resolution changes', {
+    test('the hint does not vary with the resolution', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.selectSensitivityTier(97);
+      await pm.anomalyDetectionPage.selectSensitivityTier(3);
       await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
       const atFiveMinutes = await pm.anomalyDetectionPage.getSensitivityHintLocator().textContent();
 
       await pm.anomalyDetectionPage.setHistogramInterval(1, 'h');
-      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).not.toHaveText(atFiveMinutes);
-      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toContainText('1h');
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toHaveText(atFiveMinutes);
     });
 
-    for (const [label, value] of [['below the floor', 49], ['above the ceiling', 100], ['fractional', 97.5]]) {
-      test(`rejects a ${label} percentile`, {
+    for (const [label, value] of [['below the floor', 0.5], ['above the ceiling', 10.5]]) {
+      test(`rejects a ${label} band width`, {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async () => {
-        await pm.anomalyDetectionPage.setSensitivityPercentile(value);
+        await pm.anomalyDetectionPage.setSensitivityLevel(value);
         await pm.anomalyDetectionPage.save();
         await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toHaveText(
-          'Enter a whole number between 50 and 99',
+          'Enter a band width from 1 to 10.',
         );
       });
     }
 
-    test('the hint is suppressed while the percentile is invalid', {
+    test('the hint is suppressed while the level is invalid', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async () => {
-      await pm.anomalyDetectionPage.setSensitivityPercentile(49);
+      await pm.anomalyDetectionPage.setSensitivityLevel(0.5);
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
+    });
+
+    test('the level control is labeled Level and measured in σ', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      const label = pm.anomalyDetectionPage.getSensitivityLevelLabelLocator();
+      await expect(label).toBeVisible();
+      await expect(label).toHaveText('Level');
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toContainText('σ');
     });
   });
 
@@ -320,6 +345,20 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();
     });
+
+    test('the Detection Function label explains p50/p95/p99 measure a field, not sensitivity', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async () => {
+      const info = pm.anomalyDetectionPage.getDetectionFunctionInfoLocator();
+      await expect(info).toBeVisible();
+
+      await info.hover();
+      const tooltip = pm.anomalyDetectionPage.getTooltipContentLocator();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText('p95');
+      await expect(tooltip).toContainText('field');
+      await expect(tooltip).not.toContainText('sensitivity');
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════════
@@ -355,6 +394,23 @@ test.describe('Anomaly Detection', () => {
       // canPreview goes false, which blocks the query but must not tear the
       // chart down — the empty state means "nothing to preview", not "invalid".
       await expect(pm.anomalyDetectionPage.getDataPreviewChartLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('the preview caption appears once a stream is chosen and points at Detection results', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      // The empty state is the "nothing to preview" hint, never a caption.
+      await expect(pm.anomalyDetectionPage.getDataPreviewCaptionLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('caption'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.waitForDataPreview();
+
+      const caption = pm.anomalyDetectionPage.getDataPreviewCaptionLocator();
+      await expect(caption).toBeVisible();
+      await expect(caption).toContainText('Detection results');
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -466,7 +522,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
         await pm.anomalyDetectionPage.setTrainingWindow(7);
         await pm.anomalyDetectionPage.selectRetrainInterval(7);
-        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+        await pm.anomalyDetectionPage.selectSensitivityTier(3);
 
         await pm.anomalyDetectionPage.openAlertingTab();
         await pm.anomalyDetectionPage.toggleNotifications(true);
@@ -514,7 +570,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.openAddAnomalyWizard();
         await pm.anomalyDetectionPage.fillBasicSetup(name, 'logs', testStreamName);
         await pm.anomalyDetectionPage.openConfigTab();
-        await pm.anomalyDetectionPage.selectSensitivityTier(97);
+        await pm.anomalyDetectionPage.selectSensitivityTier(3);
         await pm.anomalyDetectionPage.openAlertingTab();
         await pm.anomalyDetectionPage.toggleNotifications(false);
         await pm.anomalyDetectionPage.saveAndExpectSuccess();
@@ -527,10 +583,10 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getNameValueLocator()).toContainText(name);
 
         await pm.anomalyDetectionPage.openConfigTab();
-        // The percentile readback only exists where the tier controls do; on
+        // The level readback only exists where the tier controls do; on
         // older builds the edit-load path is still covered by the name above.
         if (await pm.anomalyDetectionPage.hasSensitivityTiers()) {
-          expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe('97');
+          expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('3');
         }
 
         await pm.anomalyDetectionPage.cancel();
@@ -540,11 +596,22 @@ test.describe('Anomaly Detection', () => {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async ({ page }) => {
         const name = await ownAnomaly(page, 'pause');
+        const pauseBtn = pm.anomalyDetectionPage.getPauseButtonLocator(name);
+
+        // The row starts enabled (createAnomalyViaApi hardcodes enabled: true),
+        // so the two-state control offers "pause" before the first click.
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
+
         await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
+        // Pause must actually flip the state: the control now offers "resume".
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'resume');
 
         await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
+        // Resume must flip it back. The row's own visibility is invariant across
+        // both states, so this state-flip is what proves the resume took effect.
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
       });
 
       test('detection can be triggered from the row menu', {
@@ -555,7 +622,7 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getToastLocator(/detection|triggered/i)).toBeVisible();
       });
 
-      test('detection can be triggered via the API and lands in history', {
+      test('triggering detection on an untrained config returns a meaningful error', {
         tag: ['@anomaly', '@P2', '@api', '@all'],
       }, async ({ page }) => {
         const name = anomalyName('apitrigger');
@@ -579,6 +646,7 @@ test.describe('Anomaly Detection', () => {
           });
         }
 
+        // The history endpoint stays well-formed even when nothing has run.
         // getAnomalyHistory returns the raw {status, data} envelope and the
         // endpoint serialises a bare array, verified against a live response.
         // (The DetectionHistoryResponse {history: [...]} utoipa annotation on
@@ -586,6 +654,58 @@ test.describe('Anomaly Detection', () => {
         const history = await getAnomalyHistory(page, id);
         expect(history.status).toBe(200);
         expect(Array.isArray(history.data)).toBe(true);
+      });
+
+      test.fixme('a completed detection run lands in history (history endpoint is a stub — src/core/src/anomaly_detection.rs:1494)', {
+        tag: ['@anomaly', '@P2', '@api', '@all'],
+      }, async ({ page }) => {
+        test.slow();
+
+        // The per-config history endpoint is a placeholder that always returns
+        // an empty array (core get_detection_history has a TODO and returns
+        // Ok(Vec::new())), so even a successful detection never lands there.
+        // Un-fixme once it queries the _anomalies stream; the assertions below
+        // then prove a completed run actually appears in this config's history.
+
+        // A successful detection needs a trained model, and a model needs
+        // backdated history — the shared e2e_automate stream is all stamped
+        // "now" and cannot train.
+        const seededStream = `anomaly_history_${randomValue}`;
+        const seed = await seedAnomalyStream(page, seededStream, {
+          hours: 4,
+          bucketSeconds: 60,
+          baseline: 10,
+          spikeValue: 120,
+          spikeBuckets: 4,
+          spikeOffset: 70,
+        });
+        expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
+        await waitForStream(page, seededStream);
+
+        const name = anomalyName('apihistory');
+        const id = await createAnomalyViaApi(page, name, {
+          streamName: seededStream,
+          histogramInterval: '1m',
+        });
+
+        const trainStarted = await triggerAnomalyTraining(page, id);
+        expect([200, 202]).toContain(trainStarted.status);
+        const trained = await waitForAnomalyTrained(page, id);
+        expect(trained.is_trained).toBe(true);
+
+        const detected = await triggerAnomalyDetection(page, id);
+        expect(detected.status).toBe(200);
+
+        // The assertion the title promises: the completed run must be visible
+        // in this config's history. The endpoint is scoped to `id`, so a
+        // non-empty array is a row for this config.
+        const history = await getAnomalyHistory(page, id);
+        expect(history.status).toBe(200);
+        expect(Array.isArray(history.data)).toBe(true);
+        expect(
+          history.data.length,
+          'a completed detection must leave a history entry',
+        ).toBeGreaterThan(0);
       });
 
       test('deletes an anomaly', {
@@ -609,6 +729,7 @@ test.describe('Anomaly Detection', () => {
         await pm.anomalyDetectionPage.openDetail(name);
 
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+        await pm.anomalyDetectionPage.openDetectorInternals();
         for (const key of ['metric', 'score', 'deviation']) {
           await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
         }
@@ -620,14 +741,21 @@ test.describe('Anomaly Detection', () => {
         const name = await ownAnomaly(page, 'range');
         await pm.anomalyDetectionPage.openDetail(name);
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+        await pm.anomalyDetectionPage.openDetectorInternals();
 
         // One picker for all three: separate pickers would let the panels
-        // silently disagree about which window they are showing.
-        for (const range of ['1h', '6h', '24h']) {
+        // silently disagree about which window they are showing. Starting at
+        // 6h (not the 1h default) so every selection is a genuine change.
+        for (const range of ['6h', '24h', '1h']) {
+          // Resolves only once every panel has re-queried the new window — the
+          // picker's own state would still pass if the panels ignored it.
+          const panelQueries = pm.anomalyDetectionPage.waitForPanelQueries(range);
           await pm.anomalyDetectionPage.selectChartRange(range);
           await expect(
             pm.anomalyDetectionPage.getChartRangeItemLocator(range),
           ).toHaveAttribute('data-state', 'on');
+          await pm.anomalyDetectionPage.revealChartPanels();
+          await panelQueries;
         }
       });
 
@@ -636,6 +764,7 @@ test.describe('Anomaly Detection', () => {
       }, async ({ page }) => {
         const name = await ownAnomaly(page, 'emptychart');
         await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.openDetectorInternals();
 
         // A freshly created anomaly has not trained, so each panel is either a
         // rendered chart or the explicit unavailable state — never neither.
@@ -703,16 +832,24 @@ test.describe('Anomaly Detection', () => {
     }, async ({ page }) => {
       test.slow();
 
-      // 4 hours of 1-minute buckets at a flat baseline, with a 120-count spike
-      // held back from the newest buckets so it stays inside the 1h detection
-      // window. Four hours because CI drops anything backdated further
+      // 4 hours of 1-minute buckets at a flat baseline, with a 120-count spike.
+      // Four hours because CI drops anything backdated further
       // (ZO_INGEST_ALLOWED_UPTO), 1-minute because the model needs 100+ points.
+      //
+      // spikeOffset keeps the spike clear of the held-out calibration tail. The
+      // trainer fits the percentile bar on the newest quarter of the training
+      // window (compute_threshold_held_out), so a spike sitting in that tail
+      // raises the very bar it is judged against and can never clear it —
+      // measured: at ~240 windows a 12x spike flags 4/4 at bucket 100 and 0/4
+      // at bucket 200+, where the split falls at 180. 70m back clears the split
+      // by 11 buckets; the detection window below is widened to 2h to match.
       const seed = await seedAnomalyStream(page, seededStream, {
         hours: 4,
         bucketSeconds: 60,
         baseline: 10,
         spikeValue: 120,
         spikeBuckets: 4,
+        spikeOffset: 70,
       });
       expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
       await waitForStream(page, seededStream);
@@ -751,9 +888,11 @@ test.describe('Anomaly Detection', () => {
       // collapse and the model sees a fifth of the points.
       await pm.anomalyDetectionPage.setHistogramInterval(1, 'm');
       await pm.anomalyDetectionPage.setScheduleInterval(10, 'm');
-      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      // 2h, not 1h: the spike sits ~70m back to stay out of the calibration tail,
+      // so a 1h look-back would cap the query short of it.
+      await pm.anomalyDetectionPage.setDetectionWindow(2, 'h');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
-      await pm.anomalyDetectionPage.selectSensitivityTier(95);
+      await pm.anomalyDetectionPage.selectSensitivityTier(2.5);
 
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
@@ -804,6 +943,7 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.searchAnomaly(firingName);
       await pm.anomalyDetectionPage.openDetail(firingName);
       await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
+      await pm.anomalyDetectionPage.openDetectorInternals();
       for (const key of ['metric', 'score', 'deviation']) {
         await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
       }
@@ -851,6 +991,272 @@ test.describe('Anomaly Detection', () => {
             'charts are proven but the notification path is not',
         );
       }
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Budget mode — the delivered-alert-per-day cap (edit-only sensitivity).
+  //
+  // `sensitivity_mode` derives from `alert_budget_per_day` presence, and there
+  // is no UI toggle that enters budget mode, so a budget config is only
+  // reachable by editing one that already carries a budget — seeded through the
+  // API. These tests only READ config; they never run detection.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Budget mode (edit-only sensitivity)', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    // Same own-record pattern as the lifecycle block: create through the API
+    // (the wizard cannot enter budget mode), settle, reload (the list is
+    // fetched once on tab mount), then edit. Omitting budgetPerDay seeds a
+    // plain percentile config instead, for the no-budget regression guard.
+    const ownConfig = async (page, suffix, budgetPerDay) => {
+      const name = anomalyName(suffix);
+      await createAnomalyViaApi(page, name, { alert_budget_per_day: budgetPerDay });
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await expect(
+        pm.anomalyDetectionPage.getRow(name),
+        `${name} was created via the API but never appeared in the list`,
+      ).toBeVisible({ timeout: 20000 });
+      return name;
+    };
+
+    test('budget controls replace the band-width tier when a config carries a budget', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'budget', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
+      expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('4');
+      expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
+      await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a budget tier preset fans out into count and period', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'tiers', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      for (const [tier, count, period] of [['1_week', '1', 'week'], ['1_day', '1', 'day'], ['4_day', '4', 'day']]) {
+        await pm.anomalyDetectionPage.selectBudgetTier(tier);
+        expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe(count);
+        expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe(period);
+        expect(await pm.anomalyDetectionPage.getActiveBudgetTier()).toBe(tier);
+      }
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a sub-1/day stored budget surfaces as alerts per week', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'subdaily', 0.5);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('3.5');
+      expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('week');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('an invalid budget count blocks save with the budget-range message', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'invalid', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await pm.anomalyDetectionPage.setBudgetCount(0);
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('the budget hint names the cap and is suppressed on invalid input', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'hint', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
+      await expect(hint).toBeVisible();
+      await expect(hint).toContainText('4');
+
+      await pm.anomalyDetectionPage.setBudgetCount(0);
+      await expect(hint).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('saving a budget config persists alert_budget_per_day', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      // Seeded at 1 so the save must change it — a no-op save leaves 1 and fails.
+      const name = await ownConfig(page, 'persist', 1);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await pm.anomalyDetectionPage.selectBudgetTier('4_day');
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+      const configs = await listAnomalyDetections(page);
+      const saved = configs.find((c) => c.name === name);
+      expect(saved, `${name} should still be listed after save`).toBeTruthy();
+      // The budget save payload sends the per-day cap, not the percentile; the
+      // persisted cap is the observable proof.
+      expect(saved.alert_budget_per_day).toBe(4);
+    });
+
+    test('a config without a budget renders the band-width tier at Auto, never the trained k', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'nobudget');
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await expect(pm.anomalyDetectionPage.getSensitivityTierLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
+      // No band_width on an API-created config: Auto, so an untouched save cannot pin band_k.
+      expect(await pm.anomalyDetectionPage.getSensitivityLevel()).toBe('');
+      expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBe('auto');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('an off-tier budget count is accepted with no tier selected', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'offtier', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await pm.anomalyDetectionPage.setBudgetCount(3);
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
+      expect(await pm.anomalyDetectionPage.getActiveBudgetTier()).toBeNull();
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toContainText('3');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('budget mode still requires a destination when notifications are enabled', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'destreq', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(true);
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a per-day budget of exactly 1 stays in day units', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'boundary', 1);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('1');
+      expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('budget mode does not render the band-width level control', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'budgetinfo', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      // The server rejects band_width beside a budget, so the level control belongs to band mode only.
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityLevelLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Look-back window floor — detection window must be at least
+  // Check Every (schedule) + one Detection Resolution (histogram).
+  //
+  // Only the cases that cross the client/server boundary live here: the floor
+  // arithmetic, the hint text and the legacy-row grandfathering are already
+  // pinned by web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.spec.ts
+  // ("look back window floor" and "client grandfathering of legacy rows"), which
+  // mounts the same component. Re-asserting them in a browser buys nothing.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Look-back window floor', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test.beforeEach(async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('window'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.openConfigTab();
+    });
+
+    // The boundary test saves successfully (wizard closes), so cancel only when
+    // the wizard is still open rather than failing on a missing cancel button.
+    test.afterEach(async () => {
+      if (await pm.anomalyDetectionPage.getSaveBtnLocator().isVisible()) {
+        await pm.anomalyDetectionPage.cancel();
+      }
+    });
+
+    test('a detection window below the floor blocks save and names the minimum', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P0', '@smoke', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h');
+      // 3600s is under the 1h 5m floor (schedule + histogram).
+      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      await pm.anomalyDetectionPage.save();
+
+      const error = pm.anomalyDetectionPage.getDetectionWindowErrorLocator();
+      await expect(error).toBeVisible();
+      await expect(error).toContainText('at least 1h 5m');
+      // Rejected save keeps the wizard open — it did not create a config.
+      await expect(pm.anomalyDetectionPage.getSaveBtnLocator()).toBeVisible();
+    });
+
+    test('a new config defaults the detection window to 3 hours', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P1', '@functional', '@all'],
+    }, async () => {
+      expect(await pm.anomalyDetectionPage.getDetectionWindowValue()).toBe('3');
+      expect(await pm.anomalyDetectionPage.getDetectionWindowUnit()).toBe('h');
+    });
+
+    test('a window exactly at the floor is accepted', {
+      tag: ['@anomaly', '@anomaly-detection-lookback-window', '@P2', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      await pm.anomalyDetectionPage.setScheduleInterval(1, 'h'); // floor 1h 5m
+      await pm.anomalyDetectionPage.setDetectionWindow(65, 'm'); // 3900s, exactly the floor
+
+      // Save must proceed: the boundary is valid, so a rejection here is the
+      // off-by-one regression the strict `<` comparison exists to prevent.
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(false);
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
     });
   });
 

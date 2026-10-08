@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b"
+        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
@@ -29,21 +29,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
-          @click="toggleFieldList"
+          @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
           <OIcon
             :name="
-              searchObj.meta.showFields
-                ? 'keyboard-double-arrow-left'
-                : 'keyboard-double-arrow-right'
+              isMobile
+                ? 'menu'
+                : searchObj.meta.showFields
+                  ? 'keyboard-double-arrow-left'
+                  : 'keyboard-double-arrow-right'
             "
             size="sm"
           />
           <OTooltip
             :content="
-              searchObj.meta.showFields
-                ? t('logs.searchResult.collapseFields')
-                : t('logs.searchResult.openFields')
+              isMobile
+                ? t('search.showFields')
+                : searchObj.meta.showFields
+                  ? t('logs.searchResult.collapseFields')
+                  : t('logs.searchResult.openFields')
             "
             side="bottom"
             shortcut-id="logsToggleSidebar"
@@ -60,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left max-md:min-w-32"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -73,13 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
                 recordsChips.records
               }}</OTag>
-              <OTag type="logsResultChip" value="info" data-test="logs-result-time-chip">{{
-                recordsChips.time
-              }}</OTag>
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-time-chip"
+                >{{ recordsChips.time }}</OTag
+              >
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
+                class="max-md:hidden"
                 data-test="logs-result-scan-chip"
                 >{{ recordsChips.scan }}</OTag
               >
@@ -99,7 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-patterns-chip"
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
-              <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-pattern-time-chip"
                 >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>
@@ -121,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pe-2">
+        <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -153,14 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
               {{ t("volumeInsights.searchInspectionsLabel") }}
             </ODropdownItem>
-            <ODropdownItem
-              v-if="showAnalyzeBtn"
-              data-test="logs-analyze-dimensions-button"
-              @select="openVolumeAnalysisDashboard"
-            >
-              <template #icon-left><OIcon name="timeline" size="sm" /></template>
-              {{ t("volumeInsights.analyzeTooltipLogs") }}
-            </ODropdownItem>
           </ODropdown>
 
           <!-- INLINE BUTTONS (wider container) -->
@@ -177,10 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <!-- Action buttons -->
-            <div
-              v-if="showInspectBtn || showAnalyzeBtn || showWrapBtn"
-              class="inline-flex items-center gap-0.5"
-            >
+            <div v-if="showInspectBtn || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="showInspectBtn"
                 variant="outline"
@@ -195,22 +197,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   v-if="!showActionLabels"
                   :content="t('volumeInsights.searchInspectionsLabel')"
-                />
-              </OButton>
-              <OButton
-                v-if="showAnalyzeBtn"
-                variant="outline"
-                :size="showActionLabels ? 'chip' : 'icon-chip'"
-                @click="openVolumeAnalysisDashboard"
-                data-test="logs-analyze-dimensions-button"
-              >
-                <OIcon name="timeline" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{
-                  t("volumeInsights.analyzeBtnLabel")
-                }}</span>
-                <OTooltip
-                  v-if="!showActionLabels"
-                  :content="t('volumeInsights.analyzeTooltipLogs')"
                 />
               </OButton>
               <OButton
@@ -757,25 +743,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add-to-search="addPatternToSearch"
         @create-alert="createAlertFromPattern"
       />
-
-      <!-- Volume Analysis Dashboard -->
-      <TracesAnalysisDashboard
-        v-if="showVolumeAnalysisDashboard"
-        :streamName="searchObj.data.stream.selectedStream[0]"
-        streamType="logs"
-        :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
-        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
-        :baseFilter="searchObj.data.editorValue"
-        :streamFields="
-          searchObj.data.stream.userDefinedSchema?.length > 0
-            ? searchObj.data.stream.userDefinedSchema
-            : searchObj.data.stream.selectedStreamFields
-        "
-        :logSamples="searchObj.data.queryResults.hits"
-        analysisType="volume"
-        :availableAnalysisTypes="['volume']"
-        @close="closeVolumeAnalysisDashboard"
-      />
     </div>
 
     <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
@@ -875,6 +842,8 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   buildPatternVolumeContext,
   fetchWindowTotal,
@@ -907,9 +876,6 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(() => import("./patterns/PatternList.vue")),
     PatternDetailsDialog: defineAsyncComponent(() => import("./patterns/PatternDetailsDialog.vue")),
-    TracesAnalysisDashboard: defineAsyncComponent(
-      () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
-    ),
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -932,6 +898,7 @@ export default defineComponent({
     "sendToAiChat",
     "run-query",
     "jump-to-stream-data",
+    "open-mobile-fields",
   ],
   props: {
     expandedLogs: {
@@ -1139,6 +1106,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    const { isMobile } = useBreakpoint();
     const searchListContainer = ref<HTMLElement | null>(null);
 
     // Responsive: observe the outer container (reacts to splitter + window resize)
@@ -1188,7 +1156,7 @@ export default defineComponent({
       if (!parts) return null;
 
       return {
-        records: t("search.recordsChip", {
+        records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
           start: parts.start,
           end: parts.end,
           total: parts.total,
@@ -1318,8 +1286,7 @@ export default defineComponent({
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
 
-    // Volume Analysis state
-    const showVolumeAnalysisDashboard = ref(false);
+    // Histogram brush selection, read by the Drill down page (Index.vue)
     const hasHistogramSelection = ref(false);
     const histogramSelectionRange = ref<{
       start: number;
@@ -2022,15 +1989,6 @@ export default defineComponent({
       correlationError.value = null;
     };
 
-    // Volume Analysis functions
-    const openVolumeAnalysisDashboard = () => {
-      showVolumeAnalysisDashboard.value = true;
-    };
-
-    const closeVolumeAnalysisDashboard = () => {
-      showVolumeAnalysisDashboard.value = false;
-    };
-
     // Search Job Inspector functions
     const openSearchJobInspector = () => {
       // Get the last search trace_id
@@ -2221,10 +2179,7 @@ export default defineComponent({
     const contextCellIsStreamField = computed(() => {
       const columnId = contextCell.value?.columnId;
       if (!columnId) return false;
-      return (
-        searchObj.data.stream.selectedStreamFields?.find((field: any) => field.name === columnId)
-          ?.isSchemaField ?? false
-      );
+      return isFilterableLogField(columnId, searchObj.data.stream.selectedStreamFields);
     });
 
     // Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on
@@ -2366,6 +2321,7 @@ export default defineComponent({
     return {
       raw,
       isDark,
+      isMobile,
       t,
       store,
       config,
@@ -2458,7 +2414,6 @@ export default defineComponent({
       hasHistogramSelection,
       histogramSelectionRange,
       originalTimeRangeBeforeSelection,
-      showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,
       patternNavTotal,
@@ -2468,8 +2423,6 @@ export default defineComponent({
       addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,
-      openVolumeAnalysisDashboard,
-      closeVolumeAnalysisDashboard,
       openSearchJobInspector,
       showCorrelation,
       correlationContext,
@@ -2522,9 +2475,6 @@ export default defineComponent({
         this.config.isCloud == "false" &&
         this.store.state.zoConfig.search_inspector_enabled
       );
-    },
-    showAnalyzeBtn() {
-      return this.searchObj.data?.queryResults?.hits?.length > 0 && !this.searchObj.meta.sqlMode;
     },
     showWrapBtn() {
       return (
@@ -2698,21 +2648,24 @@ export default defineComponent({
   backdrop-filter: blur(0.625rem);
   margin-top: 0;
   overflow: visible;
+}
 
-  :deep(.o-pagination__btn) {
-    padding: 0.125rem 0.25rem !important;
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    min-width: 1.5rem !important;
-    font-size: var(--text-xs) !important;
-    border-radius: 0.25rem !important;
-    line-height: 1rem !important;
+/* keep(deep-nesting): without lang="scss", Vue's scoped compiler doesn't flatten a
+   nested :deep() with its parent selector, so it silently never matches — keep these
+   top-level instead of nested inside .paginator-section/.select-pagination. */
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
 
-    svg {
-      width: 1rem !important;
-      height: 1rem !important;
-    }
-  }
+.paginator-section :deep(.o-pagination__btn) svg {
+  width: 1rem !important;
+  height: 1rem !important;
 }
 
 .select-pagination {
@@ -2720,13 +2673,13 @@ export default defineComponent({
   width: 4rem !important;
   height: 1.5rem !important;
   margin-top: 0;
+}
 
-  :deep(button) {
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    font-size: var(--text-xs) !important;
-    padding-inline: 0.5rem !important;
-  }
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  padding-inline: 0.5rem !important;
 }
 /* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
    animation: that references it must stay in the same scoped block so Vue

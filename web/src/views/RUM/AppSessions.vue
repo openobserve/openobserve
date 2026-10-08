@@ -18,10 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
-          <div class="flex items-start gap-1">
+        <div
+          class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5"
+          data-drawer-anchor="rum-sessions-toolbar"
+        >
+          <div class="flex items-start gap-1 max-md:flex-wrap">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="relative min-w-0 flex-1">
+            <div class="relative min-w-0 flex-1 max-md:basis-full">
               <QueryEditor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
@@ -52,7 +55,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Controls on the right -->
-            <div class="flex shrink-0 items-start gap-1">
+            <div class="flex shrink-0 items-start gap-1 max-md:w-full max-md:flex-wrap">
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="menu"
+                class="md:hidden"
+                data-test="rum-sessions-mobile-fields-btn"
+                @click="mobileFieldsOpen = true"
+              >
+                <OTooltip :content="t('search.showFields')" />
+              </OButton>
               <SyntaxGuide />
               <DateTime
                 auto-apply
@@ -116,14 +129,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end toolbar wrapper -->
 
+      <ODrawer
+        v-if="isMobile"
+        v-model:open="mobileFieldsOpen"
+        side="left"
+        :width="80"
+        bleed
+        :title="t('search.showFields')"
+        anchor='[data-drawer-anchor="rum-sessions-toolbar"]'
+        data-test="rum-sessions-mobile-fields-drawer"
+      >
+        <SearchFieldList
+          :fields="streamFields"
+          :time-stamp="{
+            startTime: dateTime.startTime,
+            endTime: dateTime.endTime,
+          }"
+          :stream-name="rumSessionStreamName"
+          stream-type="logs"
+          :enable-grouping="true"
+          :query="sessionState.data.editorValue"
+          :base-filter="fieldListBaseFilter"
+          :show-count="false"
+          @event-emitted="handleSidebarEvent"
+        />
+      </ODrawer>
       <OSplitter
         class="logs-horizontal-splitter min-h-0 flex-1"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
+        :limits="isMobile ? [0, 0] : undefined"
       >
         <template #before>
-          <div class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1">
+          <div
+            v-if="!isMobile"
+            class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1"
+          >
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -429,7 +471,10 @@ import {
   onBeforeMount,
   defineAsyncComponent,
   computed,
+  watch,
 } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -442,10 +487,12 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { isSessionLive } from "@/utils/rum/sessionReplayLive";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useRouter } from "vue-router";
+import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
@@ -545,7 +592,10 @@ const rumSessionStreamName = "_rumdata";
 // cannot edit would show there as permanently ticked.
 // The health/type/device segments stay out — they filter the fetched rows
 // client-side (see tableRows), not the underlying query.
-const fieldListBaseFilter = "session_has_replay IS NOT NULL";
+// session_has_replay may not exist yet, and no replay data means no session can match it, so the fallback is always-false, not unfiltered.
+const fieldListBaseFilter = computed(() =>
+  schemaMapping.value["session_has_replay"] ? "session_has_replay IS NOT NULL" : "1 = 0",
+);
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -642,6 +692,9 @@ const userDataSet = new Set([
   "oosource",
   "oo_evp_origin",
   "oo_evp_origin_version",
+  "o2source",
+  "o2_evp_origin",
+  "o2_evp_origin_version",
   "source",
   "api",
   "usr_email",
@@ -724,8 +777,17 @@ const tableColumns = [
   },
 ];
 
+// The filter the list was last built from, so a return that brings a new one (from Product analytics) re-applies it.
+let lastAppliedUrlFilter: string | null = null;
+
+// The router returns every value as a string, so the list's own numeric from/to must compare as strings too.
+function urlFilterSignature(query: LocationQuery | Record<string, unknown>): string {
+  return JSON.stringify(["query", "from", "to", "period"].map((k) => String(query[k] ?? "")));
+}
+
 onBeforeMount(() => {
   restoreUrlQueryParams();
+  lastAppliedUrlFilter = urlFilterSignature(router.currentRoute.value.query);
 });
 
 onMounted(async () => {
@@ -767,6 +829,18 @@ onActivated(() => {
     activatedBefore = true;
     return;
   }
+  const signature = urlFilterSignature(router.currentRoute.value.query);
+  if (
+    router.currentRoute.value.name === "Sessions" &&
+    enteredFromAnalytics &&
+    signature !== lastAppliedUrlFilter
+  ) {
+    lastAppliedUrlFilter = signature;
+    restoreUrlQueryParams();
+    syncDateTimeFromSession();
+    getSessions();
+    return;
+  }
   if (!hasCompleteResult.value) getSessions();
 });
 
@@ -787,6 +861,7 @@ const getStreamFields = () => {
           "action_frustration_type",
           "action_target_name",
           "error_message",
+          "session_has_replay",
         ]);
 
         // Define priority fields that should appear at the top
@@ -927,7 +1002,9 @@ const getSessions = () => {
   }
 
   // Build WHERE clause with session replay filter
-  let whereClause = "session_has_replay IS NOT NULL";
+  let whereClause = schemaMapping.value["session_has_replay"]
+    ? "session_has_replay IS NOT NULL"
+    : "1 = 0";
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1318,6 +1395,15 @@ const updateDateChange = (date: any) => {
 };
 
 const splitterModel = ref(250);
+const { isMobile } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile) => {
+    splitterModel.value = mobile ? 0 : 250;
+  },
+  { immediate: true },
+);
 
 const rows = ref<Session[]>([]);
 
@@ -1332,10 +1418,8 @@ const previousWindowTotals = ref<WindowTotals | null>(null);
 const frustrationCluster = ref<SessionInsight | null>(null);
 const errorCluster = ref<SessionInsight | null>(null);
 
-// A session with ≤1 event or under 10s of activity counts as a bounce; a
-// session whose last replay event is within the last 5 minutes is still live.
+// A session with ≤1 event or under 10s of activity counts as a bounce.
 const BOUNCE_MAX_MS = 10_000;
-const ACTIVE_WINDOW_MS = 5 * 60_000;
 
 // Heuristic bucketing of the UA device/os family into the segment values.
 const classifyDevice = (family?: string, os?: string): DeviceSegment => {
@@ -1370,7 +1454,7 @@ const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
-    is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
+    is_active: isSessionLive(row.end_time, Date.now()),
     device_type: classifyDevice(row.device_family, row.os),
     platform: classifySource(row.source),
   })),
@@ -1591,6 +1675,15 @@ const getSessionStatusColor = (row: any) => {
 
 const router = useRouter();
 
+// A RUM tab switch pushes Performance's range, so only a Product Analytics handoff may replace the list's own.
+let enteredFromAnalytics = false;
+const stopEntryTracking = router.afterEach((to, from) => {
+  if (to.name === "Sessions") {
+    enteredFromAnalytics = from.matched.some((r) => r.name === PA_ROUTES.shell);
+  }
+});
+onBeforeUnmount(stopEntryTracking);
+
 const { shareUrl } = useRum();
 const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
 
@@ -1679,6 +1772,16 @@ function restoreUrlQueryParams() {
   }
 }
 
+function syncDateTimeFromSession() {
+  const date = sessionState.data.datetime;
+  if (date.valueType === "relative") {
+    const resolved = getConsumableRelativeTime(date.relativeTimePeriod);
+    if (resolved) dateTime.value = { ...dateTime.value, ...date, ...resolved };
+  } else {
+    dateTime.value = { ...dateTime.value, ...date };
+  }
+}
+
 function updateUrlQueryParams() {
   if (!isMounted.value) return;
 
@@ -1699,6 +1802,7 @@ function updateUrlQueryParams() {
   if (deviceSegment.value !== "all") query["device"] = deviceSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
+  lastAppliedUrlFilter = urlFilterSignature(query);
   router.push({ query });
 }
 

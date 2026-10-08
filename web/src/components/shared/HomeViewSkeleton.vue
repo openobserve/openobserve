@@ -18,18 +18,20 @@
     </div>
 
     <!-- KPI tile strip (mirrors KpiCardRow / KpiCard) -->
-    <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-2.5">
+    <div
+      class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-2.5 max-lg:flex max-lg:flex-wrap"
+    >
       <div
         v-for="n in 5"
         :key="`kpi-${n}`"
         data-test="home-view-skeleton-tile"
-        class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5"
+        class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 max-lg:w-20 max-lg:shrink-0 max-lg:px-2 max-lg:py-1.5"
       >
-        <div class="mb-1 flex items-center justify-between gap-2">
-          <OSkeleton type="text" class="h-4 w-20" />
-          <OSkeleton class="h-10 w-10" />
+        <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
+          <OSkeleton type="text" class="h-4 w-20 max-lg:hidden" />
+          <OSkeleton class="h-10 w-10 max-lg:h-6 max-lg:w-6" />
         </div>
-        <OSkeleton type="text" class="h-7 w-24" />
+        <OSkeleton type="text" class="h-7 w-24 max-lg:h-5 max-lg:w-12" />
       </div>
     </div>
 

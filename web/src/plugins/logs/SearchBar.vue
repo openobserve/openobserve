@@ -17,9 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div
-      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5!"
+      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
-      <div ref="toolbarLeftRef" class="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
+      <div
+        ref="toolbarLeftRef"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-1 max-md:w-full max-md:flex-none"
+      >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
              the pinBudget computation before they would clip. `flex-initial`
@@ -34,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-view-mode-dropdown-btn"
                 size="xs"
                 variant="outline"
-                icon-right="chevron-down"
+                icon-right="arrow-drop-down"
               >
                 <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
                 {{ currentToggleOption.label }}
@@ -99,6 +102,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="build" size="sm" class="shrink-0" />
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
+            </OToggleGroupItem>
+
+            <OToggleGroupItem
+              data-test="logs-drilldown-toggle"
+              :disabled="searchObj.meta.sqlMode"
+              :tooltip="
+                searchObj.meta.sqlMode
+                  ? t('search.drillDownUnavailableInSqlMode')
+                  : toolbarToggleIconOnly
+                    ? t('search.drillDown')
+                    : undefined
+              "
+              value="drilldown"
+              size="sm"
+            >
+              <template #icon-left>
+                <OIcon name="query-stats" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!toolbarToggleIconOnly">{{ t("search.drillDown") }}</span>
             </OToggleGroupItem>
 
             <OToggleGroupItem
@@ -217,10 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
-                  size="icon-toolbar"
+                  size="sm-toolbar"
                 >
                   <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
@@ -284,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("search.manageSavedViews") }}
               </ODropdownItem>
             </ODropdown>
+            <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
               variant="ghost"
@@ -309,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease]"
+              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -567,7 +590,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
 
-      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
+      <div
+        ref="toolbarRightRef"
+        class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
+      >
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <FunctionSelector
             :function-options="functionOptions"
@@ -640,9 +666,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="search-download-submenu-trigger"
               :aria-disabled="isDownloadDisabled || undefined"
-              @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
-              @mouseleave="showDownloadSubmenu = false"
-              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-['']"
+              @mouseenter="!isMobile && !isDownloadDisabled && (showDownloadSubmenu = true)"
+              @mouseleave="!isMobile && (showDownloadSubmenu = false)"
+              @click="onDownloadRowClick"
+              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-[''] max-md:flex-wrap"
               :class="{
                 'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
               }"
@@ -657,7 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 me-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 me-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
                 data-test="search-download-submenu"
               >
                 <button
@@ -849,7 +876,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 me-1">
+        <div class="order-1 me-1 max-md:me-auto">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -970,6 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
@@ -1056,6 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
@@ -1139,9 +1168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
-                  store.state.zoConfig.auto_query_enabled
-                    ? 'rounded-s-default! rounded-e-none!'
-                    : 'rounded-default',
+                  'rounded-s-default! rounded-e-none!',
                 ]"
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1183,17 +1210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("search.runQuery")
                 }}
               </OButton>
-              <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
-              <OSeparator
-                v-if="store.state.zoConfig.auto_query_enabled"
-                class="h-[1.875rem]! w-px"
-                vertical
-              />
-              <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
+              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
                     variant="ghost"
                     size="icon-xs"
+                    data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       (searchObj.meta.logsVisualizeToggle === 'patterns' &&
                         patternsState.loading) ||
@@ -1206,9 +1229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
-                      store.state.zoConfig.auto_query_enabled
-                        ? 'rounded-e-default! rounded-s-none!'
-                        : 'rounded-default',
+                      'rounded-e-default! rounded-s-none!',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -1216,10 +1237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <!-- Normal mode: Refresh + Live Mode items -->
                 <ODropdownItem
-                  v-if="
-                    config.isEnterprise == 'true' &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
+                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                   data-test="logs-search-bar-refresh-btn"
                   data-cy="search-bar-refresh-button"
                   :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
@@ -1230,7 +1248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownSeparator
                   v-if="
-                    config.isEnterprise == 'true' &&
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
@@ -1778,7 +1795,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
@@ -1788,7 +1805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
@@ -1796,6 +1813,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="delete" size="xs" />
                     </OButton>
+                    <ODropdown side="bottom" align="end">
+                      <template #trigger>
+                        <OButton
+                          icon-left="more-vert"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="md:hidden"
+                          data-test="logs-search-bar-saved-view-row-more-actions"
+                          @click.stop
+                        />
+                      </template>
+                      <ODropdownItem
+                        icon-left="edit"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn-menu`"
+                        @select="handleUpdateSavedView(row)"
+                      >
+                        <span>{{ t("common.edit") }}</span>
+                      </ODropdownItem>
+                      <ODropdownItem
+                        icon-left="delete"
+                        variant="destructive"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn-menu`"
+                        @select="handleDeleteSavedView(row)"
+                      >
+                        <span>{{ t("common.delete") }}</span>
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
                 <template #empty>
@@ -1852,7 +1898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
@@ -1862,7 +1908,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"
@@ -1870,6 +1916,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="delete" size="xs" />
                     </OButton>
+                    <ODropdown side="bottom" align="end">
+                      <template #trigger>
+                        <OButton
+                          icon-left="more-vert"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="md:hidden"
+                          data-test="logs-search-bar-favorite-saved-view-row-more-actions"
+                          @click.stop
+                        />
+                      </template>
+                      <ODropdownItem
+                        icon-left="edit"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn-menu`"
+                        @select="handleUpdateSavedView(row)"
+                      >
+                        <span>{{ t("common.edit") }}</span>
+                      </ODropdownItem>
+                      <ODropdownItem
+                        icon-left="delete"
+                        variant="destructive"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn-menu`"
+                        @select="handleDeleteSavedView(row)"
+                      >
+                        <span>{{ t("common.delete") }}</span>
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
               </OTable>
@@ -1883,6 +1958,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
+import { saveFunctionMutation } from "@/services/jstransform.queries";
+import {
+  createSavedViewMutation,
+  updateSavedViewMutation,
+  deleteSavedViewMutation,
+} from "@/services/saved_views.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import {
   defineComponent,
   ref,
@@ -1895,11 +1978,15 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeUnmount,
+  inject,
+  toRef,
+  computed,
 } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
+import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1911,10 +1998,9 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
-import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
@@ -1942,7 +2028,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDashboardPanelData, {
   getPanelDataForPageKey,
 } from "@/composables/dashboard/useDashboardPanel";
-import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
@@ -2208,6 +2293,16 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    const orgIdForWrites = useOrgId();
+    const createSavedView = useMutation(() => createSavedViewMutation(orgIdForWrites.value));
+    const updateSavedView = useMutation(() => updateSavedViewMutation(orgIdForWrites.value));
+    const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgIdForWrites.value));
+    const createFunctionWrite = useMutation(() =>
+      saveFunctionMutation(orgIdForWrites.value, () => false),
+    );
+    const updateFunctionWrite = useMutation(() =>
+      saveFunctionMutation(orgIdForWrites.value, () => true),
+    );
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
@@ -2481,10 +2576,10 @@ export default defineComponent({
 
     // Approximate rendered widths of left-section content at each collapse state:
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
-    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
-    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 568);
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 248);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 176);
+    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 810);
+    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 658);
+    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
+    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
@@ -2497,7 +2592,7 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 62 };
+    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 87 };
     const SYNTAX_GUIDE_LABEL_WIDTH = 108;
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 4;
@@ -2507,8 +2602,8 @@ export default defineComponent({
     const baseReservedWidth = computed(() => {
       let w = 0;
       if (toolbarToggleAsDropdown.value) w += 120;
-      else if (toolbarToggleIconOnly.value) w += 190;
-      else w += 350;
+      else if (toolbarToggleIconOnly.value) w += 230;
+      else w += 440;
       if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 40 : 88;
       w += 92; // More button (always visible)
       w += 24; // inter-item gaps / padding buffer
@@ -2579,6 +2674,12 @@ export default defineComponent({
           ]
         : []),
       { value: "build", icon: "build", label: t("search.buildQuery"), disabled: false },
+      {
+        value: "drilldown",
+        icon: "query-stats",
+        label: t("search.drillDown"),
+        disabled: searchObj.meta.sqlMode,
+      },
       ...(config.isEnterprise === "true"
         ? [
             {
@@ -2808,6 +2909,7 @@ export default defineComponent({
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -2817,6 +2919,7 @@ export default defineComponent({
       if (value.trim() !== "" && searchObj.meta.sqlMode === true && !isSqlQuery(value)) {
         searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       if (searchObj.meta.quickMode === true) {
@@ -2928,6 +3031,7 @@ export default defineComponent({
             ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
+              searchObj.data.filterErrMsg = "";
 
               streamName = tableName;
               searchObj.data.streamResults.list.forEach((stream) => {
@@ -2944,16 +3048,19 @@ export default defineComponent({
                 }
               });
 
+              // Distinct from "no stream picked yet" (LogsNoStreamState): the
+              // query names a specific stream, and the frontend already has the
+              // full stream list, so it can tell the user which name is wrong
+              // instead of falling back to the generic "select a stream" empty
+              // state (which reads as if nothing was ever typed).
               if (streamFound == false) {
-                // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // toast({
-                //   message: "Stream not found",
-                //   color: "info",
-                //   position: "bottom-right",
-                //   timeout: 2000,
-                // });
+                if (tableName) {
+                  searchObj.data.filterErrMsg = t("logs.searchBar.streamNotFoundInQuery", {
+                    stream: tableName,
+                  });
+                }
               }
             }
           }
@@ -2997,6 +3104,11 @@ export default defineComponent({
     // DateTime.vue's selectedDate watcher → saveDate → on:date-change, so
     // without this flag updateDateTime would re-enter twice.
     let suppressUpdateDateTime = false;
+    // Drill down is built from the logs results, so a date change re-runs that search too.
+    const isLogsResultsMode = () =>
+      searchObj.meta.logsVisualizeToggle === "logs" ||
+      searchObj.meta.logsVisualizeToggle === "drilldown";
+
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
@@ -3073,15 +3185,15 @@ export default defineComponent({
         value.userChangedValue !== false &&
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
-        searchObj.meta.logsVisualizeToggle === "logs" &&
+        isLogsResultsMode() &&
         searchObj.data.stream.selectedStream.length > 0
       ) {
         searchObj.loading = true;
         searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+      if (value.userChangedValue) {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,
@@ -3095,17 +3207,13 @@ export default defineComponent({
       if (
         value.valueType === "relative" &&
         store.state.zoConfig.query_on_stream_selection == false &&
-        searchObj.meta.logsVisualizeToggle === "logs"
+        isLogsResultsMode()
       ) {
         emit("searchdata");
         return;
       }
 
-      if (
-        searchObj.meta.liveMode &&
-        ignoreAutoTrigger == false &&
-        searchObj.meta.logsVisualizeToggle === "logs"
-      ) {
+      if (searchObj.meta.liveMode && ignoreAutoTrigger == false && isLogsResultsMode()) {
         if (value.valueType === "absolute") {
           debouncedAutoRunAbsolute();
         } else {
@@ -3185,6 +3293,7 @@ export default defineComponent({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         showDownloadMenu.value = false;
+        analytics.track("logs_downloaded", { format });
       } catch (error) {
         showDownloadMenu.value = false;
         toast({
@@ -3277,10 +3386,7 @@ export default defineComponent({
 
       if (value.isSavedFunctionAction == "create") {
         try {
-          const res: { data: any } = await jsTransformService.create(
-            store.state.selectedOrganization.identifier,
-            formData.value,
-          );
+          const res: { data: any } = await createFunctionWrite.mutateAsync(formData.value);
           toast({
             variant: "success",
             message: res.data.message,
@@ -3315,10 +3421,7 @@ export default defineComponent({
     }
 
     const executeFunctionUpdate = () => {
-      const callTransform = jsTransformService.update(
-        store.state.selectedOrganization.identifier,
-        formData.value,
-      );
+      const callTransform = updateFunctionWrite.mutateAsync(formData.value);
 
       callTransform
         .then(() => {
@@ -3767,7 +3870,10 @@ export default defineComponent({
               // if visualize is there for any saved views we will get right any previous local filter fields
               // they will get applied to the current visualize selected stream
               // so we need to make sure we dont update that local filter fields when it is visualize
-              if (extractedObj.meta.logsVisualizeToggle == "logs") {
+              if (
+                extractedObj.meta.logsVisualizeToggle == "logs" ||
+                extractedObj.meta.logsVisualizeToggle == "drilldown"
+              ) {
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
@@ -3876,7 +3982,10 @@ export default defineComponent({
               // if visualize is there for any saved views we will get right any previous local filter fields
               // they will get applied to the current visualize selected stream
               // so we need to make sure we dont update that local filter fields when it is visualize
-              if (extractedObj.meta.logsVisualizeToggle == "logs") {
+              if (
+                extractedObj.meta.logsVisualizeToggle == "logs" ||
+                extractedObj.meta.logsVisualizeToggle == "drilldown"
+              ) {
                 await updatedLocalLogFilterField();
               }
             }
@@ -3972,9 +4081,9 @@ export default defineComponent({
 
     const deleteSavedViews = async () => {
       try {
-        savedviewsService
-          .delete(store.state.selectedOrganization.identifier, deleteViewID.value)
-          .then((res) => {
+        deleteSavedView
+          .mutateAsync(deleteViewID.value)
+          .then((res: any) => {
             //remove it from localstorage as well
             const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
             delete localStoredSavedViews[deleteViewID.value];
@@ -4089,11 +4198,12 @@ export default defineComponent({
         const viewObj: any = {
           data: getSearchObj(),
           view_name: viewName,
+          view_type: "logs",
         };
 
-        return savedviewsService
-          .post(store.state.selectedOrganization.identifier, viewObj)
-          .then((res) => {
+        return createSavedView
+          .mutateAsync(viewObj)
+          .then((res: any) => {
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               if (Object.prototype.hasOwnProperty.call(searchObj.data, "savedViews") === false) {
@@ -4150,9 +4260,9 @@ export default defineComponent({
           timeout: 0,
         });
 
-        savedviewsService
-          .put(store.state.selectedOrganization.identifier, viewID, viewObj)
-          .then((res) => {
+        updateSavedView
+          .mutateAsync({ viewId: viewID, view: viewObj })
+          .then((res: any) => {
             dismiss();
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
@@ -4316,6 +4426,13 @@ export default defineComponent({
     // Hover-triggered submenu state for "Download results → CSV/JSON" in the more-options dropdown.
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
     const showDownloadSubmenu = ref(false);
+    const { isMobile } = useBreakpoint();
+    // A tap also fires mouseenter, so < md only the click toggles; taps on the submenu's own buttons are ignored.
+    const onDownloadRowClick = (e: MouseEvent) => {
+      if (!isMobile.value || isDownloadDisabled.value) return;
+      if ((e.target as HTMLElement | null)?.closest(".search-download-submenu")) return;
+      showDownloadSubmenu.value = !showDownloadSubmenu.value;
+    };
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length || !searchObj.data.queryResults?.hits?.length,
@@ -4515,8 +4632,11 @@ export default defineComponent({
         return;
       }
 
-      // confirm with user on toggle from visualize to logs
-      if (value == "logs" && searchObj.meta.logsVisualizeToggle == "visualize") {
+      // confirm with user on toggle from visualize to logs (or drill down, which reads the logs results)
+      if (
+        (value == "logs" || value == "drilldown") &&
+        searchObj.meta.logsVisualizeToggle == "visualize"
+      ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
 
@@ -4533,7 +4653,10 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else if (value == "logs" && searchObj.meta.logsVisualizeToggle == "patterns") {
+      } else if (
+        (value == "logs" || value == "drilldown") &&
+        searchObj.meta.logsVisualizeToggle == "patterns"
+      ) {
         // Switching from patterns to logs - check if we need to fetch logs
         const hasLogs =
           searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
@@ -4556,7 +4679,8 @@ export default defineComponent({
       } else if (
         value == "patterns" &&
         (searchObj.meta.logsVisualizeToggle == "logs" ||
-          searchObj.meta.logsVisualizeToggle == "visualize")
+          searchObj.meta.logsVisualizeToggle == "visualize" ||
+          searchObj.meta.logsVisualizeToggle == "drilldown")
       ) {
         // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
         emit("extractPatterns");
@@ -4965,6 +5089,8 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
+      onDownloadRowClick,
+      isMobile,
       isDownloadDisabled,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
@@ -5388,6 +5514,13 @@ export default defineComponent({
   opacity: 1;
 }
 
+/* Touch has no row hover — keep the row actions visible. */
+@media (max-width: 47.99rem) {
+  .saved-view-table :deep(.action-btn-hover) {
+    opacity: 1;
+  }
+}
+
 /* Remove outer box border so both panels blend into the dialog background
    Exclude elements that also have rounded-default (OInput wrapper) so the
    search input keeps its visible border. */
@@ -5425,6 +5558,12 @@ export default defineComponent({
   height: calc(100% - 2.9rem) !important;
 }
 
+@media (max-width: 47.99rem) {
+  .logs-search-bar-component .query-editor-container {
+    height: calc(100% - 5rem) !important;
+  }
+}
+
 /* padding-left intentionally outranks the `px-1` utility on this button — that
    is the pre-existing computed result. */
 .logs-search-bar-component .region-dropdown-btn {
@@ -5447,12 +5586,6 @@ export default defineComponent({
 /* Remove pagination top separator */
 .saved-view-table :deep(.border-t) {
   border-top: none;
-}
-
-/* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table
-  :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
-  display: none;
 }
 
 /* Query editor placeholder text styling is global (styles/tailwind.css) —

@@ -33,6 +33,7 @@ vi.mock("@/components/ingestion/logs/FluentBit.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Fluentd.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Vector.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Curl.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/logs/KinesisFirehose.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/recommended/AWSConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/recommended/GCPConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/recommended/AzureConfig.vue", () => ({ default: {} }));
@@ -143,6 +144,12 @@ describe("useIngestionRoutes", () => {
       expect(Array.isArray(mainRoute.children)).toBe(true);
     });
 
+    // Ingestion is where an empty org gets data, so the empty-data gate must not block it.
+    it("should flag the ingestion route as allowOnEmptyData", () => {
+      const routes = useIngestionRoutes();
+      expect(routes[0].meta?.allowOnEmptyData).toBe(true);
+    });
+
     it("should have all expected main child routes", () => {
       const routes = useIngestionRoutes();
       const mainRoute = routes[0];
@@ -200,6 +207,8 @@ describe("useIngestionRoutes", () => {
       expect(logRouteNames).toContain("logstash");
       expect(logRouteNames).toContain("syslogNg");
       expect(logRouteNames).toContain("loongcollector");
+      expect(logRouteNames).toContain("kinesisfirehose");
+      expect(logRouteNames).toContain("gcpLogs");
     });
 
     it("should have metrics routes under custom", () => {
@@ -251,6 +260,30 @@ describe("useIngestionRoutes", () => {
 
       expect(traceRouteNames).toContain("tracesOTLP");
       expect(traceRouteNames).toContain("ingestTracesFromOtel");
+    });
+
+    it("should have profiles routes under custom", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const profilesRoute = customRoute.children.find(
+        (child: any) => child.name === "ingestProfiles",
+      );
+
+      expect(profilesRoute).toBeDefined();
+      expect(profilesRoute.path).toBe("profiles");
+      expect(profilesRoute.name).toBe("ingestProfiles");
+      expect(typeof profilesRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have all profiles ingestion routes", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const profilesRoute = customRoute.children.find(
+        (child: any) => child.name === "ingestProfiles",
+      );
+      const profileRouteNames = profilesRoute.children.map((child: any) => child.name);
+
+      expect(profileRouteNames).toContain("profilesOtelCollector");
     });
   });
 
@@ -935,6 +968,38 @@ describe("useIngestionRoutes", () => {
       expect(typeof fluentbitRoute.beforeEnter).toBe("function");
     });
 
+    it("should have kinesisfirehose route with correct configuration", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const logsRoute = customRoute.children.find((child: any) => child.name === "ingestLogs");
+      const firehoseRoute = logsRoute.children.find(
+        (child: any) => child.name === "kinesisfirehose",
+      );
+
+      expect(firehoseRoute).toBeDefined();
+      expect(firehoseRoute.path).toBe("kinesisfirehose");
+      expect(firehoseRoute.component).toBeDefined();
+      expect(typeof firehoseRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have gcpLogs route reusing the recommended GCP page", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const logsRoute = customRoute.children.find((child: any) => child.name === "ingestLogs");
+      const gcpLogsRoute = logsRoute.children.find((child: any) => child.name === "gcpLogs");
+      const recommendedRoute = routes[0].children.find(
+        (child: any) => child.name === "recommended",
+      );
+      const gcpConfigRoute = recommendedRoute.children.find(
+        (child: any) => child.name === "GCPConfig",
+      );
+
+      expect(gcpLogsRoute).toBeDefined();
+      expect(gcpLogsRoute.path).toBe("gcp");
+      expect(gcpLogsRoute.component).toBe(gcpConfigRoute.component);
+      expect(typeof gcpLogsRoute.beforeEnter).toBe("function");
+    });
+
     it("should have prometheus route with correct configuration", () => {
       const routes = useIngestionRoutes();
       const customRoute = routes[0].children.find((child: any) => child.name === "custom");
@@ -961,6 +1026,22 @@ describe("useIngestionRoutes", () => {
       expect(otlpRoute.path).toBe("opentelemetry");
       expect(otlpRoute.component).toBeDefined();
       expect(typeof otlpRoute.beforeEnter).toBe("function");
+    });
+
+    it("should have profiles OTEL collector route with correct configuration", () => {
+      const routes = useIngestionRoutes();
+      const customRoute = routes[0].children.find((child: any) => child.name === "custom");
+      const profilesRoute = customRoute.children.find(
+        (child: any) => child.name === "ingestProfiles",
+      );
+      const profilesOtelRoute = profilesRoute.children.find(
+        (child: any) => child.name === "profilesOtelCollector",
+      );
+
+      expect(profilesOtelRoute).toBeDefined();
+      expect(profilesOtelRoute.path).toBe("otelcollector");
+      expect(profilesOtelRoute.component).toBeDefined();
+      expect(typeof profilesOtelRoute.beforeEnter).toBe("function");
     });
 
     it("should have AWS config route with correct configuration", () => {

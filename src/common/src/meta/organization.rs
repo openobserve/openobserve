@@ -193,7 +193,11 @@ pub struct AllOrgListDetails {
     #[cfg(feature = "cloud")]
     pub protocol_steps_used: u64,
     #[cfg(feature = "cloud")]
+    pub status_steps_used: u64,
+    #[cfg(feature = "cloud")]
     pub protocol_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub status_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -271,6 +275,8 @@ pub struct StreamSummary {
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
     pub total_index_size: f64,
+    #[serde(default)]
+    pub total_mindex_size: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
@@ -371,6 +377,8 @@ pub struct OrgIngestionToken {
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splunk_token: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -383,11 +391,26 @@ pub struct CreateOrgIngestionTokenRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
+    /// Also mint a Splunk HEC token for this credential.
+    #[serde(default)]
+    pub splunk_token: bool,
 }
 
+/// Requested change to a Splunk HEC token.
+#[derive(Serialize, Deserialize, ToSchema, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SplunkTokenAction {
+    Generate,
+    Revoke,
+}
+
+/// At least one of the two fields must be present.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgIngestionTokenEnableRequest {
-    pub enabled: bool,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub splunk_token: Option<SplunkTokenAction>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -444,9 +467,21 @@ fn default_usage_stream_enabled() -> bool {
     false
 }
 
+fn default_red_insights_enabled() -> bool {
+    true
+}
+
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct DomainOrgMapping {
+    pub domain: String,
+    pub org_id: String,
+    pub base_role: String,
+    pub user_group: Option<String>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -475,11 +510,15 @@ pub struct OrganizationSettingPayload {
     pub max_series_per_query: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_stream_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub red_insights_enabled: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -512,6 +551,8 @@ pub struct OrganizationSetting {
     pub max_series_per_query: Option<usize>,
     #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
+    #[serde(default = "default_red_insights_enabled")]
+    pub red_insights_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -519,6 +560,9 @@ pub struct OrganizationSetting {
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
     pub org_storage_enabled: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_org_mappings: Vec<DomainOrgMapping>,
 }
 
 impl Default for OrganizationSetting {
@@ -548,10 +592,13 @@ impl Default for OrganizationSetting {
             dark_mode_theme_color,
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
+            red_insights_enabled: default_red_insights_enabled(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: Vec::new(),
         }
     }
 }
@@ -829,7 +876,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -893,7 +944,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -922,7 +977,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1006,7 +1065,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1045,7 +1108,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1398,9 +1465,11 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: None,
+            red_insights_enabled: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
+            domain_org_mappings: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1415,6 +1484,7 @@ mod tests {
         assert!(!obj.contains_key("dark_mode_theme_color"));
         assert!(!obj.contains_key("max_series_per_query"));
         assert!(!obj.contains_key("usage_stream_enabled"));
+        assert!(!obj.contains_key("red_insights_enabled"));
         assert!(!obj.contains_key("cross_links"));
     }
 
@@ -1473,10 +1543,13 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: false,
+            red_insights_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1501,10 +1574,13 @@ mod tests {
             dark_mode_theme_color: Some("#000".to_string()),
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
+            red_insights_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1574,5 +1650,24 @@ mod tests {
         }"#;
         let parsed: OrganizationSetting = serde_json::from_str(json_false).unwrap();
         assert!(!parsed.usage_stream_enabled);
+    }
+
+    #[test]
+    fn test_red_insights_enabled_defaults_on_and_round_trips() {
+        assert!(OrganizationSetting::default().red_insights_enabled);
+        let legacy: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15}"#).unwrap();
+        assert!(legacy.red_insights_enabled);
+        let off: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": false}"#)
+                .unwrap();
+        assert!(!off.red_insights_enabled);
+        let on: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": true}"#)
+                .unwrap();
+        assert!(on.red_insights_enabled);
+        let payload: OrganizationSettingPayload =
+            serde_json::from_str(r#"{"red_insights_enabled": true}"#).unwrap();
+        assert_eq!(payload.red_insights_enabled, Some(true));
     }
 }

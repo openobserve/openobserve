@@ -187,9 +187,9 @@ impl Sql {
                 matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
             });
 
-        // check if need exact limit and offset
-        if (limit == -1 || limit == 0)
-            && let Some(n) = column_visitor.limit
+        // An explicit SQL LIMIT wins over the request size; the plan keeps it anyway.
+        if let Some(n) = column_visitor.limit
+            && n > 0
         {
             limit = n;
         }

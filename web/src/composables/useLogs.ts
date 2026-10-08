@@ -37,6 +37,7 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
@@ -569,7 +570,7 @@ const useLogs = (t: TranslateFn) => {
       let expression =
         field_value == "null"
           ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} '${field_value}'`;
+          : `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
 
       const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
@@ -586,7 +587,7 @@ const useLogs = (t: TranslateFn) => {
       console.log("Error while getting filter expression by field type", e);
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      return `${quotedField} ${operator} '${field_value}'`;
+      return `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
     }
   };
 
@@ -765,7 +766,29 @@ const useLogs = (t: TranslateFn) => {
 // Priority order for FTS field selection as default columns
 const FTS_PRIORITY = ["body", "body_msg", "message", "log", "msg"];
 
+// Service fields shown before the FTS column; the first one present wins
+const SERVICE_COLUMNS = ["service", "service_name"];
+
+const hasValue = (h: Record<string, unknown>, field: string) =>
+  h[field] !== undefined && h[field] !== null && h[field] !== "";
+
 export const resolveDefaultColumns = (
+  streamFields: Array<{ name: string; ftsKey: boolean }>,
+  globalFtsKeys: string[],
+  hits?: Record<string, unknown>[],
+): string[] => {
+  const fts = resolveFtsColumn(streamFields, globalFtsKeys, hits);
+  if (fts.length === 0) return [];
+  const service = SERVICE_COLUMNS.find(
+    (f) =>
+      f !== fts[0] &&
+      streamFields.some((sf) => sf.name === f) &&
+      (!hits?.length || hits.some((h) => hasValue(h, f))),
+  );
+  return service ? [service, ...fts] : fts;
+};
+
+const resolveFtsColumn = (
   streamFields: Array<{ name: string; ftsKey: boolean }>,
   globalFtsKeys: string[],
   hits?: Record<string, unknown>[],
@@ -791,9 +814,7 @@ export const resolveDefaultColumns = (
     let bestField = "";
     let bestCount = -1;
     for (const field of candidates) {
-      const count = hits.filter(
-        (h) => h[field] !== undefined && h[field] !== null && h[field] !== "",
-      ).length;
+      const count = hits.filter((h) => hasValue(h, field)).length;
       if (
         count > bestCount ||
         (count === bestCount && priorityIndex(field) < priorityIndex(bestField))

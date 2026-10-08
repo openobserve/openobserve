@@ -15,6 +15,7 @@
 
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
+import SplunkHec from "@/components/ingestion/logs/SplunkHec.vue";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
 import LoongCollector from "@/components/ingestion/logs/LoongCollector.vue";
 import Ingestion from "@/views/Ingestion.vue";
@@ -22,6 +23,7 @@ import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
 import Vector from "@/components/ingestion/logs/Vector.vue";
 import Curl from "@/components/ingestion/logs/Curl.vue";
+import KinesisFirehose from "@/components/ingestion/logs/KinesisFirehose.vue";
 import AWSConfig from "@/components/ingestion/recommended/AWSConfig.vue";
 import GCPConfig from "@/components/ingestion/recommended/GCPConfig.vue";
 import AzureConfig from "@/components/ingestion/recommended/AzureConfig.vue";
@@ -36,13 +38,16 @@ import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
+import IngestProfiles from "@/components/ingestion/profiles/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
 import Recommended from "@/components/ingestion/Recommended.vue";
 import Custom from "@/components/ingestion/Custom.vue";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
+import ProfilesOtelCollector from "@/components/ingestion/profiles/OtelCollector.vue";
 
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
+import GpuConfig from "@/components/ingestion/recommended/GpuConfig.vue";
 import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
 import MacOSConfig from "@/components/ingestion/recommended/MacOSConfig.vue";
 import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
@@ -143,6 +148,7 @@ const useIngestionRoutes = () => {
       component: Ingestion,
       meta: {
         titleKey: "menu.ingestionText",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -197,6 +203,22 @@ const useIngestionRoutes = () => {
                   },
                 },
                 {
+                  path: "kinesisfirehose",
+                  name: "kinesisfirehose",
+                  component: KinesisFirehose,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "gcp",
+                  name: "gcpLogs",
+                  component: GCPConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
                   path: "filebeat",
                   name: "filebeat",
                   component: FileBeat,
@@ -224,6 +246,14 @@ const useIngestionRoutes = () => {
                   path: "syslogng",
                   name: "syslogNg",
                   component: SyslogNg,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "splunkhec",
+                  name: "splunkHec",
+                  component: SplunkHec,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -305,6 +335,24 @@ const useIngestionRoutes = () => {
               ],
             },
             {
+              path: "profiles",
+              name: "ingestProfiles",
+              component: IngestProfiles,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+              children: [
+                {
+                  path: "otelcollector",
+                  name: "profilesOtelCollector",
+                  component: ProfilesOtelCollector,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+              ],
+            },
+            {
               path: "traces",
               name: "ingestTraces",
               component: IngestTraces,
@@ -368,6 +416,14 @@ const useIngestionRoutes = () => {
               path: "macos",
               name: "ingestFromMacOS",
               component: MacOSConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "gpu",
+              name: "ingestFromGpu",
+              component: GpuConfig,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

@@ -779,6 +779,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_sql_limit_overrides_request_size() {
+        assert_eq!(
+            get_sql(r#"SELECT * FROM "default" LIMIT 1000"#).await.limit,
+            1000
+        );
+        assert_eq!(
+            get_sql(r#"SELECT * FROM "default" LIMIT 0"#).await.limit,
+            100
+        );
+        let cte = r#"WITH a AS (SELECT * FROM "default" LIMIT 10) SELECT * FROM a"#;
+        assert_eq!(get_sql(cte).await.limit, 100);
+    }
+
+    #[tokio::test]
     async fn test_simple_queries() {
         let sql = r#"WITH FilteredLogs AS (
                     SELECT * FROM "default"

@@ -78,6 +78,11 @@ impl TryFrom<alerts::Model> for MetaAlert {
         // Transform database JSON values into intermediate types which can be
         // directly translated into service layer types.
         let destinations: Vec<String> = serde_json::from_value(value.destinations)?;
+        let recovery_destinations: Vec<String> = value
+            .recovery_destinations
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
         let context_attributes: Option<HashMap<String, String>> = value
             .context_attributes
             .map(serde_json::from_value)
@@ -212,8 +217,14 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .tags
             .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
             .unwrap_or_default();
+        alert.oncall_team = value.oncall_team;
+        alert.runbook_url = value.runbook_url;
 
         alert.pending_period_sec = value.pending_period_sec;
+        // NULL predates the feature, which is the same as off / no hold.
+        alert.notify_on_recovery = value.notify_on_recovery.unwrap_or(false);
+        alert.recovery_destinations = recovery_destinations;
+        alert.keep_firing_for = value.keep_firing_for_seconds.unwrap_or(0);
 
         Ok(alert)
     }
@@ -972,6 +983,13 @@ fn update_mutable_fields(
     let updated_at: i64 = chrono::Utc::now().timestamp_micros();
     let workflows = serde_json::to_value(alert.workflows)?;
     let pending_periond_sec = alert.pending_period_sec;
+    let notify_on_recovery = alert.notify_on_recovery;
+    let recovery_destinations = if alert.recovery_destinations.is_empty() {
+        None
+    } else {
+        Some(serde_json::to_value(alert.recovery_destinations)?)
+    };
+    let keep_firing_for_seconds = alert.keep_firing_for;
 
     // Handle deduplication configuration
     // Note: time_window_minutes is stored in a separate column, not in the JSON config
@@ -1011,6 +1029,8 @@ fn update_mutable_fields(
     alert_am.query_promql_multi_alert = Set(promql_multi_alert.then_some(true));
     alert_am.query_slo_condition = Set(query_slo_condition);
     alert_am.slo_id = Set(slo_id);
+    alert_am.oncall_team = Set(alert.oncall_team.clone());
+    alert_am.runbook_url = Set(alert.runbook_url.clone());
     alert_am.query_vrl_function = Set(query_vrl_function);
     alert_am.query_search_event_type = Set(query_search_event_type);
     alert_am.query_multi_time_range = Set(query_multi_time_range);
@@ -1042,6 +1062,9 @@ fn update_mutable_fields(
     alert_am.creates_incident = Set(alert.creates_incident);
     alert_am.workflows = Set(workflows);
     alert_am.pending_period_sec = Set(pending_periond_sec);
+    alert_am.notify_on_recovery = Set(Some(notify_on_recovery));
+    alert_am.recovery_destinations = Set(recovery_destinations);
+    alert_am.keep_firing_for_seconds = Set(Some(keep_firing_for_seconds));
     Ok(())
 }
 
@@ -1104,6 +1127,8 @@ pub(super) mod tests {
             priority: None,
             tags: None,
             slo_id: None,
+            oncall_team: None,
+            runbook_url: None,
             query_slo_condition: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,
@@ -1121,6 +1146,9 @@ pub(super) mod tests {
             creates_incident: false,
             workflows: serde_json::json!(["abc123"]),
             pending_period_sec: 0,
+            notify_on_recovery: None,
+            recovery_destinations: None,
+            keep_firing_for_seconds: None,
         }
     }
 

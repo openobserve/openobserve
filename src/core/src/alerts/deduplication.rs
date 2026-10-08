@@ -392,8 +392,9 @@ async fn apply_deduplication_impl(
                 .await
                 {
                     log::warn!(
-                        "Failed to update dedup state for fingerprint {}: {}",
+                        "Failed to update dedup state for fingerprint {}: org_id: {}, error: {}",
                         fingerprint,
+                        org_id,
                         e
                     );
                 }
@@ -441,8 +442,9 @@ async fn apply_deduplication_impl(
             .await
             {
                 log::error!(
-                    "Failed to save dedup state for fingerprint {}: {}",
+                    "Failed to save dedup state for fingerprint {}: org_id: {}, error: {}",
                     fingerprint,
+                    org_id,
                     e
                 );
             }

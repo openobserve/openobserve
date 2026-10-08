@@ -18,7 +18,8 @@ use std::ops::ControlFlow;
 use sqlparser::ast::{
     Expr, Function, FunctionArg, FunctionArgExpr, FunctionArgumentList, FunctionArguments,
     GroupByExpr, Ident, ObjectName, ObjectNamePart, Query, Select, SelectFlavor, SelectItem,
-    SetExpr, TableFactor, TableWithJoins, VisitorMut, helpers::attached_token::AttachedToken,
+    SetExpr, TableFactor, TableWithJoins, Values, VisitorMut,
+    helpers::attached_token::AttachedToken,
 };
 
 pub struct TrackTotalHitsVisitor {}
@@ -40,169 +41,94 @@ impl VisitorMut for TrackTotalHitsVisitor {
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
         match query.body.as_mut() {
-            SetExpr::Select(select) => {
-                if select.distinct.is_some() {
-                    // For DISTINCT queries, we need to wrap the query in a subquery
-                    // and count the results, since DataFusion doesn't support COUNT DISTINCT with
-                    // multiple arguments
-                    let original_query = query.clone();
-                    let subquery = Box::new(SetExpr::Select(Box::new(Select {
-                        select_token: AttachedToken::empty(),
-                        distinct: None,
-                        top: None,
-                        top_before_distinct: false,
-                        projection: vec![SelectItem::ExprWithAlias {
-                            expr: Expr::Function(Function {
-                                name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new(
-                                    "count",
-                                ))]),
-                                parameters: FunctionArguments::None,
-                                args: FunctionArguments::List(FunctionArgumentList {
-                                    args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
-                                    duplicate_treatment: None,
-                                    clauses: vec![],
-                                }),
-                                filter: None,
-                                null_treatment: None,
-                                over: None,
-                                within_group: vec![],
-                                uses_odbc_syntax: false,
-                            }),
-                            alias: Ident::new("zo_sql_num"),
-                        }],
-                        into: None,
-                        from: vec![TableWithJoins {
-                            relation: TableFactor::Derived {
-                                lateral: false,
-                                subquery: Box::new(original_query),
-                                alias: None,
-                                sample: None,
-                            },
-                            joins: vec![],
-                        }],
-                        lateral_views: vec![],
-                        selection: None,
-                        group_by: GroupByExpr::Expressions(vec![], vec![]),
-                        having: None,
-                        prewhere: None,
-                        sort_by: vec![],
-                        cluster_by: vec![],
-                        distribute_by: vec![],
-                        named_window: vec![],
-                        qualify: None,
-                        window_before_qualify: false,
-                        connect_by: vec![],
-                        value_table_mode: None,
-                        exclude: None,
-                        flavor: SelectFlavor::Standard,
-                        optimizer_hints: vec![],
-                        select_modifiers: None,
-                    })));
-                    *query = Query {
-                        with: None,
-                        body: subquery,
-                        order_by: None,
-                        limit_clause: None,
-                        fetch: None,
-                        for_clause: None,
-                        locks: vec![],
-                        settings: None,
-                        format_clause: None,
-                        pipe_operators: vec![],
-                    };
-                } else {
-                    // For non-DISTINCT queries, use the original approach
-                    select.group_by = GroupByExpr::Expressions(vec![], vec![]);
-                    select.having = None;
-                    select.sort_by = vec![];
-                    select.projection = vec![SelectItem::ExprWithAlias {
-                        expr: Expr::Function(Function {
-                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
-                            parameters: FunctionArguments::None,
-                            args: FunctionArguments::List(FunctionArgumentList {
-                                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
-                                duplicate_treatment: None,
-                                clauses: vec![],
-                            }),
-                            filter: None,
-                            null_treatment: None,
-                            over: None,
-                            within_group: vec![],
-                            uses_odbc_syntax: false,
-                        }),
-                        alias: Ident::new("zo_sql_num"),
-                    }];
-                    query.order_by = None;
-                }
+            SetExpr::Select(select) if select.distinct.is_none() => {
+                select.group_by = GroupByExpr::Expressions(vec![], vec![]);
+                select.having = None;
+                select.sort_by = vec![];
+                select.projection = vec![count_star_item()];
+                query.order_by = None;
             }
-            SetExpr::SetOperation { .. } => {
-                let select = Box::new(SetExpr::Select(Box::new(Select {
-                    select_token: AttachedToken::empty(),
-                    distinct: None,
-                    top: None,
-                    top_before_distinct: false,
-                    projection: vec![SelectItem::ExprWithAlias {
-                        expr: Expr::Function(Function {
-                            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
-                            parameters: FunctionArguments::None,
-                            args: FunctionArguments::List(FunctionArgumentList {
-                                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
-                                duplicate_treatment: None,
-                                clauses: vec![],
-                            }),
-                            filter: None,
-                            null_treatment: None,
-                            over: None,
-                            within_group: vec![],
-                            uses_odbc_syntax: false,
-                        }),
-                        alias: Ident::new("zo_sql_num"),
-                    }],
-                    into: None,
-                    from: vec![TableWithJoins {
-                        relation: TableFactor::Derived {
-                            lateral: false,
-                            subquery: Box::new(query.clone()),
-                            alias: None,
-                            sample: None,
-                        },
-                        joins: vec![],
-                    }],
-                    lateral_views: vec![],
-                    selection: None,
-                    group_by: GroupByExpr::Expressions(vec![], vec![]),
-                    having: None,
-                    prewhere: None,
-                    sort_by: vec![],
-                    cluster_by: vec![],
-                    distribute_by: vec![],
-                    named_window: vec![],
-                    qualify: None,
-                    window_before_qualify: false,
-                    connect_by: vec![],
-                    value_table_mode: None,
-                    exclude: None,
-                    flavor: SelectFlavor::Standard,
-                    optimizer_hints: vec![],
-                    select_modifiers: None,
-                })));
-                *query = Query {
-                    with: None,
-                    body: select,
-                    order_by: None,
-                    limit_clause: None,
-                    fetch: None,
-                    for_clause: None,
-                    locks: vec![],
-                    settings: None,
-                    format_clause: None,
-                    pipe_operators: vec![],
-                };
-            }
+            // DISTINCT and set operations keep the original query as a derived table
+            SetExpr::Select(_) | SetExpr::SetOperation { .. } => wrap_in_count_subquery(query),
             _ => {}
         }
         ControlFlow::Break(())
     }
+}
+
+fn count_star_item() -> SelectItem {
+    SelectItem::ExprWithAlias {
+        expr: Expr::Function(Function {
+            name: ObjectName(vec![ObjectNamePart::Identifier(Ident::new("count"))]),
+            parameters: FunctionArguments::None,
+            args: FunctionArguments::List(FunctionArgumentList {
+                args: vec![FunctionArg::Unnamed(FunctionArgExpr::Wildcard)],
+                duplicate_treatment: None,
+                clauses: vec![],
+            }),
+            filter: None,
+            null_treatment: None,
+            over: None,
+            within_group: vec![],
+            uses_odbc_syntax: false,
+        }),
+        alias: Ident::new("zo_sql_num"),
+    }
+}
+
+// moves the original query into the derived table instead of cloning it, the tree may be deep
+fn wrap_in_count_subquery(query: &mut Query) {
+    let placeholder = Box::new(SetExpr::Values(Values {
+        explicit_row: false,
+        value_keyword: false,
+        rows: vec![],
+    }));
+    let original_query = Query {
+        with: query.with.take(),
+        body: std::mem::replace(&mut query.body, placeholder),
+        order_by: query.order_by.take(),
+        limit_clause: query.limit_clause.take(),
+        fetch: query.fetch.take(),
+        for_clause: query.for_clause.take(),
+        locks: std::mem::take(&mut query.locks),
+        settings: query.settings.take(),
+        format_clause: query.format_clause.take(),
+        pipe_operators: std::mem::take(&mut query.pipe_operators),
+    };
+    *query.body = SetExpr::Select(Box::new(Select {
+        select_token: AttachedToken::empty(),
+        distinct: None,
+        top: None,
+        top_before_distinct: false,
+        projection: vec![count_star_item()],
+        into: None,
+        from: vec![TableWithJoins {
+            relation: TableFactor::Derived {
+                lateral: false,
+                subquery: Box::new(original_query),
+                alias: None,
+                sample: None,
+            },
+            joins: vec![],
+        }],
+        lateral_views: vec![],
+        selection: None,
+        group_by: GroupByExpr::Expressions(vec![], vec![]),
+        having: None,
+        prewhere: None,
+        sort_by: vec![],
+        cluster_by: vec![],
+        distribute_by: vec![],
+        named_window: vec![],
+        qualify: None,
+        window_before_qualify: false,
+        connect_by: vec![],
+        value_table_mode: None,
+        exclude: None,
+        flavor: SelectFlavor::Standard,
+        optimizer_hints: vec![],
+        select_modifiers: None,
+    }));
 }
 
 #[cfg(test)]

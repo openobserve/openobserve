@@ -19,8 +19,6 @@ use std::{
 };
 
 use axum::body::Bytes;
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
     meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
@@ -118,7 +116,7 @@ pub async fn ingest(
 
             if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
                 let err_msg = "Invalid stream name: ".to_string() + &line_str;
-                log::warn!("[LOGS:BULK] {err_msg}");
+                log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.to_string(),
@@ -145,37 +143,6 @@ pub async fn ingest(
                 stream_name = format_stream_name(stream_name);
             }
 
-            // Reject reserved self-reporting streams (usage/stats/triggers/...).
-            // Bulk is always a user path (internal self-reporting uses the
-            // non-bulk `IngestionRequest::Usage` channel), so this is safe.
-            // Cloud-only: OSS / self-hosted may legitimately use these names.
-            #[cfg(feature = "cloud")]
-            if is_reserved_internal_stream(&stream_name) {
-                let err_msg =
-                    format!("stream '{stream_name}' is reserved and cannot be ingested into");
-                log::warn!("[LOGS:BULK] {err_msg}");
-                bulk_res.errors = true;
-                let err = BulkResponseError::new(
-                    err_msg.clone(),
-                    stream_name.to_string(),
-                    err_msg,
-                    "0".to_string(),
-                );
-                let mut item = HashMap::new();
-                item.insert(
-                    action.to_string(),
-                    BulkResponseItem::new_failed(
-                        stream_name.to_string(),
-                        doc_id.clone().unwrap_or_default(),
-                        err,
-                        Some(value),
-                        stream_name.to_string(),
-                    ),
-                );
-                bulk_res.items.push(item);
-                continue; // skip
-            }
-
             // Reject internal rollup streams (_o2_*, _agent_signals) in ALL
             // editions — written only by internal aggregation jobs (service
             // graph, agent signals, database monitoring) through the internal
@@ -184,7 +151,7 @@ pub async fn ingest(
                 let err_msg = format!(
                     "stream '{stream_name}' is an internal rollup stream and cannot be ingested into"
                 );
-                log::warn!("[LOGS:BULK] {err_msg}");
+                log::warn!("[LOGS:BULK] {err_msg}, org_id: {org_id}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(
                     err_msg.clone(),
@@ -309,8 +276,30 @@ pub async fn ingest(
         tokio::task::coop::consume_budget().await;
     }
 
+    // Checked up front, pipeline destinations included: a whole-request 503 is retried safely.
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = streams_data
+            .iter()
+            .map(|(stream, records)| (stream.as_str(), records.len() as u64))
+            .collect();
+        let streams =
+            crate::ingestion::with_pipeline_destinations(org_id, stream_type, &streams).await;
+        let streams: Vec<(&str, u64)> = streams.iter().map(|(s, n)| (s.as_str(), *n)).collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, stream_type, &streams, |_| false)
+                .await
+        {
+            return Err(infra::errors::Error::ResourceError(reason));
+        }
+    }
+
     // process data by stream
+    #[cfg(feature = "vectorscan")]
+    let mut written_any = false;
     for (stream_name, records) in streams_data {
+        #[cfg(feature = "vectorscan")]
+        let record_count = records.len();
         match super::ingest::ingest(
             thread_id,
             org_id,
@@ -323,12 +312,43 @@ pub async fn ingest(
         .await
         {
             Ok(v) => {
+                #[cfg(feature = "vectorscan")]
+                {
+                    written_any = true;
+                }
                 for status in v.status {
                     bulk_res.items.extend(status.items);
                 }
             }
             Err(e) => {
                 log::error!("[LOGS:BULK] stream {org_id}/logs/{stream_name}: Ingestion error: {e}");
+                // Once a group is written, a whole-request retry would duplicate it: 503 per item.
+                #[cfg(feature = "vectorscan")]
+                if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
+                    if !written_any {
+                        return Err(e);
+                    }
+                    bulk_res.errors = true;
+                    for _ in 0..record_count {
+                        add_record_status(
+                            stream_name.to_string(),
+                            None,
+                            action.to_string(),
+                            None,
+                            &mut bulk_res,
+                            Some("service_unavailable".to_string()),
+                            Some(e.to_string()),
+                        );
+                        if let Some(item) = bulk_res
+                            .items
+                            .last_mut()
+                            .and_then(|i| i.values_mut().next())
+                        {
+                            item.status = 503;
+                        }
+                    }
+                    continue;
+                }
                 bulk_res.errors = true;
                 metrics::INGEST_ERRORS
                     .with_label_values(&[

@@ -35,40 +35,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="pipeline-history-date-picker"
         @on:date-change="updateDateTime"
       />
-      <OSelect
-        v-model="selectedPipeline"
-        :options="allPipelines"
-        labelKey="label"
-        valueKey="value"
-        searchable
-        @update:model-value="onPipelineSelected"
-        :placeholder="t('pipeline.searchHistory')"
-        data-test="pipeline-history-search-select"
-        class="min-w-62.5"
-        clearable
+    </Teleport>
+    <!-- A phone header only has room for the title and the date, so the filters become a toolbar row in the body. -->
+    <Teleport to="#o2-page-actions" defer :disabled="isMobile">
+      <div
+        :class="
+          isMobile
+            ? 'px-page-edge border-border-default flex items-center gap-2 border-b py-2'
+            : 'contents'
+        "
       >
-        <template #empty>
-          <span>{{ t("pipeline.noPipelinesFound") }}</span>
-        </template>
-      </OSelect>
-      <OTableColumnToggle
-        :columns="columns"
-        :column-visibility="columnVisibility"
-        :has-resized-columns="tableRef?.hasResizedColumns ?? false"
-        @update:column-visibility="setColumnVisibility"
-        @reset:column-sizes="tableRef?.resetColumnSizes()"
-      />
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        class="shrink-0"
-        @click="refreshData"
-        data-test="pipeline-history-refresh-btn"
-        :loading="loading"
-        icon-left="refresh"
-      >
-        <OTooltip :content="t('common.refresh')" side="top" />
-      </OButton>
+        <OSelect
+          v-model="selectedPipeline"
+          :options="allPipelines"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          @update:model-value="onPipelineSelected"
+          :placeholder="t('pipeline.searchHistory')"
+          data-test="pipeline-history-search-select"
+          class="min-w-62.5 max-md:min-w-0 max-md:flex-1"
+          clearable
+        >
+          <template #empty>
+            <span>{{ t("pipeline.noPipelinesFound") }}</span>
+          </template>
+        </OSelect>
+        <OTableColumnToggle
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :has-resized-columns="tableRef?.hasResizedColumns ?? false"
+          @update:column-visibility="setColumnVisibility"
+          @reset:column-sizes="tableRef?.resetColumnSizes()"
+        />
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
+          class="shrink-0"
+          :last-run-at="lastUpdatedAt"
+          :loading="loading"
+          data-test="pipeline-history-refresh-btn"
+          @click="refreshData"
+        />
+      </div>
     </Teleport>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div
@@ -216,12 +225,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-action="!searchQuery"
               @action="(id) => id === 'clear-filters' && clearSearch()"
             />
-          </template>
-
-          <template #bottom="{ totalRows }">
-            <div class="me-4 flex items-center py-2 text-xs font-normal">
-              {{ totalRows }} {{ t("pipeline.header") }}
-            </div>
           </template>
         </OTable>
       </div>
@@ -457,7 +460,8 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -470,7 +474,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import pipelinesService from "@/services/pipelines";
-import http from "@/services/http";
+import { pipelineHistoryQuery } from "@/services/pipelines.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -478,9 +483,11 @@ import type { OTableColumnDef, OTableExposed } from "@/lib/core/Table/OTable.typ
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { isMobile } = useBreakpoint();
 
 // Data
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const forbidden = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
@@ -699,7 +706,7 @@ const clearSearch = () => {
   fetchPipelineHistory();
 };
 
-const fetchPipelineHistory = async () => {
+const fetchPipelineHistory = async (force = false) => {
   loading.value = true;
   forbidden.value = false;
   try {
@@ -727,13 +734,21 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    const url = `/api/${org}/pipelines/history`;
-    const response = await http().get(url, { params });
+    // Cached read — a revisit inside the freshness window paints without a
+    // request; the Refresh button forces.
+    const options = pipelineHistoryQuery(org, params);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const historyData: any = await queryClient.fetchQuery(options);
+    // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
 
-    if (response.data) {
-      // Handle the response data
-      const historyData = response.data;
-
+    if (historyData) {
       // Map the hits array or handle empty response
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
@@ -806,7 +821,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchPipelineHistory();
+  fetchPipelineHistory(true);
 };
 
 const formatDate = (timestamp: number) => {

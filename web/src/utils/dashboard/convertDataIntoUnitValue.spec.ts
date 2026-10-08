@@ -28,7 +28,6 @@ import {
   calculateWidthText,
 } from "@/utils/dashboard/chartDimensionUtils";
 import {
-  findFirstValidMappedValue,
   validatePanel,
   validateDashboardJson,
   validateSQLPanelFields,
@@ -91,9 +90,16 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 }));
 
 const mockGetNumberLocale = vi.fn(() => "en-GB");
-vi.mock("@/locales/numberFormat", () => ({
-  getNumberLocale: () => mockGetNumberLocale(),
-}));
+vi.mock("@/locales/numberFormat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/locales/numberFormat")>();
+  return {
+    ...actual,
+    getNumberLocale: () => mockGetNumberLocale(),
+    // The real resolveNumberLocale calls the unmocked getNumberLocale internally.
+    resolveNumberLocale: (tag?: string | null) =>
+      actual.toSupportedNumberLocale(tag) ?? mockGetNumberLocale(),
+  };
+});
 
 describe("Dashboard Data Conversion Utils", () => {
   // Use actual checkTimestampAlias from logsUtils
@@ -210,8 +216,30 @@ describe("Dashboard Data Conversion Utils", () => {
 
       expect(getUnitValue(0, "seconds")).toEqual({
         value: "0.00",
-        unit: "ns",
+        unit: "s",
       });
+    });
+
+    it("should keep zero in the panel's own unit", () => {
+      // zero used to fall to the smallest unit in the table, so a KB axis started at 0.00B
+      const panelUnits: [string, string][] = [
+        ["kilobytes", "KB"],
+        ["megabytes", "MB"],
+        ["milliseconds", "ms"],
+        ["microseconds", "μs"],
+      ];
+      for (const [unit, expected] of panelUnits) {
+        expect(getUnitValue(0, unit)).toEqual({ value: "0.00", unit: expected });
+      }
+      expect(getUnitValue(-0, "kilobytes")).toEqual({ value: "0.00", unit: "KB" });
+      expect(getUnitValue("0", "megabytes")).toEqual({ value: "0.00", unit: "MB" });
+      expect(getUnitValue(null, "kilobytes")).toEqual({ value: "0.00", unit: "KB" });
+    });
+
+    it("should still scale non-zero time values below 1 down", () => {
+      // only zero stays in the panel's unit
+      expect(getUnitValue(0.5, "seconds")).toEqual({ value: "500.00", unit: "ms" });
+      expect(getUnitValue(0.5, "microseconds")).toEqual({ value: "500.00", unit: "ns" });
     });
 
     it("should handle negative values", () => {
@@ -300,6 +328,29 @@ describe("Dashboard Data Conversion Utils", () => {
         const result = getUnitValue(NaN, "locale", "", 2);
         expect(Number.isNaN(result.value)).toBe(true);
         expect(result.unit).toBe("");
+      });
+
+      it("should use a pinned locale unit over the viewer's language", () => {
+        expect(getUnitValue(14158, "locale:cs-CZ", "", 2)).toEqual({
+          value: "14\u00a0158,00",
+          unit: "",
+        });
+        expect(getUnitValue(14158, "locale:de-DE", "", 2).value).toBe("14.158,00");
+      });
+
+      it("should respect decimals for a pinned locale unit", () => {
+        expect(getUnitValue(1234.5, "locale:de-DE", "", 0).value).toBe("1.235");
+      });
+
+      it.each(["locale:", "locale:xx-ZZ", "locale:not a locale!!"])(
+        "should treat the unusable pinned unit %j as Auto",
+        (unit) => {
+          expect(getUnitValue(1234567.89, unit, "", 2).value).toBe("1,234,567.89");
+        },
+      );
+
+      it("should not read the locale from the custom unit", () => {
+        expect(getUnitValue(1234567.89, "locale", "de-DE", 2).value).toBe("1,234,567.89");
       });
     });
 
@@ -849,106 +900,6 @@ describe("Dashboard Data Conversion Utils", () => {
       // Restore mocks
       global.Date = originalDate;
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe("findFirstValidMappedValue", () => {
-    const sampleMappings = [
-      { type: "value", value: "error", color: "#FF0000", text: "Error" },
-      { type: "range", from: "10", to: "20", color: "#FFFF00", text: "Warning" },
-      { type: "regex", pattern: "test.*", color: "#00FF00", text: "Success" },
-      { type: "value", value: "info", color: "#0000FF" }, // No text field
-    ];
-
-    it("should find value type mapping", () => {
-      const result = findFirstValidMappedValue("error", sampleMappings, "color");
-      expect(result).toEqual(sampleMappings[0]);
-    });
-
-    it("should find range type mapping", () => {
-      const result = findFirstValidMappedValue("15", sampleMappings, "color");
-      expect(result).toEqual(sampleMappings[1]);
-    });
-
-    it("should find regex type mapping", () => {
-      const result = findFirstValidMappedValue("testing123", sampleMappings, "color");
-      expect(result).toEqual(sampleMappings[2]);
-    });
-
-    it("should return undefined for no match", () => {
-      const result = findFirstValidMappedValue("nomatch", sampleMappings, "color");
-      expect(result).toBeUndefined();
-    });
-
-    it("should return undefined when required field is missing", () => {
-      const result = findFirstValidMappedValue("info", sampleMappings, "text");
-      expect(result).toBeUndefined();
-    });
-
-    it("should handle range type with invalid from/to values", () => {
-      const mappings = [
-        { type: "range", from: "invalid", to: "20", color: "#FFFF00" },
-        { type: "range", from: "10", to: "invalid", color: "#FFFF00" },
-        { type: "range", from: null, to: "20", color: "#FFFF00" },
-      ];
-
-      expect(findFirstValidMappedValue("15", mappings, "color")).toBeUndefined();
-    });
-
-    it("should handle regex type with invalid patterns", () => {
-      const mappings = [
-        { type: "regex", pattern: null, color: "#00FF00" },
-        { type: "regex", pattern: "", color: "#00FF00" },
-      ];
-
-      const result1 = findFirstValidMappedValue("test", mappings, "color");
-      expect(result1).toEqual(mappings[0]); // null pattern creates empty regex
-
-      const result2 = findFirstValidMappedValue("test", [mappings[1]], "color");
-      expect(result2).toEqual(mappings[1]); // empty pattern creates empty regex
-    });
-
-    it("should handle empty mappings array", () => {
-      const result = findFirstValidMappedValue("test", [], "color");
-      expect(result).toBeUndefined();
-    });
-
-    it("should handle null/undefined mappings", () => {
-      const result1 = findFirstValidMappedValue("test", null as any, "color");
-      expect(result1).toBeUndefined();
-
-      const result2 = findFirstValidMappedValue("test", undefined as any, "color");
-      expect(result2).toBeUndefined();
-    });
-
-    it("should handle numeric values in range comparison", () => {
-      const mappings = [{ type: "range", from: "10.5", to: "20.5", color: "#FFFF00" }];
-
-      const result1 = findFirstValidMappedValue("15.7", mappings, "color");
-      expect(result1).toEqual(mappings[0]);
-
-      const result2 = findFirstValidMappedValue("5", mappings, "color");
-      expect(result2).toBeUndefined();
-    });
-
-    it("should handle boundary values in range", () => {
-      const mappings = [{ type: "range", from: "10", to: "20", color: "#FFFF00" }];
-
-      const result1 = findFirstValidMappedValue("10", mappings, "color");
-      expect(result1).toEqual(mappings[0]); // Should include from boundary
-
-      const result2 = findFirstValidMappedValue("20", mappings, "color");
-      expect(result2).toEqual(mappings[0]); // Should include to boundary
-    });
-
-    it("should return first valid mapping when multiple match", () => {
-      const mappings = [
-        { type: "value", value: "test", color: "#FF0000" },
-        { type: "regex", pattern: "test", color: "#00FF00" },
-      ];
-
-      const result = findFirstValidMappedValue("test", mappings, "color");
-      expect(result).toEqual(mappings[0]); // Should return first match
     });
   });
 

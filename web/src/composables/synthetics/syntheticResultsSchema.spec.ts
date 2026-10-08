@@ -23,6 +23,7 @@ import {
   bucketInterval,
   buildHistogramSql,
   buildLastRunSql,
+  buildP95Sql,
   buildRunsSql,
   buildRunDetailSql,
   buildRunsWithStepsSql,
@@ -37,6 +38,7 @@ import {
   deviceIconName,
   deviceLabelKey,
   mapHistogram,
+  mapHistogramSplit,
   deriveKpiFromHistogram,
   mapRun,
   evidenceOriginTs,
@@ -48,7 +50,9 @@ import {
   buildStepAggregateSql,
   buildStepDimensionSql,
   buildStepSparklineSql,
+  foldEvidenceBundle,
   foldStepStream,
+  mapRunLocationResult,
 } from "./syntheticResultsSchema";
 
 /** Shim: the old mapKpi took one aggregate row; the tiles are now summed from
@@ -153,11 +157,42 @@ describe("syntheticResultsSchema query builders", () => {
     expect(sql).not.toContain(`${SYNTHETIC_FIELDS.executionId} = 'exec-1'`);
   });
 
+  it("run detail projects start_load, so the drawer's row 0 is not read only via the retry_history copy", () => {
+    const sql = buildRunDetailSql("mon-1", "run-1", "exec-1", null);
+    expect(sql).toContain("start_load as start_load");
+  });
+
   it("ERROR_SOURCE covers the control-plane sources the stream can carry", () => {
     expect(ERROR_SOURCE.dispatch).toBe("dispatch");
     expect(ERROR_SOURCE.quota).toBe("quota");
     expect(ERROR_SOURCE.queue).toBe("queue");
     expect(ERROR_SOURCE.probe).toBe("probe");
+  });
+
+  it("should scope every overview query to an environment only when one is given", () => {
+    expect(buildRunsSql("mon-1", 50, null, "ap1")).toContain("AND environment = 'ap1'");
+    expect(buildRunsSql("mon-1", 50, null)).not.toContain("environment =");
+    expect(buildHistogramSql("mon-1", "1 hour", false, false, "ap1")).toContain(
+      "AND environment = 'ap1'",
+    );
+    expect(buildP95Sql("mon-1", "ap1")).toContain("AND environment = 'ap1'");
+    expect(buildLastRunSql("mon-1", "ap1")).toContain("AND environment = 'ap1'");
+    expect(buildLastRunSql("mon-1")).not.toContain("environment =");
+    // An env named with a quote cannot break out of the predicate.
+    expect(buildP95Sql("mon-1", "a'p1")).toContain("environment = 'a''p1'");
+  });
+
+  it("should split the histogram by environment only when asked", () => {
+    const split = buildHistogramSql("mon-1", "1 hour", false, false, undefined, true);
+    expect(split).toContain("environment,");
+    expect(split).toContain("GROUP BY ts, environment");
+    const plain = buildHistogramSql("mon-1", "1 hour");
+    expect(plain).not.toContain("environment");
+  });
+
+  it("should select environment with a literal fallback like every optional column", () => {
+    expect(buildRunsSql("mon-1", 50, null)).toContain("environment as environment");
+    expect(buildRunsSql("mon-1", 50, new Set())).toContain("'' as environment");
   });
 });
 
@@ -222,6 +257,12 @@ describe("mapRun", () => {
     expect(run.location).toBe("ap-southeast-1");
     expect(run.device).toBe("desktop");
     expect(run.error).toBe("Timeout waiting for selector");
+  });
+
+  it("should carry the environment, defaulting to unattributed", () => {
+    expect(mapRun({ status: "passed", environment: "ap1" }).environment).toBe("ap1");
+    // '' — not a fake environment — for unscoped checks and pre-stamp rows.
+    expect(mapRun({ status: "passed" }).environment).toBe("");
   });
 
   it("should map probe status values to RunStatus", () => {
@@ -334,6 +375,57 @@ describe("foldStepDefs", () => {
 
   it("should tolerate rows with no recorded_steps", () => {
     expect(foldStepDefs([{}, { recorded_steps: "" }]).size).toBe(0);
+  });
+});
+
+describe("mapHistogramSplit", () => {
+  const HOUR = 60 * 60 * 1_000_000;
+  const start = 1_700_000_000_000_000;
+  const end = start + HOUR;
+  const ts = new Date(start / 1000).toISOString().slice(0, 19);
+  const row = (env: string, over: Record<string, unknown> = {}) => ({
+    ts,
+    environment: env,
+    total_runs: 2,
+    passed_runs: 1,
+    failed_runs: 1,
+    warning_runs: 0,
+    error_runs: 0,
+    avg_duration: 100,
+    p95_duration: 150,
+    ...over,
+  });
+
+  it("should build one bucket series per environment", () => {
+    const { byEnv } = mapHistogramSplit(
+      [row("cloud"), row("ap1", { avg_duration: 300 })],
+      start,
+      end,
+    );
+    expect([...byEnv.keys()].sort()).toEqual(["ap1", "cloud"]);
+    const cloudBucket = byEnv.get("cloud")!.find((b) => b.tsMs === start / 1000)!;
+    expect(cloudBucket.avgMs).toBe(100);
+  });
+
+  it("should blend counts by sum, averages by weight, and p95 as the slowest part's", () => {
+    const { blended } = mapHistogramSplit(
+      [
+        row("cloud", { total_runs: 3, avg_duration: 100, p95_duration: 150 }),
+        row("ap1", { total_runs: 1, avg_duration: 500, p95_duration: 700 }),
+      ],
+      start,
+      end,
+    );
+    const bucket = blended.find((b) => b.tsMs === start / 1000)!;
+    expect(bucket.failedRuns).toBe(2);
+    expect(bucket.avgMs).toBe(200); // (100*3 + 500*1) / 4
+    expect(bucket.p95Ms).toBe(700);
+  });
+
+  it("should fold unattributed rows into the blended series only", () => {
+    const { blended, byEnv } = mapHistogramSplit([row("cloud"), row("")], start, end);
+    expect([...byEnv.keys()]).toEqual(["cloud"]);
+    expect(blended.find((b) => b.tsMs === start / 1000)!.failedRuns).toBe(2);
   });
 });
 
@@ -968,6 +1060,24 @@ const evidenceEv = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
   ...over,
 });
 
+// Initial-load events carry `_start`, which is no recorded step; the caller's defs name it.
+describe("evidence naming for the start load", () => {
+  it("names a _start event from the step defs instead of the raw id", () => {
+    const event = evidenceEv({
+      ts: 50,
+      stepId: "_start",
+      kind: "console",
+      level: "error",
+      text: "boot failed",
+    });
+    const defs = new Map([["_start", { name: "Open https://app.test/", selector: null }]]);
+
+    const named = foldEvidenceBundle([event], defs).groups.flatMap((g) => g.events);
+
+    expect(named.map((e) => e.stepName)).toEqual(["Open https://app.test/"]);
+  });
+});
+
 describe("evidence origin", () => {
   it("takes the earliest instant, whatever order the events arrive in", () => {
     // Buckets are ranked worst-first, so the earliest event is rarely index 0.
@@ -1456,5 +1566,259 @@ describe("foldStepStream coverage", () => {
   it("orders steps by step_index", () => {
     const r = foldStepStream([agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)], [], []);
     expect(r.stepGroups.map((g) => g.key)).toEqual(["step-early", "step-late"]);
+  });
+
+  // The step stream groups by step_id, so a `_start` row arrives like a step and must be ignored.
+  it("ignores a _start row: it is never a numbered step", () => {
+    const r = foldStepStream(
+      [
+        { ...agg("_start", 0, 100, 1_000, 2_000), kind: "start", failures: 5 },
+        { ...agg("s1", 0, 100, 1_000, 2_000), kind: "step" },
+        { ...agg("s2", 1, 95, 1_000, 2_000), kind: "step" },
+      ],
+      [],
+      [],
+    );
+
+    expect(r.stepGroups.map((g) => g.key)).toEqual(["step-s1", "step-s2"]);
+    expect(r.coverage.executions).toBe(100);
+  });
+});
+
+// `start_load` sits NEXT TO the steps arrays, so every `steps.length` consumer is unchanged.
+describe("start load (row 0)", () => {
+  const startLoad = (overrides: Record<string, unknown> = {}) => ({
+    step_id: "_start",
+    status: "ok",
+    duration_ms: 420,
+    error: "",
+    url: "https://app.test/",
+    ...overrides,
+  });
+
+  const hit = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    ts: 1_700_000_000_500_000,
+    status: STATUS_VALUES.passed,
+    engine: "chromium",
+    location: "us-east-1",
+    device: "desktop",
+    run_id: "run-1",
+    execution_id: "exec-1",
+    attempts: 1,
+    recorded_steps: JSON.stringify([
+      { id: "s1", name: "Sign in", action: "click" },
+      { id: "s2", name: "Open cart", action: "click" },
+    ]),
+    last_attempt_steps: JSON.stringify([
+      { step_id: "s1", status: "ok", duration_ms: 100, error: "" },
+      { step_id: "s2", status: "ok", duration_ms: 200, error: "" },
+    ]),
+    ...overrides,
+  });
+
+  describe("mapRunDetail", () => {
+    it("exposes start_load as a sibling and leaves the steps array alone", () => {
+      const detail = mapRunDetail(hit({ start_load: JSON.stringify(startLoad()) }))!;
+
+      expect(detail.lastAttemptSteps.map((s) => s.step_id)).toEqual(["s1", "s2"]);
+      expect(detail.startLoad).toMatchObject({
+        step_id: "_start",
+        status: "ok",
+        duration_ms: 420,
+        url: "https://app.test/",
+      });
+    });
+
+    it("accepts the start load as an object as well as a JSON string", () => {
+      const detail = mapRunDetail(hit({ start_load: startLoad() }))!;
+
+      expect(detail.startLoad?.step_id).toBe("_start");
+    });
+
+    it("has no start load on a record written without one", () => {
+      const detail = mapRunDetail(hit())!;
+
+      expect(detail.startLoad).toBeNull();
+      expect(detail.lastAttemptSteps).toHaveLength(2);
+    });
+
+    it("normalises the start load's status like a step's", () => {
+      const detail = mapRunDetail(
+        hit({ start_load: startLoad({ status: "failed", error: "net::ERR_NAME_NOT_RESOLVED" }) }),
+      )!;
+
+      expect(detail.startLoad?.status).toBe("fail");
+      expect(detail.startLoad?.error).toBe("net::ERR_NAME_NOT_RESOLVED");
+    });
+
+    // No element of the steps array failed, so the id can only come from `failure_detail`.
+    it("names _start as the failed step when the start load failed", () => {
+      const detail = mapRunDetail(
+        hit({
+          status: STATUS_VALUES.failed,
+          start_load: startLoad({ status: "failed", error: "net::ERR_NAME_NOT_RESOLVED" }),
+          failure_detail_step_id: "_start",
+          failure_detail_step_index: 0,
+          failure_detail_error: "net::ERR_NAME_NOT_RESOLVED",
+        }),
+      )!;
+
+      expect(detail.failedStep).toBe("_start");
+      expect(detail.failureDetail?.stepId).toBe("_start");
+      expect(detail.failureDetail?.stepIndex).toBe(0);
+    });
+
+    it("still names the failing Step, not _start, when a Step failed after the start load", () => {
+      const detail = mapRunDetail(
+        hit({
+          status: STATUS_VALUES.failed,
+          start_load: startLoad(),
+          last_attempt_steps: JSON.stringify([
+            { step_id: "s1", status: "ok", duration_ms: 100, error: "" },
+            { step_id: "s2", status: "fail", duration_ms: 30000, error: "timeout" },
+          ]),
+        }),
+      )!;
+
+      expect(detail.failedStep).toBe("s2");
+    });
+  });
+
+  describe("retry history", () => {
+    const attemptWithStartLoad = (over: Record<string, unknown> = {}) => ({
+      attempt: 0,
+      status: "failed",
+      response_time_ms: 3400,
+      start_load: startLoad({ status: "failed", error: "net::ERR_NAME_NOT_RESOLVED" }),
+      steps: [],
+      failure_detail: { step_id: "_start", step_index: 0, error: "net::ERR_NAME_NOT_RESOLVED" },
+      ...over,
+    });
+
+    it("exposes each attempt's start load as a sibling of its steps", () => {
+      const detail = mapRunDetail(
+        hit({
+          status: STATUS_VALUES.failed,
+          attempts: 2,
+          retry_history: [attemptWithStartLoad(), attemptWithStartLoad({ attempt: 1 })],
+        }),
+      )!;
+
+      expect(detail.retryHistory[0].steps).toHaveLength(0);
+      expect(detail.retryHistory[0].startLoad).toMatchObject({ step_id: "_start", status: "fail" });
+      expect(detail.retryHistory[0].failedStep).toBe("_start");
+    });
+
+    it("gives the deciding attempt the record's start load and a superseded one its own", () => {
+      const views = buildAttemptViews(
+        mapRunDetail(
+          hit({
+            status: STATUS_VALUES.warning,
+            attempts: 2,
+            start_load: startLoad({ duration_ms: 380 }),
+            retry_history: [
+              attemptWithStartLoad(),
+              { attempt: 1, status: "passed", response_time_ms: 1200, steps: [] },
+            ],
+          }),
+        )!,
+      );
+
+      expect(views[0].startLoad).toMatchObject({ status: "fail" });
+      expect(views[1].startLoad).toMatchObject({ status: "ok", duration_ms: 380 });
+    });
+
+    it("carries the start load onto the single attempt of a run that never retried", () => {
+      const views = buildAttemptViews(mapRunDetail(hit({ start_load: startLoad() }))!);
+
+      expect(views).toHaveLength(1);
+      expect(views[0].startLoad).toMatchObject({ step_id: "_start" });
+    });
+  });
+
+  describe("mapRunLocationResult", () => {
+    it("exposes start_load as a sibling and leaves the steps array alone", () => {
+      const loc = mapRunLocationResult(hit({ start_load: JSON.stringify(startLoad()) }));
+
+      expect(loc.steps.map((s) => s.stepId)).toEqual(["s1", "s2"]);
+      expect(loc.startLoad).toMatchObject({
+        stepId: "_start",
+        status: "ok",
+        durationMs: 420,
+        url: "https://app.test/",
+      });
+    });
+
+    it("has no start load on a record written without one", () => {
+      expect(mapRunLocationResult(hit()).startLoad).toBeNull();
+    });
+  });
+
+  // The start load is in neither steps array, and `_start` in the attribution names no Step.
+  describe("analytics", () => {
+    const HOUR = 60 * 60 * 1_000_000;
+    const start = 1_700_000_000_000_000;
+    const end = start + HOUR;
+
+    it("never tallies the start load as a Step", () => {
+      const result = aggregateStepStats(
+        [
+          hit({
+            status: STATUS_VALUES.failed,
+            start_load: startLoad({ status: "failed", error: "net::ERR_NAME_NOT_RESOLVED" }),
+            failure_detail_step_id: "_start",
+            error: "net::ERR_NAME_NOT_RESOLVED",
+          }),
+          hit({ start_load: startLoad() }),
+        ],
+        start,
+        end,
+      );
+
+      expect(result.stepGroups.map((g) => g.name).sort()).toEqual(["Open cart", "Sign in"]);
+      expect(result.stepGroups.every((g) => g.failCount === 0)).toBe(true);
+      expect(result.failureInstances).toHaveLength(0);
+      expect(result.stepFailures.map((f) => f.stepName)).not.toContain("_start");
+      expect(result.stepFailures.every((f) => f.failCount === 0)).toBe(true);
+    });
+
+    it("never reports the start load as flaky", () => {
+      const attribution = foldRetryAttribution([
+        {
+          execution_id: "exec-1",
+          status: STATUS_VALUES.warning,
+          status_reason: STATUS_REASON.flaky,
+          retry_step_ids: ",_start,",
+          retry_error_classes: ",navigation,",
+        },
+      ]);
+      const result = aggregateStepStats(
+        [
+          hit({
+            status: STATUS_VALUES.warning,
+            status_reason: STATUS_REASON.flaky,
+            attempts: 2,
+            start_load: startLoad(),
+            retry_history: [
+              {
+                attempt: 0,
+                status: "failed",
+                start_load: startLoad({ status: "failed", error: "net::ERR_NAME_NOT_RESOLVED" }),
+                steps: [],
+                failure_detail: { step_id: "_start", step_index: 0 },
+              },
+            ],
+          }),
+        ],
+        start,
+        end,
+        undefined,
+        attribution,
+      );
+
+      expect(result.flakySteps).toHaveLength(0);
+      expect(result.stepGroups.every((g) => g.flakyCount === 0)).toBe(true);
+      expect(result.stepGroups.map((g) => g.name).sort()).toEqual(["Open cart", "Sign in"]);
+    });
   });
 });

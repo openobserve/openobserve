@@ -55,6 +55,8 @@ pub enum FolderType {
     Alerts,
     Reports,
     Synthetics,
+    Workflows,
+    Prompts,
 }
 
 /// Common folder fields used in HTTP request and response bodies.
@@ -107,6 +109,8 @@ impl From<FolderType> for config::meta::folder::FolderType {
             FolderType::Alerts => Self::Alerts,
             FolderType::Reports => Self::Reports,
             FolderType::Synthetics => Self::Synthetics,
+            FolderType::Workflows => Self::Workflows,
+            FolderType::Prompts => Self::Prompts,
         }
     }
 }

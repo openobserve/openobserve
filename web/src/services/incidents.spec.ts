@@ -18,10 +18,12 @@ import incidents from "./incidents";
 import http from "./http";
 import serviceStreamsApi from "./service_streams";
 import { gt } from "@/types/i18n";
+import analytics from "./product_analytics";
 
 // Mock the http module
 vi.mock("./http");
 vi.mock("./service_streams");
+vi.mock("./product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("incidents service", () => {
   const mockHttp = {
@@ -186,6 +188,7 @@ describe("incidents service", () => {
             logs: [{ stream_name: "default", filters: {} }],
             metrics: [{ stream_name: "metrics", filters: {} }],
             traces: [{ stream_name: "traces", filters: {} }],
+            profiles: [],
           },
         },
       };
@@ -219,7 +222,7 @@ describe("incidents service", () => {
           service_name: "unknown",
           matched_dimensions: {},
           additional_dimensions: {},
-          related_streams: { logs: [], metrics: [], traces: [] },
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
         },
       };
 
@@ -247,7 +250,7 @@ describe("incidents service", () => {
           service_name: "api-gateway",
           matched_dimensions: {},
           additional_dimensions: {},
-          related_streams: { logs: [], metrics: [], traces: [] },
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
         },
       };
 
@@ -260,6 +263,55 @@ describe("incidents service", () => {
         source_type: "logs",
         available_dimensions: mockIncident.group_values,
       });
+    });
+  });
+
+  describe("product analytics", () => {
+    const cases: [string, "post" | "patch", () => Promise<unknown>, string, object?][] = [
+      [
+        "updateStatus",
+        "patch",
+        () => incidents.updateStatus("test-org", "incident-123", "acknowledged"),
+        "incident_status_updated",
+        { status: "acknowledged" },
+      ],
+      [
+        "updateIncident",
+        "patch",
+        () => incidents.updateIncident("test-org", "incident-123", { severity: "P1" }),
+        "incident_updated",
+        { severity_changed: true, title_changed: false },
+      ],
+      [
+        "triggerRca",
+        "post",
+        () => incidents.triggerRca("test-org", "incident-123", { build_on_previous: true }),
+        "incident_rca_requested",
+        { build_on_previous: true },
+      ],
+      [
+        "postComment",
+        "post",
+        () => incidents.postComment("test-org", "incident-123", "note"),
+        "incident_comment_added",
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the server confirms", async (_, verb, call, event, props) => {
+      mockHttp[verb].mockResolvedValue({ data: {} });
+
+      await call();
+
+      if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+      else expect(analytics.track).toHaveBeenCalledWith(event);
+    });
+
+    it.each(cases)("%s does not track a rejected request", async (_, verb, call) => {
+      mockHttp[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

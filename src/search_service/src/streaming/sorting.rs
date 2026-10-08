@@ -230,13 +230,11 @@ impl TopKHeap {
     /// `order_by_cols`: all ORDER BY columns as (name, is_descending), in query order.
     /// `k=0` is invalid (heap would never accept any row); falls back to `ZO_QUERY_DEFAULT_LIMIT`.
     pub fn new(k: usize, order_by_cols: &[(String, bool)]) -> Self {
-        let k = if k == 0 {
-            config::get_config().limit.query_default_limit as usize
-        } else {
-            k
-        };
+        let default_k = config::get_config().limit.query_default_limit as usize;
+        let k = if k == 0 { default_k } else { k };
         Self {
-            heap: BinaryHeap::with_capacity(k + 1),
+            // k comes from size or SQL LIMIT, so grow on demand instead of pre-reserving it.
+            heap: BinaryHeap::with_capacity(k.min(default_k) + 1),
             k,
             cols: order_by_cols
                 .iter()

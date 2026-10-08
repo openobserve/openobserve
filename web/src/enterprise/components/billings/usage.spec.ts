@@ -24,18 +24,24 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 
 // Mock the billings service
-vi.mock("@/services/billings", () => ({
-  default: {
-    get_data_usage: vi.fn(),
-    get_ai_usage: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_data_usage: vi.fn(),
+      get_ai_usage: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+    },
+  });
+});
 
 // Mock the router
 const mockRouter = {
@@ -848,7 +854,7 @@ describe("Usage Component", () => {
       expect(wrapper.find('[data-test="usage-enable-cta"]').exists()).toBe(false);
     });
 
-    it("posts a merged settings payload with usage_stream_enabled:true on click", async () => {
+    it("posts only the opt-in, never the rest of the cached settings, on click", async () => {
       store.state.organizationData.organizationSettings = {
         usage_stream_enabled: false,
         scrape_interval: 15,
@@ -862,14 +868,12 @@ describe("Usage Component", () => {
       await flushPromises();
       wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
       await flushPromises();
-      expect(organizations.post_organization_settings).toHaveBeenCalledWith(
-        "org-a",
-        expect.objectContaining({
-          scrape_interval: 15,
-          usage_stream_enabled: true,
-        }),
-      );
+      // The backend applies the fields present, so posting the cached copy back would overwrite newer server values.
+      expect(organizations.post_organization_settings).toHaveBeenCalledWith("org-a", {
+        usage_stream_enabled: true,
+      });
       expect(store.state.organizationData.organizationSettings.usage_stream_enabled).toBe(true);
+      expect(store.state.organizationData.organizationSettings.scrape_interval).toBe(15);
     });
 
     it("shows the waiting-for-data graphic when the usage stream is missing", async () => {

@@ -44,15 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed, nextTick } from "vue";
+import { ref, watch, onMounted, computed, nextTick, reactive, onBeforeMount } from "vue";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
-import { reactive } from "vue";
-import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -1273,6 +1271,12 @@ const refreshData = () => {
     props.selectedTab === "sql" ||
     (props.selectedTab === "custom" && props.isAggregationEnabled)
   ) {
+    // The editor can mount (and this watcher fire) before the user has
+    // picked a stream — result_schema 400s on a stream-less/invalid query,
+    // so wait until the form actually has one.
+    if (!props.formData.stream_name || !props.formData.stream_type) {
+      return;
+    }
     // Use result_schema API to get query structure
     fetchQuerySchema();
     return;

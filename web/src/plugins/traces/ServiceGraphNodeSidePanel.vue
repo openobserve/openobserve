@@ -609,6 +609,7 @@ import {
   getDimensionAnalytics,
   type FieldAlias,
   type FoundGroup,
+  buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import {
@@ -619,13 +620,14 @@ import {
 } from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
+import { chartInterval } from "./metrics/latencyHeatmap";
 import {
   type MetricGroupDefinition,
   K8S_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
-import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
@@ -1103,6 +1105,7 @@ export default defineComponent({
 
       const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
       const catalogServiceFilter = serviceFilter();
+      const interval = chartInterval(props.timeRange.startTime, props.timeRange.endTime);
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
@@ -1117,7 +1120,12 @@ export default defineComponent({
 
         let query = panel.queries[0].query
           .replace("[STREAM_NAME]", () => `"${streamName}"`)
-          .replace("[WHERE_CLAUSE]", () => whereClause);
+          .replace("[WHERE_CLAUSE]", () => whereClause)
+          .replace("[INTERVAL]", interval.sql)
+          .replace("[INTERVAL_SECONDS]", String(interval.seconds));
+
+        // Always span counts here, so the Rate unit is too.
+        if (panel.title === "Rate") panel.config.unit_custom = t("traces.metrics.perSecond.spans");
 
         // Use count(*) instead of approx_distinct(trace_id)
         query = query
@@ -1606,10 +1614,12 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization?.identifier;
         if (!org) return;
-        const res = await genAiAgentMappingService.listAgents(
-          org,
-          Math.trunc(props.timeRange.startTime * 1000),
-          Math.trunc(props.timeRange.endTime * 1000),
+        const res = await queryClient.fetchQuery(
+          genAiAgentsQuery(
+            org,
+            Math.trunc(props.timeRange.startTime * 1000),
+            Math.trunc(props.timeRange.endTime * 1000),
+          ),
         );
         const match = res.agents.find(
           (a) => a.source_stream === props.streamFilter && a.name === behaviorAgentName.value,

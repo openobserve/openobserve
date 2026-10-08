@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
 import streamService from "@/services/stream";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import i18n from "@/locales";
 
 // Mock zincutils
@@ -13,25 +13,31 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 // Mock the stream service
-vi.mock("@/services/stream", () => ({
-  default: {
-    delete: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
+    },
+  });
+});
 
-// Mock segment analytics
-vi.mock("@/services/segment_analytics", () => ({
+// Mock product analytics
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
 }));
 
 // Mock jstransform service
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
+    },
+  });
+});
 
 // Mock toast
 const mockToast = vi.fn(() => vi.fn());
@@ -62,6 +68,7 @@ const mockResetStreamType = vi.fn();
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(async () => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),
@@ -276,11 +283,11 @@ describe("EnrichmentTableList Component", () => {
       expect(mockDelete).toHaveBeenCalled();
     });
 
-    it("tracks delete action in segment analytics", async () => {
+    it("tracks delete action in product analytics", async () => {
       await wrapper.vm.deleteLookupTable();
       await flushPromises();
 
-      expect(segment.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.track).toHaveBeenCalledWith("Button Click", {
         button: "Delete Enrichment Table",
         user_org: "test-org",
         user_id: "test@example.com",
@@ -355,7 +362,10 @@ describe("EnrichmentTableList Component", () => {
     it("refreshes list after form submission", async () => {
       await wrapper.vm.refreshList();
       expect(wrapper.vm.showAddJSTransformDialog).toBe(false);
-      expect(mockResetStreamType).toHaveBeenCalledWith("enrichment_tables");
+      // No resetStreamType: it dropped the cached list, so the table had
+      // nothing to show and fell back to the skeleton. The forced getStreams
+      // below is what actually reaches the server.
+      expect(mockResetStreamType).not.toHaveBeenCalled();
       expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false, false, true);
     });
   });
@@ -634,14 +644,12 @@ describe("EnrichmentTableList Component", () => {
     it("handles organization change in pipeline view", async () => {
       // Setup initial state
       wrapper.vm.jsTransforms = [{ name: "old-table" }];
-      wrapper.vm.resultTotal = 10;
       mockRouter.currentRoute.value.name = "pipeline";
 
       // Trigger watcher
       await wrapper.vm.$options.watch.selectedOrg.call(wrapper.vm, "new-org", "old-org");
       await flushPromises();
 
-      expect(wrapper.vm.resultTotal).toBe(0);
       expect(wrapper.vm.jsTransforms).toEqual([]);
       expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false, false, true);
     });

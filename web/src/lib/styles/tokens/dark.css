@@ -127,6 +127,12 @@
   --color-syntax-addition-bg: #033a16;
   --color-syntax-deletion-fg: #ffdcd7;
   --color-syntax-deletion-bg: #67060c;
+  /* Colorized queries — the query editor's vs-dark hues, lifted to clear 4.5:1 on surface-subtle */
+  --color-query-syntax-keyword: #569cd6;
+  --color-query-syntax-function: #ff2bff;
+  --color-query-syntax-string: #ce9178;
+  --color-query-syntax-number: #b5cea8;
+  --color-query-syntax-comment: #71a35a;
   /* AI idle washes are denser in dark for legibility */
   --color-gradient-ai-subtle: linear-gradient(
     135deg,
@@ -538,6 +544,7 @@
   --color-progress-bar-success: var(--color-success-500);
   --color-progress-bar-warning: var(--color-warning-400);
   --color-progress-bar-danger: var(--color-error-500);
+  --color-progress-bar-neutral: var(--color-grey-500);
   --color-progress-bar-track: var(--color-grey-700);
 
   /* Banner (OBanner) */
@@ -609,6 +616,13 @@
   --color-chart-series-11: #f5d0fe;
   --color-chart-series-12: #fef08a;
 
+  --color-map-seq-1: #03a92e;
+  --color-map-seq-2: #9db303;
+  --color-map-seq-3: #eeb400;
+  --color-map-seq-4: #fe933f;
+  --color-map-seq-5: #ff664b;
+  --color-map-card-header: var(--d-well);
+
   --color-chart-markline-shadow: rgba(0, 0, 0, 0.7);
 
   /* Dashboard table row-highlight palette — dark overrides */
@@ -639,6 +653,9 @@
 
   /* Chart grid line — dark override, raised for perceptibility (see base.css) */
   --color-chart-gridline: rgba(255, 255, 255, 0.25);
+
+  /* Chart expected-range band fill — dark override (see base.css) */
+  --color-chart-band: rgba(255, 255, 255, 0.18);
 
   /* Crosshair axis-pointer label chip — dark-only. Light leaves this undefined so
      chartColor() resolves to "" and ECharts uses its auto default (see base.css). */
@@ -896,6 +913,50 @@
   --color-icon-chip-info-text: var(--color-blue-400);
   --color-icon-chip-orange-bg: color-mix(in srgb, var(--color-orange-500) 15%, transparent);
   --color-icon-chip-orange-text: var(--color-orange-400);
+
+  /* Alert priority ramp — one step lighter on the dark canvas, where a 600 is
+     too dense to read as a 4px rail. */
+  --color-priority-p1: var(--color-error-400);
+  --color-priority-p2: var(--color-orange-400);
+  --color-priority-p3: var(--color-amber-400);
+  --color-priority-p4: var(--color-blue-400);
+  --color-priority-p5: var(--color-grey-400);
+
+  /* Schedule bands — the light 50-tints become faint accent washes, matching
+     the badge-soft treatment, with a light foreground for contrast. */
+  --color-schedule-band-1-bg: color-mix(in srgb, var(--color-blue-500) 22%, transparent);
+  --color-schedule-band-1-text: var(--color-blue-300);
+  --color-schedule-band-2-bg: color-mix(in srgb, var(--color-purple-500) 22%, transparent);
+  --color-schedule-band-2-text: var(--color-purple-400);
+  --color-schedule-band-3-bg: color-mix(in srgb, var(--color-teal-500) 22%, transparent);
+  --color-schedule-band-3-text: var(--color-teal-300);
+  --color-schedule-band-4-bg: color-mix(in srgb, var(--color-amber-500) 22%, transparent);
+  --color-schedule-band-4-text: var(--color-amber-300);
+  --color-schedule-band-5-bg: color-mix(in srgb, var(--color-indigo-500) 22%, transparent);
+  --color-schedule-band-5-text: var(--color-indigo-300);
+  --color-schedule-band-6-bg: color-mix(in srgb, var(--color-cyan-500) 22%, transparent);
+  --color-schedule-band-6-text: var(--color-cyan-300);
+
+  /* Solid stays saturated in dark too — it is the one thing on the chart that
+     must not recede. A step lighter than light mode so it lifts off the dark
+     surface instead of sinking into it. */
+  --color-schedule-band-1-solid-bg: var(--color-blue-500);
+  --color-schedule-band-1-border: var(--color-blue-400);
+  --color-schedule-band-2-solid-bg: var(--color-purple-500);
+  --color-schedule-band-2-border: var(--color-purple-400);
+  --color-schedule-band-3-solid-bg: var(--color-teal-500);
+  --color-schedule-band-3-border: var(--color-teal-400);
+  --color-schedule-band-4-solid-bg: var(--color-amber-500);
+  --color-schedule-band-4-border: var(--color-amber-400);
+  --color-schedule-band-5-solid-bg: var(--color-indigo-500);
+  --color-schedule-band-5-border: var(--color-indigo-400);
+  --color-schedule-band-6-solid-bg: var(--color-cyan-500);
+  --color-schedule-band-6-border: var(--color-cyan-400);
+  --color-schedule-band-solid-text: var(--color-white);
+
+  --color-schedule-gap-bg: color-mix(in srgb, var(--color-error-500) 15%, transparent);
+  --color-schedule-gap-border: var(--color-error-400);
+  --color-schedule-gap-text: var(--color-error-300);
 
   /* Misc dark overrides. */
   --color-cancel-query-bg: #7a3838;

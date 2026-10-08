@@ -82,7 +82,7 @@
                `items-start`, not `items-end`: OTagInput is taller than an
                OInput, and bottom-aligning the cells lifted its label clear of
                the other two so the row read as three unrelated fields. -->
-          <div class="grid grid-cols-1 items-start gap-3 md:grid-cols-[14rem_1fr_1fr]">
+          <div class="grid grid-cols-1 items-start gap-3 2xl:grid-cols-[14rem_1fr_1fr]">
             <div>
               <!-- No label here: SelectFolderDropDown renders its own, and a
                    second one above it left this column a row taller than the
@@ -612,6 +612,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
+import { saveSloMutation } from "@/services/slos.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFormat";
 import { smallestLegalSlice } from "@/utils/slos/alertSource";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -1318,6 +1320,15 @@ const NO_ERROR = raw("");
 const fieldError = (path: string): I18nText =>
   attemptedSave.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
 
+// Create vs update is this form's decision; the scope it drops is not.
+const saveSlo = useMutation(() =>
+  saveSloMutation(
+    org.value,
+    () => isEdit.value,
+    () => sloId.value,
+  ),
+);
+
 async function save() {
   // Block the request outright. Sending a knowingly-invalid definition just to
   // read the server's rejection is what produced "Request failed with status
@@ -1333,11 +1344,7 @@ async function save() {
 
   saving.value = true;
   try {
-    if (isEdit.value) {
-      await sloService.update(org.value, sloId.value, payload());
-    } else {
-      await sloService.create(org.value, payload());
-    }
+    await saveSlo.mutateAsync(payload());
     toast({ variant: "success", message: t("slos.saved") });
     router.push(backTarget.value);
   } catch (e: any) {

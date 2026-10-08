@@ -33,10 +33,9 @@
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import { computed, defineComponent } from "vue";
+import { computed, defineComponent, inject } from "vue";
 import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
-import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18nTyped } from "@/types/i18n";

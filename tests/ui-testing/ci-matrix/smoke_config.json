@@ -75,6 +75,8 @@
     "Traces",
     "Pipelines",
     "GeneralTests",
+    "Management",
+    "Org",
     "Streams"
   ],
   "always_run": [
@@ -115,24 +117,30 @@
     ],
     "GeneralTests": [
       "web/src/components/login/**",
-      "web/src/components/iam/**",
-      "web/src/components/settings/**",
-      "web/src/components/ingestion/**",
       "web/src/components/about/**",
       "web/src/views/About*",
       "web/src/views/Login*",
-      "web/src/views/Ingestion*",
+      "web/src/services/auth.*",
+      "tests/ui-testing/pages/generalPages/**"
+    ],
+    "Management": [
+      "web/src/components/iam/**",
+      "web/src/components/settings/**",
       "web/src/views/IdentityAccessManagement*",
       "web/src/views/Invitations*",
       "web/src/views/User*",
-      "web/src/services/auth.*",
       "web/src/services/users.*",
-      "web/src/services/organizations.*",
-      "web/src/services/settings.*",
       "web/src/services/iam.*",
       "web/src/services/service_accounts.*",
-      "tests/ui-testing/pages/generalPages/**",
-      "tests/ui-testing/pages/iamPages/**"
+      "web/src/services/settings.*",
+      "tests/ui-testing/pages/iamPages/**",
+      "tests/ui-testing/pages/generalPages/**"
+    ],
+    "Org": [
+      "web/src/components/iam/organizations/**",
+      "web/src/services/organizations.*",
+      "tests/ui-testing/pages/iamPages/**",
+      "tests/ui-testing/pages/generalPages/**"
     ],
     "Logs": [
       "web/src/plugins/logs/**",
@@ -172,13 +180,22 @@
       "web/src/services/sourcemaps.*",
       "tests/ui-testing/pages/rumPages/**"
     ],
+    "RUM-Analytics": [
+      "web/src/components/rum/productAnalytics/**",
+      "web/src/views/RUM/**",
+      "web/src/services/rumProductAnalytics.*",
+      "tests/ui-testing/pages/rumPages/**"
+    ],
     "Streams": [
       "web/src/components/logstream/**",
+      "web/src/components/ingestion/**",
       "web/src/views/LogStream*",
       "web/src/views/StreamExplorer*",
+      "web/src/views/Ingestion*",
       "web/src/services/stream.*",
       "web/src/services/service_streams.*",
-      "tests/ui-testing/pages/streamsPages/**"
+      "tests/ui-testing/pages/streamsPages/**",
+      "tests/ui-testing/pages/generalPages/**"
     ],
     "Traces": [
       "web/src/plugins/traces/**",

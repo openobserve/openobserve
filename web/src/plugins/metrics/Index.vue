@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="selectedDate"
         ref="dateTimePickerRef"
         :disable="disable"
+        :hide-range-shift="isMobile"
         class="h-8"
         data-test="metrics-date-picker"
       />
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="refreshInterval"
         trigger
         :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        :is-compact="isMobile"
         @trigger="runQuery"
         class="h-8"
         data-test="metrics-auto-refresh"
@@ -55,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         shortcut-id="metricsCopyUrl"
         class="h-8"
       />
+      <QueryHistoryDrawer @load="onHistoryLoad" />
       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
         <OButton
           v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
@@ -75,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-apply"
           :loading="disable"
           :disabled="disable"
-          @click="runQuery"
+          @click="onUserRun"
         >
           {{ t("metrics.runQuery") }}
           <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
@@ -115,6 +118,7 @@ import {
   onMounted,
   onBeforeMount,
   defineAsyncComponent,
+  provide,
 } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -124,7 +128,6 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
-import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -137,17 +140,23 @@ import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields
 import { useRoute, useRouter } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import ShareButton from "@/components/common/ShareButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   getMetricsConfig,
   encodeMetricsConfig,
   applyMetricsBlob,
   applyDeepLinkOverrides,
 } from "@/composables/metrics/metricsUrlState";
+import { useQueryHistoryRecorder } from "@/composables/metrics/useQueryHistoryRecorder";
+import { pickerSavedDate } from "@/utils/metrics/queryHistory";
+import QueryHistoryDrawer from "./QueryHistoryDrawer.vue";
+import analytics from "@/services/product_analytics";
 import {
   queryParamsToSelectedDate,
   selectedDateToQueryParams,
   refreshLabelToInterval,
   refreshIntervalToLabel,
+  type SelectedDate,
 } from "@/utils/dashboard/urlTimeParams";
 import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
 import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
@@ -175,9 +184,11 @@ export default defineComponent({
     OButton,
     OTooltip,
     ShareButton,
+    QueryHistoryDrawer,
   },
   setup() {
     provide("dashboardPanelDataPageKey", "metrics");
+    const { isMobile } = useBreakpoint();
 
     // PanelEditor ref for accessing exposed methods/properties
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
@@ -398,9 +409,10 @@ export default defineComponent({
       },
     );
 
-    const runQuery = () => {
+    // Auto-refresh and deep links run here too, so only `onUserRun` writes history.
+    const runQuery = (): boolean => {
       if (!isValid(true, false)) {
-        return;
+        return false;
       }
 
       // copy the data object excluding the reactivity
@@ -416,6 +428,34 @@ export default defineComponent({
 
       // panel -> URL (full blob + time/refresh); normalizes any inbound params.
       syncStateToUrl();
+      return true;
+    };
+
+    const { record } = useQueryHistoryRecorder();
+
+    /** An explicit Run (button or shortcut): runs, then records a valid query. */
+    const onUserRun = () => {
+      if (runQuery()) record(dashboardPanelData, selectedDate.value);
+    };
+
+    /** The editor hydrates only on mount, so an entry replaces the panel in place and reruns. */
+    const applyPanelData = (metricsData: string, timeRange: SelectedDate) => {
+      if (!applyMetricsBlob(metricsData, dashboardPanelData)) return;
+      selectedDate.value = timeRange;
+      dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(timeRange));
+      runQuery();
+    };
+
+    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
+      applyPanelData(entry.metricsData, entry.timeRange);
+      try {
+        analytics.track("metrics_query_history_loaded", {
+          org_id: store.state.selectedOrganization?.identifier,
+          surface: "editor",
+        });
+      } catch {
+        // Telemetry must never break the page.
+      }
     };
 
     const updateDateTime = () => {
@@ -522,6 +562,9 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
+    // The focused PromQL editor swallows Cmd+Enter, so the page shortcut never sees it; it runs this instead.
+    provide("runQuery", onUserRun);
+
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
         variablesAndPanelsDataLoadingState.searchRequestTraceIds,
@@ -578,7 +621,7 @@ export default defineComponent({
     useShortcuts([
       {
         id: "metricsRunQuery",
-        handler: () => runQuery(),
+        handler: () => onUserRun(),
       },
       {
         id: "metricsRefresh",
@@ -615,8 +658,12 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
       updateDateTime,
       runQuery,
+      onUserRun,
+      applyPanelData,
+      onHistoryLoad,
       dashboardPanelData,
       chartData,
       editMode,

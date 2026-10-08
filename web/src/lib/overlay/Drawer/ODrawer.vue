@@ -20,12 +20,15 @@ import {
   provide,
   nextTick,
   useAttrs,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const { t } = useI18nTyped();
 
@@ -56,6 +59,9 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   neutralButtonLoading: false,
   lazy: true,
   portalTarget: undefined,
+  anchor: undefined,
+  anchorEdge: "top",
+  modal: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -63,6 +69,9 @@ const emit = defineEmits<DrawerEmits>();
 defineSlots<DrawerSlots>();
 
 const slots = useSlots();
+
+const ESCAPE_KEEPS_OPEN =
+  "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
 // Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
 // boolean-casts an absent `open` prop to `false`, locking reka-ui into
@@ -76,13 +85,45 @@ watch(
   },
 );
 
+// A kept-alive view's portal stays in <body> when the view is away, so it hides then and returns open.
+const hostAway = ref(false);
+// An inline drawer's DOM moves with its host, so only a portaled one needs hiding.
+const shown = computed(() => internalOpen.value && (props.inline || !hostAway.value));
+
+// Remounting on return re-records focus from wherever navigation left it, so keep the opener.
+let openedFrom: HTMLElement | null = null;
+let awaySinceOpen = false;
+watch(
+  internalOpen,
+  (open) => {
+    if (!open) return;
+    openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    awaySinceOpen = false;
+  },
+  { immediate: true },
+);
+onDeactivated(() => {
+  hostAway.value = true;
+  if (internalOpen.value && !shown.value) awaySinceOpen = true;
+});
+onActivated(() => (hostAway.value = false));
+
+function handleCloseAutoFocus(event: Event) {
+  if (hostAway.value || awaySinceOpen) event.preventDefault();
+  if (hostAway.value || !awaySinceOpen) return;
+  awaySinceOpen = false;
+  if (openedFrom?.isConnected) openedFrom.focus();
+}
+
 function handleOpenChange(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  if (props.persistent || (!props.modal && target?.closest(ESCAPE_KEEPS_OPEN))) {
     e.preventDefault();
     return;
   }
@@ -90,7 +131,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
-  if (props.persistent) {
+  if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
   }
@@ -194,12 +235,49 @@ const sizeClasses = computed(() => {
 const isContained = computed(() => !!props.portalTarget);
 
 // Explicit width override — vw when full-viewport, % when container-scoped
+const { isMobile } = useBreakpoint();
+
+// Measured, not CSS: the drawer is portaled to <body>, away from its anchor row.
+const anchorTop = ref(0);
+function measureAnchor() {
+  const a = props.anchor;
+  const el = typeof a === "string" ? document.querySelector<HTMLElement>(a) : a;
+  const rect = el?.getBoundingClientRect();
+  anchorTop.value = rect
+    ? Math.max(0, Math.round(props.anchorEdge === "bottom" ? rect.bottom : rect.top))
+    : 0;
+}
+watchEffect(
+  (cleanup) => {
+    if (!shown.value || !props.anchor) {
+      anchorTop.value = 0;
+      return;
+    }
+    measureAnchor();
+    window.addEventListener("resize", measureAnchor);
+    cleanup(() => window.removeEventListener("resize", measureAnchor));
+  },
+  // The anchor can be swapped in the same tick, so measure only once it is in the DOM.
+  { flush: "post" },
+);
+const anchorStyle = computed(() => {
+  const style: Record<string, string> = {};
+  if (anchorTop.value > 0) {
+    style.top = `${anchorTop.value}px`;
+    style.height = `calc(100% - ${anchorTop.value}px)`;
+  }
+  return style;
+});
+const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
+
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
+    ...anchorStyle.value,
   };
   if (props.width != null) {
-    style.width = isContained.value ? `${props.width}%` : `${props.width}vw`;
+    const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
+    style.width = isContained.value ? `${w}%` : `${w}vw`;
   }
   return style;
 });
@@ -207,31 +285,44 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const AUTOFOCUS_TEXT_FIELDS = [
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+  "textarea:not([disabled])",
+].join(", ");
+const AUTOFOCUS_COMBOBOX = '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+
+function findAutoFocusTarget(root: Element): HTMLElement | null {
+  const scan = (selector: string): HTMLElement[] => {
+    const nested = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
+  };
+  const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
+    (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
+  );
+  if (textField) return textField;
+  return scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest("[data-no-autofocus]")) ?? null;
+}
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
     const body = bodyRef.value;
-    if (body) {
-      const candidates = body.querySelectorAll<HTMLElement>(
-        [
-          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          "textarea:not([disabled])",
-        ].join(", "),
-      );
-      const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
-      );
-      if (firstField) {
-        firstField.focus();
-        return;
-      }
+    const field = body ? findAutoFocusTarget(body) : null;
+    if (field) {
+      field.focus();
+      return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
+    const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
+    if (autofocus) {
+      autofocus.focus();
+      return;
+    }
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
+      return;
     }
+    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus();
   });
 }
 
@@ -251,7 +342,7 @@ function handleOpenAutoFocus(event: Event) {
 // body is below document in the DOM, this prevents the events from reaching
 // FocusScope's document-level handlers.
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
 
   function isPortalElement(el: Element | null): boolean {
     return !!el?.closest("[data-reka-popper-content-wrapper]");
@@ -289,7 +380,8 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
-watch(internalOpen, (open) => {
+// The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
+watch(shown, (open) => {
   if (open) {
     nextTick(() => {
       attachShadow();
@@ -302,7 +394,7 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -324,7 +416,7 @@ watch(internalOpen, (open) => {
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-120 data-[state=open]:duration-120',
         ]"
-        :style="{ zIndex: overlayZIndex }"
+        :style="overlayStyle"
       />
 
       <!-- Drawer panel -->
@@ -367,6 +459,7 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
@@ -393,8 +486,8 @@ watch(internalOpen, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0">
+            <!-- Below lg a subtitle longer than the panel must truncate, or it pushes the close button off screen. -->
+            <div v-if="title || subTitle" class="min-w-0 shrink-0 max-lg:shrink">
               <span
                 v-if="title"
                 class="text-dialog-header-text block truncate text-base font-semibold"

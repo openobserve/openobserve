@@ -58,20 +58,26 @@ vi.mock("vue-router", () => ({
   onBeforeRouteLeave: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocations: mockServiceGetLocations,
-    create: mockServiceCreate,
-    update: mockServiceUpdate,
-    get: mockServiceGet,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocations: mockServiceGetLocations,
+      create: mockServiceCreate,
+      update: mockServiceUpdate,
+      get: mockServiceGet,
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn().mockResolvedValue({ data: [] }),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn().mockResolvedValue({ data: [] }),
+    },
+  });
+});
 
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),
@@ -88,11 +94,12 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 }));
 
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
+import destinationService from "@/services/alert_destination";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OPageHeader: {
-    template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
+    template: '<div data-test="synthetics-header"><slot /></div>',
     props: ["title", "subtitle", "back"],
   },
   // Mirrors the real OButton slot contract (OButton.vue): only `icon-left`,
@@ -138,9 +145,6 @@ const baseStubs = {
   CheckSshConfig: {
     template: '<div data-test="synthetics-ssh-config" />',
     props: ["check"],
-  },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
   },
 };
 
@@ -195,6 +199,22 @@ describe("CreateProtocolCheck", () => {
     });
   });
 
+  describe("destinations refresh", () => {
+    // A destination made in another tab never expires this tab's cache, so only a forced read shows it.
+    it("should re-read the destinations from the server when the picker asks for a refresh", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+      expect(destinationService.list).toHaveBeenCalledTimes(1);
+
+      wrapper
+        .findComponent('[data-test="synthetics-check-configure"]')
+        .vm.$emit("refresh:destinations");
+      await flushPromises();
+
+      expect(destinationService.list).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("initial render", () => {
     it("should render the protocol check form with check type HTTP", async () => {
       wrapper = mountPage("http");
@@ -221,13 +241,6 @@ describe("CreateProtocolCheck", () => {
       const saveBtn = wrapper.find('[data-test="synthetics-create-save-btn"]');
       expect(saveBtn.exists()).toBe(true);
       expect(saveBtn.find('[data-test^="icon-"]').exists()).toBe(false);
-    });
-
-    it("should render the Beta badge in the page title", async () => {
-      wrapper = mountPage("http");
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 

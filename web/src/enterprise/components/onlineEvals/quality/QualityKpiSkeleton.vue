@@ -5,7 +5,7 @@
     <div
       v-for="n in count"
       :key="n"
-      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-0.5 border px-3 pt-1.5 pb-1.5"
+      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-0.5 border px-3 pt-1.5 pb-1.5 max-lg:min-h-9 max-lg:w-20 max-lg:shrink-0"
       data-test="quality-kpi-skeleton"
     >
       <OSkeleton type="text" class="h-2.75 w-[55%]" />

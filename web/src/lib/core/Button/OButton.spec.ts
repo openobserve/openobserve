@@ -132,6 +132,19 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
   });
 
+  // Destination previews are fixed-light brand replicas: the label must use the
+  // fixed brand foreground, not text-text-inverse, which turns near-black in dark mode.
+  it.each([
+    ["preview-slack", "text-brand-slack-foreground"],
+    ["preview-teams", "text-brand-teams-foreground"],
+    ["preview-email", "text-brand-email-foreground"],
+    ["preview-opsgenie", "text-brand-email-ink-foreground"],
+  ] as const)("paints the %s label with %s", (variant, label) => {
+    const wrapper = mount(OButton, { props: { variant } });
+    expect(wrapper.classes()).toContain(label);
+    expect(wrapper.classes()).not.toContain("text-text-inverse");
+  });
+
   // --- Size classes ---
 
   it("applies md size classes by default", () => {
@@ -214,6 +227,15 @@ describe("OButton", () => {
   it('renders as an <a> when as="a"', () => {
     const wrapper = mount(OButton, { props: { as: "a" } });
     expect(wrapper.element.tagName.toLowerCase()).toBe("a");
+  });
+
+  // base-elements.css underlines every a:hover, which would make a link-button
+  // read as prose text rather than a control.
+  it('never underlines when as="a"', () => {
+    const wrapper = mount(OButton, { props: { as: "a" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("no-underline");
+    expect(classes).toContain("hover:no-underline");
   });
 
   it('does not set type attribute when as="a"', () => {
