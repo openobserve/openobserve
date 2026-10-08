@@ -1808,6 +1808,47 @@ mod tests {
         );
     }
 
+    #[test]
+    fn midx_regex_selection_fully_matches_parsed_and_manual_alternations() {
+        let (_, bytes) = file(&[
+            (1, 10, 1.0, Some("first")),
+            (2, 10, 2.0, Some("last")),
+            (3, 10, 3.0, Some("first-extra")),
+            (4, 10, 4.0, Some("prefix-last")),
+            (5, 10, 5.0, Some("middle")),
+        ]);
+        let index = metrics_index::block::decode_file(
+            &bytes,
+            &ParentMetadata {
+                rows: 5,
+                compressed_size: 123,
+            },
+            &["group".into()],
+        )
+        .unwrap();
+        for (operator, expected) in [("=~", vec![0, 1]), ("!~", vec![2, 3, 4])] {
+            let query = format!(r#"m{{group{operator}"first|last"}}"#);
+            let promql_parser::parser::Expr::VectorSelector(selector) =
+                promql_parser::parser::parse(&query).unwrap()
+            else {
+                panic!("expected vector selector");
+            };
+            let regex = "first|last".parse().unwrap();
+            let op = if operator == "=~" {
+                MatchOp::Re(regex)
+            } else {
+                MatchOp::NotRe(regex)
+            };
+            let manual = Matchers::new(vec![Matcher::new(op, "group", "first|last")]);
+            for matchers in [selector.matchers, manual] {
+                assert_eq!(
+                    metrics_index::matching_blocks(&index, &matchers).unwrap(),
+                    expected
+                );
+            }
+        }
+    }
+
     #[tokio::test]
     async fn filtered_block_selection_reuses_one_decode_without_global_cache() {
         let data = file(&[

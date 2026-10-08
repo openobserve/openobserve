@@ -58,7 +58,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             MatchOp::Equal => column.eq(literal(mat.value.clone())),
             MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
-                let regex = format!("^{}$", regex.as_str());
+                let regex = format!("^(?:{})$", regex.as_str());
                 let column = if matches!(field_type, DataType::Dictionary(_, _)) {
                     cast(column, DataType::Utf8View)
                 } else {
@@ -75,4 +75,80 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         predicates.push(predicate);
     }
     predicates
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        arrow::{
+            array::{ArrayRef, LargeStringArray, RecordBatch, StringArray, StringViewArray},
+            util::display::array_value_to_string,
+        },
+        prelude::SessionContext,
+    };
+    use promql_parser::parser::{self, Expr as PromExpr};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn regex_residual_filters_fully_match_parsed_and_manual_alternations() {
+        let values = vec!["first", "last", "first-extra", "prefix-last", "middle"];
+        let columns: Vec<ArrayRef> = vec![
+            Arc::new(StringArray::from(values.clone())),
+            Arc::new(LargeStringArray::from(values.clone())),
+            Arc::new(StringViewArray::from(values)),
+        ];
+        for column in columns {
+            let schema = Arc::new(Schema::new(vec![Field::new(
+                "label",
+                column.data_type().clone(),
+                false,
+            )]));
+            let batch = RecordBatch::try_new(schema.clone(), vec![column]).unwrap();
+            for (operator, expected) in [
+                ("=~", vec!["first", "last"]),
+                ("!~", vec!["first-extra", "prefix-last", "middle"]),
+            ] {
+                let query = format!(r#"m{{label{operator}"first|last"}}"#);
+                let PromExpr::VectorSelector(selector) = parser::parse(&query).unwrap() else {
+                    panic!("expected vector selector");
+                };
+                let regex = "first|last".parse().unwrap();
+                let op = if operator == "=~" {
+                    MatchOp::Re(regex)
+                } else {
+                    MatchOp::NotRe(regex)
+                };
+                let manual = Matchers::new(vec![Matcher::new(op, "label", "first|last")]);
+                for matchers in [selector.matchers, manual] {
+                    let context = SessionContext::new();
+                    let filter = matcher_predicates(&schema, &matchers).remove(0);
+                    let batches = context
+                        .read_batch(batch.clone())
+                        .unwrap()
+                        .filter(filter)
+                        .unwrap()
+                        .collect()
+                        .await
+                        .unwrap();
+                    let actual = batches
+                        .iter()
+                        .flat_map(|batch| {
+                            (0..batch.num_rows()).map(|row| {
+                                array_value_to_string(batch.column(0).as_ref(), row).unwrap()
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    assert_eq!(
+                        actual,
+                        expected,
+                        "{operator} {:?}",
+                        schema.field(0).data_type()
+                    );
+                }
+            }
+        }
+    }
 }
