@@ -37,6 +37,9 @@ export default class DashboardPanel {
       '[data-test="dashboard-panel-refresh-panel-btn"]'
     );
     this.editLayout = page.locator('[data-test="dashboard-edit-layout"]');
+    // Layout edits are drafted in an explicit edit mode and saved once from the header.
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
     this.panelHeight = page.locator(
       '[data-test="panel-layout-settings-height-input"]'
     );
@@ -185,8 +188,10 @@ export default class DashboardPanel {
     await this.refreshBtn.click();
   }
 
-  //edit layout
+  //edit layout: Edit -> panel menu "Edit layout" -> apply -> Save
   async editLayoutPanel(panelName, height) {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
     const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
     await dropdownBtn.waitFor({ state: "visible" });
     await dropdownBtn.click();
@@ -196,6 +201,9 @@ export default class DashboardPanel {
     await this.panelHeight.click();
     await this.panelHeight.fill(height);
     await this.saveLayout.click();
+    await expect(this.layoutEditSaveBtn).toBeEnabled();
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
   }
 
   //Edit Panel: Go to logs
