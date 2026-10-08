@@ -67,10 +67,13 @@ const public_dashboards_admin = {
   listOrg: (org: string) => http().get<{ list: PublicLink[] }>(`/api/${org}/public_dashboards`),
   list: (org: string, dashboardId: string) =>
     http().get<{ list: PublicLink[] }>(linksPath(org, dashboardId)),
+  // The form shows its own message on a 403, so the global toast would repeat it.
   create: (org: string, dashboardId: string, config: PublicLinkConfig) =>
-    http().post<PublicLink>(linksPath(org, dashboardId), config),
+    http().post<PublicLink>(linksPath(org, dashboardId), config, { silentForbidden: true }),
   update: (org: string, dashboardId: string, linkId: string, config: PublicLinkConfig) =>
-    http().put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config),
+    http().put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config, {
+      silentForbidden: true,
+    }),
   pause: (org: string, dashboardId: string, linkId: string) =>
     http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`),
   resume: (org: string, dashboardId: string, linkId: string) =>

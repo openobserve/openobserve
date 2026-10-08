@@ -53,11 +53,20 @@ describe("public_dashboards_admin service", () => {
     expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links");
   });
 
-  it("creates with POST and edits one link with PUT", async () => {
+  it("creates with POST and edits one link with PUT, without the global 403 toast", async () => {
     await service.create("org1", "dash1", cfg);
     await service.update("org1", "dash1", "l1", cfg);
-    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links", cfg);
-    expect(mockHttp.put).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1", cfg);
+    const silent = { silentForbidden: true };
+    expect(mockHttp.post).toHaveBeenCalledWith(
+      "/api/org1/dashboards/dash1/public_links",
+      cfg,
+      silent,
+    );
+    expect(mockHttp.put).toHaveBeenCalledWith(
+      "/api/org1/dashboards/dash1/public_links/l1",
+      cfg,
+      silent,
+    );
   });
 
   it("pauses, resumes, rebuilds and revokes one link", async () => {
