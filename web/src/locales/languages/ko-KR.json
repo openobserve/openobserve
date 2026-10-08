@@ -5279,8 +5279,9 @@
     "hundredPlaceholder": "100",
     "last": "마지막",
     "alertContextMenu": {
-      "thresholdAbove": "임계값이 {value}보다 높은 알림 생성",
-      "thresholdBelow": "임계값이 {value}보다 낮은 알림 생성"
+      "thresholdAbove": "값이 {value} 초과이면 알림",
+      "thresholdBelow": "값이 {value} 미만이면 알림",
+      "forecastReaches": "예측값이 {value}에 도달하면 알림"
     },
     "dashboardErrors": {
       "errorsCount": "오류 ({count})"
@@ -5302,6 +5303,12 @@
     "showQueryResults": "쿼리 결과 보기",
     "hideQueryResults": "쿼리 결과 숨기기",
     "renameQuery": "쿼리 이름 바꾸기",
+    "addFormula": "수식 추가",
+    "formulaNumber": "수식 {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter}은(는) 이 패널의 쿼리가 아닙니다",
+    "formulaReferencesFormula": "{letter}은(는) 수식이며, 수식은 다른 수식을 참조할 수 없습니다",
+    "formulaInputNote": "수식에 사용되는 경우: 이 쿼리의 인스턴트/범위 설정, 범례, 스텝, 시간 이동은 적용되지 않습니다.",
     "multiSqlQueryLabel": "쿼리 라벨",
     "multiSqlQueryLabelHint": "범례로 표시된 이 쿼리의 사용자 지정 이름 (예: 'Production')",
     "multiQueryWarning": "{chartType} 에 대해서는 쿼리 1만 렌더링됩니다.",
@@ -6331,8 +6338,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "쿼리 모드 변경",
-      "changeQueryModeConfirm": "쿼리 모드를 변경하시겠습니까? X축, Y축 및 필터에 저장된 데이터가 삭제됩니다.",
-      "switchToBuilderConfirm": "빌더 모드로 전환하시겠습니까? 사용자 정의 PromQL 쿼리가 삭제됩니다."
+      "changeQueryModeConfirm": "쿼리 모드를 변경하시겠습니까? X축, Y축 및 필터에 저장된 데이터가 삭제됩니다."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "또한 예제 쿼리로 쿼리 대체",
@@ -6480,6 +6486,7 @@
       "selectRequiredFields": "차트를 렌더링하려면 필수 필드를 선택하세요",
       "noDataFound": "데이터가 없습니다",
       "seriesLimitWarning": "최적의 성능을 위해 표시되는 시리즈를 제한합니다",
+      "fitted": "적합",
       "mapLayerName": "레이어 1",
       "mapLayerNameIndexed": "레이어 {index}",
       "secondsAgo": "{count}초 전 | {count}초 전",
@@ -8666,10 +8673,39 @@
     "noData": "데이터 없음",
     "recentData": "최근 데이터",
     "theLastDay": "지난 하루 | 지난 {count}일",
+    "forecast": {
+      "modeThreshold": "임계값",
+      "modeForecast": "예측",
+      "expression": "예측할 표현식",
+      "alertWhen": "다음 조건일 때 알림",
+      "rises": "다음까지 상승",
+      "falls": "다음까지 하강",
+      "threshold": "임계값",
+      "within": "이내",
+      "days": "일",
+      "basedOn": "최근",
+      "window6h": "6시간",
+      "window1d": "1일",
+      "window2d": "2일",
+      "window7d": "7일",
+      "help": "각 시계열에 대해 이만큼의 이력을 지나는 직선 추세선이 그려집니다. 추세선이 제때 임계값에 도달하는 각 시계열은 자체적으로 알림을 발생시킵니다.",
+      "horizonRange": "{min}에서 {max} 사이의 정수 일수를 입력하세요",
+      "horizonLabel": "예측 기간(일)",
+      "dayCount": "{n}일 | {n}일",
+      "summaryRises": "{horizon} 이내에 {threshold}까지 상승할 것으로 예측되면 알림",
+      "summaryFalls": "{horizon} 이내에 {threshold}까지 하강할 것으로 예측되면 알림",
+      "triggerRises": "{horizon} 이내에 {threshold}까지 상승할 것으로 예측",
+      "triggerFalls": "{horizon} 이내에 {threshold}까지 하강할 것으로 예측",
+      "previewSeries": "{threshold}까지 남은 일수",
+      "previewReason": "{horizon} 이내에 {threshold}에 도달할 것으로 예측된 시계열 {count}개",
+      "rowTemplateHint": "각 시계열의 행은 “3일 후 90에 도달”처럼 표시됩니다. 행은 {'{'}rows{'}'}를 포함하는 대상 템플릿에서만 표시됩니다."
+    },
     "prefill": {
       "dialog": {
         "title": "경고 만들기",
         "continue": "경고로 계속",
+        "queryChoiceLabel": "알림 대상 쿼리",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "스트림",
         "thresholdLabel": "경고 대상",
         "thresholdMatchingRows": "일치하는 행",
@@ -8705,6 +8741,10 @@
         "library": {
           "label": "편집기에서 사용자 지정",
           "toast": "알림 라이브러리에서: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "알림 생성",
+          "toast": "메트릭 탐색기에서 쿼리를 가져왔습니다"
         },
         "dbm": {
           "label": "알림 받기",
@@ -9388,11 +9428,77 @@
         "close": "메트릭으로 돌아가기",
         "backTo": "메트릭",
         "openInVisualize": "시각화에서 열기",
+        "overlay": {
+          "current": "현재",
+          "noData": "{period} 데이터 없음",
+          "forecast": "예측"
+        },
+        "noAlertQuery": "이 메트릭에는 알림을 설정할 쿼리가 없습니다",
+        "drilldown": {
+          "button": "로그 및 트레이스",
+          "help": "이 메트릭의 서비스에 대한 로그와 트레이스를 엽니다. 상관 분석에는 서비스를 식별하는 레이블이 필요하므로, 서비스 레이블이 없는 인프라 메트릭은 조직에서 서비스를 선택 사항으로 설정하지 않는 한 일반적으로 아무것도 찾지 못합니다.",
+          "enterprise": "로그 및 트레이스 드릴다운은 엔터프라이즈 기능입니다.",
+          "discoveryOff": "이 조직에서는 서비스 검색이 꺼져 있습니다.",
+          "forbidden": "서비스 상관 분석을 사용할 권한이 없습니다.",
+          "checking": "액세스 확인 중…",
+          "loading": "로딩 중…",
+          "schemaError": "이 메트릭의 레이블을 로드할 수 없습니다.",
+          "retry": "다시 시도",
+          "pickService": "{label}을(를) 선택하면 해당 로그와 트레이스를 볼 수 있습니다",
+          "noServiceValues": "이 시간 범위에 {label} 값이 없습니다.",
+          "noServiceLabel": "이 메트릭에는 상관 분석에 사용할 서비스 레이블이 없습니다.",
+          "needIdentity": "상관 분석을 위해 네임스페이스 같은 식별 레이블로 필터링하세요.",
+          "noService": "이 필터에 해당하는 서비스를 찾을 수 없습니다.",
+          "noPermission": "서비스를 볼 권한이 없습니다.",
+          "logs": "로그",
+          "traces": "트레이스",
+          "noLogsStream": "서비스 {service}의 로그 스트림이 없습니다",
+          "noTracesStream": "서비스 {service}의 트레이스 스트림이 없습니다",
+          "noServiceField": "이 스트림에 서비스 필드가 없습니다",
+          "notApplied": "적용되지 않음: {labels} (이 스트림에 일치하는 필드 없음)"
+        },
+        "forecast": {
+          "label": "예측",
+          "off": "꺼짐",
+          "linear": "선형",
+          "smoothed": "평활 추세",
+          "smoothedHelp": "평활 추세는 평활화된 시계열의 선형 투영입니다. 각 포인트는 이전 10개 스텝에 걸쳐 평활화된 후 직선이 피팅됩니다. 계절성 예측이 아닙니다.",
+          "horizon": "예측 기간",
+          "horizonAuto": "범위의 25%",
+          "horizonComputed": "{duration} (범위의 25%)",
+          "linearHelp": "선형: 표시된 범위에 피팅된 직선입니다.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1시간",
+          "horizon6h": "6시간",
+          "horizon1d": "1일",
+          "horizon1w": "1주",
+          "suffix": "예측"
+        },
+        "compare": {
+          "label": "비교 대상",
+          "off": "꺼짐",
+          "ago1h": "1시간 전",
+          "ago1d": "1일 전",
+          "ago1w": "1주 전"
+        },
         "noPreview": "미리보기 없음 — 시각화에서 열어보세요",
         "exemplars": "Exemplar",
         "filtersNotApplied": "필터 {filters}이(가) 이 메트릭에 적용되지 않습니다. 모든 시계열을 표시합니다 | 필터 {filters}이(가) 이 메트릭에 적용되지 않습니다. 모든 시계열을 표시합니다",
         "tabBreakdown": "분류",
         "tabRelated": "관련",
+        "tabUsedIn": "사용 위치",
+        "tabUsedInCount": "사용 위치 ({count})",
+        "usedIn": {
+          "dashboards": "대시보드 ({count})",
+          "alerts": "알림 ({count})",
+          "slos": "SLO ({count})",
+          "pipelines": "예약된 파이프라인 ({count})",
+          "empty": "표시 가능한 대시보드, 알림, SLO 또는 예약된 파이프라인 중 이 메트릭을 사용하는 항목이 없습니다",
+          "error": "이 메트릭이 사용되는 위치를 조회할 수 없습니다",
+          "unparsed": "{count}개의 쿼리를 파싱할 수 없어 이름으로 일치시켰습니다 | {count}개의 쿼리를 파싱할 수 없어 이름으로 일치시켰습니다",
+          "textMatch": "이름으로 일치",
+          "textMatchHelp": "이 쿼리를 파싱할 수 없어 텍스트에서 메트릭 이름을 검색하여 찾았습니다. 이 메트릭을 읽지 않을 수 있습니다."
+        },
         "breakdown": {
           "distinctCount": "{count}개 값 | {count}개 값",
           "distinctMany": "{count}+개 값",
@@ -9644,6 +9750,30 @@
       "regexPattern": "정규식 패턴 (예: prod.*)",
       "regexNotMatching": "정규식 불일치 (예: test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "빌더에서 {construct}을(를) 표시할 수 없습니다",
+      "twoMetrics": "빌더에서는 두 메트릭 간의 연산을 표시할 수 없습니다 — 수식을 사용하세요",
+      "noMetric": "빌더에는 이름이 지정된 메트릭 하나에 대한 쿼리가 필요합니다",
+      "mismatch": "빌더에서 이 쿼리를 정확히 표시할 수 없습니다",
+      "constructs": {
+        "without": "without (…) 그룹화",
+        "offset": "오프셋 수정자",
+        "at": "{'@'} 수정자",
+        "orMatchers": "레이블 매처 사이의 or",
+        "subquery": "서브쿼리",
+        "vectorMatching": "on (…) 또는 ignoring (…)을 사용한 벡터 매칭",
+        "bool": "bool 비교",
+        "unaryMinus": "부정된 표현식",
+        "string": "문자열 인수",
+        "nonFinite": "유한하지 않은 숫자",
+        "rangeVector": "단독 범위 벡터",
+        "setOperator": "집합 연산자 {op}",
+        "function": "함수 {name}()",
+        "aggregation": "집계 {name}",
+        "numberFirst": "{op} 왼쪽의 숫자",
+        "operator": "연산자 {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "비율 계산 시간 범위",
@@ -9663,6 +9793,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "가장 가까운 배수"
       },
+      "rangeOnlyFirst": "범위 함수는 첫 번째 단계에만 올 수 있습니다",
+      "rangeOnlyFirstNote": "범위 함수는 원시 샘플을 읽으므로 첫 번째 단계에만 올 수 있습니다. 추가하려면 다른 단계를 제거하세요.",
       "dragToReorder": "드래그하여 순서 변경",
       "noMatchingLabels": "일치하는 레이블 없음",
       "selectMetricFirst": "레이블을 로드하려면 먼저 메트릭을 선택하세요",

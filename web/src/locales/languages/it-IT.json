@@ -5279,8 +5279,9 @@
     "hundredPlaceholder": "100",
     "last": "Ultimo",
     "alertContextMenu": {
-      "thresholdAbove": "Crea avviso con soglia superiore a {value}",
-      "thresholdBelow": "Crea avviso con soglia inferiore a {value}"
+      "thresholdAbove": "Avvisa quando supera {value}",
+      "thresholdBelow": "Avvisa quando scende sotto {value}",
+      "forecastReaches": "Avvisa quando la previsione raggiunge {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Errori ({count})"
@@ -5302,6 +5303,12 @@
     "showQueryResults": "Mostra i risultati delle query",
     "hideQueryResults": "Nascondi i risultati delle query",
     "renameQuery": "Rinomina query",
+    "addFormula": "Aggiungi formula",
+    "formulaNumber": "Formula {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} non è una query in questo pannello",
+    "formulaReferencesFormula": "{letter} è una formula e una formula non può fare riferimento a un'altra formula",
+    "formulaInputNote": "Usata in una formula: in quel contesto, l'impostazione istantanea/intervallo, la legenda, lo step e lo spostamento temporale di questa query non si applicano.",
     "multiSqlQueryLabel": "Etichetta di query",
     "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
     "multiQueryWarning": "Viene renderizzata solo la query 1 per {chartType}",
@@ -6331,8 +6338,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Cambia modalità query",
-      "changeQueryModeConfirm": "Sei sicuro di voler cambiare la modalità query? I dati salvati per l'asse X, l'asse Y e i filtri verranno cancellati.",
-      "switchToBuilderConfirm": "Sei sicuro di voler passare alla modalità builder? La tua query PromQL personalizzata verrà cancellata."
+      "changeQueryModeConfirm": "Sei sicuro di voler cambiare la modalità query? I dati salvati per l'asse X, l'asse Y e i filtri verranno cancellati."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Sostituisci anche la query con una di esempio",
@@ -6480,6 +6486,7 @@
       "selectRequiredFields": "Seleziona i campi richiesti per visualizzare il grafico",
       "noDataFound": "Nessun dato trovato",
       "seriesLimitWarning": "Limitazione delle serie visualizzate per garantire prestazioni ottimali",
+      "fitted": "adattata",
       "mapLayerName": "Livello 1",
       "mapLayerNameIndexed": "Livello {index}",
       "secondsAgo": "{count} secondo fa | {count} secondi fa",
@@ -8666,10 +8673,39 @@
     "noData": "Nessun dato",
     "recentData": "dati recenti",
     "theLastDay": "l'ultimo giorno | gli ultimi {count} giorni",
+    "forecast": {
+      "modeThreshold": "Soglia",
+      "modeForecast": "Previsione",
+      "expression": "Espressione da prevedere",
+      "alertWhen": "Avvisa quando",
+      "rises": "sale a",
+      "falls": "scende a",
+      "threshold": "Soglia",
+      "within": "entro",
+      "days": "giorni",
+      "basedOn": "In base agli ultimi",
+      "window6h": "6 ore",
+      "window1d": "1 giorno",
+      "window2d": "2 giorni",
+      "window7d": "7 giorni",
+      "help": "Per ogni serie viene tracciata una linea di tendenza retta su questa quantità di cronologia. Ogni serie la cui linea raggiunge la soglia entro il tempo previsto genera un avviso in autonomia.",
+      "horizonRange": "Inserisci un numero intero di giorni da {min} a {max}",
+      "horizonLabel": "Orizzonte in giorni",
+      "dayCount": "{n} giorno | {n} giorni",
+      "summaryRises": "Avvisa quando è previsto un aumento a {threshold} entro {horizon}",
+      "summaryFalls": "Avvisa quando è prevista una diminuzione a {threshold} entro {horizon}",
+      "triggerRises": "previsto in aumento a {threshold} entro {horizon}",
+      "triggerFalls": "previsto in diminuzione a {threshold} entro {horizon}",
+      "previewSeries": "giorni fino a {threshold}",
+      "previewReason": "{count} serie previste raggiungere {threshold} entro {horizon}",
+      "rowTemplateHint": "La riga di ogni serie si legge come “raggiunge 90 in 3 giorni”. Le righe compaiono solo in un template di destinazione che include {'{'}rows{'}'}."
+    },
     "prefill": {
       "dialog": {
         "title": "Crea avviso",
         "continue": "Continua all'avviso",
+        "queryChoiceLabel": "Avvisa sulla query",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Stream",
         "thresholdLabel": "Avviso su",
         "thresholdMatchingRows": "Righe corrispondenti",
@@ -8705,6 +8741,10 @@
         "library": {
           "label": "Personalizza nell'editor",
           "toast": "Dalla libreria di avvisi: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Crea avviso",
+          "toast": "Query importata da Metrics Explorer"
         },
         "dbm": {
           "label": "Avvisami",
@@ -9388,11 +9428,77 @@
         "close": "Torna alle metriche",
         "backTo": "metriche",
         "openInVisualize": "Apri in Visualizza",
+        "overlay": {
+          "current": "Attuale",
+          "noData": "Nessun dato {period}",
+          "forecast": "Previsione"
+        },
+        "noAlertQuery": "Questa metrica non ha una query su cui creare avvisi",
+        "drilldown": {
+          "button": "Log e tracce",
+          "help": "Apre i log e le tracce del servizio di questa metrica. La correlazione richiede etichette che identifichino un servizio, quindi le metriche di infrastruttura senza etichetta di servizio di norma non ne trovano nessuna, a meno che l'organizzazione non renda il servizio opzionale.",
+          "enterprise": "Il drilldown di log e tracce è una funzionalità Enterprise.",
+          "discoveryOff": "Il rilevamento dei servizi è disattivato per questa organizzazione.",
+          "forbidden": "Non hai l'autorizzazione per usare la correlazione dei servizi.",
+          "checking": "Verifica dell'accesso…",
+          "loading": "Caricamento…",
+          "schemaError": "Impossibile caricare le etichette di questa metrica.",
+          "retry": "Riprova",
+          "pickService": "Scegli un {label} per visualizzarne log e tracce.",
+          "noServiceValues": "Nessun valore di {label} in questo intervallo di tempo.",
+          "noServiceLabel": "Questa metrica non ha un'etichetta di servizio su cui correlare.",
+          "needIdentity": "Filtra per un'etichetta di identità, come un namespace, per correlare.",
+          "noService": "Nessun servizio trovato per questi filtri.",
+          "noPermission": "Non hai i permessi per visualizzare i servizi.",
+          "logs": "Log",
+          "traces": "Tracce",
+          "noLogsStream": "Nessuno stream di log per il servizio {service}",
+          "noTracesStream": "Nessuno stream di tracce per il servizio {service}",
+          "noServiceField": "Nessun campo servizio in questo stream",
+          "notApplied": "Non applicate: {labels} (nessun campo corrispondente in questo stream)"
+        },
+        "forecast": {
+          "label": "Previsione",
+          "off": "Off",
+          "linear": "Lineare",
+          "smoothed": "Tendenza smussata",
+          "smoothedHelp": "La tendenza smussata è una proiezione lineare di una serie smussata: ogni punto viene smussato sui dieci passi precedenti, poi viene adattata una linea retta. Non è una previsione stagionale.",
+          "horizon": "Orizzonte",
+          "horizonAuto": "25% dell'intervallo",
+          "horizonComputed": "{duration} (25% dell'intervallo)",
+          "linearHelp": "Lineare: una linea retta adattata all'intervallo visibile.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 ora",
+          "horizon6h": "6 ore",
+          "horizon1d": "1 giorno",
+          "horizon1w": "1 settimana",
+          "suffix": "previsione"
+        },
+        "compare": {
+          "label": "Confronta con",
+          "off": "Off",
+          "ago1h": "1 ora fa",
+          "ago1d": "1 giorno fa",
+          "ago1w": "1 settimana fa"
+        },
         "noPreview": "Nessuna anteprima — aprila in Visualizza",
         "exemplars": "Exemplar",
         "filtersNotApplied": "Il filtro {filters} non si applica a questa metrica; vengono mostrate tutte le sue serie | I filtri {filters} non si applicano a questa metrica; vengono mostrate tutte le sue serie",
         "tabBreakdown": "Ripartizione",
         "tabRelated": "Correlate",
+        "tabUsedIn": "Usato in",
+        "tabUsedInCount": "Usato in ({count})",
+        "usedIn": {
+          "dashboards": "Dashboard ({count})",
+          "alerts": "Avvisi ({count})",
+          "slos": "SLO ({count})",
+          "pipelines": "Pipeline pianificate ({count})",
+          "empty": "Nessuna dashboard, avviso, SLO o pipeline pianificata che puoi vedere utilizza questa metrica",
+          "error": "Impossibile trovare dove viene utilizzata questa metrica",
+          "unparsed": "{count} query non è stata analizzata ed è stata abbinata per nome | {count} query non sono state analizzate e sono state abbinate per nome",
+          "textMatch": "Abbinato per nome",
+          "textMatchHelp": "Questa query non è stata analizzata, quindi è stata trovata cercando il nome della metrica nel suo testo. Potrebbe non leggere questa metrica."
+        },
         "breakdown": {
           "distinctCount": "{count} valore | {count} valori",
           "distinctMany": "{count}+ valori",
@@ -9644,6 +9750,30 @@
       "regexPattern": "Pattern regex (es. prod.*)",
       "regexNotMatching": "Regex non corrispondente (es. test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "Il builder non può mostrare {construct}",
+      "twoMetrics": "Il builder non può mostrare un'operazione tra due metriche — usa una formula",
+      "noMetric": "Il builder richiede una query su una metrica denominata",
+      "mismatch": "Il builder non può mostrare esattamente questa query",
+      "constructs": {
+        "without": "un raggruppamento without (…)",
+        "offset": "un modificatore offset",
+        "at": "un modificatore {'@'}",
+        "orMatchers": "un or tra i matcher delle etichette",
+        "subquery": "una sottoquery",
+        "vectorMatching": "corrispondenza vettoriale con on (…) o ignoring (…)",
+        "bool": "un confronto bool",
+        "unaryMinus": "un'espressione negata",
+        "string": "un argomento stringa",
+        "nonFinite": "un numero non finito",
+        "rangeVector": "un range vector nudo",
+        "setOperator": "l'operatore di insieme {op}",
+        "function": "la funzione {name}()",
+        "aggregation": "l'aggregazione {name}",
+        "numberFirst": "un numero a sinistra di {op}",
+        "operator": "l'operatore {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Intervallo di tempo per il calcolo del tasso",
@@ -9663,6 +9793,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Multiplo più vicino"
       },
+      "rangeOnlyFirst": "Una funzione di intervallo può essere solo il primo passo",
+      "rangeOnlyFirstNote": "Una funzione di intervallo legge i campioni grezzi, quindi può essere solo il primo passo. Rimuovi gli altri passi per aggiungerne una.",
       "dragToReorder": "Trascina per riordinare",
       "noMatchingLabels": "Nessuna etichetta corrispondente",
       "selectMetricFirst": "Seleziona prima una metrica per caricare le etichette",

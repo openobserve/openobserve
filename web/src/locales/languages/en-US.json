@@ -5279,8 +5279,9 @@
     "hundredPlaceholder": "100",
     "last": "Last",
     "alertContextMenu": {
-      "thresholdAbove": "Create Alert with threshold above {value}",
-      "thresholdBelow": "Create Alert with threshold below {value}"
+      "thresholdAbove": "Alert when above {value}",
+      "thresholdBelow": "Alert when below {value}",
+      "forecastReaches": "Alert when forecast reaches {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Errors ({count})"
@@ -5302,6 +5303,12 @@
     "showQueryResults": "Show query results",
     "hideQueryResults": "Hide query results",
     "renameQuery": "Rename query",
+    "addFormula": "Add formula",
+    "formulaNumber": "Formula {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} is not a query in this panel",
+    "formulaReferencesFormula": "{letter} is a formula, and a formula may not reference another formula",
+    "formulaInputNote": "Used in a formula: there, this query's instant/range setting, legend, step and time shift do not apply.",
     "multiSqlQueryLabel": "Query Label",
     "multiSqlQueryLabelHint": "Custom name for this query in legends (e.g., 'Production')",
     "multiQueryWarning": "Only Query 1 is rendered for {chartType}",
@@ -6331,8 +6338,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Change Query Mode",
-      "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
-      "switchToBuilderConfirm": "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off."
+      "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Also replace query with example query",
@@ -6480,6 +6486,7 @@
       "selectRequiredFields": "Please select required fields to render the chart",
       "noDataFound": "No data found",
       "seriesLimitWarning": "Limiting the displayed series to ensure optimal performance",
+      "fitted": "fitted",
       "mapLayerName": "Layer 1",
       "mapLayerNameIndexed": "Layer {index}",
       "secondsAgo": "{count} Second ago | {count} Seconds ago",
@@ -8666,10 +8673,39 @@
     "noData": "No Data",
     "recentData": "recent data",
     "theLastDay": "the last day | the last {count} days",
+    "forecast": {
+      "modeThreshold": "Threshold",
+      "modeForecast": "Forecast",
+      "expression": "Expression to forecast",
+      "alertWhen": "Alert when it",
+      "rises": "rises to",
+      "falls": "falls to",
+      "threshold": "Threshold",
+      "within": "within",
+      "days": "days",
+      "basedOn": "Based on the last",
+      "window6h": "6 hours",
+      "window1d": "1 day",
+      "window2d": "2 days",
+      "window7d": "7 days",
+      "help": "A straight trend line is drawn through this much history for each series. Each series whose line reaches the threshold in time alerts on its own.",
+      "horizonRange": "Enter a whole number of days from {min} to {max}",
+      "horizonLabel": "Horizon in days",
+      "dayCount": "{n} day | {n} days",
+      "summaryRises": "Alert when it is forecast to rise to {threshold} within {horizon}",
+      "summaryFalls": "Alert when it is forecast to fall to {threshold} within {horizon}",
+      "triggerRises": "forecast to rise to {threshold} within {horizon}",
+      "triggerFalls": "forecast to fall to {threshold} within {horizon}",
+      "previewSeries": "days until {threshold}",
+      "previewReason": "{count} series forecast to reach {threshold} within {horizon}",
+      "rowTemplateHint": "Each series’ row reads like “reaches 90 in 3 days”. Rows show only in a destination template that includes {'{'}rows{'}'}."
+    },
     "prefill": {
       "dialog": {
         "title": "Create alert",
         "continue": "Continue to alert",
+        "queryChoiceLabel": "Alert on query",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert on",
         "thresholdMatchingRows": "Matching rows",
@@ -8705,6 +8741,10 @@
         "library": {
           "label": "Customize in editor",
           "toast": "From Alert Library: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Create alert",
+          "toast": "Query imported from the Metrics Explorer"
         },
         "dbm": {
           "label": "Alert me",
@@ -9388,11 +9428,77 @@
         "close": "Back to metrics",
         "backTo": "metrics",
         "openInVisualize": "Open in Visualize",
+        "overlay": {
+          "current": "Current",
+          "noData": "No data {period}",
+          "forecast": "Forecast"
+        },
+        "noAlertQuery": "This metric has no query to alert on",
+        "drilldown": {
+          "button": "Logs & traces",
+          "help": "Opens the logs and traces of this metric's service. Correlation needs labels that identify a service, so infrastructure metrics without a service label usually find none, unless the organization makes the service optional.",
+          "enterprise": "Logs and traces drilldown is an Enterprise feature.",
+          "discoveryOff": "Service discovery is turned off for this organization.",
+          "forbidden": "You do not have permission to use service correlation.",
+          "checking": "Checking access…",
+          "loading": "Loading…",
+          "schemaError": "Could not load this metric's labels.",
+          "retry": "Retry",
+          "pickService": "Choose a {label} to see its logs and traces",
+          "noServiceValues": "No {label} values in this time range.",
+          "noServiceLabel": "This metric has no service label to correlate on.",
+          "needIdentity": "Filter by an identity label, such as a namespace, to correlate.",
+          "noService": "No service found for these filters.",
+          "noPermission": "You do not have permission to view services.",
+          "logs": "Logs",
+          "traces": "Traces",
+          "noLogsStream": "No logs stream for service {service}",
+          "noTracesStream": "No traces stream for service {service}",
+          "noServiceField": "No service field in this stream",
+          "notApplied": "Not applied: {labels} (no matching field in this stream)"
+        },
+        "forecast": {
+          "label": "Forecast",
+          "off": "Off",
+          "linear": "Linear",
+          "smoothed": "Smoothed trend",
+          "smoothedHelp": "Smoothed trend is a linear projection of a smoothed series: each point is smoothed over the ten steps before it, then a straight line is fitted. It is not a seasonal forecast.",
+          "horizon": "Horizon",
+          "horizonAuto": "25% of range",
+          "horizonComputed": "{duration} (25% of range)",
+          "linearHelp": "Linear: a straight line fitted to the visible range.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 hour",
+          "horizon6h": "6 hours",
+          "horizon1d": "1 day",
+          "horizon1w": "1 week",
+          "suffix": "forecast"
+        },
+        "compare": {
+          "label": "Compare to",
+          "off": "Off",
+          "ago1h": "1 hour ago",
+          "ago1d": "1 day ago",
+          "ago1w": "1 week ago"
+        },
         "noPreview": "No preview — open it in Visualize",
         "exemplars": "Exemplars",
         "filtersNotApplied": "Filter {filters} does not apply to this metric; showing all its series | Filters {filters} do not apply to this metric; showing all its series",
         "tabBreakdown": "Breakdown",
         "tabRelated": "Related",
+        "tabUsedIn": "Used in",
+        "tabUsedInCount": "Used in ({count})",
+        "usedIn": {
+          "dashboards": "Dashboards ({count})",
+          "alerts": "Alerts ({count})",
+          "slos": "SLOs ({count})",
+          "pipelines": "Scheduled pipelines ({count})",
+          "empty": "No dashboard, alert, SLO or scheduled pipeline you can see uses this metric",
+          "error": "Could not look up where this metric is used",
+          "unparsed": "{count} query could not be parsed and was matched by name | {count} queries could not be parsed and were matched by name",
+          "textMatch": "Matched by name",
+          "textMatchHelp": "This query could not be parsed, so it was found by searching its text for the metric’s name. It may not read this metric."
+        },
         "breakdown": {
           "distinctCount": "{count} value | {count} values",
           "distinctMany": "{count}+ values",
@@ -9644,6 +9750,30 @@
       "regexPattern": "Regex pattern (e.g., prod.*)",
       "regexNotMatching": "Regex not matching (e.g., test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "The builder cannot show {construct}",
+      "twoMetrics": "The builder cannot show an operation between two metrics — use a formula",
+      "noMetric": "The builder needs a query over one named metric",
+      "mismatch": "The builder cannot show this query exactly",
+      "constructs": {
+        "without": "a without (…) grouping",
+        "offset": "an offset modifier",
+        "at": "an {'@'} modifier",
+        "orMatchers": "an or between label matchers",
+        "subquery": "a subquery",
+        "vectorMatching": "vector matching with on (…) or ignoring (…)",
+        "bool": "a bool comparison",
+        "unaryMinus": "a negated expression",
+        "string": "a string argument",
+        "nonFinite": "a non-finite number",
+        "rangeVector": "a bare range vector",
+        "setOperator": "the set operator {op}",
+        "function": "the function {name}()",
+        "aggregation": "the aggregation {name}",
+        "numberFirst": "a number on the left of {op}",
+        "operator": "the operator {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Time range for rate calculation",
@@ -9663,6 +9793,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Nearest multiple"
       },
+      "rangeOnlyFirst": "A range function can only be the first step",
+      "rangeOnlyFirstNote": "A range function reads the raw samples, so it can only be the first step. Remove the other steps to add one.",
       "dragToReorder": "Drag to reorder",
       "noMatchingLabels": "No matching labels",
       "selectMetricFirst": "Select a metric first to load labels",

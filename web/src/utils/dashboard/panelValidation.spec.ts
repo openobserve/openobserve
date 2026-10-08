@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { validateDashboardJson, validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
+import {
+  validateDashboardJson,
+  validatePanel,
+  validateSQLPanelFields,
+} from "@/utils/dashboard/panelValidation";
 import { gt } from "@/types/i18n";
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
@@ -272,5 +276,40 @@ describe("panelValidation", () => {
       );
       expect(errors).toEqual([]);
     });
+  });
+});
+
+describe("validatePanel on a PromQL formula", () => {
+  const run = (queries: any[]) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      { data: { type: "line", queryType: "promql", queries }, layout: { currentQueryIndex: 0 } },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors.filter((e) => e.includes("is empty"));
+  };
+
+  it("accepts a formula whose query field is empty", () => {
+    expect(
+      run([
+        { query: "up", config: {} },
+        { query: "", config: { formula: "A * 2" } },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("flags an empty formula", () => {
+    expect(
+      run([
+        { query: "up", config: {} },
+        { query: "", config: { formula: "" } },
+      ]),
+    ).toHaveLength(1);
   });
 });
