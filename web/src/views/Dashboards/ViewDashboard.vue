@@ -182,7 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-share-btn"
           />
           <OButton
-            v-if="!isFullscreen && store.state.zoConfig?.public_dashboards_enabled"
+            v-if="
+              !isFullscreen && store.state.zoConfig?.public_dashboards_enabled && canPublishPublicly
+            "
             v-show="store.state.printMode !== true"
             variant="outline"
             size="icon-toolbar"
@@ -617,6 +619,12 @@ export default defineComponent({
     // variables data
     const variablesData = reactive({});
     const showPublicLinksPanel = ref(false);
+    // Only these roles can publish; anyone else would open the drawer just to be refused.
+    const canPublishPublicly = computed(() =>
+      ["", "root", "admin", "editor"].includes(
+        String(store.state.userInfo?.role ?? "").toLowerCase(),
+      ),
+    );
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
 
     const variablesDataUpdated = (data: any) => {
@@ -1925,6 +1933,7 @@ export default defineComponent({
       variablesData,
       variablesManager,
       showPublicLinksPanel,
+      canPublishPublicly,
       variablesDataUpdated,
       showDashboardSettingsDialog,
       openSettingsDialog,
