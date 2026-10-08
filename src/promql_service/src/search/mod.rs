@@ -290,7 +290,7 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let ast = parser::parse(&req.query.as_ref().unwrap().query)
+    let ast = promql::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
     let window = selector_window(&ast);
 
@@ -678,7 +678,7 @@ async fn merge_vector_query(
     }
 
     let mut value = Value::Vector(merged_data);
-    let sort_descending = promql_parser::parser::parse(query)
+    let sort_descending = promql::parse(query)
         .ok()
         .and_then(|expr| top_level_sort_descending(&expr));
     match sort_descending {
@@ -814,7 +814,7 @@ mod tests {
             ("up", false),
         ] {
             assert_eq!(
-                is_root_subquery(&parser::parse(query).unwrap()),
+                is_root_subquery(&promql::parse(query).unwrap()),
                 expected,
                 "{query}"
             );
@@ -823,7 +823,7 @@ mod tests {
 
     #[test]
     fn test_rejects_root_subquery_only_in_range_sample_queries() {
-        let expr = parser::parse("up[5m:1m]").unwrap();
+        let expr = promql::parse("up[5m:1m]").unwrap();
         assert!(rejects_root_subquery(&expr, true, false));
         assert!(!rejects_root_subquery(&expr, false, false));
         assert!(!rejects_root_subquery(&expr, true, true));

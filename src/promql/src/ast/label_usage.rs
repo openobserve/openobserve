@@ -23,7 +23,7 @@ use promql_parser::parser::{
 
 /// Aggregations that with no modifier group every series into a single
 /// labelless output series, so the input labels are provably unused.
-const LABEL_DROPPING_AGGS: [u8; 8] = [
+const LABEL_DROPPING_AGGS: [token::TokenId; 8] = [
     token::T_SUM,
     token::T_AVG,
     token::T_COUNT,
