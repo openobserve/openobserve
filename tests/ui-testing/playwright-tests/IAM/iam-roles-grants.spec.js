@@ -340,6 +340,28 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
             .toBeGreaterThan(0);
     });
 
+    // ---------------- column select-all ----------------
+
+    test('G-14 · ticking the List header in All Modules grants List on every module at once', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        await openFresh(page, 'bulk');
+        await pm.rolesPage.openAllModules();
+        await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox('AllowList'), true);
+
+        const payload = await pm.rolesPage.saveAndCapture();
+        expect(payload, 'save fired no PUT').toBeTruthy();
+        expect(payload.remove).toEqual([]);
+        // One module-wide tuple per module, and only the action that was ticked.
+        expect(payload.add.every((p) => p.permission === 'AllowList')).toBe(true);
+        const objects = payload.add.map((p) => p.object);
+        expect(objects.length).toBeGreaterThan(1);
+        expect(objects.every((o) => o.endsWith(`:_all_${org()}`))).toBe(true);
+        expect(objects).toEqual(expect.arrayContaining([obj('stream'), obj('function')]));
+        // settings hides List, so the header must skip it rather than stage a grant its row cannot show.
+        expect(objects).not.toContain(obj('settings'));
+    });
+
     // ---------------- negative / rejection ----------------
 
     test('G-N1 · a blank role name is refused', {

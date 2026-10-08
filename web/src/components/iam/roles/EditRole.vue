@@ -94,23 +94,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Keyed by level, so each module or folder opens with its own empty search and filter. -->
                 <ModulePane
-                  v-if="permissionsUiType === 'table' && activeModuleView"
-                  :key="activeModuleView.trail.join('/')"
+                  v-if="permissionsUiType === 'table' && paneView"
+                  :key="paneView.trail.join('/')"
                   v-model:page-size="modulePageSize"
-                  :lists-resources="!!moduleOf(activeModule)?.hasEntities"
+                  :lists-resources="isAllModules || !!moduleOf(activeModule)?.hasEntities"
+                  :lists-modules="isAllModules"
                   :inner-grants="innerGrants"
                   class="h-full"
-                  :trail="activeModuleView.trail"
-                  :scopes="activeModuleView.scopes"
-                  :entities="activeModuleView.entities"
+                  :trail="paneView.trail"
+                  :scopes="paneView.scopes"
+                  :entities="paneView.entities"
                   :loading="moduleLoading || isFetchingInitialRoles"
                   :is-granted="isGranted"
                   :is-pending-removal="isPendingRemoval"
-                  :icon="activeRailModule?.icon"
+                  :icon="isAllModules ? ALL_MODULES_ICON : activeRailModule?.icon"
                   :added="activeRailModule?.added"
                   :removed="activeRailModule?.removed"
                   @change="(change) => handlePermissionBatchChange([change])"
-                  @open="openFolderRow"
+                  @open="openPaneRow"
                   @navigate="navigateTrail"
                 >
                   <template #actions>
@@ -267,7 +268,12 @@ import ModulePane from "@/components/iam/roles/ModulePane.vue";
 import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.vue";
 import UnsavedChangesDrawer from "@/components/iam/roles/UnsavedChangesDrawer.vue";
 import RoleSummary from "@/components/iam/roles/RoleSummary.vue";
-import { buildRoleModules, GROUP_LABEL_KEYS } from "@/components/iam/roles/roleModules";
+import {
+  ALL_MODULES_ICON,
+  ALL_MODULES_KEY,
+  buildRoleModules,
+  GROUP_LABEL_KEYS,
+} from "@/components/iam/roles/roleModules";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -753,6 +759,27 @@ const {
   streamTypeScopes,
   getResourceEntities,
 });
+
+const isAllModules = computed(() => activeModule.value === ALL_MODULES_KEY);
+
+// Each module's own top-level row is its module-wide grant, so one column tick here grants that action everywhere.
+const paneView = computed(() =>
+  isAllModules.value
+    ? {
+        trail: [t("iam.editRole.allModulesTitle")],
+        scopes: [],
+        entities: roleModules.value
+          .map((module) => resourceMapper.value[module.key])
+          .filter(Boolean),
+      }
+    : activeModuleView.value,
+);
+
+// A row on All Modules is a module, so opening it switches the rail rather than drilling into a folder.
+const openPaneRow = (row: any) => {
+  if (isAllModules.value) activeModule.value = row.name;
+  else openFolderRow(row);
+};
 
 const { updateRolePermissions } = useSavedGrantExpansion({
   permissionsState,

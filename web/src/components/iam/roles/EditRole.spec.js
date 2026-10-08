@@ -3557,3 +3557,48 @@ describe("EditRole savedGrants - JSON view", () => {
     expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([`role:_all_${ORG}:AllowGet`]);
   });
 });
+
+describe("EditRole - all modules", () => {
+  const openAllModules = async (wrapper) => {
+    wrapper.vm.activeModule = "__all__";
+    await flushPromises();
+  };
+
+  it("lists one row per rail module", async () => {
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    const keys = wrapper.vm.railModules.map((module) => module.key);
+    expect(keys.length).toBeGreaterThan(1);
+    keys.forEach((key) => {
+      expect(
+        wrapper
+          .find(`[data-test="edit-role-permissions-table-body-row-${key}-col-AllowAll-checkbox"]`)
+          .exists(),
+      ).toBe(true);
+    });
+  });
+
+  // rum_analytics hides List, so ticking the column must skip it rather than stage a grant OpenFGA rejects.
+  it("stages the module-wide List grant on every module that offers it from one header tick", async () => {
+    ctl.resources = RUM_RESOURCE_CATALOG;
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    await wrapper
+      .find('[data-test="edit-role-module-pane-bulk-AllowList"] button[role="checkbox"]')
+      .trigger("click");
+    await flushPromises();
+
+    const expected = wrapper.vm.railModules
+      .map((module) => module.key)
+      .filter((key) => key !== "rum_analytics")
+      .map((key) => `${key}:${ALL}:AllowList`);
+    expect(Object.keys(wrapper.vm.addedPermissions).sort()).toEqual(expected.sort());
+    expect(
+      wrapper
+        .find('[data-test="edit-role-module-pane-bulk-AllowList"] button[role="checkbox"]')
+        .attributes("aria-checked"),
+    ).toBe("true");
+  });
+});

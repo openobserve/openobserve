@@ -213,6 +213,16 @@ describe("ModuleRail - selection", () => {
 
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual([""]);
   });
+
+  it("pins All Modules under Role Overview and emits its key when chosen", async () => {
+    const wrapper = await mountRail([makeModule("logs")]);
+    const allModules = wrapper.find('[data-test="edit-role-module-rail-all-modules"]');
+
+    await allModules.trigger("mousedown");
+
+    expect(allModules.text()).toContain(String(i18n.global.t("iam.editRole.allModulesTitle")));
+    expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["__all__"]);
+  });
 });
 
 describe("ModuleRail - collapsible groups", () => {

@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-secondary text-xs">{{ row.hint }}</OTruncatedText>
           </div>
           <div
-            v-else-if="row.node.has_entities && row.node.childName"
+            v-else-if="listsModules || (row.node.has_entities && row.node.childName)"
             class="flex min-w-0 items-center gap-1"
           >
             <OButton
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, h, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -239,6 +239,8 @@ const props = defineProps<{
   added?: number;
   removed?: number;
   icon?: IconName;
+  /** Rows are whole modules (All Modules view): each action header gets a select-all box, and every row opens its module. */
+  listsModules?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -279,12 +281,12 @@ const columns = computed<OTableColumnDef[]>(() => [
     size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
-  { id: "AllowAll", header: t("iam.all"), size: 72, meta: { align: "left" } },
-  { id: "AllowList", header: t("iam.list"), size: 72, meta: { align: "left" } },
-  { id: "AllowGet", header: t("iam.get"), size: 72, meta: { align: "left" } },
-  { id: "AllowPost", header: t("iam.create"), size: 90, meta: { align: "left" } },
-  { id: "AllowPut", header: t("iam.update"), size: 90, meta: { align: "left" } },
-  { id: "AllowDelete", header: t("iam.delete"), size: 90, meta: { align: "left" } },
+  { id: "AllowAll", header: actionHeader(t("iam.all")), size: 72, meta: { align: "left" } },
+  { id: "AllowList", header: actionHeader(t("iam.list")), size: 72, meta: { align: "left" } },
+  { id: "AllowGet", header: actionHeader(t("iam.get")), size: 72, meta: { align: "left" } },
+  { id: "AllowPost", header: actionHeader(t("iam.create")), size: 90, meta: { align: "left" } },
+  { id: "AllowPut", header: actionHeader(t("iam.update")), size: 90, meta: { align: "left" } },
+  { id: "AllowDelete", header: actionHeader(t("iam.delete")), size: 90, meta: { align: "left" } },
 ]);
 
 // Index is the position in the full scope list, which is the depth inheritance is measured against.
@@ -466,4 +468,48 @@ const checkboxHint = (node: any, resource: string, action: string, depth: number
 
 const change = (row: any, permission: string, newValue: boolean) =>
   emit("change", { row, permission, newValue });
+
+// Every row the filter keeps, not just this page, so the tick reaches modules on later pages too.
+const bulkRows = (action: string) =>
+  filteredEntities.value.filter(
+    (node) =>
+      node.permission?.[action]?.show &&
+      !lockedByWiderScope(node, node.resourceName, action, props.scopes.length),
+  );
+
+const isBulkChecked = (node: any, action: string) =>
+  isChecked(node, node.resourceName, action, props.scopes.length);
+
+const bulkState = (action: string) => {
+  const rows = bulkRows(action);
+  const checked = rows.filter((node) => isBulkChecked(node, action)).length;
+  if (!checked) return false;
+  return checked === rows.length ? true : "indeterminate";
+};
+
+const toggleBulk = (action: string) => {
+  const rows = bulkRows(action);
+  const newValue = !rows.every((node) => isBulkChecked(node, action));
+  rows
+    .filter((node) => isBulkChecked(node, action) !== newValue)
+    .forEach((node) => change(node, action, newValue));
+};
+
+// A render function, so the box re-reads the grants each time the header draws; the column id is the action.
+const actionHeader = (label: I18nText) => {
+  if (!props.listsModules) return label;
+  const hint = t("iam.editRole.bulkSelectColumn", { action: label });
+  return ({ column }: { column: { id: string } }) =>
+    h("div", { class: "flex items-center gap-1.5" }, [
+      h(OCheckbox, {
+        modelValue: bulkState(column.id),
+        disabled: props.loading || !bulkRows(column.id).length,
+        ariaLabel: hint,
+        title: hint,
+        "data-test": `edit-role-module-pane-bulk-${column.id}`,
+        "onUpdate:modelValue": () => toggleBulk(column.id),
+      }),
+      h("span", label),
+    ]);
+};
 </script>

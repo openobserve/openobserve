@@ -2761,6 +2761,8 @@
       "noGrantedModule": "No Module Is Selected Yet",
       "moduleOverviewTitle": "Role Overview",
       "modulesTitle": "Modules",
+      "allModulesTitle": "All Modules",
+      "bulkSelectColumn": "{action} On Every Listed Module",
       "collapseModuleGroup": "Collapse Group",
       "expandModuleGroup": "Expand Group",
       "moduleRailTooltip": "{module}: {granted} Selected, {added} Added, {removed} Removed",

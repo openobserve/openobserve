@@ -571,3 +571,89 @@ describe("ModulePane - empty states wait for the load", () => {
     expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(true);
   });
 });
+
+describe("ModulePane - column select all", () => {
+  const ALL_MODULES = [raw("All Modules")];
+
+  const bulkBox = (wrapper: any, action: string) =>
+    wrapper.find(`[data-test="edit-role-module-pane-bulk-${action}"] button[role="checkbox"]`);
+
+  const mountBulk = (entities: any[]) => mountPane([], entities, ALL_MODULES, { listsModules: true });
+
+  const emittedRows = (wrapper: any) =>
+    (wrapper.emitted("change") ?? []).map(([change]: any) => [change.row.name, change.newValue]);
+
+  it("reads unticked, mixed and ticked from the rows it covers", async () => {
+    const none = await mountBulk([makeNode("logs"), makeNode("alert")]);
+    const some = await mountBulk([makeNode("logs", ["AllowList"]), makeNode("alert")]);
+    const all = await mountBulk([makeNode("logs", ["AllowList"]), makeNode("alert", ["AllowList"])]);
+
+    expect(bulkBox(none, "AllowList").attributes("aria-checked")).toBe("false");
+    expect(bulkBox(some, "AllowList").attributes("aria-checked")).toBe("mixed");
+    expect(bulkBox(all, "AllowList").attributes("aria-checked")).toBe("true");
+    expect(bulkBox(none, "AllowList").attributes("aria-label")).toBe(
+      String(i18n.global.t("iam.editRole.bulkSelectColumn", { action: i18n.global.t("iam.list") })),
+    );
+  });
+
+  // A row that hides the action has no box to show the grant, so the header must not stage one.
+  it("ticks the action once on each unticked row that offers it", async () => {
+    const settings = makeNode("settings");
+    settings.permission.AllowList.show = false;
+    const wrapper = await mountBulk([
+      makeNode("logs"),
+      makeNode("alert", ["AllowList"]),
+      settings,
+      makeNode("role"),
+    ]);
+
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(emittedRows(wrapper)).toEqual([
+      ["logs", true],
+      ["role", true],
+    ]);
+    expect(wrapper.emitted("change")![0][0]).toMatchObject({ permission: "AllowList" });
+  });
+
+  it("unticks every row once all of them hold the action", async () => {
+    const wrapper = await mountBulk([
+      makeNode("logs", ["AllowGet"]),
+      makeNode("alert", ["AllowGet"]),
+    ]);
+
+    await bulkBox(wrapper, "AllowGet").trigger("click");
+
+    expect(emittedRows(wrapper)).toEqual([
+      ["logs", false],
+      ["alert", false],
+    ]);
+  });
+
+  it("reaches only the rows the search keeps", async () => {
+    const wrapper = await mountBulk([makeNode("logs"), makeNode("alert"), makeNode("logs_cache")]);
+
+    await wrapper.find('[data-test="edit-role-module-pane-search"] input').setValue("logs");
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(emittedRows(wrapper)).toEqual([
+      ["logs", true],
+      ["logs_cache", true],
+    ]);
+  });
+
+  it("reaches rows on later pages, not just the one on screen", async () => {
+    const entities = Array.from({ length: 30 }, (_, i) => makeNode(`module_${i}`));
+    const wrapper = await mountBulk(entities);
+
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(wrapper.emitted("change")).toHaveLength(30);
+  });
+
+  it("offers no header box outside the All Modules view", async () => {
+    const wrapper = await mountPane([makeScope("metrics")], [makeNode("cpu")]);
+
+    expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
+  });
+});
