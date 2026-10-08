@@ -28,6 +28,17 @@ import {
   K8S_VIEWER_STREAMS,
   K8S_VIEWER_TYPE_NODE_PERMS,
 } from "@/components/iam/roles/k8sViewerPreset";
+import {
+  RUM_ANALYTICS_RESOURCE,
+  RUM_ANALYTICS_WRITE_PERMS,
+  RUM_PRESETS,
+  RUM_SOURCEMAPS_PERMS,
+  RUM_SOURCEMAPS_RESOURCE,
+  RUM_STREAMS,
+  RUM_STREAM_ROW_PERMS,
+  RUM_TYPE_NODE_PERMS,
+  type RumPreset,
+} from "@/components/iam/roles/rumPresets";
 
 // db_monitoring is checked as a plain GET (never LIST), and has no child
 // entities for a wildcard relation to reach — unlike the `metrics` type node,
@@ -50,7 +61,7 @@ type PresetDeps = {
   t: (key: string, named?: Record<string, unknown>) => I18nText;
 };
 
-/** The three starting points a new role can be seeded from, staged exactly as clicking would. */
+/** The starting points a new role can be seeded from, staged exactly as clicking would. */
 export const useRolePresets = (deps: PresetDeps) => {
   const {
     permissionsState,
@@ -191,10 +202,67 @@ export const useRolePresets = (deps: PresetDeps) => {
     );
   };
 
+  // Module grants are staged even before RUM ingestion; the logs type node only when a RUM stream matched, like DBM.
+  const seedRumPreset = async (preset: RumPreset) => {
+    const changes: { row: any; permission: string; newValue: boolean }[] = [];
+    const modules: [string, readonly (keyof Entity["permission"])[]][] = [
+      [RUM_SOURCEMAPS_RESOURCE, RUM_SOURCEMAPS_PERMS],
+      ...(RUM_PRESETS[preset].withWrite
+        ? [
+            [RUM_ANALYTICS_RESOURCE, RUM_ANALYTICS_WRITE_PERMS] as [
+              string,
+              typeof RUM_ANALYTICS_WRITE_PERMS,
+            ],
+          ]
+        : []),
+    ];
+    for (const [name, perms] of modules) {
+      const resource = resourceMapper.value[name];
+      if (resource) changes.push(...collectVisibleReadGrants(resource, perms));
+    }
+
+    let matched = 0;
+    const streamResource = resourceMapper.value["stream"];
+    if (streamResource) {
+      if (!streamResource.expand) await expandPermission(streamResource);
+      const logsEntity = streamResource.entities?.find((entity: Entity) => entity.name === "logs");
+      if (logsEntity) {
+        if (!logsEntity.expand) await expandPermission(logsEntity);
+        const rows = heavyResourceEntities.value["logs"] ?? [];
+        const curated = new Set(RUM_STREAMS);
+        const matchedRows = rows.filter((row: Entity) => curated.has(row.name));
+        matched = matchedRows.length;
+        changes.push(
+          ...matchedRows.flatMap((row: Entity) =>
+            collectVisibleReadGrants(row, RUM_STREAM_ROW_PERMS),
+          ),
+        );
+        if (matched) changes.push(...collectVisibleReadGrants(logsEntity, RUM_TYPE_NODE_PERMS));
+      }
+    }
+
+    if (changes.length) {
+      handlePermissionBatchChange(changes);
+    }
+
+    toast(
+      matched
+        ? {
+            variant: "info",
+            message: t("iam.editRole.rumPresetSeeded", { matched, total: RUM_STREAMS.length }),
+          }
+        : {
+            variant: "warning",
+            message: t("iam.editRole.rumPresetNoMatch", { total: RUM_STREAMS.length }),
+          },
+    );
+  };
+
   const applyPreset = async (presetId: string) => {
     if (presetId === "readonly") seedReadonlyPreset();
     else if (presetId === "dbm") await seedDbmViewerPreset();
     else if (presetId === "k8s") await seedK8sViewerPreset();
+    else if (presetId === "rum_viewer" || presetId === "rum_editor") await seedRumPreset(presetId);
   };
 
   return {
@@ -204,6 +272,7 @@ export const useRolePresets = (deps: PresetDeps) => {
     reportDbmViewerSeeding,
     seedK8sViewerPreset,
     reportK8sViewerSeeding,
+    seedRumPreset,
     applyPreset,
   };
 };

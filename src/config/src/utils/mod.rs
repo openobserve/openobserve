@@ -38,6 +38,7 @@ pub mod record_batch_ext;
 pub mod schema;
 pub mod schema_ext;
 pub mod size;
+pub mod snappy;
 pub mod sort;
 pub mod sql;
 pub mod ssrf_guard;

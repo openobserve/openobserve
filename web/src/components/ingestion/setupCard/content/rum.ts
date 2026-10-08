@@ -232,6 +232,7 @@ export default function rumCard(subs: RumCardSubs, t: TranslateFn): RichCardCont
 
   return {
     provider: {
+      id: "rum",
       name: t("ingestion.setupCard.providerNameRum"),
       tagline: t("ingestion.setupCard.rumTagline"),
       logo: getImageURL("images/common/monitoring.svg"),

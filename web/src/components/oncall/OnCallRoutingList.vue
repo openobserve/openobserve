@@ -119,35 +119,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OText>
             </span>
 
-            <!-- A rule repointed at another team stays visible until the list
-                 refetches, and "it pages us" would be a lie on that row. -->
-            <OTag
-              v-if="row.rule.team_id !== teamId"
-              variant="default-soft"
-              size="sm"
-              class="shrink-0"
-              :data-test="`oncall-routing-elsewhere-${row.rule.rule_id}`"
+            <!-- A phone row cannot hold the sentence beside its evidence, so there the evidence takes the line below it. -->
+            <span
+              class="contents max-md:order-last max-md:flex max-md:basis-full max-md:flex-wrap max-md:items-center max-md:gap-2 max-md:ps-10"
             >
-              {{ t("oncall.routingPagesTeam", { team: teamNameOf(row.rule.team_id) }) }}
-            </OTag>
-
-            <span class="shrink-0" :data-test="`oncall-routing-caught-${row.rule.rule_id}`">
-              <OTag v-if="!row.rule.last_matched_at" variant="default-soft" size="sm">
-                {{ t("oncall.routingRuleNeverMatched") }}
-              </OTag>
-              <i18n-t
-                v-else
-                keypath="oncall.routingCaughtLast"
-                :plural="row.rule.pages_caught"
-                tag="span"
-                scope="global"
-                class="text-text-secondary flex items-center gap-1 text-xs"
+              <!-- A rule repointed at another team stays visible until the list
+                   refetches, and "it pages us" would be a lie on that row. -->
+              <OTag
+                v-if="row.rule.team_id !== teamId"
+                variant="default-soft"
+                size="sm"
+                class="shrink-0"
+                :data-test="`oncall-routing-elsewhere-${row.rule.rule_id}`"
               >
-                <template #count>{{ row.rule.pages_caught }}</template>
-                <template #when>
-                  <OTimeCell :value="row.rule.last_matched_at" unit="us" />
-                </template>
-              </i18n-t>
+                {{ t("oncall.routingPagesTeam", { team: teamNameOf(row.rule.team_id) }) }}
+              </OTag>
+
+              <span class="shrink-0" :data-test="`oncall-routing-caught-${row.rule.rule_id}`">
+                <OTag v-if="!row.rule.last_matched_at" variant="default-soft" size="sm">
+                  {{ t("oncall.routingRuleNeverMatched") }}
+                </OTag>
+                <i18n-t
+                  v-else
+                  keypath="oncall.routingCaughtLast"
+                  :plural="row.rule.pages_caught"
+                  tag="span"
+                  scope="global"
+                  class="text-text-secondary flex items-center gap-1 text-xs"
+                >
+                  <template #count>{{ row.rule.pages_caught }}</template>
+                  <template #when>
+                    <OTimeCell :value="row.rule.last_matched_at" unit="us" />
+                  </template>
+                </i18n-t>
+              </span>
             </span>
 
             <OButton
@@ -205,7 +210,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="meta">{{ t("oncall.routingEverythingElseHint") }}</OText>
           </span>
 
-          <OText variant="meta" class="shrink-0" data-test="oncall-routing-catch-all-volume">
+          <OText
+            variant="meta"
+            class="shrink-0 max-md:order-last max-md:basis-full max-md:ps-10"
+            data-test="oncall-routing-catch-all-volume"
+          >
             {{ openSignals.length ? volumeNote : t("oncall.routingNothingLanded") }}
           </OText>
 
@@ -315,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-subtle flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-2 last:border-b-0"
           :data-test="`oncall-routing-signal-${signal.id}`"
         >
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5 max-md:basis-full">
             <span class="text-text-heading truncate text-sm font-medium">{{
               titleOf(signal)
             }}</span>

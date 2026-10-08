@@ -86,6 +86,8 @@ export interface SubnavChild {
    * flyout when the page itself would hide it.
    */
   gate?: string;
+  /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
+  beta?: boolean;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */

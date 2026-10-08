@@ -73,7 +73,10 @@ pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> 
     let upper = data[index + 1];
 
     let fraction = quantile * (n - 1) as f64 - index as f64;
-    Some(lower * (1.0 - fraction) + upper * fraction)
+    // Prometheus lower*(1-w)+upper*w keeps Inf; the other form makes (Inf-Inf)=NaN.
+    let quantile_value = lower * (1.0 - fraction) + upper * fraction;
+
+    Some(quantile_value)
 }
 
 pub fn calculate_trend(
@@ -229,6 +232,26 @@ mod tests {
         // Test interpolation
         let data = vec![10.0, 20.0];
         assert_eq!(quantile(&data, 0.5), Some(15.0)); // Exact midpoint
+    }
+
+    // Regression #14924: Prometheus keeps Inf bounds; the old formula returns NaN.
+    #[test]
+    fn test_quantile_with_infinite_boundary_keeps_infinity() {
+        // 0 < weight < 1 with an infinite boundary: the two formulas differ.
+        let data = vec![1.0, f64::INFINITY, f64::INFINITY];
+        assert_eq!(quantile(&data, 0.75), Some(f64::INFINITY));
+
+        let data = vec![f64::NEG_INFINITY, f64::NEG_INFINITY, 1.0];
+        assert_eq!(quantile(&data, 0.25), Some(f64::NEG_INFINITY));
+
+        // weight==0 gives Inf*0=NaN under either formula (matches Prometheus), so nothing to pin.
+
+        // finite values are unaffected by the formula change
+        let data = vec![10.0, 20.0];
+        assert_eq!(quantile(&data, 0.5), Some(15.0));
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        assert_eq!(quantile(&data, 0.5), Some(3.0));
+        assert_eq!(quantile(&data, 0.75), Some(4.0));
     }
 
     #[test]

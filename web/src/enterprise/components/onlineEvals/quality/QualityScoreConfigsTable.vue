@@ -14,7 +14,6 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
-        :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"

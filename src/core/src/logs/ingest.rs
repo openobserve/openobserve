@@ -45,7 +45,7 @@ use infra::{
 use ingestion_common::{
     AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
     IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-    IngestionValueType, KinesisFHIngestionResponse, RecordStatus, StreamStatus,
+    IngestionValueType, KinesisFHIngestionResponse, KinesisFHRequest, RecordStatus, StreamStatus,
 };
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -136,6 +136,10 @@ pub async fn ingest(
     let started_at: i64 = Utc::now().timestamp_micros();
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
+    // Usage counts only from a server-side identity; a user credential cannot claim it.
+    #[cfg(feature = "vectorscan")]
+    let usage_request =
+        matches!(in_req, IngestionRequest::Usage(_)) && matches!(user, IngestUser::SystemJob(_));
     let log_ingestion_errors = ingestion_log_enabled().await;
     // A scanner outage must never fail ingestion; the evidence row says it failed open.
     #[cfg(feature = "vectorscan")]
@@ -160,6 +164,32 @@ pub async fn ingest(
     };
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
+    }
+    // Internal writers pass the same test as the rollup write guard below.
+    #[cfg(feature = "vectorscan")]
+    let platform_write = {
+        let internal_writer = is_derived || matches!(user, IngestUser::SystemJob(_));
+        let source = stream_name.clone();
+        move |stream: &str| {
+            config::meta::self_reporting::redaction::is_platform_write(
+                usage_request,
+                internal_writer,
+                &source,
+                stream,
+            )
+        }
+    };
+    // Refused here, before any pipeline runs: a remote-stream destination writes inside it.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        org_id,
+        StreamType::Logs,
+        &[(&stream_name, 0)],
+        &platform_write,
+    )
+    .await
+    {
+        return Err(Error::ResourceError(reason));
     }
     let dbm_gate = cfg.db_monitoring.enabled && is_dbm_server_stream(&stream_name);
 
@@ -308,6 +338,10 @@ pub async fn ingest(
     for ret in data.iter() {
         let mut item = match ret {
             Ok(item) => item,
+            Err(IngestionError::PayloadTooLarge(e)) => {
+                log::error!("IngestionError: {e}");
+                return Err(Error::PayloadTooLarge(e));
+            }
             Err(e) => {
                 log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e:?}");
                 return Err(Error::IngestionError(format!("Failed processing: {e:?}")));
@@ -648,6 +682,25 @@ pub async fn ingest(
     drop(executable_pipelines);
     drop(original_options);
     drop(user_defined_schema_map);
+
+    // Pipeline destinations, which the check before the pipelines could not see.
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+            org_id,
+            StreamType::Logs,
+            &streams,
+            &platform_write,
+        )
+        .await
+        {
+            return Err(Error::ResourceError(reason));
+        }
+    }
 
     #[cfg(feature = "vectorscan")]
     if pattern_manager.is_none() {
@@ -1019,13 +1072,24 @@ impl Iterator for IngestionDataIterator {
                 Some(e) => Some(Err(IngestionError::GCPError(e.clone()))),
                 None => iter.next().map(Ok),
             },
-            IngestionDataIter::KinesisFH(iter, err) => match err {
-                Some(e) => Some(Err(IngestionError::AWSError(e.clone()))),
+            IngestionDataIter::KinesisFH(iter, err) => match err.take() {
+                Some(e) => Some(Err(e)),
                 None => iter.next().map(Ok),
             },
         }
     }
 }
+
+#[derive(Debug)]
+struct DecompressedTooLarge;
+
+impl std::fmt::Display for DecompressedTooLarge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("decompressed record exceeds the size limit")
+    }
+}
+
+impl std::error::Error for DecompressedTooLarge {}
 
 trait IngestionDataExt {
     fn iter(self) -> IngestionDataIterator;
@@ -1043,57 +1107,28 @@ impl IngestionDataExt for IngestionData {
                 let data = &request.message.data;
                 let request_id = &request.message.message_id;
                 let req_timestamp = &request.message.publish_time;
-                match decode_and_decompress_to_string(data) {
-                    Ok(decompressed_data) => {
-                        let value: json::Value = json::from_str(&decompressed_data).unwrap();
-                        IngestionDataIter::GCP(vec![value].into_iter(), None)
-                    }
+                let limit = config::get_config().limit.req_payload_limit;
+                let parsed = decode_and_decompress_to_string(data, limit)
+                    .map_err(|e| e.to_string())
+                    .and_then(|decompressed| {
+                        json::from_str::<json::Value>(&decompressed).map_err(|e| e.to_string())
+                    });
+                match parsed {
+                    Ok(value) => IngestionDataIter::GCP(vec![value].into_iter(), None),
                     Err(e) => IngestionDataIter::GCP(
                         vec![].into_iter(),
                         Some(GCPIngestionResponse {
                             request_id: request_id.to_string(),
-                            error_message: Some(e.to_string()),
+                            error_message: Some(e),
                             timestamp: req_timestamp.to_string(),
                         }),
                     ),
                 }
             }
-            IngestionData::KinesisFH(request) => {
-                let mut events = Vec::with_capacity(request.records.len());
-                let request_id = &request.request_id;
-                let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
-
-                for record in &request.records {
-                    match decode_and_decompress_to_vec(&record.data) {
-                        Err(err) => {
-                            return IngestionDataIterator(IngestionDataIter::KinesisFH(
-                                events.into_iter(),
-                                Some(KinesisFHIngestionResponse {
-                                    request_id: request_id.to_string(),
-                                    error_message: Some(err.to_string()),
-                                    timestamp: req_timestamp,
-                                }),
-                            ));
-                        }
-                        Ok(decompressed_data) => {
-                            match deserialize_aws_record_from_vec(decompressed_data, request_id) {
-                                Ok(parsed_events) => events.extend(parsed_events),
-                                Err(err) => {
-                                    return IngestionDataIterator(IngestionDataIter::KinesisFH(
-                                        events.into_iter(),
-                                        Some(KinesisFHIngestionResponse {
-                                            request_id: request_id.to_string(),
-                                            error_message: Some(err.to_string()),
-                                            timestamp: req_timestamp,
-                                        }),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-                IngestionDataIter::KinesisFH(events.into_iter(), None)
-            }
+            IngestionData::KinesisFH(request) => kinesis_fh_iter(
+                &request,
+                config::get_config().limit.firehose_decompressed_limit,
+            ),
         };
         IngestionDataIterator(iter)
     }
@@ -1102,11 +1137,13 @@ impl IngestionDataExt for IngestionData {
 // Protobufs are not valid UTF-8 strings, so we need to maintain them as byte arrays
 pub fn decode_and_decompress_to_vec(
     encoded_data: &str,
+    limit: usize,
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let decoded_data = config::utils::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(decoded_data.as_slice());
     let mut vec = Vec::new();
-    match gz.read_to_end(&mut vec) {
+    match gz.by_ref().take(limit as u64 + 1).read_to_end(&mut vec) {
+        Ok(_) if vec.len() > limit => Err(Box::new(DecompressedTooLarge)),
         Ok(_) => Ok(vec),
         Err(_) => Ok(decoded_data),
     }
@@ -1115,12 +1152,14 @@ pub fn decode_and_decompress_to_vec(
 // Use this function when we know the data is JSON since it will be valid UTF-8
 pub fn decode_and_decompress_to_string(
     encoded_data: &str,
+    limit: usize,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let decoded_data = config::utils::base64::decode_raw(encoded_data)?;
     let mut gz = GzDecoder::new(decoded_data.as_slice());
-    let mut decompressed_data = String::new();
-    match gz.read_to_string(&mut decompressed_data) {
-        Ok(_) => Ok(decompressed_data),
+    let mut buf = Vec::new();
+    match gz.by_ref().take(limit as u64 + 1).read_to_end(&mut buf) {
+        Ok(_) if buf.len() > limit => Err(Box::new(DecompressedTooLarge)),
+        Ok(_) => Ok(String::from_utf8(buf)?),
         Err(_) => Ok(String::from_utf8(decoded_data)?),
     }
 }
@@ -1137,6 +1176,46 @@ pub fn get_size_of_var_int_header(bytes: &[u8]) -> Option<usize> {
     }
 
     None
+}
+
+fn kinesis_fh_iter(request: &KinesisFHRequest, limit: usize) -> IngestionDataIter {
+    let mut events = Vec::with_capacity(request.records.len());
+    let request_id = &request.request_id;
+    let req_timestamp = request.timestamp.unwrap_or(Utc::now().timestamp_micros());
+
+    // one budget for the whole request, or N records could each expand to `limit`
+    let mut remaining = limit;
+    for record in &request.records {
+        let parsed = match decode_and_decompress_to_vec(&record.data, remaining) {
+            Err(e) if e.is::<DecompressedTooLarge>() => Err(None),
+            Err(e) => Err(Some(e.to_string())),
+            Ok(data) => match remaining.checked_sub(data.len()) {
+                None => Err(None),
+                Some(left) => {
+                    remaining = left;
+                    deserialize_aws_record_from_vec(data, request_id)
+                        .map_err(|e| Some(e.to_string()))
+                }
+            },
+        };
+        match parsed {
+            Ok(parsed_events) => events.extend(parsed_events),
+            Err(err) => {
+                let err = match err {
+                    None => IngestionError::PayloadTooLarge(format!(
+                        "decompressed records of request {request_id} exceed the {limit} byte limit (ZO_FIREHOSE_DECOMPRESSED_LIMIT)"
+                    )),
+                    Some(err) => IngestionError::AWSError(KinesisFHIngestionResponse {
+                        request_id: request_id.to_string(),
+                        error_message: Some(err),
+                        timestamp: req_timestamp,
+                    }),
+                };
+                return IngestionDataIter::KinesisFH(events.into_iter(), Some(err));
+            }
+        }
+    }
+    IngestionDataIter::KinesisFH(events.into_iter(), None)
 }
 
 fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Vec<json::Value>> {
@@ -1649,7 +1728,7 @@ mod tests {
     fn test_decode_and_decompress_success_string() {
         let encoded_data = "H4sIAAAAAAAAADWO0QqCMBiFX2XsOkKJZHkXot5YQgpdhMTSPzfSTbaZhPjuzbTLj3M45xtxC1rTGvJPB9jHQXrOL2lyP4VZdoxDvMFyEKDmpJF9NVBTskTW2gaNrGMl+85mC2VGAW0X1P1Dl4p3hksR8caA0ti/Fb9e+AZhZhwxr5a64VbD0NaOuR5xPLJzycEh+81fbxa4JmjVQ6uejwIG5YuLGjGgjWFIPlFll7ig8zOKuAImNWzxVExfL8ipzewAAAA=";
         let expected = "{\"messageType\":\"CONTROL_MESSAGE\",\"owner\":\"CloudwatchLogs\",\"logGroup\":\"\",\"logStream\":\"\",\"subscriptionFilters\":[],\"logEvents\":[{\"id\":\"\",\"timestamp\":1680683189085,\"message\":\"CWL CONTROL MESSAGE: Checking health of destination Firehose.\"}]}";
-        let result = decode_and_decompress_to_string(encoded_data)
+        let result = decode_and_decompress_to_string(encoded_data, 1024 * 1024)
             .expect("Failed to decode and decompress data");
         assert_eq!(result, expected);
     }
@@ -1672,7 +1751,7 @@ mod tests {
             115, 116, 105, 110, 97, 116, 105, 111, 110, 32, 70, 105, 114, 101, 104, 111, 115, 101,
             46, 34, 125, 93, 125,
         ];
-        let result = decode_and_decompress_to_vec(encoded_data)
+        let result = decode_and_decompress_to_vec(encoded_data, 1024 * 1024)
             .expect("Failed to decode and decompress data");
         assert_eq!(result, expected);
     }
@@ -1681,7 +1760,8 @@ mod tests {
     fn test_decode_success_string() {
         let encoded_data = "eyJtZXNzYWdlIjoiMiAwNTg2OTQ4NTY0NzYgZW5pLTAzYzBmNWJhNzlhNjZlZjE3IDEwLjMuMTY2LjcxIDEwLjMuMTQxLjIwOSA0NDMgMzg2MzQgNiAxMDMgNDI5MjYgMTY4MDgzODU1NiAxNjgwODM4NTc4IEFDQ0VQVCBPSyJ9Cg==";
         let expected = "{\"message\":\"2 058694856476 eni-03c0f5ba79a66ef17 10.3.166.71 10.3.141.209 443 38634 6 103 42926 1680838556 1680838578 ACCEPT OK\"}\n";
-        let result = decode_and_decompress_to_string(encoded_data).expect("Failed to decode data");
+        let result = decode_and_decompress_to_string(encoded_data, 1024 * 1024)
+            .expect("Failed to decode data");
         assert_eq!(result, expected);
     }
 
@@ -1697,14 +1777,15 @@ mod tests {
             32, 49, 54, 56, 48, 56, 51, 56, 53, 55, 56, 32, 65, 67, 67, 69, 80, 84, 32, 79, 75, 34,
             125, 10,
         ];
-        let result = decode_and_decompress_to_vec(encoded_data).expect("Failed to decode data");
+        let result =
+            decode_and_decompress_to_vec(encoded_data, 1024 * 1024).expect("Failed to decode data");
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_decode_and_decompress_invalid_base64_string() {
         let encoded_data = "H4sIAAAAAAAC/ytJLS4BAAxGw7gNAAA&"; // Invalid base64 string
-        let result = decode_and_decompress_to_string(encoded_data);
+        let result = decode_and_decompress_to_string(encoded_data, 1024 * 1024);
         assert!(
             result.is_err(),
             "Expected an error due to invalid base64 input"
@@ -1714,7 +1795,7 @@ mod tests {
     #[test]
     fn test_decode_and_decompress_invalid_base64_vec() {
         let encoded_data = "H4sIAAAAAAAC/ytJLS4BAAxGw7gNAAA&"; // Invalid base64 string
-        let result = decode_and_decompress_to_vec(encoded_data);
+        let result = decode_and_decompress_to_vec(encoded_data, 1024 * 1024);
         assert!(
             result.is_err(),
             "Expected an error due to invalid base64 input"
@@ -1724,7 +1805,7 @@ mod tests {
     #[test]
     fn test_deserialize_from_str_metrics() {
         let encoded_data = "eyJtZXRyaWNfc3RyZWFtX25hbWUiOiJDdXN0b21QYXJ0aWFsLUJDbjVjQSIsImFjY291bnRfaWQiOiI3MzkxNDcyMjI5ODkiLCJyZWdpb24iOiJ1cy1lYXN0LTIiLCJuYW1lc3BhY2UiOiJBV1MvVXNhZ2UiLCJtZXRyaWNfbmFtZSI6IkNhbGxDb3VudCIsImRpbWVuc2lvbnMiOnsiQ2xhc3MiOiJOb25lIiwiUmVzb3VyY2UiOiJHZXRNZXRyaWNEYXRhIiwiU2VydmljZSI6IkNsb3VkV2F0Y2giLCJUeXBlIjoiQVBJIn0sInRpbWVzdGFtcCI6MTcxMzkwMjcwMDAwMCwidmFsdWUiOnsibWF4IjoxLjAsIm1pbiI6MS4wLCJzdW0iOjMuMCwiY291bnQiOjMuMH0sInVuaXQiOiJOb25lIn0KeyJtZXRyaWNfc3RyZWFtX25hbWUiOiJDdXN0b21QYXJ0aWFsLUJDbjVjQSIsImFjY291bnRfaWQiOiI3MzkxNDcyMjI5ODkiLCJyZWdpb24iOiJ1cy1lYXN0LTIiLCJuYW1lc3BhY2UiOiJBV1MvRmlyZWhvc2UiLCJtZXRyaWNfbmFtZSI6IktNU0tleUludmFsaWRTdGF0ZSIsImRpbWVuc2lvbnMiOnsiRGVsaXZlcnlTdHJlYW1OYW1lIjoiUFVULUhUUC1SZFFXOCJ9LCJ0aW1lc3RhbXAiOjE3MTM5MDI2NDAwMDAsInZhbHVlIjp7Im1heCI6MC4wLCJtaW4iOjAuMCwic3VtIjowLjAsImNvdW50Ijo2MC4wfSwidW5pdCI6IkNvdW50In0KeyJtZXRyaWNfc3RyZWFtX25hbWUiOiJDdXN0b21QYXJ0aWFsLUJDbjVjQSIsImFjY291bnRfaWQiOiI3MzkxNDcyMjI5ODkiLCJyZWdpb24iOiJ1cy1lYXN0LTIiLCJuYW1lc3BhY2UiOiJBV1MvRmlyZWhvc2UiLCJtZXRyaWNfbmFtZSI6IktNU0tleU5vdEZvdW5kIiwiZGltZW5zaW9ucyI6eyJEZWxpdmVyeVN0cmVhbU5hbWUiOiJQVVQtSFRQLVJkUVc4In0sInRpbWVzdGFtcCI6MTcxMzkwMjY0MDAwMCwidmFsdWUiOnsibWF4IjowLjAsIm1pbiI6MC4wLCJzdW0iOjAuMCwiY291bnQiOjYwLjB9LCJ1bml0IjoiQ291bnQifQo=";
-        let decoded = decode_and_decompress_to_vec(encoded_data);
+        let decoded = decode_and_decompress_to_vec(encoded_data, 1024 * 1024);
         assert!(decoded.is_ok());
         let decoded = decoded.unwrap();
         let request_id = "test_id".to_string();
@@ -1739,7 +1820,7 @@ mod tests {
     #[test]
     fn test_deserialize_from_str_logs() {
         let encoded_data = "eyJtZXNzYWdlVHlwZSI6IkRBVEFfTUVTU0FHRSIsIm93bmVyIjoiMTIzNDU2Nzg5MDEyIiwibG9nR3JvdXAiOiJsb2dfZ3JvdXBfbmFtZSIsImxvZ1N0cmVhbSI6ImxvZ19zdHJlYW1fbmFtZSIsInN1YnNjcmlwdGlvbkZpbHRlcnMiOlsic3Vic2NyaXB0aW9uX2ZpbHRlcl9uYW1lIl0sImxvZ0V2ZW50cyI6W3siaWQiOiIwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1IiwidGltZXN0YW1wIjoxNzEzOTgzNDQ2LCJtZXNzYWdlIjoibG9nbWVzc2FnZTEifSx7ImlkIjoiMDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NSIsInRpbWVzdGFtcCI6IDE3MTM5ODM0NDYsIm1lc3NhZ2UiOiJsb2dtZXNzYWdlMiJ9XX0=";
-        let decoded = decode_and_decompress_to_vec(encoded_data);
+        let decoded = decode_and_decompress_to_vec(encoded_data, 1024 * 1024);
         assert!(decoded.is_ok());
         let decoded = decoded.unwrap();
         let request_id = "test_id".to_string();
@@ -1807,5 +1888,134 @@ mod tests {
             vec![json::json!({"a": 1})]
         );
         assert!(parse_json_body(br#"[{"a":1}"#).is_err());
+    }
+
+    fn gzip_base64(raw: &[u8]) -> String {
+        use std::io::Write;
+
+        use base64::Engine;
+        use flate2::{Compression, write::GzEncoder};
+        let mut enc = GzEncoder::new(Vec::new(), Compression::default());
+        enc.write_all(raw).unwrap();
+        let compressed = enc.finish().unwrap();
+        base64::engine::general_purpose::STANDARD.encode(compressed)
+    }
+
+    #[test]
+    fn decode_and_decompress_to_vec_rejects_a_gzip_bomb_over_the_limit() {
+        let raw = vec![b'a'; 10 * 1024 * 1024];
+        let encoded = gzip_base64(&raw);
+        assert!(decode_and_decompress_to_vec(&encoded, 1024).is_err());
+    }
+
+    #[test]
+    fn decode_and_decompress_to_vec_accepts_data_within_the_limit() {
+        let raw = b"hello world".to_vec();
+        let encoded = gzip_base64(&raw);
+        assert_eq!(decode_and_decompress_to_vec(&encoded, 1024).unwrap(), raw);
+    }
+
+    #[test]
+    fn decode_and_decompress_to_string_rejects_a_gzip_bomb_over_the_limit() {
+        let raw = vec![b'a'; 10 * 1024 * 1024];
+        let encoded = gzip_base64(&raw);
+        assert!(decode_and_decompress_to_string(&encoded, 1024).is_err());
+    }
+
+    #[test]
+    fn gcp_ingestion_data_with_non_json_payload_returns_an_error_not_a_panic() {
+        let encoded = gzip_base64(b"not json");
+        let request = ingestion_common::GCPIngestionRequest {
+            message: ingestion_common::GCPMessage {
+                data: encoded,
+                message_id: "id1".to_string(),
+                message_id_dup: "id1".to_string(),
+                publish_time: "2024-01-01T00:00:00Z".to_string(),
+                publish_time_dup: "2024-01-01T00:00:00Z".to_string(),
+                attributes: ingestion_common::GCPAttributes::default(),
+            },
+            subscription: String::new(),
+        };
+        let mut iterator = IngestionData::GCP(request).iter();
+        assert!(iterator.next().unwrap().is_err());
+    }
+
+    fn kinesis_request(records: &[&[u8]]) -> ingestion_common::KinesisFHRequest {
+        ingestion_common::KinesisFHRequest {
+            records: records
+                .iter()
+                .map(|raw| ingestion_common::KFHRecordRequest {
+                    data: gzip_base64(raw),
+                })
+                .collect(),
+            request_id: "req1".to_string(),
+            timestamp: Some(0),
+        }
+    }
+
+    fn json_record(len: usize) -> Vec<u8> {
+        let mut record = br#"{"m":""#.to_vec();
+        record.resize(len - 2, b'a');
+        record.extend_from_slice(br#""}"#);
+        record
+    }
+
+    #[test]
+    fn kinesis_records_share_one_decompressed_budget() {
+        let limit = 1000;
+        let record = json_record(600);
+        let request = kinesis_request(&[&record, &record, &record]);
+        let IngestionDataIter::KinesisFH(_, err) = kinesis_fh_iter(&request, limit) else {
+            unreachable!()
+        };
+        assert!(
+            matches!(err, Some(IngestionError::PayloadTooLarge(_))),
+            "1800 decompressed bytes under a 1000-byte budget gave {err:?}"
+        );
+    }
+
+    #[test]
+    fn kinesis_record_that_is_not_json_is_not_reported_as_too_large() {
+        let request = kinesis_request(&[b"not json"]);
+        let IngestionDataIter::KinesisFH(_, err) = kinesis_fh_iter(&request, 1000) else {
+            unreachable!()
+        };
+        assert!(matches!(err, Some(IngestionError::AWSError(_))), "{err:?}");
+    }
+
+    #[test]
+    fn kinesis_records_under_the_budget_all_decode() {
+        let record = json_record(300);
+        let request = kinesis_request(&[&record, &record, &record]);
+        let IngestionDataIter::KinesisFH(events, err) = kinesis_fh_iter(&request, 1000) else {
+            unreachable!()
+        };
+        assert!(err.is_none(), "{err:?}");
+        assert_eq!(events.count(), 3);
+    }
+
+    #[test]
+    fn kinesis_batch_inflating_past_the_body_cap_still_decodes() {
+        let body_cap = config::get_config().limit.req_payload_limit;
+        // 'w' is protobuf wire type 7, so the record cannot also decode as a metrics protobuf
+        let mut record = json_record(1024 * 1024);
+        record[6..1024 * 1024 - 2].fill(b'w');
+        let encoded = gzip_base64(&record);
+        let records = (0..body_cap / (1024 * 1024) + 2)
+            .map(|_| ingestion_common::KFHRecordRequest {
+                data: encoded.clone(),
+            })
+            .collect();
+        let request = KinesisFHRequest {
+            records,
+            request_id: "req1".to_string(),
+            timestamp: Some(0),
+        };
+        let mut decoded = 0;
+        for item in IngestionData::KinesisFH(request).iter() {
+            assert!(item.is_ok(), "refused after {decoded} records: {item:?}");
+            decoded += 1;
+        }
+        assert_eq!(decoded, body_cap / (1024 * 1024) + 2);
     }
 }

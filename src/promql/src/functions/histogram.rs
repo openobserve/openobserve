@@ -16,7 +16,9 @@
 use config::{
     meta::promql::{
         BUCKET_LABEL, HASH_LABEL, NAME_LABEL,
-        value::{EvalContext, LabelsExt, RangeValue, Sample, Value, signature_without_labels},
+        value::{
+            EvalContext, Labels, LabelsExt, RangeValue, Sample, Value, signature_without_labels,
+        },
     },
     utils::sort::sort_float,
 };
@@ -49,18 +51,8 @@ pub(crate) fn histogram_quantile(
 ) -> Result<Value> {
     let start = std::time::Instant::now();
     let trace_id = &eval_ctx.trace_id;
-
-    // Handle input data - convert to matrix format if needed
-    let in_matrix = match data {
-        Value::Matrix(m) => m,
-        Value::None => {
-            return Ok(Value::None);
-        }
-        _ => {
-            return Err(DataFusionError::Plan(
-                "histogram_quantile: vector or matrix argument expected".to_owned(),
-            ));
-        }
+    let Some(in_matrix) = histogram_input(data, "histogram_quantile")? else {
+        return Ok(Value::None);
     };
 
     // Always use range query path - compute all timestamps at once
@@ -71,75 +63,20 @@ pub(crate) fn histogram_quantile(
         timestamps.len()
     );
 
-    // Parse each upper bound once and group metrics by their signature (without
-    // bucket label). The previous implementation reparsed every bound for every
-    // evaluation timestamp.
-    let mut metrics_by_sig: HashMap<u64, Vec<(f64, RangeValue)>> = HashMap::default();
-
-    for rv in in_matrix {
-        // Verify this metric has a bucket label
-        let Ok(upper_bound) = rv.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
-            continue;
-        };
-
-        let sig = signature_without_labels(&rv.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
-        metrics_by_sig
-            .entry(sig)
-            .or_default()
-            .push((upper_bound, rv));
-    }
-
-    let group_count = metrics_by_sig.len();
+    let groups = classic_histograms(in_matrix);
+    let group_count = groups.len();
     let mut range_values = Vec::with_capacity(group_count);
-
-    for (_sig, mut bucket_series) in metrics_by_sig {
-        // Sort bucket bounds once per output series. `bucket_quantile_sorted`
-        // can then consume them directly for every timestamp.
-        bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
-        // Get the labels (without bucket label) from the first series
-        let base_labels = bucket_series[0]
-            .1
-            .labels
-            .iter()
-            .filter(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL)
-            .cloned()
-            .collect();
-
+    let mut coalesced = Vec::new();
+    for (labels, bucket_series) in groups {
         let mut samples = Vec::with_capacity(timestamps.len());
-        let mut cursors = vec![0usize; bucket_series.len()];
-        let mut buckets = Vec::with_capacity(bucket_series.len());
-        let mut coalesced = Vec::with_capacity(bucket_series.len());
-
-        // For each timestamp, compute histogram_quantile
-        for &eval_ts in &timestamps {
-            buckets.clear();
-
-            // Collect bucket values at this timestamp
-            for ((upper_bound, bucket_rv), cursor) in bucket_series.iter().zip(cursors.iter_mut()) {
-                while *cursor < bucket_rv.samples.len()
-                    && bucket_rv.samples[*cursor].timestamp < eval_ts
-                {
-                    *cursor += 1;
-                }
-                if let Some(sample) = bucket_rv
-                    .samples
-                    .get(*cursor)
-                    .filter(|sample| sample.timestamp == eval_ts)
-                {
-                    buckets.push(Bucket::new(*upper_bound, sample.value));
-                }
-            }
-
-            if !buckets.is_empty() {
-                let quantile_value =
-                    bucket_quantile_sorted(phi.at(eval_ts), &mut buckets, &mut coalesced);
-                samples.push(Sample::new(eval_ts, quantile_value));
-            }
-        }
-
+        for_each_step(&bucket_series, &timestamps, |eval_ts, buckets| {
+            let quantile_value = bucket_quantile_sorted(phi.at(eval_ts), buckets, &mut coalesced);
+            samples.push(Sample::new(eval_ts, quantile_value));
+            Ok(())
+        })?;
         if !samples.is_empty() {
             range_values.push(RangeValue {
-                labels: base_labels,
+                labels,
                 samples,
                 exemplars: None,
                 time_window: None,
@@ -153,6 +90,296 @@ pub(crate) fn histogram_quantile(
         range_values.len()
     );
     Ok(Value::Matrix(range_values))
+}
+
+/// The fraction of observations between `lower` and `upper`, per classic histogram and step.
+pub(crate) fn histogram_fraction(
+    lower: &ScalarParam,
+    upper: &ScalarParam,
+    data: Value,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let Some(in_matrix) = histogram_input(data, "histogram_fraction")? else {
+        return Ok(Value::None);
+    };
+    let timestamps = eval_ctx.timestamps();
+    let mut range_values = Vec::new();
+    let mut coalesced = Vec::new();
+    for (labels, bucket_series) in classic_histograms(in_matrix) {
+        let mut samples = Vec::with_capacity(timestamps.len());
+        for_each_step(&bucket_series, &timestamps, |eval_ts, buckets| {
+            let fraction = bucket_fraction(
+                lower.at(eval_ts),
+                upper.at(eval_ts),
+                buckets,
+                &mut coalesced,
+            );
+            samples.push(Sample::new(eval_ts, fraction));
+            Ok(())
+        })?;
+        if !samples.is_empty() {
+            range_values.push(RangeValue {
+                labels,
+                samples,
+                exemplars: None,
+                time_window: None,
+            });
+        }
+    }
+    Ok(Value::Matrix(range_values))
+}
+
+/// One series per quantile and classic histogram, labelled `label="<φ>"` with the φ of each step.
+pub(crate) fn histogram_quantiles(
+    data: Value,
+    label: &str,
+    phis: &[ScalarParam],
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let timestamps = eval_ctx.timestamps();
+    // a repeated φ is an error at any step, whether or not a histogram has data there
+    for &eval_ts in &timestamps {
+        let mut step_values = Vec::with_capacity(phis.len());
+        for phi in phis {
+            let value = quantile_label(phi.at(eval_ts));
+            if step_values.contains(&value) {
+                return Err(DataFusionError::Plan(format!(
+                    "histogram_quantiles: quantile {value} is given twice"
+                )));
+            }
+            step_values.push(value);
+        }
+    }
+    let Some(in_matrix) = histogram_input(data, "histogram_quantiles")? else {
+        return Ok(Value::None);
+    };
+    let mut range_values = Vec::new();
+    let mut scratch = Vec::new();
+    let mut coalesced = Vec::new();
+    for (labels, bucket_series) in classic_histograms(in_matrix) {
+        if labels.iter().any(|existing| existing.name == label) {
+            return Err(DataFusionError::Plan(format!(
+                "histogram_quantiles: label \"{label}\" already exists on the input"
+            )));
+        }
+        // a φ that varies per step makes one series per distinct value
+        let mut series: Vec<(String, Vec<Sample>)> = Vec::new();
+        let mut slot_of: HashMap<String, usize> = HashMap::new();
+        for_each_step(&bucket_series, &timestamps, |eval_ts, buckets| {
+            for phi in phis {
+                let phi = phi.at(eval_ts);
+                let value = quantile_label(phi);
+                scratch.clear();
+                scratch.extend_from_slice(buckets);
+                let sample = Sample::new(
+                    eval_ts,
+                    bucket_quantile_sorted(phi, &mut scratch, &mut coalesced),
+                );
+                let slot = *slot_of.entry(value.clone()).or_insert_with(|| {
+                    series.push((value.clone(), Vec::new()));
+                    series.len() - 1
+                });
+                series[slot].1.push(sample);
+            }
+            Ok(())
+        })?;
+        for (value, samples) in series {
+            let mut labels = labels.clone();
+            super::set_label(&mut labels, label, &value);
+            range_values.push(RangeValue {
+                labels,
+                samples,
+                exemplars: None,
+                time_window: None,
+            });
+        }
+    }
+    Ok(Value::Matrix(range_values))
+}
+
+/// The error for a function that reads native histograms, which ingest stores as classic buckets.
+pub(crate) fn native_histogram_guidance(func_name: &str) -> String {
+    let instead = match func_name {
+        "histogram_count" => {
+            "Query the histogram's `_count` series instead, for example `rate(x_count[5m])`."
+        }
+        "histogram_sum" => {
+            "Query the histogram's `_sum` series instead, for example `rate(x_sum[5m])`."
+        }
+        "histogram_avg" => {
+            "Divide its `_sum` series by its `_count` series instead, for example `rate(x_sum[5m]) / rate(x_count[5m])`."
+        }
+        _ => "There is no classic-bucket equivalent.",
+    };
+    format!(
+        "`{func_name}` reads native histograms, which OpenObserve stores as classic buckets. {instead}"
+    )
+}
+
+fn histogram_input(data: Value, func_name: &str) -> Result<Option<Vec<RangeValue>>> {
+    match data {
+        Value::Matrix(matrix) => Ok(Some(matrix)),
+        Value::None => Ok(None),
+        _ => Err(DataFusionError::Plan(format!(
+            "{func_name}: vector or matrix argument expected"
+        ))),
+    }
+}
+
+/// Bucket series sorted by bound, grouped by every label except `le`, `__name__` and `__hash__`.
+fn classic_histograms(in_matrix: Vec<RangeValue>) -> Vec<(Labels, Vec<(f64, RangeValue)>)> {
+    let mut metrics_by_sig: HashMap<u64, Vec<(f64, RangeValue)>> = HashMap::default();
+    for rv in in_matrix {
+        let Ok(upper_bound) = rv.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
+            continue;
+        };
+        let sig = signature_without_labels(&rv.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
+        metrics_by_sig
+            .entry(sig)
+            .or_default()
+            .push((upper_bound, rv));
+    }
+    metrics_by_sig
+        .into_values()
+        .map(|mut bucket_series| {
+            bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
+            let labels = bucket_series[0]
+                .1
+                .labels
+                .iter()
+                .filter(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL)
+                .cloned()
+                .collect();
+            (labels, bucket_series)
+        })
+        .collect()
+}
+
+/// Calls `f` at every step where a bucket of the histogram has a sample, with those buckets.
+fn for_each_step(
+    bucket_series: &[(f64, RangeValue)],
+    timestamps: &[i64],
+    mut f: impl FnMut(i64, &mut Vec<Bucket>) -> Result<()>,
+) -> Result<()> {
+    let mut cursors = vec![0usize; bucket_series.len()];
+    let mut buckets = Vec::with_capacity(bucket_series.len());
+    for &eval_ts in timestamps {
+        buckets.clear();
+        for ((upper_bound, bucket_rv), cursor) in bucket_series.iter().zip(cursors.iter_mut()) {
+            while *cursor < bucket_rv.samples.len()
+                && bucket_rv.samples[*cursor].timestamp < eval_ts
+            {
+                *cursor += 1;
+            }
+            if let Some(sample) = bucket_rv
+                .samples
+                .get(*cursor)
+                .filter(|sample| sample.timestamp == eval_ts)
+            {
+                buckets.push(Bucket::new(*upper_bound, sample.value));
+            }
+        }
+        if !buckets.is_empty() {
+            f(eval_ts, &mut buckets)?;
+        }
+    }
+    Ok(())
+}
+
+/// Upstream's `FormatOpenMetricsFloat`: Go's shortest `'g'` form, with ".0" on an integral value.
+fn quantile_label(phi: f64) -> String {
+    if phi == 0.0 {
+        return "0.0".to_string();
+    }
+    if phi.is_nan() {
+        return "NaN".to_string();
+    }
+    if phi.is_infinite() {
+        return if phi > 0.0 { "+Inf" } else { "-Inf" }.to_string();
+    }
+    let scientific = format!("{phi:e}");
+    let (mantissa, exponent) = scientific
+        .split_once('e')
+        .expect("`{:e}` always writes an exponent");
+    let exponent: i32 = exponent.parse().expect("`{:e}` writes a decimal exponent");
+    // Go's shortest `'g'` switches to an exponent below 1e-4 and from 1e6
+    if !(-4..6).contains(&exponent) {
+        let sign = if exponent < 0 { '-' } else { '+' };
+        return format!("{mantissa}e{sign}{:02}", exponent.abs());
+    }
+    let text = phi.to_string();
+    if text.contains('.') {
+        text
+    } else {
+        text + ".0"
+    }
+}
+
+// cf. upstream `BucketFraction` (promql/quantile.go); `buckets` must be sorted by upper bound
+fn bucket_fraction(
+    lower: f64,
+    upper: f64,
+    buckets: &mut Vec<Bucket>,
+    coalesced: &mut Vec<Bucket>,
+) -> f64 {
+    if buckets
+        .last()
+        .is_none_or(|b| b.upper_bound != f64::INFINITY)
+    {
+        return f64::NAN;
+    }
+    coalesce_buckets_into(buckets, coalesced);
+    let count = coalesced[coalesced.len() - 1].count;
+    if count == 0.0 || lower.is_nan() || upper.is_nan() {
+        return f64::NAN;
+    }
+    if lower >= upper {
+        return 0.0;
+    }
+    // the first bucket starts at 0 when its upper bound is positive, else at -Inf
+    let mut lower_bound = if coalesced[0].upper_bound <= 0.0 {
+        f64::NEG_INFINITY
+    } else {
+        0.0
+    };
+    let mut rank = 0.0;
+    let mut lower_rank = None;
+    let mut upper_rank = None;
+    for (i, bucket) in coalesced.iter().enumerate() {
+        if i > 0 {
+            lower_bound = coalesced[i - 1].upper_bound;
+        }
+        let upper_bound = bucket.upper_bound;
+        // a bucket with an infinite edge is not interpolated
+        let interpolate = |v: f64| {
+            if lower_bound == f64::NEG_INFINITY {
+                bucket.count
+            } else {
+                rank + (bucket.count - rank) * (v - lower_bound) / (upper_bound - lower_bound)
+            }
+        };
+        if lower_rank.is_none() && lower_bound >= lower {
+            lower_rank = Some(rank);
+        }
+        if upper_rank.is_none() && lower_bound >= upper {
+            upper_rank = Some(rank);
+        }
+        if lower_rank.is_none() && lower_bound < lower && upper_bound > lower {
+            lower_rank = Some(interpolate(lower));
+        }
+        if upper_rank.is_none() && lower_bound < upper && upper_bound > upper {
+            upper_rank = Some(interpolate(upper));
+        }
+        if lower_rank.is_some() && upper_rank.is_some() {
+            break;
+        }
+        rank = bucket.count;
+    }
+    let capped = |rank: Option<f64>| {
+        rank.filter(|rank| *rank <= count || rank.is_nan())
+            .unwrap_or(count)
+    };
+    (capped(upper_rank) - capped(lower_rank)) / count
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76
@@ -777,6 +1004,30 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, 1.0f64.to_bits()), (3, f64::NAN.to_bits())],
         );
+    }
+
+    /// Upstream `FormatOpenMetricsFloat`: Go's shortest `'g'`, with ".0" on an integral value.
+    #[test]
+    fn test_quantile_label_formats_like_openmetrics() {
+        for (phi, expected) in [
+            (0.5, "0.5"),
+            (0.0, "0.0"),
+            (-0.0, "0.0"),
+            (1.0, "1.0"),
+            (-1.0, "-1.0"),
+            (0.99, "0.99"),
+            (0.0001, "0.0001"),
+            (0.00001, "1e-05"),
+            (-0.000012, "-1.2e-05"),
+            (123456.0, "123456.0"),
+            (1e6, "1e+06"),
+            (1.5e300, "1.5e+300"),
+            (f64::NAN, "NaN"),
+            (f64::INFINITY, "+Inf"),
+            (f64::NEG_INFINITY, "-Inf"),
+        ] {
+            assert_eq!(quantile_label(phi), expected, "{phi}");
+        }
     }
 
     #[test]

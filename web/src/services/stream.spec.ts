@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import stream from "@/services/stream";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock the http service
 vi.mock("@/services/http", () => ({
@@ -294,7 +297,7 @@ describe("stream service", () => {
         data: { partition_keys: ["timestamp"] },
       };
 
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
+      mockHttpInstance.put.mockResolvedValue({ data: { success: true } });
 
       await stream.updateSettings(
         params.org_identifier,
@@ -317,7 +320,7 @@ describe("stream service", () => {
         data: { partition_keys: ["timestamp"] },
       };
 
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
+      mockHttpInstance.put.mockResolvedValue({ data: { success: true } });
 
       await stream.updateSettings(
         params.org_identifier,
@@ -601,6 +604,54 @@ describe("stream service", () => {
           end_time: 456,
         }),
       ).rejects.toThrow("Bad request");
+    });
+  });
+
+  describe("product analytics", () => {
+    it("delete does not track, since its callers decide what counts as deleted", async () => {
+      mockHttpInstance.delete.mockResolvedValue({ data: { code: 200 } });
+
+      await stream.delete("org", "s", "logs");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["createStream", "post", ["org", "s", "logs", {}], "stream_created", { stream_type: "logs" }],
+      [
+        "updateSettings",
+        "put",
+        ["org", "s", "logs", {}],
+        "stream_settings_updated",
+        { stream_type: "logs" },
+      ],
+      [
+        "deleteFields",
+        "put",
+        ["org", "s", "logs", ["a", "b"]],
+        "stream_fields_deleted",
+        { stream_type: "logs", count: 2 },
+      ],
+    ])("%s tracks its event once the request resolves", async (fn, method, args, event, props) => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance[method].mockResolvedValue(response);
+
+      await expect((stream as any)[fn](...(args as any[]))).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(event, props);
+    });
+
+    it.each([
+      ["createStream", "post", ["org", "s", "logs", {}]],
+      ["updateSettings", "put", ["org", "s", "logs", {}]],
+      ["deleteFields", "put", ["org", "s", "logs", ["a"]]],
+    ])("%s does not track when the request rejects", async (fn, method, args) => {
+      mockHttpInstance[method].mockRejectedValue(new Error("boom"));
+
+      await expect((stream as any)[fn](...(args as any[]))).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

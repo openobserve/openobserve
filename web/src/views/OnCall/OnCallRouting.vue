@@ -143,10 +143,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              emergencies the row tags name; `include_dismissed` swaps the
              outstanding worklist for the raw historical record. -->
             <template v-if="tab === 'signals'">
-              <div class="bg-border-default h-4 w-px shrink-0" />
+              <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
 
               <OToggleGroup
                 :model-value="signalFilters.landing || 'both'"
+                mobile-dropdown
+                data-test="oncall-unrouted-filter"
                 @update:model-value="setSignalLanding"
               >
                 <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
@@ -168,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
 
-              <div class="bg-border-default h-4 w-px shrink-0" />
+              <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" />
 
               <OSwitch
                 :model-value="signalFilters.include_dismissed"

@@ -71,6 +71,9 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// Every stored gauge or sum row's `flag`, a marker's too, so a marker keeps its series' labels.
+const STORED_NUMBER_POINT_FLAG: &str = "DATA_POINT_FLAGS_DO_NOT_USE";
+
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
     /// Slots past `len` are spare; their strings keep their capacity for the next point.
@@ -133,6 +136,16 @@ impl MetricRecords<'_> {
             Self::NumberPoints(points) => !points
                 .iter()
                 .any(|point| number_point_value(point).is_some()),
+        }
+    }
+
+    /// Whether every row the metric writes is a stale marker.
+    fn only_stale(&self) -> bool {
+        match self {
+            Self::Json(_) => false,
+            Self::NumberPoints(points) => !points
+                .iter()
+                .any(|point| matches!(number_point_value(point), Some(Some(_)))),
         }
     }
 }
@@ -351,6 +364,12 @@ pub async fn handle_otlp_request(
                     &mut metric_schema_map,
                 )
                 .await;
+                // stale markers alone must not create a stream, not even its metadata
+                if records.only_stale()
+                    && !ingest::has_value_column(metric_schema_map.get(&metric_name))
+                {
+                    continue;
+                }
 
                 // get partition keys
                 if !stream_partitioning_map.contains_key(&metric_name) {
@@ -383,7 +402,9 @@ pub async fn handle_otlp_request(
                 .await;
 
                 // update schema metadata
-                if !schema_exists.has_metrics_metadata {
+                if !schema_exists.has_metrics_metadata
+                    || stored_as_counter(metric, metric_schema_map.get(&metric_name))
+                {
                     if !prom_meta.contains_key(METADATA_LABEL) {
                         prom_meta.insert(
                             METADATA_LABEL.to_string(),
@@ -725,7 +746,12 @@ fn prepare_sum(
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
 ) {
-    metadata.metric_type = MetricType::Counter;
+    // a sum that can go down is a Prometheus gauge, not a counter
+    metadata.metric_type = if sum.is_monotonic {
+        MetricType::Counter
+    } else {
+        MetricType::Gauge
+    };
     prom_meta.insert(
         METADATA_LABEL.to_string(),
         json::to_string(&metadata).unwrap(),
@@ -734,7 +760,21 @@ fn prepare_sum(
     rec["is_monotonic"] = sum.is_monotonic.to_string().into();
 }
 
-/// One hashed record per gauge or sum data point that has a value.
+/// Whether a sum that can go down is still stored as a counter and needs its type corrected.
+fn stored_as_counter(
+    metric: &opentelemetry_proto::tonic::metrics::v1::Metric,
+    schema: Option<&SchemaCache>,
+) -> bool {
+    let Some(Data::Sum(sum)) = &metric.data else {
+        return false;
+    };
+    !sum.is_monotonic
+        && schema
+            .and_then(|schema| get_metadata_from_schema(schema.schema()))
+            .is_some_and(|meta| meta.metric_type == MetricType::Counter)
+}
+
+/// One hashed record per gauge or sum data point that writes one, stale markers included.
 fn number_point_records<'a>(
     rec: &json::Value,
     data_points: impl IntoIterator<Item = &'a NumberDataPoint>,
@@ -833,7 +873,7 @@ fn append_number_point(
         "start_time",
         start_time.format(data_point.start_time_unix_nano),
     );
-    scratch.push(base_labels.len(), "flag", data_point_flag(data_point.flags));
+    scratch.push(base_labels.len(), "flag", STORED_NUMBER_POINT_FLAG);
 
     let labels = scratch.labels();
     let Some(label_bytes) = columnar.resolve_columns(labels) else {
@@ -844,12 +884,15 @@ fn append_number_point(
     true
 }
 
-/// A gauge or sum point's value under the shared policy, `None` for one that writes no record.
-fn number_point_value(data_point: &NumberDataPoint) -> Option<f64> {
-    if no_recorded_value(data_point.flags) {
-        return None;
-    }
-    get_metric_val(&data_point.value).and_then(super::sanitize_metric_value)
+/// A gauge or sum point's `value` cell, `None` for no record; no recorded value is a stale marker.
+fn number_point_value(data_point: &NumberDataPoint) -> Option<Option<f64>> {
+    let value = if no_recorded_value(data_point.flags) {
+        super::SanitizedValue::Stale
+    } else {
+        get_metric_val(&data_point.value)
+            .map_or(super::SanitizedValue::Drop, super::sanitize_metric_value)
+    };
+    value.row_value()
 }
 
 fn process_histogram(
@@ -944,10 +987,10 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bo
     let Some(value) = number_point_value(data_point) else {
         return false;
     };
-    rec[VALUE_LABEL] = value.into();
+    rec[VALUE_LABEL] = value.map_or(json::Value::Null, Into::into);
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
-    rec["flag"] = data_point_flag(data_point.flags).into();
+    rec["flag"] = STORED_NUMBER_POINT_FLAG.into();
     process_exemplars(rec, &data_point.exemplars);
     true
 }
@@ -1186,7 +1229,7 @@ fn data_point_flag(flags: u32) -> &'static str {
     }
 }
 
-/// A point carrying `NO_RECORDED_VALUE` marks a gap (a staleness marker); it writes no record.
+/// A point carrying `NO_RECORDED_VALUE` marks a gap: a staleness marker.
 fn no_recorded_value(flags: u32) -> bool {
     flags & (DataPointFlags::NoRecordedValueMask as u32) != 0
 }
@@ -1985,7 +2028,8 @@ mod tests {
 
         assert_eq!(rejected, json_records[json_records.len() - 6..]);
         let accepted = &json_records[..json_records.len() - 6];
-        assert_eq!(written.len(), 4);
+        // the flagged point is a stale marker, written on both paths
+        assert_eq!(written.len(), 5);
         for (row, record) in written.iter().zip(accepted) {
             assert_eq!(row, record.as_object().unwrap());
         }
@@ -2328,21 +2372,65 @@ mod tests {
 
         #[test]
         fn test_sum_non_monotonic() {
-            let metric = create_test_sum_metric("non_monotonic_sum", 50.0, false);
-            let mut rec = json!({"__name__": "non_monotonic_sum", "__type__": "counter"});
-            let metadata = Metadata {
-                metric_family_name: String::new(),
-                metric_type: MetricType::Unknown,
-                help: String::new(),
-                unit: String::new(),
-            };
-            let mut prom_meta = HashMap::new();
+            for temporality in [
+                AggregationTemporality::Cumulative,
+                AggregationTemporality::Delta,
+            ] {
+                let mut metric = create_test_sum_metric("non_monotonic_sum", 50.0, false);
+                if let Some(Data::Sum(sum)) = &mut metric.data {
+                    sum.aggregation_temporality = temporality as i32;
+                }
+                let mut rec = json!({"__name__": "non_monotonic_sum", "__type__": "counter"});
+                let metadata = Metadata {
+                    metric_family_name: String::new(),
+                    metric_type: MetricType::Unknown,
+                    help: String::new(),
+                    unit: String::new(),
+                };
+                let mut prom_meta = HashMap::new();
 
-            if let Some(Data::Sum(sum)) = &metric.data {
-                let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
-                assert!(!result.is_empty());
-                assert_eq!(result[0]["is_monotonic"], "false");
+                if let Some(Data::Sum(sum)) = &metric.data {
+                    let result = process_sum(&mut rec, sum, metadata, &mut prom_meta);
+                    assert!(!result.is_empty());
+                    assert_eq!(result[0]["is_monotonic"], "false");
+                    let metadata = prom_meta
+                        .get(METADATA_LABEL)
+                        .and_then(|meta_str| serde_json::from_str::<Metadata>(meta_str).ok())
+                        .unwrap();
+                    assert_eq!(metadata.metric_type, MetricType::Gauge, "{temporality:?}");
+                }
             }
+        }
+
+        fn schema_with_type(metric_type: MetricType) -> SchemaCache {
+            let meta = Metadata {
+                metric_family_name: "m".to_string(),
+                metric_type,
+                help: String::new(),
+                unit: "By".to_string(),
+            };
+            let metadata = HashMap::from([(
+                METADATA_LABEL.to_string(),
+                serde_json::to_string(&meta).unwrap(),
+            )]);
+            SchemaCache::new(Schema::empty().with_metadata(metadata))
+        }
+
+        #[test]
+        fn test_stored_as_counter() {
+            let up_down = create_test_sum_metric("m", 1.0, false);
+            let monotonic = create_test_sum_metric("m", 1.0, true);
+            let gauge = create_test_gauge_metric("m", 1.0);
+            let counter = schema_with_type(MetricType::Counter);
+            let stored_gauge = schema_with_type(MetricType::Gauge);
+            let no_metadata = SchemaCache::new(Schema::empty());
+
+            assert!(stored_as_counter(&up_down, Some(&counter)));
+            assert!(!stored_as_counter(&up_down, Some(&stored_gauge)));
+            assert!(!stored_as_counter(&up_down, Some(&no_metadata)));
+            assert!(!stored_as_counter(&up_down, None));
+            assert!(!stored_as_counter(&monotonic, Some(&counter)));
+            assert!(!stored_as_counter(&gauge, Some(&counter)));
         }
 
         #[test]
@@ -3060,8 +3148,8 @@ mod tests {
                 ),
             };
 
-            assert!(!process_data_point(&mut rec, &data_point_flag1));
-            assert!(rec.get(VALUE_LABEL).is_none());
+            assert!(process_data_point(&mut rec, &data_point_flag1));
+            assert_eq!(rec[VALUE_LABEL], json::Value::Null);
             assert_eq!(
                 data_point_flag(1),
                 "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK"
@@ -3694,18 +3782,27 @@ mod tests {
             );
         }
 
-        /// A staleness marker carries `NO_RECORDED_VALUE`; storing its value as a sample would
-        /// make a gap look like a real reading.
+        /// A `NO_RECORDED_VALUE` point ends the series with a NULL, never with its own value.
         #[test]
-        fn test_process_gauge_no_recorded_value_writes_no_record() {
+        fn test_process_gauge_no_recorded_value_writes_a_stale_marker() {
             let stale = NumberDataPoint {
                 flags: DataPointFlags::NoRecordedValueMask as u32,
+                time_unix_nano: 1640995260000000000,
                 ..number_dp(2.0, vec![attr("pod", "a")])
             };
             let records = gauge_records(vec![number_dp(1.0, vec![attr("pod", "a")]), stale]);
 
-            assert_eq!(records.len(), 1);
+            assert_eq!(records.len(), 2);
             assert_eq!(records[0][VALUE_LABEL], json!(1.0));
+            assert_eq!(records[1][VALUE_LABEL], json::Value::Null);
+            assert_eq!(records[1][TIMESTAMP_COL_NAME], json!(1640995260000000_i64));
+            assert_eq!(records[0][HASH_LABEL], records[1][HASH_LABEL]);
+            // a new label value would relabel the series and split `by (flag)`
+            assert_eq!(records[1]["flag"], records[0]["flag"]);
+            assert_eq!(
+                records[1]["flag"],
+                json!(DataPointFlags::DoNotUse.as_str_name())
+            );
         }
 
         /// The flag is a bit mask, so it must be honoured when other bits are set too.
@@ -3716,7 +3813,60 @@ mod tests {
                 ..number_dp(2.0, vec![])
             };
 
-            assert!(sum_records(vec![stale]).is_empty());
+            let records = sum_records(vec![stale]);
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0][VALUE_LABEL], json::Value::Null);
+        }
+
+        #[test]
+        fn test_append_number_points_writes_a_stale_marker_as_a_null_value() {
+            use arrow::{
+                array::{Array, AsArray},
+                datatypes::Float64Type,
+            };
+
+            let rec = json!({"__name__": "requests"});
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..number_dp(2.0, vec![])
+            };
+            let fields = vec![
+                Field::new(NAME_LABEL, DataType::Utf8, true),
+                Field::new("start_time", DataType::Utf8, true),
+                Field::new("flag", DataType::Utf8, true),
+                Field::new(VALUE_LABEL, DataType::Float64, true),
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, true),
+            ];
+            let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+
+            let rejected = append_number_points(&mut columnar, &rec, &[stale]);
+            assert!(rejected.is_empty());
+            let entries = columnar.into_entries("org", "requests").unwrap();
+            let batch = entries[0].batch.as_ref().unwrap();
+            let values = batch.column(3).as_primitive::<Float64Type>();
+            assert_eq!(values.len(), 1);
+            assert!(values.is_null(0));
+            assert_eq!(
+                batch.column(2).as_string::<i32>().value(0),
+                DataPointFlags::DoNotUse.as_str_name()
+            );
+        }
+
+        #[test]
+        fn test_metric_records_with_only_stale_points_are_not_empty_but_only_stale() {
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..number_dp(2.0, vec![])
+            };
+            let points = [stale.clone()];
+            let records = MetricRecords::NumberPoints(&points);
+            assert!(!records.is_empty());
+            assert!(records.only_stale());
+
+            let points = [stale, number_dp(1.0, vec![])];
+            assert!(!MetricRecords::NumberPoints(&points).only_stale());
+            assert!(!MetricRecords::Json(vec![json!({})]).only_stale());
         }
 
         /// A flagged histogram would otherwise write zero `_count`/`_sum`/bucket rows, which

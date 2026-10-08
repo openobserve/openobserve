@@ -97,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :show-global-filter="false"
           :default-columns="false"
-          :footer-title="t('workflow.history.button')"
           :show-index="true"
           :enable-column-resize="true"
           sort-by="start_time"

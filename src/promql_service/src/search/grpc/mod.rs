@@ -82,8 +82,8 @@ impl TableProvider for StorageProvider {
             time_range,
             matchers.clone(),
             filters,
-            storage::BlockPreference {
-                enabled: streaming,
+            storage::SourcePreference {
+                streaming,
                 output_labels: &label_selector,
             },
         )
@@ -370,7 +370,7 @@ pub async fn search_inner(
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
     let query = req.query.as_ref().unwrap();
-    let prom_expr = parser::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let prom_expr = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
 
     let eval_stmt = parser::EvalStmt {
         expr: prom_expr,
@@ -439,7 +439,7 @@ async fn get_max_file_list(
     end: i64,
 ) -> Result<GroupPlan> {
     // 1. get metrics name
-    let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
+    let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
     let metrics_name = visitor.into_names();

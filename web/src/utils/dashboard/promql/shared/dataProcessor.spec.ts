@@ -103,6 +103,39 @@ describe("dataProcessor", () => {
       expect(result[0].series.map((entry: any) => entry.name)).toEqual(["api-1", "api-2"]);
     });
 
+    it("names a formula's label-less series after the formula, not {}", async () => {
+      const searchQueryData = [
+        { status: "success", resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] },
+      ] as any;
+      const formula = { ...mockPanelSchema, queries: [{ config: { formula: "B / A * 100" } }] };
+
+      const result = await processPromQLData(searchQueryData, formula, mockStore);
+
+      expect(result[0].series[0].name).toBe("B / A * 100");
+    });
+
+    it("names an input's label-less series after its letter in a panel with a formula", async () => {
+      const unlabelled = () => ({
+        status: "success",
+        resultType: "matrix",
+        result: [{ metric: {}, values: [[1, "1"]] }],
+      });
+      const searchQueryData = [unlabelled(), unlabelled(), unlabelled()] as any;
+      const queries = [
+        { config: { ref: "A" } },
+        { config: { ref: "B" } },
+        { config: { formula: "B / A" } },
+      ];
+
+      const result = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, queries },
+        mockStore,
+      );
+
+      expect(result.map((query: any) => query.series[0].name)).toEqual(["A", "B", "B / A"]);
+    });
+
     it("should process OpenObserve format (direct result)", async () => {
       const searchQueryData: PromQLResponse[] = [
         {
@@ -207,6 +240,27 @@ describe("dataProcessor", () => {
       const processedResult = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(processedResult[0].series).toHaveLength(50);
+    });
+
+    it("keeps a shifted series only when its primary survives the series limit (stacked)", async () => {
+      // Shifted series re-use their primaries' metric objects, reordered and with one missing.
+      const metrics = ["a", "b", "c", "d", "e", "f", "g"].map((job) => ({ job }));
+      const primary = metrics.map((metric) => ({ metric, values: [[1000, "1"]] }));
+      const shifted = [6, 5, 4, 3, 2, 1].map((i) => ({
+        metric: metrics[i],
+        values: [[1000, "2"]],
+      }));
+      const searchQueryData: PromQLResponse[] = [{ result: primary }, { result: shifted }] as any;
+
+      const processed = await processPromQLData(
+        searchQueryData,
+        { ...mockPanelSchema, type: "stacked", config: { promql_series_limit: 5 } },
+        mockStore,
+        { parentQueryIndex: [0, 0], nameSuffixes: ["", "1 day ago"] },
+      );
+
+      expect(processed[0].series.map((s: any) => s.metric.job)).toEqual(["a", "b", "c", "d", "e"]);
+      expect(processed[1].series.map((s: any) => s.metric.job)).toEqual(["e", "d", "c", "b"]);
     });
 
     it("should use default series limit when not specified", async () => {

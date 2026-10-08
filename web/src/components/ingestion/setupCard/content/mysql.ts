@@ -87,6 +87,7 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
   const tool = sharedToolIcons();
   return {
     provider: {
+      id: "mySQL",
       name: raw("MySQL"),
       tagline: t("ingestion.setupCard.mysqlTagline"),
       logo: getImageURL("images/ingestion/mysql.svg"),

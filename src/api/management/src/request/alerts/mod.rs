@@ -637,6 +637,9 @@ fn composite_list_item(
         owner: definition.owner,
         description: definition.description,
         alert_type: "composite".to_string(),
+        // Composites watch their children's outcomes, not a stream.
+        stream_name: None,
+        stream_type: None,
         condition: None,
         trigger_condition: None,
         enabled: definition.enabled,
@@ -1297,6 +1300,11 @@ async fn create_anomaly_alert(
         rcf_num_trees: anomaly_fields.rcf_num_trees,
         rcf_tree_size: anomaly_fields.rcf_tree_size,
         rcf_shingle_size: anomaly_fields.rcf_shingle_size,
+        band_width: anomaly_fields.band_width,
+        alert_direction: anomaly_fields.alert_direction,
+        alert_window_buckets: anomaly_fields.alert_window_buckets,
+        alert_window_fire_pct: anomaly_fields.alert_window_fire_pct,
+        alert_window_recover_pct: anomaly_fields.alert_window_recover_pct,
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
@@ -2076,9 +2084,13 @@ async fn build_and_run_anomaly_update(
         detection_window_seconds: fields.detection_window_seconds,
         training_window_days: fields.training_window_days,
         percentile: fields.percentile,
-        // Set-only mapping: this endpoint's partial semantics cannot express "clear".
-        alert_budget_per_day: fields.alert_budget_per_day.map(Some),
+        alert_budget_per_day: fields.alert_budget_per_day,
         level_half_width_seconds: fields.level_half_width_seconds.map(Some),
+        band_width: fields.band_width,
+        alert_direction: fields.alert_direction,
+        alert_window_buckets: fields.alert_window_buckets,
+        alert_window_fire_pct: fields.alert_window_fire_pct,
+        alert_window_recover_pct: fields.alert_window_recover_pct,
         retrain_interval_days: fields.retrain_interval_days,
         alert_enabled: fields.alert_enabled,
         alert_destinations: Some(alert.destinations),
@@ -3458,7 +3470,7 @@ pub async fn enable_alert_bulk(
     tag = "Alerts",
     operation_id = "TriggerAlert",
     summary = "Manually trigger alert",
-    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring.",
+    description = "Manually triggers an alert to test its functionality and notification delivery. Useful for testing alert configurations, verifying notification channels, and ensuring alerts work as expected before relying on them for monitoring. For an anomaly detection alert it runs detection now and returns `message`, `claim_lost`, `ineligible`, `anomaly_id`, `anomalies_found`, `points_scored` and `anomalies`; `claim_lost: true` means another detection run for this alert is in progress, and `ineligible: true` means the detector is disabled or untrained (`message` says which), so nothing was scored.",
     security(
         ("Authorization"= [])
     ),
@@ -3468,7 +3480,7 @@ pub async fn enable_alert_bulk(
         ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success; for an anomaly alert, the detection result (see description)", content_type = "application/json", body = Object),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),
@@ -3530,7 +3542,8 @@ pub async fn trigger_alert(
                 )
                 .await
                 {
-                    Ok(_) => MetaHttpResponse::ok("Detection triggered"),
+                    // The reply carries `claim_lost`, so an in-flight run is not shown as fresh.
+                    Ok(result) => MetaHttpResponse::json(result),
                     Err(e) => {
                         let msg = e.to_string().to_lowercase();
                         if msg.contains("not found") {
@@ -4232,6 +4245,48 @@ mod tests {
         let cron_err = cron::Schedule::from_str("not-a-cron").unwrap_err();
         assert_eq!(
             status(AlertError::ParseCron(cron_err)),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_frequency_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::FrequencyOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_silence_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::SilenceOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_tolerance_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::ToleranceOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_tz_offset_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::TzOffsetOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_cron_has_no_future_occurrence_is_bad_request() {
+        assert_eq!(
+            status(AlertError::CronHasNoFutureOccurrence {
+                cron: "0 0 0 1 1 * 2020".to_string()
+            }),
             StatusCode::BAD_REQUEST
         );
     }

@@ -56,6 +56,8 @@ export interface CodeBlockProps {
    * number accounts for, so the two columns would drift apart.
    */
   lineNumbers?: boolean;
+  /** Inset the code from the block's edge, for a block with no toolbar above it. */
+  padded?: boolean;
   /**
    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
@@ -64,7 +66,7 @@ export interface CodeBlockProps {
 }
 
 export interface CodeBlockEmits {
-  /** Fired after the raw code is copied to the clipboard. */
+  /** Fired only after the raw code was copied to the clipboard successfully. */
   (e: "copy"): void;
 }
 

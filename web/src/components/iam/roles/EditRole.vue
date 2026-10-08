@@ -540,6 +540,8 @@ const getRoleDetails = () => {
           await seedDbmViewerPreset();
         } else if (preset === "k8s") {
           await seedK8sViewerPreset();
+        } else if (preset === "rum_viewer" || preset === "rum_editor") {
+          await seedRumPreset(preset);
         }
       }
     })
@@ -690,7 +692,7 @@ const expandPermission = async (resource: any) => {
   }
 };
 
-const { seedReadonlyPreset, seedDbmViewerPreset, seedK8sViewerPreset, applyPreset } =
+const { seedReadonlyPreset, seedDbmViewerPreset, seedK8sViewerPreset, seedRumPreset, applyPreset } =
   useRolePresets({
     permissionsState,
     resourceMapper,

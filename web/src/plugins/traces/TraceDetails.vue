@@ -441,6 +441,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex items-center gap-2 space-x-2 pe-[0.325rem]">
+            <OSwitch
+              v-if="activeTab === 'waterfall'"
+              :model-value="showCriticalPath"
+              :label="t('traces.criticalPath')"
+              size="sm"
+              data-test="trace-details-critical-path-toggle"
+              @update:model-value="setShowCriticalPath"
+            />
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
@@ -559,6 +567,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
           ref="parentContainer"
         >
+          <OBanner
+            v-if="isPartialTrace"
+            variant="warning"
+            dense
+            class="mx-2 mb-1 shrink-0"
+            data-test="trace-details-partial-banner"
+          >
+            {{ t("traces.traceDetails.partial") }}
+          </OBanner>
+          <OBanner
+            v-if="hasMoreSpans"
+            variant="warning"
+            dense
+            inline-actions
+            class="mx-2 mb-1 shrink-0"
+            data-test="trace-details-truncated-banner"
+          >
+            {{ t("traces.traceDetails.truncated", { count: loadedSpanCount }, loadedSpanCount) }}
+            <template #actions>
+              <OButton
+                data-test="trace-details-load-more-btn"
+                variant="outline"
+                size="sm"
+                :loading="isLoadingMoreSpans"
+                @click="loadMoreSpans"
+              >
+                {{ t("traces.traceDetails.loadMore", { size: spanPageSize }, spanPageSize) }}
+              </OButton>
+            </template>
+          </OBanner>
           <div class="box-border flex min-h-0 flex-1 flex-col overflow-hidden">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
             <div v-if="activeTab === 'waterfall'" class="bg-card-glass-bg! flex h-full">
@@ -612,6 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :selectedSpanId="selectedSpanId"
                         :hoveredSpanId="hoveredSpanId"
                         :isSidebarOpen="!!(isSidebarOpen && (selectedSpanId || showTraceDetails))"
+                        :showCriticalPath="showCriticalPath"
                         @toggle-collapse="toggleSpanCollapse"
                         @select-span="updateSelectedSpan"
                         @select-span-event="onSelectSpanEvent"
@@ -634,6 +673,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <TraceDetailsSidebar
+                  ref="treeSidebarRef"
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
@@ -819,6 +859,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Map View with Pattern/Span Toggle -->
             <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
+              <div class="flex items-center gap-2 px-2.5 pt-2.5">
+                <OToggleGroup :model-value="traceGraphView" @update:model-value="setTraceGraphView">
+                  <OToggleGroupItem data-test="trace-graph-tree-view-btn" value="tree" size="sm">
+                    <template #icon-left>
+                      <OIcon name="git-branch" size="sm" />
+                    </template>
+                    <span class="max-lg:hidden">{{ t("traces.treeView") }}</span>
+                  </OToggleGroupItem>
+                  <OToggleGroupItem data-test="trace-graph-graph-view-btn" value="graph" size="sm">
+                    <template #icon-left
+                      ><OIcon name="share" size="sm" class="shrink-0"
+                    /></template>
+                    <span class="max-lg:hidden">{{ t("traces.graphView") }}</span>
+                  </OToggleGroupItem>
+                </OToggleGroup>
+                <OSearchInput
+                  v-model="traceGraphSearch"
+                  data-test="trace-graph-search-input"
+                  class="w-56! max-lg:w-40!"
+                  :placeholder="t('traces.serviceGraph.searchPlaceholder')"
+                  :debounce="300"
+                  clearable
+                />
+              </div>
               <!-- Chart Container -->
               <div class="min-h-0 flex-1 overflow-hidden p-2.5">
                 <ChartRenderer
@@ -898,6 +962,7 @@ import {
   type PropType,
   onMounted,
   onUnmounted,
+  onBeforeUnmount,
   watch,
   defineAsyncComponent,
   onBeforeMount,
@@ -926,7 +991,17 @@ import {
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
-import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
+import {
+  MAX_NETWORK_NODE_SYMBOL_SIZE,
+  convertServiceGraphToNetwork,
+  convertTimelineData,
+  convertTraceServiceMapData,
+} from "@/utils/traces/convertTraceData";
+import {
+  buildTraceServiceGraph,
+  filterTraceServiceGraph,
+  filterTraceTree,
+} from "@/utils/traces/traceServiceGraph";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
@@ -941,30 +1016,39 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
-import { spanWindowUs } from "@/utils/rum/traceWindow";
+import { spanWindowUs, waterfallAxisSpans } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
-import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
+import useRumSpanBuilder, { hasDanglingParent } from "@/composables/rum/useRumSpanBuilder";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
+import { spanTimeBounds } from "./threadView.utils";
+import {
+  computeCriticalPathForRoots,
+  toCriticalPathNode,
+  type CriticalPathSection,
+} from "@/utils/traces/criticalPath";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -1037,6 +1121,10 @@ const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
+const LS_TRACE_CRITICAL_PATH_KEY = "o2_trace_critical_path";
+const LS_TRACE_GRAPH_VIEW_KEY = "o2_trace_graph_view";
+
+type TraceGraphView = "tree" | "graph";
 
 const isKnownTraceTab = (value: string): value is TraceTabValue =>
   TRACE_TAB_DEFS.some((tab) => tab.value === value);
@@ -1079,6 +1167,22 @@ function loadTraceActiveTab(): TraceTabValue {
     // Ignore — fall through to the default tab.
   }
   return DEFAULT_TRACE_TAB;
+}
+
+function loadTraceCriticalPath(): boolean {
+  try {
+    return localStorage.getItem(LS_TRACE_CRITICAL_PATH_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function loadTraceGraphView(): TraceGraphView {
+  try {
+    return localStorage.getItem(LS_TRACE_GRAPH_VIEW_KEY) === "graph" ? "graph" : "tree";
+  } catch {
+    return "tree";
+  }
 }
 
 export default defineComponent({
@@ -1168,6 +1272,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OBanner,
     ODrawer,
     OIcon,
     ThreadView,
@@ -1179,6 +1284,7 @@ export default defineComponent({
     OTooltip,
     OSearchInput,
     OSelect,
+    OSwitch,
     ManualEvaluationDialog,
     TraceAnnotateMenu,
     AddToDatasetDrawer,
@@ -1194,6 +1300,9 @@ export default defineComponent({
     const spanMap: any = ref({});
     const activeTab = ref<string>(loadTraceActiveTab());
     const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
+    const showCriticalPath = ref(loadTraceCriticalPath());
+    const traceGraphView = ref<TraceGraphView>(loadTraceGraphView());
+    const traceGraphSearch = ref("");
     const sidebarActiveTab = ref("attributes");
 
     const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
@@ -1212,6 +1321,8 @@ export default defineComponent({
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
+    // The tree view's span sidebar; it owns the correlation lookup.
+    const treeSidebarRef = ref<any>(null);
 
     // Tooltip lifecycle management
     let tooltipCleanup: (() => void) | null = null;
@@ -1246,6 +1357,51 @@ export default defineComponent({
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
+      if (traceGraphView.value === "graph") {
+        const graph = filterTraceServiceGraph(
+          buildTraceServiceGraph(effectiveSpanList.value, t("traces.traceDetails.unknownService")),
+          traceGraphSearch.value,
+        );
+        if (!graph.nodes.length) return { options: {}, notMerge: true };
+        const chartWidth = chartRendererRef.value?.$el?.clientWidth || 1200;
+        const network = convertServiceGraphToNetwork(
+          graph,
+          "force",
+          new Map(),
+          isDarkMode.value,
+          undefined,
+          // computeForceLayout subtracts ~330×310 of padding; smaller sizes yield NaN positions.
+          Math.max(chartWidth, 800),
+          Math.max(chartRendererRef.value?.$el?.clientHeight || 700, 500),
+        );
+        // ECharts fits node centres, not symbols, into the series box; inset by the largest radius.
+        const inset = MAX_NETWORK_NODE_SYMBOL_SIZE / 2;
+        const labelWidth = 120;
+        // Label reserves are capped at a quarter of the width so narrow charts keep room for nodes.
+        const labelReserve = (wanted: number) => Math.max(inset, Math.min(wanted, chartWidth / 4));
+        const [graphSeries, ...otherSeries] = network.options.series;
+        return {
+          options: {
+            ...network.options,
+            series: [
+              {
+                ...graphSeries,
+                top: inset,
+                // A bottom label is centred on its node, so half its width plus the text stroke overhangs left.
+                left: labelReserve(labelWidth / 2 + 4),
+                // Edge nodes still get labels below or to their right, so reserve a text line and a label width.
+                bottom: inset + 24,
+                right: labelReserve(inset + labelWidth),
+                label: { ...graphSeries.label, width: labelWidth, overflow: "truncate" },
+                labelLayout: { hideOverlap: true },
+              },
+              ...otherSeries,
+            ],
+          },
+          notMerge: true,
+          lazyUpdate: true,
+        };
+      }
       // Pattern view - use new pattern-based visualization
       // Engine TreeNode makes errorRate/children optional while the pattern
       // callbacks (useTreeVisualization) require errorRate; adapt each call to
@@ -1259,9 +1415,12 @@ export default defineComponent({
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
       });
+      const treeData = filterTraceTree(patternTreeData.value, traceGraphSearch.value);
+      // ECharts' tree series throws on empty data and leaves the chart stuck until reload.
+      if (!treeData.length) return { options: {}, notMerge: true };
       const chartOptions = generateEChartsOptions(
         {
-          treeData: patternTreeData.value,
+          treeData,
           getNodeLabel: (node: EngineTreeNode) => getPatternNodeLabel(toPatternNode(node)),
           getNodeTooltip: (node: EngineTreeNode) => getPatternNodeTooltip(toPatternNode(node)),
           getNodeErrorRate: (node: EngineTreeNode) => getPatternNodeErrorRate(toPatternNode(node)),
@@ -1533,11 +1692,10 @@ export default defineComponent({
       if (!spans || spans.length === 0) return null;
 
       try {
-        // Calculate trace duration from spans
-        const startTimes = spans.map((s: any) => s.start_time);
-        const endTimes = spans.map((s: any) => s.end_time);
-        const minStart = Math.min(...startTimes);
-        const maxEnd = Math.max(...endTimes);
+        const bounds = spanTimeBounds(spans);
+        if (!bounds) return null;
+        const minStart = bounds.startNs;
+        const maxEnd = bounds.endNs;
         const durationMs = (maxEnd - minStart) / 1000000; // Convert from nanoseconds to milliseconds
 
         return {
@@ -1582,24 +1740,18 @@ export default defineComponent({
     const traceStartTime = computed(() => {
       const spans = effectiveSpanList.value;
       if (!spans || spans.length === 0) return 0;
-      return Math.min(...spans.map((span: any) => span.start_time));
+      return spanTimeBounds(spans)?.startNs ?? 0;
     });
 
     const traceEvaluationRange = computed(() => {
-      const spans = effectiveSpanList.value ?? [];
-      const starts = spans
-        .map((span: any) => Number(span.start_time))
-        .filter((value: number) => Number.isFinite(value) && value >= 0);
-      const ends = spans
-        .map((span: any) => Number(span.end_time))
-        .filter((value: number) => Number.isFinite(value) && value >= 0);
-      if (starts.length > 0 && ends.length > 0) {
+      const bounds = spanTimeBounds(effectiveSpanList.value ?? []);
+      if (bounds) {
         // Raw nanosecond timestamps exceed JavaScript's exact integer range.
         // A one-microsecond guard on each side prevents rounding from excluding
         // the boundary spans while keeping the worker window trace-specific.
         return {
-          startTime: Math.max(0, Math.floor(Math.min(...starts) / 1_000) - 1),
-          endTime: Math.ceil(Math.max(...ends) / 1_000) + 1,
+          startTime: Math.max(0, Math.floor(bounds.startNs / 1_000) - 1),
+          endTime: Math.ceil(bounds.endNs / 1_000) + 1,
         };
       }
       return {
@@ -1909,6 +2061,25 @@ export default defineComponent({
       },
     );
 
+    const setShowCriticalPath = (value: unknown) => {
+      showCriticalPath.value = value === true;
+      try {
+        localStorage.setItem(LS_TRACE_CRITICAL_PATH_KEY, String(showCriticalPath.value));
+      } catch {
+        // Storage unavailable — the toggle still applies for this session.
+      }
+    };
+
+    const setTraceGraphView = (value: boolean | AcceptableValue | AcceptableValue[]) => {
+      traceGraphView.value = value === "graph" ? "graph" : "tree";
+      try {
+        localStorage.setItem(LS_TRACE_GRAPH_VIEW_KEY, traceGraphView.value);
+      } catch {
+        // Storage unavailable — the view still applies for this session.
+      }
+      setupTooltips();
+    };
+
     const updateActiveTab = (value: boolean | AcceptableValue | AcceptableValue[]) => {
       const tab = String(value);
       activeTab.value = tab;
@@ -1934,11 +2105,15 @@ export default defineComponent({
         clearTimeout(pendingTooltipSetup);
         pendingTooltipSetup = null;
       }
+      // Graph View draws ECharts' own tooltips; the custom tree tooltip would overlay them.
+      if (traceGraphView.value !== "tree") return;
 
       await nextTick();
       // 300ms delay matches Service Graph tooltip setup timing
       pendingTooltipSetup = setTimeout(() => {
         pendingTooltipSetup = null;
+        // The view or tab may have changed during the delay.
+        if (traceGraphView.value !== "tree" || activeTab.value !== "map") return;
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
@@ -1957,6 +2132,7 @@ export default defineComponent({
     };
 
     const resetTraceDetails = () => {
+      resetPaging();
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";
       // Selection is being cleared — cancel any live scroll targeting it.
@@ -2197,18 +2373,107 @@ export default defineComponent({
       t,
     );
 
+    // Keyset paging of the details endpoint: native and RUM spans are kept apart and merged per page.
+    const hasMoreSpans = ref(false);
+    const isPartialTrace = ref(false);
+    const isLoadingMoreSpans = ref(false);
+    const loadedSpanCount = ref(0);
+    const spanPageSize = ref(0);
+    let nextAfter: { start_time: string; span_id: string } | null = null;
+    // Bumped by every load and reset, so a late page for an earlier trace is dropped.
+    let loadGeneration = 0;
+    // The span list is shared state, so a page still in flight must not land after this view goes.
+    onBeforeUnmount(() => {
+      loadGeneration++;
+    });
+    let pagedTrace: any = null;
+    let nativeSpans: any[] = [];
+    let rumSpans: any[] = [];
+    let firstPageSpanIds = new Set<string>();
+    let rumEnrichmentRan = false;
+
+    const resetPaging = () => {
+      loadGeneration++;
+      pagedTrace = null;
+      nativeSpans = [];
+      rumSpans = [];
+      firstPageSpanIds = new Set();
+      rumEnrichmentRan = false;
+      nextAfter = null;
+      hasMoreSpans.value = false;
+      isPartialTrace.value = false;
+      isLoadingMoreSpans.value = false;
+      loadedSpanCount.value = 0;
+      spanPageSize.value = 0;
+    };
+
+    const appendSpanPage = (page: any) => {
+      const seen = new Set(nativeSpans.map((span) => span.span_id));
+      for (const span of page.hits ?? []) {
+        if (span.span_id && seen.has(span.span_id)) continue;
+        seen.add(span.span_id);
+        nativeSpans.push(span);
+      }
+      loadedSpanCount.value = nativeSpans.length;
+      hasMoreSpans.value = page.has_more === true;
+      nextAfter = page.next_after ?? null;
+      if (page.is_partial) isPartialTrace.value = true;
+      if (!spanPageSize.value) spanPageSize.value = page.hits?.length ?? 0;
+    };
+
+    // Retried after each page while a dangling parent has found no RUM spans; false when superseded.
+    const enrichWithRum = async (traceId: string, generation: number) => {
+      if (rumEnrichmentRan || !hasDanglingParent(nativeSpans)) return true;
+      const { tracedResources, viewEvents, actionEvents, allViewEvents } =
+        await fetchRumEventsForTrace(traceId, nativeSpans);
+      if (generation !== loadGeneration) return false;
+      const found = formatRumEventsAsSpans(
+        tracedResources,
+        viewEvents,
+        actionEvents,
+        allViewEvents,
+      );
+      if (found.length) {
+        rumSpans = found;
+        rumEnrichmentRan = true;
+      }
+      return true;
+    };
+
+    // RUM wins over a first-page span with its id; a later page's native span replaces the synthetic one.
+    const mergeSpanList = () => {
+      const nativeIds = new Set(nativeSpans.map((span) => span.span_id));
+      const keptRum = rumSpans.filter(
+        (span: any) => !nativeIds.has(span.span_id) || firstPageSpanIds.has(span.span_id),
+      );
+      const keptRumIds = new Set(keptRum.map((span: any) => span.span_id));
+      // spanList is never[] in useTraces state; widen container to accept spans.
+      (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
+        ...keptRum,
+        ...nativeSpans.filter((span) => !keptRumIds.has(span.span_id)),
+      ];
+    };
+
+    const fetchSpanPage = (trace: any, after: { start_time: string; span_id: string } | null) =>
+      searchService.get_trace_details({
+        org_identifier: effectiveOrgIdentifier.value,
+        stream_name: trace.stream,
+        trace_id: trace.trace_id,
+        start_time: trace.from,
+        end_time: trace.to,
+        hint_ts: trace.from + Math.floor((trace.to - trace.from) / 2),
+        ...(after ? { after_start_time: after.start_time, after_span_id: after.span_id } : {}),
+      });
+
     const getTraceDetails = async (data: any) => {
+      resetPaging();
+      const generation = loadGeneration;
+      pagedTrace = data;
       try {
         searchObj.data.traceDetails.isLoadingTraceDetails = true;
         searchObj.data.traceDetails.spanList = [];
-        const traceRes = await searchService.get_trace_details({
-          org_identifier: effectiveOrgIdentifier.value,
-          stream_name: data.stream,
-          trace_id: data.trace_id,
-          start_time: data.from,
-          end_time: data.to,
-          hint_ts: data.from + Math.floor((data.to - data.from) / 2),
-        });
+        const traceRes = await fetchSpanPage(data, null);
+        if (generation !== loadGeneration) return;
         if (!traceRes.data?.hits?.length) {
           showTraceDetailsError();
           return;
@@ -2219,31 +2484,46 @@ export default defineComponent({
         if (effectiveStart !== data.from || effectiveEnd !== data.to) {
           updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
         }
-        const traceSpans = traceRes.data.hits;
-        const rumData = await fetchRumEventsForTrace(data.trace_id, traceSpans);
-        const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
-        const rumSpans = formatRumEventsAsSpans(
-          tracedResources,
-          viewEvents,
-          actionEvents,
-          allViewEvents,
-        );
-        // RUM spans take priority over trace spans with the same span_id
-        const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
-        const deduplicatedTraceSpans = traceSpans.filter((s: any) => !rumSpanIds.has(s.span_id));
-        // spanList is never[] in useTraces state; widen container to accept spans.
-        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
-          ...rumSpans,
-          ...deduplicatedTraceSpans,
-        ];
+        firstPageSpanIds = new Set(traceRes.data.hits.map((span: any) => span.span_id));
+        appendSpanPage(traceRes.data);
+        if (!(await enrichWithRum(data.trace_id, generation))) return;
+        mergeSpanList();
         updateSelectedTrace(data.trace_id, spanList.value);
         updateServiceColors();
         buildTracesTree();
+        analytics.track("trace_details_loaded", { mode: props.mode });
       } catch (error) {
+        if (generation !== loadGeneration) return;
         console.error("Error fetching trace details:", error);
         showTraceDetailsError();
       } finally {
-        searchObj.data.traceDetails.isLoadingTraceDetails = false;
+        if (generation === loadGeneration) {
+          searchObj.data.traceDetails.isLoadingTraceDetails = false;
+        }
+      }
+    };
+
+    const loadMoreSpans = async () => {
+      const trace = pagedTrace;
+      const after = nextAfter;
+      if (!trace || !after || isLoadingMoreSpans.value) return;
+      const generation = loadGeneration;
+      isLoadingMoreSpans.value = true;
+      try {
+        const traceRes = await fetchSpanPage(trace, after);
+        if (generation !== loadGeneration || pagedTrace?.trace_id !== trace.trace_id) return;
+        appendSpanPage(traceRes.data ?? {});
+        if (!(await enrichWithRum(trace.trace_id, generation))) return;
+        mergeSpanList();
+        updateSelectedTrace(trace.trace_id, spanList.value);
+        updateServiceColors();
+        buildTracesTree();
+      } catch (error) {
+        if (generation !== loadGeneration) return;
+        console.error("Error loading more trace spans:", error);
+        showErrorNotification(t("traces.traceDetails.loadMoreFailed"));
+      } finally {
+        if (generation === loadGeneration) isLoadingMoreSpans.value = false;
       }
     };
 
@@ -2305,7 +2585,11 @@ export default defineComponent({
       const tics: { value: number; label: I18nText; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
+      // Axis start, not the root's: a RUM view root can begin minutes earlier.
       baseTracePosition.value["startTimeUs"] =
+        traceTree.value[0].axisStartUs + timeRange.value.start * 1000;
+      // Span start offsets in the sidebar stay relative to the trace's root.
+      baseTracePosition.value["traceStartUs"] =
         traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
@@ -2396,7 +2680,13 @@ export default defineComponent({
       // In updateChart method, we are using start and end time to set the time range of trace
       traceTree.value[0].lowestStartTime = convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
+      // The waterfall axis fits trace participants only, never RUM context spans.
+      const axisWindow = spanWindowUs(waterfallAxisSpans(spanList.value));
+      traceTree.value[0].axisStartUs = axisWindow?.start ?? traceTree.value[0].lowestStartTime;
+      traceTree.value[0].axisEndUs = axisWindow?.end ?? traceTree.value[0].highestEndTime;
       traceTree.value[0].style.color = getOrSetServiceColor(traceTree.value[0].resolvedIdentity);
+
+      assignCriticalSections(Object.values(formattedSpanMap));
 
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
@@ -2442,36 +2732,50 @@ export default defineComponent({
     }
 
     let index = 0;
-    const addSpansPositions = (span: any, depth: number) => {
-      if (!span.index) index = 0;
-      span.depth = depth;
-      spanPositionList.value.push(
-        Object.assign(span, {
-          style: {
-            color: span.style.color,
-            backgroundColor: span.style.backgroundColor,
-            top: index * spanDimensions.height + "px",
-            left: spanDimensions.gap * depth + "px",
-          },
-          hasChildSpans: !!span.spans.length,
-          currentIndex: index,
-        }),
-      );
-      if (collapseMapping.value[span.spanId]) {
-        if (span.spans.length) {
-          span.spans.forEach((childSpan: any) => {
-            index = index + 1;
-            childSpan.totalSpans = addSpansPositions(childSpan, depth + 1);
-          });
-          span.totalSpans = span.spans.reduce(
-            (acc: number, span: any) =>
-              acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
-            0,
-          );
+    // Pre-order rows, post-order totals; an explicit stack, so trace depth never bounds the call stack.
+    const addSpansPositions = (root: any, rootDepth: number) => {
+      const stack: { span: any; depth: number; next: number }[] = [];
+      const enter = (span: any, depth: number) => {
+        if (!span.index) index = 0;
+        span.depth = depth;
+        spanPositionList.value.push(
+          Object.assign(span, {
+            style: {
+              color: span.style.color,
+              backgroundColor: span.style.backgroundColor,
+              top: index * spanDimensions.height + "px",
+              left: spanDimensions.gap * depth + "px",
+            },
+            hasChildSpans: !!span.spans.length,
+            currentIndex: index,
+          }),
+        );
+        stack.push({ span, depth, next: 0 });
+      };
+      enter(root, rootDepth);
+      while (stack.length) {
+        const frame = stack[stack.length - 1];
+        const { span } = frame;
+        const expanded = collapseMapping.value[span.spanId];
+        if (expanded && frame.next < span.spans.length) {
+          index = index + 1;
+          enter(span.spans[frame.next++], frame.depth + 1);
+          continue;
         }
-        return (span?.spans?.length || 0) + (span?.totalSpans || 0);
-      } else {
-        return 0;
+        stack.pop();
+        let visible = 0;
+        if (expanded) {
+          if (span.spans.length) {
+            span.totalSpans = span.spans.reduce(
+              (acc: number, span: any) =>
+                acc + ((span?.spans?.length || 0) + (span?.totalSpans || 0)),
+              0,
+            );
+          }
+          visible = (span?.spans?.length || 0) + (span?.totalSpans || 0);
+        }
+        // A child's total is what its own walk returned, as the recursive form assigned it.
+        if (stack.length) span.totalSpans = visible;
       }
     };
 
@@ -2492,51 +2796,45 @@ export default defineComponent({
       const serviceTree: any[] = [];
       let maxDepth = 0;
       let maxHeight: number[] = [0];
-      const getService = (
-        span: any,
-        currentColumn: any[],
-        serviceName: string,
-        depth: number,
-        height: number,
-      ) => {
-        maxHeight[depth] = maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
-        const serviceIdentity = span.resolvedIdentity || span.serviceName || "unknown";
-        if (serviceName !== serviceIdentity) {
-          const children: any[] = [];
-          currentColumn.push({
-            name: `${serviceIdentity} \n (${span.durationMs}ms)`,
-            parent: serviceName,
-            duration: span.durationMs,
-            children: children,
-            itemStyle: {
-              color: getOrSetServiceColor(span.resolvedIdentity),
-            },
-            emphasis: {
-              disabled: true,
-            },
-          });
-          if (span.spans && span.spans.length) {
-            span.spans.forEach((_span: any) =>
-              getService(_span, children, serviceIdentity, depth + 1, height),
-            );
-          } else {
-            if (maxDepth < depth) maxDepth = depth;
+      // Pre-order with an explicit stack, so trace depth never bounds the call stack.
+      const getService = (root: any, rootColumn: any[]) => {
+        const stack: [any, any[], string, number][] = [[root, rootColumn, "", 1]];
+        while (stack.length) {
+          const [span, currentColumn, serviceName, depth] = stack.pop()!;
+          maxHeight[depth] = maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
+          const serviceIdentity = span.resolvedIdentity || span.serviceName || "unknown";
+          let column = currentColumn;
+          let parentName = serviceName;
+          if (serviceName !== serviceIdentity) {
+            column = [];
+            parentName = serviceIdentity;
+            currentColumn.push({
+              name: `${serviceIdentity} \n (${span.durationMs}ms)`,
+              parent: serviceName,
+              duration: span.durationMs,
+              children: column,
+              itemStyle: {
+                color: getOrSetServiceColor(span.resolvedIdentity),
+              },
+              emphasis: {
+                disabled: true,
+              },
+            });
           }
-          return;
-        }
-        if (span.spans && span.spans.length) {
-          span.spans.forEach((span: any) =>
-            getService(span, currentColumn, serviceName, depth + 1, height),
-          );
-        } else {
-          if (maxDepth < depth) maxDepth = depth;
+          if (span.spans && span.spans.length) {
+            for (let i = span.spans.length - 1; i >= 0; i--) {
+              stack.push([span.spans[i], column, parentName, depth + 1]);
+            }
+          } else if (maxDepth < depth) {
+            maxDepth = depth;
+          }
         }
       };
 
       // Handle multiple root nodes - process each root span to ensure
       // all root services appear in the service map
       traceTree.value.forEach((span: any) => {
-        getService(span, serviceTree, "", 1, 1);
+        getService(span, serviceTree);
       });
 
       // Build consolidated patterns for pattern view
@@ -2545,8 +2843,9 @@ export default defineComponent({
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
       // Pattern consolidation completed successfully
 
+      // serviceTree is built fresh above, so it is passed as is: a deep clone recurses once per tree level.
       traceServiceMap.value = convertTraceServiceMapData(
-        cloneDeep(serviceTree),
+        serviceTree,
         maxDepth,
         true, // Enable multi-root handling for trace service maps
       );
@@ -2610,6 +2909,18 @@ export default defineComponent({
       };
     };
 
+    const assignCriticalSections = (spans: any[]) => {
+      const sectionsBySpan = new Map<string, CriticalPathSection[]>();
+      computeCriticalPathForRoots(traceTree.value.map(toCriticalPathNode)).forEach((section) => {
+        const sections = sectionsBySpan.get(section.spanId) ?? [];
+        sections.push(section);
+        sectionsBySpan.set(section.spanId, sections);
+      });
+      spans.forEach((span) => {
+        span.criticalSections = sectionsBySpan.get(span.spanId) ?? [];
+      });
+    };
+
     const convertTime = (time: number) => {
       return Number((time / 1000).toFixed(2));
     };
@@ -2655,7 +2966,7 @@ export default defineComponent({
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeUs -
-          convertTimeFromNsToUs(traceTree.value[0].lowestStartTime * 1000);
+          convertTimeFromNsToUs(traceTree.value[0].axisStartUs * 1000);
 
         const x1 = Number((absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4));
 
@@ -2682,11 +2993,11 @@ export default defineComponent({
         newStart = 0;
         // Safety check to ensure trace chart data exists
         if (
-          traceTree.value[0].highestEndTime > 0 &&
-          traceTree.value[0].lowestStartTime > 0 &&
-          traceTree.value[0].highestEndTime > traceTree.value[0].lowestStartTime
+          traceTree.value[0].axisEndUs > 0 &&
+          traceTree.value[0].axisStartUs > 0 &&
+          traceTree.value[0].axisEndUs > traceTree.value[0].axisStartUs
         ) {
-          newEnd = (traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime) / 1000;
+          newEnd = (traceTree.value[0].axisEndUs - traceTree.value[0].axisStartUs) / 1000;
         } else {
           newEnd = 0;
         }
@@ -2796,9 +3107,19 @@ export default defineComponent({
       });
     };
 
-    const handleTreeViewCorrelatedLogs = (span: any) => {
+    const handleTreeViewCorrelatedLogs = async (span: any) => {
       const spanId = span.spanId || span.span_id;
       updateSelectedSpan(spanId);
+
+      // Let the sidebar switch spans and run its own View Logs, which waits for the span's correlation.
+      await nextTick();
+      const sidebar = treeSidebarRef.value;
+      if (sidebar?.viewSpanLogs) {
+        // The selection moved on before the sidebar showed this span.
+        if (selectedSpanId.value !== spanId || sidebar.span?.span_id !== spanId) return;
+        await sidebar.viewSpanLogs();
+        return;
+      }
 
       const correlationData = searchObj.data.traceDetails.correlationProps;
       if (correlationData?.logStreams?.length) {
@@ -3014,6 +3335,11 @@ export default defineComponent({
       router,
       t,
       raw,
+      showCriticalPath,
+      setShowCriticalPath,
+      traceGraphView,
+      setTraceGraphView,
+      traceGraphSearch,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.
@@ -3048,6 +3374,7 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
+      treeSidebarRef,
       activeVisual,
       traceVisuals,
       getImageURL,
@@ -3155,6 +3482,13 @@ export default defineComponent({
       openSpanEvaluation,
       updateManualEvaluationOpen,
       formatTimestamp,
+      // Keyset paging
+      hasMoreSpans,
+      isPartialTrace,
+      isLoadingMoreSpans,
+      loadedSpanCount,
+      spanPageSize,
+      loadMoreSpans,
       // FlameGraph data
       flatSpans,
       traceMetadata,

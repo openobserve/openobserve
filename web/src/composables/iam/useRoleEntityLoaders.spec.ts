@@ -763,14 +763,19 @@ describe("useRoleEntityLoaders - flat resource loaders", () => {
     ]);
   });
 
-  it("getPrompts keys prompts by entityId and labels them by name", async () => {
-    const { getPrompts, updateResourceEntities } = setup();
+  it("getPrompts lists one folder's prompts, keyed by entityId and labelled by name", async () => {
+    const { getPrompts, updateEntityEntities } = setup();
+    const folder = row({ name: "f9", childName: "prompt" });
 
-    await getPrompts();
+    await getPrompts(folder as any);
 
-    expect(llmPromptsService.list).toHaveBeenCalledWith(ORG);
-    expect(updateResourceEntities.mock.calls).toEqual([
-      ["prompt", ["entityId"], [{ entityId: "welcome", name: "Welcome" }], false, "name"],
-    ]);
+    expect(llmPromptsService.list).toHaveBeenCalledWith(ORG, { folderId: "f9" });
+    expect(updateEntityEntities).toHaveBeenCalledWith(
+      folder,
+      ["entityId"],
+      [{ entityId: "welcome", name: "Welcome" }],
+      false,
+      "name",
+    );
   });
 });
