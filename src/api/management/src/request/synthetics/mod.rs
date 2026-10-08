@@ -599,14 +599,6 @@ async fn composition_error_response(
         return Err(e);
     };
     Ok(match ce {
-        CE::WritesDisabled => (
-            StatusCode::CONFLICT,
-            Json(serde_json::json!({
-                "code": "subtests_disabled",
-                "message": ce.to_string(),
-            })),
-        )
-            .into_response(),
         CE::Invalid(msg) => MetaHttpResponse::bad_request(format!("validation: {msg}")),
         CE::Lock(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -2239,11 +2231,6 @@ mod tests {
 
     #[tokio::test]
     async fn every_composition_error_maps_to_its_status_and_code() {
-        let (status, body) = mapped(CE::WritesDisabled).await;
-        assert_eq!(
-            (status, body["code"].as_str()),
-            (409, Some("subtests_disabled"))
-        );
         let (status, body) = mapped(CE::Lock("down".into())).await;
         assert_eq!(
             (status, body["code"].as_str()),
