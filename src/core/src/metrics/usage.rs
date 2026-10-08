@@ -46,6 +46,8 @@ use crate::{
 const RANGE_PLACEHOLDER: &str = "1m";
 const VALUE_PLACEHOLDER: &str = "__o2_var__";
 const SCALAR_PLACEHOLDER: &str = "1";
+/// Per-node cap on concurrent scans, since each one loads and re-parses every query in the org.
+const MAX_CONCURRENT_SCANS: usize = 2;
 /// Bounds the OpenFGA calls one request has outstanding, since an org can hold many folders.
 #[cfg(feature = "enterprise")]
 const FOLDER_CHECKS_IN_FLIGHT: usize = 16;
@@ -225,6 +227,8 @@ pub async fn metric_usage(
     user_id: &str,
     metric: &str,
 ) -> Result<MetricUsage, anyhow::Error> {
+    static SCANS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(MAX_CONCURRENT_SCANS);
+    let _permit = SCANS.acquire().await?;
     let conn = infra::db::get_orm_client_ro().await;
     let sources = UsageSources {
         dashboards: infra::table::dashboards::list_skipping_invalid(ListDashboardsParams::new(
