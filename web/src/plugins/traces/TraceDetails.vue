@@ -1016,7 +1016,7 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
-import { spanWindowUs } from "@/utils/rum/traceWindow";
+import { spanWindowUs, waterfallAxisSpans } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -2585,7 +2585,11 @@ export default defineComponent({
       const tics: { value: number; label: I18nText; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
+      // Axis start, not the root's: a RUM view root can begin minutes earlier.
       baseTracePosition.value["startTimeUs"] =
+        traceTree.value[0].axisStartUs + timeRange.value.start * 1000;
+      // Span start offsets in the sidebar stay relative to the trace's root.
+      baseTracePosition.value["traceStartUs"] =
         traceTree.value[0].startTimeUs + timeRange.value.start * 1000;
       const quarterMs = (timeRange.value.end - timeRange.value.start) / 4;
       let time = timeRange.value.start;
@@ -2676,6 +2680,10 @@ export default defineComponent({
       // In updateChart method, we are using start and end time to set the time range of trace
       traceTree.value[0].lowestStartTime = convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
+      // The waterfall axis fits trace participants only, never RUM context spans.
+      const axisWindow = spanWindowUs(waterfallAxisSpans(spanList.value));
+      traceTree.value[0].axisStartUs = axisWindow?.start ?? traceTree.value[0].lowestStartTime;
+      traceTree.value[0].axisEndUs = axisWindow?.end ?? traceTree.value[0].highestEndTime;
       traceTree.value[0].style.color = getOrSetServiceColor(traceTree.value[0].resolvedIdentity);
 
       assignCriticalSections(Object.values(formattedSpanMap));
@@ -2958,7 +2966,7 @@ export default defineComponent({
       for (let i = spanPositionList.value.length - 1; i > -1; i--) {
         const absoluteStartTime =
           spanPositionList.value[i].startTimeUs -
-          convertTimeFromNsToUs(traceTree.value[0].lowestStartTime * 1000);
+          convertTimeFromNsToUs(traceTree.value[0].axisStartUs * 1000);
 
         const x1 = Number((absoluteStartTime + spanPositionList.value[i].durationMs).toFixed(4));
 
@@ -2985,11 +2993,11 @@ export default defineComponent({
         newStart = 0;
         // Safety check to ensure trace chart data exists
         if (
-          traceTree.value[0].highestEndTime > 0 &&
-          traceTree.value[0].lowestStartTime > 0 &&
-          traceTree.value[0].highestEndTime > traceTree.value[0].lowestStartTime
+          traceTree.value[0].axisEndUs > 0 &&
+          traceTree.value[0].axisStartUs > 0 &&
+          traceTree.value[0].axisEndUs > traceTree.value[0].axisStartUs
         ) {
-          newEnd = (traceTree.value[0].highestEndTime - traceTree.value[0].lowestStartTime) / 1000;
+          newEnd = (traceTree.value[0].axisEndUs - traceTree.value[0].axisStartUs) / 1000;
         } else {
           newEnd = 0;
         }
