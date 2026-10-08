@@ -461,8 +461,15 @@ function createLogsAutoRun() {
   }
 
   // Reasons come from the engine's `t`, which is gt(), so they are already translated text.
-  function persistReason(surface: PersistSurface, action?: PersistAction): I18nText | null {
-    const decision = engine.canPersistOrShare(surface, action);
+  function persistReason(
+    surface: PersistSurface,
+    action?: PersistAction,
+    options: { allowNotRun?: boolean } = {},
+  ): I18nText | null {
+    // The engine's search-around flag is plain state; this ref makes callers' computeds recompute when it flips.
+    if (surface === "logs" && searchAroundShown.value)
+      return gt("search.autoRunSearchAroundActive");
+    const decision = engine.canPersistOrShare(surface, action, options);
     return decision.ok ? null : (decision.reason as I18nText);
   }
 

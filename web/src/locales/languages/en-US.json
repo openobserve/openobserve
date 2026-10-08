@@ -1042,12 +1042,17 @@
     "savedFunctionNotFound": "Function not found.",
     "exportLogs": "Export logs",
     "runQuery": "Run query",
+    "runQueryPendingLabel": "Run query, changes not applied yet",
     "refreshCacheAndRunQuery": "Refresh Cache & Run Query",
     "liveModeTooltip": "Auto-run query on filter/time changes",
     "autoRunEnabled": "Auto run enabled",
     "queryActions": {
       "runEditedFirst": "Run your edited query first",
-      "runFirst": "Run your query first"
+      "runFirst": "Run your query first",
+      "usesEditedQuery": "Uses your edited query (not run yet)",
+      "usesUnrunQuery": "Uses your query (not run yet)",
+      "downloadsShownResults": "Downloads the shown results, not your edit",
+      "downloadsLastRun": "Uses the query that last ran, not your edit"
     },
     "noFtsRecovery": {
       "title": "Word search is not configured for {stream}",
@@ -1081,7 +1086,6 @@
     "autoRunPersistNeedsRun": "Run the query first: this action saves or shares what you ran",
     "autoRunSearchAroundActive": "Showing records around a line: run the query to return to results",
     "autoRunStaleTooltip": "Run the query to update results",
-    "autoRunStaleChip": "Results out of date",
     "runQueryToDownload": "Run the query to download",
     "searchCancelledNotice": "Search cancelled.",
     "linePermalink": {
@@ -1123,7 +1127,7 @@
       "pageGo": "Go to page {page}",
       "pageGoLast": "Go to last page ({page})"
     },
-    "autoRunPendingDot": "A run is waiting: click Run query to apply your changes",
+    "autoRunPendingDot": "Run query to apply latest changes",
     "autoRunAppliesTo": "Applies to Logs and Traces",
     "autoRunGuardScope": "{streams} · {window}",
     "autoRunGuardMoreStreams": "{streams} +{count}",

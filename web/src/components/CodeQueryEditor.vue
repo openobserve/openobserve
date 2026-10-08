@@ -878,6 +878,20 @@ export default defineComponent({
       }
     };
 
+    // A single undoable edit, so Cmd+Z brings back the text it replaced.
+    const replaceValue = (value: string) => {
+      const model = editorObj?.getModel?.();
+      if (!model) return setValue(value);
+      if (model.getValue() === value) return;
+      asProgrammatic(() => {
+        editorObj.pushUndoStop();
+        editorObj.executeEdits("replace-value", [
+          { range: model.getFullModelRange(), text: value },
+        ]);
+        editorObj.pushUndoStop();
+      });
+    };
+
     /**
      * Register the provider set for a language exactly once.
      *
@@ -1240,6 +1254,7 @@ export default defineComponent({
         return editorObj;
       },
       setValue,
+      replaceValue,
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,

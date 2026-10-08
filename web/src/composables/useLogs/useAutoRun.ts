@@ -1076,6 +1076,28 @@ export function createAutoRun(deps: AutoRunDeps) {
     meta.editorDirty = false;
   }
 
+  function liveMatchesLastRun(): boolean {
+    const mode = deps.getMode();
+    if (mode === "patterns") {
+      return sameSignature(deps.readSignature(), meta.executedPatterns?.signature);
+    }
+    if (mode === "visualize" || mode === "build") {
+      const panel = meta.executedPanel;
+      if (!panel || panel.surface !== mode) return false;
+      return deps.readPanelConfigSignature?.(mode) === panel.configSignature;
+    }
+    const ran = meta.executed ?? meta.pendingExecution;
+    return sameSignature(deps.readSignature(), ran?.signature);
+  }
+
+  /** Clears the edit flag once the inputs equal the last run's again, so an edit undone by hand is not dirty. */
+  function reconcileEditorDirty(): boolean {
+    if (!meta.editorDirty || !liveMatchesLastRun()) return false;
+    meta.editorDirty = false;
+    meta.runPending = false;
+    return true;
+  }
+
   function isResultsStale(): boolean {
     const executed = meta.executed;
     if (!executed) return false;
@@ -1106,14 +1128,18 @@ export function createAutoRun(deps: AutoRunDeps) {
     return live !== null && live === panel.configSignature;
   }
 
-  function canPersistOrShare(surface: PersistSurface, action?: PersistAction): PersistDecision {
+  function canPersistOrShare(
+    surface: PersistSurface,
+    action?: PersistAction,
+    options: { allowNotRun?: boolean } = {},
+  ): PersistDecision {
     if (surface === "logs" && invalidation === "search-around") {
       return { ok: false, reason: translate(AUTO_RUN_I18N.searchAroundActive) };
     }
     // Blocked text has no SQL at all, so its reason outranks "run the query first".
     const flags = deps.getFreeTextFlags?.();
     if (flags?.blockedReason) return { ok: false, reason: flags.blockedReason };
-    if (!surfacePersistOk(surface))
+    if (!options.allowNotRun && !surfacePersistOk(surface))
       return { ok: false, reason: translate(AUTO_RUN_I18N.persistNeedsRun) };
     if (flags?.scanReason && action && SCAN_GATED_ACTIONS.has(action)) {
       return { ok: false, reason: flags.scanReason };
@@ -1228,6 +1254,34 @@ export function createAutoRun(deps: AutoRunDeps) {
     }
     if (meta.consentedScope)
       meta.consentedScope = { ...meta.consentedScope, time: cloneJson(time) };
+    const executed = meta.executed;
+    if (republish && executed) {
+      emitExecuted({
+        surface: "logs",
+        generation: gen.id,
+        signature: executed.signature,
+        sortPreference: executed.sortPreference,
+        req: executed.req,
+      });
+    }
+    return true;
+  }
+
+  /** Relabels a run with the filter text the editor now shows for it, so that rewrite never reads as an edit. */
+  function recordQueryRewrite(generationId: number, query: string): boolean {
+    const gen = generations.get(generationId);
+    if (!gen || !isCurrent(generationId)) return false;
+    gen.signature = { ...gen.signature, query };
+    let republish = false;
+    for (const record of [meta.pendingExecution, meta.executed]) {
+      if (!record || record.generation !== gen.id) continue;
+      record.signature = { ...record.signature, query };
+      if (record === meta.executed) republish = true;
+    }
+    const patterns = meta.executedPatterns;
+    if (patterns?.generation === gen.id) {
+      meta.executedPatterns = { ...patterns, signature: { ...patterns.signature, query } };
+    }
     const executed = meta.executed;
     if (republish && executed) {
       emitExecuted({
@@ -1398,6 +1452,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     currentGeneration: (lane: "grid" | "patterns" = "grid") => current[lane],
     markEditorDirty,
     clearEditorDirty,
+    reconcileEditorDirty,
     syncBlockedScope,
     isResultsStale,
     staleReason,
@@ -1409,6 +1464,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     recordComplete,
     recordFailure,
     recordWindowMove,
+    recordQueryRewrite,
     recordPatternsComplete,
     recordPatternsFailure,
     recordPanelDispatch,

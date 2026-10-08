@@ -3,6 +3,9 @@ import type { I18nText } from "@/types/i18n";
 export interface DropdownSubProps {
   open?: boolean;
   textValue: I18nText;
+  /** Secondary line under the trigger label, linked as its accessible description. */
+  description?: I18nText | null;
+  descriptionId?: string;
 }
 
 export interface DropdownSubEmits {

@@ -13,6 +13,15 @@ const ids = {
   utilities: ['logs-search-bar-menu-create-saved-view-btn'],
   saved: ['logs-search-bar-saved-views-menu-create'],
 };
+const EDITED_NOTE = 'Uses your edited query (not run yet)';
+const notes = {
+  'logs-create-alert-btn': EDITED_NOTE,
+  'search-scheduler-create-new-btn': EDITED_NOTE,
+  'logs-search-bar-menu-create-saved-view-btn': EDITED_NOTE,
+  'logs-search-bar-saved-views-menu-create': EDITED_NOTE,
+  'search-download-submenu-trigger': 'Downloads the shown results, not your edit',
+  'logs-search-bar-download-custom-range-btn': 'Uses the query that last ran, not your edit',
+};
 // Generated Reka IDs vary between mounts, so match the exact base nodes by stable selectors.
 const baseAxeNodes = [
   { id: 'aria-allowed-attr', target: '[role="menu"] div[aria-haspopup="menu"]:has(> [data-cy="syntax-guide-button"])' },
@@ -46,7 +55,7 @@ test.describe('G1 visible action reasons C2', () => {
   });
 
   for (const theme of ['light', 'dark']) {
-    test(`${theme}: edited reasons stay readable, unavailable actions take keyboard focus and successful execution clears G1 (AC-C2.1-C2.3)`, async ({ page }) => {
+    test(`${theme}: edited-not-run actions stay enabled with readable notes, take keyboard focus, and a run clears the notes (AC-C2.1-C2.3, Reinstated)`, async ({ page }) => {
       await page.addInitScript((theme) => { localStorage.setItem('theme', theme); localStorage.setItem('oo_toggle_auto_run', 'false'); }, theme);
       await open(page);
       const manager = new PageManager(page);
@@ -69,8 +78,8 @@ test.describe('G1 visible action reasons C2', () => {
         const availableIds = [...ids[menu], ...(menu === 'more' && await scheduled.count() ? ['search-scheduler-create-new-btn'] : [])];
         for (const id of availableIds) {
           const item = page.locator(`[data-test="${id}"]`);
-          await expect(item).toHaveAttribute('aria-disabled', 'true');
-          await expect(page.locator(`[data-test="${id}-reason"]`)).toHaveText('Run your edited query first');
+          await expect(item).not.toHaveAttribute('aria-disabled', 'true');
+          await expect(page.locator(`[data-test="${id}-reason"]`)).toHaveText(notes[id]);
           const first = page.locator('[role="menu"]').last();
           await first.press('Home');
           let reached = false;
@@ -79,9 +88,6 @@ test.describe('G1 visible action reasons C2', () => {
             await page.keyboard.press('ArrowDown');
           }
           expect(reached, `${id} participates in roving focus`).toBe(true);
-          for (const key of ['Enter', 'Space']) await page.keyboard.press(key);
-          await item.click({ force: true });
-          await expect(item).toBeVisible();
           await expect(page.locator('[data-test="search-download-csv-btn"]')).toHaveCount(0);
           await expect(page.locator('[data-test="search-download-json-btn"]')).toHaveCount(0);
           if (id === 'search-download-submenu-trigger') {
@@ -113,6 +119,7 @@ test.describe('G1 visible action reasons C2', () => {
       await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
       await expect(page.locator('[data-test="logs-create-alert-btn"]')).not.toHaveAttribute('aria-disabled', 'true');
       await expect(page.locator('[data-test="logs-create-alert-btn-reason"]')).toHaveCount(0);
+      await expect(page.locator('[data-test="search-download-submenu-trigger-reason"]')).toHaveCount(0);
       const download = page.locator('[data-test="search-download-submenu-trigger"]');
       await download.focus();
       for (const id of [

@@ -83,6 +83,11 @@ const SCAN_RANK_PATTERN = /message|msg|text|body|log|error|desc|detail|reason|co
 // Mirrors the backend: every policy other than AtIngestion redacts hits at search time.
 const AT_INGESTION_POLICY = "AtIngestion";
 
+// One single-quoted argument and nothing else; any other call keeps the whole filter SQL.
+const MATCH_ALL_CALL = /^match_all\(\s*'(?:[^']|'')*'\s*\)$/i;
+
+const NUMERIC_LITERAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
+
 const PREDICATE_OPERATORS = new Set([
   "=",
   "!=",
@@ -145,6 +150,8 @@ export interface PlanFilterOptions {
   /** The token gate applies only to fts targets; defaults to fts. */
   targetMode?: TextSearchTarget["mode"];
   tokenLimits?: TokenLimits;
+  /** Text+SQL mixes are rewritten only when every selected stream has FTS; defaults to an fts target. */
+  allTargetsFts?: boolean;
 }
 
 export interface SchemaField {
@@ -212,6 +219,12 @@ interface SuggestionTally {
   predicates: number;
 }
 
+interface MixState {
+  names: ReadonlySet<string>;
+  limits: TokenLimits;
+  units: number;
+}
+
 interface AstNode {
   type?: string;
   operator?: string;
@@ -245,14 +258,18 @@ export function planFilter(
   const tokens = lex(raw);
   if (tokens === null) return { kind: "unclassified", filter: raw };
   const names = withImplicitFields(booleanFields);
-  if (tokens.length === 0 || !isPureTextShape(tokens, names)) return { kind: "sql", filter: raw };
+  if (tokens.length === 0) return { kind: "sql", filter: raw };
+  if (!isPureTextShape(tokens, names)) {
+    return { kind: "sql", filter: planMix(tokens, raw, names, options) ?? raw };
+  }
   if (exceedsTextNesting(tokens)) return { kind: "unclassified", filter: raw };
 
   const root = parseBooleanText(tokens);
   if (root === null) return { kind: "unclassified", filter: raw };
 
   const units = collectUnits(root);
-  if (units.some((unit) => unit === "")) return { kind: "sql", filter: raw };
+  // match_all calls alone are already rendered, so there is nothing to rewrite.
+  if (units.length === 0 || units.some((unit) => unit === "")) return { kind: "sql", filter: raw };
   const limits = options.tokenLimits ?? DEFAULT_TOKEN_LIMITS;
   if ((options.targetMode ?? "fts") === "fts" && !units.every((u) => hasIndexToken(u, limits))) {
     return { kind: "sql", filter: raw };
@@ -424,14 +441,38 @@ function renderSqlFilter(filter: string, knownFields: ReadonlySet<string>): stri
     .join("\n");
   if (body.trim() === "") return "";
 
-  const parts = addSpacesToOperators(body).split(" ");
+  const spaced = addSpacesToOperators(body);
+  const parts = spaced.split(" ");
+  const protectedRanges = sqlLiteralAndCommentRanges(spaced);
+  let rangeIndex = 0;
+  let offset = 0;
   for (const [index, token] of parts.entries()) {
+    while (protectedRanges[rangeIndex]?.end <= offset) rangeIndex++;
+    const range = protectedRanges[rangeIndex];
+    const isProtected = range !== undefined && range.start < offset + token.length;
     const normalizedToken = token.replaceAll('"', "");
-    if (knownFields.has(normalizedToken)) {
+    // A field name inside a string literal is searched text, so its quotes stay as typed.
+    if (!isProtected && knownFields.has(normalizedToken)) {
       parts[index] = quoteSqlIdentifierIfNeeded(normalizedToken);
     }
+    offset += token.length + 1;
   }
   return parts.join(" ");
+}
+
+function sqlLiteralAndCommentRanges(raw: string): TextRange[] {
+  const ranges: TextRange[] = [];
+  let i = 0;
+  while (i < raw.length) {
+    const end = maskedSpanEnd(raw, i);
+    if (end === null) {
+      i++;
+    } else {
+      if (raw[i] !== '"') ranges.push({ start: i, end });
+      i = end;
+    }
+  }
+  return ranges;
 }
 
 function renderNode(node: PlanNode, target: { mode: "fts" | "scan"; fields: string[] }): string {
@@ -669,9 +710,15 @@ function isPureTextToken(
       return !names.has(tok.text) && !gluedToNextOperand(lexed, next);
     case "squote":
       return !gluedToNextOperand(lexed, next);
+    case "opaque":
+      return isMatchAllCall(lexed);
     default:
       return false;
   }
+}
+
+function isMatchAllCall(lexed: Lexed | undefined): boolean {
+  return lexed?.tok.t === "opaque" && MATCH_ALL_CALL.test(lexed.tok.text);
 }
 
 // A quoted token glued to a following operand (`"s".f`, `'a'b`) is identifier syntax, not text.
@@ -748,6 +795,7 @@ function parsePrimary(tokens: Lexed[], state: { pos: number }): PlanNode | null 
   }
   if (tok.t === "word" || tok.t === "squote" || tok.t === "dquote")
     return { k: "text", value: tok.text };
+  if (isMatchAllCall(lexed) && tok.t === "opaque") return { k: "sql", text: tok.text };
   return null;
 }
 
@@ -776,7 +824,12 @@ function startsOperand(lexed: Lexed | undefined): boolean {
   if (!lexed) return false;
   const { t } = lexed.tok;
   return (
-    t === "word" || t === "squote" || t === "dquote" || t === "lparen" || isKeyword(lexed, "NOT")
+    t === "word" ||
+    t === "squote" ||
+    t === "dquote" ||
+    t === "lparen" ||
+    isKeyword(lexed, "NOT") ||
+    isMatchAllCall(lexed)
   );
 }
 
@@ -802,6 +855,80 @@ function hasIndexToken(value: string, limits: TokenLimits): boolean {
     const bytes = new TextEncoder().encode(piece).length;
     return bytes >= limits.min && bytes < limits.max;
   });
+}
+
+// Rendered as SQL so field checks and per-stream mapping still see every predicate; null keeps the filter.
+function planMix(
+  tokens: Lexed[],
+  raw: string,
+  names: ReadonlySet<string>,
+  options: PlanFilterOptions,
+): string | null {
+  // A scan or blocked target would need consent or would drop the SQL half on side requests.
+  const allFts = options.allTargetsFts ?? (options.targetMode ?? "fts") === "fts";
+  if (!allFts || exceedsTextNesting(tokens)) return null;
+  const state: MixState = {
+    names,
+    limits: options.tokenLimits ?? DEFAULT_TOKEN_LIMITS,
+    units: 0,
+  };
+  const root = buildMixExpr(tokens, raw, state);
+  if (root === null || state.units === 0) return null;
+  const filter = renderNode(root, { mode: "fts", fields: [] });
+  return whereShape(filter) === null ? null : filter;
+}
+
+function buildMixExpr(tokens: Lexed[], raw: string, state: MixState): PlanNode | null {
+  const children: PlanNode[] = [];
+  for (const part of splitTopLevel(tokens, "OR")) {
+    const andChildren: PlanNode[] = [];
+    for (const unit of splitTopLevel(part, "AND")) {
+      const node = buildMixUnit(unit, raw, state);
+      if (node === null) return null;
+      andChildren.push(node);
+    }
+    children.push(andChildren.length === 1 ? andChildren[0] : { k: "and", children: andChildren });
+  }
+  return children.length === 1 ? children[0] : { k: "or", children };
+}
+
+function buildMixUnit(tokens: Lexed[], raw: string, state: MixState): PlanNode | null {
+  if (tokens.length === 0) return null;
+  if (isKeyword(tokens[0], "NOT")) {
+    const child = buildMixUnit(tokens.slice(1), raw, state);
+    return child === null ? null : { k: "not", child };
+  }
+  if (tokens[0].tok.t === "lparen" && matchingParen(tokens, 0) === tokens.length - 1) {
+    const child = buildMixExpr(tokens.slice(1, -1), raw, state);
+    return child === null ? null : { k: "group", child };
+  }
+  if (!tokens.every((lexed) => isOperandToken(lexed) || isMatchAllCall(lexed))) {
+    return { k: "sql", text: sliceOf(tokens, raw) };
+  }
+  const children: PlanNode[] = [];
+  for (const [index, lexed] of tokens.entries()) {
+    const node = mixTextUnit(lexed, tokens[index + 1], state);
+    if (node === null) return null;
+    children.push(node);
+  }
+  return children.length === 1 ? children[0] : { k: "and", children };
+}
+
+// Numbers stay SQL literals here, unlike pure text, because a predicate beside them makes the filter SQL.
+function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): PlanNode | null {
+  const { tok } = lexed;
+  if (tok.t === "opaque") return { k: "sql", text: tok.text };
+  if (tok.t !== "word" && tok.t !== "squote" && tok.t !== "dquote") return null;
+  if (tok.t !== "word" && gluedToNextOperand(lexed, next)) return null;
+  if (tok.t === "dquote" && state.names.has(tok.text)) return null;
+  const negated = tok.t === "word" && /^-[A-Za-z]/.test(tok.text);
+  const value = negated ? tok.text.slice(1) : tok.text;
+  if (tok.t === "word" && (NUMERIC_LITERAL.test(value) || isFieldLikeWord(value, state.names)))
+    return null;
+  if (value === "" || !hasIndexToken(value, state.limits)) return null;
+  state.units++;
+  const text: PlanNode = { k: "text", value };
+  return negated ? { k: "not", child: text } : text;
 }
 
 function buildSuggestionExpr(

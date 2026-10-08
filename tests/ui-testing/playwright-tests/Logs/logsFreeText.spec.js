@@ -61,7 +61,13 @@ async function open(page, streams, query, extra = '') {
   const searches = trackSearches(page);
   await page.goto(urlFor(streams, query, extra));
   await page.locator(editor).first().waitFor({ timeout: 60000 });
-  await expect.poll(() => editorText(page), { timeout: 30000 }).toBe(query);
+  // The load run may already have replaced the text with the filter it sent.
+  await expect
+    .poll(async () => {
+      const text = await editorText(page);
+      return text === query || /match_all\(|str_match_ignore_case\(/.test(text);
+    }, { timeout: 30000 })
+    .toBe(true);
   return searches;
 }
 
@@ -128,10 +134,21 @@ test.describe('Logs bare-word search (item 1)', () => {
       .toBe(40);
   });
 
-  test('a bare word runs as match_all, highlights and keeps the raw text (AC1.1-AC1.5)', {
+  test('a bare word runs as match_all, highlights and the editor then shows what ran (AC1.1-AC1.5, Reinstated)', {
     tag: ['@freeText', '@logs'],
   }, async ({ page, request }) => {
     const searches = await open(page, FTS, 'timeout');
+    await new PageManager(page).logsPage.setQueryEditorContent('timeout');
+
+    testLogger.info('Editor decoration and hover before the run');
+    const term = page.locator(`${editor} .o2-free-text-term`).first();
+    await expect(term).toBeVisible();
+    await term.hover();
+    await expect(page.locator('.monaco-hover:not(.hidden)').first()).toContainText(
+      'Full-text search in: body',
+      { timeout: 15000 },
+    );
+
     const sql = await run(page, searches);
 
     expect(sql).toContain("match_all('timeout')");
@@ -144,25 +161,18 @@ test.describe('Logs bare-word search (item 1)', () => {
       await apiTotal(request, `SELECT * FROM "${FTS}" WHERE match_all('timeout')`),
     );
 
-    expect(await editorText(page)).toBe('timeout');
-    await expect.poll(() => unb64(new URL(page.url()).searchParams.get('query') || '')).toBe('timeout');
-
-    testLogger.info('Editor decoration and hover');
-    const term = page.locator(`${editor} .o2-free-text-term`).first();
-    await expect(term).toBeVisible();
-    await term.hover();
-    await expect(page.locator('.monaco-hover:not(.hidden)').first()).toContainText(
-      'Full-text search in: body',
-      { timeout: 15000 },
-    );
+    await expect.poll(() => editorText(page), { timeout: 15000 }).toBe("match_all('timeout')");
+    await expect
+      .poll(() => unb64(new URL(page.url()).searchParams.get('query') || ''))
+      .toBe("match_all('timeout')");
+    await expect(page.locator(runBtn)).not.toHaveAttribute('data-run-pending', 'true');
   });
 
   test('edits clear mixed-filter decorations and restore pure text without a search (AC-BW.8)', {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
     const searches = await open(page, FTS, 'timeout');
-    await run(page, searches);
-    await expect(page.locator(rows).first()).toBeVisible({ timeout: 30000 });
+    await new PageManager(page).logsPage.setQueryEditorContent('timeout');
     const term = page.locator(`${editor} .o2-free-text-term`);
     await expect(term.first()).toBeVisible();
     const before = searches.all().length;
@@ -192,7 +202,7 @@ test.describe('Logs bare-word search (item 1)', () => {
       const searches = await open(page, FTS, raw);
       const sql = await run(page, searches);
       expect(sql).toBe(`select * from "${FTS}"  WHERE ${where}`);
-      expect(await editorText(page)).toBe(raw);
+      await expect.poll(() => editorText(page), { timeout: 15000 }).toBe(where);
       expect(await apiTotal(request, sql)).toBe(total);
       const dataRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
       await expect(dataRows.first()).toBeVisible({ timeout: 30000 });
@@ -207,7 +217,9 @@ test.describe('Logs bare-word search (item 1)', () => {
     const searches = await open(page, FTS, 'limit 50');
     const sql = await run(page, searches);
     expect(sql).toBe(`select * from "${FTS}"  WHERE match_all('limit') AND match_all('50')`);
-    expect(await editorText(page)).toBe('limit 50');
+    await expect
+      .poll(() => editorText(page), { timeout: 15000 })
+      .toBe("match_all('limit') AND match_all('50')");
     expect(await apiTotal(request, sql)).toBe(8);
     await expect(page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(8, { timeout: 30000 });
 
@@ -262,7 +274,7 @@ test.describe('Logs bare-word search (item 1)', () => {
     await expect(page.locator('[data-test="logs-search-filter-error-message"]')).toHaveCount(0);
   });
 
-  test('a text and field mix is sent unchanged, then Run as recovers it (AC5.6, AC2.2)', {
+  test('a mix with no connective is sent unchanged and Run as recovers it; an AND mix is rewritten (AC5.6, AC2.2)', {
     tag: ['@freeText', '@logs'],
   }, async ({ page, request }) => {
     const searches = await open(page, FTS, "service_name='api' timeout");
@@ -280,15 +292,12 @@ test.describe('Logs bare-word search (item 1)', () => {
     expect(decodedSql(searches.hits().at(-1))).toContain("WHERE service_name = 'api' AND match_all('timeout')");
     await expect(page.locator(rows).first()).toBeVisible({ timeout: 30000 });
 
-    testLogger.info('A quoted phrase with a field narrows the phrase hits');
+    testLogger.info('A quoted phrase joined to a field by AND is rewritten on the first run (1-Q7 replaced)');
     const searches2 = await open(page, FTS, `"connection refused" AND service_name='api'`);
-    await run(page, searches2);
-    const phraseCard = page.locator('[data-test="query-error-run-suggestion-card"]');
-    await expect(phraseCard).toContainText("match_all('connection refused') AND service_name='api'", {
-      timeout: 30000,
-    });
-    await phraseCard.click();
-    await expect.poll(() => editorText(page)).toBe("match_all('connection refused') AND service_name='api'");
+    const phraseSql = await run(page, searches2);
+    expect(phraseSql).toContain("WHERE match_all('connection refused') AND service_name = 'api'");
+    await expect(page.locator(rows).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-test="query-error-run-suggestion-card"]')).toHaveCount(0);
     const narrowed = await apiTotal(
       request,
       `SELECT * FROM "${FTS}" WHERE match_all('connection refused') AND service_name='api'`,
@@ -397,6 +406,8 @@ test.describe('Logs bare-word search (item 1)', () => {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
     const searches = await open(page, FTS, 'NOT timeout');
+    // The load run shows its rendered SQL, which Build can hold; retype the text to test the gate.
+    await new PageManager(page).logsPage.setQueryEditorContent('NOT timeout');
     const gridSql = `select * from "${FTS}"  WHERE NOT match_all('timeout')`;
     await page.locator('[data-test="logs-build-toggle"]').click();
     await expect(page.locator('[data-test="logs-build-free-text-notice"]')).toBeVisible({ timeout: 30000 });

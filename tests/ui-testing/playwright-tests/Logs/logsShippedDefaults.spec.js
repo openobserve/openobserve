@@ -98,7 +98,7 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
     await page.keyboard.type(' WHERE ', { delay: 20 });
     await page.waitForTimeout(3000);
     expect(searches.all().length).toBe(beforeTyping);
-    await expect(page.locator('[data-test="logs-search-bar-run-pending-dot"]')).toBeVisible();
+    await expect(page.locator('[data-test="logs-search-bar-refresh-btn"][data-run-pending="true"]')).toBeVisible();
 
     testLogger.info('Auto Run off and reload: stream restored, nothing runs (#14759)');
     await page.locator('[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]').click();

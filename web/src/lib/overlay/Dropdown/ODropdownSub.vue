@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, ref, useAttrs, useId, watch } from "vue";
 import {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
@@ -8,11 +8,18 @@ import {
 } from "reka-ui";
 import type { DropdownSubProps, DropdownSubEmits, DropdownSubSlots } from "./ODropdownSub.types";
 import { O_DROPDOWN_NESTED_KEY, type DropdownNestedRegistry } from "./ODropdown.context";
+import OText from "../../core/Typography/OText.vue";
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<DropdownSubProps>();
 const emit = defineEmits<DropdownSubEmits>();
 defineSlots<DropdownSubSlots>();
+
+const attrs = useAttrs();
+const id = useId();
+const descriptionDomId = computed(
+  () => props.descriptionId ?? `${attrs["data-test"] ?? id}-reason`,
+);
 
 const internalOpen = ref(props.open ?? false);
 const trigger = ref<{ $el: HTMLElement } | null>(null);
@@ -77,10 +84,22 @@ function onKeydown(event: KeyboardEvent) {
       as="button"
       type="button"
       :text-value="textValue"
-      class="rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors duration-150 outline-none select-none"
+      :aria-describedby="description ? descriptionDomId : undefined"
+      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-150 outline-none select-none"
     >
       <slot name="icon-left" />
-      <slot name="trigger" />
+      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-1">
+        <span><slot name="trigger" /></span>
+        <OText
+          :id="descriptionDomId"
+          :data-test="descriptionDomId"
+          as="span"
+          variant="meta"
+          class="text-text-secondary! group-data-[highlighted]/sub:text-text-heading! leading-snug! whitespace-normal"
+          >{{ description }}</OText
+        >
+      </span>
+      <slot v-else name="trigger" />
       <slot name="icon-right" />
     </DropdownMenuSubTrigger>
     <DropdownMenuPortal>

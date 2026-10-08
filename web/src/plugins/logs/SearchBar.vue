@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-saved-views-menu-create"
                 :disabled="!!saveViewReason"
                 focusable-unavailable
-                :description="saveViewReason"
+                :description="saveViewReason || saveViewNote"
                 @select="fnSavedView"
               >
                 {{ t("search.createSavedView") }}
@@ -565,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               shortcut-id="logsSaveView"
               :disabled="!!saveViewReason"
               focusable-unavailable
-              :description="saveViewReason"
+              :description="saveViewReason || saveViewNote"
               @select="fnSavedView"
             >
               <template #icon-left>
@@ -686,6 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model:open="showDownloadSubmenu"
               data-test="search-download-submenu-trigger"
               :text-value="t('search.downloadTable')"
+              :description="downloadNote"
             >
               <template #icon-left>
                 <span
@@ -737,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-download-custom-range-btn"
               :disabled="isDownloadDisabled || !!customRangeReason"
               focusable-unavailable
-              :description="customRangeReason || downloadReason"
+              :description="customRangeReason || downloadReason || customRangeNote"
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
@@ -766,7 +767,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="search-scheduler-create-new-btn"
               :disabled="scheduledSearchAccess.allowed && !!scheduleJobReason"
               focusable-unavailable
-              :description="scheduledSearchAccess.allowed ? scheduleJobReason : undefined"
+              :description="
+                scheduledSearchAccess.allowed ? scheduleJobReason || scheduleJobNote : undefined
+              "
               @select="scheduledSearchAccess.allowed ? createScheduleJob() : openUpgradeDialog()"
             >
               <template #icon-left>
@@ -820,6 +823,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :source="createAlertSource"
               :build="buildAlertPrefill"
               :disabled-reason="createAlertDisabledReason"
+              :note="createAlertNote"
               data-test="logs-create-alert-btn"
             >
               <!-- Same icon badge every other item in this menu uses, so the
@@ -1177,7 +1181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                variant="primary"
+                :data-run-pending="showRunQueryPending ? 'true' : undefined"
+                :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
+                :variant="showRunQueryPending ? 'warning' : 'primary'"
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
@@ -1188,7 +1194,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
+                    : 'w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]',
+                  showRunQueryPending || (isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                    ? ''
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
                   'rounded-s-default! rounded-e-none!',
                 ]"
                 @click="
@@ -1209,12 +1218,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip
                   v-if="
-                    ((searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
-                      showRunPendingDot) &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                    (searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
+                    showRunQueryPending
                   "
                   :content="
-                    showRunPendingDot ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')
+                    showRunQueryPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')
                   "
                 />
                 <OIcon
@@ -1232,29 +1240,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t("search.generateQuery")
                     : t("search.runQuery")
                 }}
-                <span
-                  v-if="
-                    showRunPendingDot && !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
-                  data-test="logs-search-bar-run-pending-dot"
-                  role="status"
-                  :aria-label="t('search.autoRunPendingDot')"
-                  class="bg-banner-warning-border border-surface-base absolute end-1 -top-1 h-2 w-2 rounded-full border"
-                />
               </OButton>
               <OSeparator class="h-[1.875rem]! w-px" vertical />
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    variant="ghost"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
                     size="icon-xs"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
-                      (searchObj.meta.logsVisualizeToggle === 'patterns' &&
-                        patternsState.loading) ||
-                      (!(isNaturalLanguageDetected && !searchObj.meta.nlpMode) && isGridInFlight)
+                      isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                            !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
                       'rounded-e-default! rounded-s-none!',
@@ -2177,22 +2175,46 @@ export default defineComponent({
       if (mode === "patterns" || mode === "visualize" || mode === "build") return mode;
       return "logs";
     });
+    // These take the editor's query, not the shown results, so an unrun query gets a note instead of a block.
+    const EDITOR_QUERY_ACTIONS = new Set<PersistAction>([
+      "save-view",
+      "create-alert",
+      "search-job",
+    ]);
     const persistReason = (surface: PersistSurface, action?: PersistAction) => {
-      const reason = autoRun.persistReason(surface, action);
+      const reason = autoRun.persistReason(surface, action, {
+        allowNotRun: !!action && EDITOR_QUERY_ACTIONS.has(action),
+      });
       if (reason !== t("search.autoRunPersistNeedsRun") || action === "share-link") return reason;
       return queryRunReason.value;
     };
+    const unrunQueryNote = (surface: PersistSurface, action: PersistAction) => {
+      if (persistReason(surface, action)) return null;
+      if (autoRun.persistReason(surface, action) !== t("search.autoRunPersistNeedsRun"))
+        return null;
+      return isQueryEdited.value
+        ? t("search.queryActions.usesEditedQuery")
+        : t("search.queryActions.usesUnrunQuery");
+    };
+    const isQueryEdited = computed(
+      () =>
+        !!(
+          searchObj.meta.executed ||
+          searchObj.meta.executedPatterns ||
+          searchObj.meta.executedPanel
+        ) &&
+        (autoRun.engine.isResultsStale() || !!searchObj.meta.editorDirty),
+    );
     const queryRunReason = computed(() =>
-      (searchObj.meta.executed ||
-        searchObj.meta.executedPatterns ||
-        searchObj.meta.executedPanel) &&
-      (autoRun.engine.isResultsStale() || searchObj.meta.editorDirty)
+      isQueryEdited.value
         ? t("search.queryActions.runEditedFirst")
         : t("search.queryActions.runFirst"),
     );
     const saveViewReason = computed(() => persistReason(activeSurface.value, "save-view"));
+    const saveViewNote = computed(() => unrunQueryNote(activeSurface.value, "save-view"));
     const shareReason = computed(() => persistReason(activeSurface.value, "share-link"));
     const scheduleJobReason = computed(() => persistReason("logs", "search-job"));
+    const scheduleJobNote = computed(() => unrunQueryNote("logs", "search-job"));
     const visualizeReason = computed(() =>
       searchObj.meta.logsVisualizeToggle === "visualize"
         ? null
@@ -2204,7 +2226,19 @@ export default defineComponent({
         (searchObj.loading == true || searchObj.loadingHistogram == true),
     );
     const showRunPendingDot = computed(
-      () => !!searchObj.meta.runPending || !!searchObj.meta.editorDirty,
+      () =>
+        !!searchObj.meta.runPending ||
+        !!searchObj.meta.editorDirty ||
+        (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isResultsStale()),
+    );
+    const showRunQueryPending = computed(
+      () =>
+        showRunPendingDot.value && !(isNaturalLanguageDetected.value && !searchObj.meta.nlpMode),
+    );
+    const isRunQueryCancelShown = computed(
+      () =>
+        (searchObj.meta.logsVisualizeToggle === "patterns" && patternsState.value.loading) ||
+        (!(isNaturalLanguageDetected.value && !searchObj.meta.nlpMode) && isGridInFlight.value),
     );
     const blockWithReason = (reason: I18nText | null) => {
       if (!reason) return false;
@@ -2967,6 +3001,8 @@ export default defineComponent({
       } catch (e) {
         console.log(e, "Logs: Error while updating query value");
       }
+      // A keystroke pair that cancels out within the debounce never changes the signature, so only this commit sees it.
+      autoRun.engine.reconcileEditorDirty();
     };
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -3140,6 +3176,12 @@ export default defineComponent({
 
     const updateQuery = () => {
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);
+    };
+
+    // Shows the filter a run sent as an editor edit, so Cmd+Z restores what was typed.
+    const showRanQuery = (text: string) => {
+      if (queryEditorRef.value?.replaceValue) queryEditorRef.value.replaceValue(text);
+      else updateQuery();
     };
 
     const downloadLogs = async (data, format) => {
@@ -4311,13 +4353,12 @@ export default defineComponent({
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
     const showDownloadSubmenu = ref(false);
     const { isMobile } = useBreakpoint();
-    // An out-of-date grid would export rows that no longer match the query (AC5.2).
+    // An incomplete grid would export rows that no longer match the query (AC5.2); an unrun edit only gets a note.
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length ||
         !searchObj.data.queryResults?.hits?.length ||
-        (!autoRun.searchAroundActive() &&
-          (!searchObj.meta.executed?.complete || autoRun.engine.isResultsStale())),
+        (!autoRun.searchAroundActive() && !searchObj.meta.executed?.complete),
     );
 
     watch(isDownloadDisabled, (disabled) => {
@@ -4325,10 +4366,7 @@ export default defineComponent({
     });
 
     const downloadReason = computed<I18nText | null>(() => {
-      if (
-        !autoRun.searchAroundActive() &&
-        (autoRun.engine.isResultsStale() || !searchObj.meta.executed?.complete)
-      )
+      if (!autoRun.searchAroundActive() && !searchObj.meta.executed?.complete)
         return queryRunReason.value;
       if (!searchObj.data.stream.selectedStream?.length)
         return t("logs.searchBar.selectStreamBeforeSchedule");
@@ -4337,10 +4375,20 @@ export default defineComponent({
     });
     const customRangeReason = computed<I18nText | null>(() => {
       if (autoRun.searchAroundActive()) return t("search.autoRunSearchAroundActive");
-      if (autoRun.engine.isResultsStale() || !searchObj.meta.executed?.complete)
-        return queryRunReason.value;
+      if (!searchObj.meta.executed?.complete) return queryRunReason.value;
       return null;
     });
+    const downloadNote = computed<I18nText | null>(() =>
+      !isDownloadDisabled.value && !autoRun.searchAroundActive() && autoRun.engine.isResultsStale()
+        ? t("search.queryActions.downloadsShownResults")
+        : null,
+    );
+    // Custom range re-sends the request the last run built, not the editor's text.
+    const customRangeNote = computed<I18nText | null>(() =>
+      !isDownloadDisabled.value && !customRangeReason.value && autoRun.engine.isResultsStale()
+        ? t("search.queryActions.downloadsLastRun")
+        : null,
+    );
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
       { label: "JSON", value: "json" },
@@ -4755,6 +4803,11 @@ export default defineComponent({
       }
       return persistReason(isPatternsTab.value ? "patterns" : "logs", "create-alert");
     });
+    const createAlertNote = computed(() =>
+      createAlertDisabledReason.value
+        ? null
+        : unrunQueryNote(isPatternsTab.value ? "patterns" : "logs", "create-alert"),
+    );
 
     /**
      * This page's contribution to alert creation: a plain snapshot of searchObj
@@ -4933,11 +4986,15 @@ export default defineComponent({
     return {
       autoRun,
       saveViewReason,
+      saveViewNote,
       shareReason,
       scheduleJobReason,
+      scheduleJobNote,
       visualizeReason,
       isGridInFlight,
       showRunPendingDot,
+      showRunQueryPending,
+      isRunQueryCancelShown,
       blockWithReason,
       flushEditorValue,
       onEditorUserEdit,
@@ -4958,6 +5015,8 @@ export default defineComponent({
       isMobile,
       isDownloadDisabled,
       customRangeReason,
+      downloadNote,
+      customRangeNote,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
@@ -4967,6 +5026,7 @@ export default defineComponent({
       cancelConfirmDialog,
       confirmDialogOK,
       updateQuery,
+      showRanQuery,
       downloadLogs,
       saveFunction,
       resetFunctionContent,
@@ -5070,6 +5130,7 @@ export default defineComponent({
       buildAlertPrefill,
       createAlertSource,
       createAlertDisabledReason,
+      createAlertNote,
       searchInspectDialog,
       searchInspectTraceId,
       openSearchInspectDialog,

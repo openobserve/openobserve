@@ -54,14 +54,14 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
     :aria-describedby="description ? reasonId : undefined"
     :text-value="textValue"
     :class="[
-      'relative flex items-center gap-2',
+      'group/item relative flex items-center gap-2',
       'rounded-default w-full px-3 py-1.5',
       'cursor-pointer outline-none select-none',
       'transition-colors duration-150',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
       unavailable &&
-        'group/unavailable text-text-secondary! data-[highlighted]:text-text-heading! focus-visible:ring-focus-ring-accent cursor-not-allowed focus-visible:ring-2 focus-visible:ring-inset',
+        'text-text-secondary! data-[highlighted]:text-text-heading! focus-visible:ring-focus-ring-accent cursor-not-allowed focus-visible:ring-2 focus-visible:ring-inset',
     ]"
     @click.capture="blockActivation"
     @keydown.capture="onKeydown"
@@ -82,8 +82,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
           :data-test="reasonId"
           as="span"
           variant="meta"
-          class="text-text-secondary! leading-snug! whitespace-normal"
-          :class="unavailable && 'group-data-[highlighted]/unavailable:text-text-heading!'"
+          class="text-text-secondary! group-data-[highlighted]/item:text-text-heading! leading-snug! whitespace-normal"
           >{{ description }}</OText
         >
       </span>

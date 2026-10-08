@@ -230,6 +230,22 @@ describe("noFtsStreams", () => {
   });
 });
 
+describe("planStreamsFilter mixed rewrites", () => {
+  it("rewrites a text+SQL mix only when every selected stream has FTS", () => {
+    const raw = "timeout and level='x'";
+    const both = makeSearchObj(raw, [fts("app"), fts("web")]);
+    expect(planStreamsFilter(raw, ["app", "web"], buildFilterContext(both, zoConfig))).toEqual({
+      kind: "sql",
+      filter: "match_all('timeout') AND level='x'",
+    });
+    const mixed = makeSearchObj(raw, [fts("app"), noFts("raw")]);
+    expect(planStreamsFilter(raw, ["app", "raw"], buildFilterContext(mixed, zoConfig))).toEqual({
+      kind: "sql",
+      filter: raw,
+    });
+  });
+});
+
 describe("refreshFreeTextSchemas (spec 6.3 residual risk)", () => {
   it("re-reads the schema once before the first rewrite and uses its new fields", async () => {
     const obj = makeSearchObj("is_error", [fts("app")]);
@@ -267,6 +283,16 @@ describe("refreshFreeTextSchemas (spec 6.3 residual risk)", () => {
     expect(planStreamsFilter("timeout", ["app"], buildFilterContext(obj, zoConfig)).kind).toBe(
       "freeText",
     );
+  });
+
+  it("re-reads before a mixed rewrite, so a new boolean field stays a SQL predicate", async () => {
+    const obj = makeSearchObj("is_error and level='x'", [fts("app")]);
+    const fetchStream = vi.fn(async () => fts("app", [{ name: "is_error", type: "Boolean" }]));
+    await refreshFreeTextSchemas(obj, zoConfig, fetchStream, 0);
+    expect(fetchStream).toHaveBeenCalledTimes(1);
+    const ctx = buildFilterContext(obj, zoConfig);
+    const raw = "is_error and level='x'";
+    expect(planStreamsFilter(raw, ["app"], ctx)).toEqual({ kind: "sql", filter: raw });
   });
 
   it("does nothing for SQL filters or in SQL mode", async () => {

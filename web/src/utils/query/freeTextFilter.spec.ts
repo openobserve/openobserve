@@ -161,13 +161,52 @@ describe("freeTextFilter", () => {
 
     it.each([
       ["timeout AND service_name='api'", "match_all('timeout') AND service_name='api'"],
-      ["service_name='api' timeout", "service_name='api' AND match_all('timeout')"],
       [
         "(timeout OR refused) AND status>=500",
         "(match_all('timeout') OR match_all('refused')) AND status>=500",
       ],
+      ["error AND status=500", "match_all('error') AND status=500"],
+    ])("mix %s with connectives is sent as %s (1-Q7 replaced)", (raw, rendered) => {
+      const plan = planFilter(raw, FIELDS);
+      expect(plan).toEqual({ kind: "sql", filter: rendered });
+      expect(renderPlan(plan, FTS, KNOWN)).toBe(legacyWhere(rendered, KNOWN));
+      expect(suggestRecovery(raw, FIELDS, true).runSuggestion).toBe(rendered);
+    });
+
+    it("keeps a field name inside a searched phrase as typed when the rendering is re-run", () => {
+      const first = renderPlan(planFilter(`'request "level" failed'`, FIELDS), FTS, KNOWN);
+      expect(first).toBe(`match_all('request "level" failed')`);
+      expect(renderPlan(planFilter(first!, FIELDS), FTS, KNOWN)).toBe(first);
+    });
+
+    it.each([
+      `/* user's filter */ match_all('request "level" failed')`,
+      `match_all('before') -- user's filter\nAND match_all('request "level" failed')`,
+      `/* user's filter */ match_all('user''s "level" failed')`,
+      `match_all('before') -- user's filter\nAND match_all('user''s "level" failed')`,
+      `match_all('user''s "level" failed')`,
+      `match_all('/* user''s filter */ "level" failed')`,
+      `match_all('-- user''s filter "level" failed')`,
+      `"user'field" IS NULL AND match_all('request "level" failed')`,
+      `"user''field" IS NULL AND match_all('request "level" failed')`,
+    ])("preserves searched literals when re-running %s", (raw) => {
+      const first = renderPlan(planFilter(raw, FIELDS), FTS, KNOWN);
+      expect(first).toBe(raw);
+      expect(renderPlan(planFilter(first!, FIELDS), FTS, KNOWN)).toBe(raw);
+    });
+
+    it("still normalizes known identifiers after comments and escaped literals", () => {
+      const raw = `/* user's filter */ match_all('user''s "level" failed') AND "level" = 'error'`;
+      const expected = `/* user's filter */ match_all('user''s "level" failed') AND level = 'error'`;
+      const first = renderPlan(planFilter(raw, FIELDS), FTS, KNOWN);
+      expect(first).toBe(expected);
+      expect(renderPlan(planFilter(first!, FIELDS), FTS, KNOWN)).toBe(expected);
+    });
+
+    it.each([
+      ["service_name='api' timeout", "service_name='api' AND match_all('timeout')"],
       ["f IS NOT NULL timeout", "f IS NOT NULL AND match_all('timeout')"],
-    ])("mix %s is sent unchanged and Run as reads %s", (raw, suggestion) => {
+    ])("mix %s with no connective is sent unchanged and Run as reads %s", (raw, suggestion) => {
       const plan = planFilter(raw, FIELDS);
       expect(plan.kind).toBe("sql");
       expect(renderPlan(plan, FTS, KNOWN)).toBe(legacyWhere(raw, KNOWN));
@@ -207,7 +246,6 @@ describe("freeTextFilter", () => {
       ["f LIKE '%x%'"],
       ["f IN ('a')"],
       ["f > 5"],
-      ["error AND status=500"],
       ["status=500 timeout"],
       ["''"],
       ['""'],

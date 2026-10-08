@@ -85,6 +85,17 @@ const router = createRouter({
 });
 
 const PERSIST_REASON = "Run the query first: this action saves or shares what you ran";
+const UNRUN_NOTE = "Uses your query (not run yet)";
+const EDITED_NOTE = "Uses your edited query (not run yet)";
+const SHOWN_RESULTS_NOTE = "Downloads the shown results, not your edit";
+const EXPECTED_NOTES: Record<string, string> = {
+  "logs-search-bar-menu-create-saved-view-btn": EDITED_NOTE,
+  "logs-search-bar-saved-views-menu-create": EDITED_NOTE,
+  "logs-create-alert-btn": EDITED_NOTE,
+  "search-scheduler-create-new-btn": EDITED_NOTE,
+  "search-download-submenu-trigger": SHOWN_RESULTS_NOTE,
+  "logs-search-bar-download-custom-range-btn": "Uses the query that last ran, not your edit",
+};
 
 describe("SearchBar — auto-run wiring (item 2)", () => {
   let wrapper: VueWrapper<any> | undefined;
@@ -159,15 +170,18 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
   });
 
   describe("J7 / G1 gates at the real controls", () => {
-    it("disables every persist or share action before the first run, with the reason", async () => {
+    it("before the first run, share and visualize need a run while editor-query actions carry a note", async () => {
       (config as any).isEnterprise = "true";
       await setup();
       const vm = wrapper!.vm;
       expect(vm.shareReason).toBe(PERSIST_REASON);
-      expect(vm.saveViewReason).toBe("Run your query first");
-      expect(vm.scheduleJobReason).toBe("Run your query first");
       expect(vm.visualizeReason).toBe("Run your query first");
-      expect(vm.createAlertDisabledReason).toBe("Run your query first");
+      expect(vm.saveViewReason).toBeNull();
+      expect(vm.scheduleJobReason).toBeNull();
+      expect(vm.createAlertDisabledReason).toBeNull();
+      expect(vm.saveViewNote).toBe(UNRUN_NOTE);
+      expect(vm.scheduleJobNote).toBe(UNRUN_NOTE);
+      expect(vm.createAlertNote).toBe(UNRUN_NOTE);
     });
 
     it("keeps shown-row export allowed in search-around while blocking whole-query export", async () => {
@@ -203,7 +217,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(download.hasAttribute("disabled")).toBe(false);
     });
 
-    it("renders the enabled Download trigger as a native button and closes its submenu when G1 blocks it", async () => {
+    it("renders the enabled Download trigger as a native button, keeps it open with a note after an edit, and closes it once disabled", async () => {
       const { searchObj } = await setup({ liveMode: false });
       markExecuted();
       await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
@@ -221,6 +235,11 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       );
       searchObj.meta.editorDirty = true;
       searchObj.data.query = "level = 'error'";
+      await flushPromises();
+      expect(wrapper!.vm.isDownloadDisabled).toBe(false);
+      expect(wrapper!.vm.downloadNote).toBe(SHOWN_RESULTS_NOTE);
+      expect(document.querySelector('[data-test="search-download-csv-btn"]')).not.toBeNull();
+      searchObj.meta.executed = null;
       await flushPromises();
       expect(wrapper!.vm.showDownloadSubmenu).toBe(false);
       expect(document.querySelector('[data-test="search-download-csv-btn"]')).toBeNull();
@@ -280,7 +299,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       }
     });
 
-    it("shows current G1 reasons on every menu entry and prevents activation", async () => {
+    it("keeps every editor-query and download entry enabled after an edit, each describing what it uses", async () => {
       (config as any).isEnterprise = "true";
       const { searchObj } = await setup({ liveMode: false });
       markExecuted();
@@ -311,26 +330,17 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         for (const testId of ids) {
           const element = document.querySelector<HTMLElement>(`[data-test="${testId}"]`)!;
           expect(element).not.toBeNull();
-          expect(element.getAttribute("aria-disabled")).toBe("true");
+          expect(element.getAttribute("aria-disabled")).not.toBe("true");
+          expect(element.hasAttribute("data-disabled")).toBe(false);
           const id = element.getAttribute("aria-describedby")!;
           expect(id).toBeTruthy();
-          expect(document.getElementById(id)?.textContent).toContain("Run your edited query first");
-          expect(element.hasAttribute("data-disabled")).toBe(false);
-          element.click();
-          element.dispatchEvent(
-            new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-          );
-          element.dispatchEvent(
-            new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }),
-          );
+          expect(document.getElementById(id)?.textContent).toContain(EXPECTED_NOTES[testId]);
         }
         document
           .querySelector<HTMLElement>('[role="menu"]')
           ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
         await flushPromises();
       }
-      expect(wrapper!.vm.customDownloadDialog).toBe(false);
-      expect(wrapper!.vm.showDownloadSubmenu).toBe(false);
       expect(scheduleSearch).not.toHaveBeenCalled();
       markExecuted();
       searchObj.meta.editorDirty = false;
@@ -338,9 +348,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(wrapper!.vm.saveViewReason).toBeNull();
       expect(wrapper!.vm.scheduleJobReason).toBeNull();
       expect(wrapper!.vm.createAlertDisabledReason).toBeNull();
+      expect(wrapper!.vm.saveViewNote).toBeNull();
+      expect(wrapper!.vm.downloadNote).toBeNull();
+      expect(wrapper!.vm.customRangeNote).toBeNull();
     });
 
-    it("enables them once the current query has run, and disables them again when it goes stale", async () => {
+    it("enables them once the current query has run; when it goes stale only sharing needs a run", async () => {
       await setup();
       const vm = wrapper!.vm;
       markExecuted();
@@ -353,7 +366,10 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       vm.searchObj.data.query = "level='error'";
       await flushPromises();
       expect(vm.shareReason).toBe(PERSIST_REASON);
-      expect(vm.isDownloadDisabled).toBe(true);
+      expect(vm.isDownloadDisabled).toBe(false);
+      expect(vm.downloadNote).toBe(SHOWN_RESULTS_NOTE);
+      expect(vm.saveViewReason).toBeNull();
+      expect(vm.saveViewNote).toBe(EDITED_NOTE);
     });
 
     it("refuses a partial (cancelled mid-stream) run", async () => {
@@ -368,22 +384,28 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       await setup();
       const dispatch = vi.spyOn(store, "dispatch");
       wrapper!.vm.fnSavedView();
-      expect(dispatch).not.toHaveBeenCalledWith("setSavedViewDialog", true);
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning", message: "Run your query first" }),
-      );
+      expect(dispatch).toHaveBeenCalledWith("setSavedViewDialog", true);
+      dispatch.mockClear();
       markExecuted();
+      wrapper!.vm.autoRun.invalidateExecuted("search-around");
       await flushPromises();
       wrapper!.vm.fnSavedView();
-      expect(dispatch).toHaveBeenCalledWith("setSavedViewDialog", true);
+      expect(dispatch).not.toHaveBeenCalledWith("setSavedViewDialog", true);
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: i18n.global.t("search.autoRunSearchAroundActive"),
+        }),
+      );
     });
 
-    it("blocks the menu's Schedule search job while unrun, but the guard's job path stays open (G1-X1)", async () => {
+    it("opens the menu's Schedule search job while unrun, and the guard's job path stays open (G1-X1)", async () => {
       (config as any).isEnterprise = "true";
       await setup();
       const vm = wrapper!.vm;
       vm.createScheduleJob();
-      expect(vm.searchSchedulerJob).toBe(false);
+      expect(vm.searchSchedulerJob).toBe(true);
+      vm.searchSchedulerJob = false;
       vm.openGuardSearchJob({ query: { sql: "frozen" } });
       expect(vm.searchSchedulerJob).toBe(true);
     });

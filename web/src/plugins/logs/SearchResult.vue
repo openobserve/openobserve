@@ -1719,6 +1719,7 @@ export default defineComponent({
     const openLogDetails = (_row: any, index: number) => {
       if (!openDetail({ index }, { tab: "json" })) return;
       searchObj.meta.resultGrid.navigation.selectionActive = true;
+      scrollRowIntoView(index);
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = detailRow.value;
@@ -2019,8 +2020,22 @@ export default defineComponent({
         }),
       );
 
+    // The table header sticks inside the scroller, so plain scrollIntoView can park the row under it.
     const scrollRowIntoView = (index: number) => {
-      nextTick(() => resultsRowElement(index)?.scrollIntoView({ block: "nearest" }));
+      nextTick(() => {
+        const row = resultsRowElement(index);
+        const scroller = scrollContainerRef.value;
+        if (!row || !scroller) return;
+        const header = searchListContainer.value?.querySelector<HTMLElement>(
+          '[data-test="logs-search-result-logs-table"] [data-test="o2-table-header"]',
+        );
+        const viewTop = scroller.getBoundingClientRect().top + scroller.clientTop;
+        const top = Math.max(viewTop, header?.getBoundingClientRect().bottom ?? viewTop);
+        const bottom = viewTop + scroller.clientHeight;
+        const rect = row.getBoundingClientRect();
+        if (rect.top < top) scroller.scrollTop -= top - rect.top;
+        else if (rect.bottom > bottom) scroller.scrollTop += rect.bottom - bottom;
+      });
     };
 
     const clearRowSelection = () => {

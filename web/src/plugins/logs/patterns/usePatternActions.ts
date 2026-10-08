@@ -150,12 +150,13 @@ export const usePatternActions = () => {
    * so it cannot be spliced in front of the pattern terms; we say so instead of
    * silently dropping the user's query.
    */
-  // Free text becomes its match_all form for the patterns' stream; any other filter stays as typed.
+  // Free text and text+SQL mixes become what a run would send for the patterns' stream.
   const patternsBaseFilter = (rawQuery: string): string => {
     const stream = searchObj.data.stream.selectedStream?.[0];
     if (!rawQuery || !stream) return rawQuery;
     const ctx = buildFilterContext(searchObj as any, store.state.zoConfig);
     const plan = planStreamsFilter(rawQuery, [stream], ctx);
+    if (plan.kind === "sql") return plan.filter;
     if (plan.kind !== "freeText" || !ctx.targets[stream]) return rawQuery;
     return renderPlan(plan, ctx.targets[stream], ctx.knownFields) ?? rawQuery;
   };
