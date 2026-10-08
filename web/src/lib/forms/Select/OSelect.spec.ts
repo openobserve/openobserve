@@ -148,6 +148,43 @@ describe("OSelect", () => {
     expect(docSpy).toHaveBeenCalled();
   });
 
+  it("emits close once when Escape closes the dropdown", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: {
+        multiple: true,
+        searchable: true,
+        options: [
+          { label: "A", value: "a" },
+          { label: "B", value: "b" },
+        ],
+      },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("open")).toHaveLength(1);
+
+    const input = document.body.querySelector('input[placeholder="Search..."]') as HTMLInputElement;
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
+
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("emits close when the dropdown is closed programmatically", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { multiple: true, options: [{ label: "A", value: "a" }] },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+
+    (wrapper.vm as any).close();
+    await flushPromises();
+
+    expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
   it("does not emit create on Enter when creatable is false", async () => {
     wrapper = mount(OSelect, {
       attachTo: document.body,
