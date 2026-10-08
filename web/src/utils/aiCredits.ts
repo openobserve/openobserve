@@ -30,6 +30,13 @@ export function aiCreditsRemedy(body: any, t: TranslateFn): I18nText | undefined
   return body?.message ? raw(body.message) : undefined;
 }
 
+/** The page that unblocks an AI-credits 402, or undefined when resending is the remedy. */
+export function aiCreditsAction(body: any): "plans" | "contact" | undefined {
+  if (body?.remedy === "subscribe") return "plans";
+  if (body?.remedy === "contact_account_manager") return "contact";
+  return undefined;
+}
+
 /** One-line notice for surfaces with room for a single message, such as a toast. */
 export function aiCreditsNotice(body: any, t: TranslateFn): I18nText {
   const remedy = aiCreditsRemedy(body, t);

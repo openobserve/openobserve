@@ -15,7 +15,12 @@
 
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
-import { aiCreditsNotice, aiCreditsRemedy, isAiCreditsExhausted } from "./aiCredits";
+import {
+  aiCreditsAction,
+  aiCreditsNotice,
+  aiCreditsRemedy,
+  isAiCreditsExhausted,
+} from "./aiCredits";
 
 const body = (over: Record<string, unknown>) => ({
   error_type: "ai_credits_exhausted",
@@ -41,6 +46,12 @@ describe("aiCredits", () => {
       "Contact your account manager to add more AI credits",
     );
     expect(aiCreditsRemedy(body({ remedy: "retry" }), gt)).toBe("server wording");
+  });
+
+  it("points each remedy at the page that unblocks it", () => {
+    expect(aiCreditsAction(body({ remedy: "subscribe" }))).toBe("plans");
+    expect(aiCreditsAction(body({ remedy: "contact_account_manager" }))).toBe("contact");
+    expect(aiCreditsAction(body({ remedy: "retry" }))).toBeUndefined();
   });
 
   it("joins the headline and remedy for one-line surfaces", () => {

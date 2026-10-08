@@ -1530,7 +1530,7 @@ import {
   usePaidOverageConsent,
 } from "@/composables/usePaidOverageConsent";
 import BillingService, { type AiCreditCounts } from "@/services/billings";
-import { aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
+import { aiCreditsAction, aiCreditsNotice, isAiCreditsExhausted } from "@/utils/aiCredits";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -1753,7 +1753,9 @@ export default defineComponent({
     // show elapsed time and flag a run that has outlived the server's staleness window.
     const analysisStartedAt = ref<number | null>(null);
     // Last terminal failure, surfaced persistently in the panel instead of a transient toast.
-    const rcaError = ref<{ reason: string; details: string } | null>(null);
+    const rcaError = ref<{ reason: string; details: string; remedy?: "plans" | "contact" } | null>(
+      null,
+    );
     const rcaCancelling = ref(false);
 
     // Superseded reports (newest first) and which one is being viewed.
@@ -2978,6 +2980,7 @@ export default defineComponent({
 
         // A denied request never started on the server. Stop optimistic loading
         // and polling while the user decides whether to authorize paid usage.
+        const wasLoading = rcaLoading.value;
         rcaLoading.value = false;
         analysisStartedAt.value = null;
         if (!analysisInFlight.value) stopInFlightPolling();
@@ -2990,11 +2993,22 @@ export default defineComponent({
           incidentDetails.value?.id === incidentId;
         if (!accepted || !drawerStillActive) {
           if (!accepted && drawerStillActive) {
-            toast({ variant: "info", message: t("paidUsage.declinedNotice") });
+            // Persist it with the way out: Plans is where paid usage is turned on.
+            rcaError.value = {
+              reason: t("paidUsage.declinedNotice"),
+              details: "",
+              remedy: "plans",
+            };
           }
           return null;
         }
 
+        // The replacement request is the run itself, so it gets the running state back.
+        if (wasLoading) {
+          rcaLoading.value = true;
+          analysisStartedAt.value = Date.now() * 1000;
+          startInFlightPolling();
+        }
         // Exactly one guarded replacement request. A second denial propagates.
         return incidentsService.triggerRca(org, incidentId, params, { signal });
       }
@@ -3067,6 +3081,13 @@ export default defineComponent({
                       typeof responseData.message === "string"
                     ? raw(responseData.message)
                     : t("alerts.incidents.reanalysisStartFailed");
+                if (isAiCreditsExhausted(responseData)) {
+                  rcaError.value = {
+                    reason: message,
+                    details: "",
+                    remedy: aiCreditsAction(responseData),
+                  };
+                }
                 toast({ variant: "error", message });
               }
             }
@@ -3566,7 +3587,11 @@ export default defineComponent({
           ? aiCreditsNotice(responseData, t)
           : responseData?.message || error?.message || t("alerts.incidents.rcaFailedGeneric");
         // Persist the failure in the panel; the toast alone disappears.
-        rcaError.value = { reason: message, details: "" };
+        rcaError.value = {
+          reason: message,
+          details: "",
+          remedy: isAiCreditsExhausted(responseData) ? aiCreditsAction(responseData) : undefined,
+        };
         toast({ variant: "error", message });
         // Surface the failure event in the Activity timeline too.
         timelineRefreshTrigger.value++;

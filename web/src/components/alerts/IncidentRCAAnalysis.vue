@@ -18,12 +18,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="rca-analysis-container" class="flex flex-1 flex-col overflow-hidden">
     <!-- Persistent failure state. Rendered above any existing report so a failed
          reanalysis is visible without hiding the previous result. -->
-    <OBanner
-      v-if="rcaError && !isRunning"
+    <!-- AI credits blocked the run: same look as the chat's credits notice, with the
+         page that unblocks it first. Retry stays for after the org fixes it. -->
+    <div
+      v-if="rcaError && !isRunning && rcaError.remedy"
       data-test="rca-error-banner"
-      variant="error"
+      class="rounded-default border-border-default bg-surface-subtle mb-2 flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border px-3 py-2 text-xs"
+    >
+      <div class="min-w-0 flex-1">
+        <div class="text-status-error-text font-semibold">
+          {{ t("alerts.incidents.rcaBlocked") }}
+        </div>
+        <div data-test="rca-error-reason" class="text-text-secondary">
+          {{ rcaError.reason }}
+        </div>
+      </div>
+      <OButton
+        v-if="rcaError.remedy === 'plans'"
+        data-test="rca-plans-btn"
+        variant="primary"
+        size="xs"
+        @click="openPlans"
+      >
+        {{ t("billing.plansLabel") }}
+      </OButton>
+      <OButton v-else data-test="rca-contact-btn" variant="primary" size="xs" @click="contactSales">
+        {{ t("billing.contactLabel") }}
+      </OButton>
+      <OButton data-test="rca-retry-btn" variant="outline" size="xs" @click="$emit('trigger-rca')">
+        {{ t("alerts.incidents.rcaRetry") }}
+      </OButton>
+    </div>
+    <OBanner
+      v-else-if="rcaError && !isRunning"
+      data-test="rca-error-banner"
+      variant="error-soft"
       icon="error-outline"
-      class="mb-2 flex-shrink-0"
+      class="mb-2 flex-shrink-0 border-0!"
     >
       <p class="mb-0 font-medium">{{ t("alerts.incidents.rcaFailed") }}</p>
       <p data-test="rca-error-reason" class="mt-0.5 mb-0 text-xs opacity-90">
@@ -285,7 +316,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
+import { siteURL } from "@/constants/config";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -295,9 +329,11 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { ArchivedRcaReport } from "@/services/incidents";
 
-interface RcaError {
+export interface RcaError {
   reason: string;
   details: string;
+  /** Set when AI credits blocked the run: what unblocks it, shown instead of Retry. */
+  remedy?: "plans" | "contact";
 }
 
 /** Compact "3m" / "2h 5m" / "4d" elapsed label from a millisecond delta. */
@@ -402,7 +438,25 @@ export default defineComponent({
 
     const sanitize = (html: string): string => DOMPurify.sanitize(html);
 
-    return { t, isRunning, analyzedAgoLabel, formatArchivedAt, sanitize };
+    const router = useRouter();
+    const store = useStore();
+    // Plans is where an org subscribes or turns on paid AI usage.
+    const openPlans = () =>
+      router.push({
+        name: "plans",
+        query: { org_identifier: store.state.selectedOrganization?.identifier },
+      });
+    const contactSales = () => window.open(siteURL.contactSales, "_blank");
+
+    return {
+      t,
+      isRunning,
+      analyzedAgoLabel,
+      formatArchivedAt,
+      sanitize,
+      openPlans,
+      contactSales,
+    };
   },
 });
 </script>

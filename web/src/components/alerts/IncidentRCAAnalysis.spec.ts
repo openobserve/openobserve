@@ -556,6 +556,13 @@ describe("IncidentRCAAnalysis", () => {
       expect(wrapper.emitted("trigger-rca")).toBeTruthy();
     });
 
+    it("should lead with Plans when AI credits blocked the run", () => {
+      wrapper = mountComponent({ rcaError: { ...failure, remedy: "plans" } });
+
+      expect(existsByTestId(wrapper, "rca-plans-btn")).toBe(true);
+      expect(existsByTestId(wrapper, "rca-error-details")).toBe(false);
+    });
+
     it("should keep an existing report visible alongside a failed reanalysis", () => {
       wrapper = mountComponent({
         rcaError: failure,

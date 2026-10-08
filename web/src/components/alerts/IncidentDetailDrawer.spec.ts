@@ -629,13 +629,18 @@ describe("IncidentDetailDrawer.vue", () => {
         },
       };
       mockPromptForConsent.mockResolvedValue(true);
+      let loadingDuringRetry = false;
       vi.mocked(incidentsService.triggerRca)
         .mockRejectedValueOnce(consentError)
-        .mockResolvedValueOnce({
-          data: { rca_content: "Authorized RCA" },
+        .mockImplementationOnce(async () => {
+          // The authorized run must show the in-progress banner again.
+          loadingDuringRetry = wrapper.vm.rcaLoading;
+          return { data: { rca_content: "Authorized RCA" } } as any;
         });
 
       await wrapper.vm.triggerRca();
+
+      expect(loadingDuringRetry).toBe(true);
 
       expect(mockPromptForConsent).toHaveBeenCalledTimes(1);
       expect(incidentsService.triggerRca).toHaveBeenCalledTimes(2);
@@ -666,12 +671,12 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.triggerRca();
 
       expect(incidentsService.triggerRca).toHaveBeenCalledTimes(1);
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "info",
-          message: "Paid AI usage is off, so this request wasn't sent.",
-        }),
-      );
+      // Persisted in the panel with a way to turn paid usage on.
+      expect(wrapper.vm.rcaError).toEqual({
+        reason: "Paid AI usage is off, so this request wasn't sent.",
+        details: "",
+        remedy: "plans",
+      });
     });
   });
 

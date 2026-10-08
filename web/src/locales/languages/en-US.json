@@ -7975,6 +7975,7 @@
       "rcaCancelled": "Analysis cancelled",
       "rcaCancelFailed": "Failed to cancel analysis",
       "rcaFailed": "AI analysis failed",
+      "rcaBlocked": "AI analysis didn't run",
       "rcaFailedGeneric": "Failed to perform RCA analysis",
       "rcaRetry": "Retry analysis",
       "rcaStale": "This analysis has been running unusually long and may have stopped. You can cancel it and try again.",
