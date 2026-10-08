@@ -121,6 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="h-full max-lg:overflow-y-auto"
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <FirstDataPanel
                         v-slot="{ layout, statusLine }"
                         signal="logs"
@@ -165,6 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="h-full max-lg:overflow-y-auto"
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
                         :stream-type="searchObj.data.stream.streamType"
@@ -178,6 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
                       data-test="logs-search-filter-error-message"
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <LogsErrorState
                         :error-code="0"
                         :error-msg="searchObj.data.filterErrMsg"
@@ -192,6 +210,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="searchObj.data.freeTextBlocked && searchObj.loading == false"
                       class="h-full"
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <LogsNoFtsPanel
                         :streams="noFtsPanelStreams"
                         @configure="onConfigureFreeTextStream"
@@ -201,6 +225,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
                       data-test="logs-search-error-state"
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <LogsErrorState
                         :error-code="parseInt(searchObj.data.errorCode) || 0"
                         :error-msg="searchObj.data.errorMsg"
@@ -219,6 +249,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div v-else-if="showGuardEmptyState" class="h-full max-lg:overflow-y-auto">
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <LogsAutoRunGuard
                         :blocked="searchObj.meta.autoRunBlocked"
                         :auto-run-on="isAutoRunOn"
@@ -240,6 +276,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex h-full flex-col"
                       data-test="logs-search-no-events-found-text"
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <!-- With no rows the results grid is gone, so the exclusions banner moves here. -->
                       <LogsMissingStreamBanner
                         v-if="searchObj.data.missingStreamMessage"
@@ -271,6 +313,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.searchApplied == false
                       "
                     >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <OEmptyState
                         preset="no-query-applied"
                         size="hero"
@@ -324,6 +372,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OBadge>
                         <OTooltip :content="t('search.autoRunStaleTooltip')" />
                       </div>
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
                       <div class="min-h-0 flex-1">
                         <SearchResult
                           ref="searchResultRef"
@@ -540,6 +594,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-row-nav-live">
       {{ rowNavAnnouncement }}
     </div>
+    <LogsPermalinkDrawer
+      @search-around="runSearchAround"
+      @add-search-term="onPermalinkAddSearchTerm"
+      @send-to-ai-chat="sendToAiChat"
+    />
   </div>
 </template>
 
@@ -620,6 +679,31 @@ import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import LogsNoFtsPanel from "@/plugins/logs/LogsNoFtsPanel.vue";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import LogsAutoRunGuard from "@/plugins/logs/LogsAutoRunGuard.vue";
+import LogsPermalinkBanner from "@/plugins/logs/LogsPermalinkBanner.vue";
+import LogsPermalinkDrawer from "@/plugins/logs/LogsPermalinkDrawer.vue";
+import {
+  activePermalink,
+  clearColumnsFromUrl,
+  clearPermalink,
+  currentInitOrigin,
+  initOriginForRun,
+  resetPermalinkState,
+  sharedLineRecord,
+} from "@/composables/useLogs/useLogPermalink";
+import {
+  beginPermalinkFromUrl,
+  resolveActivePermalink,
+  retryPermalinkResolve,
+  type ResolveContext,
+} from "@/composables/useLogs/permalinkResolve";
+import {
+  parseSharedPage,
+  resetShownSearch,
+  sharedPage,
+  sharedPageNotice,
+} from "@/composables/useLogs/useLogsUrl";
+import { useLogsUrlSync } from "@/composables/useLogs/useLogsUrlSync";
+import { useSearchAround } from "@/composables/useLogs/searchAround";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
@@ -644,6 +728,7 @@ import {
   nextJobRequestId,
   notePageLoad,
   notePageRequest,
+  resetRowSelection,
 } from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -657,6 +742,8 @@ export default defineComponent({
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
     LogsNoFtsPanel,
     LogsMissingStreamBanner,
+    LogsPermalinkBanner,
+    LogsPermalinkDrawer,
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("@/plugins/traces/metrics/TracesAnalysisDashboard.vue"),
     ),
@@ -814,6 +901,7 @@ export default defineComponent({
       loadPatternsData,
       runGridSearch,
       resetRunStateForReapply,
+      getFilterExpressionByFieldType,
     } = useLogs(t);
     const autoRun = useLogsAutoRun();
 
@@ -834,6 +922,7 @@ export default defineComponent({
       isLimitQuery,
       updateUrlQueryParams,
       generateURLQuery,
+      patchUrlViewState,
       addTraceId,
     } = logsUtils();
     const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
@@ -968,6 +1057,7 @@ export default defineComponent({
     onBeforeUnmount(async () => {
       // Cancel all the search queries
       if (store.state.refreshIntervalID) clearInterval(store.state.refreshIntervalID);
+      endSharedLinkSession();
 
       autoRun.engine.cancelGeneration(null, { cause: "unmount" });
       cancelPatterns();
@@ -1156,7 +1246,7 @@ export default defineComponent({
       let mode: "full" | "page" | "page-size" = "full";
       if (ctx.op === "page") mode = ctx.reason === "page-size" ? "page-size" : "page";
       try {
-        await runGridSearch(generationId, mode);
+        await runGridSearch(generationId, mode, initOriginForRun(ctx.origin));
         refreshHistogramChart();
         if (mode === "full") showJobScheduler.value = true;
       } finally {
@@ -1377,7 +1467,11 @@ export default defineComponent({
             !!urlOrgId && urlOrgId !== store.state.selectedOrganization.identifier;
 
           if (!isOrgMismatch) {
+            startSharedLinkSession(router.currentRoute.value.query);
             await restoreUrlQueryParams(dashboardPanelData);
+            if (activePermalink.value) void resolveActivePermalink(permalinkResolveContext());
+          } else {
+            endSharedLinkSession();
           }
 
           if (
@@ -1403,7 +1497,7 @@ export default defineComponent({
               await applyReAppliedQuery();
             } else {
               searchObj.loading = true;
-              loadLogsData("landing");
+              loadLogsData("landing", { origin: currentInitOrigin() ?? undefined });
             }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
@@ -1570,6 +1664,7 @@ export default defineComponent({
     function handleOrganizationChange() {
       bumpSelectionToken();
       autoRun.engine.resetScope("org");
+      endSharedLinkSession();
       searchObj.meta.freeTextScan = {};
       searchObj.loading = true;
       resetStreamData();
@@ -1767,7 +1862,7 @@ export default defineComponent({
       }
       autoRun.engine.onRefreshIntervalChanged(Number(searchObj.meta.refreshInterval) || 0);
 
-      updateUrlQueryParams();
+      patchUrlViewState();
       refreshData();
     };
 
@@ -2119,7 +2214,6 @@ export default defineComponent({
         if (searchObj.meta.sqlMode == true) {
           searchObj.data.query = replaceSelectFieldList(searchObj.data.query, field_list);
           setQuery(searchObj.meta.quickMode);
-          updateUrlQueryParams();
         }
       }
     };
@@ -2623,7 +2717,7 @@ export default defineComponent({
 
             // Sync visualization data to URL parameters when chart type changes
             if (searchObj.meta.logsVisualizeToggle === "visualize") {
-              updateUrlQueryParams(dashboardPanelData);
+              patchUrlViewState(dashboardPanelData);
             }
           } else {
             // reset dashboard panel data as we will rebuild when user came back to visualize
@@ -2732,7 +2826,7 @@ export default defineComponent({
 
         // Sync visualization data to URL parameters when chart type changes
         if (searchObj.meta.logsVisualizeToggle === "visualize") {
-          updateUrlQueryParams(dashboardPanelData);
+          patchUrlViewState(dashboardPanelData);
         }
       },
     );
@@ -2743,7 +2837,7 @@ export default defineComponent({
       () => {
         // Sync build data to URL parameters when chart type changes
         if (searchObj.meta.logsVisualizeToggle === "build") {
-          updateUrlQueryParams(null, buildDashboardPanelData);
+          patchUrlViewState(null, buildDashboardPanelData);
         }
       },
     );
@@ -2753,7 +2847,7 @@ export default defineComponent({
       () => buildDashboardPanelData.data.config,
       () => {
         if (searchObj.meta.logsVisualizeToggle === "build") {
-          updateUrlQueryParams(null, buildDashboardPanelData);
+          patchUrlViewState(null, buildDashboardPanelData);
         }
       },
       { deep: true },
@@ -2985,7 +3079,7 @@ export default defineComponent({
         if (generationId != null) autoRun.markPanelDispatched(generationId);
 
         // Sync visualization config to URL parameters
-        updateUrlQueryParams(dashboardPanelData);
+        patchUrlViewState(dashboardPanelData);
         return true;
       }
 
@@ -3022,7 +3116,7 @@ export default defineComponent({
         if (!launched) return false;
 
         // Sync build config to URL parameters
-        updateUrlQueryParams(null, buildQueryPageRef.value?.dashboardPanelData);
+        patchUrlViewState(null, buildQueryPageRef.value?.dashboardPanelData);
         return true;
       }
       return false;
@@ -3630,9 +3724,98 @@ export default defineComponent({
       { deep: true },
     );
 
+    // Run anyway on the initial-load generation keeps the shared line open (CROSS-SPEC row 10).
     const onGuardRunAnyway = () => {
-      autoRun.engine.runAnyway();
+      autoRun.engine.runAnyway({ origin: initOriginForRun(currentInitOrigin()) });
     };
+
+    /** Initial load only: reads `page` and `log_*` before restore (4c C5 step 2, C7). */
+    const startSharedLinkSession = (query: Record<string, any>) => {
+      clearColumnsFromUrl();
+      resetShownSearch();
+      const refreshOff = !(Number(query.refresh) > 0);
+      const page = refreshOff ? parseSharedPage(query.page) : null;
+      sharedPage.value = page !== null && page > 1 ? page : null;
+      sharedPageNotice.value = null;
+      beginPermalinkFromUrl(query, store.state.selectedOrganization.identifier);
+    };
+
+    /** Leaving Logs or switching org: no shared line, page notice, link columns or shown run survive. */
+    const endSharedLinkSession = () => {
+      resetPermalinkState();
+      clearColumnsFromUrl();
+      resetShownSearch();
+      sharedPage.value = null;
+      sharedPageNotice.value = null;
+    };
+
+    const permalinkResolveContext = (): ResolveContext => {
+      const superCluster = !!store.state.zoConfig?.super_cluster_enabled;
+      return {
+        regions: superCluster ? [...(searchObj.meta.regions ?? [])] : [],
+        clusters: superCluster ? [...(searchObj.meta.clusters ?? [])] : [],
+        multiStream: searchObj.data.stream.selectedStream.length > 1,
+        allFieldsName: store.state.zoConfig?.all_fields_name,
+        retentionDays: (stream: string) => {
+          const entry = (searchObj.data.streamResults?.list ?? []).find(
+            (item: any) => item?.name === stream,
+          );
+          const days = Number(entry?.settings?.data_retention ?? 0);
+          return days > 0 ? days : null;
+        },
+      };
+    };
+
+    const onPermalinkRetry = () => {
+      void retryPermalinkResolve(permalinkResolveContext());
+    };
+
+    // "Show these lines" is a user scope change that ends the permalink; SearchBar keeps the 1 µs window through the picker echo.
+    const onPermalinkShowLines = (ts: number) => {
+      onJumpToStreamData(ts, ts + 1);
+    };
+
+    const { searchAroundData } = useSearchAround();
+
+    const runSearchAround = (params: {
+      key: unknown;
+      size: number;
+      body: Record<string, unknown>;
+    }) => {
+      clearPermalink();
+      searchObj.meta.showDetailTab = false;
+      resetRowSelection(searchObj);
+      searchObj.data.searchAround.indexTimestamp = params.key;
+      searchAroundData(params as any);
+    };
+
+    const onPermalinkShowInContext = () => {
+      const record = sharedLineRecord.value;
+      const ts = activePermalink.value?.link.ts;
+      if (!record || ts === undefined) return;
+      runSearchAround({ key: ts, size: 10, body: { ...record } });
+    };
+
+    const onPermalinkAddSearchTerm = (
+      field: string | number,
+      value: string | number | boolean,
+      action: string,
+    ) => {
+      searchObj.data.stream.addToFilterMode = "append";
+      searchObj.data.stream.addToFilter = getFilterExpressionByFieldType(field, value, action);
+    };
+
+    const onSharedPageGo = (page: number) => {
+      sharedPageNotice.value = null;
+      searchResultRef.value?.changePage?.(page);
+    };
+
+    useLogsUrlSync({
+      panelData: (surface) =>
+        surface === "visualize"
+          ? dashboardPanelData
+          : (buildQueryPageRef.value?.dashboardPanelData ?? buildDashboardPanelData),
+    });
 
     // Narrow to sets only the date, then runs once after re-checking the guard (J5).
     const onGuardNarrow = (period: string) => {
@@ -3774,6 +3957,13 @@ export default defineComponent({
       onSplitterUpdate,
       updateGridColumns,
       updateUrlQueryParams,
+      patchUrlViewState,
+      onPermalinkRetry,
+      onPermalinkShowLines,
+      onPermalinkShowInContext,
+      onPermalinkAddSearchTerm,
+      runSearchAround,
+      onSharedPageGo,
       refreshHistogramChart,
       onChangeInterval,
       onAutoIntervalTrigger,
@@ -3945,7 +4135,7 @@ export default defineComponent({
         }
       }
 
-      this.updateUrlQueryParams();
+      this.patchUrlViewState();
     },
     moveSplitter() {
       if (this.searchObj.meta.showFields == false) {
@@ -4010,7 +4200,6 @@ export default defineComponent({
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
           this.setQuery(newVal);
-          this.updateUrlQueryParams();
         }
       } else {
         this.searchObj.meta.sqlMode = false;

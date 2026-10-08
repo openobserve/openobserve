@@ -616,6 +616,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("logs.cellActions.copy") }}
               </OContextMenuItem>
 
+              <OContextMenuItem
+                v-if="contextLineLink.kind !== 'hidden'"
+                icon-left="link"
+                :disabled="contextLineLink.kind === 'disabled'"
+                data-test="log-context-menu-copy-line-link"
+                @select="copyLineLink(contextCell.row, 'menu')"
+              >
+                <!-- A child tooltip binds to its previous sibling, so the label gets its own box. -->
+                <span class="min-w-0 flex-1">
+                  <OTooltip
+                    v-if="contextLineLink.kind === 'disabled'"
+                    :content="contextLineLink.reason"
+                    side="right"
+                  />
+                  {{ t("search.linePermalink.copyLinkMenu") }}
+                </span>
+              </OContextMenuItem>
+
               <template v-if="contextCellIsStreamField">
                 <OContextMenuItem
                   data-test="log-context-menu-include-term"
@@ -716,7 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.rowDetail')"
         :sub-title="drawerSubTitle"
         :return-focus-to="detailReturnFocus"
-        @update:open="(v) => !v && reDrawChart()"
+        @update:open="(v) => !v && (reDrawChart(), endSharedDetail())"
         @after-close="onDetailDrawerAfterClose"
       >
         <DetailTable
@@ -746,7 +764,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
-          @close="searchObj.meta.showDetailTab = false"
+          @close="onDetailUserClose"
           @view-trace="redirectToTraces(detailRow)"
           @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
@@ -757,6 +775,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ detailNavAnnouncement }}
         </div>
       </ODrawer>
+
+      <!-- The menu closes on select, so the fallback popover anchors where the right-click landed, outside the scrolling results. -->
+      <div
+        v-if="menuLinkAnchor"
+        class="pointer-events-none fixed size-0"
+        :style="{ insetInlineStart: `${menuLinkAnchor.x}px`, top: `${menuLinkAnchor.y}px` }"
+      >
+        <LogLineLinkPopover source="menu" />
+      </div>
 
       <!-- Pattern Details Drawer -->
       <PatternDetailsDialog
@@ -845,6 +872,19 @@ import {
   setPageNavFailureHandler,
 } from "@/composables/useLogs/logsRowNav";
 import { nextRowTarget } from "@/utils/rowNavigation";
+import {
+  activePermalink,
+  clearColumnsFromUrl,
+  clearPermalink,
+  columnsFromUrl,
+  permalinkHighlightTs,
+  permalinkRowIndex,
+  searchResultMounts,
+  sharedLineRecord,
+} from "@/composables/useLogs/useLogPermalink";
+import { useLogLineLink, type LineLinkState } from "@/composables/useLogs/useLogLineLink";
+import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
+import { traceDetailsLocation } from "@/composables/useLogs/useViewTraceAction";
 import { matchDetailRow, trustworthyFields } from "@/utils/logs/detailRowMatch";
 import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
@@ -893,6 +933,7 @@ import {
 export default defineComponent({
   name: "SearchResult",
   components: {
+    LogLineLinkPopover,
     ORefreshButton,
     OButton,
     ODrawer,
@@ -992,6 +1033,7 @@ export default defineComponent({
         ] = [...newColOrder];
 
         if (newColOrder.length > 0) {
+          clearColumnsFromUrl();
           this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
@@ -1054,6 +1096,7 @@ export default defineComponent({
     closeColumn(col: any) {
       // Explicit user action — clear the system-pick marker so the result persists.
       this.searchObj.meta.isFtsDefaultColumn = false;
+      clearColumnsFromUrl();
       let selectedFields = this.reorderSelectedFields();
 
       // `col` is the OTable columnDef, which carries `id` but not the original
@@ -1110,6 +1153,8 @@ export default defineComponent({
       }
     },
     onTimeBoxed(obj: any) {
+      // Search-around is a user scope change, so it ends a shared line (4c C5 step 6b).
+      clearPermalink();
       this.searchObj.meta.showDetailTab = false;
       // Search-around never reaches getQueryData, so it drops the old open row itself (AC5.4).
       resetRowSelection(this.searchObj);
@@ -1888,10 +1933,15 @@ export default defineComponent({
       return null;
     });
 
-    const navDisabledReason = computed<"resultsChanged" | "loading" | null>(() => {
+    // True while the drawer shows the resolved record of an opened line link (4c C5).
+    const detailIsShared = ref(false);
+
+    const navDisabledReason = computed<"resultsChanged" | "notInPage" | "loading" | null>(() => {
       if (navigation().pendingPageSelection) return null;
       if (!hitsSettled()) return "loading";
-      if (navigation().currentRowIndex == null) return "resultsChanged";
+      if (navigation().currentRowIndex == null) {
+        return detailIsShared.value ? "notInPage" : "resultsChanged";
+      }
       return null;
     });
 
@@ -1969,7 +2019,11 @@ export default defineComponent({
         record = target.record;
       }
       if (!record) return false;
-      if ((options.origin ?? "user") !== "crossing") navigation().pendingPageSelection = null;
+      const origin = options.origin ?? "user";
+      // The user's own row always wins over a shared line, pending or open (4c C5 step 6c).
+      if (origin !== "permalink" && activePermalink.value) clearPermalink();
+      detailIsShared.value = origin === "permalink";
+      if (origin !== "crossing") navigation().pendingPageSelection = null;
       const tab =
         options.tab ?? (searchObj.meta.showDetailTab ? detailTableInitialTab.value : "json");
       detailRow.value = { ...record };
@@ -2173,14 +2227,11 @@ export default defineComponent({
       if (message) nextTick(() => announceInto(rowNavAnnouncement, message));
     };
 
-    /** Keeps the open drawer on its row after a search replaced the hits (4a §3.2.7 "Row match"). */
-    const rematchDetailRow = () => {
-      const snapshot = detailRow.value;
-      if (!snapshot) return;
+    const executedTrustworthy = () => {
       const executed = searchObj.meta.executed as
         { signature?: { sqlMode?: boolean }; req?: any } | null | undefined;
       const options = { timestampColumn: logsTimestampCol.value };
-      const fields = executed?.req
+      return executed?.req
         ? trustworthyFields(
             {
               sqlMode: !!executed.signature?.sqlMode,
@@ -2190,14 +2241,68 @@ export default defineComponent({
             options,
           )
         : "all";
-      navigation().currentRowIndex = matchDetailRow(hitsList(), snapshot, fields, options);
+    };
+
+    /** Keeps the open drawer on its row after a search replaced the hits (4a §3.2.7 "Row match"). */
+    const rematchDetailRow = () => {
+      const snapshot = detailRow.value;
+      if (!snapshot) return;
+      const options = { timestampColumn: logsTimestampCol.value };
+      navigation().currentRowIndex = matchDetailRow(
+        hitsList(),
+        snapshot,
+        executedTrustworthy(),
+        options,
+      );
+    };
+
+    /** Maps the shared line onto the loaded page: open-row highlight, scroll, and J/K resume from it (4c C5 row 7). */
+    const mapSharedLine = () => {
+      const record = detailRow.value;
+      if (!record) return;
+      const hits = hitsList();
+      const snapshot: Record<string, any> = { ...record };
+      // The resolve always carries _o2_id; a page whose projection dropped it must still match on content.
+      if (!hits.some((hit) => hit?._o2_id !== undefined)) delete snapshot._o2_id;
+      const options = { timestampColumn: logsTimestampCol.value };
+      const index = matchDetailRow(hits, snapshot, executedTrustworthy(), options);
+      navigation().currentRowIndex = index;
+      permalinkRowIndex.value = index;
+      if (index === null) return;
+      navigation().selectionActive = true;
+      scrollRowIntoView(index);
     };
 
     const stopHitsComplete = onHitsComplete((payload) => {
       if (payload.type !== "search" || navigation().pendingPageSelection) return;
       if (!searchObj.meta.showDetailTab || !detailRow.value) return;
-      rematchDetailRow();
+      if (detailIsShared.value && sharedLineRecord.value) mapSharedLine();
+      else rematchDetailRow();
     });
+
+    // Opens the shared line whatever the first search is doing; a page already loaded maps at once.
+    watch(
+      sharedLineRecord,
+      (record) => {
+        if (!record) return;
+        openDetail({ record }, { origin: "permalink", tab: "json" });
+        const executed = searchObj.meta.executed as { complete?: boolean } | null | undefined;
+        if (executed?.complete && hitsSettled() && hitsList().length) mapSharedLine();
+      },
+      { immediate: true },
+    );
+
+    // An explicit close of the drawer ends the shared line and drops log_* (4c C5 step 6a).
+    const endSharedDetail = () => {
+      if (detailIsShared.value) clearPermalink();
+    };
+
+    const onDetailUserClose = () => {
+      searchObj.meta.showDetailTab = false;
+      endSharedDetail();
+    };
+
+    searchResultMounts.value += 1;
 
     const stopPageNavFailure = setPageNavFailureHandler(({ quiet }) => {
       const pending = navigation().pendingPageSelection;
@@ -2205,6 +2310,7 @@ export default defineComponent({
     });
 
     onBeforeUnmount(() => {
+      searchResultMounts.value = Math.max(0, searchResultMounts.value - 1);
       stopHitsComplete();
       stopPageNavFailure();
       // A failed page can swap the results for the error state before the drawer reports its close.
@@ -2242,6 +2348,7 @@ export default defineComponent({
       // Explicit user action — this selection is now user-owned, so allow it to
       // persist (clears any prior system-pick FTS-default marker).
       searchObj.meta.isFtsDefaultColumn = false;
+      clearColumnsFromUrl();
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields.filter(
           (v: any) => v !== fieldName,
@@ -2274,27 +2381,7 @@ export default defineComponent({
         return;
       }
 
-      // 15 mins +- from the log timestamp
-      const from = log[store.state.zoConfig.timestamp_column] - 900000000;
-      const to = log[store.state.zoConfig.timestamp_column] + 900000000;
-      const refresh = 0;
-
-      const query: any = {
-        name: "traceDetails",
-        query: {
-          stream: searchObj.meta.selectedTraceStream,
-          from,
-          to,
-          refresh,
-          org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: log[store.state.organizationData.organizationSettings.trace_id_field_name],
-          reload: "true",
-        },
-      };
-
-      query["span_id"] = log[store.state.organizationData.organizationSettings.span_id_field_name];
-
-      router.push(query);
+      router.push(traceDetailsLocation(log, store.state, searchObj.meta.selectedTraceStream));
     };
 
     const getTableWidth = computed(() => {
@@ -2354,6 +2441,7 @@ export default defineComponent({
 
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
+      endSharedDetail();
       // Clear correlation data when closing sidebar so it doesn't persist to next "row"
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
@@ -2399,6 +2487,8 @@ export default defineComponent({
           if (searchObj.meta.sqlMode) {
             return;
           }
+          // A shared link's columns, including [], are rendered as given (4c C7).
+          if (columnsFromUrl.value) return;
           // Only the system may overwrite a column the system itself picked.
           // isFtsDefaultColumn is the authoritative "current columns are a system
           // pick" signal: it is true only when this watcher set the columns, and
@@ -2548,6 +2638,11 @@ export default defineComponent({
     }
 
     const contextCell = ref<ContextCell | null>(null);
+    const menuLinkAnchor = ref<{ x: number; y: number } | null>(null);
+    const { lineLinkState, copyLineLink } = useLogLineLink();
+    const contextLineLink = computed<LineLinkState>(() =>
+      contextCell.value ? lineLinkState(contextCell.value.row) : { kind: "hidden" },
+    );
 
     const contextCellIsStreamField = computed(() => {
       const columnId = contextCell.value?.columnId;
@@ -2578,6 +2673,7 @@ export default defineComponent({
 
     const handleTableContextMenu = (event: MouseEvent) => {
       contextCell.value = null;
+      menuLinkAnchor.value = { x: event.clientX, y: event.clientY };
       const target = event.target;
       if (!(target instanceof Element) || !target.closest?.(DATA_CELL_SELECTOR)) {
         event.preventDefault();
@@ -2661,6 +2757,23 @@ export default defineComponent({
       if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
         classes.push("bg-table-row-selected-bg");
       }
+      // Ambiguous timestamp link: every loaded row at that µs, without the open-row ring (DECISIONS S-C3).
+      const sharedTs = permalinkHighlightTs.value;
+      const sharedStream = activePermalink.value?.link.stream;
+      if (
+        sharedTs !== null &&
+        Number(row[logsTimestampCol.value]) === sharedTs &&
+        (row._stream_name === undefined || row._stream_name === sharedStream)
+      ) {
+        classes.push("bg-table-row-selected-bg o2-log-permalink-match");
+      }
+      if (
+        activePermalink.value &&
+        permalinkRowIndex.value !== null &&
+        logsRowIndex(row) === permalinkRowIndex.value
+      ) {
+        classes.push("o2-log-permalink-row");
+      }
       // Carries the detected severity for the status spine, which is otherwise
       // only readable as a colour.
       classes.push(severityRowClass(rowSeverity(row)));
@@ -2712,6 +2825,12 @@ export default defineComponent({
       detailReturnFocus,
       onDetailDrawerAfterClose,
       detailRow,
+      detailIsShared,
+      endSharedDetail,
+      onDetailUserClose,
+      contextLineLink,
+      copyLineLink,
+      menuLinkAnchor,
       detailOpenSeq,
       detailActiveTab,
       onDetailTabChange,

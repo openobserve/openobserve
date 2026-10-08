@@ -1090,6 +1090,15 @@ describe("useSearchQuery › getQueryReq records the severity guard of the dispa
     expect(getQueryReq(false)).toBeNull();
     expect(recordSeverityRequestMock).not.toHaveBeenCalled();
   });
+
+  it("writes no URL at dispatch: the run publishes it when its first results arrive (4c C7b)", async () => {
+    const { logsUtils } = await import("./logsUtils");
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).not.toBeNull();
+    for (const { value } of vi.mocked(logsUtils).mock.results) {
+      expect(value.updateUrlQueryParams).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe("useSearchQuery › getQueryReq signature contract (AC5.2)", () => {

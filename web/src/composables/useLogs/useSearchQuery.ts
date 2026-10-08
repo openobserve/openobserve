@@ -318,7 +318,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     isWithQuery,
     isLimitQuery,
     addTransformToQuery,
-    updateUrlQueryParams,
     fnUnparsedSQL,
     checkTimestampAlias,
   } = logsUtils();
@@ -931,7 +930,6 @@ export const useSearchQuery = (t: TranslateFn) => {
       req.query.sql = b64EncodeUnicode(req.query.sql);
     }
 
-    updateUrlQueryParams();
     return req;
   };
 

@@ -45,6 +45,13 @@ import type { RunReason } from "@/composables/useLogs/useAutoRun";
 import { resetTransient } from "@/utils/logs/transientSearchKeys";
 import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
+import {
+  decodeColumns,
+  initShownSearchFromUrl,
+  parseRowsParam,
+  writeLogsUrl,
+} from "@/composables/useLogs/useLogsUrl";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 
 const useLogs = (t: TranslateFn) => {
   const store = useStore();
@@ -248,7 +255,7 @@ const useLogs = (t: TranslateFn) => {
   /** Loads the list, functions and fields, then requests the scope's first run (AC4.6 `reason` unless the URL names it). */
   const loadLogsData = async (
     reason: RunReason = "landing",
-    options: { ignoreUrl?: boolean } = {},
+    options: { ignoreUrl?: boolean; origin?: string } = {},
   ) => {
     try {
       const autoRun = useLogsAutoRun();
@@ -267,7 +274,7 @@ const useLogs = (t: TranslateFn) => {
       if (searchObj.meta.jobId == "") {
         const result =
           searchObj.data.stream.selectedStream.length > 0
-            ? autoRun.request(fromUrl ? "url" : reason)
+            ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
         if (result !== "scheduled" && result !== "dispatched") showNoQueryAppliedIfIdle();
       } else {
@@ -349,6 +356,7 @@ const useLogs = (t: TranslateFn) => {
   const runGridSearch = async (
     generationId: number,
     mode: "full" | "page" | "page-size" = "full",
+    origin?: string,
   ) => {
     if (mode !== "page") {
       searchObj.meta.refreshHistogram = true;
@@ -365,7 +373,7 @@ const useLogs = (t: TranslateFn) => {
       // A run that replaced this one while the schema loaded owns the shared results now.
       if (!useLogsAutoRun().engine.isCurrent(generationId)) return;
     }
-    await getQueryData(mode === "page", { generationId, reuseSchema: mode !== "full" });
+    await getQueryData(mode === "page", { generationId, reuseSchema: mode !== "full", origin });
   };
 
   // Search-history and AI re-apply load a scope for the user to run, so run-state from before is dropped.
@@ -469,6 +477,16 @@ const useLogs = (t: TranslateFn) => {
       searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
     }
 
+    // C7: page size and columns are applied before the first query; `page` only offers a notice.
+    const rows = parseRowsParam(queryParams.rows);
+    if (rows !== null) searchObj.meta.resultGrid.rowsPerPage = rows;
+    const columns = searchObj.meta.sqlMode ? null : decodeColumns(queryParams.columns);
+    if (columns !== null) {
+      searchObj.data.stream.selectedFields = columns;
+      searchObj.meta.isFtsDefaultColumn = false;
+      columnsFromUrl.value = true;
+    }
+
     searchObj.shouldIgnoreWatcher = false;
     if (Object.hasOwn(queryParams, "type") && queryParams.type == "search_history_re_apply") {
       delete queryParams.type;
@@ -494,13 +512,12 @@ const useLogs = (t: TranslateFn) => {
       searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;
     }
 
-    // TODO OK : Replace push with replace and test all scenarios
-    router.push({
-      query: {
-        ...queryParams,
-        sql_mode: searchObj.meta.sqlMode,
-        defined_schemas: searchObj.meta.useUserDefinedSchemas,
-      },
+    initShownSearchFromUrl(queryParams);
+    // Opening a link must not add a second history entry (C7b): the restore's own write replaces.
+    void writeLogsUrl("replace", {
+      ...queryParams,
+      sql_mode: searchObj.meta.sqlMode,
+      defined_schemas: searchObj.meta.useUserDefinedSchemas,
     });
   };
 

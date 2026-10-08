@@ -33,6 +33,13 @@ import useNotifications from "../composables/useNotifications";
 
 import store from "../test/unit/helpers/store";
 import i18nInstance from "@/locales";
+import {
+  bindLogsUrlRouter,
+  encodeColumns,
+  resetLogsUrlForTests,
+  shownSearch,
+} from "@/composables/useLogs/useLogsUrl";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 const t = (i18nInstance.global as any).t;
 
 // Mock toast
@@ -109,6 +116,7 @@ vi.mock("vue-router", () => ({
       },
     },
     push: vi.fn(),
+    replace: vi.fn(),
   }),
 }));
 
@@ -477,6 +485,7 @@ describe("Use Logs Composable", () => {
             },
           },
           push: vi.fn(),
+          replace: vi.fn(),
         }),
       }));
     });
@@ -631,6 +640,61 @@ describe("Use Logs Composable", () => {
 
       // Should have returned early
       expect(wrapper.vm.searchObj.shouldIgnoreWatcher).toBe(false);
+    });
+
+    it("writes its own URL with a replace, so opening a link adds no history entry (4c C7b)", async () => {
+      bindLogsUrlRouter(wrapper.vm.router);
+      wrapper.vm.router.replace = vi.fn();
+      wrapper.vm.router.push = vi.fn();
+      wrapper.vm.router.currentRoute.value.query = { stream: "app", period: "15m", log_ts: "1" };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.router.push).not.toHaveBeenCalled();
+      expect(wrapper.vm.router.replace).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.router.replace.mock.calls[0][0].query).toMatchObject({
+        stream: "app",
+        log_ts: "1",
+      });
+    });
+
+    it("applies rows and columns before the first query and names the opened link (C7)", async () => {
+      bindLogsUrlRouter(wrapper.vm.router);
+      wrapper.vm.router.replace = vi.fn();
+      resetLogsUrlForTests();
+      columnsFromUrl.value = false;
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.resultGrid.rowsPerPage = 50;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "app",
+        period: "15m",
+        rows: "25",
+        columns: encodeColumns(["level", "message"]),
+        page: "3",
+      };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.resultGrid.rowsPerPage).toBe(25);
+      expect(wrapper.vm.searchObj.data.stream.selectedFields).toEqual(["level", "message"]);
+      expect(columnsFromUrl.value).toBe(true);
+      expect(wrapper.vm.searchObj.data.resultGrid.currentPage).not.toBe(3);
+      expect(shownSearch.logs?.inputs.streams).toEqual(["app"]);
+      expect(shownSearch.logs?.page).toBe(3);
+    });
+
+    it("ignores columns in SQL mode and an out-of-range page size (C7)", async () => {
+      bindLogsUrlRouter(wrapper.vm.router);
+      wrapper.vm.router.replace = vi.fn();
+      columnsFromUrl.value = false;
+      wrapper.vm.searchObj.meta.resultGrid.rowsPerPage = 50;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "app",
+        period: "15m",
+        sql_mode: "true",
+        query: btoa('SELECT * FROM "app"'),
+        rows: "75",
+        columns: encodeColumns(["level"]),
+      };
+      await wrapper.vm.restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.resultGrid.rowsPerPage).toBe(50);
+      expect(columnsFromUrl.value).toBe(false);
     });
   });
 

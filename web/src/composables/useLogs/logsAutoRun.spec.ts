@@ -25,6 +25,12 @@ import {
 } from "./logsAutoRun";
 import useSearchConnection from "./useSearchConnection";
 import { buildLogsSignature } from "./useAutoRun";
+import {
+  activePermalink,
+  isInitOrigin,
+  mintInitOrigin,
+  resetPermalinkForTests,
+} from "./useLogPermalink";
 
 const { fakeStore, fakeSearchObj, sentPayloads, cancelled } = vi.hoisted(() => ({
   fakeStore: { state: { zoConfig: {} as Record<string, unknown> } },
@@ -372,6 +378,41 @@ describe("transport binding (AC4.1, P2 records)", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     // The old generation's org, even though the page has switched org since.
     expect(serverCancel).toHaveBeenCalledWith("org1", ["t1"]);
+  });
+});
+
+describe("4c line link: user refinements end the permalink, init requests carry its origin", () => {
+  beforeEach(() => resetPermalinkForTests());
+
+  it.each(["stream", "filter", "function", "zoom", "compare"] as const)(
+    "a %s refinement ends an open permalink even when it runs nothing",
+    (reason) => {
+      const token = mintInitOrigin().token;
+      activePermalink.value = {
+        org: "default",
+        link: { stream: "app", ts: 1 },
+        generation: 1,
+        multiStream: false,
+        regions: [],
+        clusters: [],
+        outcome: null,
+      };
+      fakeSearchObj.value.data.stream.selectedStream = [];
+      run().request(reason);
+      expect(activePermalink.value).toBeNull();
+      expect(isInitOrigin(token)).toBe(false);
+    },
+  );
+
+  it("an initial-load request keeps the token and hands it to the executor", async () => {
+    const token = mintInitOrigin().token;
+    const logs = vi.fn();
+    run().setExecutors({ logs });
+    expect(run().request("url", { origin: token })).toBe("scheduled");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(logs).toHaveBeenCalledTimes(1);
+    expect(logs.mock.calls[0][0].origin).toBe(token);
+    expect(isInitOrigin(token)).toBe(true);
   });
 });
 

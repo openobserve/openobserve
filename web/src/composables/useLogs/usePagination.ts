@@ -181,7 +181,7 @@ export const usePagination = () => {
                 endUs: Number(res.data.new_end_time),
               });
             }
-            updateUrlQueryParams();
+            updateUrlQueryParams(null, null, "replace");
           }
           searchObjDebug["paginatedDataReceivedStartTime"] = performance.now();
           // check for total records update for the partition and update pagination accordingly

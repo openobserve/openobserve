@@ -39,7 +39,12 @@ import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { raw } from "@/types/i18n";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { pruneFreeTextScan } from "@/utils/logs/freeTextScan";
-import { closeDrawerForQuery, resetRowSelection } from "@/composables/useLogs/logsRowNav";
+import {
+  closeDrawerForQuery,
+  resetRowSelection,
+  withQueryOrigin,
+} from "@/composables/useLogs/logsRowNav";
+import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 
 // Moved on every selection change, so a slower schema response for an earlier pick never wins (P1).
 let selectionToken = 0;
@@ -56,6 +61,8 @@ export interface QueryDataOptions {
   generationId?: number;
   /** Same query re-sent (page size): its results reuse the stream schemas already loaded. */
   reuseSchema?: boolean;
+  /** The permalink-init token on the initial-load search only (4c C5 step 6); any other query ends the permalink. */
+  origin?: string;
 }
 
 export const useSearchBar = (t: TranslateFn) => {
@@ -428,7 +435,12 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
-  const getQueryData = async (isPagination = false, options: QueryDataOptions = {}) => {
+  const getQueryData = (isPagination = false, options: QueryDataOptions = {}) => {
+    noteGridQuery(options.origin, options.generationId);
+    return withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
+  };
+
+  const runQueryData = async (isPagination: boolean, options: QueryDataOptions) => {
     try {
       //remove any data that has been cached
       if (Object.keys(searchObj.data.originalDataCache).length > 0) {

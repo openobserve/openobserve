@@ -48,6 +48,7 @@ import {
 import { sqlSources } from "@/utils/logs/sqlSources";
 import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
 import { notePageCancelled } from "@/composables/useLogs/logsRowNav";
+import { noteUserScopeChange } from "@/composables/useLogs/useLogPermalink";
 
 export interface TransportPayload {
   traceId: string;
@@ -74,6 +75,15 @@ const MODES: Record<string, SearchMode> = {
   visualize: "visualize",
   build: "build",
 };
+
+// User refinements end a shared line even when Auto Run is off; time is noted by the picker, which knows a user pick from a restore.
+const SCOPE_CHANGE_REASONS = new Set<RunReason>([
+  "stream",
+  "filter",
+  "function",
+  "zoom",
+  "compare",
+]);
 
 const ROLE_BY_TYPE: Record<string, "hits" | "histogram" | "pageCount" | "other"> = {
   search: "hits",
@@ -437,6 +447,7 @@ function createLogsAutoRun() {
     reason: RunReason,
     options: RequestRunOptions = {},
   ): RequestRunResult | "unchanged" {
+    if (SCOPE_CHANGE_REASONS.has(reason)) noteUserScopeChange();
     // Without a readable list or a selection there is nothing to estimate or run, e.g. the picker's mount emit.
     const stream = searchObj().data.stream;
     if (
