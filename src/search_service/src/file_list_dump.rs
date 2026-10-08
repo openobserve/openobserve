@@ -27,7 +27,7 @@ use config::{
 use hashbrown::HashMap;
 use infra::{
     errors,
-    file_list::{FileId, FileRecord, calculate_max_ts_upper_bound},
+    file_list::{FileId, FileRecord, calculate_max_ts_upper_bound, max_ts_bound_level},
 };
 use itertools::Itertools;
 use rayon::slice::ParallelSliceMut;
@@ -377,7 +377,10 @@ async fn query_inner(
                 .join(",")
         )
     } else {
-        let max_ts_upper_bound = calculate_max_ts_upper_bound(range.1, stream_type);
+        let max_ts_upper_bound = calculate_max_ts_upper_bound(
+            range.1,
+            max_ts_bound_level(org_id, stream_type, stream_name).await,
+        );
         format!(
             "SELECT {fields} FROM file_list WHERE org = '{org_id}' AND stream = '{stream_key}' AND max_ts >= {} AND max_ts <= {} AND min_ts <= {};",
             range.0, max_ts_upper_bound, range.1
