@@ -1,6 +1,7 @@
 import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 
 /**
  * Validates a single condition item
@@ -650,7 +651,7 @@ const validateQueriesNotEmpty = (
   customMessage?: string,
 ) => {
   queries.forEach((q: any, index: number) => {
-    if (q && q?.query === "") {
+    if (q && (isFormulaQuery(q) ? q.config.formula : q?.query) === "") {
       errors.push(customMessage || t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
     }
   });

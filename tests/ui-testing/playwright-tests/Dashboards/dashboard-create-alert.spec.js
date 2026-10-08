@@ -190,11 +190,11 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Verify menu items contain threshold text
       const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
       await expect(aboveOption).toBeVisible({ timeout: 5000 });
-      await expect(aboveOption).toContainText("Create Alert with threshold above");
+      await expect(aboveOption).toContainText("Alert when above");
 
       const belowOption = pm.dashboardPanelEdit.getAlertContextMenuBelow();
       await expect(belowOption).toBeVisible({ timeout: 5000 });
-      await expect(belowOption).toContainText("Create Alert with threshold below");
+      await expect(belowOption).toContainText("Alert when below");
 
       // Click "above threshold" option and wait for navigation simultaneously
       await Promise.all([
@@ -427,11 +427,11 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
       await expect(aboveOption).toBeVisible({ timeout: 5000 });
-      await expect(aboveOption).toContainText("Create Alert with threshold above");
+      await expect(aboveOption).toContainText("Alert when above");
 
       const belowOption = pm.dashboardPanelEdit.getAlertContextMenuBelow();
       await expect(belowOption).toBeVisible({ timeout: 5000 });
-      await expect(belowOption).toContainText("Create Alert with threshold below");
+      await expect(belowOption).toContainText("Alert when below");
 
       await Promise.all([
         page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
