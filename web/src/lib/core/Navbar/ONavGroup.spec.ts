@@ -318,6 +318,7 @@ describe("ONavGroup", () => {
         gate: "databaseMonitoring",
       },
       { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
     ];
 
     function infraRouter() {
@@ -330,6 +331,11 @@ describe("ONavGroup", () => {
           {
             path: "/infra/kubernetes",
             name: "infraKubernetes",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/infra/kubernetes-2",
+            name: "infraKubernetes2",
             component: { template: "<div />" },
           },
           { path: "/streams", name: "logstreams", component: { template: "<div />" } },
@@ -386,6 +392,7 @@ describe("ONavGroup", () => {
       const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
       expect(fly.find('[data-test="nav-group-item-infraHosts"]').exists()).toBe(true);
       expect(fly.find('[data-test="nav-group-item-infraKubernetes"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes2"]').exists()).toBe(true);
       // Databases stays behind its runtime gate.
       expect(fly.find('[data-test="nav-group-item-dbmDatabases"]').exists()).toBe(false);
     });
@@ -402,7 +409,7 @@ describe("ONavGroup", () => {
       expect(tileLink()).toBe("/infra/databases");
     });
 
-    it.each(["infraHosts", "infraKubernetes"])(
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
       "custom_hide_menus can hide %s by route name",
       async (name) => {
         wrapper = mountInfraTile(true, { hiddenMenus: name });

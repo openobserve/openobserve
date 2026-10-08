@@ -4252,6 +4252,48 @@ mod tests {
     }
 
     #[test]
+    fn test_frequency_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::FrequencyOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_silence_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::SilenceOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_tolerance_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::ToleranceOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_tz_offset_out_of_range_is_bad_request() {
+        assert_eq!(
+            status(AlertError::TzOffsetOutOfRange),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_cron_has_no_future_occurrence_is_bad_request() {
+        assert_eq!(
+            status(AlertError::CronHasNoFutureOccurrence {
+                cron: "0 0 0 1 1 * 2020".to_string()
+            }),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
     fn test_get_destination_with_template_error_is_internal_server_error() {
         use db::alerts::destinations::DestinationError;
         assert_eq!(

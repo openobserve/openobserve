@@ -66,6 +66,8 @@ pub mod service;
 pub mod session;
 pub mod short_url;
 pub mod slo;
+#[cfg(test)]
+mod ssrf_test_support;
 pub mod status_pages;
 pub mod stream;
 pub mod stream_utils;

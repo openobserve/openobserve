@@ -559,10 +559,11 @@ describe("groupNavLinks", () => {
       "infraHosts",
       "dbmDatabases",
       "infraKubernetes",
+      "infraKubernetes2",
     ]);
   });
 
-  it("declares the two workload children ungated, with their titleKey/icon/route", () => {
+  it("declares the workload children ungated, with their titleKey/icon/route", () => {
     // Ungated = always present under Infra; detection changes page state, never existence.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     const byName = (name: string) => infra?.children.find((c) => c.name === name);
@@ -576,7 +577,12 @@ describe("groupNavLinks", () => {
       icon: "hub",
       name: "infraKubernetes",
     });
-    for (const name of ["infraHosts", "infraKubernetes"]) {
+    expect(byName("infraKubernetes2")).toMatchObject({
+      titleKey: "menu.kubernetes2",
+      icon: "hub",
+      name: "infraKubernetes2",
+    });
+    for (const name of ["infraHosts", "infraKubernetes", "infraKubernetes2"]) {
       expect(byName(name)?.gate, name).toBeUndefined();
     }
   });
@@ -643,7 +649,7 @@ describe("groupNavLinks", () => {
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(3);
+    expect(infra?.children).toHaveLength(4);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 

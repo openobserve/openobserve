@@ -33,7 +33,9 @@ use o2_enterprise::enterprise::password_policy::lockout::{self, LoginAttemptOutc
 pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
-    auth::{AuthExtractor, SESSION_AUTH_MARKER, V2_API_PREFIX, get_hash, get_user_details},
+    auth::{
+        AuthExtractor, SESSION_AUTH_MARKER, V2_API_PREFIX, get_hash, get_user_details, try_get_hash,
+    },
     users,
 };
 
@@ -385,6 +387,10 @@ pub async fn validate_credentials(
     method: &Method,
     from_session: bool,
 ) -> Result<TokenValidationResponse, AuthError> {
+    // A blank credential must never reach a comparison with a token that may be stored blank.
+    if user_password.is_empty() {
+        return Ok(TokenValidationResponse::default());
+    }
     // Strip leading slash if present
     let path = path.strip_prefix('/').unwrap_or(path);
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
@@ -662,22 +668,6 @@ pub async fn validate_credentials(
         return Ok(build_token_validation_response(&user));
     }
 
-    // An empty password on an ingestion request is never valid (blocks
-    // anonymous ingestion). Classified against the ingestion-route table so it
-    // fires for real ingestion endpoints only, not any path that merely
-    // contains an ingestion word.
-    if is_ingestion_path && user_password.is_empty() {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            user_name: "".to_string(),
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
-    }
-
     // A regular (non-service-account) user's static token is an ingestion-only
     // credential: it authenticates only on ingestion requests (writes + the ES
     // handshake stubs). Using the route table here — instead of "any path
@@ -719,12 +709,7 @@ pub async fn validate_credentials(
     }
     let password_check: PasswordCheck =
         enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
-            user.password.eq(&get_hash(user_password, &user.salt))
-                || user
-                    .password_ext
-                    .as_deref()
-                    .unwrap_or_default()
-                    .eq(user_password)
+            password_matches(user_password, &user.password, &user.salt)
         })
         .await;
     // A lockout is the one refusal that carries an answer, so it is the one that does not collapse
@@ -863,15 +848,13 @@ pub async fn validate_credentials_ext(
         return Ok(TokenValidationResponse::default());
     }
 
-    let hashed_pass = get_hash(
-        &format!(
-            "{}{}",
-            get_hash(
-                &format!("{}{}", user.password_ext.unwrap(), auth_token.request_time),
-                password_ext_salt
-            ),
-            auth_token.expires_in
-        ),
+    let Some(password_ext) = user.password_ext.as_deref().filter(|ext| !ext.is_empty()) else {
+        return Ok(TokenValidationResponse::default());
+    };
+    let hashed_pass = password_ext_credential(
+        password_ext,
+        &auth_token.request_time.to_string(),
+        auth_token.expires_in,
         password_ext_salt,
     );
     if !hashed_pass.eq(&in_password) {
@@ -972,6 +955,22 @@ pub async fn validate_credentials_ext(
     Err(AuthError::Forbidden("Not allowed".to_string()))
 }
 
+// External users are stored without a salt: they have no password to match, and argon2 rejects it.
+fn password_matches(candidate: &str, stored_hash: &str, salt: &str) -> bool {
+    try_get_hash(candidate, salt).is_some_and(|hash| hash == stored_hash)
+}
+
+/// Presigned/`auth_ext` credential from `password_ext`, matching `generate_presigned_url`.
+fn password_ext_credential(
+    password_ext: &str,
+    request_time: &str,
+    expires_in: i64,
+    salt: &str,
+) -> String {
+    let stage2 = get_hash(&format!("{password_ext}{request_time}"), salt);
+    get_hash(&format!("{stage2}{expires_in}"), salt)
+}
+
 async fn validate_user_from_db(
     db_user: Result<DBUser, anyhow::Error>,
     user_password: &str,
@@ -979,13 +978,16 @@ async fn validate_user_from_db(
     exp_in: i64,
     password_ext_salt: &str,
 ) -> Result<TokenValidationResponse, AuthError> {
+    if user_password.is_empty() {
+        return Err(AuthError::Forbidden("Not allowed".to_string()));
+    }
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(mut user) => {
             // Only this branch is a raw password guess; the password_ext branches below are not.
             let password_check = if req_time.is_none() {
                 enforce_lockout_and_compare_password(&user.email, !user.is_external, || {
-                    user.password.eq(&get_hash(user_password, &user.salt))
+                    password_matches(user_password, &user.password, &user.salt)
                 })
                 .await
             } else {
@@ -1013,23 +1015,13 @@ async fn validate_user_from_db(
                 }
                 let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                 Ok(resp)
-            } else if user.password_ext.is_some() && req_time.is_some() {
+            } else if let (Some(password_ext), Some(req_time)) = (
+                user.password_ext.as_deref().filter(|ext| !ext.is_empty()),
+                req_time,
+            ) {
                 log::debug!("Validating user for query params");
-                let hashed_pass = get_hash(
-                    &format!(
-                        "{}{}",
-                        get_hash(
-                            &format!(
-                                "{}{}",
-                                user.password_ext.as_ref().unwrap(),
-                                req_time.unwrap()
-                            ),
-                            password_ext_salt
-                        ),
-                        exp_in
-                    ),
-                    password_ext_salt,
-                );
+                let hashed_pass =
+                    password_ext_credential(password_ext, req_time, exp_in, password_ext_salt);
                 if hashed_pass.eq(&user_password) {
                     let resp = TokenValidationResponseBuilder::from_db_user(&user).build();
                     Ok(resp)
@@ -1091,13 +1083,11 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                         return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
                     }
                 };
-                let creds = amz_creds
-                    .split(':')
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>();
+                let Some((user_id, password)) = get_user_details(&amz_creds) else {
+                    return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                };
 
-                match validate_credentials(&creds[0], &creds[1], path, &req_data.method, false)
-                    .await
+                match validate_credentials(&user_id, &password, path, &req_data.method, false).await
                 {
                     Ok(res) => {
                         if res.is_valid {
@@ -1141,12 +1131,11 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                 Ok(val) => val,
                 Err(_) => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
-            let creds = gcp_creds
-                .split(':')
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>();
+            let Some((user_id, password)) = get_user_details(&gcp_creds) else {
+                return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+            };
 
-            match validate_credentials(&creds[0], &creds[1], path, &req_data.method, false).await {
+            match validate_credentials(&user_id, &password, path, &req_data.method, false).await {
                 Ok(res) => {
                     if res.is_valid {
                         Ok(AuthValidationResult {
@@ -1314,13 +1303,10 @@ async fn oo_validator_internal(
             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
         } else {
             log::debug!("Auth ext token found: decoding");
-            let decoded = match base64::decode(
-                auth_tokens
-                    .auth_ext
-                    .strip_prefix("auth_ext")
-                    .unwrap()
-                    .trim(),
-            ) {
+            let Some(encoded) = auth_tokens.auth_ext.strip_prefix("auth_ext") else {
+                return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+            };
+            let decoded = match base64::decode(encoded.trim()) {
                 Ok(val) => val,
                 Err(_) => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
             };
@@ -1477,6 +1463,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn auth_ext_token_without_its_prefix_is_rejected() {
+        let now = Utc::now().timestamp();
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse::<Uri>().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        for auth in [
+            format!(
+                r#"{{"auth_ext":"x","refresh_token":"","request_time":{now},"expires_in":300}}"#
+            ),
+            format!(
+                r#"{{"refresh_token":"","expires_in":300,"request_time":{now},"auth_ext":"x"}}"#
+            ),
+        ] {
+            let auth_info = AuthExtractor::bypass(auth.clone(), String::new());
+            assert!(
+                matches!(
+                    oo_validator(&req_data, &auth_info).await,
+                    Err(AuthError::Unauthorized(_))
+                ),
+                "{auth} must be refused"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn cloud_ingest_credentials_without_a_colon_are_rejected() {
+        let encoded = base64::encode("nocolon");
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Amz-Firehose-Access-Key", encoded.parse().unwrap());
+        let aws = RequestData {
+            uri: "/aws/default/mystream/_kinesis_firehose"
+                .parse::<Uri>()
+                .unwrap(),
+            method: Method::POST,
+            headers,
+        };
+        assert!(matches!(
+            validator_aws(&aws).await,
+            Err(AuthError::Unauthorized(_))
+        ));
+
+        let query: String = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("API-Key", &encoded)
+            .finish();
+        let gcp = RequestData {
+            uri: format!("/gcp/default/mystream/_sub?{query}")
+                .parse::<Uri>()
+                .unwrap(),
+            method: Method::POST,
+            headers: HeaderMap::new(),
+        };
+        assert!(matches!(
+            validator_gcp(&gcp).await,
+            Err(AuthError::Unauthorized(_))
+        ));
+    }
+
+    #[tokio::test]
     async fn splunk_guid_as_a_basic_password_is_rejected() {
         // A GUID is not an `o2oi_` token and is not a user password, so Basic
         // with it must fail too.
@@ -1616,6 +1662,60 @@ mod tests {
         assert!(resp_from_builder.user_name.eq(&resp.user_name));
         assert!(resp_from_builder.family_name.eq(&resp.family_name));
         assert!(resp_from_builder.given_name.eq(&resp.given_name));
+    }
+
+    #[test]
+    fn password_ext_credential_matches_the_presigned_url() {
+        let (salt, pwd, time, exp_in) = ("openobserve", "Complexpass#123", 1_700_000_000, 300);
+        let url = openobserve_core::auth::generate_presigned_url(
+            "u@example.com",
+            pwd,
+            salt,
+            "http://o2",
+            exp_in,
+            time,
+        );
+        let auth = url.split("auth=").nth(1).unwrap();
+        let (_, carried) = get_user_details(base64::decode(auth).unwrap()).unwrap();
+        let password_ext = get_hash(pwd, salt);
+        assert_eq!(
+            password_ext_credential(&password_ext, &time.to_string(), exp_in, salt),
+            carried
+        );
+    }
+
+    #[tokio::test]
+    async fn presigned_login_refuses_a_blank_password_ext() {
+        let salt = "openobserve";
+        let req_time = "1700000000".to_string();
+        let user = |password_ext: &str| DBUser {
+            email: "sso@example.com".into(),
+            first_name: "Sso".into(),
+            last_name: "User".into(),
+            password: "".into(),
+            salt: "".into(),
+            organizations: vec![],
+            is_external: true,
+            password_ext: Some(password_ext.into()),
+        };
+
+        let real_ext = get_hash("Complexpass#123", salt);
+        let genuine = password_ext_credential(&real_ext, &req_time, 300, salt);
+        assert!(
+            validate_user_from_db(Ok(user(&real_ext)), &genuine, Some(&req_time), 300, salt)
+                .await
+                .unwrap()
+                .is_valid
+        );
+
+        // An empty password_ext needs no secret to hash, so it must not back a login.
+        let unbacked = password_ext_credential("", &req_time, 300, salt);
+        assert!(
+            validate_user_from_db(Ok(user("")), &unbacked, Some(&req_time), 300, salt)
+                .await
+                .is_err(),
+            "an empty password_ext must not back a presigned login"
+        );
     }
 
     #[tokio::test]
@@ -1998,9 +2098,172 @@ mod tests {
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
+        let stored_ext = get_hash(pwd, &get_config().auth.ext_auth_salt);
+        for (path, method) in [
+            ("default/_bulk", Method::POST),
+            ("default/streams", Method::GET),
+        ] {
+            assert!(
+                !validate_credentials(init_user, &stored_ext, path, &method, false)
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "the stored password_ext must not work as a password on {method} /{path}"
+            );
+        }
+
+        exercise_empty_password_rejected(org_id).await;
+        exercise_saltless_sso_user_refused(org_id).await;
 
         #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
+    }
+
+    // NULL `password_ext`, exactly as the SRE-agent service-account migration writes it.
+    async fn seed_user_without_password_ext(
+        org_id: &str,
+        email: &str,
+        role: UserRole,
+        pwd: &str,
+        token: &str,
+    ) {
+        let salt = "no-ext-salt";
+        infra::table::users::add(infra::table::users::UserRecord {
+            email: email.to_string(),
+            first_name: "No".to_string(),
+            last_name: "Ext".to_string(),
+            password: get_hash(pwd, salt),
+            salt: salt.to_string(),
+            is_root: false,
+            password_ext: None,
+            user_type: UserType::Internal,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        db::org_users::add_with_flags(org_id, email, role, token, None, true)
+            .await
+            .unwrap();
+    }
+
+    // Stored the way the SSO/Dex callback creates external users: no password, no salt.
+    async fn exercise_saltless_sso_user_refused(org_id: &str) {
+        let sso_user = "saltless-sso@example.com";
+        infra::table::users::add(infra::table::users::UserRecord {
+            email: sso_user.to_string(),
+            first_name: "Sso".to_string(),
+            last_name: "User".to_string(),
+            password: String::new(),
+            salt: String::new(),
+            is_root: false,
+            password_ext: Some(String::new()),
+            user_type: UserType::External,
+            created_at: 0,
+            updated_at: 0,
+            must_reset_password: false,
+            password_reset_reason: None,
+            flagged_at: None,
+            password_updated_at: None,
+        })
+        .await
+        .unwrap();
+        db::org_users::add_with_flags(org_id, sso_user, UserRole::Admin, "sso-tok", None, true)
+            .await
+            .unwrap();
+
+        for guess in ["anything", " "] {
+            assert!(
+                !validate_credentials(sso_user, guess, "default/streams", &Method::GET, false)
+                    .await
+                    .is_ok_and(|r| r.is_valid)
+            );
+            assert!(
+                !validate_user(sso_user, guess)
+                    .await
+                    .is_ok_and(|r| r.is_valid)
+            );
+        }
+        let credentials = base64::encode(&format!("{sso_user}:anything"));
+        let req_data = RequestData {
+            uri: "/api/default/streams".parse().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let auth_info = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+        assert!(oo_validator(&req_data, &auth_info).await.is_err());
+    }
+
+    // Folded into `test_validate`: a standalone test clearing the same user tables would race it.
+    async fn exercise_empty_password_rejected(org_id: &str) {
+        let pwd = "Complexpass#123";
+        let sre_agent = "o2-sre-agent.org-default@openobserve.internal";
+        let plain_user = "no-ext-user@example.com";
+        let blank_token_sa = "blank-token-sa@example.com";
+        seed_user_without_password_ext(org_id, sre_agent, UserRole::SreAgent, pwd, "sre-tok").await;
+        seed_user_without_password_ext(org_id, plain_user, UserRole::Admin, pwd, "user-tok").await;
+        seed_user_without_password_ext(org_id, blank_token_sa, UserRole::ServiceAccount, pwd, "")
+            .await;
+
+        assert!(
+            validate_credentials(plain_user, pwd, "default/streams", &Method::GET, false)
+                .await
+                .unwrap()
+                .is_valid,
+            "the seeded user must still sign in with its real password"
+        );
+        let mut accepted = vec![];
+        for email in [sre_agent, plain_user, blank_token_sa] {
+            for (path, method) in [
+                ("default/streams", Method::GET),
+                ("default/_search", Method::POST),
+                ("default/users", Method::GET),
+            ] {
+                let res = validate_credentials(email, "", path, &method, false).await;
+                if res.is_ok_and(|r| r.is_valid) {
+                    accepted.push(format!("validate_credentials {email} {method} /{path}"));
+                }
+            }
+        }
+        for email in [sre_agent, plain_user] {
+            let credentials = base64::encode(&format!("{email}:"));
+            let req_data = RequestData {
+                uri: "/api/default/streams".parse().unwrap(),
+                method: Method::GET,
+                headers: HeaderMap::new(),
+            };
+            let auth_info = AuthExtractor::bypass(format!("Basic {credentials}"), String::new());
+            if oo_validator(&req_data, &auth_info).await.is_ok() {
+                accepted.push(format!("oo_validator Basic {email}:"));
+            }
+        }
+        assert!(
+            accepted.is_empty(),
+            "empty password accepted: {accepted:#?}"
+        );
+
+        #[cfg(feature = "enterprise")]
+        for email in [sre_agent, plain_user] {
+            let auth_token = AuthTokensExt {
+                auth_ext: String::new(),
+                refresh_token: String::new(),
+                request_time: 1_700_000_000,
+                expires_in: 300,
+            };
+            let salt = get_config().auth.ext_auth_salt.clone();
+            let unbacked = password_ext_credential("", "1700000000", 300, &salt);
+            assert!(
+                !validate_credentials_ext(email, &unbacked, "default/streams", auth_token, "GET")
+                    .await
+                    .unwrap()
+                    .is_valid,
+                "auth_ext for {email} without a password_ext must be refused"
+            );
+        }
     }
 
     /// Root survives any number of wrong passwords, and a locked-out user is refused even once they

@@ -63,3 +63,43 @@ pub mod instance {
         db::put("/instance/", data, db::NO_NEED_WATCH, None).await
     }
 }
+
+pub mod grpc_token {
+    use bytes::Bytes;
+    use infra::{
+        db::{NO_NEED_WATCH, get_db},
+        errors::{Error, Result},
+    };
+
+    // its own module, not a key under /instance/: NATS get falls back to a prefix scan there
+    const KEY: &str = "/internal_grpc_token/";
+
+    pub async fn get() -> Result<Option<String>> {
+        let value = get_db().await.get_if_exists(KEY).await?;
+        Ok(value
+            .map(|v| String::from_utf8_lossy(&v).trim().to_string())
+            .filter(|v| !v.is_empty()))
+    }
+
+    /// Stores `candidate` unless a token is already stored, and returns the stored token.
+    pub async fn get_or_create(candidate: &str) -> Result<String> {
+        let value = Bytes::from(candidate.to_string());
+        get_db()
+            .await
+            .get_for_update(
+                KEY,
+                NO_NEED_WATCH,
+                None,
+                Box::new(move |existing| {
+                    Ok(match existing {
+                        Some(_) => None,
+                        None => Some((None, Some((KEY.to_string(), value, None)))),
+                    })
+                }),
+            )
+            .await?;
+        get()
+            .await?
+            .ok_or_else(|| Error::Message("internal grpc token is missing after create".into()))
+    }
+}

@@ -110,6 +110,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchDebounce: 0,
   hideSelected: false,
   collapsibleGroups: false,
+  pinSelectedInGroups: false,
   creatable: false,
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
@@ -289,13 +290,24 @@ const baseFilteredOptions = computed(() => {
   if (!term) {
     // In multi-select mode, float previously-selected items to the top so users
     // can immediately see and manage their current choices on re-open.
-    // Only applies when there is a non-empty pin set and no headers in the list
-    // (headers imply grouped options where reordering would break visual grouping).
-    if (props.multiple && pinnedSelected.value.size > 0 && !options.some((o) => o.header)) {
+    // Grouped lists keep their order unless `pinSelectedInGroups` is set; then
+    // items float within their own group (a header and the items under it; a
+    // flat list is one group), so no item leaves its group. sort() is stable.
+    if (
+      props.multiple &&
+      pinnedSelected.value.size > 0 &&
+      (props.pinSelectedInGroups || !options.some((o) => o.header))
+    ) {
       const pinned = pinnedSelected.value;
-      const top = options.filter((o) => pinned.has(toRekaString(o.value)));
-      const rest = options.filter((o) => !pinned.has(toRekaString(o.value)));
-      return [...top, ...rest];
+      let group = 0;
+      return options
+        .map((o) => ({
+          o,
+          group: o.header ? ++group : group,
+          rank: o.header ? 0 : pinned.has(toRekaString(o.value)) ? 1 : 2,
+        }))
+        .sort((a, b) => a.group - b.group || a.rank - b.rank)
+        .map(({ o }) => o);
     }
     return options;
   }
