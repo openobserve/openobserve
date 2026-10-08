@@ -21,6 +21,17 @@ export interface PreviewContext {
 }
 
 // Tokens the client must never substitute (server expands these at runtime).
+/** Visual style for a rendered segment: live data, sample value, or an unresolved token. */
+export function segmentClass(kind: SegmentClass): string {
+  return kind === "live"
+    ? "text-text-heading font-semibold"
+    : kind === "sample"
+      ? "text-text-secondary italic underline decoration-dashed"
+      : kind === "opaque"
+        ? "rounded-default bg-surface-subtle-hover text-text-body px-1"
+        : "text-text-body";
+}
+
 const OPAQUE_PATTERNS: RegExp[] = [
   /^rows$/,
   /^rows:\d+$/,

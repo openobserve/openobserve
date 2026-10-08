@@ -62,6 +62,7 @@ pub struct Model {
     /// record the alert opens, and a JSON key is not portably indexable.
     /// NULL = no runbook.
     pub runbook_url: Option<String>,
+    pub incident_title_template: Option<String>,
     /// Feature 5 (D42): the `SloCondition` payload. Follows the
     /// `query_aggregation` precedent, NOT `trigger_thresholds`, whose scope is
     /// threshold and level configuration only (D1).
@@ -155,6 +156,7 @@ mod tests {
             slo_id: None,
             oncall_team: None,
             runbook_url: None,
+            incident_title_template: None,
             query_slo_condition: None,
             trigger_frequency_type: 0,
             trigger_frequency_seconds: 300,

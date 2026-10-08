@@ -165,6 +165,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
 } | null>(null);
+const sampleRow = ref<Record<string, unknown> | null>(null);
 const { t } = useI18nTyped();
 
 const store = useStore();
@@ -550,6 +551,11 @@ const fetchQuerySchema = async () => {
 // Handle chart data updates from PanelSchemaRenderer
 // This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
+  sampleRow.value =
+    (Array.isArray(resultMetaData?.[0]) ? resultMetaData[0] : [])
+      .flatMap((partition: any) => (Array.isArray(partition?.hits) ? partition.hits : []))
+      .find((hit: unknown) => hit && typeof hit === "object") ?? null;
+
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
@@ -1505,5 +1511,5 @@ const resizeChart = async () => {
 
 // Expose the real refreshData for explicit parent calls (bypasses the 200ms debounce).
 // The watcher internally still uses refreshDataOnce to prevent duplicate calls on rapid prop changes.
-defineExpose({ refreshData, resizeChart, evaluationStatus });
+defineExpose({ refreshData, resizeChart, evaluationStatus, sampleRow });
 </script>
