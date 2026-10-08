@@ -86,7 +86,7 @@ pub struct ObjectUsage {
     pub match_kind: Option<MatchKind>,
 }
 
-/// The objects that use a metric, and how many of their queries could not be parsed.
+/// The objects that use a metric, and how many unparseable queries name it.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, ToSchema)]
 pub struct MetricUsage {
     pub dashboards: Vec<DashboardUsage>,
