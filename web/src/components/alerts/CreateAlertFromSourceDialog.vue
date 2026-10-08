@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.queryLabel") }}
         </span>
         <OCodeBlock
-          class="[&_pre]:px-3 [&_pre]:py-2"
+          padded
           wrap
           :max-lines="10"
           :code="previewQuery"
