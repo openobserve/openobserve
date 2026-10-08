@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Top Queries",
     "profiles": "Profielen",
-    "productAnalytics": "Productanalyse"
+    "productAnalytics": "Productanalyse",
+    "trialEndedTitle": "Je proefperiode is afgelopen",
+    "trialPageNeedsPlan": "{page} heeft een plan nodig",
+    "trialPageNeedsPlanToast": "{page} heeft een plan nodig. Kies er een op deze pagina om deze te blijven gebruiken.",
+    "trialChoosePlanToast": "Kies een plan op deze pagina om {product} te blijven gebruiken.",
+    "trialFlyoutNote": "Je proefperiode is afgelopen. Pagina's met een slot hebben een plan nodig."
   },
   "profiles": {
     "title": "Profielen",
@@ -4182,7 +4187,7 @@
     "selectFunction": "Functie selecteren",
     "appendData": "Gegevens toevoegen aan bestaande verrijkingstabel",
     "deleteAssociatedFunction": "Bijbehorende functie verwijderen",
-    "streamPipeline": "Stroompijpleidingen",
+    "streamPipeline": "Datapipelines",
     "testFunction": "Testfunctie",
     "errorDetails": "Fout",
     "jsErrorDetails": "Details van JavaScript-fouten",
@@ -7260,7 +7265,7 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
-    "allAlerts": "Alle meldingen",
+    "allAlerts": "Alle alarmen",
     "compositeAlert": "Samengesteld",
     "import": {
       "anomalyImportSuccess": "Anomaliedetectie - {index}: \"{name}\" succesvol geïmporteerd",
@@ -8840,7 +8845,7 @@
     "sectionOtherConsumers": "Ook gebruikt door"
   },
   "alert_library": {
-    "header": "Meldingenbibliotheek",
+    "header": "Alarmbibliotheek",
     "subtitle": "Samengestelde, gebruiksklare alarmen, afgestemd op de gegevens die u al binnenhaalt.",
     "contribute": "Bijdragen op GitHub",
     "searchPlaceholder": "Zoeken op naam, beschrijving of stream",
@@ -19438,6 +19443,7 @@
         "sessionsAxis": "Gem. actieve sessies",
         "waitEventAxis": "Wachtgebeurtenis",
         "viewActivity": "Bekijk in Activiteit",
+        "about": "Over deze grafiek",
         "breakdowns": {
           "waitEvent": "Per wachtgebeurtenis",
           "query": "Per query",
@@ -19838,7 +19844,7 @@
       "waitingOn": "wachtend op {pid}",
       "degraded": "Eén sessie houdt {count} tegen. Deze heeft al {age} een open transactie en heeft in die tijd geen query uitgevoerd — hoogstwaarschijnlijk een applicatie die is vergeten te committen.",
       "footer": {
-        "allLeadBack": "Alle {waits} leiden terug naar pid {pid}",
+        "allLeadBack": "{waits} leidt terug naar pid {pid} | Alle {waits} leiden terug naar pid {pid}",
         "allLeadBackDetail": "— één sessie, die een lock vasthoudt op {object}.",
         "switchToBlocking": "Schakel over naar “Wie blokkeert”",
         "releaseAll": "Het beëindigen van sessie {pid} maakt alle {count} vrij.",
@@ -20052,14 +20058,14 @@
         "totalBytes": "Totale grootte",
         "heapBytes": "Heap-grootte",
         "overheadBytes": "Index + TOAST",
-        "liveTuples": "Levende rijen (geschat)",
-        "deadTuples": "Dode rijen (geschat)",
-        "deadTupPct": "Bloat (geschat)",
+        "liveTuples": "Live rijen",
+        "deadTuples": "Dode rijen",
+        "deadTupPct": "Bloat",
         "modSinceAnalyze": "Rijen sinds analyse",
-        "seqScanCount": "Seq-scans (totaal)",
-        "seqTupRead": "Rijen sequentieel gescand (totaal)",
-        "idxScanCount": "Indexscans (totaal)",
-        "autovacuumCount": "Autovacuums (totaal)",
+        "seqScanCount": "Seq-scans",
+        "seqTupRead": "Seq-gescande rijen",
+        "idxScanCount": "Indexscans",
+        "autovacuumCount": "Autovacuums",
         "frozenXidAge": "Txid-leeftijd",
         "lastVacuum": "Laatste vacuum",
         "lastAutovacuum": "Laatste autovacuum",

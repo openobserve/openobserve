@@ -258,6 +258,14 @@ pub(crate) mod tests {
         fn children(&self) -> &[promql_parser::parser::Expr] {
             &[]
         }
+
+        fn with_new_children(
+            &self,
+            children: Vec<promql_parser::parser::Expr>,
+        ) -> Arc<dyn promql_parser::parser::ast::ExtensionExpr> {
+            assert!(children.is_empty());
+            Arc::new(Self)
+        }
     }
 
     pub(crate) fn range_value(timestamp: i64, value: f64) -> RangeValue {
@@ -1091,14 +1099,13 @@ pub(crate) mod tests {
         let func = Function {
             name: "time",
             arg_types: vec![],
-            variadic: false,
+            variadic: 0,
+            experimental: false,
             return_type: ValueType::Scalar,
         };
         let expr = PromExpr::Call(Call { func, args });
 
         let result = engine.exec_expr(&expr).await;
-        // This will fail because call_expr is not fully implemented, but we're testing the call
-        // logic
         assert!(result.is_ok());
     }
 

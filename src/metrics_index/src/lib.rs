@@ -138,12 +138,7 @@ mod tests {
             vec![Range { start: 0, end: 8 }]
         );
 
-        // regex matchers go through regexp_like on the (Utf8View) label column
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::NotRe(regex::Regex::new("a").unwrap()),
-            name: "path".to_string(),
-            value: "a".to_string(),
-        }]);
+        let matchers = parsed_matchers(r#"m{path!~"a"}"#);
         let filter = create_physical_filter(&schema, &matchers).unwrap();
         assert_eq!(
             evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
@@ -303,7 +298,7 @@ mod tests {
         // matchers the query never re-applies do not break exactness
         let covered = Matchers::new(vec![
             Matcher::new(MatchOp::Equal, "path", "a"),
-            Matcher::new(MatchOp::Re("i.*".parse().unwrap()), "instance", "i.*"),
+            parsed_matchers(r#"m{instance=~"i.*"}"#).matchers.remove(0),
             Matcher::new(MatchOp::Equal, "__name__", "m"),
             Matcher::new(MatchOp::Equal, "missing_label", "x"),
         ]);
@@ -363,5 +358,14 @@ mod tests {
             evaluate_metrics_index(&data, filter.as_deref(), 6).unwrap(),
             vec![Range { start: 0, end: 6 }]
         );
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
     }
 }

@@ -150,6 +150,11 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - `lastRunAt` (`number | null`, default `null`) — Unix ms timestamp of the last completed query; drives the dot color and relative label
 - `loading` (boolean, default `false`) — spins the icon, disables the button, forces the idle dot
 - `disabled` (boolean, default `false`) — disables independently of loading
+- `variant` (`"ghost"` | `"outline"`, default `"ghost"`) — `outline` beside a bordered date picker in a page header
+- `layout` (`"split"` | `"inline"`, default `"split"`) — `inline` puts the age inside the button ([⟳ | 2m ago]); the age hides below md
+- `dataTest` / `shortcutId` — keep a page's own selector; show the page's refresh shortcut in the tooltip
+
+  **Every page refreshes with this button.** A page header is `DateTime` + `ORefreshButton layout="inline" variant="outline"`, the same as the dashboards list and Database Monitoring; no hand-rolled refresh button with its own "checked just now" text. When an absolute range fills the header below lg, pass `:last-run-at="null"` there so the button drops to its icon.
   **Slots:** none
   **Emits:** `click` (`MouseEvent`) — suppressed while `loading` or `disabled`
   **Example:**
@@ -432,6 +437,8 @@ arrow, the rows re-order, and the order is wrong.
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 
+**Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState preset="load-error" :description="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
+
 **Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
 
 #### Footer
@@ -543,6 +550,20 @@ const columns: OTableColumnDef[] = [
   </OTable>
 </template>
 ```
+
+**Column widths and headers that read.**
+
+- **Size the column the reader came for.** Unsized columns share the leftover
+  evenly, so a statement column got ~175px of a 1,180px table and truncated every
+  query while When / Took / Status sat half empty. Give the primary column an
+  explicit `size` (Top queries 520, Deadlocks 560, Slowest calls 480) with a
+  one-line comment saying why.
+- **A header names its column, nothing more.** Qualifiers ("(est.)", "(lifetime)")
+  are what the ellipsis eats first; put the explanation in `meta.headerTooltip`.
+  The tooltip anchors to the whole header cell, so it costs no width and no icon.
+- **Good news drops the count.** An empty table whose `#empty` says "All clear"
+  must not print "0 of 0" beneath it; pass an empty `#pagination-bar` (or the
+  wrapper's `#bottom`) for that case only.
 
 **Family:** cell renderers (below); `OTable.types.ts` exports `OTableColumnDef`, the mode/param types, and `COL`/`TABLE_*` size constants. `sub-components/` is internal.
 
