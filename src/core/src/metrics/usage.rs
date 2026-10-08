@@ -437,7 +437,18 @@ fn visible(org_id: &str, sources: UsageSources, access: &Access) -> UsageSources
         slos: sources
             .slos
             .into_iter()
-            .filter(|slo| access.alert_folder(&slo.folder_id).list)
+            .filter(|slo| {
+                // an SLO is authorized as an alert, so it passes the same folder and grant gate
+                let folder_access = access.alert_folder(&slo.folder_id);
+                folder_access.list
+                    && (folder_access.get
+                        || access.alerts.as_ref().is_none_or(|permitted| {
+                            permitted.contains(&alls)
+                                || permitted
+                                    .contains(&format!("alert:{}/{}", slo.folder_id, slo.id))
+                                || permitted.contains(&format!("alert:{}", slo.id))
+                        }))
+            })
             .collect(),
         pipelines: sources
             .pipelines
@@ -1315,6 +1326,27 @@ mod tests {
         let slos = visible("org", sources, &access).slos;
         assert_eq!(slos.len(), 1);
         assert_eq!(slos[0].folder_id, "open");
+    }
+
+    #[test]
+    fn slos_in_a_list_only_folder_need_an_alert_grant() {
+        let visible_slos = |alerts: Option<Vec<String>>| {
+            let access = Access {
+                alert_folders: folders(&[("shared", true, false)]),
+                alerts,
+                ..Default::default()
+            };
+            let sources = UsageSources {
+                slos: vec![promql_slo("shared")],
+                ..Default::default()
+            };
+            visible("org", sources, &access).slos.len()
+        };
+        assert_eq!(visible_slos(Some(vec!["alert:other".to_string()])), 0);
+        assert_eq!(visible_slos(Some(vec!["alert:slo1".to_string()])), 1);
+        assert_eq!(visible_slos(Some(vec!["alert:shared/slo1".to_string()])), 1);
+        assert_eq!(visible_slos(Some(vec!["alert:_all_org".to_string()])), 1);
+        assert_eq!(visible_slos(None), 1);
     }
 
     #[test]
