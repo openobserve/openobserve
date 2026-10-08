@@ -481,7 +481,10 @@ pub struct DomainOrgMapping {
     pub domain: String,
     pub org_id: String,
     pub base_role: String,
+    #[serde(default)]
     pub role_claim_name: Option<String>,
+    #[serde(default)]
+    pub create_missing_roles: bool,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]

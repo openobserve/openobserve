@@ -547,6 +547,7 @@ async fn map_group_to_custom_role(
                     user_email,
                     org_name,
                     org_roles,
+                    !openfga_cfg.map_group_to_role_skip_role_creation,
                     &mut tuples,
                 )
                 .await;
@@ -745,6 +746,7 @@ async fn map_group_to_custom_role(
                 user_email,
                 &org_name,
                 org_roles,
+                !openfga_cfg.map_group_to_role_skip_role_creation,
                 &mut add_tuples,
             )
             .await;
@@ -928,6 +930,7 @@ pub async fn process_domain_org_mapping(
                         user_email,
                         &mapped.org_id,
                         add_roles,
+                        mapped.create_missing_roles,
                         &mut add_tuples,
                     )
                     .await;

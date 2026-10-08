@@ -190,10 +190,11 @@ pub async fn create(
                     mapping.base_role, mapping.org_id
                 ));
             }
-            if let Some(claim) = mapping.role_claim_name.as_ref()
-                && claim.is_empty()
-            {
-                return MetaHttpResponse::bad_request("role claim name must not be empty");
+            if let Some(mut claim) = mapping.role_claim_name.as_mut() {
+                if claim.trim().is_empty() {
+                    return MetaHttpResponse::bad_request("role claim name must not be empty");
+                }
+                claim = claim.trim();
             }
 
             mapping.domain = mapping.domain.to_lowercase();
