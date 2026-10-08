@@ -227,6 +227,8 @@ export interface OTableColumnDef<TData = any> {
   maxSize?: number;
   /** Can the user sort by this column? */
   sortable?: boolean;
+  /** Where client sorting puts rows whose value is undefined; "first"/"last" hold in both directions. */
+  sortUndefined?: "first" | "last" | false | -1 | 1;
   /** Can the user filter by this column? */
   filterable?: boolean;
   /** Can the user resize this column? */

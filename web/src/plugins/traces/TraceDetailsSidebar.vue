@@ -2198,7 +2198,8 @@ export default defineComponent({
 
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
-        convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
+        convertTimeFromNsToUs(props.span.start_time) -
+          (props.baseTracePosition?.traceStartUs ?? props.baseTracePosition?.startTimeUs ?? 0),
       );
     });
 

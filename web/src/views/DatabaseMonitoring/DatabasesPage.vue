@@ -77,6 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @sort-change="onSortChange"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-databases-error"
+            @action="onRefresh()"
+          />
+        </template>
         <!-- ONE toolbar row, the same one Top queries uses. The engine select
              is a dimension inside the shared filter popover rather than a bare
              full-width select, so both tabs filter the same way. -->
@@ -450,6 +458,7 @@ import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

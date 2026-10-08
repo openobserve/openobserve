@@ -356,6 +356,7 @@ import {
   getTokens,
   classify,
   buildTraceGroup,
+  spanTimeBounds,
   type Message,
   type Turn,
   type TraceGroup,
@@ -460,10 +461,8 @@ const summary = computed(() => {
   let totalCost = 0;
   for (const t of allTurnSpans) totalCost += getCost(t);
 
-  const starts = all.map((s) => Number(s.start_time)).filter(Number.isFinite);
-  const ends = all.map((s) => Number(s.end_time)).filter(Number.isFinite);
-  const totalDurationNs =
-    starts.length && ends.length ? Math.max(...ends) - Math.min(...starts) : 0;
+  const bounds = spanTimeBounds(all);
+  const totalDurationNs = bounds ? bounds.endNs - bounds.startNs : 0;
 
   const modelCount: Record<string, number> = {};
   for (const t of allTurnSpans) {

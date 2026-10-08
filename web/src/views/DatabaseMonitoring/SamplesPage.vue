@@ -133,6 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-samples-table"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-samples-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #subheader>
           <!-- The scatter — inside the table frame because it draws exactly
                the rows below it. Hidden while empty: an axis with no points
@@ -567,6 +575,8 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     id: "query",
     accessorKey: "queryText",
     header: t("dbm.samples.columns.query"),
+    // Unsized, it took an even share and truncated every statement inside its SELECT list.
+    size: 480,
     sortable: false,
   },
   {
@@ -648,6 +658,7 @@ const serverColumns = computed<OTableColumnDef<ServerSampleTableRow>[]>(() => [
     id: "query",
     accessorKey: "query",
     header: t("dbm.samples.serverList.columns.query"),
+    size: 480,
     sortable: false,
   },
   {

@@ -75,13 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-rail-tabs w-full"
         @change="onTabChange"
       >
-        <template v-for="(group, idx) in visibleGroups" :key="group.label">
+        <template v-for="(group, idx) in visibleGroups" :key="group.label || idx">
           <!-- Section label. Each group after the first gets top spacing so the
                sub-sections read as separate blocks rather than one merged list. -->
           <!-- ps-1.5 (on top of the container's px-1.5) puts the section label on
                the same 12px item-label grid line as the tabs below it. -->
           <div
-            v-if="!collapsed"
+            v-if="!collapsed && group.label"
             class="text-text-secondary py-1 ps-1.5 text-xs font-semibold"
             :class="{ 'mt-3': idx > 0 }"
           >

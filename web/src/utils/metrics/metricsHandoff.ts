@@ -48,6 +48,105 @@ export interface HandoffVariant {
  */
 const PROM_METRIC_NAME_RE = /^[a-zA-Z_:][a-zA-Z0-9_:]*$/;
 
+/** Words PromQL reads as operators or modifiers, so a metric with such a name must keep the selector form. */
+const PROMQL_KEYWORDS = new Set([
+  "sum",
+  "min",
+  "max",
+  "avg",
+  "group",
+  "stddev",
+  "stdvar",
+  "count",
+  "count_values",
+  "bottomk",
+  "topk",
+  "quantile",
+  "limitk",
+  "limit_ratio",
+  "offset",
+  "bool",
+  "on",
+  "ignoring",
+  "group_left",
+  "group_right",
+  "by",
+  "without",
+  "and",
+  "or",
+  "unless",
+  "atan2",
+  "inf",
+  "nan",
+  "start",
+  "end",
+]);
+
+const MATCHER_RE = /\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(=~|!=|!~|=)\s*("(?:[^"\\]|\\.)*")\s*(,|\})/y;
+
+/** The index just past the string literal opening at `start`. */
+const afterString = (expr: string, start: number): number => {
+  const quote = expr[start];
+  let i = start + 1;
+  while (i < expr.length && expr[i] !== quote) i += quote !== "`" && expr[i] === "\\" ? 2 : 1;
+  return i + 1;
+};
+
+const stringValue = (quoted: string): string | null => {
+  try {
+    return JSON.parse(quoted);
+  } catch {
+    return null;
+  }
+};
+
+/** The selector opening at `start` with its `__name__="x"` matcher lifted out as `x`, or null to keep it. */
+const bareSelector = (expr: string, start: number): { text: string; end: number } | null => {
+  if (/[a-zA-Z0-9_:]/.test(expr[start - 1] ?? "")) return null;
+  const matchers: string[] = [];
+  let name: string | null = null;
+  MATCHER_RE.lastIndex = start + 1;
+  for (let m = MATCHER_RE.exec(expr); m; m = MATCHER_RE.exec(expr)) {
+    const [, label, op, value, close] = m;
+    const literal = label === "__name__" && op === "=" ? stringValue(value) : null;
+    if (literal !== null && name === null) name = literal;
+    else matchers.push(`${label}${op}${value}`);
+    if (close === "}") {
+      if (!name || !PROM_METRIC_NAME_RE.test(name) || PROMQL_KEYWORDS.has(name.toLowerCase()))
+        return null;
+      return {
+        text: matchers.length ? `${name}{${matchers.join(",")}}` : name,
+        end: MATCHER_RE.lastIndex,
+      };
+    }
+  }
+  return null;
+};
+
+/** `{__name__="x",job="api"}` as `x{job="api"}`, for a query a person reads and edits. */
+export const withBareMetricNames = (expr: string): string => {
+  let out = "";
+  let i = 0;
+  while (i < expr.length) {
+    const c = expr[i];
+    if (c === '"' || c === "'" || c === "`") {
+      const end = afterString(expr, i);
+      out += expr.slice(i, end);
+      i = end;
+      continue;
+    }
+    const lifted = c === "{" ? bareSelector(expr, i) : null;
+    if (lifted) {
+      out += lifted.text;
+      i = lifted.end;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
+};
+
 /** Characters `buildSelector` escapes but the query modeller does not. */
 // eslint-disable-next-line no-control-regex -- matching control chars is the intent
 const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
@@ -92,6 +191,14 @@ function builderStatesFor(variant: HandoffVariant): PromqlBuilderQuery[] | null 
 function legendFor(template: string | undefined, stream: string): string {
   if (!template || template === stream) return "";
   return template;
+}
+
+/** Each query with the stream it reads, which an alert built from its chart needs. */
+export function withSourceStreams<Q extends HandoffVariant["queries"][number]>(
+  queries: Q[],
+  cardName: string,
+): Array<Q & { stream: string }> {
+  return queries.map((query) => ({ ...query, stream: query.builder?.metric ?? cardName }));
 }
 
 /**

@@ -15,13 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- `embedded` renders in place as a Logs mode; `fullPage` is the traces overlay page. -->
+  <!-- Renders in place as the Logs Drill down mode. -->
   <component
-    :is="embedded ? AnalysisPage : fullPage ? TracesDrillDownPage : ODrawer"
+    :is="AnalysisPage"
     data-test="traces-analysis-dashboard-drawer"
-    v-bind="embedded || fullPage ? {} : { bleed: true, width: 80 }"
     v-model:open="isOpen"
-    :title="fullPage ? t('traces.drillDown') : raw(drawerTitle)"
+    :title="raw(drawerTitle)"
     @update:open="(v: boolean) => !v && onClose()"
   >
     <template #header-left>
@@ -73,18 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="filterMetadata" class="text-3xs ms-1 opacity-60">
           {{ filterMetadata }}
         </span>
-
-        <!-- Refresh button (shown when percentile changes on duration tab) -->
-        <OButton
-          v-if="showRefreshButton"
-          variant="primary"
-          size="icon-xs-sq"
-          @click="refreshAfterPercentileChange"
-          data-test="percentile-refresh-button"
-          icon-left="refresh"
-        >
-          <OTooltip :content="t('latencyInsights.refreshTooltip')" />
-        </OButton>
       </div>
     </template>
 
@@ -93,25 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of growing to fit all content — otherwise the dimension list and
          the charts share the drawer's outer scrollbar instead of scrolling independently. -->
     <div class="flex h-full min-h-0 flex-col">
-      <!-- Tabs (only shown if multiple analysis types available) -->
-      <OTabs
-        v-if="showTabs"
-        v-model="activeAnalysisType"
-        dense
-        class="px-page-edge border-card-glass-border text-text-secondary! insights-dashboard-tabs shrink-0 border-b border-solid"
-        align="left"
-      >
-        <OTab
-          v-for="tab in availableTabs"
-          :key="tab.name"
-          :name="tab.name"
-          :label="tab.label"
-          :icon="tab.icon"
-          :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="min-h-12"
-        />
-      </OTabs>
-
       <!-- Dashboard Content with Sidebar -->
       <div class="analysis-content bg-surface-subtle flex min-h-0 flex-1 overflow-hidden pt-2">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
@@ -297,7 +265,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :simplifiedPanelView="true"
                   :hideAddPanel="true"
                   :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
-                  @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
                   class="trace-analysis-dashboards p-[0.4rem]"
                 />
@@ -311,12 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import TracesDrillDownPage from "./TracesDrillDownPage.vue";
 import {
   ref,
   computed,
@@ -342,10 +305,7 @@ import {
   useLatencyInsightsDashboard,
   COMPARISON_COLORS,
 } from "@/composables/useLatencyInsightsDashboard";
-import {
-  selectDimensionsFromData,
-  selectTraceDimensions,
-} from "@/composables/useDimensionSelector";
+import { selectDimensionsFromData } from "@/composables/useDimensionSelector";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -358,21 +318,7 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-interface DurationFilter {
-  start: number;
-  end: number;
-  timeStart?: number;
-  timeEnd?: number;
-}
-
 interface RateFilter {
-  start: number;
-  end: number;
-  timeStart?: number;
-  timeEnd?: number;
-}
-
-interface ErrorFilter {
   start: number;
   end: number;
   timeStart?: number;
@@ -385,25 +331,18 @@ interface TimeRange {
 }
 
 interface Props {
-  durationFilter?: DurationFilter;
   rateFilter?: RateFilter;
-  errorFilter?: ErrorFilter;
   timeRange: TimeRange;
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
-  analysisType?: "duration" | "volume" | "error"; // Initial/default analysis type
-  availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
+  analysisType: "duration" | "volume" | "error"; // Initial/default analysis type
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
   embedded?: boolean; // Render as a page in place instead of a drawer
-  fullPage?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  analysisType: "duration",
-  availableAnalysisTypes: () => ["volume"], // Default to just volume
-});
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "close"): void;
@@ -447,16 +386,6 @@ const chipColors = computed(() =>
 const { loading, error } = useLatencyInsightsAnalysis(t);
 const { generateDashboard } = useLatencyInsightsDashboard(t);
 
-// Variables manager will be initialized by RenderDashboardCharts
-// and we'll receive a reference to it via the @variablesManagerReady event
-interface VariablesManager {
-  hasUncommittedChanges?: boolean | { value: boolean };
-  committedVariablesData?: {
-    global?: Array<{ name: string; value?: string }>;
-  };
-}
-const variablesManager = ref<VariablesManager | null>(null);
-
 const isOpen = ref(true);
 
 // Computed title for the drawer header based on analysis type
@@ -477,59 +406,8 @@ const splitterModel = ref(25); // 25% width for dimension selector (default)
 const splitterLimits: [number, number] = [0, 30]; // Min 0% (allow full collapse), Max 30%
 const lastSplitterPosition = ref(25); // Remember last position before collapse
 
-// Percentile change tracking - use variables manager's hasUncommittedChanges
-// This matches the pattern used in ViewDashboard
-const showRefreshButton = computed(() => {
-  if (activeAnalysisType.value !== "duration") {
-    return false;
-  }
-
-  // Use variables manager to check for uncommitted changes (same as ViewDashboard)
-  const manager = variablesManager.value;
-  // Use optional chaining for safer property access
-  if (manager?.hasUncommittedChanges !== undefined) {
-    // Access the value if it's a ref, otherwise use directly
-    const hasChanges =
-      typeof manager.hasUncommittedChanges === "object" && "value" in manager.hasUncommittedChanges
-        ? manager.hasUncommittedChanges.value
-        : manager.hasUncommittedChanges;
-    return hasChanges;
-  }
-
-  return false;
-});
-
 // Active tab management
 const activeAnalysisType = ref<"duration" | "volume" | "error">(props.analysisType);
-
-// Tab configuration
-const availableTabs = computed(() => {
-  return props.availableAnalysisTypes.map((type) => {
-    switch (type) {
-      case "volume":
-        return {
-          name: "volume",
-          label: t("volumeInsights.tabLabel"),
-          icon: "trending-up",
-        };
-      case "duration":
-        return {
-          name: "duration",
-          label: t("latencyInsights.tabLabel"),
-          icon: "schedule",
-        };
-      case "error":
-        return {
-          name: "error",
-          label: t("errorInsights.tabLabel"),
-          icon: "error-outline",
-        };
-    }
-  });
-});
-
-// Show tabs only if multiple analysis types available
-const showTabs = computed(() => props.availableAnalysisTypes.length > 1);
 
 /**
  * Smart dimension selection
@@ -549,11 +427,6 @@ const getInitialDimensions = () => {
   // For LOGS: Use sample-based analysis if we have log data
   if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
-  }
-
-  // For TRACES: Use OTel conventions
-  if (streamType === "traces") {
-    return selectTraceDimensions(schemaFields, 6);
   }
 
   // Fallback for logs without samples
@@ -734,16 +607,6 @@ const selectedTimeRangeDisplay = computed(() => {
       startTime: props.rateFilter.timeStart,
       endTime: props.rateFilter.timeEnd,
     };
-  } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-    return {
-      startTime: props.durationFilter.timeStart,
-      endTime: props.durationFilter.timeEnd,
-    };
-  } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-    return {
-      startTime: props.errorFilter.timeStart,
-      endTime: props.errorFilter.timeEnd,
-    };
   }
   return null;
 });
@@ -755,64 +618,20 @@ const hasSelectedTimeRange = computed(() => {
 
 // Additional filter metadata (duration, rate, or error count)
 const filterMetadata = computed(() => {
-  if (
-    props.analysisType === "duration" &&
-    props.durationFilter &&
-    !props.durationFilter.timeStart
-  ) {
-    return `${t("latencyInsights.durationLabel")} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
-  } else if (props.analysisType === "volume" && props.rateFilter && !props.rateFilter.timeStart) {
+  if (props.analysisType === "volume" && props.rateFilter && !props.rateFilter.timeStart) {
     return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t("traces.tracesAnalysisDashboard.tracesPerInterval")}`;
-  } else if (props.analysisType === "error" && props.errorFilter && !props.errorFilter.timeStart) {
-    return `${t("errorInsights.errorsGreaterThan")} ${props.errorFilter.start}`;
   }
   return null;
 });
 
 const loadAnalysis = async () => {
   try {
-    // Determine which filter to use based on active analysis type
-    let filterConfig;
-    if (activeAnalysisType.value === "duration") {
-      filterConfig = {
-        durationFilter: props.durationFilter,
-        rateFilter: undefined,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "volume") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: props.rateFilter,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "error") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: undefined,
-        errorFilter: props.errorFilter,
-      };
-    }
-
-    // For volume/error analysis with filter, use the actual selected time range from the brush
-    // Otherwise, use the global time range
+    // A histogram brush narrows the selected range; otherwise it is the global time range.
     let selectedTimeRange = props.timeRange;
-
-    // Check for ANY time-based filter (from any RED metrics panel)
-    // Use whichever filter has a time range selection - applies to ALL tabs
     if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
-      };
-    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.durationFilter.timeStart,
-        endTime: props.durationFilter.timeEnd,
-      };
-    } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.errorFilter.timeStart,
-        endTime: props.errorFilter.timeEnd,
       };
     }
 
@@ -822,11 +641,10 @@ const loadAnalysis = async () => {
       orgIdentifier: currentOrgIdentifier.value,
       selectedTimeRange,
       baselineTimeRange: baselineTimeRange.value,
-      ...filterConfig,
+      rateFilter: props.rateFilter,
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
       analysisType: activeAnalysisType.value,
-      percentile: getCurrentPercentile() || undefined,
     };
 
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
@@ -852,43 +670,6 @@ const loadAnalysis = async () => {
     console.error("Error loading analysis:", err);
     showErrorNotification(err.message || t("latencyInsights.failedToLoad"));
   }
-};
-
-// Handler for when variables manager is ready from RenderDashboardCharts
-const onVariablesManagerReady = (manager: any) => {
-  variablesManager.value = manager;
-
-  // Load analysis immediately when manager is ready to populate dashboard
-  // This ensures the dashboard shows data on initial load instead of remaining blank
-  if (activeAnalysisType.value === "duration" && !dashboardData.value) {
-    loadAnalysis();
-  }
-};
-
-// Helper to get current percentile from variables manager
-const getCurrentPercentile = (): string => {
-  const manager = variablesManager.value;
-  if (manager && manager.committedVariablesData) {
-    // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
-    // Percentile is likely a global variable
-    const percentileVar = manager.committedVariablesData.global?.find(
-      (v: { name: string; value?: string }) => v.name === "percentile",
-    );
-    if (percentileVar && percentileVar.value !== undefined) {
-      return percentileVar.value;
-    }
-  }
-  return "0.95"; // Default to P95
-};
-
-const refreshAfterPercentileChange = () => {
-  // Commit all variable changes before reloading (same as ViewDashboard's refreshData)
-  if (dashboardChartsRef.value?.commitAllVariables) {
-    dashboardChartsRef.value.commitAllVariables();
-  }
-
-  // Reload the analysis with new percentile
-  loadAnalysis();
 };
 
 const onClose = () => {
@@ -930,13 +711,6 @@ const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number
   }
 };
 
-const formatTimeWithSuffix = (milliseconds: number) => {
-  if (milliseconds >= 1000) {
-    return `${(milliseconds / 1000).toFixed(2)}s`;
-  }
-  return `${milliseconds.toFixed(2)}ms`;
-};
-
 // Load analysis when modal opens
 watch(
   () => isOpen.value,
@@ -960,43 +734,11 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     const currentPanels = dashboardData.value.tabs[0].panels;
     const existingCount = currentPanels.length;
 
-    // Build config (reuse logic from loadAnalysis)
-    let filterConfig: any = {};
-    if (activeAnalysisType.value === "duration") {
-      filterConfig = {
-        durationFilter: props.durationFilter,
-        rateFilter: undefined,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "volume") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: props.rateFilter,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "error") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: undefined,
-        errorFilter: props.errorFilter,
-      };
-    }
-
     let selectedTimeRange = props.timeRange;
     if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
-      };
-    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.durationFilter.timeStart,
-        endTime: props.durationFilter.timeEnd,
-      };
-    } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.errorFilter.timeStart,
-        endTime: props.errorFilter.timeEnd,
       };
     }
 
@@ -1006,7 +748,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       orgIdentifier: currentOrgIdentifier.value,
       selectedTimeRange,
       baselineTimeRange: baselineTimeRange.value,
-      ...filterConfig,
+      rateFilter: props.rateFilter,
       baseFilter: props.baseFilter,
       dimensions: addedDimensions,
       analysisType: activeAnalysisType.value,
@@ -1128,13 +870,7 @@ watch(
 
 // Watch for changes in props
 watch(
-  () => [
-    props.durationFilter,
-    props.rateFilter,
-    props.timeRange,
-    props.streamName,
-    props.analysisType,
-  ],
+  () => [props.rateFilter, props.timeRange, props.streamName, props.analysisType],
   () => {
     if (isOpen.value) {
       loadAnalysis();
@@ -1145,16 +881,6 @@ watch(
 </script>
 
 <style scoped>
-/* keep(lib-override:o-drawer): ODrawer renders its own panel; the Insights drawer
- * needs the body cell (4th child — after the two sr-only nodes h2/p and the header
- * div) to flex to full height for the splitter layout, reachable only via :deep. */
-[data-test="traces-analysis-dashboard-drawer"] > :deep(div:nth-child(4)) {
-  flex: 1 1 0 !important;
-  overflow: hidden !important;
-  display: flex;
-  flex-direction: column;
-}
-
 /* keep(brand): comparison chips are tinted from the runtime --chip-color
  * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
  * color Tailwind can't express; the text mix flips through --color-text-heading. */

@@ -480,8 +480,12 @@ const {
       return props.currentPage;
     },
     showIndex: props.showIndex,
-    sortBy: props.sortBy,
-    sortOrder: props.sortOrder,
+    get sortBy() {
+      return props.sortBy;
+    },
+    get sortOrder() {
+      return props.sortOrder;
+    },
     sortFieldMap: props.sortFieldMap,
     get globalFilter() {
       return globalFilterLocal.value;
@@ -1291,6 +1295,9 @@ defineExpose({
   resetColumnOrder: () => {
     userReorderedColumns.value = false;
     columnOrder.value = props.columns.map((c) => c.id);
+  },
+  applyColumnVisibility: (visibility: Record<string, boolean>) => {
+    internalColumnVisibility.value = { ...internalColumnVisibility.value, ...visibility };
   },
   resetPersistedColumns: () => {
     persistence.clearPersistedState();

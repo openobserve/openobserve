@@ -140,4 +140,35 @@ describe("SectionRail", () => {
     await wrapper.get('[data-name="insights"]').trigger("click");
     expect(push).toHaveBeenCalledWith({ name: "a" });
   });
+
+  const headings = (wrapper: ReturnType<typeof mountRail>) =>
+    wrapper.findAll("div.text-text-secondary.font-semibold");
+
+  it("renders no heading for a group with an empty label", () => {
+    const wrapper = mountRail({ groups: [groups[0], { ...groups[1], label: "" }] });
+    expect(headings(wrapper).map((h) => h.text())).toEqual(["Monitor"]);
+    expect(wrapper.find('[data-name="playground"]').exists()).toBe(true);
+  });
+
+  it("renders the items of two unlabelled groups without a duplicate key", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const item = (key: string) => ({ key, label: key, icon: "insights", to: { name: key } });
+    const mixed = [
+      { label: "Monitor", items: [item("a")] },
+      { label: "", items: [item("b")] },
+      { label: "", items: [item("c")] },
+      { label: "Experiment", items: [item("d")] },
+    ];
+    const wrapper = mountRail({ groups: mixed });
+    // Vue reports a duplicate key only when a reorder forces a keyed diff.
+    await wrapper.setProps({ groups: [...mixed].reverse() });
+    const duplicateKey = warn.mock.calls.some((args) => String(args[0]).includes("Duplicate keys"));
+    warn.mockRestore();
+
+    expect(["a", "b", "c", "d"].every((k) => wrapper.find(`[data-name="${k}"]`).exists())).toBe(
+      true,
+    );
+    expect(headings(wrapper).map((h) => h.text())).toEqual(["Experiment", "Monitor"]);
+    expect(duplicateKey).toBe(false);
+  });
 });

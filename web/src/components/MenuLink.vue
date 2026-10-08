@@ -15,76 +15,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
-       and submenu-group triggers (<button>, used by ONavGroup) all share the
-       exact same tile markup and styling — a group tile is literally a MenuLink. -->
-  <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
-    <div
-      class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
+  <!-- Always wrapped (disabled when silent) so the tile element the rail measures never remounts. -->
+  <OTooltip :disabled="!tooltipText" :side="tooltipSide" :delay="300">
+    <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
+         and submenu-group triggers (<button>, used by ONavGroup) all share the
+         exact same tile markup and styling — a group tile is literally a MenuLink. -->
+    <component
+      :is="rootComponent"
+      v-bind="{ ...$attrs, ...rootProps }"
+      :class="rootClass"
+      @click="onRootClick"
     >
       <div
-        class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
-        :class="isActive ? activeIconClass : 'text-tabs-inactive-text group-hover:text-accent'"
+        class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
       >
-        <!-- Rail icons are a hair smaller than the md (24px) default. -->
-        <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
-        <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
         <div
-          v-if="badge && badge > 0"
-          class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
-          aria-live="polite"
-          :aria-label="t('common.notificationsCount', { count: badge })"
+          class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
+          :class="iconClass"
         >
-          {{ badge > 99 ? "99+" : badge }}
+          <!-- Rail icons are a hair smaller than the md (24px) default. -->
+          <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
+          <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
+          <div
+            v-if="badge && badge > 0"
+            class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
+            aria-live="polite"
+            :aria-label="t('common.notificationsCount', { count: badge })"
+          >
+            {{ badge > 99 ? "99+" : badge }}
+          </div>
+          <span
+            v-else-if="paywalled"
+            :data-test="`menu-link-${link}-lock`"
+            class="menu-lock text-text-secondary absolute -end-1.5 -top-1 z-1 inline-flex"
+            aria-hidden="true"
+          >
+            <OIcon name="lock" size="xs" class="size-3!" />
+          </span>
+        </div>
+        <div
+          ref="labelRef"
+          class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal text-ellipsis [hyphens:none] transition-colors duration-250 max-md:text-start max-md:text-sm"
+          :class="labelClass"
+        >
+          {{ title }}
         </div>
       </div>
-      <OTruncatedText
-        as="div"
-        :lines="2"
-        :tooltip="asTrigger || submenu ? false : undefined"
-        class="nav-menu-item-label w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250 max-md:text-left max-md:text-sm"
-        :class="
-          isActive
-            ? activeLabelClass
-            : 'text-tabs-inactive-text group-hover:text-accent font-medium'
-        "
-      >
-        {{ title }}
-      </OTruncatedText>
-    </div>
+      <TooltipSilencer :silent="!tooltipText" />
+      <span v-if="paywalled" :id="paywallDescriptionId" class="sr-only">{{ paywallText }}</span>
 
-    <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
-         indistinguishable from a plain tile (consistency). It fades in only on
-         hover, or stays lit while the flyout is open / the section is active. -->
-    <span
-      v-if="asTrigger || submenu"
-      class="absolute top-3 right-1 transition-opacity duration-150 max-md:top-1/2 max-md:right-3 max-md:-translate-y-1/2 max-md:opacity-100"
-      :class="[
-        isActive || expanded
-          ? 'text-accent opacity-100'
-          : 'text-tabs-inactive-text opacity-70 group-hover:opacity-100',
-        expanded ? 'max-md:rotate-90' : '',
-      ]"
-      aria-hidden="true"
-    >
-      <OIcon name="chevron-right" size="xs" class="max-md:size-4.5!" />
-    </span>
-  </component>
+      <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
+           indistinguishable from a plain tile (consistency). It fades in only on
+           hover, or stays lit while the flyout is open / the section is active. -->
+      <span
+        v-if="asTrigger || submenu"
+        class="absolute end-1 top-3 transition-opacity duration-150 max-md:end-3 max-md:top-1/2 max-md:-translate-y-1/2 max-md:opacity-100"
+        :class="[
+          isActive || expanded
+            ? 'text-accent opacity-100'
+            : 'text-tabs-inactive-text opacity-70 group-hover:opacity-100',
+          expanded ? 'max-md:rotate-90 max-md:rtl:-rotate-90' : '',
+        ]"
+        aria-hidden="true"
+      >
+        <OIcon name="chevron-right" size="xs" class="max-md:size-4.5!" />
+      </span>
+    </component>
+    <template #content>
+      <span :data-test="`menu-link-${link}-tooltip`" class="flex flex-col">
+        <span>{{ tooltipText }}</span>
+        <span v-if="paywalled">{{ t("menu.trialEndedTitle") }}</span>
+      </span>
+    </template>
+  </OTooltip>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, inject, type PropType } from "vue";
+import { defineComponent, computed, inject, nextTick, ref, useId, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
+import { injectTooltipRootContext } from "reka-ui";
 import { useTheme } from "@/composables/useTheme";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
+
+// A disabled reka tooltip drops its trigger listeners but keeps a pending hover-open timer; onClose() is the only way to cancel it.
+const TooltipSilencer = defineComponent({
+  name: "MenuLinkTooltipSilencer",
+  props: {
+    silent: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  setup(props) {
+    const tooltip = injectTooltipRootContext(null);
+    watch(
+      () => props.silent,
+      (silent) => {
+        if (silent) tooltip?.onClose();
+      },
+    );
+    return () => null;
+  },
+});
 
 export default defineComponent({
   name: "MenuLink",
-  components: { OIcon, OTruncatedText },
+  components: { OIcon, OTooltip, TooltipSilencer },
+  // Attrs are re-bound onto the tile element by hand: the tooltip wrapper is a fragment.
+  inheritAttrs: false,
   props: {
     title: {
       type: String as unknown as PropType<I18nText>,
@@ -153,6 +196,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // The destination is behind the trial paywall: muted, locked, still clickable.
+    paywalled: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["trigger"],
   setup(props, { emit }) {
@@ -209,21 +257,55 @@ export default defineComponent({
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-accent!",
     );
+    // Light active and hover labels use the darker label token; the icon keeps the accent.
     const activeLabelClass = computed(() =>
-      isDark.value ? "font-semibold text-tabs-active-text!" : "font-semibold text-accent!",
+      isDark.value
+        ? "font-semibold text-tabs-active-text!"
+        : "font-semibold text-nav-label-accent!",
     );
+    const iconClass = computed(() => {
+      if (props.paywalled) return "text-text-secondary";
+      return isActive.value
+        ? activeIconClass.value
+        : "text-tabs-inactive-text group-hover:text-accent";
+    });
+    const labelClass = computed(() => {
+      if (props.paywalled) return "text-text-body font-medium";
+      return isActive.value
+        ? activeLabelClass.value
+        : "text-tabs-inactive-text group-hover:text-nav-label-accent font-medium";
+    });
 
-    // Compute ARIA label with fallback
+    // aria-current already announces the page, so the name carries no suffix.
     const ariaLabel = computed(() => {
-      let label: string = props.title || t("menu.navigationLink");
+      const label: string = props.title || t("menu.navigationLink");
       if (props.badge && props.badge > 0) {
-        label = t("menu.ariaWithNotifications", { label, count: props.badge });
-      }
-      if (isActive.value) {
-        label = t("menu.ariaCurrentPage", { label });
+        return t("menu.ariaWithNotifications", { label, count: props.badge });
       }
       return label;
     });
+
+    const paywallDescriptionId = useId();
+    const paywallText = computed(() => t("menu.trialPageNeedsPlan", { page: props.title }));
+
+    const labelRef = ref<HTMLElement | null>(null);
+    const { isTruncated, update: updateTruncated } = useIsTruncated(labelRef, { clamp: true });
+    // A new label in the same box never resizes it, so the observer would miss a language switch.
+    watch(
+      () => props.title,
+      async () => {
+        await nextTick();
+        updateTruncated();
+      },
+    );
+
+    // A group tile never gets a tooltip: its flyout opens on the same edge and shows the title.
+    const tooltipText = computed<I18nText | "">(() => {
+      if (props.asTrigger || props.submenu) return "";
+      if (props.paywalled) return paywallText.value;
+      return isTruncated.value ? props.title : "";
+    });
+    const tooltipSide = computed(() => (document.documentElement.dir === "rtl" ? "left" : "right"));
 
     // The default prop is an empty object `{}`; only render a custom icon
     // component when a real one was passed.
@@ -243,7 +325,13 @@ export default defineComponent({
       const common: Record<string, any> = {
         "data-test": `menu-link-${props.link}-item`,
         "aria-label": ariaLabel.value,
+        "data-truncated": isTruncated.value ? "true" : undefined,
       };
+      // Set only when present: an explicit undefined would erase the tooltip's own describedby.
+      if (props.paywalled) {
+        common["data-paywalled"] = "true";
+        common["aria-describedby"] = paywallDescriptionId;
+      }
       if (props.external) {
         return {
           ...common,
@@ -268,12 +356,13 @@ export default defineComponent({
         },
         target: props.target,
         "aria-current": isActive.value ? "page" : undefined,
+        ...(props.submenu ? { "aria-haspopup": "menu", "aria-expanded": props.expanded } : {}),
       };
     });
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface-chrome-deeper",
       // Drawer rows are tap targets, so they clear the 44px touch-target minimum.
       "max-md:flex max-md:min-h-11 max-md:items-center max-md:px-2 max-md:py-2",
       // Sit above the rail's sliding pill so icon/label stay readable.
@@ -314,6 +403,14 @@ export default defineComponent({
       activePillClass,
       activeIconClass,
       activeLabelClass,
+      iconClass,
+      labelClass,
+      labelRef,
+      isTruncated,
+      tooltipText,
+      tooltipSide,
+      paywallDescriptionId,
+      paywallText,
       hasIconComponent,
       rootComponent,
       rootProps,

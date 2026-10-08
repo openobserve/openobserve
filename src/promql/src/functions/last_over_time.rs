@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::Sample;
+use config::meta::promql::{is_stale_marker, value::Sample};
 
 use crate::functions::RangeFunc;
 
@@ -33,6 +33,26 @@ impl RangeFunc for LastOverTimeFunc {
         // vector functions, the only change needed is to drop the
         // metric name in the output.
         samples.last().map(|sample| sample.value)
+    }
+}
+
+/// `last_over_time` as a bare selector's lookback, where a stale newest sample means no value.
+pub struct InstantLookbackFunc;
+
+impl RangeFunc for InstantLookbackFunc {
+    fn name(&self) -> &'static str {
+        LastOverTimeFunc.name()
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        samples
+            .last()
+            .map(|sample| sample.value)
+            .filter(|value| !is_stale_marker(*value))
+    }
+
+    fn reads_stale_markers(&self) -> bool {
+        true
     }
 }
 

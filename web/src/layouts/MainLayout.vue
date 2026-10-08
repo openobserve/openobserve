@@ -237,6 +237,9 @@ import {
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
+import { isPaywalledDestination } from "@/utils/auth";
+import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
+import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
 
 import {
   ref,
@@ -379,7 +382,8 @@ export default defineComponent({
         },
       });
     },
-    changeLanguage(item: { code: string; label: string }) {
+    async changeLanguage(item: { code: string; label: string }) {
+      await runBeforeAppReloadHooks();
       setLanguage(item.code);
       window.location.reload();
     },
@@ -887,7 +891,7 @@ export default defineComponent({
 
       linksList.value.splice(insertAt, 0, {
         title: t("menu.profiles"),
-        icon: "account-tree",
+        icon: "memory",
         link: "/profiles",
         name: "profiles",
       });
@@ -1204,7 +1208,7 @@ export default defineComponent({
         claim_parser_function: "",
         org_storage_enabled: false,
         domain_org_mappings: [],
-        red_insights_enabled: false,
+        red_insights_enabled: true,
       };
 
       try {
@@ -1263,6 +1267,13 @@ export default defineComponent({
             router.currentRoute.value.name,
           )
         ) {
+          // Name the page only when its own guard would block it; Home has none, so it gets the generic copy.
+          const current = router.currentRoute.value;
+          notifyTrialBlocked(
+            isPaywalledDestination(orgSettings?.data?.data?.free_trial_expiry, current)
+              ? current
+              : {},
+          );
           router.push({
             name: "plans",
             query: {

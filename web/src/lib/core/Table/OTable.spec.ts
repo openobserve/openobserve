@@ -681,6 +681,80 @@ describe("OTable", () => {
           .attributes("data-test-sort-direction"),
       ).toBe("none");
     });
+
+    const shuffled = (): TestRow[] =>
+      ["Carol", "Alice", "Bob"].map((name, i) => ({
+        id: i + 1,
+        name,
+        email: `${name.toLowerCase()}@example.com`,
+        status: "Active",
+      }));
+    const columnText = (w: VueWrapper, id: string) =>
+      w.findAll(`[data-test="o2-table-cell-${id}"]`).map((c) => c.text());
+    const nameTrigger = (w: VueWrapper) =>
+      w.findAll('[data-test="o2-table-th-sort-trigger"]').find((t) => t.text().includes("Name"))!;
+
+    it("emits the post-toggle sort on a header click and reorders the rows", async () => {
+      wrapper = mount(OTable, {
+        props: { data: shuffled(), columns: makeColumns(), sorting: "client" },
+      });
+
+      await nameTrigger(wrapper).trigger("click");
+      expect(columnText(wrapper, "name")).toEqual(["Alice", "Bob", "Carol"]);
+      expect(wrapper.emitted("update:sortBy")?.at(-1)).toEqual(["name"]);
+      expect(wrapper.emitted("update:sortOrder")?.at(-1)).toEqual(["asc"]);
+      expect(wrapper.emitted("sort-change")?.at(-1)).toEqual([{ column: "name", order: "asc" }]);
+
+      await nameTrigger(wrapper).trigger("click");
+      expect(columnText(wrapper, "name")).toEqual(["Carol", "Bob", "Alice"]);
+      expect(wrapper.emitted("sort-change")?.at(-1)).toEqual([{ column: "name", order: "desc" }]);
+
+      await nameTrigger(wrapper).trigger("click");
+      expect(columnText(wrapper, "name")).toEqual(["Carol", "Alice", "Bob"]);
+      expect(wrapper.emitted("update:sortBy")?.at(-1)).toEqual([""]);
+      expect(wrapper.emitted("sort-change")?.at(-1)).toEqual([{ column: "", order: "asc" }]);
+    });
+
+    it("applies a later sortBy/sortOrder prop change without emitting", async () => {
+      wrapper = mount(OTable, {
+        props: { data: shuffled(), columns: makeColumns(), sorting: "client" },
+      });
+
+      await wrapper.setProps({ sortBy: "name", sortOrder: "desc" });
+      expect(columnText(wrapper, "name")).toEqual(["Carol", "Bob", "Alice"]);
+      await wrapper.setProps({ sortOrder: "asc" });
+      expect(columnText(wrapper, "name")).toEqual(["Alice", "Bob", "Carol"]);
+
+      expect(wrapper.emitted("update:sortBy")).toBeUndefined();
+      expect(wrapper.emitted("update:sortOrder")).toBeUndefined();
+      expect(wrapper.emitted("sort-change")).toBeUndefined();
+    });
+
+    it("keeps undefined values last in both directions with sortUndefined: last", async () => {
+      const columns: OTableColumnDef<TestRow>[] = [
+        ...makeColumns(),
+        {
+          id: "score",
+          header: "Score",
+          accessorFn: (r) => (r.id % 2 === 0 ? undefined : r.id),
+          sortable: true,
+          sortUndefined: "last",
+        },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns,
+          sorting: "client",
+          sortBy: "score",
+          sortOrder: "asc",
+        },
+      });
+      expect(columnText(wrapper, "id")).toEqual(["1", "3", "5", "2", "4"]);
+
+      await wrapper.setProps({ sortOrder: "desc" });
+      expect(columnText(wrapper, "id")).toEqual(["5", "3", "1", "2", "4"]);
+    });
   });
 
   // ── Server-Side Sorting ────────────────────────────────────
@@ -721,6 +795,30 @@ describe("OTable", () => {
         column: "id",
         order: "desc",
       });
+    });
+  });
+
+  describe("applyColumnVisibility", () => {
+    beforeEach(() => localStorage.clear());
+
+    it("hides a column for the session without persisting the choice", async () => {
+      const columns = makeColumns().map((c) => (c.id === "email" ? { ...c, hideable: true } : c));
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns,
+          tableId: "apply-visibility",
+          persistColumns: true,
+        },
+      });
+      const stored = localStorage.getItem("o2-tables-column-state-v1");
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(3);
+
+      (wrapper.vm as any).applyColumnVisibility({ email: false });
+      await nextTick();
+
+      expect(wrapper.findAll('[data-test="o2-table-cell-email"]').length).toBe(0);
+      expect(localStorage.getItem("o2-tables-column-state-v1")).toBe(stored);
     });
   });
 

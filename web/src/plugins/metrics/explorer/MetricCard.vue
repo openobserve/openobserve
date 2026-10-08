@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <MetricCardChart
         v-else-if="preview?.results?.length"
         :results="preview.results"
-        :queries="queries"
+        :queries="chartQueries"
         :chart-type="preview.chartType"
         :unit="o2Unit.unit"
         :unit-custom="o2Unit.unitCustom ?? undefined"
@@ -488,6 +488,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { BADGE_LABEL_KEYS, UNIT_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
+import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
@@ -555,6 +556,7 @@ export default defineComponent({
     const { isDark } = useTheme();
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
+    const chartQueries = computed(() => withSourceStreams(props.queries, props.card.name));
     // Kept for the card's aria label; the VISIBLE badge renders through the
     // registry's metricType group, which owns the label and colour.
     const badgeLabel = computed(() =>
@@ -732,6 +734,7 @@ export default defineComponent({
       t,
       root,
       color,
+      chartQueries,
       badgeLabel,
       o2Unit,
       bucketO2Unit,

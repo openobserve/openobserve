@@ -59,13 +59,9 @@ fn may_skip_permission_check(
 fn relaxes_audience_check(path_columns: &[&str], mcp_marker: Option<&[u8]>) -> bool {
     let is_mcp_endpoint = path_columns.len() == 2 && path_columns[1] == "mcp";
     is_mcp_endpoint
-        || mcp_marker
-            .is_some_and(|v| constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes()))
-}
-
-#[cfg(any(feature = "enterprise", test))]
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
+        || mcp_marker.is_some_and(|v| {
+            config::utils::str::constant_time_eq(v, config::cluster::MCP_LOOPBACK_SECRET.as_bytes())
+        })
 }
 
 #[cfg(feature = "enterprise")]
