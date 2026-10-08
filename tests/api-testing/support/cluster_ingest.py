@@ -26,12 +26,13 @@ Deliberately omitted:
 from __future__ import annotations
 
 import base64
-import os
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
 import grpc
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
+
+# cluster.Ingest shares the main gRPC listener with OTLP, so it resolves to the same target.
+from support.otlp_grpc import grpc_target  # noqa: F401  (re-exported for this module's callers)
 
 INGEST_METHOD = "/cluster.Ingest/Ingest"
 
@@ -87,14 +88,6 @@ def _build_messages():
 
 
 IngestionData, IngestionRequest, IngestionResponse = _build_messages()
-
-
-def grpc_target() -> str:
-    """host:port of the gRPC listener. Mirrors support.otlp_grpc.grpc_target."""
-    if os.environ.get("ZO_GRPC_ADDR"):
-        return os.environ["ZO_GRPC_ADDR"]
-    host = urlparse(os.environ.get("ZO_BASE_URL", "http://localhost:5080")).hostname or "localhost"
-    return f"{host}:{os.environ.get('ZO_GRPC_PORT', '5081')}"
 
 
 def basic_auth(email: str, password: str) -> str:

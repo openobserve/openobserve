@@ -153,8 +153,7 @@ def test_vrl_lookup_of_a_missing_key_leaves_the_event_unenriched(
         f'rec, err = get_enrichment_table_record("{enrichment_table}", '
         '{"code": to_string!(.code)})\n.label = rec.label\n.'
     )
-    # A known key rides along as the control: a table that resolves but holds no rows
-    # yet, and a lookup broken outright, both produce the same empty label otherwise.
+    # A known key rides along as the control: an empty table and a broken lookup look alike.
     events = [{"code": "c1"}, {"code": "no-such-code"}]
     resp = _poll_function_test(create_session, base_url, vrl, events, _control_event_labelled)
 

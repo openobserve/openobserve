@@ -474,8 +474,7 @@ def test_a_band_width_outside_one_to_ten_is_rejected(
         _cleanup(client, resp)
 
 
-# The inclusive edges are the point: narrowing 1.0..=10.0 to 1.0..10.0 would pass every
-# rejection case above, so the bounds themselves must be asserted as accepted.
+# The inclusive edges are the point: 1.0..10.0 would pass every rejection case above.
 @pytest.mark.parametrize("band_width", [1.0, 3, 10.0])
 def test_a_band_width_inside_the_range_round_trips(client: OpenObserveClient, band_width):
     """A plain band-mode create keeps the width it was given, edges included."""
