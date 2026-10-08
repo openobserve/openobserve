@@ -64,7 +64,7 @@ struct StorageScan<'a> {
 
 impl StorageScan<'_> {
     /// Blocks read the sidecars by range: the parquet files are neither downloaded nor selected.
-    async fn blocks(mut self, scan: Arc<MetricsBlockScan>) -> Result<ScanContext> {
+    async fn blocks(mut self) -> Result<ScanContext> {
         let trace_id = self.trace_id;
         let cache_start = std::time::Instant::now();
         let (_, hits, misses) =
@@ -84,11 +84,10 @@ impl StorageScan<'_> {
             schema: self.schema,
             scan_stats: self.scan_stats,
             keep_filters: true,
-            source: ScanSource::Blocks(scan),
+            source: ScanSource::Blocks(Arc::new(MetricsBlockScan { files: self.files })),
         })
     }
 
-    /// A table downloads its files, lets the metrics index select their rows, and registers them.
     async fn table(
         mut self,
         matchers: &Matchers,
@@ -128,6 +127,10 @@ impl StorageScan<'_> {
                 true
             }
         };
+
+        if self.files.is_empty() {
+            return Ok(None);
+        }
 
         log::info!(
             "[trace_id {trace_id}] promql->search->storage: after metrics-index path selection, files {}, scan_size {}, compressed_size {}, index took: {} ms",
@@ -217,6 +220,12 @@ impl StorageScan<'_> {
     }
 }
 
+enum StorageScanSource {
+    Table,
+    HashSorted,
+    Blocks,
+}
+
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
@@ -301,7 +310,7 @@ pub(crate) async fn create_context(
     let source = scan_source(&schema, &files, &matchers, &preference);
     // a materialized table reads its files unordered: declaring the order would regroup them
     let sort_order = match source {
-        ScanSource::Table => FileSortOrder::None,
+        StorageScanSource::Table => FileSortOrder::None,
         _ => FileSortOrder::HashTimestampAsc,
     };
     let scan = StorageScan {
@@ -314,8 +323,9 @@ pub(crate) async fn create_context(
         sort_order,
     };
     match source {
-        ScanSource::Blocks(blocks) => scan.blocks(blocks).await.map(Some),
-        source => scan.table(&matchers, source).await,
+        StorageScanSource::Blocks => scan.blocks().await.map(Some),
+        StorageScanSource::HashSorted => scan.table(&matchers, ScanSource::HashSorted).await,
+        StorageScanSource::Table => scan.table(&matchers, ScanSource::Table).await,
     }
 }
 
@@ -325,22 +335,20 @@ fn scan_source(
     files: &[FileKey],
     matchers: &Matchers,
     preference: &SourcePreference<'_>,
-) -> ScanSource {
+) -> StorageScanSource {
     if !preference.streaming
         || !MetricsFileLayout::all_hash_ordered(files)
         || !hash_column_streams(schema)
     {
-        return ScanSource::Table;
+        return StorageScanSource::Table;
     }
     if files.iter().all(block_parent_eligible)
         && block_output_labels_supported(schema, preference.output_labels)
         && block_matchers_supported(schema, matchers)
     {
-        ScanSource::Blocks(Arc::new(MetricsBlockScan {
-            files: files.to_vec(),
-        }))
+        StorageScanSource::Blocks
     } else {
-        ScanSource::HashSorted
+        StorageScanSource::HashSorted
     }
 }
 
@@ -525,7 +533,7 @@ mod tests {
         )
     }
 
-    fn source(files: &[FileKey], streaming: bool, hash: DataType) -> ScanSource {
+    fn source(files: &[FileKey], streaming: bool, hash: DataType) -> StorageScanSource {
         let schema = Schema::new(vec![
             Field::new(HASH_LABEL, hash, false),
             Field::new("path", DataType::Utf8, true),
@@ -541,20 +549,19 @@ mod tests {
     #[test]
     fn unfiltered_scan_uses_all_rows_without_source_selection() {
         let files = vec![file(100)];
-        let ScanSource::Blocks(scan) = source(&files, true, DataType::UInt64) else {
+        let StorageScanSource::Blocks = source(&files, true, DataType::UInt64) else {
             panic!("indexed files with sidecars read blocks");
         };
-        assert_eq!(scan.files.len(), 1);
         assert!(files[0].selection.is_none());
     }
 
     #[test]
     fn scan_source_needs_every_block_condition() {
         let files = vec![file(100)];
-        let is = |source: ScanSource| match source {
-            ScanSource::Table => "table",
-            ScanSource::HashSorted => "hash_sorted",
-            ScanSource::Blocks(_) => "blocks",
+        let is = |source: StorageScanSource| match source {
+            StorageScanSource::Table => "table",
+            StorageScanSource::HashSorted => "hash_sorted",
+            StorageScanSource::Blocks => "blocks",
         };
         assert_eq!(is(source(&files, true, DataType::UInt64)), "blocks");
         assert_eq!(is(source(&files, false, DataType::UInt64)), "table");
@@ -568,6 +575,35 @@ mod tests {
         let mut missing = files;
         missing[0].meta.mindex_size = 0;
         assert_eq!(is(source(&missing, true, DataType::UInt64)), "hash_sorted");
+    }
+
+    #[tokio::test]
+    async fn empty_storage_scan_returns_no_context() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("trace_id", DataType::Utf8, true),
+        ]));
+        for source in [ScanSource::Table, ScanSource::HashSorted] {
+            let scan = StorageScan {
+                trace_id: "empty-storage-scan",
+                org_id: "org",
+                stream_name: "m",
+                schema: Arc::clone(&schema),
+                files: Vec::new(),
+                scan_stats: ScanStats {
+                    files: 1,
+                    ..Default::default()
+                },
+                sort_order: match source {
+                    ScanSource::Table => FileSortOrder::None,
+                    _ => FileSortOrder::HashTimestampAsc,
+                },
+            };
+            assert!(scan.table(&Matchers::empty(), source).await?.is_none());
+        }
+        Ok(())
     }
 
     #[test]
