@@ -84,7 +84,6 @@ env:
   # Non-secret defaults for a fresh local OpenObserve (identical to the other test workflows).
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_EXT_AUTH_SALT: ci-only-ext-auth-salt-0123456789abcdef
   # RUM-ingestion parity with the proven playwright.yml suite. Without these a fresh
   # OpenObserve can silently reject/misfile RUM ingest (loopback SSRF guard, missing org,
   # dynamic schema, past-timestamp window). The iOS binary inherits these from the job env;
