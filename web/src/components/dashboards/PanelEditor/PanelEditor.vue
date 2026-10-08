@@ -770,6 +770,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   variablesData: undefined,
   dashboardData: undefined,
   editMode: false,
+  holdQueries: false,
 });
 
 const emit = defineEmits<PanelEditorEmits>();
@@ -840,6 +841,7 @@ const {
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
@@ -870,6 +872,7 @@ const {
   dateTimePickerRef: undefined, // Managed by parent
   selectedDate: undefined, // Managed by parent
   validatePanel,
+  holdQueries: () => props.holdQueries,
 });
 
 // The desktop 20% field-list splitter is unusable on a phone, so there it opens at ~half width.
@@ -1317,6 +1320,7 @@ defineExpose({
   // Actions
   initChartData,
   runQuery,
+  reportValidationErrors,
   resetErrors,
   collapseFieldList,
   updateDateTime,

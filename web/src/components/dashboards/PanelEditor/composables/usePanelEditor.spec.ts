@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18nInstance from "@/locales";
 import { ref, reactive, nextTick } from "vue";
 import { usePanelEditor } from "./usePanelEditor";
+import {
+  LIVE_PREVIEW_DEBOUNCE_MS,
+  usePanelLivePreview,
+} from "@/composables/dashboard/usePanelLivePreview";
 
 // Mock vuex store
 vi.mock("vuex", () => ({
@@ -408,6 +412,21 @@ describe("usePanelEditor", () => {
       ]);
     });
 
+    it("does not list a removed axis field as a function field when results arrive late", async () => {
+      dashboardPanelData.data.queries[0].fields.x = [{ alias: "x_axis_1", isDerived: false }];
+      dashboardPanelData.data.queries[0].fields.y = [{ alias: "y_axis_1", isDerived: false }];
+      const { updateVrlFunctionFieldList, initChartData } = usePanelEditor(options);
+      initChartData();
+      await nextTick();
+
+      dashboardPanelData.data.queries[0].fields.y = [];
+      updateVrlFunctionFieldList(["x_axis_1", "y_axis_1", "vrlField"]);
+
+      expect(dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
+        { name: "vrlField", type: "Utf8" },
+      ]);
+    });
+
     it("should filter out customQueryFields", () => {
       // customQueryFields are read from the per-query cache (meta.queryFields)
       dashboardPanelData.meta.queryFields[0] = {
@@ -697,6 +716,121 @@ describe("usePanelEditor", () => {
       const { isOutDated } = usePanelEditor(options);
 
       expect(isOutDated.value).toBe(false);
+    });
+  });
+
+  describe("reportValidationErrors", () => {
+    it("lists the errors without touching the chart", () => {
+      const { reportValidationErrors, errorData, chartData } = usePanelEditor(options);
+      reportValidationErrors(["Filter on level needs a value"]);
+      expect(errorData.errors).toEqual(["Filter on level needs a value"]);
+      expect(chartData.value).toBeUndefined();
+    });
+  });
+
+  describe("held queries (typed text waiting for Apply)", () => {
+    const typeIntoQuery = () => {
+      dashboardPanelData.data.queries[0].customQuery = true;
+      dashboardPanelData.data.queries[0].query = "SELECT * FROM logs WHERE";
+    };
+
+    it("initChartData keeps the last-run queries when asked", async () => {
+      const { chartData, initChartData } = usePanelEditor(options);
+      initChartData();
+      await nextTick();
+      typeIntoQuery();
+      dashboardPanelData.data.description = "edited";
+
+      initChartData(undefined, { keepQueries: true });
+      await nextTick();
+
+      expect(chartData.value?.queries[0].query).toBe("SELECT * FROM logs");
+      expect(chartData.value?.description).toBe("edited");
+    });
+
+    it("a chart type change keeps the last-run queries while holdQueries is on", async () => {
+      const { chartData, initChartData } = usePanelEditor({ ...options, holdQueries: () => true });
+      initChartData();
+      await nextTick();
+      typeIntoQuery();
+
+      dashboardPanelData.data.type = "bar";
+      await nextTick();
+      await nextTick();
+
+      expect(chartData.value?.type).toBe("bar");
+      expect(chartData.value?.queries[0].query).toBe("SELECT * FROM logs");
+    });
+
+    it("a chart type change takes the current queries when nothing is held", async () => {
+      const { chartData, initChartData } = usePanelEditor(options);
+      initChartData();
+      await nextTick();
+      dashboardPanelData.data.queries[0].query = "SELECT count(*) FROM logs";
+
+      dashboardPanelData.data.type = "bar";
+      await nextTick();
+      await nextTick();
+
+      expect(chartData.value?.queries[0].query).toBe("SELECT count(*) FROM logs");
+    });
+  });
+
+  describe("with the dashboard live preview", () => {
+    const setupLive = () => {
+      const editor = usePanelEditor({ ...options, holdQueries: () => live.isTypedPending.value });
+      const live = usePanelLivePreview({
+        panel: () => dashboardPanelData.data,
+        applied: () => editor.chartData.value,
+        liveVariables: () => [],
+        committedVariables: () => [],
+        isBuilderValid: () => true,
+        isLoading: ref(false),
+        run: () => editor.initChartData(),
+        isOverlayOpen: () => false,
+      });
+      return { editor, live };
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("pushes a builder edit to the chart after the debounce", async () => {
+      const { editor, live } = setupLive();
+      editor.initChartData();
+      await nextTick();
+      live.arm();
+
+      dashboardPanelData.data.queries[0].query = "SELECT count(*) FROM logs";
+      await nextTick();
+      expect(editor.chartData.value?.queries[0].query).toBe("SELECT * FROM logs");
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(editor.chartData.value?.queries[0].query).toBe("SELECT count(*) FROM logs");
+    });
+
+    it("never sends another tab's typed text with a builder edit", async () => {
+      dashboardPanelData.data.queries.push({
+        ...JSON.parse(JSON.stringify(dashboardPanelData.data.queries[0])),
+        customQuery: true,
+        query: "SELECT 1",
+      });
+      const { editor, live } = setupLive();
+      editor.initChartData();
+      await nextTick();
+      live.arm();
+
+      dashboardPanelData.data.queries[1].query = "SELECT * FROM logs WHERE";
+      dashboardPanelData.data.queries[0].query = "SELECT count(*) FROM logs";
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+
+      expect(editor.chartData.value?.queries[1].query).toBe("SELECT 1");
+      expect(live.isPending.value).toBe(true);
     });
   });
 

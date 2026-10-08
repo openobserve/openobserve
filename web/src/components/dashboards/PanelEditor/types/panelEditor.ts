@@ -228,6 +228,12 @@ export interface PanelEditorProps {
    */
   showAddToDashboardButton?: boolean;
 
+  /**
+   * While true, chart-type and config re-renders keep the queries the chart last ran.
+   * @default false
+   */
+  holdQueries?: boolean;
+
   // ---- Chart Configuration ----
   /**
    * Array of allowed chart types. If not specified, all chart types are allowed.
@@ -516,7 +522,8 @@ export const DASHBOARD_PRESET: PanelEditorConfig = {
   showQueryBuilder: true,
   showVariablesSelector: true,
   showLastRefreshedTime: true,
-  showOutdatedWarning: true,
+  // Live preview runs builder edits itself; pending changes show on the Apply button.
+  showOutdatedWarning: false,
   showAddToDashboardButton: false, // Dashboard has Save button instead
   showQueryTypeSelector: false,
   showGeneratedQueryDisplay: false,
