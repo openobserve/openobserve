@@ -602,7 +602,6 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
-    const btnRefreshInterval = ref(null);
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
     const queryEditorRef = ref(null);
@@ -657,12 +656,6 @@ export default defineComponent({
         );
       }
     });
-
-    const refreshTimeChange = (item) => {
-      searchObj.meta.refreshInterval = item.value;
-      searchObj.meta.refreshIntervalLabel = item.label;
-      btnRefreshInterval.value = false;
-    };
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -1133,9 +1126,6 @@ export default defineComponent({
       store,
       searchObj,
       queryEditorRef,
-      btnRefreshInterval,
-      refreshTimes: searchObj.config.refreshTimes,
-      refreshTimeChange,
       onQueryEditorFocus,
       onQueryEditorBlur,
       updateQueryValue,

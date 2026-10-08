@@ -10497,6 +10497,67 @@
     "searchTypeOthers": "Altri"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Durata",
+      "tooltipSpans": "{count} span | {count} span",
+      "tooltipErrors": "{count} errore ({share}) | {count} errori ({share})",
+      "colorBy": {
+        "label": "Colora per",
+        "spans": "Span",
+        "errors": "Errori"
+      },
+      "noData": "Nessun dato",
+      "unavailable": "La heatmap della latenza non è disponibile per questa ricerca",
+      "loadFailed": "Impossibile caricare la heatmap della latenza"
+    },
+    "comparison": {
+      "title": "Confronta selezione",
+      "baselineOutside": "Al di fuori della selezione",
+      "baselineBefore": "Subito prima",
+      "sampleNote": "Selezione: {selection} · Baseline: {baseline}",
+      "sampleNoteAll": "tutto {count} span | tutti i {count} span",
+      "sampleCapped": "{sampled} campionati di {total} span",
+      "noiseNote": "Le differenze inferiori a {pts} pts rientrano nel rumore di campionamento",
+      "loading": "Campionamento span…",
+      "loadFailed": "Impossibile confrontare la selezione",
+      "sampleOverflow": "Il campione non corrisponde al numero di span, ad esempio perché sono arrivati dati in ritardo. Riprova a contare.",
+      "baselineCapped": "Baseline limitata a {range}, fino a 3 h su entrambi i lati della selezione",
+      "baselineLimited": "Baseline limitata a {range} dal limite di query di {hours} ore di questo stream",
+      "rangeClamped": "Il server ha accorciato l'intervallo di tempo, quindi il confronto sarebbe incompleto",
+      "rangeTooLong": "La selezione è più lunga del limite di query di {hours} ore di questo stream",
+      "retry": "Riprova",
+      "noSelectionTitle": "Seleziona gli span da confrontare",
+      "noSelectionBody": "Disegna un riquadro sulla heatmap della Durata, o seleziona il grafico Errori o Rate, quindi apri Drill down.",
+      "emptySelection": "Nessuno span nella selezione",
+      "emptyBaseline": "Nessuno span di baseline",
+      "emptyBaselineHint": "Nessuna corrispondenza per questa baseline. Prova invece con {mode}.",
+      "scorePts": "Δ {pts} pts",
+      "presentIn": "presente nel {pct} della selezione",
+      "filterTo": "Filtra per questo valore",
+      "exclude": "Escludi questo valore",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Selezione {pct}",
+      "baselineShare": "Baseline {pct}",
+      "noValue": "(nessun valore)",
+      "emptyValue": "(vuoto)",
+      "otherValues": "Altro ({count} valore) | Altro ({count} valori)",
+      "showMore": "Mostra {count} altro campo | Mostra {count} altri campi",
+      "mostlyEmpty": "Prevalentemente vuoto nella selezione ({count})",
+      "highCardinality": "Campi ad alta cardinalità ({count})",
+      "distinctInSample": "{count} valore distinto nel campione | {count} valori distinti nel campione",
+      "constantFields": "{count} campo ha un unico valore ovunque | {count} campi hanno un unico valore ovunque",
+      "excludedFields": "Non confrontati: {fields}",
+      "summaryErrors": "Errori · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "risultati",
+    "metrics": {
+      "perSecond": {
+        "traces": "tracce/s",
+        "spans": "span/s"
+      }
+    },
     "errLabel": "ERR",
     "agentDefaultVariant": "predefinito",
     "agentNoEnv": "(Nessun ambiente)",
@@ -11066,7 +11127,11 @@
       "unknownOperation": "Operazione sconosciuta",
       "unknownService": "Servizio sconosciuto",
       "traceIdCopied": "ID traccia copiato negli appunti",
-      "sessionIdCopied": "ID sessione copiato negli appunti"
+      "sessionIdCopied": "ID sessione copiato negli appunti",
+      "partial": "Alcuni span di questa traccia non possono essere letti. Il waterfall potrebbe essere incompleto.",
+      "truncated": "Mostrando il primo span di questa traccia, in ordine di ora di inizio. Gli span successivi non sono ancora caricati. | Mostrando i primi {count} span di questa traccia, in ordine di ora di inizio. Gli span successivi non sono ancora caricati.",
+      "loadMore": "Carica lo span successivo | Carica i prossimi {size} span",
+      "loadMoreFailed": "Non è stato possibile caricare altri span di questa traccia"
     },
     "traceTree": {
       "clickToExpand": "Clicca per espandere",

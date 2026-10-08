@@ -10492,6 +10492,67 @@
     "searchTypeOthers": "其他"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "持續時間",
+      "tooltipSpans": "{count} 個 Span | {count} 個 Span",
+      "tooltipErrors": "{count} 個錯誤（{share}） | {count} 個錯誤（{share}）",
+      "colorBy": {
+        "label": "顏色依據",
+        "spans": "Span",
+        "errors": "錯誤"
+      },
+      "noData": "無數據",
+      "unavailable": "此搜尋無法使用延遲熱圖",
+      "loadFailed": "無法載入延遲熱圖"
+    },
+    "comparison": {
+      "title": "比較選取項目",
+      "baselineOutside": "選取項目之外",
+      "baselineBefore": "緊接之前",
+      "sampleNote": "選取項目：{selection} · 基準：{baseline}",
+      "sampleNoteAll": "全部 {count} 個 Span | 全部 {count} 個 Span",
+      "sampleCapped": "已取樣 {sampled}，共 {total} 個 Span",
+      "noiseNote": "差異低於 {pts} 個百分點即屬於取樣雜訊",
+      "loading": "正在取樣 Span…",
+      "loadFailed": "無法比較選取項目",
+      "sampleOverflow": "取樣結果與 Span 數量不符，例如因為資料延遲送達。請重試以重新計數。",
+      "baselineCapped": "基準限制為 {range}，選取項目前後最多 3 小時",
+      "baselineLimited": "由於此串流的 {hours} 小時查詢限制，基準限制為 {range}",
+      "rangeClamped": "伺服器縮短了時間範圍，因此比較結果將不完整",
+      "rangeTooLong": "選取範圍超過此串流的 {hours} 小時查詢限制",
+      "retry": "重試",
+      "noSelectionTitle": "選取要比較的 Span",
+      "noSelectionBody": "在持續時間熱圖上繪製方框，或在錯誤或速率圖表上刷選，然後開啟深入分析",
+      "emptySelection": "選取項目中沒有 Span",
+      "emptyBaseline": "沒有基準 Span",
+      "emptyBaselineHint": "沒有項目符合此基準。請改試 {mode}。",
+      "scorePts": "Δ {pts} 個百分點",
+      "presentIn": "出現在 {pct} 的選取項目中",
+      "filterTo": "篩選至此值",
+      "exclude": "排除此值",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "選取佔比 {pct}",
+      "baselineShare": "基準佔比 {pct}",
+      "noValue": "（無值）",
+      "emptyValue": "（空）",
+      "otherValues": "其他（{count} 個值） | 其他（{count} 個值）",
+      "showMore": "顯示另外 {count} 個欄位 | 顯示另外 {count} 個欄位",
+      "mostlyEmpty": "選取項目中大多為空（{count}）",
+      "highCardinality": "高基數欄位（{count}）",
+      "distinctInSample": "取樣中有 {count} 個相異值 | 取樣中有 {count} 個相異值",
+      "constantFields": "{count} 個欄位在各處都是單一值 | {count} 個欄位在各處都是單一值",
+      "excludedFields": "未比較：{fields}",
+      "summaryErrors": "錯誤 · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "結果",
+    "metrics": {
+      "perSecond": {
+        "traces": "追蹤/秒",
+        "spans": "Span/秒"
+      }
+    },
     "errLabel": "錯誤",
     "agentDefaultVariant": "預設",
     "agentNoEnv": "（無環境）",
@@ -11061,7 +11122,11 @@
       "unknownOperation": "未知操作",
       "unknownService": "未知服務",
       "traceIdCopied": "追蹤 ID 已複製到剪貼簿",
-      "sessionIdCopied": "工作階段 ID 已複製到剪貼簿"
+      "sessionIdCopied": "工作階段 ID 已複製到剪貼簿",
+      "partial": "無法讀取此追蹤的部分 Span。瀑布圖可能不完整。",
+      "truncated": "顯示此追蹤的第一個 Span，依開始時間排序。後續 Span 尚未載入。 | 顯示此追蹤的前 {count} 個 Span，依開始時間排序。後續 Span 尚未載入。",
+      "loadMore": "載入下一個 Span | 載入接下來 {size} 個 Span",
+      "loadMoreFailed": "無法載入此追蹤的更多 Span"
     },
     "traceTree": {
       "clickToExpand": "點擊展開",

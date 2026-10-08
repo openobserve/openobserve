@@ -10497,6 +10497,67 @@
     "searchTypeOthers": "Khác"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Thời lượng",
+      "tooltipSpans": "{count} span | {count} span",
+      "tooltipErrors": "{count} lỗi ({share}) | {count} lỗi ({share})",
+      "colorBy": {
+        "label": "Tô màu theo",
+        "spans": "Span",
+        "errors": "Lỗi"
+      },
+      "noData": "Không có dữ liệu",
+      "unavailable": "Biểu đồ nhiệt độ trễ không khả dụng cho tìm kiếm này",
+      "loadFailed": "Không tải được biểu đồ nhiệt độ trễ"
+    },
+    "comparison": {
+      "title": "So sánh vùng chọn",
+      "baselineOutside": "Ngoài vùng chọn",
+      "baselineBefore": "Ngay trước đó",
+      "sampleNote": "Vùng chọn: {selection} · Đường cơ sở: {baseline}",
+      "sampleNoteAll": "tất cả {count} span | tất cả {count} span",
+      "sampleCapped": "{sampled} được lấy mẫu trong {total} span",
+      "noiseNote": "Chênh lệch dưới {pts} điểm nằm trong ngưỡng nhiễu lấy mẫu",
+      "loading": "Đang lấy mẫu span…",
+      "loadFailed": "Không thể so sánh vùng chọn",
+      "sampleOverflow": "Mẫu không khớp với số lượng span, ví dụ do dữ liệu đến muộn. Thử lại để đếm lại.",
+      "baselineCapped": "Đường cơ sở giới hạn trong {range}, tối đa 3 giờ mỗi bên của vùng chọn",
+      "baselineLimited": "Đường cơ sở giới hạn trong {range} do giới hạn truy vấn {hours} giờ của stream này",
+      "rangeClamped": "Máy chủ đã rút ngắn khoảng thời gian, nên so sánh sẽ không đầy đủ",
+      "rangeTooLong": "Vùng chọn dài hơn giới hạn truy vấn {hours} giờ của stream này",
+      "retry": "Thử lại",
+      "noSelectionTitle": "Chọn span để so sánh",
+      "noSelectionBody": "Vẽ một khung trên biểu đồ nhiệt Thời lượng, hoặc quét biểu đồ Lỗi hay Tốc độ, rồi mở Xem chi tiết.",
+      "emptySelection": "Không có span trong vùng chọn",
+      "emptyBaseline": "Không có span đường cơ sở",
+      "emptyBaselineHint": "Không có gì khớp với đường cơ sở này. Hãy thử {mode} thay thế.",
+      "scorePts": "Δ {pts} điểm",
+      "presentIn": "xuất hiện trong {pct} vùng chọn",
+      "filterTo": "Lọc theo giá trị này",
+      "exclude": "Loại trừ giá trị này",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Vùng chọn {pct}",
+      "baselineShare": "Đường cơ sở {pct}",
+      "noValue": "(không có giá trị)",
+      "emptyValue": "(trống)",
+      "otherValues": "Khác ({count} giá trị) | Khác ({count} giá trị)",
+      "showMore": "Hiện thêm {count} trường | Hiện thêm {count} trường",
+      "mostlyEmpty": "Phần lớn trống trong vùng chọn ({count})",
+      "highCardinality": "Các trường có cardinality cao ({count})",
+      "distinctInSample": "{count} giá trị riêng biệt trong mẫu | {count} giá trị riêng biệt trong mẫu",
+      "constantFields": "{count} trường có một giá trị duy nhất ở mọi nơi | {count} trường có một giá trị duy nhất ở mọi nơi",
+      "excludedFields": "Không so sánh: {fields}",
+      "summaryErrors": "Lỗi · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "kết quả",
+    "metrics": {
+      "perSecond": {
+        "traces": "trace/s",
+        "spans": "span/s"
+      }
+    },
     "errLabel": "ERR",
     "agentDefaultVariant": "mặc định",
     "agentNoEnv": "(Không có env)",
@@ -11066,7 +11127,11 @@
       "unknownOperation": "Thao tác không xác định",
       "unknownService": "Dịch vụ không xác định",
       "traceIdCopied": "Đã sao chép Trace ID vào clipboard",
-      "sessionIdCopied": "ID phiên đã sao chép vào bảng nháp"
+      "sessionIdCopied": "ID phiên đã sao chép vào bảng nháp",
+      "partial": "Một số span của trace này không thể đọc được. Biểu đồ thác nước có thể không đầy đủ.",
+      "truncated": "Hiển thị span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải. | Hiển thị {count} span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải.",
+      "loadMore": "Tải span tiếp theo | Tải {size} span tiếp theo",
+      "loadMoreFailed": "Không thể tải thêm span của trace này"
     },
     "traceTree": {
       "clickToExpand": "Nhấp để mở rộng",
