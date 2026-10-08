@@ -1267,7 +1267,8 @@ pub async fn decline_invitation(
                 };
                 let _ = jwt::check_and_add_to_org(
                     user_id,
-                    &format!("{} {}", db_user.first_name, db_user.last_name),
+                    &format!("{} {}", db_user.first_name, db_user.last_name,),
+                    Default::default(),
                 )
                 .await;
             }

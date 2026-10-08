@@ -192,24 +192,10 @@ pub async fn create(
                     mapping.base_role, mapping.org_id
                 ));
             }
-            if let Some(group) = mapping.user_group.as_ref() {
-                let all_groups = match get_all_groups(&mapping.org_id, None).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "error getting all groups for {} when updating domain org mappings : {e}",
-                            mapping.org_id
-                        );
-                        return MetaHttpResponse::bad_request(format!(
-                            "error getting groups for org {} : {e}",
-                            mapping.org_id
-                        ));
-                    }
-                };
-                if !all_groups.contains(&group) {
+            if let Some(claim) = mapping.role_claim_name.as_ref() {
+                if claim.is_empty() {
                     return MetaHttpResponse::bad_request(format!(
-                        "custom group {group} not found in org {}",
-                        mapping.org_id
+                        "role claim name must not be empty",
                     ));
                 }
             }
