@@ -43,6 +43,8 @@ import { raw } from "@/types/i18n";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import type { RunReason } from "@/composables/useLogs/useAutoRun";
 import { resetTransient } from "@/utils/logs/transientSearchKeys";
+import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
+import { decodeFtScan } from "@/utils/logs/freeTextScan";
 
 const useLogs = (t: TranslateFn) => {
   const store = useStore();
@@ -63,7 +65,7 @@ const useLogs = (t: TranslateFn) => {
     useStreamFields();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams(t);
+  const { getStreams, getStream } = useStreams(t);
 
   const router = useRouter();
 
@@ -86,7 +88,8 @@ const useLogs = (t: TranslateFn) => {
       // if window has use_web_socket property then use that
       // else use organization settings
       const queryReq: any = snapshot ? cloneDeep(snapshot) : buildSearch();
-      if (queryReq == false) {
+      // A blocked text search builds no request at all, so null must stop here too.
+      if (!queryReq) {
         throw new Error(notificationMsg.value || t("search.somethingWentWrongPeriod"));
       }
       if (searchObj.meta.jobId == "") {
@@ -354,6 +357,13 @@ const useLogs = (t: TranslateFn) => {
     }
     searchObj.loading = true;
     searchObj.loadingProgressPercentage = 0;
+    if (mode !== "page") {
+      await refreshFreeTextSchemas(searchObj, store.state.zoConfig, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true, true),
+      );
+      // A run that replaced this one while the schema loaded owns the shared results now.
+      if (!useLogsAutoRun().engine.isCurrent(generationId)) return;
+    }
     await getQueryData(mode === "page", { generationId });
   };
 
@@ -361,6 +371,8 @@ const useLogs = (t: TranslateFn) => {
   const resetRunStateForReapply = () => {
     useLogsAutoRun().engine.resetScope("reapply");
     resetTransient(searchObj as unknown as Record<string, unknown>);
+    // Re-applied SQL is user-authored, so it carries no scan provenance.
+    searchObj.meta.freeTextScan = {};
   };
 
   const restoreUrlQueryParams = async (_dashboardPanelData: any = null) => {
@@ -411,6 +423,8 @@ const useLogs = (t: TranslateFn) => {
         searchObj.meta.pendingUrlQueryRestore = true;
       }
     }
+    // Read with `query`; a malformed or absent value restores no scan consent.
+    searchObj.meta.freeTextScan = decodeFtScan(queryParams.ft_scan);
 
     if (
       Object.prototype.hasOwnProperty.call(queryParams, "defined_schemas") &&

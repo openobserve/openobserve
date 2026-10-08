@@ -42,7 +42,18 @@ export const ITEM2_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "data.customDownloadQueryObj", mode: "reset", owner: "item2" },
 ];
 
-export const TRANSIENT_SEARCH_KEYS: TransientSearchKey[] = [...ITEM2_TRANSIENT_KEYS];
+// Scan consent is saved with a view on purpose, but applying a view replaces it instead of merging.
+export const ITEM1_TRANSIENT_KEYS: TransientSearchKey[] = [
+  { path: "data.freeTextBlocked", mode: "reset", owner: "item1", defaultValue: () => null },
+  { path: "data.freeTextExcluded", mode: "reset", owner: "item1", defaultValue: () => [] },
+  { path: "data.freeTextDecorations", mode: "reset", owner: "item1", defaultValue: () => null },
+  { path: "meta.freeTextScan", mode: "replace", owner: "item1", defaultValue: () => ({}) },
+];
+
+export const TRANSIENT_SEARCH_KEYS: TransientSearchKey[] = [
+  ...ITEM2_TRANSIENT_KEYS,
+  ...ITEM1_TRANSIENT_KEYS,
+];
 
 function isPlainObject(value: unknown): value is PlainObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);

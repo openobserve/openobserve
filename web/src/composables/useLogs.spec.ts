@@ -488,6 +488,36 @@ describe("Use Logs Composable", () => {
       }
     });
 
+    it("restores a valid ft_scan and clears consent when it is absent or malformed (item 1 AC3.9)", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      const map = { stream1: { fields: ["msg_text"] } };
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        ft_scan: btoa(JSON.stringify(map)),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual(map);
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        ft_scan: "%%%",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
+    });
+
     it("should handle empty query params", async () => {
       const { restoreUrlQueryParams } = wrapper.vm;
       await restoreUrlQueryParams();

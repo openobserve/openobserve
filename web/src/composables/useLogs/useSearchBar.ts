@@ -38,6 +38,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { raw } from "@/types/i18n";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { pruneFreeTextScan } from "@/utils/logs/freeTextScan";
 
 // Moved on every selection change, so a slower schema response for an earlier pick never wins (P1).
 let selectionToken = 0;
@@ -308,6 +309,8 @@ export const useSearchBar = (t: TranslateFn) => {
       // Reset query results; the executed record goes with them, so nothing reads as current.
       autoRun.invalidateExecuted("stream");
       searchObj.data.queryResults = { hits: [] };
+      searchObj.data.freeTextBlocked = null;
+      pruneFreeTextScan(searchObj);
       // Cleared with the results, else the previous stream's "no events found"
       // flashes before the new fields land.
       searchObj.meta.searchApplied = false;

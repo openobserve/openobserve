@@ -996,6 +996,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t('search.runQuery')
                   "
                   :disabled="
+                    buildRunBlocked ||
                     isGeneratingSQL ||
                     (isNaturalLanguageDetected &&
                       !searchObj.meta.nlpMode &&
@@ -1047,7 +1048,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
-                      config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length
+                      buildRunBlocked ||
+                      (config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length)
                     "
                     @select="handleRunQueryFn(true)"
                   >
@@ -1082,6 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t('search.runQuery')
                   "
                   :disabled="
+                    buildRunBlocked ||
                     disable ||
                     isGeneratingSQL ||
                     (isNaturalLanguageDetected &&
@@ -1134,7 +1137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
-                      config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length
+                      buildRunBlocked ||
+                      (config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length)
                     "
                     @select="handleRunQueryFn(true)"
                   >
@@ -1397,6 +1401,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
+                :free-text-decorations="
+                  searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
+                "
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
                 language="sql"
@@ -1848,6 +1855,8 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
+import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
+import { buildFilterContext } from "@/composables/useLogs/freeTextSearch";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
@@ -2103,6 +2112,10 @@ export default defineComponent({
     fieldValues: {
       type: Object,
       default: () => ({}),
+    },
+    buildRunBlocked: {
+      type: Boolean,
+      default: false,
     },
   },
   setup(props, { emit }) {
@@ -2715,6 +2728,19 @@ export default defineComponent({
       return columnNames;
     };
 
+    // An unknown stream has no fields: a sentence stays a filter, "SELECT * FROM missing" still flips.
+    const sqlStatementLookup = {
+      hasStream: () => true,
+      fieldsOf: (name: string) => {
+        const list: any[] = searchObj.data.streamResults?.list ?? [];
+        const entry = list.find((stream: any) => stream?.name === name);
+        if (!entry) return list.length ? new Set<string>() : undefined;
+        return Array.isArray(entry.schema)
+          ? new Set<string>(entry.schema.map((field: any) => field.name))
+          : undefined;
+      },
+    };
+
     const updateQueryValue = (value: string) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
@@ -2833,8 +2859,7 @@ export default defineComponent({
       if (
         searchObj.meta.sqlMode === false &&
         searchObj.meta.logsVisualizeToggle !== "build" &&
-        value.toLowerCase().includes("select") &&
-        value.toLowerCase().includes("from")
+        looksLikeSqlStatement(value, sqlStatementLookup)
       ) {
         searchObj.meta.sqlMode = true;
         searchObj.meta.sqlModeManualTrigger = true;
@@ -4837,6 +4862,7 @@ export default defineComponent({
       _sqlMode,
       _noStream,
       t,
+      { freeText: true },
     );
     // [END] query editor placeholder overlay
 
@@ -5206,9 +5232,13 @@ export default defineComponent({
             if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
               currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
             } else {
-              currentQuery[0].length == 0
-                ? (currentQuery[0] = filter)
-                : (currentQuery[0] += " and " + filter);
+              const streams = this.searchObj.data.stream.selectedStream;
+              currentQuery[0] = appendConjunct(
+                currentQuery[0],
+                filter,
+                streams,
+                buildFilterContext(this.searchObj, this.store.state.zoConfig),
+              );
             }
           }
 

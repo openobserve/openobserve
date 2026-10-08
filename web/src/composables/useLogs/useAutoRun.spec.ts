@@ -1616,13 +1616,19 @@ describe("canPersistOrShare (G1 matrix)", () => {
     }
   });
 
-  it("item 1 blocked applies to every action, after G1", () => {
+  it("item 1 blocked applies to every action and outranks the G1 reason (AC6.1)", () => {
     const h = makeHarness();
     h.freeText.blockedReason = "blocked-reason";
     expect(h.engine.canPersistOrShare("logs", "save-view")).toEqual({
       ok: false,
+      reason: "blocked-reason",
+    });
+    h.freeText.blockedReason = null;
+    expect(h.engine.canPersistOrShare("logs", "save-view")).toEqual({
+      ok: false,
       reason: "t:search.autoRunPersistNeedsRun",
     });
+    h.freeText.blockedReason = "blocked-reason";
     h.engine.requestRun("run");
     h.completeLast();
     expect(h.engine.canPersistOrShare("logs", "save-view")).toEqual({

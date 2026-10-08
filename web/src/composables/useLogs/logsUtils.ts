@@ -26,6 +26,7 @@ import {
 } from "@/composables/useLogs/logsVisualization";
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { encodeFtScan } from "@/utils/logs/freeTextScan";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
@@ -436,6 +437,9 @@ export const logsUtils = () => {
     if (searchObj.data.query) {
       query["sql_mode"] = searchObj.meta.sqlMode;
       query["query"] = b64EncodeUnicode(searchObj.data.query.trim());
+      // Written in the same call as `query`, so the two never disagree.
+      const ftScan = encodeFtScan(searchObj.meta.freeTextScan);
+      if (ftScan) query["ft_scan"] = ftScan;
     }
 
     //add the function editor toggle is true or false

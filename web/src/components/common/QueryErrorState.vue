@@ -105,6 +105,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Caller can replace all action cards via #actions slot -->
         <slot name="actions" v-bind="slotProps">
           <EmptyStateActionCard
+            v-if="showRunSuggestion"
+            icon="play-arrow"
+            :label="t('queryError.runAs')"
+            :sublabel="raw(runSuggestionText)"
+            data-test="query-error-run-suggestion-card"
+            @click="emit('run-suggestion', runSuggestionText)"
+          />
+          <OTooltip
+            v-if="showSearchText"
+            :content="raw(searchTextFull)"
+            :disabled="!searchTextTruncated"
+          >
+            <EmptyStateActionCard
+              icon="search"
+              :label="t('queryError.searchTextFor', { text: searchTextLabel })"
+              :sublabel="t('queryError.searchTextDesc')"
+              data-test="query-error-search-text-card"
+              @click="emit('search-text', searchTextFull)"
+            />
+          </OTooltip>
+          <EmptyStateActionCard
             v-if="errorCode === 20003"
             icon="settings"
             :label="t('queryError.configureResource')"
@@ -303,15 +324,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
 import { useQueryError } from "@/composables/useQueryError";
 import ErrorDetailPanel from "./ErrorDetailPanel.vue";
+
+const SEARCH_TEXT_LABEL_MAX = 40;
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -338,6 +362,10 @@ const props = withDefaults(
     title?: I18nText;
     /** Override the error code's default description. */
     description?: I18nText;
+    /** Filter text the hero layout offers to search as one phrase (logs filter mode). */
+    freeTextCandidate?: string;
+    /** Rewritten filter, with text already as match_all, that the hero layout offers to run. */
+    runSuggestion?: string;
   }>(),
   { size: "hero", aiEnabled: false },
 );
@@ -353,6 +381,10 @@ const emit = defineEmits<{
   "configure-resource": [];
   /** User clicked "Try a different time range". */
   "widen-range": [];
+  /** User chose to search the whole filter text as one phrase. */
+  "search-text": [text: string];
+  /** User chose to run the suggested rewrite. */
+  "run-suggestion": [suggestion: string];
 }>();
 
 // ── Error parsing ──────────────────────────────────────────────────────────
@@ -380,6 +412,19 @@ const {
 const { t } = useI18nTyped();
 const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
 const resolvedDescription = computed(() => props.description ?? defaultDescription.value);
+
+const runSuggestionText = computed(() => props.runSuggestion?.trim() ?? "");
+const showRunSuggestion = computed(() => isQueryError.value && runSuggestionText.value !== "");
+const searchTextFull = computed(() => props.freeTextCandidate?.trim() ?? "");
+const showSearchText = computed(
+  () => isQueryError.value && searchTextFull.value !== "" && !showRunSuggestion.value,
+);
+const searchTextTruncated = computed(() => searchTextFull.value.length > SEARCH_TEXT_LABEL_MAX);
+const searchTextLabel = computed(() =>
+  searchTextTruncated.value
+    ? `${searchTextFull.value.slice(0, SEARCH_TEXT_LABEL_MAX).trimEnd()}…`
+    : searchTextFull.value,
+);
 
 // ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
 

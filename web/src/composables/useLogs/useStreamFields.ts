@@ -327,6 +327,7 @@ export const useStreamFields = () => {
 
             stream.settings = { ...streamData.settings };
             stream.schema = [...streamData.schema];
+            stream.removedSchemaFields = [...(streamData.removedSchemaFields ?? [])];
 
             userDefineSchemaSettings = stream.settings?.defined_schema_fields?.slice() || [];
 

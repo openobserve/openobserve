@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import { ref, reactive } from "vue";
 import i18n from "@/locales";
 
@@ -706,6 +707,17 @@ describe("logsUtils", () => {
       const query = utils.generateURLQuery();
       expect(query.sql_mode).toBe(true);
       expect(query.query).toBeDefined();
+    });
+
+    it("writes ft_scan in the same call as query, and omits it without consent (item 1)", () => {
+      mockSearchObj.meta.freeTextScan = { default: { fields: ["msg_text"] } };
+      const query = utils.generateURLQuery();
+      expect(query.query).toBeDefined();
+      expect(decodeFtScan(query.ft_scan)).toEqual({ default: { fields: ["msg_text"] } });
+
+      mockSearchObj.meta.freeTextScan = {};
+      expect(utils.generateURLQuery().ft_scan).toBeUndefined();
+      delete mockSearchObj.meta.freeTextScan;
     });
 
     it("should include quick_mode setting", () => {

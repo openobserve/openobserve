@@ -1107,10 +1107,11 @@ export function createAutoRun(deps: AutoRunDeps) {
     if (surface === "logs" && invalidation === "search-around") {
       return { ok: false, reason: translate(AUTO_RUN_I18N.searchAroundActive) };
     }
-    if (!surfacePersistOk(surface))
-      return { ok: false, reason: translate(AUTO_RUN_I18N.persistNeedsRun) };
+    // Blocked text has no SQL at all, so its reason outranks "run the query first".
     const flags = deps.getFreeTextFlags?.();
     if (flags?.blockedReason) return { ok: false, reason: flags.blockedReason };
+    if (!surfacePersistOk(surface))
+      return { ok: false, reason: translate(AUTO_RUN_I18N.persistNeedsRun) };
     if (flags?.scanReason && action && SCAN_GATED_ACTIONS.has(action)) {
       return { ok: false, reason: flags.scanReason };
     }

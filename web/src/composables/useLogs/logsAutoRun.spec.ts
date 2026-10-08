@@ -490,3 +490,63 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(run().persistReason("visualize", "add-to-dashboard")).toBeTruthy();
   });
 });
+
+describe("item 1: scan consent in the signature, the Stop guard and G1 inputs", () => {
+  it("adds freeTextScan to the signature only once consent exists", () => {
+    expect("freeTextScan" in readLogsSignature(fakeSearchObj.value)).toBe(false);
+    fakeSearchObj.value.meta.freeTextScan = { app: { fields: ["msg_text"] } };
+    expect(readLogsSignature(fakeSearchObj.value).freeTextScan).toEqual({
+      app: { fields: ["msg_text"] },
+    });
+  });
+
+  it("drops every response dispatched before Stop, histogram included, and clears consent", () => {
+    fakeSearchObj.value.meta.freeTextScan = { app: { fields: ["msg_text"] } };
+    const generation = run().engine.newGeneration({
+      lane: "grid",
+      kind: "explicit",
+      reason: "run",
+      op: "full",
+      signature: run().readSignature(),
+    });
+    const hits = { traceId: "t-scan", type: "search", generationId: generation.id, queryReq: {} };
+    const histogram = { traceId: "t-scan-h", type: "histogram", generationId: generation.id };
+    run().bindPayload(hits);
+    run().bindPayload(histogram);
+    fakeSearchObj.value.data.queryResults = { hits: [{ a: 1 }] };
+
+    run().stopFreeTextScan("app");
+
+    expect(run().isPayloadCurrent(hits)).toBe(false);
+    expect(run().isPayloadCurrent(histogram)).toBe(false);
+    expect(fakeSearchObj.value.meta.freeTextScan).toEqual({});
+    expect(fakeSearchObj.value.data.queryResults.hits).toEqual([]);
+    expect(fakeSearchObj.value.meta.executed).toBeNull();
+  });
+
+  it("re-runs the remaining arms explicitly after Stop on one stream of a multi-stream search", async () => {
+    fakeSearchObj.value.data.stream.selectedStream = ["app", "raw"];
+    fakeSearchObj.value.meta.freeTextScan = { raw: { fields: ["msg_text"] } };
+    const logs = vi.fn();
+    run().setExecutors({ logs });
+
+    run().stopFreeTextScan("raw");
+
+    await vi.waitFor(() => expect(logs).toHaveBeenCalledTimes(1));
+    expect(logs.mock.calls[0][0]).toMatchObject({ kind: "explicit", origin: "scan-stop" });
+    expect(fakeSearchObj.value.meta.freeTextScan).toEqual({});
+  });
+
+  it("gives the blocked reason for every persist and share action", () => {
+    fakeSearchObj.value.data.freeTextBlocked = {
+      streams: ["app"],
+      plan: { kind: "sql", filter: "" },
+    };
+    expect(String(run().persistReason("logs", "save-view"))).toContain(
+      "Choose how to search text first",
+    );
+    expect(String(run().persistReason("logs", "create-alert"))).toContain(
+      "Choose how to search text first",
+    );
+  });
+});

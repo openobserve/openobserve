@@ -340,6 +340,109 @@ describe("Logs Index", async () => {
     );
   });
 
+  describe("free text (item 1)", () => {
+    const stream = (name: string, fts: boolean) => ({
+      name,
+      schema: [
+        { name: fts ? "body" : "msg_text", type: "Utf8" },
+        { name: "level", type: "Utf8" },
+      ],
+      settings: fts ? { full_text_search_keys: ["body"] } : {},
+    });
+    const select = (...streams: any[]) => {
+      wrapper.vm.searchObj.data.streamResults = { list: streams };
+      wrapper.vm.searchObj.data.stream.selectedStream = streams.map((s: any) => s.name);
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "level" }];
+      wrapper.vm.searchObj.data.stream.interestingFieldList = [];
+      wrapper.vm.searchObj.meta.quickMode = false;
+    };
+
+    it("SQL toggle renders a bare word as match_all per stream (AC6.3)", async () => {
+      select(stream("fts_a", true), stream("fts_d", true));
+      wrapper.vm.searchObj.data.query = "timeout";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        `SELECT * FROM "fts_a" WHERE match_all('timeout') UNION ALL BY NAME SELECT * FROM "fts_d" WHERE match_all('timeout')`,
+      );
+    });
+
+    it("SQL toggle is refused while a stream cannot search text (AC6.3)", async () => {
+      select(stream("fts_a", true), stream("nofts_b", false));
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.query = "timeout";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
+      expect(wrapper.vm.searchObj.data.query).toBe("timeout");
+      expect(wrapper.vm.searchObj.data.freeTextBlocked.streams).toEqual(["nofts_b"]);
+    });
+
+    it("SQL toggle treats text that only contains select as a filter (isAuthoredStatement)", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "msg='select'";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(wrapper.vm.searchObj.data.query).toBe(`SELECT * FROM "fts_a" WHERE msg = 'select'`);
+    });
+
+    it("Search text writes durable match_all and runs it (AC5.2)", async () => {
+      select(stream("fts_a", true));
+      const searchBar = { updateQuery: vi.fn(), handleRunQueryFn: vi.fn() };
+      wrapper.vm.searchBarRef = searchBar as any;
+
+      wrapper.vm.onSearchText("status =");
+
+      expect(wrapper.vm.searchObj.data.query).toBe("match_all('status =')");
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("match_all('status =')");
+      expect(searchBar.updateQuery).toHaveBeenCalled();
+      expect(searchBar.handleRunQueryFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("Run as writes the suggestion verbatim and runs it (AC5.6)", async () => {
+      select(stream("fts_a", true));
+      const searchBar = { updateQuery: vi.fn(), handleRunQueryFn: vi.fn() };
+      wrapper.vm.searchBarRef = searchBar as any;
+
+      wrapper.vm.onRunSuggestion("level='api' AND match_all('timeout')");
+
+      expect(wrapper.vm.searchObj.data.query).toBe("level='api' AND match_all('timeout')");
+      expect(searchBar.handleRunQueryFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the no-FTS panel in the results slot while blocked (AC3.1)", async () => {
+      select(stream("nofts_b", false));
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.data.filterErrMsg = "";
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.data.freeTextBlocked = {
+        streams: ["nofts_b"],
+        plan: { kind: "sql", filter: "" },
+      };
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-no-fts-panel"]').text()).toContain(
+        '"nofts_b" has no full-text fields',
+      );
+      wrapper.vm.searchObj.data.freeTextBlocked = null;
+    });
+
+    it("Build gets the rendered WHERE for a pure-text filter", () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.query = "timeout";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({
+        where: "match_all('timeout')",
+        freeText: true,
+      });
+      wrapper.vm.searchObj.data.query = "level='x'";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "level='x'", freeText: false });
+    });
+  });
+
   it("Should modify SQL query when adding/removing interesting fields", async () => {
     // Mock the removeFieldByName function
     const removeFieldByNameSpy = vi

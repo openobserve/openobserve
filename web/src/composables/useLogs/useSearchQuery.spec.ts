@@ -924,8 +924,11 @@ describe("useSearchQuery › handleMultiStream _stream_name filter", () => {
     fnUnparsedSQLMock.mockImplementation((ast: any) => parser.sqlify(ast));
   });
 
+  // Rewritten arms keep the generated statement's keyword case; only the WHERE goes through the parser.
   const armFor = (sql: string, stream: string) =>
-    sql.split(" UNION ALL BY NAME ").find((arm: string) => arm.includes(`FROM "${stream}"`));
+    sql
+      .split(" UNION ALL BY NAME ")
+      .find((arm: string) => arm.toLowerCase().includes(`from "${stream}"`));
 
   it("accepts a _stream_name filter and resolves it to each stream's own name", () => {
     mockState.searchObj.data.query = "_stream_name = 'rum'";
@@ -1166,5 +1169,216 @@ describe("useSearchQuery › getQueryReq signature contract (AC5.2)", () => {
       ).toBeTruthy();
       covered.forEach((key) => expect(signatureKeys).toContain(key));
     }
+  });
+});
+
+describe("useSearchQuery › free text (item 1)", () => {
+  const parser = new SqlParser();
+  const ftsStream = (name: string) => ({
+    name,
+    schema: [
+      { name: "_timestamp", type: "Int64" },
+      { name: "body", type: "Utf8" },
+      { name: "level", type: "Utf8" },
+    ],
+    settings: { full_text_search_keys: ["body"] },
+  });
+  const noFtsStream = (name: string) => ({
+    name,
+    schema: [
+      { name: "_timestamp", type: "Int64" },
+      { name: "msg_text", type: "Utf8" },
+      { name: "detail", type: "Utf8" },
+    ],
+    settings: {},
+  });
+
+  const select = (...streams: any[]) => {
+    mockState.searchObj.data.stream.selectedStream = streams.map((s) => s.name);
+    (mockState.searchObj.data as any).streamResults = { list: streams };
+    (mockState.searchObj.data.stream as any).streamLists = streams.map((s) => ({ name: s.name }));
+    mockState.searchObj.data.stream.selectedStreamFields = streams.flatMap((s) =>
+      s.schema.map((f: any) => ({ name: f.name, streams: [s.name] })),
+    );
+  };
+
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    mockSemanticGroups.value = [];
+    fnParsedSQLMock.mockImplementation((sql?: string) => {
+      try {
+        return (sql ? parser.astify(sql) : {}) as any;
+      } catch {
+        return { columns: [], from: [], where: null } as any;
+      }
+    });
+    fnUnparsedSQLMock.mockImplementation((ast: any) => parser.sqlify(ast));
+  });
+
+  it("renders a bare word as match_all on a full-text stream (AC1.2)", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = "timeout";
+    const { getQueryReq } = useSearchQuery(gt);
+
+    const sql = getSql(getQueryReq(false));
+
+    expect(sql).toBe(`select * from "fts_a"  WHERE match_all('timeout')`);
+    expect(sql).not.toContain("WHERE timeout");
+    expect((mockState.searchObj.data as any).highlightQuery).toBe("match_all('timeout')");
+    expect(mockState.searchObj.data.query).toBe("timeout");
+  });
+
+  it("joins words with AND, keeps OR/NOT and groups (J2)", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = 'timeout AND (error OR "connection refused") NOT x1';
+    const { buildSearch } = useSearchQuery(gt);
+
+    expect(getSql(buildSearch())).toContain(
+      "WHERE match_all('timeout') AND (match_all('error') OR match_all('connection refused')) AND NOT match_all('x1')",
+    );
+  });
+
+  it("sends a field filter byte-identical to the pre-change path (AC2.3)", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = "level='error' and timeout";
+    const { buildSearch } = useSearchQuery(gt);
+
+    expect(getSql(buildSearch())).toBe(`select * from "fts_a"  WHERE level = 'error' and timeout`);
+  });
+
+  it("sends the filter unchanged while the schema is not loaded", () => {
+    select(ftsStream("fts_a"));
+    (mockState.searchObj.data as any).streamResults = { list: [{ name: "fts_a" }] };
+    mockState.searchObj.data.query = "timeout";
+    const { buildSearch } = useSearchQuery(gt);
+
+    expect(getSql(buildSearch())).toBe(`select * from "fts_a"  WHERE timeout`);
+  });
+
+  it("blocks a word on a stream with no full-text field: no request, no toast (AC3.1, AC3.8)", () => {
+    select(noFtsStream("nofts_b"));
+    mockState.searchObj.data.query = "timeout";
+    (mockState.searchObj.data as any).errorCode = 20004;
+    const { getQueryReq } = useSearchQuery(gt);
+
+    expect(getQueryReq(false)).toBeNull();
+    expect((mockState.searchObj.data as any).freeTextBlocked).toMatchObject({
+      streams: ["nofts_b"],
+    });
+    expect(mockState.notificationMsg.value).toBe("");
+    expect((mockState.searchObj.data as any).errorCode).toBe(0);
+  });
+
+  it("never sets the blocked state from a read-only build, and clears it at the next run (AC3.8)", () => {
+    select(noFtsStream("nofts_b"));
+    mockState.searchObj.data.query = "timeout";
+    const { buildSearch, getQueryReq } = useSearchQuery(gt);
+
+    expect(buildSearch(true)).toBeNull();
+    expect((mockState.searchObj.data as any).freeTextBlocked ?? null).toBeNull();
+
+    getQueryReq(false);
+    expect((mockState.searchObj.data as any).freeTextBlocked).not.toBeNull();
+    mockState.searchObj.data.query = "level='x'";
+    select(ftsStream("fts_a"));
+    expect(getQueryReq(false)).not.toBeNull();
+    expect((mockState.searchObj.data as any).freeTextBlocked).toBeNull();
+  });
+
+  it("sends only the full-text arm and names the excluded stream (AC4.1, AC4.3)", () => {
+    select(ftsStream("fts_a"), noFtsStream("nofts_b"));
+    mockState.searchObj.data.query = "timeout";
+    const { buildSearch } = useSearchQuery(gt);
+
+    const sql = getSql(buildSearch());
+
+    expect(sql).toContain(`from "fts_a"  WHERE match_all('timeout')`);
+    expect(sql).not.toContain("nofts_b");
+    expect(mockState.searchObj.data.filterErrMsg).toBe("");
+    expect(mockState.searchObj.data.missingStreamMessage).toContain("nofts_b");
+    expect(mockState.searchObj.data.missingStreamMessage).toContain("no full-text fields");
+    expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter).toEqual(["nofts_b"]);
+    expect((mockState.searchObj.data as any).freeTextExcluded).toEqual(["nofts_b"]);
+  });
+
+  it("blocks when no selected stream has a full-text field", () => {
+    select(noFtsStream("nofts_b"), noFtsStream("nofts_c"));
+    mockState.searchObj.data.query = "timeout";
+    const { getQueryReq } = useSearchQuery(gt);
+
+    expect(getQueryReq(false)).toBeNull();
+    expect((mockState.searchObj.data as any).freeTextBlocked.streams).toEqual([
+      "nofts_b",
+      "nofts_c",
+    ]);
+  });
+
+  it("excludes the union of streams missing any filter field (AC4.4, fixes the last-field-wins bug)", () => {
+    const a = { name: "a", schema: [{ name: "f1", type: "Utf8" }], settings: {} };
+    const b = { name: "b", schema: [{ name: "f2", type: "Utf8" }], settings: {} };
+    const c = {
+      name: "c",
+      schema: [
+        { name: "f1", type: "Utf8" },
+        { name: "f2", type: "Utf8" },
+      ],
+      settings: {},
+    };
+    select(a, b, c);
+    mockState.searchObj.data.stream.selectedStreamFields = [
+      { name: "f1", streams: ["a", "c"] },
+      { name: "f2", streams: ["b", "c"] },
+    ];
+    mockState.searchObj.data.query = "f1='x' and f2='y'";
+    const { buildSearch } = useSearchQuery(gt);
+
+    const sql = getSql(buildSearch());
+
+    expect(mockState.searchObj.data.stream.missingStreamMultiStreamFilter.sort()).toEqual([
+      "a",
+      "b",
+    ]);
+    expect(sql).toContain(`from "c"`);
+    expect(sql).not.toContain(`from "a"`);
+    expect(sql).not.toContain(`from "b"`);
+  });
+
+  it("sends an unparseable multi-stream filter unchanged instead of a client error (AC5.6-multi)", () => {
+    select(ftsStream("fts_a"), ftsStream("fts_d"));
+    mockState.searchObj.data.query = "level='api' timeout";
+    const { getQueryReq } = useSearchQuery(gt);
+
+    const sql = getSql(getQueryReq(false));
+
+    expect(mockState.notificationMsg.value).toBe("");
+    expect(sql).toContain(`from "fts_a"  WHERE level = 'api' timeout`);
+    expect(sql).toContain(`from "fts_d"  WHERE level = 'api' timeout`);
+    expect((mockState.searchObj.data as any).errorCode).toBe(0);
+  });
+
+  it("decorates the searched words and names the fields on hover (AC1.4)", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = "timeout error";
+    const { getQueryReq } = useSearchQuery(gt);
+
+    getQueryReq(false);
+
+    const deco = (mockState.searchObj.data as any).freeTextDecorations;
+    expect(deco.ranges).toEqual([
+      { start: 0, end: 7 },
+      { start: 8, end: 13 },
+    ]);
+    expect(deco.hover).toContain("Full-text search in: body");
+    expect(deco.hover).toContain("match_all('timeout') AND match_all('error')");
+  });
+
+  it("validates only SQL nodes: a word is never reported as a missing field", () => {
+    select(ftsStream("fts_a"), ftsStream("fts_d"));
+    mockState.searchObj.data.query = "timeout";
+    const { validateFilterForMultiStream } = useSearchQuery(gt);
+
+    expect(validateFilterForMultiStream()).toBe(true);
+    expect(mockState.searchObj.data.filterErrMsg).toBe("");
   });
 });

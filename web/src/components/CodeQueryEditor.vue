@@ -217,6 +217,11 @@ export default defineComponent({
       type: Function as PropType<(field: string) => Promise<string[]>>,
       default: null,
     },
+    /** Character ranges searched as free text, decorated with a hover naming the searched fields. */
+    freeTextDecorations: {
+      type: Object as PropType<{ ranges: { start: number; end: number }[]; hover: string } | null>,
+      default: null,
+    },
   },
   emits: [
     "update-query",
@@ -744,9 +749,38 @@ export default defineComponent({
       },
     );
 
+    let freeTextDecorationIds: string[] = [];
+    const escapeMarkdown = (text: string) => text.replace(/[\\`*_{}[\]()#+\-.!|<>~]/g, "\\$&");
+    const applyFreeTextDecorations = () => {
+      const model = editorObj?.getModel?.();
+      if (!model || !monaco) return;
+      const decorations = props.freeTextDecorations;
+      const length = model.getValueLength();
+      const next = (decorations?.ranges ?? [])
+        .filter((range) => range.end <= length)
+        .map((range) => {
+          const start = model.getPositionAt(range.start);
+          const end = model.getPositionAt(range.end);
+          return {
+            range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column),
+            options: {
+              inlineClassName: "o2-free-text-term",
+              hoverMessage: (decorations?.hover ?? "")
+                .split("\n\n")
+                .map((line) => ({ value: escapeMarkdown(line) })),
+              stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+            },
+          };
+        });
+      freeTextDecorationIds = editorObj.deltaDecorations(freeTextDecorationIds, next);
+    };
+
+    watch(() => props.freeTextDecorations, applyFreeTextDecorations, { deep: true });
+
     onMounted(async () => {
       await loadLanguageContribution(props.language);
       setupEditor();
+      applyFreeTextDecorations();
     });
 
     onActivated(async () => {
@@ -1276,6 +1310,12 @@ export default defineComponent({
   background-color: color-mix(in srgb, var(--color-status-negative) 10%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--color-status-negative);
+}
+
+/* Set by deltaDecorations inside Monaco's DOM, so only :deep() reaches it. */
+.logs-query-editor :deep(.o2-free-text-term) {
+  background-color: var(--color-surface-accent-hover);
+  border-bottom: 0.0625rem dashed var(--color-accent);
 }
 
 /* PromQL brackets render plain (like Prometheus). The rainbow colours are

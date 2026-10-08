@@ -19,6 +19,7 @@ import { useRouter } from "vue-router";
 import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import { resetTransient } from "@/utils/logs/transientSearchKeys";
+import type { FreeTextBlocked, FreeTextDecorations } from "@/composables/useLogs/freeTextSearch";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
@@ -204,6 +205,9 @@ export interface SearchObjectData {
     column?: number;
     error: string;
   }>;
+  freeTextBlocked?: FreeTextBlocked | null;
+  freeTextExcluded?: string[];
+  freeTextDecorations?: FreeTextDecorations | null;
 }
 
 export interface SearchObject {

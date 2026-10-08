@@ -1185,6 +1185,28 @@ function extractSemanticError(text: string): { field: string; message: string } 
   return null;
 }
 
+/** A sqlparser failure, which the server may report with only the HTTP status instead of 20001. */
+export function isSqlSyntaxErrorText(text: string): boolean {
+  return (
+    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) || /ParserError|sql parser error/i.test(text)
+  );
+}
+
+// The search stream reports only the HTTP status, so the code is read back from the server's message.
+const QUERY_ERROR_MESSAGES: [RegExp, number][] = [
+  [/Search SQL not valid/i, 20001],
+  [/Search field not found/i, 20004],
+  [/Search function not defined/i, 20005],
+  [/Search field has no compatible data type/i, 20007],
+  [/Search SQL execute error/i, 20008],
+];
+
+/** The 2000x query-error code a server message stands for, or null for any other error. */
+export function queryErrorCodeFromText(text: string): number | null {
+  if (isSqlSyntaxErrorText(text)) return 20001;
+  return QUERY_ERROR_MESSAGES.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+}
+
 /**
  * Unified server-error → editor ranges entry point. Handles ALL locatable
  * search error codes. This is the single function response handlers should
@@ -1220,10 +1242,7 @@ export async function rangesFromServerError(params: {
   // ParserError signature (some callers surface only the HTTP status, not the
   // 2000x business code). Falls through to the semantic path if it locates
   // nothing (the client parser can't always reproduce the server's error).
-  const looksLikeSyntax =
-    code === 20001 ||
-    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) ||
-    /ParserError|sql parser error/i.test(text);
+  const looksLikeSyntax = code === 20001 || isSqlSyntaxErrorText(text);
   if (looksLikeSyntax) {
     let syntaxRanges: SqlErrorRange[] = [];
     if (sqlMode && (errorDetail || message)) {
