@@ -97,13 +97,10 @@
             <OTag :variant="statusVariant(row.status)" dot>{{ statusLabel(row.status) }}</OTag>
           </template>
           <template #cell-parsedOutput="{ row }">
-            <span
-              v-if="row.parsedOutput !== undefined"
-              class="text-text-body line-clamp-1 font-mono text-xs"
-            >
+            <span v-if="row.parsedOutput !== undefined" class="text-text-body font-mono text-xs">
               {{ prettyJson(row.parsedOutput) }}
             </span>
-            <span v-else class="text-status-error-text line-clamp-1 text-xs">
+            <span v-else class="text-status-error-text text-xs">
               {{ row.error || DASH }}
             </span>
           </template>

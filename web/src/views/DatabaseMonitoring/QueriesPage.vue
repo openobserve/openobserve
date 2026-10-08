@@ -277,13 +277,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body text-xs font-medium">
               {{ t("dbm.queries.foldRowText", { count: row.foldCount ?? 0 }) }}
             </span>
-            <span class="text-text-secondary text-3xs truncate">
+            <OTruncatedText class="text-text-secondary text-3xs">
               {{
                 tailExpanded
                   ? t("dbm.queries.foldRowDetailOpen", { share: formatPercent(row.share, 0) })
                   : t("dbm.queries.foldRowDetail", { share: formatPercent(row.share, 0) })
               }}
-            </span>
+            </OTruncatedText>
           </div>
           <div v-else class="flex min-w-0 flex-col gap-px">
             <span
@@ -298,16 +298,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <div
               v-if="!row.isOther"
-              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate"
+              class="text-text-secondary text-3xs flex min-w-0 items-center gap-1"
               :class="row.isTail ? 'ps-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <span class="opacity-45">·</span>
-              <span class="text-text-secondary font-medium">{{ row.serviceLabel }}</span>
-              <template v-if="row.db_instance">
-                <span class="opacity-45">·</span>
-                <span>{{ row.db_instance }}</span>
-              </template>
+              <OTruncatedText
+                :tooltip="raw([row.serviceLabel, row.db_instance].filter(Boolean).join(' · '))"
+              >
+                <span class="text-text-secondary font-medium">{{ row.serviceLabel }}</span>
+                <template v-if="row.db_instance">
+                  <span class="px-1 opacity-45">·</span>
+                  <span>{{ row.db_instance }}</span>
+                </template>
+              </OTruncatedText>
               <DbmRowChips :chips="chipsByFingerprint.get(row.fingerprint) ?? []" />
             </div>
             <!-- Every remainder states its own call count; only the first
@@ -527,7 +531,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-query="{ row }">
             <DbmQueryCell
               :text="raw(row.query ?? '')"
-              :title-attr="row.query ?? undefined"
               :db-system="row.db_system"
               :meta-items="[
                 { key: 'instance', label: raw(row.db_instance ?? '') },
@@ -606,6 +609,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTable from "@/lib/core/Table/OTable.vue";

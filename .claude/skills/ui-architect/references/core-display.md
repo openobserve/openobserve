@@ -20,6 +20,7 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - [OSettingRowPair](#osettingrowpair)
 - [OShortcut](#oshortcut)
 - [OText](#otext)
+- [OTruncatedText](#otruncatedtext) — cut text ("…") + full-text tooltip only when cut
 - [OVirtualScroll](#ovirtualscroll)
 
 ---
@@ -121,7 +122,8 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - `dimKey` (string, required — drives the colour)
 - `value` (string | number, required — shown in the bold segment)
 - `keyLabel` (string — display override for the key segment)
-- `tooltip` (boolean, default `false` — show a `key=value` hover tooltip)
+- `tooltip` (boolean, default `false` — show an always-on `key=value` hover tooltip instead of the value's own one)
+- `valueTooltip` (boolean, default `true` — a cut value shows its full text on hover; set `false` when an enclosing element already explains the chip, e.g. a row whose `title` holds the full sentence, so only one bubble opens)
 
 **Slots:** none
 **Emits:** none
@@ -219,7 +221,8 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 - `block` (boolean, default `false` — full-width scrollable block vs inline chip)
 - `copyable` (boolean, default `false` — shows a copy-to-clipboard button)
-- `truncate` (boolean, default `false` — ellipsis; inline mode only)
+- `truncate` (boolean, default `false` — ellipsis; inline mode only). A cut value shows its full text on hover, only while it is cut.
+- `tooltip` (I18nText | `false` — with `truncate`: hover text when cut, defaults to the value; **`false` for secrets** such as API keys and tokens, which must never show on hover)
 
 **Slots:** `default` (code content)
 **Emits:** none
@@ -540,7 +543,8 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   - `meta` — 12px normal secondary, `<span>` default (timestamps, counts, hints)
   - `mono` — 12px IBM Plex Mono, `<span>` default (cron, IDs, field names — non-linked)
 - `as` (string — override the rendered element). There is **no `tag` prop**: `<OText tag="h2">` renders the variant's default element (a `<p>` for `body`) and passes `tag` through as a dead attribute, so a "heading" is not one.
-- `truncate` (boolean, default `false` — ellipsis on overflow)
+- `truncate` (boolean, default `false` — ellipsis on overflow; the full text shows on hover only while it is cut)
+- `tooltip` (I18nText | `false` — with `truncate`: hover text when cut, defaults to the text; `false` for none. It cuts only as a block or flex item)
 - `nowrap` (boolean, default `false` — prevent wrapping)
 
 **Slots:** `default`
@@ -554,6 +558,53 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 ```
 
 **Family:** Built on reka-ui `Primitive`. Standalone.
+
+---
+
+### OTruncatedText
+
+**Import:** `@/lib/core/Typography/OTruncatedText.vue`
+**Use when:** Any text that may not fit and is cut with "…" — names, IDs, URLs, descriptions, previews. **Write `<OTruncatedText>` wherever you would write `truncate` or `line-clamp-*`.** It cuts the text and shows the full value in a tooltip **only while the text is actually cut**; text that fits shows nothing.
+**Don't use for:** Executable code (use `OCode` with `truncate`). Plain text in an `OTable` cell needs nothing — the table already shows a cut cell's full text (see [core-controls-table](core-controls-table.md)).
+**Key props:**
+
+- `as` (string, default `"span"` — keep the element the call site used, e.g. `h2`, `code`, `div`, so layout doesn't shift. It must be a **block or a flex/grid item**: inline text cannot cut)
+- `lines` (`1`–`6`, default `1` — lines shown before "…"; `1` = `truncate`, more = `line-clamp-N`)
+- `tooltip` (I18nText | `false` — custom tooltip text, e.g. `raw(name)` when the element also holds other markup; **`false` = no tooltip**)
+
+**Slots:** `default` (the text)
+**Emits:** none
+**Example:**
+
+```vue
+<!-- cut text with a full-text tooltip when cut -->
+<OTruncatedText class="text-text-heading font-medium">{{ dashboard.name }}</OTruncatedText>
+
+<!-- two lines, then "…" -->
+<OTruncatedText :lines="2" class="text-text-secondary text-xs">{{ row.description }}</OTruncatedText>
+
+<!-- deliberately no tooltip -->
+<OTruncatedText :tooltip="false" class="font-mono">{{ token }}</OTruncatedText>
+```
+
+**No tooltip (`:tooltip="false"`) when:**
+- the value is a **secret** — token, API/access key, password, webhook or signed URL, connection string, a URL that can carry secret values — a tooltip would print it in full;
+- the full text is **already readable another way** — printed right below, a click/expand reveals it, or a side panel shows it. Huge values (log lines, JSON, prompts) belong here.
+
+Outside a table, `:tooltip="false"` and a plain `truncate` behave the same; use the component anyway so "no tooltip" reads as a decision. **Inside an `OTable` cell a plain `truncate` is NOT enough** — the table's own tooltip would still show the value; `:tooltip="false"` marks the element so the table stays out too.
+
+**Never repeat the visible text** in a `title` or an `OTooltip` next to it (two bubbles, or an always-on bubble for text that fits). Add a tooltip only when it shows *more* than the text on screen.
+
+**Several parts in one cut box** (tags, label pairs, value + delta): the tooltip reads the raw text, which has no separators (`trace0annotation0manual1`). Either
+- **list of tags** → wrap them: `<OTruncatedText as="div" class="flex flex-nowrap items-center gap-1" :tooltip="raw(tags.join(', '))">`, or
+- **one long text + small badges** → put `OTruncatedText` on the text only and give the badges `class="shrink-0"`, so the text cuts and the badges stay visible.
+
+**Gotchas:**
+- The parent row must let it shrink: a flex parent needs `min-w-0` (and so does every flex ancestor up to the box with the fixed width).
+- Directly inside a block container (not a flex row), use `as="div"` — an inline `span` never measures as cut.
+- Inside a non-hoverable bubble (an `OTooltip #content`), a nested `OTruncatedText` can't be hovered; give that content its own wrapping instead.
+
+**Family:** Wraps `OTooltip` (`overflow-only`). Related: `OText` / `OCode` (`truncate` + `tooltip` props), `OTable`'s shared cut-cell tooltip.
 
 ---
 
