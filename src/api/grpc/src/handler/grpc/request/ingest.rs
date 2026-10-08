@@ -50,6 +50,28 @@ fn caller_identity(
     }
 }
 
+/// The org a request writes to; a user credential only reaches the org check_auth verified it in.
+fn destination_org(
+    user_id: Option<&str>,
+    header_org: Option<&str>,
+    body_org: String,
+) -> std::result::Result<String, Status> {
+    if user_id.is_none() {
+        return Ok(body_org);
+    }
+    let Some(header_org) = header_org else {
+        return Err(Status::unauthenticated(
+            "missing organization header for user-authenticated request",
+        ));
+    };
+    if !body_org.is_empty() && body_org != header_org {
+        return Err(Status::permission_denied(format!(
+            "credentials for organization {header_org} cannot ingest into {body_org}"
+        )));
+    }
+    Ok(header_org.to_string())
+}
+
 #[tonic::async_trait]
 impl Ingest for Ingester {
     async fn ingest(
@@ -65,8 +87,13 @@ impl Ingest for Ingester {
             .next_back()
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
+        let header_org = request
+            .metadata()
+            .get(&config::get_config().grpc.org_header_key)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
         let req = request.into_inner();
-        let org_id = req.org_id;
+        let org_id = destination_org(user_id.as_deref(), header_org.as_deref(), req.org_id)?;
         let stream_type: StreamType = req.stream_type.into();
         let stream_name = req.stream_name;
         let in_data = req.data.unwrap_or_default();
@@ -151,7 +178,6 @@ impl Ingest for Ingester {
                 }
             }
             StreamType::EnrichmentTables => {
-                let json_records = parse_enrichment_records(&in_data.data);
                 let append_data = match req.metadata {
                     Some(metadata) => metadata
                         .data
@@ -160,32 +186,8 @@ impl Ingest for Ingester {
                         .unwrap_or(true),
                     None => true,
                 };
-                match enrichment_data::enrichment_table::save_enrichment_data(
-                    &org_id,
-                    &stream_name,
-                    json_records,
-                    append_data,
-                )
-                .await
-                {
-                    Err(e) => Err(Error::IngestionError(format!(
-                        "Internal gPRC ingestion service errors saving enrichment data: {e}"
-                    ))),
-                    Ok(res) => {
-                        if res.status() != StatusCode::OK {
-                            let status: StatusCode = res.status();
-                            log::error!(
-                                "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
-                                res.into_body()
-                            );
-                            Err(Error::IngestionError(format!(
-                                "Internal gPRC ingestion service errors saving enrichment data: http code {status}"
-                            )))
-                        } else {
-                            Ok(())
-                        }
-                    }
-                }
+                ingest_enrichment_records(&org_id, &stream_name, &in_data.data, append_data)
+                    .await
             }
             StreamType::ServiceGraph => {
                 // Service graph edges - use same pattern as Logs
@@ -241,17 +243,54 @@ fn ok_reply() -> IngestionResponse {
     }
 }
 
-fn parse_enrichment_records(data: &[u8]) -> Vec<json::Map<String, json::Value>> {
-    json::from_slice(data).unwrap_or_else(|_| {
-        let vec_value: Vec<json::Value> = json::from_slice(data).unwrap();
-        vec_value
-            .into_iter()
-            .filter_map(|v| match v {
-                json::Value::Object(map) => Some(map),
-                _ => None,
-            })
-            .collect()
-    })
+async fn ingest_enrichment_records(
+    org_id: &str,
+    stream_name: &str,
+    data: &[u8],
+    append_data: bool,
+) -> Result<()> {
+    let json_records = parse_enrichment_records(data)?;
+    match enrichment_data::enrichment_table::save_enrichment_data(
+        org_id,
+        stream_name,
+        json_records,
+        append_data,
+    )
+    .await
+    {
+        Err(e) => Err(Error::IngestionError(format!(
+            "Internal gPRC ingestion service errors saving enrichment data: {e}"
+        ))),
+        Ok(res) => {
+            if res.status() != StatusCode::OK {
+                let status: StatusCode = res.status();
+                log::error!(
+                    "Internal gPRC ingestion service errors saving enrichment data: code: {status}, body: {:?}",
+                    res.into_body()
+                );
+                Err(Error::IngestionError(format!(
+                    "Internal gPRC ingestion service errors saving enrichment data: http code {status}"
+                )))
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+fn parse_enrichment_records(data: &[u8]) -> Result<Vec<json::Map<String, json::Value>>> {
+    if let Ok(records) = json::from_slice(data) {
+        return Ok(records);
+    }
+    let values: Vec<json::Value> = json::from_slice(data)
+        .map_err(|e| Error::IngestionError(format!("enrichment data must be a JSON array: {e}")))?;
+    Ok(values
+        .into_iter()
+        .filter_map(|v| match v {
+            json::Value::Object(map) => Some(map),
+            _ => None,
+        })
+        .collect())
 }
 
 /// The proto has only `status_code` + `message`, so `207` carries the partial-failure JSON.
@@ -310,6 +349,32 @@ mod tests {
         assert!(!derived, "a user cannot claim pipeline-derived routing");
     }
 
+    #[test]
+    fn destination_org_user_call_cannot_name_another_org() {
+        let err = destination_org(Some("a@b.c"), Some("org_a"), "org_b".to_string()).unwrap_err();
+        assert_eq!(err.code(), tonic::Code::PermissionDenied);
+    }
+
+    #[test]
+    fn destination_org_user_call_writes_to_the_authenticated_org() {
+        for body_org in ["org_a", ""] {
+            let org = destination_org(Some("a@b.c"), Some("org_a"), body_org.to_string()).unwrap();
+            assert_eq!(org, "org_a");
+        }
+    }
+
+    #[test]
+    fn destination_org_user_call_without_an_org_header_is_unauthenticated() {
+        let err = destination_org(Some("a@b.c"), None, "org_b".to_string()).unwrap_err();
+        assert_eq!(err.code(), tonic::Code::Unauthenticated);
+    }
+
+    #[test]
+    fn destination_org_internal_token_keeps_the_body_org() {
+        let org = destination_org(None, Some("org_a"), "org_b".to_string()).unwrap();
+        assert_eq!(org, "org_b");
+    }
+
     fn metrics_resp(
         code: u16,
         failed: u32,
@@ -334,31 +399,37 @@ mod tests {
     #[test]
     fn test_parse_enrichment_records_object_array() {
         let records =
-            parse_enrichment_records(br#"[{"id": 1}, {"id": 2, "nested": {"ok": true}}]"#);
+            parse_enrichment_records(br#"[{"id": 1}, {"id": 2, "nested": {"ok": true}}]"#).unwrap();
         assert_eq!(
             json::to_value(records).unwrap(),
             json::json!([
                 {"id": 1}, {"id": 2, "nested": {"ok": true}}
             ])
         );
-        assert!(parse_enrichment_records(b"[]").is_empty());
+        assert!(parse_enrichment_records(b"[]").unwrap().is_empty());
     }
 
     #[test]
     fn test_parse_enrichment_records_mixed_array() {
         let records =
-            parse_enrichment_records(br#"[null, {"id": 1}, 2, "text", false, [], {"id": 2}]"#);
+            parse_enrichment_records(br#"[null, {"id": 1}, 2, "text", false, [], {"id": 2}]"#)
+                .unwrap();
         assert_eq!(
             json::to_value(records).unwrap(),
             json::json!([{"id": 1}, {"id": 2}])
         );
-        assert!(parse_enrichment_records(b"[null, 1, false]").is_empty());
+        assert!(
+            parse_enrichment_records(b"[null, 1, false]")
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
-    #[should_panic]
     fn test_parse_enrichment_records_rejects_non_array() {
-        parse_enrichment_records(br#"{"id": 1}"#);
+        for input in [&b"{}"[..], b"42", b"null", br#""x""#] {
+            assert!(parse_enrichment_records(input).is_err());
+        }
     }
 
     #[test]

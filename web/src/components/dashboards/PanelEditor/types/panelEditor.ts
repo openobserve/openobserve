@@ -140,6 +140,9 @@ export interface PanelEditorChartData {
       min?: number;
       max?: number;
       time_shift?: any[];
+      formula?: string;
+      ref?: string;
+      hide?: boolean;
     };
   }>;
   [key: string]: any;

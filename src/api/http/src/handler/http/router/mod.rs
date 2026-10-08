@@ -31,9 +31,9 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, query_history, rum_analytics, service_accounts, short_url, slos, sourcemaps,
-    status, status_pages, stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, folders, kv, metrics_usage,
+    model_pricing, organization, query_history, rum_analytics, service_accounts, short_url, slos,
+    sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -48,7 +48,6 @@ use utoipa_swagger_ui::SwaggerUi;
 use {
     audit::audit,
     axum::body::{Body, to_bytes},
-    base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
     o2_enterprise::enterprise::common::{
         auditor::{AuditMessage, Protocol, ResponseMeta},
@@ -73,7 +72,9 @@ use crate::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
             validator_rum,
         },
-        router::middlewares::{blocked_orgs_middleware, password_policy_middleware},
+        router::middlewares::{
+            blocked_orgs_middleware, password_policy_middleware, root_only_middleware,
+        },
     },
 };
 
@@ -394,7 +395,7 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
 ///
 /// `audit_middleware` records request bodies verbatim. Remote Task secret
 /// writes and the Prompt webhook secret write must never reach that trail.
-#[cfg(feature = "enterprise")]
+#[cfg(any(feature = "enterprise", test))]
 fn is_secret_write(method: &Method, path: &str) -> bool {
     if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
         return false;
@@ -411,6 +412,93 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
+/// The request body as the audit trail may store it.
+#[cfg(any(feature = "enterprise", test))]
+fn audit_body(method: &Method, path: &str, content_type: Option<&str>, body: Vec<u8>) -> String {
+    use base64::Engine as _;
+    if is_secret_write(method, path) {
+        return "[REDACTED: secret write]".to_string();
+    }
+    if path.ends_with("/settings/logo") {
+        return base64::engine::general_purpose::STANDARD.encode(&body);
+    }
+    if body.is_empty() {
+        return String::new();
+    }
+    if content_type.is_some_and(|ct| ct.starts_with("application/x-www-form-urlencoded")) {
+        return redact_form_fields(&body);
+    }
+    // Field names are the only signal a route-independent filter has, so unparsable bodies go.
+    match serde_json::from_slice::<serde_json::Value>(&body) {
+        Ok(mut value) => {
+            redact_secret_fields(&mut value);
+            value.to_string()
+        }
+        Err(_) => format!("[REDACTED: non-JSON body, {} bytes]", body.len()),
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn redact_secret_fields(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (name, field) in map.iter_mut() {
+                if field.is_boolean() || field.is_null() {
+                    continue;
+                }
+                if is_secret_field(name) {
+                    *field = serde_json::Value::String("[REDACTED]".to_string());
+                } else {
+                    redact_secret_fields(field);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(redact_secret_fields),
+        _ => {}
+    }
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn redact_form_fields(body: &[u8]) -> String {
+    let mut out = url::form_urlencoded::Serializer::new(String::new());
+    for (name, value) in url::form_urlencoded::parse(body) {
+        out.append_pair(
+            &name,
+            if is_secret_field(&name) {
+                "[REDACTED]"
+            } else {
+                &value
+            },
+        );
+    }
+    out.finish()
+}
+
+/// Whether a field holds a credential; `url`, `endpoint` and headers carry webhook secrets.
+#[cfg(any(feature = "enterprise", test))]
+fn is_secret_field(name: &str) -> bool {
+    const SECRET_KEYS: [&str; 8] = [
+        "apikey",
+        "accesskey",
+        "privatekey",
+        "routingkey",
+        "integrationkey",
+        "signingkey",
+        "accountkey",
+        "encryptionkey",
+    ];
+    let name = name.to_ascii_lowercase().replace(['-', '_'], "");
+    matches!(
+        name.as_str(),
+        "url" | "endpoint" | "auth" | "authorization" | "cookie" | "passcode"
+    ) || name.ends_with("headers")
+        || name.ends_with("token")
+        || SECRET_KEYS.iter().any(|key| name.ends_with(key))
+        || ["password", "secret", "credential"]
+            .iter()
+            .any(|word| name.contains(word))
 }
 
 #[cfg(feature = "enterprise")]
@@ -455,6 +543,12 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .unwrap_or("")
             .to_string();
 
+        let content_type = request
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+
         // Extract body
         let (parts, body) = request.into_parts();
         let bytes = match to_bytes(body, usize::MAX).await {
@@ -481,13 +575,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         response.headers_mut().remove(ERROR_HEADER);
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if is_secret_write(&http_method, &path) {
-                "[REDACTED: secret write]".to_string()
-            } else if path.ends_with("/settings/logo") {
-                general_purpose::STANDARD.encode(&request_body)
-            } else {
-                String::from_utf8(request_body).unwrap_or_default()
-            };
+            let body = audit_body(&http_method, &path, content_type.as_deref(), request_body);
 
             audit(AuditMessage {
                 user_email,
@@ -646,24 +734,7 @@ pub fn basic_routes() -> Router {
         .route("/invites/{token}", delete(users::decline_invitation));
     router = router.nest("/auth", auth_routes);
 
-    // Node routes with auth
-    let mut node_routes = Router::new()
-        .route("/status", get(status::cache_status))
-        .route("/enable", put(status::enable_node))
-        .route("/flush", put(status::flush_node))
-        .route("/reload", get(status::cache_reload))
-        .route("/list", get(status::list_node))
-        .route("/metrics", get(status::node_metrics));
-
-    #[cfg(feature = "enterprise")]
-    {
-        node_routes = node_routes.route("/drain_status", get(status::drain_status));
-    }
-
-    node_routes = node_routes
-        .route("/consistent_hash", post(status::consistent_hash))
-        .route("/refresh_nodes_list", get(status::refresh_nodes_list))
-        .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+    let node_routes = node_routes()
         // Listed first, so it wraps closer to the route and runs after authentication.
         .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware));
@@ -882,6 +953,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/cache/results", delete(stream::delete_stream_cache))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
+        .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -893,10 +965,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
         .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
         // OTLP Profiles is still development; otlp_http exporter defaults to this path.
-        .route(
-            "/{org_id}/v1development/profiles",
-            post(profiles::ingest::otlp_profiles_write),
-        )
+        .route("/{org_id}/v1development/profiles", post(profiles::ingest::otlp_profiles_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
@@ -976,6 +1045,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
         .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
+        .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
         // Search
         .route("/{org_id}/_search", post(search::search))
@@ -2183,6 +2253,26 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     outer
 }
 
+/// Root-only node management routes, before the authentication layers `basic_routes` adds.
+fn node_routes() -> Router {
+    let node_routes = Router::new()
+        .route("/status", get(status::cache_status))
+        .route("/enable", put(status::enable_node))
+        .route("/flush", put(status::flush_node))
+        .route("/reload", get(status::cache_reload))
+        .route("/list", get(status::list_node))
+        .route("/metrics", get(status::node_metrics));
+
+    #[cfg(feature = "enterprise")]
+    let node_routes = node_routes.route("/drain_status", get(status::drain_status));
+
+    node_routes
+        .route("/consistent_hash", post(status::consistent_hash))
+        .route("/refresh_nodes_list", get(status::refresh_nodes_list))
+        .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+        .layer(middleware::from_fn(root_only_middleware))
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{body::Body, http::Request};
@@ -2257,6 +2347,133 @@ mod tests {
             &Method::GET,
             "api/org/prompts/settings/secret"
         ));
+    }
+
+    fn audited(method: Method, path: &str, body: &str) -> String {
+        audit_body(&method, path, None, body.as_bytes().to_vec())
+    }
+
+    #[test]
+    fn audit_body_drops_header_values_under_any_headers_field() {
+        let body = audited(
+            Method::POST,
+            "api/default/scorers",
+            r#"{"params":{"custom_headers":[{"key":"X-Api-Key","value":"hv-1"}]}}"#,
+        );
+        assert!(!body.contains("hv-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_drops_webhook_endpoints() {
+        let body = audited(
+            Method::PUT,
+            "api/default/prompts/settings",
+            r#"{"webhook":{"endpoint":"https://hooks.example.com/x?token=ep-1"}}"#,
+        );
+        assert!(!body.contains("ep-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_keeps_identifiers_that_merely_end_in_key() {
+        let body = audited(
+            Method::POST,
+            "api/default/settings/v2",
+            r#"{"setting_key":"theme","setting_value":"dark","group_key":"g-1","idempotency_key":"i-1"}"#,
+        );
+        for kept in ["theme", "dark", "g-1", "i-1"] {
+            assert!(body.contains(kept), "{kept} lost: {body}");
+        }
+    }
+
+    #[test]
+    fn audit_body_keeps_form_queries_but_drops_form_secrets() {
+        let body = audit_body(
+            &Method::POST,
+            "api/default/prometheus/api/v1/query_range",
+            Some("application/x-www-form-urlencoded"),
+            b"query=up%7Bjob%3D%22api%22%7D&start=1&password=pf-1".to_vec(),
+        );
+        assert!(
+            body.contains("up%7Bjob") || body.contains(r#"up{job="api"}"#),
+            "{body}"
+        );
+        assert!(body.contains("start=1"), "{body}");
+        assert!(!body.contains("pf-1"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_drops_user_passwords_but_keeps_who_was_changed() {
+        let created = audited(
+            Method::POST,
+            "api/default/users",
+            r#"{"email":"new@example.com","password":"Created#Pass1","role":"admin"}"#,
+        );
+        assert!(!created.contains("Created#Pass1"), "{created}");
+        assert!(
+            created.contains("new@example.com") && created.contains("admin"),
+            "{created}"
+        );
+
+        let changed = audited(
+            Method::PUT,
+            "api/default/users/new@example.com",
+            r#"{"change_password":true,"old_password":"Old#Pass1","new_password":"New#Pass2"}"#,
+        );
+        assert!(!changed.contains("Old#Pass1"), "{changed}");
+        assert!(!changed.contains("New#Pass2"), "{changed}");
+        assert!(changed.contains(r#""change_password":true"#), "{changed}");
+    }
+
+    #[test]
+    fn audit_body_drops_destination_urls_and_headers() {
+        let body = audited(
+            Method::POST,
+            "api/default/alerts/destinations",
+            r#"{"name":"oncall","url":"https://hooks.slack.com/services/T0/B0/XYZSECRET","method":"post","headers":{"Authorization":"Bearer tok-123","X-Routing-Key":"rk-9"}}"#,
+        );
+        for secret in ["XYZSECRET", "tok-123", "rk-9"] {
+            assert!(!body.contains(secret), "{secret} leaked: {body}");
+        }
+        assert!(body.contains("oncall"), "{body}");
+    }
+
+    #[test]
+    fn audit_body_redacts_secret_fields_at_any_depth() {
+        let body = audited(
+            Method::PUT,
+            "api/default/settings",
+            r#"{"items":[{"api_key":"k-1"}],"config":{"client_secret":"s-1","access_token":"t-1","passcode":"p-1","name":"kept"},"max_tokens":5}"#,
+        );
+        for secret in ["k-1", "s-1", "t-1", "p-1"] {
+            assert!(!body.contains(secret), "{secret} leaked: {body}");
+        }
+        assert!(
+            body.contains(r#""max_tokens":5"#) && body.contains("kept"),
+            "{body}"
+        );
+    }
+
+    #[test]
+    fn audit_body_never_stores_a_body_it_cannot_parse() {
+        let body = audited(Method::POST, "api/default/users", "password=Form#Pass1");
+        assert!(!body.contains("Form#Pass1"), "{body}");
+        assert_eq!(audited(Method::POST, "api/default/users", ""), "");
+    }
+
+    #[test]
+    fn audit_body_keeps_the_route_level_rules() {
+        assert_eq!(
+            audited(
+                Method::PUT,
+                "api/org/prompts/settings/secret",
+                r#"{"secret":"x"}"#
+            ),
+            "[REDACTED: secret write]"
+        );
+        assert_eq!(
+            audited(Method::POST, "api/org/settings/logo", "png"),
+            "cG5n"
+        );
     }
 
     #[tokio::test]
@@ -2615,6 +2832,28 @@ mod tests {
                 .status();
             assert_ne!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE, "{uri}");
         }
+    }
+
+    // the Loki handler does not inflate bodies itself, so this layer pair is the only cap
+    #[tokio::test]
+    async fn loki_body_that_decompresses_over_the_limit_is_413() {
+        let limit = 64 * 1024;
+        let app = Router::new()
+            .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
+            .layer(RequestDecompressionLayer::new())
+            .layer(DefaultBodyLimit::max(limit));
+        let compressed = zstd::encode_all(&vec![b' '; limit + 1][..], 3).unwrap();
+        assert!(compressed.len() < limit);
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/default/loki/api/v1/push")
+            .header(header::CONTENT_ENCODING, "zstd")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(compressed))
+            .unwrap();
+
+        let status = app.oneshot(req).await.unwrap().status();
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     // ── unauthenticated /config bootstrap ─────────────────────────────────
@@ -3301,6 +3540,134 @@ mod tests {
             .unwrap();
 
         let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// `service_routes()` minus comments, whitespace and wrap commas.
+    fn service_routes_registrations() -> String {
+        let source = include_str!("mod.rs");
+        let start = source.find("pub fn service_routes() -> Router {").unwrap();
+        let end = start + source[start..].find("\npub fn ").unwrap();
+        let mut body = String::new();
+        let mut rest = &source[start..end];
+        while let Some(at) = rest.find("/*") {
+            body.push_str(&rest[..at]);
+            rest = rest[at..]
+                .find("*/")
+                .map_or("", |close| &rest[at + close + 2..]);
+        }
+        body.push_str(rest);
+        body.lines()
+            .map(|line| line.split("//").next().unwrap_or_default())
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<String>()
+            .replace(",)", ")")
+    }
+
+    #[test]
+    fn metric_usage_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/{metric_name}/usage",get(metrics_usage::get_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/{{metric_name}}/usage must be registered in service_routes()"
+        );
+    }
+
+    #[test]
+    fn metric_usage_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/{metric_name}/usage")
+            .expect("metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetMetricUsage")
+        );
+    }
+
+    #[test]
+    fn parse_tree_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/prometheus/api/v1/parse_tree")
+            .expect("parse_tree is missing from the OpenAPI surface");
+        assert_eq!(
+            path.post.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("PrometheusParseTree")
+        );
+    }
+
+    #[test]
+    fn parse_tree_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/prometheus/api/v1/parse_tree",post(promql::parse_tree))"#
+            ),
+            "POST /{{org_id}}/prometheus/api/v1/parse_tree must be registered in service_routes()"
+        );
+    }
+
+    #[tokio::test]
+    async fn metric_usage_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/metrics/{metric_name}/usage",
+            get(metrics_usage::get_metric_usage),
+        );
+        let request = |method: &str| {
+            Request::builder()
+                .method(method)
+                .uri("/myorg/metrics/http_requests_total/usage")
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        // No user header: the handler's own extractor answers, before any scan.
+        let get = app.clone().oneshot(request("GET")).await.unwrap();
+        assert_eq!(get.status(), StatusCode::BAD_REQUEST);
+
+        let post = app.oneshot(request("POST")).await.unwrap();
+        assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
+    }
+
+    fn node_request(user_id: &str) -> Request<Body> {
+        Request::builder()
+            .uri("/metrics")
+            .header("user_id", user_id)
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn node_routes_refuse_a_non_root_caller() {
+        let response = node_routes()
+            .oneshot(node_request("member@node-routes.test"))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn node_routes_serve_the_root_user() {
+        let root = "root@node-routes.test";
+        common::infra::config::ORG_USERS.insert(
+            format!("{}/{root}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                role: config::meta::user::UserRole::Root,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: config::DEFAULT_ORG.to_string(),
+                email: root.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+        let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
     }
 }

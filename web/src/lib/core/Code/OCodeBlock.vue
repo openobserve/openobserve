@@ -50,6 +50,7 @@ const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
   copyable: true,
   lineNumbers: false,
+  padded: false,
   dataTest: "code-block",
 });
 
@@ -203,7 +204,11 @@ const onCopy = () => {
          <pre>, so a newline here would indent the first line of code. -->
     <pre
       class="o2-code-pre"
-      :class="[wrap ? 'o2-code-pre--wrap' : '', showLineNumbers ? 'o2-code-pre--numbered' : '']"
+      :class="[
+        wrap ? 'o2-code-pre--wrap' : '',
+        showLineNumbers ? 'o2-code-pre--numbered' : '',
+        padded ? 'px-3 py-2' : '',
+      ]"
       :style="preStyle"
     ><span
       v-if="showLineNumbers"

@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :injected-promql-data="injectedPromqlData"
       :injected-exemplars="injectedExemplars"
       :allow-alert-creation="allowAlertCreation"
+      alert-source="explorer"
       :allow-annotations-add="false"
       :allow-annotations-a-p-i="false"
       @error="onPanelError"
@@ -47,6 +48,21 @@ import { computed, defineComponent, type PropType } from "vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
 import { adaptiveDecimals } from "@/utils/metrics/breakdownStats";
+import { withBareMetricNames } from "@/utils/metrics/metricsHandoff";
+
+/** `gapMs` is in ms although dashboards store it as `timeRangeGap.seconds`. */
+export interface ShiftedResult {
+  result: any;
+  gapMs: number;
+  periodAsStr: string;
+  parentIndex: number;
+}
+
+export interface ChartForecast {
+  until: number;
+  label: string;
+  entries: Array<{ result: any; parentIndex: number }>;
+}
 
 export default defineComponent({
   name: "MetricCardChart",
@@ -54,6 +70,7 @@ export default defineComponent({
   props: {
     /** One PromQL query_range response per query in the effective variant. */
     results: { type: Array as PropType<any[]>, required: true },
+    /** `{expr, legendTemplate?, stream?}`; `stream` is what a right-click alert reads. */
     queries: { type: Array as PropType<any[]>, required: true },
     chartType: { type: String, default: "line" },
     unit: { type: String, default: null },
@@ -87,6 +104,11 @@ export default defineComponent({
      */
     allowAlertCreation: { type: Boolean, default: false },
     legend: { type: Boolean, default: false },
+    shifted: { type: Array as PropType<ShiftedResult[]>, default: () => [] },
+    /** The queries' step, so shifted samples snap onto the primaries' grid. */
+    stepSeconds: { type: Number, default: 0 },
+    /** `until` (µs) widens the pinned x-axis past the range end, where the forecast lies. */
+    forecast: { type: Object as PropType<ChartForecast | null>, default: null },
     /** The card's exemplar state; the explorer grid owns the fetch. */
     injectedExemplars: {
       type: Object as PropType<InjectedExemplars | undefined>,
@@ -134,9 +156,10 @@ export default defineComponent({
       type: props.chartType,
       queryType: "promql",
       queries: (props.queries ?? []).map((q: any) => ({
-        query: q.expr,
+        // The data is injected, so the query text only seeds a right-click alert, which should read naturally.
+        query: withBareMetricNames(q.expr),
         customQuery: true,
-        fields: { stream_type: "metrics" },
+        fields: { ...(q.stream ? { stream: q.stream } : {}), stream_type: "metrics" },
         config: { promql_legend: q.legendTemplate ?? "" },
       })),
       config: {
@@ -155,6 +178,7 @@ export default defineComponent({
         // Injected data is never "loading", so the converter would auto-range
         // the x-axis; pin it to the queried window instead. See `timeRange`.
         pin_x_axis_to_range: true,
+        explorer_overlays: true,
         // Activates the classic-histogram transform (le-sort + de-accumulate)
         // and the card-sized heatmap look (small colour bar, thinned bucket
         // labels, no top gap). Without them a cumulative-bucket heatmap renders
@@ -191,16 +215,33 @@ export default defineComponent({
     const injectedPromqlData = computed(() => {
       if (!props.results?.length) return undefined;
       const range = props.timeRange;
+      const primary = { startTime: range?.start_time, endTime: range?.end_time };
+      const shifted = props.shifted.map((entry) => ({
+        startTime: range?.start_time - entry.gapMs * 1000,
+        endTime: range?.end_time - entry.gapMs * 1000,
+        timeRangeGap: { seconds: entry.gapMs, periodAsStr: entry.periodAsStr },
+        panelQueryIndex: entry.parentIndex,
+      }));
+      const ahead = props.forecast;
+      const forecast = (ahead?.entries ?? []).map((entry) => ({
+        ...primary,
+        seriesRole: "forecast",
+        timeRangeGap: { seconds: 0, periodAsStr: ahead?.label ?? "" },
+        panelQueryIndex: entry.parentIndex,
+      }));
+      const queries = [...props.results.map(() => ({ ...primary })), ...shifted, ...forecast];
+      // The x-axis pin and the gap fill read the first entry's window only.
+      if (ahead) queries[0] = { ...queries[0], endTime: ahead.until };
       return {
-        data: props.results,
-        metadata: {
-          queries: [
-            {
-              startTime: range?.start_time,
-              endTime: range?.end_time,
-            },
-          ],
-        },
+        data: [
+          ...props.results,
+          ...props.shifted.map((entry) => entry.result),
+          ...(ahead?.entries ?? []).map((entry) => entry.result),
+        ],
+        metadata: { queries },
+        ...(props.stepSeconds > 0
+          ? { resultMetaData: queries.map(() => [{ step: props.stepSeconds * 1e6 }]) }
+          : {}),
       };
     });
 

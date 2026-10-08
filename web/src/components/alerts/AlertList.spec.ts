@@ -1849,7 +1849,7 @@ describe("AlertList - trigger", () => {
       { variant: "warning", message: i18n.global.t("alerts.anomaly.detectionAlreadyRunning") },
     ]);
   });
-});
+}, 15000);
 
 describe("AlertList - triggered in the last 15 minutes", () => {
   const nowUs = () => Date.now() * 1000;

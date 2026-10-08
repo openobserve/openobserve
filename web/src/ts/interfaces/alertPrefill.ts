@@ -111,9 +111,21 @@ export interface AlertPrefillPatternFilter {
   filtered: boolean;
 }
 
+/** One query of a several-query surface, offered in the confirm dialog. */
+export interface AlertPrefillQueryChoice {
+  /** The query's index among the surface's queries. */
+  index: number;
+  tabName?: string;
+  /** The query's PromQL legend, which names it on the chart. */
+  legend?: string;
+  ref?: string;
+  query: string;
+}
+
 /** Options a surface's builder accepts when the dialog re-parameterises it. */
 export interface AlertBuildOptions {
   patternMode?: AlertPatternMode;
+  queryIndex?: number;
 }
 
 /** Bumped whenever the persisted shape changes; a stale blob is ignored. */
@@ -137,6 +149,8 @@ export interface AlertPrefill {
 
   aggregation?: AlertPrefillAggregation | null;
   promqlCondition?: AlertPrefillThresholdCondition | null;
+  /** Alert per output series (`promql_multi_alert`). */
+  promqlMultiAlert?: boolean;
   thresholdShape?: AlertPrefillThresholdShape;
 
   /**
@@ -167,6 +181,11 @@ export interface AlertPrefill {
 
   /** Present when the surface can fold its patterns into the query. */
   patternFilter?: AlertPrefillPatternFilter;
+
+  /** Present when the surface has several queries and the user must pick one. */
+  queryChoices?: AlertPrefillQueryChoice[];
+  /** The `queryChoices` index this prefill was built from. */
+  queryIndex?: number;
 
   warnings: AlertPrefillWarning[];
 

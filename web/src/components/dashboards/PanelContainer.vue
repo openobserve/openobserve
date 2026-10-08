@@ -515,7 +515,13 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
-import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import {
+  buildPrefillFromPanel,
+  executedPanelQuery,
+  panelQueryChoices,
+} from "@/utils/alerts/prefill/fromPanel";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
 import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
@@ -1130,8 +1136,12 @@ export default defineComponent({
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
     const alertDisabledReason = computed(() => {
-      if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
-      if (!props.data.queries[0]?.fields?.stream) return t("panel.panelQueryMustHaveStream");
+      const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
+      if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // A formula's stream comes from its inputs' text; any other query needs its own.
+      if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
+        return t("panel.panelQueryMustHaveStream");
+      }
       return null;
     });
 
@@ -1219,13 +1229,24 @@ export default defineComponent({
      * AlertPrefill out. Everything downstream — the confirm dialog, the
      * transport, the form — is shared with every other surface.
      */
-    buildPanelAlertPrefill() {
+    buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
+      const queries = this.props.data.queries || [];
+      // A saved-hidden query is not drawn, so it is not what the user means to alert on.
+      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
+      const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
         panelId: this.props.data.id,
         panelType: this.props.data.type,
-        queries: this.props.data.queries || [],
+        queries,
         queryType: this.props.data.queryType,
+        queryIndex,
+        queryChoices:
+          visible.length > 1
+            ? panelQueryChoices(queries, this.metaData?.queries, visible)
+            : undefined,
+        executedQuery: executedPanelQuery(this.metaData?.queries, queryIndex),
+        metadataQueries: this.metaData?.queries,
         timeRange: this.props.selectedTimeDate,
       });
     },

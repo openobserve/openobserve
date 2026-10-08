@@ -191,32 +191,32 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-white/50",
     "disabled:opacity-50",
   ].join(" "),
-  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
+  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards.
+  // The cards are fixed-light brand replicas, so each label uses its fixed
+  // `text-brand-*-foreground` token, never the theme-following text-text-inverse.
   // preview-slack: Slack green (#007a5a)
   "preview-slack": [
-    "bg-brand-slack text-text-inverse border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "bg-brand-slack text-brand-slack-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
     "enabled:hover:bg-brand-slack-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-teams: Microsoft Teams purple (#6264a7)
   "preview-teams": [
-    "bg-brand-teams text-text-inverse border-0 !rounded !h-auto !py-2 !px-4",
+    "bg-brand-teams text-brand-teams-foreground border-0 !rounded !h-auto !py-2 !px-4",
     "enabled:hover:bg-brand-teams-hover",
     "disabled:opacity-60",
   ].join(" "),
-  // preview-email: Email blue (#007bff)
+  // preview-email: Email blue (#0069d9)
   "preview-email": [
-    "bg-brand-email text-text-inverse border-0 !rounded !h-auto !py-3 !px-6",
+    "bg-brand-email text-brand-email-foreground border-0 !rounded !h-auto !py-3 !px-6",
     "enabled:hover:bg-brand-email-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-opsgenie: Opsgenie ink (dark neutral CTA). Was a scoped
   // `.opsgenie-actions button` override in DestinationPreview.vue that beat this
   // variant map from unlayered CSS; it belongs with its sibling brand variants.
-  // `text-white` (not text-text-inverse) — the preview card is a fixed-light
-  // brand replica, so the label must stay white in dark mode too.
   "preview-opsgenie": [
-    "bg-brand-email-ink text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "bg-brand-email-ink text-brand-email-ink-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
     "enabled:hover:bg-brand-email-ink-deep",
     "disabled:opacity-60",
   ].join(" "),
