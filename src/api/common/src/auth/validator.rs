@@ -757,8 +757,7 @@ pub async fn validate_credentials_ext(
     auth_token: AuthTokensExt,
     method: &str,
 ) -> Result<TokenValidationResponse, AuthError> {
-    let cfg = get_config();
-    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
+    let password_ext_salt = &config::get_ext_auth_salt();
     // Strip leading slash if present
     let path = path.strip_prefix('/').unwrap_or(path);
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
@@ -1043,8 +1042,14 @@ pub async fn validate_user(
     let db_user = db::user::get_user_record(user_id)
         .await
         .map(|user| DBUser::from(&user));
-    let cfg = get_config();
-    validate_user_from_db(db_user, user_password, None, 0, &cfg.auth.ext_auth_salt).await
+    validate_user_from_db(
+        db_user,
+        user_password,
+        None,
+        0,
+        &config::get_ext_auth_salt(),
+    )
+    .await
 }
 
 pub async fn validate_user_for_query_params(
@@ -1054,13 +1059,12 @@ pub async fn validate_user_for_query_params(
     exp_in: i64,
 ) -> Result<TokenValidationResponse, AuthError> {
     let db_user = db::user::get_db_user(user_id).await;
-    let cfg = get_config();
     validate_user_from_db(
         db_user,
         user_password,
         req_time,
         exp_in,
-        &cfg.auth.ext_auth_salt,
+        &config::get_ext_auth_salt(),
     )
     .await
 }
@@ -2098,7 +2102,7 @@ mod tests {
                 .is_valid
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
-        let stored_ext = get_hash(pwd, &get_config().auth.ext_auth_salt);
+        let stored_ext = get_hash(pwd, &config::get_ext_auth_salt());
         for (path, method) in [
             ("default/_bulk", Method::POST),
             ("default/streams", Method::GET),
@@ -2254,7 +2258,7 @@ mod tests {
                 request_time: 1_700_000_000,
                 expires_in: 300,
             };
-            let salt = get_config().auth.ext_auth_salt.clone();
+            let salt = config::get_ext_auth_salt();
             let unbacked = password_ext_credential("", "1700000000", 300, &salt);
             assert!(
                 !validate_credentials_ext(email, &unbacked, "default/streams", auth_token, "GET")

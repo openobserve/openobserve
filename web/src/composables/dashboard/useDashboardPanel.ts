@@ -68,6 +68,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   }
 
   const dashboardPanelData = reactive(dashboardPanelDataObj[pageKey]);
+
+  // Auto shows exactly the labels a saved panel already stores, so a panel without a mode can adopt it.
+  const ensureAxisLabelMode = () => {
+    const config = dashboardPanelData.data?.config;
+    if (config && config.axis_label_mode == null) config.axis_label_mode = "auto";
+  };
+  ensureAxisLabelMode();
+  watch(() => dashboardPanelData.data?.config?.axis_label_mode, ensureAxisLabelMode);
+
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
     dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
@@ -217,6 +226,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   const resetDashboardPanelData = () => {
     Object.assign(dashboardPanelData, getDefaultDashboardPanelData(store));
+    ensureAxisLabelMode();
   };
 
   const resetDashboardPanelDataAndAddTimeField = () => {

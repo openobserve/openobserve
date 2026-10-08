@@ -290,7 +290,7 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let ast = parser::parse(&req.query.as_ref().unwrap().query)
+    let ast = promql::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
     let window = selector_window(&ast);
 
@@ -351,7 +351,7 @@ async fn search_in_cluster(
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
-        match cache::get(query, start, end, step).await {
+        match cache::get(&req.org_id, query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
@@ -678,7 +678,7 @@ fn merge_vector_series(series: &[cluster_rpc::Series], query: &str, max_limit: u
         .collect::<Vec<_>>();
 
     let mut value = Value::Vector(merged_data);
-    match promql_parser::parser::parse(query)
+    match promql::parse(query)
         .ok()
         .and_then(|expr| top_level_order(&expr))
     {
@@ -819,7 +819,7 @@ mod tests {
             ("up", false),
         ] {
             assert_eq!(
-                is_root_subquery(&parser::parse(query).unwrap()),
+                is_root_subquery(&promql::parse(query).unwrap()),
                 expected,
                 "{query}"
             );
@@ -828,7 +828,7 @@ mod tests {
 
     #[test]
     fn test_rejects_root_subquery_only_in_range_sample_queries() {
-        let expr = parser::parse("up[5m:1m]").unwrap();
+        let expr = promql::parse("up[5m:1m]").unwrap();
         assert!(rejects_root_subquery(&expr, true, false));
         assert!(!rejects_root_subquery(&expr, false, false));
         assert!(!rejects_root_subquery(&expr, true, true));

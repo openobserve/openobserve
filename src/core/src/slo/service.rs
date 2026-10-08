@@ -209,7 +209,7 @@ fn validate_promql_parses(sli_config: &config::meta::slo::SliConfig) -> Result<(
 /// One expression, named by its field so a count SLI's rejection says which
 /// half of the pair is wrong.
 fn parse_promql(field: &str, expr: &str) -> Result<(), SloError> {
-    promql_parser::parser::parse(expr)
+    promql::parse(expr)
         .map(|_| ())
         .map_err(|e| SloError::Validation(format!("{field} is not a valid PromQL expression: {e}")))
 }
