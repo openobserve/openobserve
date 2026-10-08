@@ -55,7 +55,7 @@ pub async fn link_domain(
             );
         }
         Err(e) => {
-            MetaHttpResponse::internal_error(format!("error getting org domain linking : {e}"));
+            return MetaHttpResponse::internal_error(format!("error getting org domain linking : {e}"));
         }
         _ => {}
     }
