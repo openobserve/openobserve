@@ -58,7 +58,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             MatchOp::Equal => column.eq(literal(mat.value.clone())),
             MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
-                let regex = format!("^(?:{})$", regex.as_str());
+                let regex = regex.as_str();
                 let column = if matches!(field_type, DataType::Dictionary(_, _)) {
                     cast(column, DataType::Utf8View)
                 } else {
@@ -93,8 +93,17 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn regex_residual_filters_fully_match_parsed_and_manual_alternations() {
-        let values = vec!["first", "last", "first-extra", "prefix-last", "middle"];
+    async fn regex_residual_filters_preserve_parser_anchoring_and_normalization() {
+        let values = vec![
+            "first",
+            "last",
+            "first-extra",
+            "prefix-last",
+            "middle",
+            "bc{abc}",
+            "xbc{abc}",
+            "bc{abc}x",
+        ];
         let columns: Vec<ArrayRef> = vec![
             Arc::new(StringArray::from(values.clone())),
             Arc::new(LargeStringArray::from(values.clone())),
@@ -107,47 +116,63 @@ mod tests {
                 false,
             )]));
             let batch = RecordBatch::try_new(schema.clone(), vec![column]).unwrap();
-            for (operator, expected) in [
-                ("=~", vec!["first", "last"]),
-                ("!~", vec!["first-extra", "prefix-last", "middle"]),
+            for (pattern, operator, expected) in [
+                ("first|last", "=~", vec!["first", "last"]),
+                (
+                    "first|last",
+                    "!~",
+                    vec![
+                        "first-extra",
+                        "prefix-last",
+                        "middle",
+                        "bc{abc}",
+                        "xbc{abc}",
+                        "bc{abc}x",
+                    ],
+                ),
+                ("bc{abc}", "=~", vec!["bc{abc}"]),
+                (
+                    "bc{abc}",
+                    "!~",
+                    vec![
+                        "first",
+                        "last",
+                        "first-extra",
+                        "prefix-last",
+                        "middle",
+                        "xbc{abc}",
+                        "bc{abc}x",
+                    ],
+                ),
             ] {
-                let query = format!(r#"m{{label{operator}"first|last"}}"#);
+                let query = format!(r#"m{{label{operator}"{pattern}"}}"#);
                 let PromExpr::VectorSelector(selector) = parser::parse(&query).unwrap() else {
                     panic!("expected vector selector");
                 };
-                let regex = "first|last".parse().unwrap();
-                let op = if operator == "=~" {
-                    MatchOp::Re(regex)
-                } else {
-                    MatchOp::NotRe(regex)
-                };
-                let manual = Matchers::new(vec![Matcher::new(op, "label", "first|last")]);
-                for matchers in [selector.matchers, manual] {
-                    let context = SessionContext::new();
-                    let filter = matcher_predicates(&schema, &matchers).remove(0);
-                    let batches = context
-                        .read_batch(batch.clone())
-                        .unwrap()
-                        .filter(filter)
-                        .unwrap()
-                        .collect()
-                        .await
-                        .unwrap();
-                    let actual = batches
-                        .iter()
-                        .flat_map(|batch| {
-                            (0..batch.num_rows()).map(|row| {
-                                array_value_to_string(batch.column(0).as_ref(), row).unwrap()
-                            })
+                let context = SessionContext::new();
+                let filter = matcher_predicates(&schema, &selector.matchers).remove(0);
+                let batches = context
+                    .read_batch(batch.clone())
+                    .unwrap()
+                    .filter(filter)
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                let actual = batches
+                    .iter()
+                    .flat_map(|batch| {
+                        (0..batch.num_rows()).map(|row| {
+                            array_value_to_string(batch.column(0).as_ref(), row).unwrap()
                         })
-                        .collect::<Vec<_>>();
-                    assert_eq!(
-                        actual,
-                        expected,
-                        "{operator} {:?}",
-                        schema.field(0).data_type()
-                    );
-                }
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    actual,
+                    expected,
+                    "{pattern} {operator} {:?}",
+                    schema.field(0).data_type()
+                );
             }
         }
     }

@@ -1757,11 +1757,7 @@ mod tests {
         bytes[index.blocks.block(1).block_offset as usize] ^= 1;
         key.selection = None;
         let fixture = Fixture::new(&[(key.clone(), bytes)], false).await;
-        let matchers = Matchers::new(vec![Matcher::new(
-            MatchOp::Re("first|last".parse().unwrap()),
-            "group",
-            "first|last",
-        )]);
+        let matchers = parsed_matchers(r#"m{group=~"first|last"}"#);
         let prepared = prepare(
             &fixture.scan([key]),
             &matchers,
@@ -1809,43 +1805,38 @@ mod tests {
     }
 
     #[test]
-    fn midx_regex_selection_fully_matches_parsed_and_manual_alternations() {
+    fn midx_regex_selection_preserves_parser_anchoring_and_normalization() {
         let (_, bytes) = file(&[
             (1, 10, 1.0, Some("first")),
             (2, 10, 2.0, Some("last")),
             (3, 10, 3.0, Some("first-extra")),
             (4, 10, 4.0, Some("prefix-last")),
             (5, 10, 5.0, Some("middle")),
+            (6, 10, 6.0, Some("bc{abc}")),
+            (7, 10, 7.0, Some("xbc{abc}")),
+            (8, 10, 8.0, Some("bc{abc}x")),
         ]);
         let index = metrics_index::block::decode_file(
             &bytes,
             &ParentMetadata {
-                rows: 5,
+                rows: 8,
                 compressed_size: 123,
             },
             &["group".into()],
         )
         .unwrap();
-        for (operator, expected) in [("=~", vec![0, 1]), ("!~", vec![2, 3, 4])] {
-            let query = format!(r#"m{{group{operator}"first|last"}}"#);
-            let promql_parser::parser::Expr::VectorSelector(selector) =
-                promql_parser::parser::parse(&query).unwrap()
-            else {
-                panic!("expected vector selector");
-            };
-            let regex = "first|last".parse().unwrap();
-            let op = if operator == "=~" {
-                MatchOp::Re(regex)
-            } else {
-                MatchOp::NotRe(regex)
-            };
-            let manual = Matchers::new(vec![Matcher::new(op, "group", "first|last")]);
-            for matchers in [selector.matchers, manual] {
-                assert_eq!(
-                    metrics_index::matching_blocks(&index, &matchers).unwrap(),
-                    expected
-                );
-            }
+        for (pattern, operator, expected) in [
+            ("first|last", "=~", vec![0, 1]),
+            ("first|last", "!~", vec![2, 3, 4, 5, 6, 7]),
+            ("bc{abc}", "=~", vec![5]),
+            ("bc{abc}", "!~", vec![0, 1, 2, 3, 4, 6, 7]),
+        ] {
+            let query = format!(r#"m{{group{operator}"{pattern}"}}"#);
+            let matchers = parsed_matchers(&query);
+            assert_eq!(
+                metrics_index::matching_blocks(&index, &matchers).unwrap(),
+                expected
+            );
         }
     }
 
@@ -1888,8 +1879,8 @@ mod tests {
             Matcher::new(MatchOp::Equal, "path", "/api/bar"),
             Matcher::new(MatchOp::Equal, "path", ""),
             Matcher::new(MatchOp::NotEqual, "path", "/api/bar"),
-            Matcher::new(MatchOp::Re(".*".parse().unwrap()), "path", ".*"),
-            Matcher::new(MatchOp::NotRe("api.*".parse().unwrap()), "path", "api.*"),
+            parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
+            parsed_matchers(r#"m{path!~"api.*"}"#).matchers.remove(0),
         ] {
             let prepared = prepare(
                 &fixture.scan([data.0.clone()]),
@@ -3004,5 +2995,14 @@ mod tests {
         cache.trim(0);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
     }
 }
