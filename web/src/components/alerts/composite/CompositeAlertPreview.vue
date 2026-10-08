@@ -5,6 +5,7 @@ import { computed } from "vue";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type {
   CompositeAlertChild,
   CompositeAlertReadableChild,
@@ -159,7 +160,7 @@ const warningText = (code: string) => {
               <span class="text-theme-accent font-bold">{{
                 raw(letterById.get(token.id) ?? "?")
               }}</span>
-              <span class="text-text-heading min-w-0 truncate">{{ nameFor(token.id) }}</span>
+              <OTruncatedText class="text-text-heading">{{ nameFor(token.id) }}</OTruncatedText>
             </span>
             <span class="text-text-secondary flex items-center gap-1.5 text-xs">
               <OTag type="alertLevel" :value="levelFor(token.id)" size="xs" />

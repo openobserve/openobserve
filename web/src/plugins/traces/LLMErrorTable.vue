@@ -62,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-error-600">{{ value }}</span>
       </template>
 
-      <!-- Trace id: only a title for the full value on hover; default text. -->
       <template #cell-trace_id="{ value }">
-        <span :title="value">{{ value }}</span>
+        <span>{{ value }}</span>
       </template>
     </OTable>
   </LLMPanelCard>

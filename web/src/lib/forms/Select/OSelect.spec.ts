@@ -3,6 +3,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import OSelect from "./OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 describe("OSelect", () => {
   let wrapper: VueWrapper;
@@ -335,6 +337,49 @@ describe("OSelect", () => {
       );
       document.removeEventListener("keydown", docSpy);
       expect(docSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cut-off text", () => {
+    const OPTIONS = [
+      { label: "payment-service-production-eu-west-1", value: "a" },
+      { label: "inventory-service", value: "b" },
+    ];
+
+    it("shows each selected chip as cut-only text with no always-on tooltip", () => {
+      wrapper = mount(OSelect, {
+        props: { modelValue: ["a", "b"], multiple: true, options: OPTIONS },
+      });
+      const chips = wrapper
+        .findAllComponents(OTruncatedText)
+        .filter((c) => c.classes().includes("max-w-40"));
+      expect(chips.map((c) => c.text())).toEqual([
+        "payment-service-production-eu-west-1",
+        "inventory-service",
+      ]);
+      expect(chips[0].classes()).toContain("inline-block");
+      expect(wrapper.findAllComponents(OTooltip).every((t) => t.props("overflowOnly"))).toBe(true);
+    });
+
+    it("gives the listbox trigger label a cut-only tooltip", () => {
+      wrapper = mount(OSelect, { props: { modelValue: "a", searchable: true, options: OPTIONS } });
+      const tip = wrapper.findComponent(OTooltip);
+      expect(tip.props("overflowOnly")).toBe(true);
+      expect(tip.props("content")).toBeUndefined();
+    });
+
+    it("wraps the native trigger value so it cuts, with no tooltip over a custom trigger", () => {
+      wrapper = mount(OSelect, { props: { modelValue: "a", searchable: false, options: OPTIONS } });
+      const value = wrapper.findComponent(OTruncatedText);
+      expect(value.classes()).toContain("flex-1");
+      expect(value.props("tooltip")).toBeUndefined();
+
+      wrapper.unmount();
+      wrapper = mount(OSelect, {
+        props: { modelValue: "a", searchable: false, options: OPTIONS },
+        slots: { trigger: "<b>Custom</b>" },
+      });
+      expect(wrapper.findComponent(OTruncatedText).props("tooltip")).toBe(false);
     });
   });
 });

@@ -61,10 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disable"
           icon-left="schedule"
         >
-          <span
-            class="date-time-label flex-1 text-left font-semibold max-md:min-w-0 max-md:truncate"
-            >{{ triggerLabel }}</span
-          >
+          <OTruncatedText class="date-time-label flex-1 text-left font-semibold">{{
+            triggerLabel
+          }}</OTruncatedText>
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
@@ -341,6 +340,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -398,6 +398,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OInput,
     OSearchInput,
     OSelect,

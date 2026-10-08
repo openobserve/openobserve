@@ -782,6 +782,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "alertLibrary",
       "sloList",
       "incidentList",
+      "downtimes",
       "onCallResponses",
       "onCallTeams",
       "onCallRouting",
@@ -811,6 +812,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
     expect(reliability?.filtered?.map((c) => c.name)).toEqual([
       "sloList",
       "incidentList",
+      "downtimes",
       "alertSources",
     ]);
     expect(reliability?.children.some((c) => c.name === "alertSources")).toBe(false);

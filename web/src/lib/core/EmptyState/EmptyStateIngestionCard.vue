@@ -32,7 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon :name="icon" size="md" />
     </span>
     <span class="es-ing-card__body flex min-w-0 flex-1 flex-col gap-0.5">
-      <span class="text-compact text-text-heading truncate font-semibold">{{ label }}</span>
+      <OTruncatedText class="text-compact text-text-heading font-semibold">{{
+        label
+      }}</OTruncatedText>
       <span v-if="sublabel" class="text-text-secondary text-xs leading-[1.4]">{{ sublabel }}</span>
     </span>
     <OIcon
@@ -47,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 type IconVariant = "default" | "blue" | "teal" | "purple" | "amber" | "orange";

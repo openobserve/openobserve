@@ -48,14 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
         <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
-        <div
-          :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap max-lg:line-clamp-2 max-lg:whitespace-normal"
+        <OTruncatedText
+          as="div"
+          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] max-lg:line-clamp-2 max-lg:whitespace-normal"
           :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
-        </div>
+        </OTruncatedText>
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
@@ -509,6 +509,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -590,6 +591,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    OTruncatedText,
     CreateAlertAction,
     ExemplarToggle,
     ShowLegendsPopup: defineAsyncComponent(() => {

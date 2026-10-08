@@ -49,11 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-title-${card.name}`"
           @click="$emit('open-detail', card)"
         >
-          <span
-            class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
-            :title="card.name"
-            >{{ card.name }}</span
-          >
+          <OTruncatedText class="text-compact text-text-heading font-medium tracking-[0.02em]">{{
+            card.name
+          }}</OTruncatedText>
         </OButton>
         <!-- Badge text is never the sole carrier of meaning — the card's aria
              label spells the type out too. -->
@@ -484,6 +482,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { BADGE_LABEL_KEYS, UNIT_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
@@ -507,6 +506,7 @@ export default defineComponent({
     PanelBar,
     OTag,
     OTooltip,
+    OTruncatedText,
     ExemplarToggle,
   },
   props: {

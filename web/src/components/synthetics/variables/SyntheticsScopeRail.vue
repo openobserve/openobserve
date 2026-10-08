@@ -62,9 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="group/row flex w-full flex-nowrap items-center gap-2">
             <OIcon :name="env.is_global ? 'public' : 'layers'" size="sm" class="shrink-0" />
-            <span class="min-w-0 flex-1 truncate text-left" :title="env.name">{{
-              labelFor(env)
-            }}</span>
+            <OTruncatedText class="flex-1 text-left">{{ labelFor(env) }}</OTruncatedText>
 
             <span
               class="text-text-secondary shrink-0 tabular-nums group-hover/row:hidden group-has-[[data-state=open]]/row:hidden"
@@ -133,6 +131,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

@@ -137,8 +137,8 @@
       </template>
 
       <template #cell-name="{ row }">
-        <div class="flex items-center gap-2">
-          <span class="font-medium">{{ row.name }}</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
@@ -218,12 +218,18 @@
       </template>
 
       <template #cell-window="{ row }">
-        <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
+        <OTruncatedText as="div" :tooltip="windowText(row.window_secs)">
+          <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
+          <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
+        </OTruncatedText>
       </template>
 
       <template #cell-tags="{ row }">
-        <div class="flex flex-wrap gap-1">
+        <OTruncatedText
+          as="div"
+          class="flex flex-wrap gap-1"
+          :tooltip="raw((row.tags || []).join(', '))"
+        >
           <OTag
             v-for="tag in (row.tags || []).slice(0, 2)"
             :key="tag"
@@ -232,7 +238,7 @@
             :label="raw(tag)"
           />
           <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
-        </div>
+        </OTruncatedText>
       </template>
 
       <template #cell-folder="{ row }">
@@ -531,6 +537,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -698,6 +705,11 @@ function onExported({ count }: { format: string; count: number }) {
 function folderName(folderId: string): string {
   const folders = store.state.organizationData?.foldersByType?.alerts ?? [];
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
+}
+
+// The two spans hold no space in their text, so the cut-cell tooltip spells it out.
+function windowText(secs: number) {
+  return raw(`${formatWindow(secs)} ${t("slos.rolling")}`);
 }
 
 const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
