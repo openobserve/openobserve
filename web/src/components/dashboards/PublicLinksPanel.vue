@@ -303,7 +303,6 @@
         :frame="false"
         pagination="client"
         :show-global-filter="false"
-        :footer-title="t('dashboard.publicLinks.panelTitle')"
         :default-columns="false"
         show-index
         :enable-column-resize="true"

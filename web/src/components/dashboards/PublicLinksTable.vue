@@ -27,7 +27,6 @@
       show-index
       pagination="client"
       :show-global-filter="false"
-      :footer-title="t('dashboard.publicLinks.panelTitle')"
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="public-links"
