@@ -114,3 +114,33 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObje
     filterStreamFn,
   };
 }
+
+/** The trace-details route View Trace opens for a log record: ±15 min around its timestamp. */
+export function traceDetailsLocation(
+  log: Record<string, any>,
+  state: {
+    zoConfig: { timestamp_column: string };
+    selectedOrganization: { identifier: string };
+    organizationData: {
+      organizationSettings: { trace_id_field_name: string; span_id_field_name: string };
+    };
+  },
+  traceStream: string,
+) {
+  const timestamp = log[state.zoConfig.timestamp_column];
+  const settings = state.organizationData.organizationSettings;
+  return {
+    name: "traceDetails",
+    query: {
+      stream: traceStream,
+      from: timestamp - 900000000,
+      to: timestamp + 900000000,
+      refresh: 0,
+      org_identifier: state.selectedOrganization.identifier,
+      trace_id: log[settings.trace_id_field_name],
+      reload: "true",
+    },
+    // On the location, not in `query`, so the trace page opens without a span filter.
+    span_id: log[settings.span_id_field_name],
+  };
+}

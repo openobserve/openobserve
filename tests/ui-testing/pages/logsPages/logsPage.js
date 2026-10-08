@@ -7579,12 +7579,12 @@ export class LogsPage {
     async clickShareLinkButton() {
         const btn = this.page.locator(this.shareLinkButton);
         await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // ShareButton stays disabled until the authenticated /api/<org>/config supplies web_url; the public /config lacks it.
+        // ShareButton stays disabled until /api/<org>/config supplies web_url, and (G1) until the query has run.
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
-            testLogger.warn('Share link button still disabled after 30s (org config not loaded); reloading once', { url: this.page.url() });
+            testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
             await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await expect(btn, 'share link button never enabled: org config (web_url) did not load').toBeEnabled({ timeout: 30000 });
+            await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
         }
         await btn.click();
         testLogger.info('Clicked share link button');

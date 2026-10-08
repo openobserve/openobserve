@@ -1858,6 +1858,12 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import usePatterns, { patternsState } from "@/composables/useLogs/usePatterns";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { writeLogsUrl } from "@/composables/useLogs/useLogsUrl";
+import {
+  clearColumnsFromUrl,
+  clearPermalink,
+  noteUserScopeChange,
+} from "@/composables/useLogs/useLogPermalink";
 import type { PersistAction, PersistSurface } from "@/composables/useLogs/useAutoRun";
 import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -2131,7 +2137,7 @@ export default defineComponent({
       fnParsedSQL,
       fnUnparsedSQL,
       updatedLocalLogFilterField,
-      updateUrlQueryParams,
+      patchUrlViewState,
       generateURLQuery,
       checkTimestampAlias,
     } = logsUtils();
@@ -2959,8 +2965,23 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle === "logs" ||
       searchObj.meta.logsVisualizeToggle === "drilldown";
 
+    // The picker's whole-second echo of a programmatic µs window must not trim it; DateTime can stamp that echo as a user change, so the ignore flag counts too.
+    const keepsSubSecondWindow = (value: any): boolean => {
+      const current = searchObj.data.datetime;
+      const programmatic = value.userChangedValue === false || !!searchObj.shouldIgnoreWatcher;
+      if (!programmatic || value.relativeTimePeriod) return false;
+      if (current?.type !== "absolute") return false;
+      const toSecond = (us: unknown) => Math.floor(Number(us) / 1_000_000) * 1_000_000;
+      return (
+        toSecond(current.startTime) === Number(value.startTime) &&
+        toSecond(current.endTime) === Number(value.endTime)
+      );
+    };
+
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
+      // A picked time is a user scope change: it ends an opened line link (4c C5 step 6b).
+      if (value.userChangedValue === true) noteUserScopeChange();
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
         value.valueType == "absolute" &&
@@ -3013,9 +3034,10 @@ export default defineComponent({
           }
         }
       }
+      const precise = keepsSubSecondWindow(value);
       searchObj.data.datetime = {
-        startTime: value.startTime,
-        endTime: value.endTime,
+        startTime: precise ? searchObj.data.datetime.startTime : value.startTime,
+        endTime: precise ? searchObj.data.datetime.endTime : value.endTime,
         relativeTimePeriod: value.relativeTimePeriod
           ? value.relativeTimePeriod
           : searchObj.data.datetime.relativeTimePeriod,
@@ -3445,10 +3467,7 @@ export default defineComponent({
           const currentQuery = { ...router.currentRoute.value.query };
           currentQuery.visualization_data = encoded;
 
-          await router.replace({
-            name: router.currentRoute.value.name,
-            query: currentQuery,
-          });
+          await writeLogsUrl("replace", currentQuery);
         }
       }
     };
@@ -3465,15 +3484,15 @@ export default defineComponent({
         delete currentQuery.build_data;
       }
 
-      await router.replace({
-        name: router.currentRoute.value.name,
-        query: currentQuery,
-      });
+      await writeLogsUrl("replace", currentQuery);
     };
 
     const applySavedView = async (item) => {
       savedViewDropdownModel.value = false;
       autoRun.engine.resetScope("saved-view");
+      // A saved view replaces the scope: the shared line and the link's columns end here (C5 step 1).
+      clearPermalink();
+      clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       savedviewsService
@@ -3851,7 +3870,6 @@ export default defineComponent({
                 // Applying a view is explicit and always reloads the grid, whatever tab it opens on (C11).
                 autoRun.engine.requestRun("saved-view", { op: "full" });
                 store.dispatch("setSavedViewFlag", false);
-                updateUrlQueryParams();
                 searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
                 searchObj.shouldIgnoreWatcher = false;
@@ -4238,7 +4256,6 @@ export default defineComponent({
       }
 
       queryEditorRef.value?.setValue(searchObj.data.query);
-      updateUrlQueryParams();
       if (store.state.zoConfig.query_on_stream_selection == false) {
         handleRunQueryFn();
       } else {
@@ -4506,7 +4523,7 @@ export default defineComponent({
         }
       }
       searchObj.meta.logsVisualizeToggle = value;
-      updateUrlQueryParams();
+      patchUrlViewState();
       if (tabRunPending) autoRun.request(tabRunPending);
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {

@@ -631,7 +631,7 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.datetime.startTime).toBe(1000);
       expect(mockState.searchObj.data.datetime.endTime).toBe(2000);
       expect(mockState.searchObj.data.datetime.type).toBe("absolute");
-      expect(utils.updateUrlQueryParams).toHaveBeenCalled();
+      expect(utils.updateUrlQueryParams).toHaveBeenCalledWith(null, null, "replace");
     });
   });
 

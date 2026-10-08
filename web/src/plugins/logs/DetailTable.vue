@@ -110,6 +110,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
           </div>
         </OPopover>
+        <!-- The tooltip sits on the wrapper: a disabled button gets no hover, and its reason must still show. -->
+        <div
+          v-if="!embedded && lineLink.kind !== 'hidden'"
+          class="flex shrink-0 items-center"
+          data-test="log-detail-copy-line-link"
+        >
+          <OTooltip :content="lineLinkTooltip" />
+          <OButton
+            data-test="log-detail-copy-line-link-btn"
+            variant="outline"
+            size="xs"
+            icon-left="link"
+            class="disabled:pointer-events-none"
+            :disabled="lineLink.kind === 'disabled' || pageLoading"
+            :loading="lineLinkBusy"
+            @click="copyLineLink(modelValue, 'drawer')"
+          >
+            {{ t("search.linePermalink.copyLink") }}
+          </OButton>
+          <LogLineLinkPopover source="drawer" />
+        </div>
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -625,6 +646,8 @@ import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
+import { lineLinkBusy, useLogLineLink } from "@/composables/useLogs/useLogLineLink";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -679,6 +702,7 @@ export default defineComponent({
     OSpinner,
     OShortcut,
     OTooltip,
+    LogLineLinkPopover,
     OIcon,
     OTable,
     OSearchInput,
@@ -822,6 +846,13 @@ export default defineComponent({
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
+    const { lineLinkState, copyLineLink } = useLogLineLink();
+    const lineLink = computed(() => lineLinkState(props.modelValue));
+    const lineLinkTooltip = computed(() =>
+      lineLink.value.kind === "disabled"
+        ? lineLink.value.reason
+        : t("search.linePermalink.copyLinkTooltip"),
+    );
 
     // The View Trace action is rendered in this component's header row (not
     // inside JsonPreview) so it stays reachable from every tab. Gate on
@@ -1318,6 +1349,10 @@ export default defineComponent({
       raw,
       store,
       router,
+      lineLink,
+      lineLinkTooltip,
+      lineLinkBusy,
+      copyLineLink,
       rowData,
       tab,
       prevDisabled,

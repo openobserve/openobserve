@@ -21,6 +21,7 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { captureFromSearchHits } from "@/composables/fieldValueStore";
@@ -1029,6 +1030,19 @@ export const useStreamFields = () => {
     });
   };
 
+  // Names a shared link carries that this stream's schema no longer has are dropped (4c C7).
+  const dropUnknownLinkColumns = () => {
+    const known = new Set(
+      (searchObj.data.stream.selectedStreamFields ?? []).map(
+        (field: { name?: string }) => field?.name,
+      ),
+    );
+    if (!known.size) return;
+    const fields = searchObj.data.stream.selectedFields ?? [];
+    const kept = fields.filter((name: string) => known.has(name));
+    if (kept.length !== fields.length) searchObj.data.stream.selectedFields = kept;
+  };
+
   const updateGridColumns = () => {
     try {
       searchObj.data.resultGrid.columns = [];
@@ -1037,8 +1051,10 @@ export const useStreamFields = () => {
         useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
       const logFieldSelectedValue: any = [];
       const stream = searchObj.data.stream.selectedStream.sort().join("_");
-      // Check if logFilterField has keys (since it's an object, not an array)
+      if (columnsFromUrl.value) dropUnknownLinkColumns();
+      // A shared link's columns, including [], are rendered as given: this user's saved selection is not read (4c C7).
       if (
+        !columnsFromUrl.value &&
         Object.keys(logFilterField).length > 0 &&
         logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`] != undefined &&
         Array.isArray(logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`])

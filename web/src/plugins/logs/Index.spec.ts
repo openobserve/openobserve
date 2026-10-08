@@ -206,9 +206,9 @@ vi.mock("@/composables/useLogs", async () => {
       const api = actual.default(...args);
       return {
         ...api,
-        loadLogsData: () => {
+        loadLogsData: (...loadArgs: Parameters<typeof api.loadLogsData>) => {
           loaderCalls.push("logs");
-          return api.loadLogsData();
+          return api.loadLogsData(...loadArgs);
         },
         loadVisualizeData: () => {
           loaderCalls.push("visualize");
@@ -621,7 +621,8 @@ describe("Logs Index", async () => {
       'SELECT timestamp,level,message FROM "my_stream1" WHERE level = "error"',
     );
     expect(setQuerySpy).toHaveBeenCalledWith(true);
-    expect(updateUrlQueryParamsSpy).toHaveBeenCalled();
+    // The rewritten field list is a draft until it runs, so the address bar is left alone (4c C7b).
+    expect(updateUrlQueryParamsSpy).not.toHaveBeenCalled();
 
     // Test with empty interesting fields list
     wrapper.vm.searchObj.data.stream.interestingFieldList = [];
@@ -928,7 +929,7 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.showJobScheduler).toBe(true);
   });
 
-  it("Should watch fullSQLMode true -> setQuery & updateUrl; false -> reset and maybe getQueryData", async () => {
+  it("Should watch fullSQLMode true -> setQuery without a URL write; false -> reset and maybe getQueryData", async () => {
     const setQuerySpy = vi.spyOn(wrapper.vm, "setQuery");
     const updateSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
@@ -938,7 +939,7 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.meta.sqlMode = true;
     await flushPromises();
     expect(setQuerySpy).toHaveBeenCalledWith(true);
-    expect(updateSpy).toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
 
     // Trigger false branch
     wrapper.vm.searchObj.loading = false;

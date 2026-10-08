@@ -21,6 +21,8 @@ import store from "@/test/unit/helpers/store";
 import useStreamFields, { pickInitialLogsStreams } from "./useStreamFields";
 import { searchState } from "./searchState";
 import { restoreLogsSelectedStreams, saveLogsSelectedStreams } from "@/utils/streamPersist";
+import { useLocalLogFilterField } from "@/utils/zincutils";
+import { columnsFromUrl } from "./useLogPermalink";
 
 // Create i18n instance
 const i18n = createI18n({
@@ -165,6 +167,54 @@ describe("useStreamFields Composable", () => {
       wrapper.vm.updateGridColumns();
 
       expect(columnIds()).toEqual(["_timestamp", "source"]);
+    });
+  });
+
+  describe("updateGridColumns with a shared link's columns (4c C7)", () => {
+    const { searchObj } = searchState();
+    const org = () => store.state.selectedOrganization.identifier;
+
+    beforeEach(() => {
+      searchObj.meta.sqlMode = false;
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.data.stream.selectedStreamFields = [
+        { name: "_timestamp", streams: ["app"] },
+        { name: "level", streams: ["app"] },
+        { name: "message", streams: ["app"] },
+      ] as any;
+      searchObj.data.queryResults = {
+        hits: [{ _timestamp: 1, level: "info", message: "a" }],
+      } as any;
+      useLocalLogFilterField({ [`${org()}_app`]: ["message"] });
+    });
+
+    afterEach(() => {
+      columnsFromUrl.value = false;
+      useLocalLogFilterField({});
+    });
+
+    const columnIds = () => searchObj.data.resultGrid.columns.map((column: any) => column.id);
+
+    it("renders the link's empty selection as source, not this user's saved columns", () => {
+      searchObj.data.stream.selectedFields = [];
+      columnsFromUrl.value = true;
+      wrapper.vm.updateGridColumns();
+      expect(searchObj.data.stream.selectedFields).toEqual([]);
+      expect(columnIds()).toEqual(["_timestamp", "source"]);
+    });
+
+    it("drops names the stream's schema no longer has", () => {
+      searchObj.data.stream.selectedFields = ["level", "gone_field"];
+      columnsFromUrl.value = true;
+      wrapper.vm.updateGridColumns();
+      expect(searchObj.data.stream.selectedFields).toEqual(["level"]);
+      expect(columnIds()).toEqual(["_timestamp", "level"]);
+    });
+
+    it("without a link, an empty selection still restores the saved columns (old links unchanged)", () => {
+      searchObj.data.stream.selectedFields = [];
+      wrapper.vm.updateGridColumns();
+      expect(searchObj.data.stream.selectedFields).toEqual(["message"]);
     });
   });
 

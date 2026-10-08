@@ -531,7 +531,7 @@ export const useSearchResponseHandler = () => {
         endUs: Number(response.content.results.new_end_time),
       });
 
-      updateUrlQueryParams();
+      updateUrlQueryParams(null, null, "replace");
     }
   };
 

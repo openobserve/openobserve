@@ -42,6 +42,7 @@ export interface RowNavNavigation {
 export interface DrawerCloseContext {
   isPagination: boolean;
   searchObj: RowNavSearchObj;
+  origin?: string;
 }
 
 export type DrawerCloseExemption = (ctx: DrawerCloseContext) => boolean;
@@ -57,6 +58,8 @@ export interface HitsCompletePayload {
 }
 
 let jobRequestCounter = 0;
+// The origin of the grid query being built; getQueryReq runs inside getQueryData's synchronous part.
+let activeQueryOrigin: string | undefined;
 
 /** Text of `logs-row-nav-live`; rendered by the logs page, so a failure that swaps the results for an error state is still announced. */
 export const logsRowNavAnnouncement = ref("");
@@ -71,10 +74,25 @@ const crossingExemption: DrawerCloseExemption = ({ isPagination, searchObj }) =>
 export const drawerCloseExemptions: DrawerCloseExemption[] = [crossingExemption];
 
 /** The one drawer-close rule shared by both query entry points (4a §3.2.7). */
-export function closeDrawerForQuery(searchObj: RowNavSearchObj, isPagination: boolean): void {
-  const ctx = { isPagination, searchObj };
+export function closeDrawerForQuery(
+  searchObj: RowNavSearchObj,
+  isPagination: boolean,
+  origin: string | undefined = activeQueryOrigin,
+): void {
+  const ctx = { isPagination, searchObj, origin };
   if (drawerCloseExemptions.some((exempt) => exempt(ctx))) return;
   searchObj.meta.showDetailTab = false;
+}
+
+/** Runs `build` with `origin` as the grid query's origin, so the close rule inside it sees the caller's origin. */
+export function withQueryOrigin<T>(origin: string | undefined, build: () => T): T {
+  const previous = activeQueryOrigin;
+  activeQueryOrigin = origin;
+  try {
+    return build();
+  } finally {
+    activeQueryOrigin = previous;
+  }
 }
 
 /** Drops the J/K anchor, the open-row highlight and any crossing in flight. */
