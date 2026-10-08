@@ -106,8 +106,8 @@ pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
-/// File-name prefix of the current metrics result cache format; the startup scan drops others.
-pub const METRICS_RESULT_CACHE_FILE_PREFIX: &str = "v2-";
+/// File-name prefix of the current metrics result format; its `_` makes pre-v2 parsers reject it.
+pub const METRICS_RESULT_CACHE_FILE_PREFIX: &str = "v2_";
 
 const RESULT_CACHE_MAX_ENTRIES_PER_KEY: usize = 10;
 
@@ -2483,6 +2483,10 @@ mod tests {
     async fn test_load_drops_legacy_metrics_result_files() {
         // multi_dir strips the first path segment from scanned keys
         if !get_config().disk_cache.multi_dir.is_empty() {
+            return;
+        }
+        // remove() is a no-op with the disk cache off, so the scanned key would stay indexed
+        if !get_config().disk_cache.enabled {
             return;
         }
         let tmp = tempfile::tempdir().unwrap();

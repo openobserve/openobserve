@@ -627,18 +627,20 @@ fn get_cache_item_key(org: &str, hash: &str, start: i64, end: i64) -> String {
     )
 }
 
-/// Parses `metrics_results/{org}/{Y/m/d/H}/v2-{md5}_{start}_{end}_{suffix}.pb`.
+/// Parses `metrics_results/{org}/{Y/m/d/H}/v2_{md5}_{start}_{end}_{suffix}.pb`.
 fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
     let path = key.split('/').collect::<Vec<_>>();
     if path.len() != 7 || path[0] != "metrics_results" || path[1].is_empty() {
         return None;
     }
-    let item_key = path[6].strip_suffix(".pb")?;
+    let item_key = path[6]
+        .strip_suffix(".pb")?
+        .strip_prefix(METRICS_RESULT_CACHE_FILE_PREFIX)?;
     let parts = item_key.split('_').collect::<Vec<_>>();
     if parts.len() != 4 {
         return None;
     }
-    let hash = parts[0].strip_prefix(METRICS_RESULT_CACHE_FILE_PREFIX)?;
+    let hash = parts[0];
     if hash.len() != 32 || !hash.bytes().all(|ch| ch.is_ascii_hexdigit()) {
         return None;
     }
@@ -1010,10 +1012,11 @@ mod tests {
         for invalid_key in [
             "invalid_key",
             "metrics_results/default/2024/01/01/00/b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
-            "metrics_results/default/2024/01/01/00/v2-short_1234_5678_1.pb",
-            "metrics_results/default/2024/01/01/00/v2-b235015c612525ad7c11c109e3fdc261_5678_1234_1.pb",
-            "metrics_results/default/2024/01/01/00/v2-b235015c612525ad7c11c109e3fdc261_1234_5678_bad.pb",
-            "metrics_results/2024/01/01/00/v2-b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_short_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_5678_1234_1.pb",
+            "metrics_results/default/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_1234_5678_bad.pb",
+            "metrics_results/2024/01/01/00/v2_b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
+            "metrics_results/default/2024/01/01/00/v2-b235015c612525ad7c11c109e3fdc261_1234_5678_1.pb",
         ] {
             assert!(parse_cache_item_key(invalid_key).is_none());
         }
