@@ -1244,4 +1244,110 @@ describe("DetailTable Component", () => {
       expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
     });
   });
+  describe("severity tag and drawer border (A7)", () => {
+    let sevWrapper: any;
+    const BADGE = '[data-test="log-detail-severity-badge"]';
+    const POPOVER = '[data-test="log-detail-severity-popover"]';
+    const mountWith = (modelValue: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      mount(DetailTable, {
+        attachTo: document.body,
+        props: { ...defaultProps, modelValue, ...extra },
+        global: globalMountOptions,
+      });
+
+    afterEach(() => {
+      sevWrapper?.unmount();
+      document.body.querySelectorAll("[data-o-popover-content]").forEach((n) => n.remove());
+    });
+
+    it("AC-A1.3: an inferred row shows an 'inferred' tag and the same solid border", async () => {
+      sevWrapper = mountWith({ message: "2026-10-06 12:00:01 ERROR payment failed" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.exists()).toBe(true);
+      expect(badge.element.tagName).toBe("BUTTON");
+      expect(badge.attributes("data-severity-source")).toBe("message");
+      expect(badge.text()).toContain("inferred");
+      const root = sevWrapper.find('[data-test="dialog-box"]');
+      expect(root.classes()).toEqual(
+        expect.arrayContaining([
+          "border-t-3",
+          "border-log-severity-error-indicator",
+          "border-solid",
+        ]),
+      );
+      expect(root.classes()).not.toContain("border-dashed");
+    });
+
+    it("an HTTP row shows a solid tag and border", async () => {
+      sevWrapper = mountWith({ status: 503 });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.attributes("data-severity-source")).toBe("http");
+      expect(badge.text()).not.toContain("inferred");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toEqual(
+        expect.arrayContaining(["border-log-severity-error-indicator", "border-solid"]),
+      );
+    });
+
+    it("a row with no evidence shows an unknown tag and a neutral border", async () => {
+      sevWrapper = mountWith({ host: "a" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.attributes("data-severity-source")).toBe("none");
+      expect(badge.text()).toBe("Unknown");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toContain(
+        "border-border-default",
+      );
+    });
+
+    it("is the first item of the header action row", async () => {
+      sevWrapper = mountWith({ level: "warn" });
+      await flushPromises();
+      const html = sevWrapper.html();
+      const ai = html.indexOf("logs-detail-ai-context-btn");
+      expect(ai).toBeGreaterThan(0);
+      expect(html.indexOf("log-detail-severity-badge")).toBeLessThan(ai);
+    });
+
+    it("is hidden, with no border, when embedded", async () => {
+      sevWrapper = mountWith({ message: "[ERROR] x" }, { embedded: true });
+      await flushPromises();
+      expect(sevWrapper.find(BADGE).exists()).toBe(false);
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).not.toContain("border-t-3");
+    });
+
+    it("opens its popover from the keyboard with the 'Not searchable' note", async () => {
+      sevWrapper = mountWith({ message: "[ERROR] x" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      (badge.element as HTMLElement).focus();
+      expect(document.activeElement).toBe(badge.element);
+      await badge.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      const popover = document.body.querySelector(POPOVER);
+      expect(popover).not.toBeNull();
+      expect(popover!.textContent).toContain("Not searchable");
+      expect(popover!.textContent).toContain("message");
+    });
+
+    it("names the field for an explicit row", async () => {
+      sevWrapper = mountWith({ severity_number: 18 });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const text = document.body.querySelector(POPOVER)?.textContent ?? "";
+      expect(text).toContain("From field");
+      expect(text).toContain("severity_number");
+      expect(text).toContain("(18)");
+    });
+
+    it("says no level field was found for an unknown row", async () => {
+      sevWrapper = mountWith({ host: "a" });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      expect(document.body.querySelector(POPOVER)?.textContent).toContain("No level field found");
+    });
+  });
 });

@@ -533,9 +533,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="logsCellHtml(col.id, row)"
                       class="log-cell-html"
+                      :data-test="
+                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                      "
                       v-html="logsCellHtml(col.id, row)"
                     />
-                    <span v-else>{{ value }}</span>
+                    <span
+                      v-else
+                      :data-test="
+                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                      "
+                      >{{ value }}</span
+                    >
+                    <span
+                      v-if="col.id === logsTimestampCol"
+                      class="sr-only select-none"
+                      data-test="log-row-severity-sr"
+                      >{{ logRowSeveritySrText(row) }}</span
+                    >
                   </template>
 
                   <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
@@ -842,7 +857,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { severityIndicatorColor, severityRowClass } from "@/utils/logs/statusParser";
+import useLogSeverity from "@/composables/useLogs/useLogSeverity";
 import { isFilterableLogField } from "@/utils/logs/streamNameColumn";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
@@ -2271,7 +2287,15 @@ export default defineComponent({
       () => reprocessLogsHighlight(false),
     );
 
-    const getLogRowStatusColor = (row: any): string | undefined => extractStatusFromLog(row)?.color;
+    const { rowSeverity } = useLogSeverity();
+    const getLogRowStatusColor = (row: any): string => severityIndicatorColor(rowSeverity(row));
+    const logRowSeveritySrText = (row: any) => {
+      const severity = rowSeverity(row);
+      const level = t(`logs.severity.levels.${severity.level}`);
+      return severity.source === "message"
+        ? t("logs.severity.srTextInferred", { level })
+        : t("logs.severity.srText", { level });
+    };
 
     // "Search around" highlight, applied as a class (not an inline style) so the
     // row-hover utility still wins on hover.
@@ -2283,8 +2307,7 @@ export default defineComponent({
       }
       // Carries the detected severity for the status spine, which is otherwise
       // only readable as a colour.
-      const level = extractStatusFromLog(row)?.level;
-      if (level) classes.push(`o2-log-level-${level}`);
+      classes.push(severityRowClass(rowSeverity(row)));
       return classes.join(" ");
     };
 
@@ -2347,6 +2370,7 @@ export default defineComponent({
       logsRowKey,
       getLogRowStatusColor,
       getLogRowClass,
+      logRowSeveritySrText,
       expandedLogIds,
       onExpandedLogIdsChange,
       openLogDetailsByRow,

@@ -16,6 +16,10 @@
 import { searchState } from "@/composables/useLogs/searchState";
 import { patternsState } from "@/composables/useLogs/usePatterns";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import {
+  captureSeverityRequest,
+  recordSeverityRequest,
+} from "@/composables/useLogs/useLogSeverity";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -124,6 +128,11 @@ export const useSearchQuery = (t: TranslateFn) => {
       searchObj.data.datetime.startTime = "Invalid Date";
 
     const queryReq: SearchRequestPayload | null = buildSearch();
+    if (queryReq) {
+      recordSeverityRequest(
+        captureSeverityRequest(searchObj, !!queryReq.query?.quick_mode, () => fnParsedSQL()),
+      );
+    }
 
     // Keep the query's case: str_match and re_match highlight case-sensitively.
     if (searchObj.meta.sqlMode) {

@@ -24,6 +24,10 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import {
+  bindSeverityRequest,
+  type SeverityRequestSnapshot,
+} from "@/composables/useLogs/useLogSeverity";
+import {
   SearchAroundParams,
   StreamField,
   SearchAroundResponse,
@@ -76,6 +80,16 @@ export const useSearchAround = () => {
       // The _around endpoint is single-stream, so multi-stream hits use their own _stream_name.
       const isMultiStream = searchObj.data.stream.selectedStream.length > 1;
       const hitStreamName: string = isMultiStream ? (params.body?.[STREAM_NAME_FIELD] ?? "") : "";
+      // The _around endpoint runs SELECT * on the stream whatever select list is sent.
+      const severityRequest: SeverityRequestSnapshot = {
+        sqlMode: true,
+        quickMode: false,
+        interestingFields: [],
+        sqlColumns: "all",
+        selectedStreams: hitStreamName
+          ? [hitStreamName]
+          : [...searchObj.data.stream.selectedStream],
+      };
 
       if (hitStreamName && searchObj.meta.sqlMode === true) {
         sqlContext.push(b64EncodeUnicode(`SELECT * FROM "${hitStreamName}"`) ?? "");
@@ -183,6 +197,7 @@ export const useSearchAround = () => {
           } else {
             searchObj.data.queryResults = res.data;
           }
+          bindSeverityRequest(searchObj.data.queryResults.hits, severityRequest);
           await extractFields();
           generateHistogramSkeleton();
           generateHistogramData();

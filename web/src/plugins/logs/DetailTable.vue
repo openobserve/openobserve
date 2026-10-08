@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="searchdetaildialog flex h-full flex-col flex-nowrap" data-test="dialog-box">
+  <div
+    class="searchdetaildialog flex h-full flex-col flex-nowrap"
+    :class="severityBorderClass"
+    data-test="dialog-box"
+  >
     <!-- Single Tab Row -->
     <div class="flex shrink-0 items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
@@ -41,6 +45,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </div>
       <div class="flex shrink-0 items-center gap-2 pe-3">
+        <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
+          <template #trigger>
+            <OTag
+              type="logLevel"
+              :value="severity.level"
+              :label="severityTagLabel"
+              clickable
+              data-test="log-detail-severity-badge"
+              :data-severity-source="severity.source"
+            />
+          </template>
+          <div
+            class="flex w-72 flex-col gap-1.5 px-3 py-2.5 text-xs"
+            data-test="log-detail-severity-popover"
+          >
+            <span class="text-text-heading font-semibold">{{
+              t("logs.severity.popoverTitle", { level: severityTagLabel })
+            }}</span>
+            <span class="text-text-secondary text-2xs">{{ t("logs.severity.evidence") }}</span>
+            <i18n-t
+              v-if="severity.source === 'field' || severity.source === 'http'"
+              keypath="logs.severity.fromField"
+              tag="span"
+              scope="global"
+              class="text-text-heading"
+            >
+              <template #field>
+                <code class="font-mono">{{ raw(severity.field) }}</code>
+                {{ raw(severityFieldValue) }}
+              </template>
+            </i18n-t>
+            <template v-else-if="severity.source === 'message'">
+              <i18n-t
+                keypath="logs.severity.inferredFrom"
+                tag="span"
+                scope="global"
+                class="text-text-heading"
+              >
+                <template #field>
+                  <code class="font-mono">{{ raw(severity.field) }}</code>
+                </template>
+              </i18n-t>
+              <span class="text-text-heading">{{ t("logs.severity.notSearchable") }}</span>
+            </template>
+            <span v-else class="text-text-heading">{{
+              severity.notFetched
+                ? t("logs.severity.notInSelectedColumns")
+                : t("logs.severity.noLevelField")
+            }}</span>
+          </div>
+        </OPopover>
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -497,7 +552,11 @@ import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { resolveLogSeverity, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
+import useLogSeverity from "@/composables/useLogs/useLogSeverity";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
@@ -519,6 +578,20 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
+// Literal class names so Tailwind emits each one.
+const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
+  emergency: "border-log-severity-emergency-indicator",
+  alert: "border-log-severity-alert-indicator",
+  critical: "border-log-severity-critical-indicator",
+  error: "border-log-severity-error-indicator",
+  warning: "border-log-severity-warning-indicator",
+  notice: "border-log-severity-notice-indicator",
+  info: "border-log-severity-info-indicator",
+  debug: "border-log-severity-debug-indicator",
+  trace: "border-log-severity-trace-indicator",
+  ok: "border-log-severity-ok-indicator",
+};
+
 const defaultValue: any = () => {
   return {
     data: {},
@@ -552,6 +625,8 @@ export default defineComponent({
     OIcon,
     OTable,
     OSearchInput,
+    OTag,
+    OPopover,
   },
   emits: [
     "showPrevDetail",
@@ -776,9 +851,26 @@ export default defineComponent({
         searchObj.data.stream.selectedStream.length <= 1 || !!rowData.value?.[STREAM_NAME_FIELD],
     );
 
-    // Compute status color for the top border
-    const statusColor = computed(() => {
-      return extractStatusFromLog(rowData.value).color;
+    const { rowSeverity } = useLogSeverity();
+    // Embedded hosts show another panel's stream, so the logs-page projection guard does not apply.
+    const severity = computed(() =>
+      props.embedded ? resolveLogSeverity(props.modelValue) : rowSeverity(props.modelValue),
+    );
+    const severityTagLabel = computed(() => {
+      const label = resolveBadgeLabel("logLevel", severity.value.level);
+      return severity.value.source === "message"
+        ? t("logs.severity.inferredLabel", { level: label })
+        : label;
+    });
+    const severityFieldValue = computed(() => {
+      const value = severity.value.field ? props.modelValue?.[severity.value.field] : undefined;
+      return value === undefined ? "" : `(${String(value)})`;
+    });
+    const severityBorderClass = computed(() => {
+      if (props.embedded) return "";
+      const { level } = severity.value;
+      if (level === "unknown") return "border-t-3 border-border-default";
+      return `border-t-3 border-solid ${SEVERITY_BORDER_CLASSES[level]}`;
     });
 
     // Check if service streams feature is enabled
@@ -1107,6 +1199,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       router,
       rowData,
@@ -1136,7 +1229,10 @@ export default defineComponent({
       addSearchTerm,
       closeTable,
       showCorrelation,
-      statusColor,
+      severity,
+      severityTagLabel,
+      severityFieldValue,
+      severityBorderClass,
       tableColumns,
       tableRows,
       detailSearchQuery,

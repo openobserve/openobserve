@@ -14688,6 +14688,32 @@
       "sendToAiChat": "Send to AI Chat",
       "contentCopiedSuccessfully": "Content Copied Successfully!"
     },
+    "severity": {
+      "srText": "Severity {level}",
+      "srTextInferred": "Severity {level}, inferred",
+      "inferredLabel": "{level} · inferred",
+      "popoverTitle": "Severity: {level}",
+      "popoverAriaLabel": "Severity evidence",
+      "evidence": "Evidence",
+      "fromField": "From field {field}",
+      "inferredFrom": "Inferred from the {field} text.",
+      "notSearchable": "Not searchable; the histogram does not use it.",
+      "noLevelField": "No level field found",
+      "notInSelectedColumns": "Level field not in the selected columns",
+      "levels": {
+        "emergency": "emergency",
+        "alert": "alert",
+        "critical": "critical",
+        "error": "error",
+        "warning": "warning",
+        "notice": "notice",
+        "info": "info",
+        "debug": "debug",
+        "trace": "trace",
+        "ok": "ok",
+        "unknown": "unknown"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
       "fixErrorsAndRetry": "There are some errors, please fix them and try again"
@@ -17192,7 +17218,13 @@
         "debug": "Debug",
         "info": "Info",
         "warn": "WARN",
-        "fatal": "Fatal"
+        "fatal": "Fatal",
+        "emergency": "Emergency",
+        "alert": "Alert",
+        "critical": "Critical",
+        "notice": "Notice",
+        "ok": "OK",
+        "unknown": "Unknown"
       },
       "pipelineRunOutcome": {
         "firing": "Firing",

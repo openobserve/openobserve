@@ -35,6 +35,7 @@ import {
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { bumpSeveritySchemaGeneration } from "@/utils/logs/statusParser";
 import {
   resolveFieldGroup,
   buildSemanticIndex,
@@ -778,6 +779,7 @@ export const useStreamFields = () => {
 
         if (!shouldGroup) {
           searchObj.data.stream.selectedStreamFields = [...commonSchemaMaps, ...schemaMaps];
+          bumpSeveritySchemaGeneration();
           searchObj.data.stream.selectedInterestingStreamFields = [
             ...interestingCommonSchemaMaps,
             ...interestingSchemaMaps,
@@ -832,6 +834,7 @@ export const useStreamFields = () => {
           }
 
           searchObj.data.stream.selectedStreamFields = orderedFields;
+          bumpSeveritySchemaGeneration();
           searchObj.data.stream.selectedInterestingStreamFields = orderedInterestingFields;
         }
 

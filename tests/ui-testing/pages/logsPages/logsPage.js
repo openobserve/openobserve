@@ -7145,26 +7145,19 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // OTable draws the spine as a ::before on the row's first cell, fed by
-                // the --row-status-color custom property set inline on the <tr>, and
-                // marks the row with data-status-bar. The level rides along on the row
-                // class (o2-log-level-<level>) so it stays machine-readable whichever
-                // column is shown.
-                const raw = row.style.getPropertyValue('--row-status-color').trim();
-                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
-                // The token resolves to a hex; callers normalise through rgbToHex,
-                // so hand back the rgb() form a computed style would have given.
-                let bgColor = raw;
-                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-                if (hex) {
-                    let h = hex[1];
-                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-                    const n = parseInt(h, 16);
-                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-                }
+                const firstCell = row.querySelector('td');
+                if (!firstCell) continue;
+                const spine = getComputedStyle(firstCell, '::before');
+                const backgroundImage = spine.backgroundImage;
+                const bgColor = spine.backgroundColor;
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const levelClass = Array.from(row.classList).find(
+                    (c) => c.startsWith('o2-log-level-') && !c.startsWith('o2-log-level-src-'),
+                );
                 const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
+                const sourceClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-src-'));
+                const source = sourceClass ? sourceClass.replace('o2-log-level-src-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7184,7 +7177,7 @@ export class LogsPage {
                 }
 
                 if (level === null && severity === null) continue;
-                findings.push({ severity, level, color: bgColor });
+                findings.push({ severity, level, source, backgroundImage, color: bgColor });
             }
 
             return findings;
@@ -11364,10 +11357,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            let text = await cells.nth(i).textContent();
+            // The value span excludes the expand icon text and the sr-only severity text.
+            const valueSpan = cells.nth(i).locator('[data-test="log-row-timestamp-value"]');
+            let text = (await valueSpan.count()) > 0
+                ? await valueSpan.first().textContent()
+                : await cells.nth(i).textContent();
             text = text?.trim() || '';
-            // Strip expand button icon text that appears before the timestamp
-            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
             text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             values.push(text);
         }
