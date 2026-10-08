@@ -210,6 +210,60 @@ describe("FieldList", () => {
     });
   });
 
+  // ── Default stream for a new dashboard panel ────────────────────────
+
+  describe("Default stream", () => {
+    afterEach(() => {
+      localStorage.clear();
+    });
+
+    const mountWithoutStream = (pageKey: string, editMode = false) => {
+      mockReturn.dashboardPanelData.data.queries[0].fields.stream = "";
+      wrapper = mountComponent({ pageKey, props: { editMode } });
+      mockReturn.dashboardPanelData.meta.stream.streamResults = [...mockStreamResults];
+    };
+
+    it("opens a new dashboard panel on the stream the last panel was saved with", async () => {
+      localStorage.setItem("oo_dashboard_panel_stream_logs_test-org", "error_logs");
+      mountWithoutStream("dashboard");
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("error_logs");
+    });
+
+    it("falls back to the last explored logs stream", async () => {
+      localStorage.setItem("oo_selected_stream_logs_test-org", JSON.stringify(["error_logs"]));
+      mountWithoutStream("dashboard");
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("error_logs");
+    });
+
+    it("skips an internal stream and prefers one with data when nothing is remembered", async () => {
+      mockReturn.dashboardPanelData.data.queries[0].fields.stream = "";
+      wrapper = mountComponent({ pageKey: "dashboard" });
+      mockReturn.dashboardPanelData.meta.stream.streamResults = [
+        { name: "_agent_signals", stream_type: "logs", stats: { doc_num: 1, doc_time_max: 9 } },
+        { name: "app_logs", stream_type: "logs", stats: { doc_num: 0 } },
+        { name: "error_logs", stream_type: "logs", stats: { doc_num: 3, doc_time_max: 5 } },
+      ];
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("error_logs");
+    });
+
+    it("keeps the first stream when editing a saved panel", async () => {
+      localStorage.setItem("oo_dashboard_panel_stream_logs_test-org", "error_logs");
+      mountWithoutStream("dashboard", true);
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("app_logs");
+    });
+
+    it("keeps the first stream outside dashboards", async () => {
+      localStorage.setItem("oo_dashboard_panel_stream_logs_test-org", "error_logs");
+      mountWithoutStream("build");
+      await flushPromises();
+      expect(mockReturn.dashboardPanelData.data.queries[0].fields.stream).toBe("app_logs");
+    });
+  });
+
   // ── Stream Type Selection ───────────────────────────────────────────
 
   describe("Stream Type Selection", () => {
