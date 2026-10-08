@@ -8086,6 +8086,19 @@
     "wouldTrigger": "DÉCLENCHERAIT",
     "wouldNotTrigger": "NE DÉCLENCHERAIT PAS",
     "queryBuilder": "Constructeur",
+    "saveModeDialog": {
+      "title": "Choisir le mode de requête",
+      "leadAllSetUp": "{first}, {second} et {third} sont tous configurés.",
+      "leadBothSetUp": "{first} et {second} sont tous deux configurés.",
+      "leadSelectedEmptyOneOther": "{selected} est sélectionné mais vide. {other} est configuré.",
+      "leadSelectedEmptyTwoOthers": "{selected} est sélectionné mais vide. {first} et {second} sont configurés.",
+      "noFilters": "Aucun filtre, donc chaque ligne de {stream} compte",
+      "noQuery": "Aucune requête écrite pour l'instant",
+      "noteOneOtherUnused": "Seul le mode {pick} s'exécute. Le mode {other} n'est pas utilisé.",
+      "noteOnlyPick": "Seul le mode {pick} s'exécute.",
+      "noteTwoOthersUnused": "Seul le mode {pick} s'exécute. Les modes {first} et {second} ne sont pas utilisés.",
+      "saveWithMode": "Enregistrer avec le mode {mode}"
+    },
     "conditions": {
       "condition": "État",
       "conditionGroup": "Groupe de conditions",
@@ -10852,9 +10865,10 @@
       "organizationRequired": "L'organisation est requise",
       "baseRole": "Rôle de base",
       "baseRoleHelp": "Le rôle attribué aux utilisateurs correspondants dans cette organisation.",
-      "userGroup": "Groupe d'utilisateurs",
-      "userGroupPlaceholder": "Nom du groupe",
-      "userGroupHelp": "Facultatif. Les utilisateurs correspondants rejoignent également ce groupe dans cette organisation.",
+      "roleClaimName": "Claim de rôles",
+      "roleClaimNamePlaceholder": "Nom du claim, par ex. groups",
+      "roleClaimNameHelp": "Facultatif. Claim du jeton listant les rôles personnalisés de l'utilisateur ; à chaque connexion, ses rôles personnalisés dans cette organisation y sont synchronisés.",
+      "createMissingRoles": "Créer les rôles du claim qui n'existent pas dans l'organisation",
       "duplicateDomain": "Une correspondance pour ce domaine existe déjà",
       "confirmRemove": "Êtes-vous sûr de vouloir supprimer la correspondance pour {domain} ?",
       "deleteTitle": "Supprimer la correspondance"

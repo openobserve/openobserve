@@ -8086,6 +8086,19 @@
     "wouldTrigger": "DESENCADEARIA",
     "wouldNotTrigger": "NÃO ACIONARIA",
     "queryBuilder": "Construtor",
+    "saveModeDialog": {
+      "title": "Escolher modo de consulta",
+      "leadAllSetUp": "{first}, {second} e {third} estão todos configurados.",
+      "leadBothSetUp": "{first} e {second} estão ambos configurados.",
+      "leadSelectedEmptyOneOther": "{selected} está selecionado, mas vazio. {other} está configurado.",
+      "leadSelectedEmptyTwoOthers": "{selected} está selecionado, mas vazio. {first} e {second} estão configurados.",
+      "noFilters": "Sem filtros, então cada linha em {stream} conta",
+      "noQuery": "Nenhuma consulta escrita ainda",
+      "noteOneOtherUnused": "Apenas o modo {pick} é executado. O modo {other} não é usado.",
+      "noteOnlyPick": "Apenas o modo {pick} é executado.",
+      "noteTwoOthersUnused": "Apenas o modo {pick} é executado. Os modos {first} e {second} não são usados.",
+      "saveWithMode": "Salvar com o modo {mode}"
+    },
     "conditions": {
       "condition": "Condição",
       "conditionGroup": "Grupo de condições",
@@ -10852,9 +10865,10 @@
       "organizationRequired": "A organização é obrigatória",
       "baseRole": "Função base",
       "baseRoleHelp": "A função atribuída aos usuários correspondentes nessa organização.",
-      "userGroup": "Grupo de usuários",
-      "userGroupPlaceholder": "Nome do grupo",
-      "userGroupHelp": "Opcional. Os usuários correspondentes também entram nesse grupo nessa organização.",
+      "roleClaimName": "Claim de funções",
+      "roleClaimNamePlaceholder": "Nome do claim, ex.: groups",
+      "roleClaimNameHelp": "Opcional. Claim do token que lista as funções personalizadas do usuário; a cada login, as funções personalizadas dele nessa organização são sincronizadas com ele.",
+      "createMissingRoles": "Criar as funções do claim que não existem na organização",
       "duplicateDomain": "Já existe um mapeamento para este domínio",
       "confirmRemove": "Tem certeza de que deseja excluir o mapeamento para {domain}?",
       "deleteTitle": "Excluir mapeamento"

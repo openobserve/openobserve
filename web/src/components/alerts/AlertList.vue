@@ -2771,6 +2771,14 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
+      // An editor save lands here, and the editor opens alerts from their detail
+      // cache (getAlertById): mark those stale, or a reopen within a minute shows
+      // the pre-save copy.
+      void queryClient.invalidateQueries({
+        queryKey: alertKeys.all(store.state.selectedOrganization.identifier),
+        predicate: (q: any) => q.queryKey[3] === "detail",
+        refetchType: "none",
+      });
       // Always fetch the latest alerts for the folder from backend
       await getAlertsFn(store, resolvedFolderId, "", true, "", true);
       // Re-apply active search/filter on the freshly fetched data
