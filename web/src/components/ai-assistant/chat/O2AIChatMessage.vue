@@ -12,6 +12,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import O2AIChatToolCallBlock from "./O2AIChatToolCallBlock.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -103,11 +104,9 @@ const isLogEntryExpanded = (blockIndex: number) =>
           >
             <div class="log-entry-header flex items-center gap-1.5">
               <OIcon name="description" size="xs" />
-              <span
-                class="log-entry-info flex-1 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap"
-              >
+              <OTruncatedText :tooltip="false" class="log-entry-info flex-1 text-xs font-medium">
                 {{ block.preview }}
-              </span>
+              </OTruncatedText>
               <OIcon
                 :name="isLogEntryExpanded(blockIndex) ? 'expand-less' : 'expand-more'"
                 size="sm"

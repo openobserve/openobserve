@@ -410,7 +410,6 @@ import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFilters
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
-import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 
@@ -643,9 +642,7 @@ export default defineComponent({
           : "",
       );
 
-      return label?.length > MAX_FIELD_LABEL_CHARS
-        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-        : label;
+      return label;
     };
 
     const latitudeLabel = computed(() => {

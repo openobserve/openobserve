@@ -245,7 +245,7 @@ the same recipe so it never takes two rows of chrome:
 - `OBanner inline-actions` keeps its message at least 12rem wide below md and wraps
   the actions under it; do not stack them by hand.
 - Full-viewport shells use `h-dvh`, never `100vh` (mobile browser chrome overlaps it).
-- Long chips and IDs: `max-md:max-w-full max-md:truncate` on the text, not on the row.
+- Long chips and IDs: cut the text, not the row — `<OTruncatedText class="max-md:max-w-full">`, which keeps the full value on hover. A bare `max-md:truncate` cuts it on phones with no way to read the rest.
 - **No horizontal page scroll does not mean nothing is clipped.** An
   `overflow-hidden` ancestor swallows the overflow silently: "Counted up to
   12:45:00; we're 19 m…" lost its tail at 768 while `scrollWidth === innerWidth`.

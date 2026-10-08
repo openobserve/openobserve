@@ -9,6 +9,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { CompositeTimelineLane, CompositeTimelineResponse } from "@/ts/interfaces/alert";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { letterFor } from "./expression";
@@ -133,13 +134,12 @@ onMounted(fetch);
           >
             {{ raw(letterFor(lane.slot ?? index)) }}
           </span>
-          <span
+          <OTruncatedText
             :class="isResult(lane) ? 'font-semibold' : ''"
-            class="text-text-heading min-w-0 truncate text-sm"
-            :title="String(labelFor(lane))"
+            class="text-text-heading text-sm"
           >
             {{ labelFor(lane) }}
-          </span>
+          </OTruncatedText>
           <OTag
             v-if="lane.accessible && lane.current_level"
             type="alertLevel"

@@ -205,11 +205,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex flex-col gap-1 max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5"
               >
                 <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
-                  <div
-                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold max-lg:hidden"
+                  <OTruncatedText
+                    as="div"
+                    class="text-2xs text-text-secondary leading-normal font-semibold max-lg:hidden"
                   >
                     {{ card.label }}
-                  </div>
+                  </OTruncatedText>
                   <span
                     class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                   >
@@ -313,6 +314,7 @@ import { buildAgentTraceFilter } from "./llmAgentFilter";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
 import analytics from "@/services/product_analytics";

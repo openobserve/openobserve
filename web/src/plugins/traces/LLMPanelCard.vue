@@ -39,9 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-compact text-text-heading shrink-0 font-medium tracking-[0.02em]">
           {{ title }}
         </span>
-        <span v-if="subtitle" class="text-text-secondary text-2xs truncate leading-normal">
+        <OTruncatedText v-if="subtitle" class="text-text-secondary text-2xs leading-normal">
           {{ subtitle }}
-        </span>
+        </OTruncatedText>
       </div>
       <div class="flex-1" />
       <div v-if="$slots.actions" class="flex shrink-0 items-center gap-1">
@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import type { I18nText } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineProps<{
   /** Resolved panel title (the caller passes its own t(...) value). */

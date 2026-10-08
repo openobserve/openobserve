@@ -1741,12 +1741,19 @@ describe("emptyMeansHealthy travels to the panel config", () => {
     }
   });
 
-  it("a section that does NOT declare it stamps nothing", () => {
+  it("outside a declaring section, only a panel that declares it is stamped", () => {
     const dashboard = build(resolve({}));
+    const declared = new Set(
+      kubernetesPage.sections.flatMap((section) =>
+        section.panels.filter((panel) => panel.emptyMeansHealthy).map((panel) => panel.id),
+      ),
+    );
+    expect([...declared]).toEqual(["k8s_ov_unhealthy_pods"]);
     for (const tab of dashboard.tabs) {
       if (tab.tabId === "health") continue;
       for (const panel of tab.panels) {
-        expect(panel.config.curated_empty_means_healthy, panel.id).toBeUndefined();
+        const expected = declared.has(panel.id) ? true : undefined;
+        expect(panel.config.curated_empty_means_healthy, panel.id).toBe(expected);
       }
     }
   });
