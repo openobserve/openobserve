@@ -760,6 +760,182 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("RED Metrics pin", () => {
+    const { isPinned, togglePin } = useToolbarPins("traces");
+    let widthSpy: ReturnType<typeof mockToolbarWidth>;
+
+    const pinBtn = () => wrapper.find('[data-test="traces-search-bar-menu-pin-metrics-btn"]');
+    const pinnedBtn = () => wrapper.find('[data-test="traces-search-bar-metrics-pinned-btn"]');
+    const savedViewsGroup = () => wrapper.find('[data-test="traces-search-bar-saved-views"]');
+    const menuItem = () => wrapper.find('[data-test="traces-search-bar-menu-metrics-btn"]');
+    const resetPins = () => {
+      if (isPinned("histogram")) togglePin("histogram");
+      if (!isPinned("savedViews")) togglePin("savedViews");
+    };
+    const useWidth = (width: number) => {
+      widthSpy.mockRestore();
+      widthSpy = mockToolbarWidth(width);
+    };
+
+    beforeEach(() => {
+      mockSavedViewsGet.mockResolvedValue({ data: { views: [] } });
+      searchObjInstance.meta.searchMode = "spans";
+      breakpointState.lgUp = true;
+      resetPins();
+      widthSpy = mockToolbarWidth(1600);
+    });
+
+    afterEach(() => {
+      widthSpy.mockRestore();
+      breakpointState.lgUp = true;
+      resetPins();
+    });
+
+    it("offers a pin in the More item and no toolbar copy by default", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(pinBtn().exists()).toBe(true);
+      expect(pinBtn().attributes("title")).toBe("search.pinToToolbar");
+      expect(pinBtn().findComponent({ name: "OIcon" }).props("name")).toBe("keep-outline");
+      expect(pinnedBtn().exists()).toBe(false);
+    });
+
+    it("pins without selecting the menu item, and unpins", async () => {
+      searchObjInstance.meta.showHistogram = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c) => c.attributes("data-test") === "traces-search-bar-menu-metrics-btn")!;
+      await pinBtn().trigger("click");
+      await flushPromises();
+
+      expect(item.emitted("select")).toBeUndefined();
+      expect(searchObjInstance.meta.showHistogram).toBe(true);
+      expect(pinnedBtn().exists()).toBe(true);
+      expect(pinBtn().attributes("title")).toBe("search.unpinFromToolbar");
+      expect(pinBtn().findComponent({ name: "OIcon" }).props("name")).toBe("keep");
+      expect(menuItem().exists()).toBe(true);
+
+      await pinBtn().trigger("click");
+      await flushPromises();
+      expect(pinnedBtn().exists()).toBe(false);
+    });
+
+    it("flips showHistogram from the pinned button and its switch exactly once", async () => {
+      searchObjInstance.meta.showHistogram = true;
+      togglePin("histogram");
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await pinnedBtn().trigger("click");
+      await flushPromises();
+      expect(searchObjInstance.meta.showHistogram).toBe(false);
+
+      await pinnedBtn().find('[role="switch"]').trigger("click");
+      await flushPromises();
+      expect(searchObjInstance.meta.showHistogram).toBe(true);
+    });
+
+    it("keeps a single show-metrics toggle data-test while pinned", async () => {
+      togglePin("histogram");
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(pinnedBtn().exists()).toBe(true);
+      expect(
+        wrapper.findAll('[data-test="traces-search-bar-show-metrics-toggle-btn"]'),
+      ).toHaveLength(1);
+    });
+
+    it.each(["service-graph", "services-catalog"] as const)(
+      "hides the pinned copy on the %s tab",
+      async (mode) => {
+        searchObjInstance.meta.searchMode = mode;
+        togglePin("histogram");
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(pinnedBtn().exists()).toBe(false);
+      },
+    );
+
+    it("shows the pinned copy below lg without a width budget", async () => {
+      useWidth(0);
+      breakpointState.lgUp = false;
+      togglePin("histogram");
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(pinnedBtn().exists()).toBe(true);
+      expect(savedViewsGroup().exists()).toBe(true);
+    });
+
+    it("falls back to More at a narrow lg width", async () => {
+      useWidth(300);
+      togglePin("histogram");
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(pinnedBtn().exists()).toBe(false);
+      expect(menuItem().exists()).toBe(true);
+    });
+
+    it.each([
+      [359, false],
+      [360, true],
+    ])(
+      "admits the pinned copy at width %i only when its full width fits: %s",
+      async (width, shown) => {
+        togglePin("savedViews");
+        togglePin("histogram");
+        useWidth(width);
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(pinnedBtn().exists()).toBe(shown);
+        expect(menuItem().exists()).toBe(true);
+      },
+    );
+
+    it("keeps RED Metrics before Saved Views when only one fits", async () => {
+      useWidth(400);
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(savedViewsGroup().exists()).toBe(true);
+
+      togglePin("histogram");
+      await flushPromises();
+      expect(pinnedBtn().exists()).toBe(true);
+      expect(savedViewsGroup().exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-bar-menu-saved-views-group"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("shrinks the toggle labels for the pinned RED Metrics width", async () => {
+      togglePin("savedViews");
+      togglePin("histogram");
+      useWidth(800);
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(pinnedBtn().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').text()).not.toContain(
+        "traces.spansTab",
+      );
+
+      togglePin("histogram");
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').text()).toContain(
+        "traces.spansTab",
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   describe("Drill down button", () => {
     const applySearch = () => {
       searchObjInstance.searchApplied = true;

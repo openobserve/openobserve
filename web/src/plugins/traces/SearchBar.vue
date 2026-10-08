@@ -108,6 +108,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
+          <OButton
+            v-if="showPinnedMetrics"
+            data-test="traces-search-bar-metrics-pinned-btn"
+            size="xs"
+            variant="outline"
+            class="gap-1.5"
+            @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
+            <OIcon name="bar-chart" size="sm" class="shrink-0" />
+            <OTooltip :content="t('traces.redMetrics')" />
+          </OButton>
+
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="traces-search-bar-saved-views"
@@ -195,13 +208,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             {{ t("traces.redMetrics") }}
             <template #icon-right>
-              <OSwitch
-                v-model="searchObj.meta.showHistogram"
-                size="md"
-                class="ms-auto"
-                data-test="traces-search-bar-show-metrics-toggle-btn"
-                @click.stop
-              />
+              <span class="ms-auto flex items-center gap-1">
+                <OSwitch
+                  v-model="searchObj.meta.showHistogram"
+                  size="md"
+                  data-test="traces-search-bar-show-metrics-toggle-btn"
+                  @click.stop
+                />
+                <OButton
+                  data-test="traces-search-bar-menu-pin-metrics-btn"
+                  variant="ghost-neutral"
+                  size="icon-sm"
+                  :title="
+                    isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('histogram')"
+                >
+                  <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </span>
             </template>
           </ODropdownItem>
 
@@ -1209,14 +1234,20 @@ export default defineComponent({
 
     // Approximate rendered widths of the Traces left-section items, used only to decide whether the pinned group fits.
     const TOOLBAR_ITEM_GAP = 6;
+    const METRICS_PINNED_WIDTH = 72 + TOOLBAR_ITEM_GAP;
     const SAVED_VIEWS_GROUP_WIDTH = 87 + TOOLBAR_ITEM_GAP;
     const TOGGLE_WIDTH = { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } };
     const DRILL_DOWN_WIDTH = { text: 97, icon: 36 };
     const RESET_WIDTH = { text: 72, icon: 36 };
     const MORE_WIDTH = 70;
 
+    const metricsPinned = computed(() => isSearchMode.value && isPinned("histogram"));
     const savedViewsPinned = computed(() => isSearchMode.value && isPinned("savedViews"));
-    const pinnedGroupWidth = computed(() => (savedViewsPinned.value ? SAVED_VIEWS_GROUP_WIDTH : 0));
+    const pinnedGroupWidth = computed(
+      () =>
+        (metricsPinned.value ? METRICS_PINNED_WIDTH : 0) +
+        (savedViewsPinned.value ? SAVED_VIEWS_GROUP_WIDTH : 0),
+    );
 
     // Traces-specific breakpoints, raised by the pinned group so labels shrink before it falls back into More.
     const shouldHideToggleText = computed(
@@ -1247,12 +1278,16 @@ export default defineComponent({
       return widths.reduce((sum, w) => sum + w, 0) + (widths.length - 1) * TOOLBAR_ITEM_GAP;
     });
 
-    // Below lg the bar wraps and availableLeftWidth reads ~0, so the pinned group needs no budget there.
-    const showPinnedSavedViews = computed(
-      () =>
-        savedViewsPinned.value &&
-        (!lgUp.value || availableLeftWidth.value >= leftBaseWidth.value + SAVED_VIEWS_GROUP_WIDTH),
-    );
+    // Below lg the bar wraps and availableLeftWidth reads ~0, so pinned items need no budget there.
+    const pinnedFit = computed(() => {
+      if (!lgUp.value) return { metrics: metricsPinned.value, savedViews: savedViewsPinned.value };
+      let budget = availableLeftWidth.value - leftBaseWidth.value;
+      const metrics = metricsPinned.value && budget >= METRICS_PINNED_WIDTH;
+      if (metrics) budget -= METRICS_PINNED_WIDTH;
+      return { metrics, savedViews: savedViewsPinned.value && budget >= SAVED_VIEWS_GROUP_WIDTH };
+    });
+    const showPinnedMetrics = computed(() => pinnedFit.value.metrics);
+    const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
 
     return {
       t,
@@ -1293,6 +1328,7 @@ export default defineComponent({
       isSearchMode,
       isPinned,
       togglePin,
+      showPinnedMetrics,
       showPinnedSavedViews,
       tracesSavedViews,
       isSavingView,

@@ -82,7 +82,33 @@ describe("useToolbarPins scopes", () => {
     const { useToolbarPins } = await importFresh();
     const { isPinned, pinnedItems } = useToolbarPins("traces");
     expect(isPinned("savedViews")).toBe(true);
+    expect(isPinned("histogram")).toBe(false);
     expect(pinnedItems.value).toEqual(["savedViews"]);
+  });
+
+  it("pins traces RED Metrics through the histogram key in canonical order", async () => {
+    const { useToolbarPins } = await importFresh();
+    const { togglePin, pinnedItems } = useToolbarPins("traces");
+    togglePin("histogram");
+    expect(pinnedItems.value).toEqual(["histogram", "savedViews"]);
+    expect(JSON.parse(window.localStorage.getItem("traces_toolbar_pinned_items")!)).toEqual([
+      "savedViews",
+      "histogram",
+    ]);
+    const fresh = await importFresh();
+    expect(fresh.useToolbarPins("traces").isPinned("histogram")).toBe(true);
+  });
+
+  it("keeps the traces and logs histogram pins independent", async () => {
+    const { useToolbarPins } = await importFresh();
+    useToolbarPins("traces").togglePin("histogram");
+    expect(useToolbarPins("traces").isPinned("histogram")).toBe(true);
+    useToolbarPins().togglePin("histogram");
+    expect(useToolbarPins().isPinned("histogram")).toBe(false);
+    expect(useToolbarPins("traces").isPinned("histogram")).toBe(true);
+    useToolbarPins("traces").togglePin("histogram");
+    expect(useToolbarPins("traces").isPinned("histogram")).toBe(false);
+    expect(useToolbarPins().isPinned("histogram")).toBe(false);
   });
 
   it("isolates scopes from each other", async () => {
@@ -130,8 +156,8 @@ describe("useToolbarPins scope keys", () => {
   it("ignores a key outside the scope's key list", async () => {
     const { useToolbarPins } = await importFresh();
     const traces = useToolbarPins("traces");
-    traces.togglePin("histogram");
-    expect(traces.isPinned("histogram")).toBe(false);
+    traces.togglePin("sqlMode");
+    expect(traces.isPinned("sqlMode")).toBe(false);
     expect(window.localStorage.getItem("traces_toolbar_pinned_items")).toBeNull();
   });
 });
