@@ -48,7 +48,7 @@ def test_js_builtin_replacement_does_not_leak_to_another_org(create_session, bas
     for _ in range(ROUNDS):
         _run(create_session, base_url, org_a, hook, {"n": 1})
     for _ in range(ROUNDS):
-        _run(create_session, base_url, org_b, "row.ran = true;", {"secret": SECRET})
+        _run(create_session, base_url, org_b, hook, {"secret": SECRET})
     later = [_run(create_session, base_url, org_a, hook, {"n": 2}) for _ in range(ROUNDS)]
 
     for event in later:
@@ -60,13 +60,16 @@ def test_js_builtin_replacement_does_not_leak_to_another_org(create_session, bas
 def test_js_global_object_property_does_not_leak_to_another_org(create_session, base_url, two_orgs):
     """A property one org's function adds to a global object must never be visible to another org."""
     org_a, org_b = two_orgs
-    writer = "JSON.stash = row.secret; row.ran = true;"
-    reader = "row.ran = true; row.leaked = (typeof JSON.stash !== 'undefined') ? JSON.stash : '';"
+    fn = (
+        "if (row.secret) { JSON.stash = row.secret; }"
+        "row.ran = true;"
+        "row.leaked = (typeof JSON.stash !== 'undefined') ? JSON.stash : '';"
+    )
     for _ in range(ROUNDS):
-        _run(create_session, base_url, org_a, writer, {"secret": SECRET})
+        _run(create_session, base_url, org_a, fn, {"secret": SECRET})
     for _ in range(ROUNDS):
-        event = _run(create_session, base_url, org_b, reader, {"n": 1})
+        event = _run(create_session, base_url, org_b, fn, {"n": 1})
         assert SECRET not in str(event.get("leaked", "")), f"org B saw a property set by org A: {event!r}"
     # unless org A reads its own property back, no two requests shared a thread and the check above proved nothing
-    own = [_run(create_session, base_url, org_a, reader, {"n": 1}).get("leaked") for _ in range(ROUNDS)]
+    own = [_run(create_session, base_url, org_a, fn, {"n": 1}).get("leaked") for _ in range(ROUNDS)]
     assert SECRET in own, f"org A's property never outlived a request: {own!r}"
