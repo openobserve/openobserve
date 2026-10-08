@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @onChangeInterval="onChangeInterval"
               @onChangeTimezone="refreshTimezone"
               @handleQuickModeChange="handleQuickModeChange"
+              :buildRunBlocked="buildRunBlocked"
               @handleRunQueryFn="handleRunQueryFn"
               @on-auto-interval-trigger="onAutoIntervalTrigger"
               @showSearchHistory="showSearchHistoryfn"
@@ -167,6 +168,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div
+                      v-else-if="searchObj.data.freeTextBlocked && searchObj.loading == false"
+                      class="h-full"
+                    >
+                      <LogsNoFtsPanel
+                        :streams="noFtsPanelStreams"
+                        @configure="onConfigureFreeTextStream"
+                      />
+                    </div>
+                    <div
                       v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
                       data-test="logs-search-error-state"
                     >
@@ -176,10 +186,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-detail="searchObj.data.errorDetail"
                         :ai-enabled="isAiEnabled"
                         :stream-name="searchObj.data.stream.selectedStream[0]"
+                        :free-text-candidate="recoveryCards.freeTextCandidate"
+                        :run-suggestion="recoveryCards.runSuggestion"
+                        :filter-mode="!searchObj.meta.sqlMode"
                         @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
                         @widen-range="onWidenRange"
+                        @search-text="onSearchText"
+                        @run-suggestion="onRunSuggestion"
                       />
                     </div>
                     <div v-else-if="showGuardEmptyState" class="h-full max-lg:overflow-y-auto">
@@ -201,10 +216,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
-                      class="h-full"
+                      class="flex h-full flex-col"
                       data-test="logs-search-no-events-found-text"
                     >
+                      <!-- With no rows the results grid is gone, so the exclusions banner moves here. -->
+                      <LogsMissingStreamBanner
+                        v-if="searchObj.data.missingStreamMessage"
+                        :message="searchObj.data.missingStreamMessage"
+                        :no-fts-streams="searchObj.data.freeTextExcluded ?? []"
+                      />
                       <LogsNoEventsState
+                        class="min-h-0 flex-1"
                         :sql-mode="searchObj.meta.sqlMode"
                         :query="searchObj.data.query"
                         :editor-value="searchObj.data.editorValue"
@@ -319,7 +341,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @search-job="onGuardSearchJob"
               @select-stream="onSelectStream"
             />
+            <LogsNoFtsPanel
+              v-if="
+                searchObj.data.freeTextBlocked && searchObj.meta.logsVisualizeToggle == 'visualize'
+              "
+              :streams="noFtsPanelStreams"
+              @configure="onConfigureFreeTextStream"
+            />
             <VisualizeLogsQuery
+              v-show="!searchObj.data.freeTextBlocked"
               class="min-h-0 flex-1"
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
@@ -455,7 +485,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
-              :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
+              :whereClause="buildWhereForBuild.where"
+              :freeTextFilter="buildWhereForBuild.freeText"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
@@ -559,6 +590,8 @@ import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
+import LogsNoFtsPanel from "@/plugins/logs/LogsNoFtsPanel.vue";
+import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import LogsAutoRunGuard from "@/plugins/logs/LogsAutoRunGuard.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -568,6 +601,15 @@ import {
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { isAuthoredStatement, renderPlan } from "@/utils/query/freeTextFilter";
+import {
+  buildFilterContext,
+  markFreeTextBlocked,
+  noFtsStreams,
+  planStreamsFilter,
+  recoveryCardsFor,
+  searchTextReplacement,
+} from "@/composables/useLogs/freeTextSearch";
 import { isAutoRunActive, type RunContext } from "@/composables/useLogs/useAutoRun";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -580,6 +622,8 @@ export default defineComponent({
     SearchResult: defineAsyncComponent(() => import("@/plugins/logs/SearchResult.vue")),
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
+    LogsNoFtsPanel,
+    LogsMissingStreamBanner,
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("@/plugins/traces/metrics/TracesAnalysisDashboard.vue"),
     ),
@@ -1484,6 +1528,7 @@ export default defineComponent({
     function handleOrganizationChange() {
       bumpSelectionToken();
       autoRun.engine.resetScope("org");
+      searchObj.meta.freeTextScan = {};
       searchObj.loading = true;
       resetStreamData();
       // The URL still names the previous org's stream; this is a landing in the new org (C20).
@@ -1524,6 +1569,7 @@ export default defineComponent({
 
       try {
         if (sqlMode) {
+          searchObj.data.freeTextBlocked = null;
           let selectFields = "";
           let whereClause = "";
           let currentQuery = searchObj.data.query;
@@ -1532,8 +1578,27 @@ export default defineComponent({
             currentQuery != "" &&
             (currentQuery.toLowerCase() === "select" ||
               currentQuery.toLowerCase().indexOf("select ") == 0);
-          //check if user try to applied saved views in which sql mode is enabled.
-          if (currentQuery.toLowerCase().indexOf("select") >= 0) {
+          // An authored statement is kept as typed; text that merely contains "select" is a filter.
+          if (isAuthoredStatement(currentQuery)) {
+            return;
+          }
+
+          const toggleStreams: string[] = searchObj.data.stream.selectedStream;
+          const toggleCtx = buildFilterContext(searchObj, store.state.zoConfig);
+          const togglePlan = planStreamsFilter(currentQuery.trim(), toggleStreams, toggleCtx);
+          const textWhere =
+            togglePlan.kind === "freeText"
+              ? toggleStreams.map((stream) =>
+                  renderPlan(togglePlan, toggleCtx.targets[stream], toggleCtx.knownFields),
+                )
+              : null;
+          if (textWhere?.some((where) => where === null)) {
+            // A no-FTS arm would fail or be dropped, so the toggle is refused (AC6.3).
+            const blocked = toggleStreams.filter((_, index) => textWhere[index] === null);
+            searchObj.meta.sqlModeEditTransition = true;
+            searchObj.meta.sqlMode = false;
+            markFreeTextBlocked(searchObj, blocked, togglePlan);
+            showErrorNotification(t("search.freeTextChooseFirst"));
             return;
           }
 
@@ -1571,7 +1636,8 @@ export default defineComponent({
               if (index > 0) {
                 searchObj.data.query += " UNION ALL BY NAME ";
               }
-              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
+              const armWhere = textWhere ? `WHERE ${textWhere[index]}` : whereClause;
+              searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${armWhere}`;
             });
 
             if (
@@ -1825,6 +1891,58 @@ export default defineComponent({
       if (stream) {
         router.push(`/streams?dialog=${stream}`);
       }
+    };
+
+    // Build gets the rendered WHERE, so a text search is never parsed as a column.
+    const buildRunBlocked = computed(
+      () =>
+        searchObj.meta.logsVisualizeToggle === "build" &&
+        !!(buildQueryPageRef.value as { runBlocked?: boolean } | null)?.runBlocked,
+    );
+
+    const buildWhereForBuild = computed(() => {
+      if (searchObj.meta.sqlMode) return { where: "", freeText: false };
+      const raw = searchObj.data.query ?? "";
+      const stream = searchObj.data.stream.selectedStream?.[0];
+      const ctx = buildFilterContext(searchObj, store.state.zoConfig);
+      const plan = stream ? planStreamsFilter(raw.trim(), [stream], ctx) : null;
+      if (!stream || plan?.kind !== "freeText") return { where: raw, freeText: false };
+      const target = ctx.targets[stream];
+      return {
+        where: target ? (renderPlan(plan, target, ctx.knownFields) ?? "") : "",
+        freeText: true,
+      };
+    });
+
+    // Only routes to the stream settings; nothing is written from the logs page.
+    const onConfigureFreeTextStream = (stream: string) => {
+      router.push(`/streams?dialog=${stream}`);
+    };
+
+    const noFtsPanelStreams = computed(() =>
+      searchObj.data.freeTextBlocked ? noFtsStreams(searchObj, store.state.zoConfig) : [],
+    );
+
+    const recoveryCards = computed(() =>
+      searchObj.data.errorMsg !== ""
+        ? recoveryCardsFor(searchObj, store.state.zoConfig)
+        : { runSuggestion: null, freeTextCandidate: null },
+    );
+
+    // Recovery text is SQL (match_all) or a quoted phrase, so later runs send it verbatim.
+    const runRecoveryFilter = (text: string) => {
+      searchObj.data.query = text;
+      searchObj.data.editorValue = text;
+      searchBarRef.value?.updateQuery?.();
+      searchBarRef.value?.handleRunQueryFn?.();
+    };
+
+    const onSearchText = (text: string) => {
+      runRecoveryFilter(searchTextReplacement(text, searchObj, store.state.zoConfig));
+    };
+
+    const onRunSuggestion = (suggestion: string) => {
+      runRecoveryFilter(suggestion);
     };
 
     function removeFieldByName(data, fieldName) {
@@ -2820,6 +2938,7 @@ export default defineComponent({
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
+        if (buildRunBlocked.value) return false;
         // Validate query before running - only block if in custom query mode with empty query.
         // In builder mode (non-custom), BuildQueryPage generates the query automatically.
         const isCustomQueryMode = buildDashboardPanelData.data.queries[0]?.customQuery === true;
@@ -2847,7 +2966,8 @@ export default defineComponent({
         }
 
         // Trigger PanelEditor's runQuery
-        buildQueryPageRef.value?.runQuery(clear_cache, generationId);
+        const launched = await buildQueryPageRef.value?.runQuery(clear_cache, generationId);
+        if (!launched) return false;
 
         // Sync build config to URL parameters
         updateUrlQueryParams(null, buildQueryPageRef.value?.dashboardPanelData);
@@ -3092,6 +3212,12 @@ export default defineComponent({
         // return if query is empty and stream is not selected
         if (logsPageQuery === "" && searchObj?.data?.stream?.selectedStream?.length === 0) {
           showErrorNotification(t("search.queryEmptyToVisualize"));
+          variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
+          return null;
+        }
+
+        // Blocked text shows the no-FTS panel in the Visualize pane instead of a toast.
+        if (logsPageQuery === "" && searchObj.data.freeTextBlocked) {
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
         }
@@ -3548,6 +3674,13 @@ export default defineComponent({
       onGuardRunAnyway,
       onGuardNarrow,
       onGuardSearchJob,
+      onConfigureFreeTextStream,
+      noFtsPanelStreams,
+      recoveryCards,
+      onSearchText,
+      onRunSuggestion,
+      buildWhereForBuild,
+      buildRunBlocked,
       t,
       store,
       router,

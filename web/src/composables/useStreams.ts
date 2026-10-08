@@ -370,9 +370,13 @@ const useStreams = (t: TranslateFn) => {
 
   function removeSchemaFields(streamData: any) {
     if (streamData.schema) {
-      streamData.schema = streamData.schema.filter((field: any) => {
-        return field.name != "_o2_id" && field.name != "_original" && field.name != "_all_values";
-      });
+      const isRemoved = (field: any) =>
+        field.name == "_o2_id" || field.name == "_original" || field.name == "_all_values";
+      // Free-text search still needs the removed text columns, which the backend counts as FTS fields.
+      streamData.removedSchemaFields = streamData.schema
+        .filter(isRemoved)
+        .map((field: any) => ({ name: field.name, type: field.type }));
+      streamData.schema = streamData.schema.filter((field: any) => !isRemoved(field));
     }
     return streamData;
   }

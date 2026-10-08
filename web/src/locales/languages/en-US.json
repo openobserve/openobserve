@@ -1303,7 +1303,20 @@
     "aliasNotAllowed": "Alias '{alias}' is not allowed.",
     "commonGroupFields": "Common Group Fields",
     "queryRangeHours": "{count} hour | {count} hours",
-    "menuGroupAlerts": "Alerts"
+    "menuGroupAlerts": "Alerts",
+    "freeTextChooseFirst": "Choose how to search text first",
+    "freeTextScanLogsOnly": "Scan mode works in the logs view only; set a full-text field to use text search here",
+    "freeTextSearchedFields": "Full-text search in: {fields}",
+    "freeTextRunsAs": "Runs as {sql}",
+    "freeTextNotSearched": "Not searched: {streams} (no full-text fields).",
+    "freeTextSetField": "Set a full-text field",
+    "freeTextSetFieldDesc": "Makes word search fast for this stream. Requires permission to edit stream settings.",
+    "freeTextNoFtsTitle": "\"{stream}\" has no full-text fields",
+    "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
+    "freeTextNoFtsDesc": "Words are searched in full-text fields such as body, log or message. This stream has none.",
+    "freeTextNoTextFields": "This stream has no text fields to search.",
+    "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
   },
   "menu": {
     "upgradeToProPlan": "Upgrade to PRO Plan",
@@ -14989,7 +15002,10 @@
     "traceId": "Trace ID:",
     "askAi": "Ask AI to fix my query",
     "showDetail": "Show details",
-    "hideDetail": "Hide details"
+    "hideDetail": "Hide details",
+    "runAs": "Run as",
+    "searchTextFor": "Search text for \"{text}\"",
+    "searchTextDesc": "Search the whole input as one phrase"
   },
   "refreshButton": {
     "justNow": "just now",

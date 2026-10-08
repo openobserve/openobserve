@@ -31,6 +31,8 @@ interface Options {
   noStreamText?: string;
   /** When true, all example queries containing match_all() are omitted (e.g. traces page). */
   excludeMatchAll?: boolean;
+  /** Logs only: filter mode searches bare words, so its examples lead with them. */
+  freeText?: boolean;
 }
 
 const SYSTEM_FIELDS = new Set(["_timestamp", "_all", "_stream"]);
@@ -156,9 +158,18 @@ export function useQueryPlaceholder(
       return result;
     }
 
+    const term = ff0 ? ftsVal(ff0) : "error";
+    if (options.freeText) {
+      return freeTextExamples(
+        kf0 ? fieldExpr(kf0) : null,
+        term,
+        sf0 ? `str_match(${sf0.name}, '${strVal(sf0)}')` : null,
+        options,
+      );
+    }
+
     // Filter mode — interleaved variations covering raw filters, match_all, and other functions
     const result: string[] = [];
-    const term = ff0 ? ftsVal(ff0) : "error";
 
     // 1. Simple raw filter
     if (kf0) result.push(fieldExpr(kf0));
@@ -231,5 +242,19 @@ export function useQueryPlaceholder(
     placeholder.value = "";
   });
 
-  return { placeholder };
+  return { placeholder, examples };
+}
+
+// A text+field example always carries an explicit AND match_all, since an implicit mix is sent as SQL and errors.
+function freeTextExamples(
+  fieldFilter: string | null,
+  term: string,
+  strMatch: string | null,
+  options: Options,
+): string[] {
+  const result = ["timeout", '"connection refused"'];
+  if (fieldFilter) result.push(fieldFilter, `${fieldFilter} AND match_all('timeout')`);
+  result.push(`match_all('${term}*')`);
+  if (strMatch) result.push(strMatch);
+  return options.excludeMatchAll ? result.filter((q) => !q.includes("match_all")) : result;
 }

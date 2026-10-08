@@ -32,6 +32,7 @@ import {
   extractFilters,
   extractTableName,
   parseWhereClauseToFilter,
+  parseWhereClauseToFilterChecked,
   extractWhereClause,
 } from "./sqlUtils";
 
@@ -3720,6 +3721,41 @@ describe("sqlUtils", () => {
     it("should handle floating point precision", async () => {
       const result = formatValue("3.141592653589793238462643383279502884197");
       expect(result).toBe("'3.141592653589793238462643383279502884197'");
+    });
+  });
+
+  describe("parseWhereClauseToFilterChecked (logs Build tab, AC6.6)", () => {
+    const matchAll = (value: string) => ({
+      type: "function",
+      name: { name: [{ value: "match_all" }] },
+      args: { type: "expr_list", value: [{ type: "single_quote_string", value }] },
+    });
+
+    it("is complete when every text unit becomes a condition", async () => {
+      mockAstify.mockReturnValue({
+        where: { type: "binary_expr", operator: "AND", left: matchAll("a"), right: matchAll("b") },
+      });
+      const { filter, complete } = await parseWhereClauseToFilterChecked(
+        "match_all('a') AND match_all('b')",
+      );
+      expect(complete).toBe(true);
+      expect(filter.conditions.map((c: any) => c.operator)).toEqual(["match_all", "match_all"]);
+    });
+
+    it("is incomplete when the builder drops a node, such as NOT", async () => {
+      mockAstify.mockReturnValue({
+        where: { type: "unary_expr", operator: "NOT", expr: matchAll("a") },
+      });
+      expect((await parseWhereClauseToFilterChecked("NOT match_all('a')")).complete).toBe(false);
+    });
+
+    it("is incomplete when the parser rejects the text, and complete when empty", async () => {
+      mockAstify.mockImplementation(() => {
+        throw new Error("parse");
+      });
+      expect((await parseWhereClauseToFilterChecked("a(")).complete).toBe(false);
+      expect((await parseWhereClauseToFilterChecked("")).complete).toBe(true);
+      mockAstify.mockReset();
     });
   });
 

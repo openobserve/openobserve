@@ -96,6 +96,7 @@
         :suggestions="suggestions"
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
+        :free-text-decorations="freeTextDecorations ?? null"
         @update:query="handleQueryUpdate"
         @user-edit="emit('user-edit')"
         @run-query="emit('run-query')"
@@ -167,6 +168,7 @@ interface Props {
   suggestions?: any[]; // Autocomplete suggestions for Monaco
   fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
+  freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: string } | null;
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)

@@ -19,6 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default relative h-full w-full border-t"
     data-test="logs-build-query-page"
   >
+    <div
+      v-if="freeTextNotice"
+      class="bg-status-info-bg text-status-info-text flex items-center gap-2 px-3 py-2 text-xs"
+      data-test="logs-build-free-text-notice"
+    >
+      <OIcon name="info" size="sm" />
+      <span>{{ t("search.freeTextBuildNotice") }}</span>
+    </div>
     <!-- PanelEditor with BUILD_PRESET -->
     <PanelEditor
       ref="panelEditorRef"
@@ -54,7 +62,8 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
-import { parseWhereClauseToFilter } from "@/utils/query/sqlUtils";
+import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useNotifications from "@/composables/useNotifications";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
@@ -126,6 +135,8 @@ interface Props {
   isSqlMode?: boolean;
   /** Raw WHERE clause text from non-SQL mode */
   whereClause?: string;
+  /** The WHERE was rendered from a text search, so dropping any part of it would widen the query. */
+  freeTextFilter?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -135,6 +146,7 @@ const props = withDefaults(defineProps<Props>(), {
   isFirstToggle: true,
   isSqlMode: true,
   whereClause: "",
+  freeTextFilter: false,
 });
 
 // Emits
@@ -157,6 +169,13 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
+const freeTextNotice = ref(false);
+const needsFilterInit = () =>
+  !props.isSqlMode && (!!props.whereClause?.trim() || props.freeTextFilter);
+// Until the search bar's filter is in the builder, the panel holds the stream with no WHERE.
+const filterInitPending = ref(needsFilterInit());
+// The editor's own interim queries carry no text search; synced back, they would erase the user's filter.
+const holdGeneratedQuery = ref(!props.isSqlMode && props.freeTextFilter);
 
 // Get dashboard panel data for build page
 const {
@@ -166,6 +185,15 @@ const {
   makeAutoSQLQuery,
   validatePanel,
 } = useDashboardPanelData("build", t);
+
+// A builder run before the filter lands, or while the text search cannot be held, runs unfiltered (AC6.6).
+const runBlocked = computed(
+  () =>
+    filterInitPending.value ||
+    (freeTextNotice.value && !dashboardPanelData.data.queries[0]?.customQuery),
+);
+// A newer initialisation owns the panel; an older one resuming after an await must not write to it.
+let initSeq = 0;
 
 const { showErrorNotification } = useNotifications();
 const { searchObj } = searchState();
@@ -220,6 +248,10 @@ const restoreConfigFromUrl = (): {
 // ============================================================================
 
 const initializeFromQuery = async () => {
+  const seq = ++initSeq;
+  freeTextNotice.value = false;
+  filterInitPending.value = needsFilterInit();
+  holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
   // Reset panel data first
   resetDashboardPanelData();
 
@@ -260,6 +292,8 @@ const initializeFromQuery = async () => {
     urlConfig.fields &&
     (urlConfig.fields.x?.length || urlConfig.fields.y?.length || urlConfig.customQuery)
   ) {
+    holdGeneratedQuery.value = false;
+    filterInitPending.value = false;
     const savedFields = urlConfig.fields;
     dashboardPanelData.data.queries[0].fields.stream =
       savedFields.stream || props.selectedStream || "";
@@ -301,10 +335,14 @@ const initializeFromQuery = async () => {
   // When SQL mode is OFF, always use builder mode with histogram/count fields
   // and carry over the WHERE clause as a filter
   if (!props.isSqlMode) {
+    // Read before any await, since the parent re-derives both from the search bar text.
+    const whereClause = props.whereClause;
+    const freeTextFilter = props.freeTextFilter;
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
       dashboardPanelData.data.queries[0].fields.stream_type = "logs";
       await updateGroupedFields();
+      if (seq !== initSeq) return;
     }
 
     dashboardPanelData.data.queries[0].customQuery = false;
@@ -314,14 +352,25 @@ const initializeFromQuery = async () => {
     dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
 
     // Parse WHERE clause into builder filter
-    if (props.whereClause?.trim()) {
-      const filter = await parseWhereClauseToFilter(props.whereClause);
+    if (whereClause?.trim() || freeTextFilter) {
+      const { filter, complete } = await parseWhereClauseToFilterChecked(whereClause);
+      if (seq !== initSeq) return;
+      // A text search the builder cannot hold would otherwise run unfiltered (AC6.6).
+      if (freeTextFilter && (!whereClause?.trim() || !complete)) {
+        freeTextNotice.value = true;
+        filterInitPending.value = false;
+        emit("initialized");
+        return;
+      }
       dashboardPanelData.data.queries[0].fields.filter = filter;
     }
+    filterInitPending.value = false;
+    holdGeneratedQuery.value = false;
 
     emit("initialized");
 
     const generatedQuery = await makeAutoSQLQuery();
+    if (seq !== initSeq) return;
     if (generatedQuery !== undefined) {
       emit("queryGenerated", generatedQuery);
     }
@@ -515,6 +564,7 @@ watch(
 // ============================================================================
 
 const onQueryGenerated = (query: string) => {
+  if (holdGeneratedQuery.value || freeTextNotice.value) return;
   // Forward the generated query to parent (Index.vue -> SearchBar)
   emit("queryGenerated", query);
 };
@@ -545,10 +595,19 @@ onMounted(() => {
 /**
  * Run the query in PanelEditor
  */
-const runQuery = async (withoutCache?: boolean, generationId?: number) => {
+const runQuery = async (withoutCache?: boolean, generationId?: number): Promise<boolean> => {
+  if (runBlocked.value) return false;
   // Build's own runs (init, apply) open their generation here; Run passes the one it opened.
   const panelGenerationId =
     generationId ?? autoRun.openPanelRun(() => panelEditorRef.value?.cancelRunningQuery?.());
+  // A re-initialisation can start during the awaits below and empty the filter again.
+  const abandon = () => {
+    // The caller closes a generation it passed in; one opened here has nobody else to close it.
+    if (generationId == null && autoRun.hasPanelRun(panelGenerationId)) {
+      autoRun.endPanelRun(false);
+    }
+    return false;
+  };
   // Sync latest datetime from parent before running the query
   if (props.selectedDateTime) {
     dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
@@ -558,10 +617,12 @@ const runQuery = async (withoutCache?: boolean, generationId?: number) => {
   if (!dashboardPanelData.data.queries[0].customQuery) {
     if (!dashboardPanelData.meta.streamFields?.groupedFields?.length) {
       await updateGroupedFields();
+      if (runBlocked.value) return abandon();
     }
     // Generate SQL query after stream fields are loaded
     // The watcher won't fire because only streamFields changed, not the watched fields
     const generatedQuery = await makeAutoSQLQuery();
+    if (runBlocked.value) return abandon();
     if (generatedQuery !== undefined) {
       emit("queryGenerated", generatedQuery);
     }
@@ -570,10 +631,12 @@ const runQuery = async (withoutCache?: boolean, generationId?: number) => {
   panelEditorRef.value?.runQuery(withoutCache);
   // The editor copied its config synchronously above; that copy is what this run certifies.
   autoRun.markPanelDispatched(panelGenerationId);
+  return true;
 };
 
 defineExpose({
   runQuery,
+  runBlocked,
   panelEditorRef,
   dashboardPanelData,
 });

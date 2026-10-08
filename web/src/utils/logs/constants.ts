@@ -172,9 +172,13 @@ export const DEFAULT_LOGS_CONFIG = {
     runOutcome: {} as any,
     editorDirty: false,
     nlDetected: false,
+    freeTextScan: {} as any,
   },
   data: {
     query: "" as any,
+    freeTextBlocked: null as any,
+    freeTextExcluded: [] as string[],
+    freeTextDecorations: null as any,
     histogramQuery: "" as any,
     parsedQuery: {} as any,
     countErrorMsg: "",

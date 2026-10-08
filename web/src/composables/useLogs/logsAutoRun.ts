@@ -46,6 +46,7 @@ import {
   type WindowUs,
 } from "@/utils/logs/estimateScanMb";
 import { sqlSources } from "@/utils/logs/sqlSources";
+import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
 
 export interface TransportPayload {
   traceId: string;
@@ -134,6 +135,7 @@ export function readLogsSignature(searchObj: SearchObject): LogsSignature {
   const meta = searchObj.meta ?? {};
   const data = searchObj.data;
   const datetime = data.datetime ?? {};
+  const scan = meta.freeTextScan ?? {};
   const superCluster = config.isEnterprise === "true" && !!zoConfig().super_cluster_enabled;
   return buildLogsSignature({
     query: String(data.query ?? "").trim(),
@@ -158,6 +160,8 @@ export function readLogsSignature(searchObj: SearchObject): LogsSignature {
     refreshInterval: Number(meta.refreshInterval ?? 0),
     sortOrder: "desc",
     definedSchemas: String(meta.useUserDefinedSchemas ?? ""),
+    // Absent while empty, so signatures recorded before any scan consent keep their key.
+    freeTextScan: Object.keys(scan).length ? scan : undefined,
   });
 }
 
@@ -207,6 +211,9 @@ function createLogsAutoRun() {
   const searchAroundShown = ref(false);
 
   const traceGeneration = new Map<string, number>();
+  // Stop on a text-field scan bumps this; responses dispatched before it never render.
+  let freeTextScanEpoch = 0;
+  const generationEpoch = new Map<number, number>();
   const pendingLaunches = new Map<number, number>();
   const hitsDone = new Set<number>();
 
@@ -270,6 +277,7 @@ function createLogsAutoRun() {
       };
     },
     rearmRefresh: () => rearm?.(),
+    getFreeTextFlags: () => freeTextGateFlags(searchObj(), (key) => gt(key as I18nKey)),
     readPanelConfigSignature: (surface) => {
       if (!panelConfigReader) return null;
       return panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()));
@@ -292,6 +300,7 @@ function createLogsAutoRun() {
     if (hasOpenTrace(generationId) || (pendingLaunches.get(generationId) ?? 0) > 0) return;
     hitsDone.delete(generationId);
     pendingLaunches.delete(generationId);
+    generationEpoch.delete(generationId);
     engine.settleGeneration(generationId);
   }
 
@@ -302,6 +311,7 @@ function createLogsAutoRun() {
     const role = ROLE_BY_TYPE[payload.type] ?? "other";
     if (!engine.registerTrace(generationId, payload.traceId, role)) return false;
     traceGeneration.set(payload.traceId, generationId);
+    if (!generationEpoch.has(generationId)) generationEpoch.set(generationId, freeTextScanEpoch);
     if (payload.type === "search") {
       searchAroundShown.value = false;
       engine.recordDispatch(generationId, {
@@ -315,7 +325,23 @@ function createLogsAutoRun() {
 
   function isPayloadCurrent(payload: TransportPayload): boolean {
     const generationId = generationOf(payload);
-    return generationId == null || engine.isCurrent(generationId);
+    if (generationId == null) return true;
+    const epoch = generationEpoch.get(generationId) ?? freeTextScanEpoch;
+    return epoch === freeTextScanEpoch && engine.isCurrent(generationId);
+  }
+
+  /** Stop on one stream's text-field scan: drops its consent and every row the scan produced (AC3.6). */
+  function stopFreeTextScan(stream: string): void {
+    freeTextScanEpoch += 1;
+    engine.cancelGeneration(null, { cause: "user" });
+    const obj = searchObj();
+    const scan = { ...(obj.meta.freeTextScan ?? {}) };
+    delete scan[stream];
+    obj.meta.freeTextScan = scan;
+    invalidateExecuted("scan-stop");
+    if ((obj.data.stream?.selectedStream?.length ?? 0) > 1) {
+      engine.requestRun("explicit", { origin: "scan-stop" });
+    }
   }
 
   function onPayloadData(payload: TransportPayload, responseType: string | undefined): void {
@@ -523,6 +549,7 @@ function createLogsAutoRun() {
     finishDispatch,
     adoptHandOver,
     invalidateExecuted,
+    stopFreeTextScan,
     recordWindowMove,
     persistReason,
     searchAroundActive,

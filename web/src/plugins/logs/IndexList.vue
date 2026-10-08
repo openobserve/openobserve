@@ -297,6 +297,7 @@ import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs
 import { compareStreamsByLatest } from "@/utils/logs/estimateScanMb";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { filterForParsing, freeTextWhereByStream } from "@/composables/useLogs/freeTextSearch";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -516,12 +517,22 @@ export default defineComponent({
      *
      * Used to pre-check the corresponding checkboxes (blue) in the field sidebar.
      */
+    const sidebarFieldNames = computed(
+      () =>
+        new Set<string>([
+          ...searchObj.data.stream.selectedStream,
+          ...searchObj.data.stream.selectedStreamFields.map((field: any) => field.name),
+        ]),
+    );
+
     const activeIncludeFilterValues = computed((): Record<string, string[]> => {
       const result: Record<string, string[]> = {};
       const query = searchObj.data.query;
       if (!query) return result;
       try {
-        const queryToParse = searchObj.meta.sqlMode ? query : `select * from stream where ${query}`;
+        const queryToParse = searchObj.meta.sqlMode
+          ? query
+          : `select * from stream where ${filterForParsing(query, sidebarFieldNames.value)}`;
         const parsed = fnParsedSQL(queryToParse);
         if (!parsed?.where) return result;
         const walkNode = (node: any) => {
@@ -570,7 +581,9 @@ export default defineComponent({
       const query = searchObj.data.query;
       if (!query) return result;
       try {
-        const queryToParse = searchObj.meta.sqlMode ? query : `select * from stream where ${query}`;
+        const queryToParse = searchObj.meta.sqlMode
+          ? query
+          : `select * from stream where ${filterForParsing(query, sidebarFieldNames.value)}`;
         const parsed = fnParsedSQL(queryToParse);
         if (!parsed?.where) return result;
         const walkNode = (node: any) => {
@@ -1044,9 +1057,14 @@ export default defineComponent({
           }
         }
 
+        const textWhere = freeTextWhereByStream(searchObj, store.state.zoConfig);
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
+          }
+          if (textWhere) {
+            const where = textWhere.get(selectedStream) ?? "";
+            query_context = `SELECT * FROM "[INDEX_NAME]"${where ? ` WHERE ${where}` : ""}`;
           }
           if (
             searchObj.data.stream.selectedStream.length > 1 &&

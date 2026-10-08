@@ -453,13 +453,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
           <!-- Missing-stream warning banner -->
-          <div
+          <LogsMissingStreamBanner
             v-if="!searchObj.loading && searchObj.data.missingStreamMessage"
-            class="px-page-edge text-status-warning-text bg-status-warning-bg flex items-center gap-2 py-2 text-xs"
-          >
-            <OIcon name="warning" size="sm" />
-            <span>{{ searchObj.data.missingStreamMessage }}</span>
-          </div>
+            :message="searchObj.data.missingStreamMessage"
+            :no-fts-streams="searchObj.data.freeTextExcluded ?? []"
+          />
           <!-- VRL function-error banner (collapsible) -->
           <div
             v-if="!searchObj.loading && searchObj?.data?.functionError"
@@ -865,6 +863,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { severityIndicatorColor, severityRowClass } from "@/utils/logs/statusParser";
@@ -898,6 +897,7 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
     CellActions,
+    LogsMissingStreamBanner,
     O2AIContextAddBtn,
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     TelemetryCorrelationDashboard,

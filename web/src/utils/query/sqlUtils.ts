@@ -736,6 +736,23 @@ function parseCondition(condition: any) {
   }
 }
 
+function countWhereLeaves(node: any): number {
+  if (!node) return 0;
+  if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
+    return countWhereLeaves(node.left) + countWhereLeaves(node.right);
+  }
+  return 1;
+}
+
+function countFilterConditions(filter: any): number {
+  if (!filter) return 0;
+  if (filter.filterType === "condition") return 1;
+  return (filter.conditions ?? []).reduce(
+    (total: number, child: any) => total + countFilterConditions(child),
+    0,
+  );
+}
+
 function convertWhereToFilter(where: any) {
   try {
     if (!where) {
@@ -1293,6 +1310,20 @@ export const parseWhereClauseToFilter = async (
     };
   } catch {
     return defaultFilter;
+  }
+};
+
+/** parseWhereClauseToFilter plus whether every predicate survived; a dropped one would widen the query. */
+export const parseWhereClauseToFilterChecked = async (
+  whereClauseText: string,
+): Promise<{ filter: Awaited<ReturnType<typeof parseWhereClauseToFilter>>; complete: boolean }> => {
+  const filter = await parseWhereClauseToFilter(whereClauseText);
+  if (!whereClauseText?.trim()) return { filter, complete: true };
+  try {
+    const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
+    return { filter, complete: countWhereLeaves(ast?.where) === countFilterConditions(filter) };
+  } catch {
+    return { filter, complete: false };
   }
 };
 
