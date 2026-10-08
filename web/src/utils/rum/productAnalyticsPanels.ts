@@ -31,8 +31,15 @@ interface AxisField {
   label: I18nText;
 }
 
-export const stepLabel = (step: StepRef, events: NamedEvent[]): string =>
-  step.kind === "e" ? (events.find((e) => e.id === step.key)?.name ?? step.key) : step.key;
+/** `deletedNames` is consulted only once the id is confirmed absent from `events`. */
+export const stepLabel = (
+  step: StepRef,
+  events: NamedEvent[],
+  deletedNames: Readonly<Record<string, string>> = {},
+): string =>
+  step.kind === "e"
+    ? (events.find((e) => e.id === step.key)?.name ?? deletedNames[step.key] ?? step.key)
+    : step.key;
 
 const axis = (alias: string, label: I18nText): AxisField => ({
   alias,

@@ -322,6 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :sampled="1"
               :events="events"
               :events-status="eventsStatus"
+              :deleted-names="namedEvents.deletedNames.value"
               :unit-label="unitLabel"
               :unit-noun="unitNoun"
               :hide-time="!!def.breakdown"
@@ -562,7 +563,9 @@ const step1Empty = computed(
     !firstStepDeleted.value,
 );
 const firstLabel = computed(() =>
-  def.value.steps[0] ? stepLabel(def.value.steps[0], events.value) : "",
+  def.value.steps[0]
+    ? stepLabel(def.value.steps[0], events.value, namedEvents.deletedNames.value)
+    : "",
 );
 
 const suggestions = computed(() =>
@@ -629,6 +632,19 @@ const openAlert = () => {
 };
 
 const org = () => pa.toQuery().org_identifier as string;
+
+// Once the live list says a step's event is gone, its last known name is worth a lookup.
+watch(
+  () => [def.value.steps, eventsStatus.value] as const,
+  () => {
+    if (eventsStatus.value !== "ready") return;
+    const missing = def.value.steps
+      .filter((s) => s.kind === "e" && !events.value.some((e) => e.id === s.key))
+      .map((s) => s.key);
+    if (missing.length) void namedEvents.resolveDeletedNames(org(), missing);
+  },
+  { immediate: true, deep: true },
+);
 
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {

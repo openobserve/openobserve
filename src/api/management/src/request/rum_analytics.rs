@@ -28,8 +28,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
     rum_pa::{
-        CreateFunnel, CreateNamedEvent, FunnelRefList, NamedEvent, NamedEventList, RumPaError,
-        RumPaErrorBody, SavedFunnel, SavedFunnelList, UpdateFunnel, UpdateNamedEvent,
+        CreateFunnel, CreateNamedEvent, FunnelRefList, NamedEvent, NamedEventList, NamedEventRefList,
+        RumPaError, RumPaErrorBody, SavedFunnel, SavedFunnelList, UpdateFunnel, UpdateNamedEvent,
         service::{self, Scope},
         validate_app, validate_id,
     },
@@ -237,6 +237,48 @@ pub async fn delete_named_event(Path((org_id, id)): Path<(String, String)>, quer
     let db = infra::db::get_orm_client_rw().await;
     match service::delete_event(db, scope(&org_id, &app), &id, force).await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => error_response(e),
+    }
+}
+
+/// At most this many ids are resolved per call, so a crafted query cannot force an unbounded scan.
+const MAX_DELETED_NAMES_IDS: usize = 100;
+
+#[derive(Debug, Default, Deserialize)]
+pub struct IdsQuery {
+    #[serde(default)]
+    pub ids: Option<String>,
+}
+
+type IdsQ = Result<Query<IdsQuery>, QueryRejection>;
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/rum/analytics/named_events/deleted_names",
+    context_path = "/api",
+    tag = "Product Analytics",
+    operation_id = "ListRumDeletedNamedEventNames",
+    summary = "The last known names of deleted named events",
+    description = "Resolves the names deleted named events had just before deletion, for ids among a comma-separated list; an id never deleted, or deleted before this capture existed, is simply absent from the result.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("ids" = String, Query, description = "Comma-separated named event ids"),
+    ),
+    responses(
+        (status = 200, description = "Success", body = NamedEventRefList),
+        (status = 500, description = "Internal error", body = RumPaErrorBody),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "RUM Product Analytics", "operation": "list"})),
+        ("x-o2-mcp" = json!({"description": "Resolve the last known names of deleted RUM named events", "category": "rum"}))
+    )
+)]
+pub async fn deleted_event_names(Path(org_id): Path<String>, query: IdsQ) -> Response {
+    let ids = ids_of(&query);
+    let db = infra::db::get_orm_client_rw().await;
+    match service::deleted_event_names(db, &org_id, &ids).await {
+        Ok(list) => Json(NamedEventRefList { list }).into_response(),
         Err(e) => error_response(e),
     }
 }
@@ -495,6 +537,23 @@ fn flag<'de, D: serde::Deserializer<'de>>(de: D) -> Result<bool, D::Error> {
     Ok(raw.is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true")))
 }
 
+/// Never fails: a missing, empty or malformed `ids` reads as none. Deduplicated and capped.
+fn ids_of(query: &IdsQ) -> Vec<String> {
+    let raw = query
+        .as_ref()
+        .ok()
+        .and_then(|Query(q)| q.ids.clone())
+        .unwrap_or_default();
+    let mut seen = std::collections::HashSet::new();
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && validate_id(s).is_ok())
+        .filter(|s| seen.insert(*s))
+        .take(MAX_DELETED_NAMES_IDS)
+        .map(str::to_string)
+        .collect()
+}
+
 /// A rejected body is a JSON `invalid_body`, never axum's plain-text 422.
 fn body_of<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, RumPaError> {
     body.map(|Json(body)| body)
@@ -682,5 +741,27 @@ mod tests {
         for no in ["", "&force=false", "&force=0", "&force=", "&force=yes"] {
             assert!(!force(no), "{no}");
         }
+    }
+
+    #[test]
+    fn ids_are_parsed_deduplicated_and_never_rejected() {
+        const A: &str = "2A7YeEEBY3ABp3e2zS8iq9y7Ajz";
+        const B: &str = "2kY9pF34Qy6nB3Wwd25rq4f5zr3";
+        let parse = |qs: &str| {
+            let uri: axum::http::Uri = format!("/x{qs}").parse().unwrap();
+            let query: IdsQ = Ok(Query::<IdsQuery>::try_from_uri(&uri).unwrap());
+            ids_of(&query)
+        };
+        assert_eq!(parse(&format!("?ids={A},{B},{A}")), [A, B]);
+        assert_eq!(parse(&format!("?ids={A}, {B} ,short,")), [A, B]);
+        assert!(parse("").is_empty());
+        assert!(parse("?ids=").is_empty());
+        let missing: IdsQ = Ok(Query(IdsQuery::default()));
+        assert!(ids_of(&missing).is_empty());
+        let many: Vec<String> = (0..150).map(|i| format!("{i:0>27}")).collect();
+        assert_eq!(
+            parse(&format!("?ids={}", many.join(","))).len(),
+            MAX_DELETED_NAMES_IDS
+        );
     }
 }
