@@ -465,6 +465,18 @@ const nodeValue = (name: string) => flow.value?.nodes.find((n) => n.name === nam
 const linkValue = (source: string, target: string) =>
   flow.value?.links.find((l) => l.source === source && l.target === target)?.value ?? null;
 
+// A link already carries the full chain of keys from the anchor to its target; a box can be fed by
+// several links with different histories, so it falls back to the heaviest one as the representative path.
+const pathKeysTo = (targetName: string, sourceName: string | null): string[] => {
+  const f = flow.value;
+  if (!f) return [];
+  const incoming = f.links.filter((l) => l.target === targetName);
+  const exact = sourceName ? incoming.find((l) => l.source === sourceName) : null;
+  if (exact) return exact.pathKeys;
+  if (!incoming.length) return [];
+  return incoming.reduce((a, b) => (b.value > a.value ? b : a)).pathKeys;
+};
+
 const onFlowSelect = (sel: FlowSelection) => {
   const f = flow.value;
   if (!f) return;
@@ -500,12 +512,15 @@ const onFlowSelect = (sel: FlowSelection) => {
     },
     events.value,
   );
+  // "other"/"exit" nodes carry no real key of their own, so the chain ends at their parent instead.
+  const chainEnd = sel.type === "other" || sel.type === "exit" ? parentName : targetName;
+  const chainSource = sel.type === "link" ? parentName : null;
   branch.value = {
     predicate: branchPredicate(f, target),
     stepDepth: sel.type === "exit" ? sel.depth - 1 : sel.depth,
     title: raw(title),
     expectedTotal: expected,
-    pathKeys: [...(sel.parentKey ? [sel.parentKey] : []), ...(sel.key ? [sel.key] : [])],
+    pathKeys: pathKeysTo(chainEnd, chainSource),
   };
 };
 
