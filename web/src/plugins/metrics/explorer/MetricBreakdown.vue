@@ -37,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <!-- The chart header is one clipped row, too narrow on a phone for the key beside the title. -->
       <MetricOverlayKey
         v-if="showOverlayKey"
         class="mb-1.5 md:hidden"

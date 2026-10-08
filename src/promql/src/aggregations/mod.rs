@@ -58,6 +58,9 @@ pub(crate) use sum::{Sum, SumState};
 
 /// Series per parallel partial-aggregation chunk when a single group is large.
 const AGG_PARALLEL_CHUNK: usize = 32768;
+// upstream's bounds for a k converted to int64 (`engine.go`)
+const MAX_K: f64 = 9_223_372_036_854_774_784.0;
+const MIN_K: f64 = -9_223_372_036_854_775_808.0;
 
 /// Trait for PromQL aggregation operators.
 ///
@@ -481,10 +484,6 @@ where
     }
     Ok(Value::Matrix(results))
 }
-
-// upstream's bounds for a k converted to int64 (`engine.go`)
-const MAX_K: f64 = 9_223_372_036_854_774_784.0;
-const MIN_K: f64 = -9_223_372_036_854_775_808.0;
 
 /// `limitk`'s k: an error when NaN or beyond int64, as upstream.
 fn limitk_param(k: ScalarParam) -> Result<ScalarParam> {

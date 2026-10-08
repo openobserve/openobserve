@@ -213,6 +213,9 @@ mod tests {
 
     use super::*;
 
+    const SECOND: i64 = 1_000_000;
+    const BASE: i64 = 1_640_995_200;
+
     #[tokio::test]
     async fn test_numeric_aggregation_dispatch() {
         use crate::{engine::tests::*, exec::PromqlContext};
@@ -363,9 +366,6 @@ mod tests {
         );
         assert_eq!(shape("topk(3, abs(m))"), None);
     }
-
-    const SECOND: i64 = 1_000_000;
-    const BASE: i64 = 1_640_995_200;
 
     /// `n` series `{instance="<i>", job="api"|"db"}` whose values differ at every step.
     fn requests(n: usize) -> String {
