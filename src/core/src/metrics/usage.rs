@@ -558,12 +558,12 @@ fn token_end(chars: &[char], start: usize) -> usize {
 
 fn ends_with_offset(text: &str) -> bool {
     let text = text.trim_end();
-    text.len() >= 6
-        && text[text.len() - 6..].eq_ignore_ascii_case("offset")
-        && !text[..text.len() - 6]
-            .chars()
-            .next_back()
-            .is_some_and(is_ident_char)
+    let Some(head) = text.len().checked_sub(6) else {
+        return false;
+    };
+    // compared as bytes first, so `head` is a char boundary before the str is sliced
+    text.as_bytes()[head..].eq_ignore_ascii_case(b"offset")
+        && !text[..head].chars().next_back().is_some_and(is_ident_char)
 }
 
 /// Whether `text` contains `metric` as a whole identifier.
@@ -937,6 +937,14 @@ mod tests {
         assert_eq!(promql("topk($k, http_requests_total)"), Outcome::Match);
         assert_eq!(
             promql("quantile_over_time($q, http_requests_total[5m])"),
+            Outcome::Match
+        );
+    }
+
+    #[test]
+    fn a_multibyte_character_before_a_template_token_is_read_safely() {
+        assert_eq!(
+            promql(r#"http_requests_total{job="é"}  +$k"#),
             Outcome::Match
         );
     }
