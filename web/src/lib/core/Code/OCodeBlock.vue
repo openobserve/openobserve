@@ -154,7 +154,7 @@ const onCopy = () => {
           <i class="bg-warning block size-2.5 rounded-full" />
           <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+        <span class="o2-code-lang text-2xs font-mono opacity-55">{{
           t("components.codeBlock.terminal")
         }}</span>
       </span>
@@ -167,7 +167,7 @@ const onCopy = () => {
           filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+      <span v-else class="o2-code-lang text-2xs font-mono opacity-55">{{
         lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
