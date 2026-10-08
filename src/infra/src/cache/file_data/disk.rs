@@ -576,9 +576,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
         }
         let root_dir = tokio::fs::canonicalize(&root_dir).await.unwrap();
-        if let Err(e) = load(&root_dir, &root_dir).await {
+        let mut legacy_metrics = Vec::new();
+        if let Err(e) = load(&root_dir, &root_dir, &mut legacy_metrics).await {
             log::error!("load disk cache error: {e}");
         }
+        // off the scan path so a large legacy cache does not delay LOADING_FROM_DISK_DONE
+        tokio::spawn(remove_legacy_metrics_files(legacy_metrics));
         log::info!(
             "Loading disk cache done, total files: {}",
             LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
@@ -1082,7 +1085,11 @@ pub async fn remove_result_cache_metas(file_keys: &[String]) {
 }
 
 #[async_recursion]
-async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
+async fn load(
+    root_dir: &PathBuf,
+    scan_dir: &PathBuf,
+    legacy_metrics: &mut Vec<PathBuf>,
+) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
     let mut metrics_cache: Vec<String> = Vec::new();
     loop {
@@ -1105,7 +1112,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                 };
                 if ft.is_dir() {
-                    if let Err(e) = load(root_dir, &fp).await {
+                    if let Err(e) = load(root_dir, &fp, legacy_metrics).await {
                         log::error!("load disk cache error: {e}");
                     }
                 } else {
@@ -1140,15 +1147,9 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     if !get_config().disk_cache.multi_dir.is_empty() {
                         file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
                     }
-                    // legacy metrics result files may mix organizations' results, so they are
-                    // dropped
+                    // legacy names may mix organizations' results, so they are never indexed
                     if is_legacy_metrics_result_file(&file_key) {
-                        if let Err(e) = tokio::fs::remove_file(&fp).await {
-                            log::warn!(
-                                "Failed to remove legacy metrics cache file: {}, error: {e}",
-                                fp.display()
-                            );
-                        }
+                        legacy_metrics.push(fp);
                         continue;
                     }
                     // check file already exists
@@ -1450,6 +1451,17 @@ fn is_legacy_metrics_result_file(file_key: &str) -> bool {
             .next()
             .unwrap_or_default()
             .starts_with(METRICS_RESULT_CACHE_FILE_PREFIX)
+}
+
+async fn remove_legacy_metrics_files(files: Vec<PathBuf>) {
+    for fp in files {
+        if let Err(e) = tokio::fs::remove_file(&fp).await {
+            log::warn!(
+                "Failed to remove legacy metrics cache file: {}, error: {e}",
+                fp.display()
+            );
+        }
+    }
 }
 
 fn last_modified(metadata: &std::fs::Metadata) -> chrono::DateTime<chrono::Utc> {
@@ -2483,7 +2495,10 @@ mod tests {
         std::fs::write(root.join(&legacy_key), b"x").unwrap();
         std::fs::write(root.join(&current_key), b"x").unwrap();
 
-        load(&root, &root).await.unwrap();
+        let mut legacy = Vec::new();
+        load(&root, &root, &mut legacy).await.unwrap();
+        assert_eq!(legacy, vec![root.join(&legacy_key)]);
+        remove_legacy_metrics_files(legacy).await;
 
         assert!(!root.join(&legacy_key).exists());
         assert!(root.join(&current_key).exists());
