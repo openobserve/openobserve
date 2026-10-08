@@ -61,7 +61,7 @@ use super::{
     pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
-    alerts::alert::AlertExt,
+    alerts::alert::{AlertError, AlertExt, NotificationOutcome},
     common::{
         infra::config::STREAM_ALERTS,
         meta::stream::{SchemaEvolution, SchemaRecords},
@@ -152,6 +152,7 @@ pub async fn get_stream_partition_keys(
 
 #[inline(always)]
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
+    pipeline::report_broken_realtime_pipelines(stream).await;
     pipeline::get_executable_pipelines(stream).await
 }
 
@@ -234,25 +235,15 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.org_id,
             alert.name
         );
-        match alert
+        let outcome = alert
             .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
-            .await
-        {
+            .await;
+        record_realtime_delivery(&mut trigger_data_stream, &outcome);
+        match outcome {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
-                trigger_data_stream.status = RunOutcome::NotifyFailed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
             }
-            Ok(outcome) => {
-                let success_msg = outcome.success_message.trim().to_owned();
-                let error_msg = outcome.error_message.trim().to_owned();
-                if !error_msg.is_empty() {
-                    trigger_data_stream.error = Some(error_msg);
-                }
-                if !success_msg.is_empty() {
-                    trigger_data_stream.success_response = Some(success_msg);
-                }
+            Ok(_) => {
                 // enforce a minimum silence floor so a high-volume stream cannot
                 // fire (and write to the db) once per matching request
                 let silence_micros = alert.trigger_condition.effective_silence_micros();
@@ -929,6 +920,32 @@ fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
     match time_level {
         PartitionTimeLevel::Daily => DAY_MICRO_SECS,
         PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
+}
+
+fn record_realtime_delivery(
+    trigger_data_stream: &mut TriggerData,
+    outcome: &Result<NotificationOutcome, AlertError>,
+) {
+    match outcome {
+        Err(e) => {
+            trigger_data_stream.status = RunOutcome::NotifyFailed;
+            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+        }
+        Ok(outcome) => {
+            // Any undelivered destination is a failure, even when others succeeded.
+            if !outcome.failed.is_empty() {
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
+            }
+            let success_msg = outcome.success_message.trim().to_owned();
+            let error_msg = outcome.error_message.trim().to_owned();
+            if !error_msg.is_empty() {
+                trigger_data_stream.error = Some(error_msg);
+            }
+            if !success_msg.is_empty() {
+                trigger_data_stream.success_response = Some(success_msg);
+            }
+        }
     }
 }
 
@@ -1629,6 +1646,56 @@ mod tests {
         assert_eq!(
             write_error_status(&Error::IngestionError("disk failure".to_string())),
             http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    fn realtime_row() -> TriggerData {
+        TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_realtime_send_that_reached_every_destination_stays_firing() {
+        let mut row = realtime_row();
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            success_message: " sent ".to_string(),
+            ..Default::default()
+        });
+        record_realtime_delivery(&mut row, &delivered);
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.success_response.as_deref(), Some("sent"));
+        assert_eq!(row.error, None);
+    }
+
+    #[test]
+    fn test_realtime_send_that_partially_failed_is_notify_failed() {
+        let mut row = realtime_row();
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            success_message: "sent to slack".to_string(),
+            error_message: "pagerduty timed out".to_string(),
+        });
+        record_realtime_delivery(&mut row, &partial);
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
+        assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
+    }
+
+    #[test]
+    fn test_realtime_send_that_failed_is_notify_failed() {
+        let mut row = realtime_row();
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        record_realtime_delivery(&mut row, &failed);
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(
+            row.error.as_deref(),
+            Some("error sending notification for alert: http 500")
         );
     }
 }

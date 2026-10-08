@@ -164,6 +164,16 @@ const readFallbacks = (): Map<string, string> => {
   return entries;
 };
 
+// The Kubernetes map reaches chartColor through a fill-class table, which the call-site regex cannot see.
+const readMapClassTokens = (): string[] => {
+  const source = readFileSync(
+    resolve(SRC, "views/Infrastructure/kubernetes2/K8sHexMap.vue"),
+    "utf8",
+  );
+  const block = /const CLASS_TOKEN[^=]*= \{([\s\S]*?)\};/.exec(source);
+  return block ? [...block[1].matchAll(/"(--[a-zA-Z0-9-]+)"/g)].map(([, token]) => token) : [];
+};
+
 const CALL_SITE_TOKENS = collectCallSiteTokens();
 const FALLBACKS = readFallbacks();
 
@@ -183,6 +193,12 @@ describe("chartTheme FALLBACKS", () => {
       .filter((token) => !UNMIRRORED_BY_DESIGN.has(token) && !FALLBACKS.has(token))
       .sort();
     expect(offenders).toEqual([]);
+  });
+
+  it("mirrors every token the Kubernetes map fill-class table asks for", () => {
+    const tokens = readMapClassTokens();
+    expect(tokens.length).toBeGreaterThanOrEqual(9);
+    expect(tokens.filter((token) => !FALLBACKS.has(token)).sort()).toEqual([]);
   });
 
   it("leaves the deliberately unmirrored tokens out of the map", () => {

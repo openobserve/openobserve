@@ -99,7 +99,7 @@ ZO_ROOT_USER_EMAIL="root@example.com" ZO_ROOT_USER_PASSWORD="Complexpass#123" ca
 
 This will start the openobserve API server on port 5080
 
-environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started.
+environment variables ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD can be used first time to configure default admin user when openobserve is started. A new install generates the salt for presigned and ext-token logins and stores it in the meta db; set ZO_EXT_AUTH_SALT to a random secret of 16 to 48 bytes (for example `openssl rand -hex 24`) only if you want it kept out of the db, and then keep the same value across restarts and nodes.
 
 ### UI
 

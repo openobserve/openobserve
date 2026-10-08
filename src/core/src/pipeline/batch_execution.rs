@@ -57,6 +57,10 @@ use usage_reporting::publish_error;
 
 use crate::alerts::{ConditionExt, ConditionGroupExt};
 
+/// Largest destination response body echoed back into node outputs and errors.
+#[cfg(feature = "enterprise")]
+const DESTINATION_BODY_ECHO_LIMIT: usize = 4096;
+
 // Global batch buffer for accumulating remote stream records
 #[cfg(feature = "enterprise")]
 #[derive(Debug)]
@@ -2191,8 +2195,28 @@ async fn process_function_node(
                         res
                     }
                 };
+                let Some(result_arr) = result.as_array() else {
+                    if let Err(send_err) = channels
+                        .error_sender
+                        .send((
+                            node.id.to_string(),
+                            node.node_type(),
+                            "FunctionNode VRL result array error: the function must return an array"
+                                .to_string(),
+                            Some(func_params.name.to_owned()),
+                            None,
+                        ))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} [inv={inv_id}]: FunctionNode failed sending errors for collection caused by: {send_err}",
+                            metadata.pipeline_name
+                        );
+                    }
+                    return count;
+                };
                 // since apply_vrl_fn can produce unflattened data
-                for record in result.as_array().unwrap().iter() {
+                for record in result_arr.iter() {
                     // use usize::MAX as a flag to disregard original_value
                     channels.send_output(&metadata, &node.id, record).await;
                     send_to_children(
@@ -2878,8 +2902,10 @@ async fn process_destination_node(
         }
         Module::Pipeline { endpoint } => {
             if let Err(e) =
-                common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url)
-                    .await
+                common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+                    &endpoint.url,
+                )
+                .await
             {
                 return drain_destination_node_with_error(
                     &metadata,
@@ -2889,35 +2915,27 @@ async fn process_destination_node(
                 )
                 .await;
             }
+            let client = destination_http_client(
+                &endpoint,
+                std::time::Duration::from_secs(cfg.pipeline.remote_request_timeout),
+            );
             let op_fmt = endpoint.output_format.unwrap_or_default();
             let send_data = op_fmt.get_body_from_data(&data, &endpoint.metadata);
             let content_type = op_fmt.get_content_type();
             let headers = endpoint.headers.unwrap_or_default();
-            let builder = reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(
-                    cfg.pipeline.remote_request_timeout,
-                ))
-                .danger_accept_invalid_certs(endpoint.skip_tls_verify);
-            let client = match common::utils::ssrf_guard::build_safe_client(builder) {
-                Ok(client) => client,
-                Err(e) => {
-                    return drain_destination_node_with_error(
-                        &metadata,
-                        &mut channels,
-                        node,
-                        format!("Failed to build HTTP client: {e}"),
-                    )
-                    .await;
-                }
-            };
 
-            let mut client = client
-                .post(endpoint.url)
-                .header("Content-type", content_type);
-            for (name, val) in headers {
-                client = client.header(name, val);
-            }
-            let res = client.body(send_data).send().await;
+            let res = match client {
+                Ok(client) => {
+                    let mut req = client
+                        .post(endpoint.url)
+                        .header("Content-type", content_type);
+                    for (name, val) in headers {
+                        req = req.header(name, val);
+                    }
+                    req.body(send_data).send().await.map_err(|e| e.to_string())
+                }
+                Err(e) => Err(e),
+            };
 
             let res = match res {
                 Ok(v) => v,
@@ -2945,7 +2963,7 @@ async fn process_destination_node(
                 }
             };
             let status = res.status();
-            let body = res.text().await.unwrap_or_else(|e| e.to_string());
+            let body = read_body_capped(res, DESTINATION_BODY_ECHO_LIMIT).await;
             if !status.is_success() {
                 let data_copy: Vec<_> = data.into_iter().map(|v| v.as_ref().clone()).collect();
                 let data = Value::Array(data_copy);
@@ -2978,6 +2996,39 @@ async fn process_destination_node(
         }
     }
     Ok(data_count)
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn destination_http_client(
+    endpoint: &config::meta::destinations::Endpoint,
+    timeout: std::time::Duration,
+) -> Result<reqwest::Client, String> {
+    // The client's DNS guard never sees a literal IP, so the URL is checked here.
+    config::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config(&endpoint.url)?;
+    config::utils::ssrf_guard::build_safe_destination_client(
+        reqwest::Client::builder()
+            .timeout(timeout)
+            .danger_accept_invalid_certs(endpoint.skip_tls_verify),
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// Empty for a peer only the operator allowlist admits, since node outputs and errors reach users.
+#[cfg(any(feature = "enterprise", test))]
+async fn read_body_capped(mut res: reqwest::Response, limit: usize) -> String {
+    if config::utils::ssrf_guard::admitted_only_by_allowlist(&res) {
+        return String::new();
+    }
+    let mut buf = Vec::new();
+    while buf.len() < limit {
+        match res.chunk().await {
+            Ok(Some(chunk)) => buf.extend_from_slice(&chunk),
+            Ok(None) => break,
+            Err(e) => return e.to_string(),
+        }
+    }
+    let text = String::from_utf8_lossy(&buf);
+    config::meta::db_normalizer::truncate_at_boundary(&text, limit).to_string()
 }
 
 #[cfg(feature = "enterprise")]
@@ -5065,6 +5116,48 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_destination_the_allowlist_admits_is_sent() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_a_destination_the_allowlist_admits_is_sent"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                seed_pipeline_destination_with_url("org-1", "allowlisted", &format!("{base}/ok"));
+                let workflow = destination_workflow("allowlisted");
+                let executable = ExecutablePipeline::new_from_workflow(&workflow)
+                    .await
+                    .expect("workflow must build");
+
+                let result = executable
+                    .process_workflow(
+                        "org-1",
+                        vec![json::json!({"severity": "high"})],
+                        None,
+                        WorkflowRunOptions {
+                            suppress_destinations: false,
+                        },
+                    )
+                    .await
+                    .expect("run must complete");
+
+                let messages: Vec<String> = result
+                    .errors
+                    .get("d1")
+                    .map(|e| e.errors.iter().map(|(m, _)| m.clone()).collect())
+                    .unwrap_or_default();
+                assert!(
+                    messages.is_empty(),
+                    "an allowlisted destination must be sent, got {messages:?}"
+                );
+            },
+        );
+    }
+
     fn eq_case_num(
         handle: &str,
         column: &str,
@@ -5272,5 +5365,142 @@ mod tests {
                 "error should name the function and the reason, got: {err}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_destination_http_client_refuses_loopback() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let mut buf = [0u8; 4096];
+                let _ = sock.read(&mut buf).await;
+                let _ = sock
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecret")
+                    .await;
+            }
+        });
+        let endpoint = config::meta::destinations::Endpoint {
+            url: format!("http://127.0.0.1:{port}/"),
+            ..Default::default()
+        };
+        let timeout = std::time::Duration::from_secs(5);
+        let error = match destination_http_client(&endpoint, timeout) {
+            Err(e) => e,
+            Ok(client) => match client.post(&endpoint.url).send().await {
+                Ok(res) => panic!("reached {}: {}", endpoint.url, res.status()),
+                Err(e) => e.to_string(),
+            },
+        };
+        assert!(error.contains("not allowed"), "{error}");
+    }
+
+    async fn capped_body_from(base: &str) -> String {
+        let endpoint = config::meta::destinations::Endpoint {
+            url: format!("{base}/ok"),
+            ..Default::default()
+        };
+        let client = destination_http_client(&endpoint, std::time::Duration::from_secs(5)).unwrap();
+        let res = client.post(&endpoint.url).send().await.unwrap();
+        assert!(res.status().is_success());
+        read_body_capped(res, 4096).await
+    }
+
+    #[test]
+    fn test_read_body_capped_hides_a_peer_only_the_allowlist_admits() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_read_body_capped_hides_a_peer_only_the_allowlist_admits"
+            ),
+            &[("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32")],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                assert_eq!(capped_body_from(&base).await, "");
+            },
+        );
+    }
+
+    #[test]
+    fn test_read_body_capped_echoes_a_peer_the_strict_policy_admits() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::test_read_body_capped_echoes_a_peer_the_strict_policy_admits"
+            ),
+            &[
+                ("ZO_SSRF_ALLOWED_CIDRS", "127.0.0.1/32"),
+                ("ZO_SSRF_ALLOW_LOOPBACK", "true"),
+            ],
+            || async {
+                let base = crate::ssrf_test_support::secret_server().await;
+                assert_eq!(capped_body_from(&base).await, "secret");
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn test_read_body_capped_stops_at_limit() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = sock.read(&mut buf).await;
+            let body = "é".repeat(50_000);
+            let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
+            let _ = sock.write_all(head.as_bytes()).await;
+            let _ = sock.write_all(body.as_bytes()).await;
+        });
+        let res = reqwest::get(format!("http://127.0.0.1:{port}/"))
+            .await
+            .unwrap();
+        let body = read_body_capped(res, 4097).await;
+        assert_eq!(body.len(), 4096);
+        assert!(body.chars().all(|c| c == 'é'));
+    }
+
+    #[tokio::test]
+    async fn test_result_array_vrl_returning_non_array_reports_node_error() {
+        let vrl = transform::compile_vrl_function(". = {\"not\": \"an array\"}", "org-1").unwrap();
+        let runtime = CompiledFunctionRuntime::VRL(
+            Box::new(VRLResultResolver {
+                program: vrl.program,
+                fields: vec![],
+            }),
+            true,
+        );
+        let node = ExecutableNode {
+            id: "fn-1".to_string(),
+            node_data: NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                name: "result_array_fn".to_string(),
+                after_flatten: false,
+                num_args: 0,
+                raw_fn: None,
+            }),
+            children: vec![],
+            is_disabled: false,
+        };
+        let (input_tx, input_rx) = channel(8);
+        let (error_tx, mut error_rx) = channel(8);
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders: vec![],
+            result_sender: None,
+            error_sender: error_tx,
+            inputs_sender: None,
+            outputs_sender: None,
+        };
+        send_records(&input_tx, vec![json::json!({"a": 1})]).await;
+        drop(input_tx);
+
+        let result =
+            process_node(dummy_metadata(1), node, Some(runtime), channels, Vec::new()).await;
+        assert!(result.is_ok());
+        let (node_id, _, message, ..) = error_rx.try_recv().expect("a node error is expected");
+        assert_eq!(node_id, "fn-1");
+        assert!(message.contains("array"), "{message}");
     }
 }

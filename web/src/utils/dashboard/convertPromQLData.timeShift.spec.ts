@@ -16,6 +16,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { alignShiftedPromQLResults, convertPromQLData } from "./convertPromQLData";
 import { getAreaGradientColor } from "./colorPalette";
+import echartsTokens from "echarts/lib/visual/tokens.js";
 
 vi.mock("./chartDimensionUtils", () => ({
   calculateOptimalFontSize: vi.fn(() => 14),
@@ -263,6 +264,46 @@ describe("convertPromQLData with time-shifted results", () => {
     expect(tagged.map((s: any) => s.name)).toEqual(["api-1", "api-2"]);
   });
 
+  it("tags every series with its panel query and role, leaving _queryIndex as it was", async () => {
+    const result = await convert(
+      panel("line", [{ config: {} }, { config: {} }]),
+      [twoPods(), twoPods(DAY_S)],
+      meta([{ panelQueryIndex: 1 }, { panelQueryIndex: 1, gapMs: DAY_MS, period: "1 day ago" }]),
+      stepMeta(2, 60),
+    );
+
+    expect(
+      result.options.series
+        .filter((s: any) => s.name)
+        .map((s: any) => [s.name, s._panelQueryIndex, s._seriesRole, s._queryIndex]),
+    ).toEqual([
+      ["api-1", 1, "primary", 0],
+      ["api-2", 1, "primary", 0],
+      ["api-1 (1 day ago)", 1, "shifted", undefined],
+      ["api-2 (1 day ago)", 1, "shifted", undefined],
+    ]);
+  });
+
+  it("tags stacked series with their panel query and role", async () => {
+    const result = await convert(
+      panel("stacked", [{ config: {} }, { config: {} }]),
+      [twoPods(), twoPods(DAY_S)],
+      meta([{ panelQueryIndex: 1 }, { panelQueryIndex: 1, gapMs: DAY_MS, period: "1 day ago" }]),
+      stepMeta(2, 60),
+    );
+
+    expect(
+      result.options.series
+        .filter((s: any) => s.name)
+        .map((s: any) => [s.name, s._panelQueryIndex, s._seriesRole]),
+    ).toEqual([
+      ["api-1", 1, "primary"],
+      ["api-2", 1, "primary"],
+      ["api-1 (1 day ago)", 1, "shifted"],
+      ["api-2 (1 day ago)", 1, "shifted"],
+    ]);
+  });
+
   it("renders when only a shifted result has data", async () => {
     const result = await convert(
       panel("line"),
@@ -300,6 +341,11 @@ describe("convertPromQLData with time-shifted results", () => {
       { panelQueryIndex: 0, gapMs: DAY_MS, period: "1 day ago" },
     ]);
 
+    const explorer = (config: Record<string, any> = {}) => ({
+      ...panel("line"),
+      config: { explorer_overlays: true, ...config },
+    });
+
     it("draws it dashed in the primary's palette colour", async () => {
       const result = await convert(
         panel("line"),
@@ -313,8 +359,67 @@ describe("convertPromQLData with time-shifted results", () => {
         expect(shifted.itemStyle.color).toBeTruthy();
         expect(shifted.itemStyle.color).toBe(primary.itemStyle.color);
         expect(shifted.lineStyle.type).toBe("dashed");
-        expect(primary.lineStyle?.type).not.toBe("dashed");
+        expect(primary.lineStyle?.type).toBeUndefined();
       }
+    });
+
+    it("in the Explorer, draws it dotted so it reads apart from a dashed forecast", async () => {
+      const result = await convert(
+        explorer(),
+        [twoPods(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      const [, shifted] = pair(result, "api-1");
+      expect(shifted.lineStyle.type).toBe("dotted");
+    });
+
+    it("in the Explorer's classic palette, keeps ECharts' own primary colours and gives them to the twins", async () => {
+      const classic = explorer({ color: { mode: "palette-classic" } });
+      const alone = await convert(
+        classic,
+        [twoPods()],
+        meta([{ panelQueryIndex: 0 }]),
+        stepMeta(1, 60),
+      );
+      const overlaid = await convert(classic, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+      const theme = echartsTokens.color.theme;
+
+      ["api-1", "api-2"].forEach((name, position) => {
+        const [before] = pair(alone, name);
+        const [primary, shifted] = pair(overlaid, name);
+        expect(before.itemStyle.color).toBe(theme[position]);
+        expect(primary.itemStyle.color).toBe(theme[position]);
+        expect(shifted.itemStyle.color).toBe(theme[position]);
+      });
+    });
+
+    it("on a dashboard, leaves the classic palette to ECharts", async () => {
+      const classic = { ...panel("line"), config: { color: { mode: "palette-classic" } } };
+      const result = await convert(classic, [twoPods(), twoPods(DAY_S)], oneDay, stepMeta(2, 60));
+      const [primary, shifted] = pair(result, "api-1");
+      expect(primary.itemStyle.color).toBeNull();
+      expect(shifted.itemStyle.color).toBeNull();
+    });
+
+    it("keeps the twins out of the Explorer's legend, and in a dashboard's", async () => {
+      const data = [twoPods(), twoPods(DAY_S)];
+      const inExplorer = await convert(explorer(), data, oneDay, stepMeta(2, 60));
+      expect(inExplorer.options.legend.data).toEqual(["api-1", "api-2"]);
+      const [, twin] = pair(inExplorer, "api-1");
+      expect(twin._legendFollows).toBe("api-1");
+      const onDashboard = await convert(panel("line"), data, oneDay, stepMeta(2, 60));
+      expect(onDashboard.options.legend.data).toBeUndefined();
+    });
+
+    it("keeps a compared series with no current counterpart in the Explorer's legend", async () => {
+      const onlyPast = await convert(
+        explorer(),
+        [matrix(), twoPods(DAY_S)],
+        oneDay,
+        stepMeta(2, 60),
+      );
+      expect(onlyPast.options.legend.data).toEqual(["api-1 (1 day ago)", "api-2 (1 day ago)"]);
     });
 
     it("follows a series colour mapping set on the primary", async () => {

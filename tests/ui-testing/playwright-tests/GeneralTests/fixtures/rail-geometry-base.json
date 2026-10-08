@@ -1,0 +1,845 @@
+{
+  "label": "BASE 17e771a6c7",
+  "frames": {
+    "1440x900-ltr-light": {
+      "rail": {
+        "x": 0,
+        "y": 40,
+        "w": 88,
+        "h": 860
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "content": {
+        "x": 89,
+        "y": 41,
+        "w": 1342,
+        "h": 850
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 4,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 4,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 4,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 4,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 4,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 4,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 4,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 4,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 4,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 4,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 4,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(107, 118, 227)",
+        "activeIcon": "rgb(107, 118, 227)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(255, 255, 255)",
+        "inactiveLabel": "rgb(38, 38, 38)",
+        "hoverLabel": "rgb(107, 118, 227)",
+        "hoverBg": "color(srgb 0.943137 0.945098 0.990196)",
+        "hoverIcon": "rgb(107, 118, 227)"
+      }
+    },
+    "1000x600-ltr-light": {
+      "rail": {
+        "x": 0,
+        "y": 40,
+        "w": 88,
+        "h": 560
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1000,
+        "h": 40
+      },
+      "content": {
+        "x": 89,
+        "y": 41,
+        "w": 902,
+        "h": 550
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 4,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 4,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 4,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 4,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 4,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 4,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 4,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 4,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 4,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 4,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 4,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(107, 118, 227)",
+        "activeIcon": "rgb(107, 118, 227)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(255, 255, 255)",
+        "inactiveLabel": "rgb(38, 38, 38)",
+        "hoverLabel": "rgb(107, 118, 227)",
+        "hoverBg": "color(srgb 0.943137 0.945098 0.990196)",
+        "hoverIcon": "rgb(107, 118, 227)"
+      }
+    },
+    "1440x900-rtl-light": {
+      "rail": {
+        "x": 1352,
+        "y": 40,
+        "w": 88,
+        "h": 860
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "content": {
+        "x": 9,
+        "y": 41,
+        "w": 1342,
+        "h": 850
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 1356,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 1356,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 1356,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 1356,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 1356,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 1356,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 1356,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 1356,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 1356,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 1356,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 1356,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 1356,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(107, 118, 227)",
+        "activeIcon": "rgb(107, 118, 227)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(255, 255, 255)",
+        "inactiveLabel": "rgb(38, 38, 38)",
+        "hoverLabel": "rgb(107, 118, 227)",
+        "hoverBg": "color(srgb 0.943137 0.945098 0.990196)",
+        "hoverIcon": "rgb(107, 118, 227)"
+      }
+    },
+    "1000x600-rtl-light": {
+      "rail": {
+        "x": 912,
+        "y": 40,
+        "w": 88,
+        "h": 560
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1000,
+        "h": 40
+      },
+      "content": {
+        "x": 9,
+        "y": 41,
+        "w": 902,
+        "h": 550
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 916,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 916,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 916,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 916,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 916,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 916,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 916,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 916,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 916,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 916,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 916,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 916,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(107, 118, 227)",
+        "activeIcon": "rgb(107, 118, 227)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(255, 255, 255)",
+        "inactiveLabel": "rgb(38, 38, 38)",
+        "hoverLabel": "rgb(107, 118, 227)",
+        "hoverBg": "color(srgb 0.943137 0.945098 0.990196)",
+        "hoverIcon": "rgb(107, 118, 227)"
+      }
+    },
+    "1440x900-ltr-dark": {
+      "rail": {
+        "x": 0,
+        "y": 40,
+        "w": 88,
+        "h": 860
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "content": {
+        "x": 89,
+        "y": 41,
+        "w": 1342,
+        "h": 850
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 4,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 4,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 4,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 4,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 4,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 4,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 4,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 4,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 4,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 4,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 4,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(255, 255, 255)",
+        "activeIcon": "rgb(255, 255, 255)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(83, 85, 144)",
+        "inactiveLabel": "rgb(229, 229, 229)",
+        "hoverLabel": "rgb(174, 175, 245)",
+        "hoverBg": "rgb(56, 56, 96)",
+        "hoverIcon": "rgb(174, 175, 245)"
+      }
+    },
+    "1000x600-ltr-dark": {
+      "rail": {
+        "x": 0,
+        "y": 40,
+        "w": 88,
+        "h": 560
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1000,
+        "h": 40
+      },
+      "content": {
+        "x": 89,
+        "y": 41,
+        "w": 902,
+        "h": 550
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 4,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 4,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 4,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 4,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 4,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 4,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 4,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 4,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 4,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 4,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 4,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 4,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(255, 255, 255)",
+        "activeIcon": "rgb(255, 255, 255)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(83, 85, 144)",
+        "inactiveLabel": "rgb(229, 229, 229)",
+        "hoverLabel": "rgb(174, 175, 245)",
+        "hoverBg": "rgb(56, 56, 96)",
+        "hoverIcon": "rgb(174, 175, 245)"
+      }
+    },
+    "1440x900-rtl-dark": {
+      "rail": {
+        "x": 1352,
+        "y": 40,
+        "w": 88,
+        "h": 860
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1440,
+        "h": 40
+      },
+      "content": {
+        "x": 9,
+        "y": 41,
+        "w": 1342,
+        "h": 850
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 1356,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 1356,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 1356,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 1356,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 1356,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 1356,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 1356,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 1356,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 1356,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 1356,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 1356,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 1356,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(255, 255, 255)",
+        "activeIcon": "rgb(255, 255, 255)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(83, 85, 144)",
+        "inactiveLabel": "rgb(229, 229, 229)",
+        "hoverLabel": "rgb(174, 175, 245)",
+        "hoverBg": "rgb(56, 56, 96)",
+        "hoverIcon": "rgb(174, 175, 245)"
+      }
+    },
+    "1000x600-rtl-dark": {
+      "rail": {
+        "x": 912,
+        "y": 40,
+        "w": 88,
+        "h": 560
+      },
+      "railWidthPx": 88,
+      "header": {
+        "x": 0,
+        "y": 0,
+        "w": 1000,
+        "h": 40
+      },
+      "content": {
+        "x": 9,
+        "y": 41,
+        "w": 902,
+        "h": 550
+      },
+      "tiles": {
+        "menu-link-/-item": {
+          "x": 916,
+          "y": 40,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/logs-item": {
+          "x": 916,
+          "y": 95,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/metrics-item": {
+          "x": 916,
+          "y": 150,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/traces-item": {
+          "x": 916,
+          "y": 205,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/ai-item": {
+          "x": 916,
+          "y": 260,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/rum-item": {
+          "x": 916,
+          "y": 315,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/dashboards-item": {
+          "x": 916,
+          "y": 370,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/alerts-item": {
+          "x": 916,
+          "y": 425,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/infra/databases-item": {
+          "x": 916,
+          "y": 480,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/streams-item": {
+          "x": 916,
+          "y": 535,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/iam-item": {
+          "x": 916,
+          "y": 590,
+          "w": 80,
+          "h": 51
+        },
+        "menu-link-/settings-item": {
+          "x": 916,
+          "y": 645,
+          "w": 80,
+          "h": 51
+        }
+      },
+      "colours": {
+        "activeLabel": "rgb(255, 255, 255)",
+        "activeIcon": "rgb(255, 255, 255)",
+        "activeBg": "rgba(0, 0, 0, 0)",
+        "pillBg": "rgb(83, 85, 144)",
+        "inactiveLabel": "rgb(229, 229, 229)",
+        "hoverLabel": "rgb(174, 175, 245)",
+        "hoverBg": "rgb(56, 56, 96)",
+        "hoverIcon": "rgb(174, 175, 245)"
+      }
+    }
+  }
+}

@@ -29,7 +29,9 @@ use {o2_enterprise::enterprise::search::TaskStatus, search_service::SEARCH_SERVE
 
 use crate::handler::grpc::{
     MetadataMap,
-    cluster_rpc::{MetricsQueryRequest, MetricsQueryResponse, metrics_server::Metrics},
+    cluster_rpc::{
+        MetricsQueryRequest, MetricsQueryResponse, MetricsQueryStmt, metrics_server::Metrics,
+    },
 };
 
 pub struct MetricsQuerier;
@@ -50,11 +52,10 @@ impl Metrics for MetricsQuerier {
         let _ = tracing::Span::current().set_parent(parent_cx);
 
         let req: &MetricsQueryRequest = req.get_ref();
+        #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+        let (_, trace_id) = query_and_trace_id(req)?;
         let org_id = &req.org_id;
         let stream_type = StreamType::Metrics.as_str();
-
-        #[cfg(feature = "enterprise")]
-        let trace_id = req.job.as_ref().unwrap().trace_id.clone();
         #[cfg(feature = "enterprise")]
         if !SEARCH_SERVER.contain_key(&trace_id).await {
             SEARCH_SERVER
@@ -105,22 +106,20 @@ impl Metrics for MetricsQuerier {
         let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
         let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         let mut req: MetricsQueryRequest = req.into_inner();
-        req.query.as_mut().unwrap().query_data = true;
-
+        let (query, trace_id) = query_and_trace_id(&req)?;
         log::info!(
-            "[trace_id {}] promql->data->grpc: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}, label_selector: {:?}",
-            req.job.as_ref().unwrap().trace_id,
+            "[trace_id {trace_id}] promql->data->grpc: org_id: {}, use_cache: {}, time_range: [{},{}), step: {}, query: {}, label_selector: {:?}",
             req.org_id,
             req.use_cache,
-            req.query.as_ref().unwrap().start,
-            req.query.as_ref().unwrap().end,
-            req.query.as_ref().unwrap().step,
-            req.query.as_ref().unwrap().query,
-            req.query.as_ref().unwrap().label_selector,
+            query.start,
+            query.end,
+            query.step,
+            query.query,
+            query.label_selector,
         );
-
-        #[cfg(feature = "enterprise")]
-        let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+        if let Some(query) = req.query.as_mut() {
+            query.query_data = true;
+        }
 
         // Register trace_id in SEARCH_SERVER so selector_load_data_inner can
         // insert_sender — without this the engine returns SearchCancelQuery
@@ -145,5 +144,53 @@ impl Metrics for MetricsQuerier {
 
         let out_stream = ReceiverStream::new(rx);
         Ok(Response::new(Box::pin(out_stream) as Self::DataStream))
+    }
+}
+
+fn query_and_trace_id(req: &MetricsQueryRequest) -> Result<(&MetricsQueryStmt, String), Status> {
+    let Some(query) = req.query.as_ref() else {
+        return Err(Status::invalid_argument("metrics request has no query"));
+    };
+    let Some(job) = req.job.as_ref() else {
+        return Err(Status::invalid_argument("metrics request has no job"));
+    };
+    Ok((query, job.trace_id.clone()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::handler::grpc::cluster_rpc::Job;
+
+    fn requests_missing_fields() -> [MetricsQueryRequest; 2] {
+        [
+            MetricsQueryRequest::default(),
+            MetricsQueryRequest {
+                query: Some(MetricsQueryStmt::default()),
+                ..Default::default()
+            },
+        ]
+    }
+
+    #[tokio::test]
+    async fn test_query_without_query_or_job_is_invalid_argument() {
+        for req in requests_missing_fields() {
+            let status = MetricsQuerier.query(Request::new(req)).await.unwrap_err();
+            assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_data_without_query_or_job_is_invalid_argument() {
+        let job_only = MetricsQueryRequest {
+            job: Some(Job::default()),
+            ..Default::default()
+        };
+        for req in requests_missing_fields().into_iter().chain([job_only]) {
+            let Err(status) = MetricsQuerier.data(Request::new(req)).await else {
+                panic!("a request without a query and a job must be rejected");
+            };
+            assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        }
     }
 }

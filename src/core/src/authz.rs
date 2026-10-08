@@ -183,7 +183,7 @@ pub async fn check_permissions(
         return true;
     }
 
-    if o2_enterprise::enterprise::license::block_feature_for_report_failure().await {
+    if report_failure_lifts_rbac().await {
         return true;
     }
 
@@ -236,4 +236,27 @@ pub async fn list_objects_for_user(
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
+}
+
+/// Never before the first usage report: an unloaded license also reads as a reporting failure.
+#[cfg(feature = "enterprise")]
+pub async fn report_failure_lifts_rbac() -> bool {
+    use o2_enterprise::enterprise::license::{
+        block_feature_for_report_failure, last_reported_timestamp,
+    };
+    block_feature_for_report_failure().await && last_reported_timestamp().await > 0
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn report_failure_does_not_lift_rbac_before_any_report() {
+        assert_eq!(
+            o2_enterprise::enterprise::license::last_reported_timestamp().await,
+            0
+        );
+        assert!(!report_failure_lifts_rbac().await);
+    }
 }
