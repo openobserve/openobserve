@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, provide } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount, provide } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -344,15 +344,19 @@ const mapError = (e: unknown) => {
   if (state.value !== "ready" || next === "unavailable") state.value = next;
 };
 
+// Each read takes the next id, so a slower reply for a range switched away from is dropped.
+let dataRequestId = 0;
+
 const loadData = async () => {
-  // No preset resolved yet means no snapshot has been built — show "preparing"
-  // rather than hanging on the loading spinner forever.
-  if (selectedKey.value == null) {
+  const requestId = ++dataRequestId;
+  // No preset resolved yet means no snapshot has been built, so show "preparing" instead of a spinner.
+  if (selectedKey.value === null) {
     state.value = "preparing";
     return;
   }
   try {
     const res = await publicDashboardsService.getData(slug, selectedKey.value);
+    if (requestId !== dataRequestId) return;
     if (res.status === 202) {
       failures.value = 0;
       state.value = "preparing";
@@ -362,22 +366,26 @@ const loadData = async () => {
     failures.value = 0;
     state.value = "ready";
   } catch (e: unknown) {
-    mapError(e);
+    if (requestId === dataRequestId) mapError(e);
   }
 };
+
+// Anonymous viewers only get the minimal /config bootstrap, which lacks the timestamp column the renderer needs.
+const applyTimestampColumn = () => {
+  const column = config.value?.timestamp_column;
+  if (column && store.state.zoConfig?.timestamp_column !== column) {
+    store.dispatch("setConfig", { ...store.state.zoConfig, timestamp_column: column });
+  }
+};
+
+// The bootstrap /config resolves unawaited and replaces zoConfig wholesale, possibly after applyConfig ran.
+watch(() => store.state.zoConfig?.timestamp_column, applyTimestampColumn);
 
 const applyConfig = (next: Record<string, any>) => {
   // Keep the layout reference when unchanged so the grid is not rebuilt on every refresh.
   const sameLayout = JSON.stringify(next.layout) === JSON.stringify(config.value.layout);
   config.value = sameLayout ? { ...next, layout: config.value.layout } : next;
-  // Anonymous viewers only get the minimal /config bootstrap, which lacks the
-  // timestamp column the renderer needs to detect time-series axes.
-  if (next.timestamp_column && store.state.zoConfig?.timestamp_column !== next.timestamp_column) {
-    store.dispatch("setConfig", {
-      ...store.state.zoConfig,
-      timestamp_column: next.timestamp_column,
-    });
-  }
+  applyTimestampColumn();
   if (!tabs.value.some((tab) => tab.tabId === selectedTabId.value)) {
     selectedTabId.value = tabs.value[0]?.tabId ?? "";
   }
@@ -415,7 +423,10 @@ const refresh = async () => {
   try {
     const res = await publicDashboardsService.getConfig(slug);
     applyConfig(res.data ?? {});
-    if (selectedKey.value === null) selectedKey.value = pickDefaultRange();
+    // The author may have removed the viewer's range, whose snapshot then never arrives.
+    if (!rangeOptions.value.some((r) => r.key === selectedKey.value)) {
+      selectedKey.value = pickDefaultRange();
+    }
     await loadData();
   } catch (e: unknown) {
     mapError(e);

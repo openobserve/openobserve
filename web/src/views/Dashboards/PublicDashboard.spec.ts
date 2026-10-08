@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { shallowMount, flushPromises } from "@vue/test-utils";
+import { shallowMount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -27,6 +27,7 @@ import service from "@/services/public_dashboards";
 import PublicDashboard from "@/views/Dashboards/PublicDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
 const CONFIG = {
   title: "My Dashboard",
@@ -61,6 +62,25 @@ const mountWithActions = () =>
     },
   });
 const grid = (w: any) => w.findComponent(RenderDashboardCharts);
+const mountWithPicker = () =>
+  shallowMount(PublicDashboard, {
+    global: {
+      plugins: [i18n],
+      provide: { store },
+      stubs: {
+        OPageHeader: { template: "<div><slot name='actions' /></div>" },
+        ODropdown: { template: "<div><slot /></div>" },
+      },
+    },
+  });
+const pickRange = (w: VueWrapper, key: string) =>
+  w
+    .findComponent<typeof ODropdownItem>(`[data-test="dashboards-public-dashboard-preset-${key}"]`)
+    .vm.$emit("select");
+const okSnapshot = (data: unknown) => ({
+  status: 200,
+  data: { panels: { p1: { state: { state: "ok" }, data } } },
+});
 
 describe("PublicDashboard viewer", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -369,6 +389,64 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     const list = grid(w).props("dashboardData").variables.list;
     expect(list.map((v: { value: string }) => v.value)).toEqual(["default-env"]);
+  });
+
+  it("falls back to the default range when the author removes the viewer's range", async () => {
+    vi.useFakeTimers();
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = mountWithPicker();
+    await flushPromises();
+    pickRange(w, "r86400");
+    await flushPromises();
+    expect(service.getData).toHaveBeenLastCalledWith("abc", "r86400");
+
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...CONFIG, ranges: [CONFIG.ranges[0]], available_keys: ["r3600"] },
+      status: 200,
+    } as never);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(service.getData).toHaveBeenLastCalledWith("abc", "r3600");
+    expect(grid(w).exists()).toBe(true);
+  });
+
+  it("drops a slower reply for a range the viewer already switched away from", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({ data: CONFIG, status: 200 } as never);
+    vi.mocked(service.getData).mockResolvedValueOnce(okSnapshot([]) as never);
+    const w = mountWithPicker();
+    await flushPromises();
+
+    let resolveSlow: (v: unknown) => void = () => {};
+    let resolveFast: (v: unknown) => void = () => {};
+    vi.mocked(service.getData)
+      .mockReturnValueOnce(new Promise((r) => (resolveSlow = r)) as never)
+      .mockReturnValueOnce(new Promise((r) => (resolveFast = r)) as never);
+    pickRange(w, "r86400");
+    pickRange(w, "r3600");
+    resolveFast(okSnapshot([[{ y: 1 }]]));
+    await flushPromises();
+    resolveSlow(okSnapshot([[{ y: 24 }]]));
+    await flushPromises();
+    expect(grid(w).props("injectedPanelData").p1.data).toEqual([[{ y: 1 }]]);
+  });
+
+  it("keeps the link's timestamp column after the bootstrap config lands", async () => {
+    const original = store.state.zoConfig;
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...CONFIG, timestamp_column: "event_time" },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    expect(store.state.zoConfig.timestamp_column).toBe("event_time");
+
+    await store.dispatch("setConfig", { version: "v1" });
+    await flushPromises();
+    expect(store.state.zoConfig.timestamp_column).toBe("event_time");
+    expect(store.state.zoConfig.version).toBe("v1");
+    w.unmount();
+    await store.dispatch("setConfig", original);
   });
 
   it("injects a Not-available error for a withheld panel", async () => {
