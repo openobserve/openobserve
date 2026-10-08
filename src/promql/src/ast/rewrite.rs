@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::get_config;
-use promql_parser::{
-    label::{MatchOp, Matcher},
-    parser::VectorSelector,
-};
+use promql_parser::{label::Matcher, parser::VectorSelector};
 
 pub fn remove_filter_all(vs: &mut VectorSelector) {
     let placeholder = get_config().common.dashboard_placeholder.to_string();
@@ -31,15 +28,15 @@ pub fn remove_filter_all(vs: &mut VectorSelector) {
 }
 
 fn match_placeholder(matcher: &Matcher, placeholder: &str) -> bool {
-    match &matcher.op {
-        MatchOp::Equal | MatchOp::NotEqual => matcher.value == placeholder,
-        MatchOp::Re(pattern) | MatchOp::NotRe(pattern) => pattern.as_str() == placeholder,
-    }
+    matcher.value == placeholder
 }
 
 #[cfg(test)]
 mod tests {
-    use promql_parser::label::Matchers;
+    use promql_parser::{
+        label::{MatchOp, Matchers},
+        parser::{self, Expr},
+    };
     use regex::Regex;
 
     use super::*;
@@ -198,9 +195,50 @@ mod tests {
 
         assert_eq!(vs.matchers.matchers.len(), 1);
         assert_eq!(vs.matchers.or_matchers.len(), 2);
-        assert_eq!(vs.matchers.or_matchers[0].len(), 1); // placeholder removed
-        assert_eq!(vs.matchers.or_matchers[1].len(), 1); // unchanged
+        assert_eq!(vs.matchers.or_matchers[0].len(), 1);
+        assert_eq!(vs.matchers.or_matchers[1].len(), 1);
         assert_eq!(vs.matchers.or_matchers[0][0].name, "service");
+    }
+
+    #[test]
+    fn parsed_placeholder_matchers_are_removed_for_every_operator() {
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        for operator in ["=", "!=", "=~", "!~"] {
+            let query = format!(
+                r#"test_metric{{env{operator}"{placeholder}",service="web",version=~"v1.*"}}"#
+            );
+            let Expr::VectorSelector(mut selector) =
+                parser::parse(&query).unwrap_or_else(|error| panic!("{query}: {error}"))
+            else {
+                panic!("expected vector selector");
+            };
+            let expected = selector.matchers.matchers[1..].to_vec();
+            remove_filter_all(&mut selector);
+            assert_eq!(selector.matchers.matchers, expected, "{operator}");
+        }
+    }
+
+    #[test]
+    fn parsed_regex_placeholders_are_removed_from_or_groups() {
+        let placeholder = get_config().common.dashboard_placeholder.to_string();
+        let query = format!(
+            r#"test_metric{{env=~"{placeholder}",service="web" or env!~"{placeholder}",service="api",version!~"v2.*"}}"#
+        );
+        let Expr::VectorSelector(mut selector) =
+            parser::parse(&query).unwrap_or_else(|error| panic!("{query}: {error}"))
+        else {
+            panic!("expected vector selector");
+        };
+        let expected = selector
+            .matchers
+            .or_matchers
+            .iter()
+            .map(|group| group[1..].to_vec())
+            .collect::<Vec<_>>();
+        assert_eq!(expected.len(), 2);
+        remove_filter_all(&mut selector);
+        assert!(selector.matchers.matchers.is_empty());
+        assert_eq!(selector.matchers.or_matchers, expected);
     }
 
     #[test]

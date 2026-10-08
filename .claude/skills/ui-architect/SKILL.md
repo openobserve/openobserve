@@ -568,7 +568,7 @@ and each domain has its own reference below.
 | --- | --- | --- |
 | **Server data (fetch & cache)** | Every read is a declared `queryOptions()` in `services/<domain>.queries.ts` (reuse the existing one if the list is already declared), keyed with `orgKey`, on its **module's** `staleTime` tier from `cachePolicy.ts`; components `useQuery` it (rows as a `computed`) — never `http`/axios, never a Vuex copy of a server list. Writes are `mutationOptions()` with `meta.invalidates`. A user refresh forces **every** read on the view; mount, paging and search read the cache. | [data-fetching](references/data-fetching.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
-| **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
+| **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY in two cases: chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit (convert once the schema renderer forwards clicks), or a chart needing a fixed grid that keeps empty rows/columns, or box-selection mapping from category indices back to values, which the dashboard converters cannot express (e.g. `TracesLatencyHeatmap.vue`). Annotate the site with a one-line why. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
@@ -636,6 +636,38 @@ confirm*, a sensible value for every field the user has no opinion about, and a
 preview instead of a wizard step. Do not hit the budget by hiding required
 fields behind "Advanced" — that moves the click, it does not remove it.
 
+## Copy and values — read the screen with real data
+
+Lint proves a string is translated; it cannot prove the sentence it produces is
+English, that a number means what its label claims, or that a blank is not a
+zero. Before a screen is done, read it with real data in every state (loading,
+never set up, stopped, partly there, failed, populated). The recurring defects:
+
+- **Casing reaches past your template** — shared component copy and `en-US.json`
+  values are sentence case too; a library never forces caps.
+- **An interpolated slot takes a noun phrase or a value**, never another
+  sentence; every `{count}` message is a plural called with the count.
+- **Say it once, by the label on screen** — no chip and text repeating each
+  other, no two headings for one thing, no help text naming a control by a word
+  the control does not show.
+- **Names, not ids; what differs, first** — an org label, not its identifier; the
+  database name, not the host every row shares.
+- **Minute-precision times, whole-number counts, `—` for unknown, skeleton (never
+  `0`) while loading; one failure look** (`#error` → load-error with Retry).
+- **Warning icons only on problems; a page publishes only its own facts** into
+  any state its sibling tabs share.
+- **Density: a screen states, the reader opens the rest** — explanatory copy opens
+  from an "About …" info popover beside its control instead of a paragraph or a
+  truncated sentence; a banner is one line (what + since when + action); a list
+  shows one line per item and each item opens on its own; one entity is one row;
+  a column header carries no qualifier (it goes in `meta.headerTooltip`); "All
+  clear" is never followed by "0 of 0".
+- **Rewording a shared key rewords every screen using it** — search its callers and
+  add a new key instead; every new key gets all 16 locales.
+
+Full rules, each with the bug it came from:
+[references/copy-and-values.md](references/copy-and-values.md).
+
 ## Pick a component
 
 The **scenario → component** index and the per-file catalog (what each `O*` is,
@@ -682,8 +714,10 @@ considering the UI done:
 - [ ] **Every data chart goes through `PanelSchemaRenderer`** (panel schema) — no
       `echarts.init` / `<v-chart>` / ApexCharts / D3 / hand-rolled `<canvas>`/`<svg>`
       plot in a feature page. Low-level `panels/ChartRenderer.vue` only as the
-      annotated escape hatch for chart-click forwarding. Sparklines/progress/data
-      bars stay `OSparkline`/`OProgressBar`/`ODataBarCell` (not charts).
+      annotated escape hatch for chart-click forwarding, or for a fixed grid / box
+      mapping the converters can't express (`TracesLatencyHeatmap.vue`).
+      Sparklines/progress/data bars stay `OSparkline`/`OProgressBar`/`ODataBarCell`
+      (not charts).
 - [ ] **Server mode was checked against the backend**: every `sortable: true`
       column has a real sort key in the handler (an unknown key falls back
       silently and orders by something else), and any page-relative device
@@ -821,6 +855,32 @@ considering the UI done:
       to their trigger's row (or come from `OPageLayout #sidebar` / `FolderList`);
       inline row actions are `max-md:hidden` with a `md:hidden` kebab mirroring them
       (`<data-test>-menu`); no hover-only affordance without `max-md:opacity-100`.
+- [ ] **Copy and values read right with real data** — sentence case in the
+      rendered screen (shared copy included); interpolated slots read as a
+      sentence; every `{count}` is a plural; controls named by their visible
+      label; nothing said twice; labels instead of ids; times to the minute,
+      counts without decimals, `—` for unknown. See
+      [copy-and-values](references/copy-and-values.md).
+- [ ] **Every state was seen with real data** — loading (skeletons, never `0`),
+      never set up, stopped/stale, partly there, failed (`#error` → load-error
+      with Retry, never the raw red bar) and populated — in light and dark.
+- [ ] **Nothing is clipped, not just nothing scrolls** — text runs past no cell
+      or container at 375 / 768 / 1024 / 1280 (an `overflow-hidden` ancestor hides
+      it from a page-width check); right-aligned cells checked on their left edge;
+      every ellipsis read (a cut title or header is a bug, a cut SQL statement is not).
+- [ ] **Nothing is sparse or doubled** — the page edge is applied once (`bleed`
+      when the body insets itself); a one-line disclosure is sized to its label with
+      its info control beside it, not a full-width bar; the primary table column has
+      an explicit `size`; a status screen fits 1366×768 and 375 collapsed; tiles that
+      sit six to a row wrap and keep two title lines so their values line up.
+- [ ] **Same job, same component** — refresh is `ORefreshButton`, an explainer is
+      the `OPopover` info recipe, an expandable row is `OCollapsible`, a toolbar view
+      toggle is `OToggleGroup mobile-dropdown`; never a hand-built `<button>`. See
+      [conventions § The same affordance](references/conventions.md).
+- [ ] **A UI pass changes UI only** — no new capability in a shared engine; a shared
+      component's visual change is gated below lg or on a flag only your page sets,
+      and a regular page using it is unchanged at ≥1024. See
+      [conventions § A UI pass changes UI only](references/conventions.md).
 - [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
       never layout narration ("< md this wraps"), a re-telling of the code, or the
       history of the PR that added it (no ticket ids, "review finding", "as

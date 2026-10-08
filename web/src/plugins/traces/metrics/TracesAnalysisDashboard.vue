@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <!-- Renders in place as the Logs Drill down mode. -->
+  <component
+    :is="AnalysisPage"
     data-test="traces-analysis-dashboard-drawer"
-    bleed
     v-model:open="isOpen"
-    :width="80"
     :title="raw(drawerTitle)"
-    @update:open="(v) => !v && onClose()"
+    @update:open="(v: boolean) => !v && onClose()"
   >
     <template #header-left>
       <OIcon name="timeline" size="md" />
@@ -72,18 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="filterMetadata" class="text-3xs ms-1 opacity-60">
           {{ filterMetadata }}
         </span>
-
-        <!-- Refresh button (shown when percentile changes on duration tab) -->
-        <OButton
-          v-if="showRefreshButton"
-          variant="primary"
-          size="icon-xs-sq"
-          @click="refreshAfterPercentileChange"
-          data-test="percentile-refresh-button"
-          icon-left="refresh"
-        >
-          <OTooltip :content="t('latencyInsights.refreshTooltip')" />
-        </OButton>
       </div>
     </template>
 
@@ -92,25 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of growing to fit all content — otherwise the dimension list and
          the charts share the drawer's outer scrollbar instead of scrolling independently. -->
     <div class="flex h-full min-h-0 flex-col">
-      <!-- Tabs (only shown if multiple analysis types available) -->
-      <OTabs
-        v-if="showTabs"
-        v-model="activeAnalysisType"
-        dense
-        class="px-page-edge border-card-glass-border text-text-secondary! insights-dashboard-tabs shrink-0 border-b border-solid"
-        align="left"
-      >
-        <OTab
-          v-for="tab in availableTabs"
-          :key="tab.name"
-          :name="tab.name"
-          :label="tab.label"
-          :icon="tab.icon"
-          :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="min-h-12"
-        />
-      </OTabs>
-
       <!-- Dashboard Content with Sidebar -->
       <div class="analysis-content bg-surface-subtle flex min-h-0 flex-1 overflow-hidden pt-2">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
@@ -203,6 +172,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </span>
                       </div>
+                      <span
+                        v-if="dimensionCounts[dimension.value] !== undefined"
+                        class="text-text-muted shrink-0 text-xs tabular-nums"
+                        :data-test="`dimension-count-${dimension.value}`"
+                      >
+                        {{ formatEventCount(dimensionCounts[dimension.value]) }}
+                      </span>
                     </li>
                   </ul>
 
@@ -276,6 +252,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
 
+                <!-- Every dimension removed (sidebar or panel X) -->
+                <OEmptyState
+                  v-else-if="selectedDimensions.length === 0"
+                  size="hero"
+                  icon="bar-chart"
+                  :title="t('latencyInsights.noDimensionsSelected')"
+                  data-test="traces-analysis-dashboard-no-dimensions"
+                />
+
                 <!-- Dashboard -->
                 <RenderDashboardCharts
                   v-else-if="dashboardData"
@@ -288,7 +273,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :simplifiedPanelView="true"
                   :hideAddPanel="true"
                   :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
-                  @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
                   class="trace-analysis-dashboards p-[0.4rem]"
                 />
@@ -298,17 +282,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSplitter>
       </div>
     </div>
-  </ODrawer>
+  </component>
 </template>
 
 <script lang="ts" setup>
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  defineAsyncComponent,
+  nextTick,
+  h,
+  onBeforeUnmount,
+  type FunctionalComponent,
+} from "vue";
 import { useStore } from "vuex";
+import searchService from "@/services/search";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { formatEventCount } from "@/utils/formatters";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -320,11 +313,9 @@ import {
   useLatencyInsightsDashboard,
   COMPARISON_COLORS,
 } from "@/composables/useLatencyInsightsDashboard";
-import {
-  selectDimensionsFromData,
-  selectTraceDimensions,
-} from "@/composables/useDimensionSelector";
+import { selectDimensionsFromData } from "@/composables/useDimensionSelector";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -334,21 +325,7 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-interface DurationFilter {
-  start: number;
-  end: number;
-  timeStart?: number;
-  timeEnd?: number;
-}
-
 interface RateFilter {
-  start: number;
-  end: number;
-  timeStart?: number;
-  timeEnd?: number;
-}
-
-interface ErrorFilter {
   start: number;
   end: number;
   timeStart?: number;
@@ -361,27 +338,50 @@ interface TimeRange {
 }
 
 interface Props {
-  durationFilter?: DurationFilter;
   rateFilter?: RateFilter;
-  errorFilter?: ErrorFilter;
   timeRange: TimeRange;
   streamName: string;
   streamType?: string; // logs or traces
   baseFilter?: string;
-  analysisType?: "duration" | "volume" | "error"; // Initial/default analysis type
-  availableAnalysisTypes?: Array<"duration" | "volume" | "error">; // Which tabs to show
+  analysisType: "duration" | "volume" | "error"; // Initial/default analysis type
   streamFields?: any[]; // Stream schema fields for smart dimension selection
   logSamples?: any[]; // Actual log data for sample-based analysis (logs only)
+  embedded?: boolean; // Render as a page in place instead of a drawer
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  analysisType: "duration",
-  availableAnalysisTypes: () => ["volume"], // Default to just volume
-});
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "close"): void;
 }>();
+
+// Page shell for `embedded`: lays out the drawer's slots in place, without drawer-only attrs.
+const AnalysisPage: FunctionalComponent = (_, { slots, attrs }) =>
+  h(
+    "div",
+    { class: "flex h-full min-h-0 flex-col", "data-test": "traces-analysis-dashboard-page" },
+    [
+      h(
+        "div",
+        {
+          class: "border-card-glass-border px-page-edge flex shrink-0 items-center border-b py-1.5",
+        },
+        [
+          h(
+            "span",
+            {
+              class: "text-text-heading me-3 shrink-0 text-sm font-semibold",
+              "data-test": "traces-analysis-dashboard-page-title",
+            },
+            attrs.title as string,
+          ),
+          slots["header-left"]?.(),
+        ],
+      ),
+      slots.default?.(),
+    ],
+  );
+AnalysisPage.inheritAttrs = false;
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
@@ -392,16 +392,6 @@ const chipColors = computed(() =>
 );
 const { loading, error } = useLatencyInsightsAnalysis(t);
 const { generateDashboard } = useLatencyInsightsDashboard(t);
-
-// Variables manager will be initialized by RenderDashboardCharts
-// and we'll receive a reference to it via the @variablesManagerReady event
-interface VariablesManager {
-  hasUncommittedChanges?: boolean | { value: boolean };
-  committedVariablesData?: {
-    global?: Array<{ name: string; value?: string }>;
-  };
-}
-const variablesManager = ref<VariablesManager | null>(null);
 
 const isOpen = ref(true);
 
@@ -423,59 +413,8 @@ const splitterModel = ref(25); // 25% width for dimension selector (default)
 const splitterLimits: [number, number] = [0, 30]; // Min 0% (allow full collapse), Max 30%
 const lastSplitterPosition = ref(25); // Remember last position before collapse
 
-// Percentile change tracking - use variables manager's hasUncommittedChanges
-// This matches the pattern used in ViewDashboard
-const showRefreshButton = computed(() => {
-  if (activeAnalysisType.value !== "duration") {
-    return false;
-  }
-
-  // Use variables manager to check for uncommitted changes (same as ViewDashboard)
-  const manager = variablesManager.value;
-  // Use optional chaining for safer property access
-  if (manager?.hasUncommittedChanges !== undefined) {
-    // Access the value if it's a ref, otherwise use directly
-    const hasChanges =
-      typeof manager.hasUncommittedChanges === "object" && "value" in manager.hasUncommittedChanges
-        ? manager.hasUncommittedChanges.value
-        : manager.hasUncommittedChanges;
-    return hasChanges;
-  }
-
-  return false;
-});
-
 // Active tab management
 const activeAnalysisType = ref<"duration" | "volume" | "error">(props.analysisType);
-
-// Tab configuration
-const availableTabs = computed(() => {
-  return props.availableAnalysisTypes.map((type) => {
-    switch (type) {
-      case "volume":
-        return {
-          name: "volume",
-          label: t("volumeInsights.tabLabel"),
-          icon: "trending-up",
-        };
-      case "duration":
-        return {
-          name: "duration",
-          label: t("latencyInsights.tabLabel"),
-          icon: "schedule",
-        };
-      case "error":
-        return {
-          name: "error",
-          label: t("errorInsights.tabLabel"),
-          icon: "error-outline",
-        };
-    }
-  });
-});
-
-// Show tabs only if multiple analysis types available
-const showTabs = computed(() => props.availableAnalysisTypes.length > 1);
 
 /**
  * Smart dimension selection
@@ -497,11 +436,6 @@ const getInitialDimensions = () => {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
-  // For TRACES: Use OTel conventions
-  if (streamType === "traces") {
-    return selectTraceDimensions(schemaFields, 6);
-  }
-
   // Fallback for logs without samples
   return selectDimensionsFromData([], schemaFields, 6);
 };
@@ -515,6 +449,7 @@ const availableDimensions = computed(() => {
   const timestampField = store.state.zoConfig?.timestamp_column || "_timestamp";
 
   return (props.streamFields || [])
+    .filter((f: any) => f?.label !== true) // field-group headers (e.g. "AWS"), not fields
     .map((f: any) => ({
       label: f.name || f,
       value: f.name || f,
@@ -533,19 +468,68 @@ const filteredDimensions = computed(() => {
     dimensions = dimensions.filter((dim) => dim.label.toLowerCase().includes(searchLower));
   }
 
-  // Sort: selected dimensions first, then unselected
-  return dimensions.sort((a, b) => {
-    const aSelected = selectedDimensions.value.includes(a.value);
-    const bSelected = selectedDimensions.value.includes(b.value);
-
-    // If one is selected and other is not, selected comes first
-    if (aSelected && !bSelected) return -1;
-    if (!aSelected && bSelected) return 1;
-
-    // If both selected or both unselected, maintain original order (alphabetical)
+  // By count descending when counts exist, else selected first; ties are alphabetical.
+  const counts = dimensionCounts.value;
+  const hasCounts = Object.keys(counts).length > 0;
+  return [...dimensions].sort((a, b) => {
+    if (hasCounts) {
+      const countDiff = (counts[b.value] ?? -1) - (counts[a.value] ?? -1);
+      if (countDiff) return countDiff;
+    } else {
+      const aSelected = selectedDimensions.value.includes(a.value);
+      const bSelected = selectedDimensions.value.includes(b.value);
+      if (aSelected !== bSelected) return aSelected ? -1 : 1;
+    }
     return a.label.localeCompare(b.label);
   });
 });
+
+// One count(field) query scans once; _values would GROUP BY per field and return only top values.
+const dimensionCounts = ref<Record<string, number>>({});
+let dimensionCountsAbort: AbortController | null = null;
+
+const loadDimensionCounts = async () => {
+  dimensionCountsAbort?.abort();
+  dimensionCountsAbort = null;
+  dimensionCounts.value = {};
+  const fields = availableDimensions.value.map((d) => d.value);
+  if (!props.embedded || !props.streamName || fields.length === 0) return;
+
+  const columns = fields.map((f, i) => `count("${f.replace(/"/g, '""')}") AS c${i}`).join(", ");
+  // Drill down is unavailable in SQL mode, so the base filter is a WHERE clause
+  const filter = props.baseFilter?.trim();
+  const where = filter ? ` WHERE ${filter}` : "";
+
+  // A histogram brush narrows the search; count the brushed window when present
+  const range = selectedTimeRangeDisplay.value ?? baselineTimeRange.value;
+
+  const controller = new AbortController();
+  dimensionCountsAbort = controller;
+  try {
+    const res: any = await searchService.search({
+      org_identifier: store.state.selectedOrganization.identifier,
+      query: {
+        query: {
+          sql: `SELECT ${columns} FROM ${quoteSqlIdentifierIfNeeded(props.streamName)}${where}`,
+          start_time: range.startTime,
+          end_time: range.endTime,
+          size: 1,
+        },
+      },
+      page_type: props.streamType || "logs",
+      signal: controller.signal,
+    });
+    const row = res?.data?.hits?.[0] ?? {};
+    if (controller.signal.aborted) return;
+    dimensionCounts.value = Object.fromEntries(
+      fields.map((f, i) => [f, Number(row[`c${i}`] ?? 0)]),
+    );
+  } catch {
+    // Counts are a sorting aid only; the list stays alphabetical without them
+  }
+};
+
+onBeforeUnmount(() => dimensionCountsAbort?.abort());
 
 const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
@@ -564,10 +548,6 @@ const currentTimeObj = computed(() => {
 const toggleDimension = (dimensionValue: string) => {
   const index = selectedDimensions.value.indexOf(dimensionValue);
   if (index > -1) {
-    // Prevent removing the last dimension - at least one must remain
-    if (selectedDimensions.value.length <= 1) {
-      return;
-    }
     // Remove dimension - create new array to trigger reactivity
     selectedDimensions.value = selectedDimensions.value.filter((d) => d !== dimensionValue);
   } else {
@@ -634,16 +614,6 @@ const selectedTimeRangeDisplay = computed(() => {
       startTime: props.rateFilter.timeStart,
       endTime: props.rateFilter.timeEnd,
     };
-  } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-    return {
-      startTime: props.durationFilter.timeStart,
-      endTime: props.durationFilter.timeEnd,
-    };
-  } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-    return {
-      startTime: props.errorFilter.timeStart,
-      endTime: props.errorFilter.timeEnd,
-    };
   }
   return null;
 });
@@ -655,64 +625,20 @@ const hasSelectedTimeRange = computed(() => {
 
 // Additional filter metadata (duration, rate, or error count)
 const filterMetadata = computed(() => {
-  if (
-    props.analysisType === "duration" &&
-    props.durationFilter &&
-    !props.durationFilter.timeStart
-  ) {
-    return `${t("latencyInsights.durationLabel")} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
-  } else if (props.analysisType === "volume" && props.rateFilter && !props.rateFilter.timeStart) {
+  if (props.analysisType === "volume" && props.rateFilter && !props.rateFilter.timeStart) {
     return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t("traces.tracesAnalysisDashboard.tracesPerInterval")}`;
-  } else if (props.analysisType === "error" && props.errorFilter && !props.errorFilter.timeStart) {
-    return `${t("errorInsights.errorsGreaterThan")} ${props.errorFilter.start}`;
   }
   return null;
 });
 
 const loadAnalysis = async () => {
   try {
-    // Determine which filter to use based on active analysis type
-    let filterConfig;
-    if (activeAnalysisType.value === "duration") {
-      filterConfig = {
-        durationFilter: props.durationFilter,
-        rateFilter: undefined,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "volume") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: props.rateFilter,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "error") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: undefined,
-        errorFilter: props.errorFilter,
-      };
-    }
-
-    // For volume/error analysis with filter, use the actual selected time range from the brush
-    // Otherwise, use the global time range
+    // A histogram brush narrows the selected range; otherwise it is the global time range.
     let selectedTimeRange = props.timeRange;
-
-    // Check for ANY time-based filter (from any RED metrics panel)
-    // Use whichever filter has a time range selection - applies to ALL tabs
     if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
-      };
-    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.durationFilter.timeStart,
-        endTime: props.durationFilter.timeEnd,
-      };
-    } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.errorFilter.timeStart,
-        endTime: props.errorFilter.timeEnd,
       };
     }
 
@@ -722,11 +648,10 @@ const loadAnalysis = async () => {
       orgIdentifier: currentOrgIdentifier.value,
       selectedTimeRange,
       baselineTimeRange: baselineTimeRange.value,
-      ...filterConfig,
+      rateFilter: props.rateFilter,
       baseFilter: props.baseFilter,
       dimensions: selectedDimensions.value,
       analysisType: activeAnalysisType.value,
-      percentile: getCurrentPercentile() || undefined,
     };
 
     // OPTIMIZATION: Skip analyzeAllDimensions() to avoid 20 extra queries
@@ -752,43 +677,6 @@ const loadAnalysis = async () => {
     console.error("Error loading analysis:", err);
     showErrorNotification(err.message || t("latencyInsights.failedToLoad"));
   }
-};
-
-// Handler for when variables manager is ready from RenderDashboardCharts
-const onVariablesManagerReady = (manager: any) => {
-  variablesManager.value = manager;
-
-  // Load analysis immediately when manager is ready to populate dashboard
-  // This ensures the dashboard shows data on initial load instead of remaining blank
-  if (activeAnalysisType.value === "duration" && !dashboardData.value) {
-    loadAnalysis();
-  }
-};
-
-// Helper to get current percentile from variables manager
-const getCurrentPercentile = (): string => {
-  const manager = variablesManager.value;
-  if (manager && manager.committedVariablesData) {
-    // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
-    // Percentile is likely a global variable
-    const percentileVar = manager.committedVariablesData.global?.find(
-      (v: { name: string; value?: string }) => v.name === "percentile",
-    );
-    if (percentileVar && percentileVar.value !== undefined) {
-      return percentileVar.value;
-    }
-  }
-  return "0.95"; // Default to P95
-};
-
-const refreshAfterPercentileChange = () => {
-  // Commit all variable changes before reloading (same as ViewDashboard's refreshData)
-  if (dashboardChartsRef.value?.commitAllVariables) {
-    dashboardChartsRef.value.commitAllVariables();
-  }
-
-  // Reload the analysis with new percentile
-  loadAnalysis();
 };
 
 const onClose = () => {
@@ -830,13 +718,6 @@ const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number
   }
 };
 
-const formatTimeWithSuffix = (milliseconds: number) => {
-  if (milliseconds >= 1000) {
-    return `${(milliseconds / 1000).toFixed(2)}s`;
-  }
-  return `${milliseconds.toFixed(2)}ms`;
-};
-
 // Load analysis when modal opens
 watch(
   () => isOpen.value,
@@ -860,43 +741,11 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     const currentPanels = dashboardData.value.tabs[0].panels;
     const existingCount = currentPanels.length;
 
-    // Build config (reuse logic from loadAnalysis)
-    let filterConfig: any = {};
-    if (activeAnalysisType.value === "duration") {
-      filterConfig = {
-        durationFilter: props.durationFilter,
-        rateFilter: undefined,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "volume") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: props.rateFilter,
-        errorFilter: undefined,
-      };
-    } else if (activeAnalysisType.value === "error") {
-      filterConfig = {
-        durationFilter: undefined,
-        rateFilter: undefined,
-        errorFilter: props.errorFilter,
-      };
-    }
-
     let selectedTimeRange = props.timeRange;
     if (props.rateFilter?.timeStart && props.rateFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
-      };
-    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.durationFilter.timeStart,
-        endTime: props.durationFilter.timeEnd,
-      };
-    } else if (props.errorFilter?.timeStart && props.errorFilter?.timeEnd) {
-      selectedTimeRange = {
-        startTime: props.errorFilter.timeStart,
-        endTime: props.errorFilter.timeEnd,
       };
     }
 
@@ -906,7 +755,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       orgIdentifier: currentOrgIdentifier.value,
       selectedTimeRange,
       baselineTimeRange: baselineTimeRange.value,
-      ...filterConfig,
+      rateFilter: props.rateFilter,
       baseFilter: props.baseFilter,
       dimensions: addedDimensions,
       analysisType: activeAnalysisType.value,
@@ -941,24 +790,8 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
       panel.id = `${panel.id}_${timestamp}`;
     });
 
-    // Create a new dashboard object to ensure Vue detects the change
-    // We need to increment the render key to force grid re-layout, but this will cause re-queries
-    // Unfortunately, without modifying RenderDashboardCharts to cache panel data, we can't avoid this
-    const updatedDashboard = {
-      ...dashboardData.value,
-      tabs: [
-        {
-          ...dashboardData.value.tabs[0],
-          panels: [...currentPanels, ...newPanels],
-        },
-        ...dashboardData.value.tabs.slice(1),
-      ],
-    };
-
-    dashboardData.value = updatedDashboard;
-
-    // DON'T increment dashboardRenderKey - let Vue's reactivity handle it
-    // Since each panel has a unique ID (item.id + timestamp), Vue will only render the new panel
+    // Append in place: a new dashboard object would re-run every existing panel's query.
+    dashboardData.value.tabs[0].panels = [...currentPanels, ...newPanels];
 
     // Wait for DOM to update, then refresh GridStack to position new panels
     await nextTick();
@@ -971,12 +804,24 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
   }
 };
 
+// In place, so the remaining panels are neither remounted nor re-queried.
+const removeDimensionPanels = async (removedDimensions: string[]) => {
+  const tab = dashboardData.value?.tabs?.[0];
+  if (!tab?.panels) return;
+  tab.panels = tab.panels.filter((p: any) => !removedDimensions.includes(p.title));
+
+  await nextTick();
+  if (dashboardChartsRef.value?.refreshGridStack) {
+    await dashboardChartsRef.value.refreshGridStack();
+  }
+};
+
 // Reload when selected dimensions change
 watch(
   selectedDimensions,
   (newDimensions, oldDimensions) => {
     // Skip if this is the initial load (already handled by isOpen watcher)
-    if (!oldDimensions || oldDimensions.length === 0) {
+    if (!oldDimensions) {
       return;
     }
 
@@ -992,15 +837,12 @@ watch(
     const addedDimensions = newDimensions.filter((d) => !oldDimensions.includes(d));
     const removedDimensions = oldDimensions.filter((d) => !newDimensions.includes(d));
 
-    if (isOpen.value && newDimensions.length > 0) {
+    if (isOpen.value) {
       if (removedDimensions.length > 0) {
-        // If dimensions were removed, we need to regenerate to remove panels
-        dashboardData.value = null;
-        nextTick(() => {
-          loadAnalysis();
-        });
-      } else if (addedDimensions.length > 0) {
-        // If only added, append new panels without regenerating existing ones
+        removeDimensionPanels(removedDimensions);
+      }
+      if (addedDimensions.length > 0) {
+        // Append new panels without regenerating existing ones
         addDimensionPanels(addedDimensions);
       }
     }
@@ -1018,15 +860,24 @@ watch(
   },
 );
 
-// Watch for changes in props
 watch(
   () => [
-    props.durationFilter,
-    props.rateFilter,
-    props.timeRange,
+    props.embedded,
     props.streamName,
-    props.analysisType,
+    props.baseFilter,
+    baselineTimeRange.value.startTime,
+    baselineTimeRange.value.endTime,
+    selectedTimeRangeDisplay.value?.startTime,
+    selectedTimeRangeDisplay.value?.endTime,
+    availableDimensions.value.map((d) => d.value).join(","),
   ],
+  loadDimensionCounts,
+  { immediate: true },
+);
+
+// Watch for changes in props
+watch(
+  () => [props.rateFilter, props.timeRange, props.streamName, props.analysisType],
   () => {
     if (isOpen.value) {
       loadAnalysis();
@@ -1037,16 +888,6 @@ watch(
 </script>
 
 <style scoped>
-/* keep(lib-override:o-drawer): ODrawer renders its own panel; the Insights drawer
- * needs the body cell (4th child — after the two sr-only nodes h2/p and the header
- * div) to flex to full height for the splitter layout, reachable only via :deep. */
-[data-test="traces-analysis-dashboard-drawer"] > :deep(div:nth-child(4)) {
-  flex: 1 1 0 !important;
-  overflow: hidden !important;
-  display: flex;
-  flex-direction: column;
-}
-
 /* keep(brand): comparison chips are tinted from the runtime --chip-color
  * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
  * color Tailwind can't express; the text mix flips through --color-text-heading. */

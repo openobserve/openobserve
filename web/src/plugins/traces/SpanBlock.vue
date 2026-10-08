@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="wrap bg-surface-base flex items-center justify-start"
-    :class="defocusSpan ? 'opacity-30' : ''"
+    :class="dimmed ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
     }"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the bar itself — that would rebase them onto the span. -->
       <div
         class="relative flex w-full cursor-pointer flex-nowrap items-center"
-        :class="defocusSpan ? 'opacity-30' : ''"
+        :class="dimmed ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -64,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             left: leftPosition + '%',
           }"
           class="relative flex flex-nowrap items-center justify-start"
+          :class="startsInWindow ? 'min-w-0.5' : ''"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
@@ -72,6 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{
               backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"
+          />
+          <div
+            v-for="(segment, segmentIndex) in criticalSegments"
+            :key="segmentIndex"
+            class="bg-accent rounded-default absolute top-0 h-full"
+            :style="{ left: segment.left + '%', width: segment.width + '%' }"
+            data-test="span-critical-section"
           />
         </div>
         <button
@@ -123,6 +131,7 @@ import {
   type SpanEventMarker,
   type SpanEventCluster,
 } from "@/composables/traces/useSpanEvents";
+import type { CriticalPathSection } from "@/utils/traces/criticalPath";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
 // never assigned. No semantic token fits — it is a categorical "unassigned span"
@@ -225,6 +234,10 @@ export default defineComponent({
       type: Object,
       default: () => ({}),
     },
+    showCriticalPath: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["toggleCollapse", "selectSpan", "hover", "view-logs", "selectSpanEvent"],
   setup(props, { emit }) {
@@ -238,6 +251,27 @@ export default defineComponent({
     const defocusSpan = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return false;
       return searchObj.data.traceDetails.selectedSpanId !== props.span.spanId;
+    });
+
+    const criticalSections = computed<CriticalPathSection[]>(
+      () => props.span?.criticalSections ?? [],
+    );
+
+    const dimmed = computed(() => {
+      if (searchObj.data.traceDetails.selectedSpanId === props.span.spanId) return false;
+      return defocusSpan.value || (props.showCriticalPath && !criticalSections.value.length);
+    });
+
+    // Positioned against the span's own endpoints, since the stored duration can differ from them by a fraction of a µs.
+    const criticalSegments = computed(() => {
+      const spanLengthUs = props.span.endTimeUs - props.span.startTimeUs;
+      if (!props.showCriticalPath || !(spanLengthUs > 0)) return [];
+      const toPercent = (us: number) =>
+        Math.min(100, Math.max(0, ((us - props.span.startTimeUs) / spanLengthUs) * 100));
+      return criticalSections.value.map((section) => {
+        const left = toPercent(section.sectionStartUs);
+        return { left, width: toPercent(section.sectionEndUs) - left };
+      });
     });
 
     const durationStyle = ref({});
@@ -311,17 +345,29 @@ export default defineComponent({
 
     const spanMarkerRef = ref(null);
 
-    const getLeftPosition = () => {
-      const left = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
-
-      return (left / props.baseTracePosition?.durationUs) * 100;
+    // Unclamped percentages of the window; a span may run past either edge.
+    const getSpanExtent = () => {
+      const offset = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
+      const start = (offset / props.baseTracePosition?.durationUs) * 100;
+      return {
+        start,
+        end: start + (props.span?.durationUs / props.baseTracePosition?.durationUs) * 100,
+      };
     };
+
+    // Clamped so the duration label, placed from these values, stays on screen.
+    const getLeftPosition = () => Math.min(Math.max(getSpanExtent().start, 0), 100);
 
     const getSpanWidth = () => {
-      return Number(
-        ((props.span?.durationUs / props.baseTracePosition?.durationUs) * 100).toFixed(2),
-      );
+      const { start, end } = getSpanExtent();
+      return Number(Math.max(Math.min(end, 100) - Math.max(start, 0), 0).toFixed(2));
     };
+
+    // A span starting inside the window keeps a minimum-width sliver.
+    const startsInWindow = computed(() => {
+      const { start } = getSpanExtent();
+      return start >= 0 && start <= 100;
+    });
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
@@ -371,7 +417,12 @@ export default defineComponent({
     );
 
     watch(
-      () => props.span?.durationUs + props.baseTracePosition?.durationUs,
+      () => [
+        props.span?.startTimeUs,
+        props.span?.durationUs,
+        props.baseTracePosition?.startTimeUs,
+        props.baseTracePosition?.durationUs,
+      ],
       () => {
         spanWidth.value = getSpanWidth();
       },
@@ -478,12 +529,15 @@ export default defineComponent({
       getImageURL,
       leftPosition,
       spanWidth,
+      startsInWindow,
       getDurationStyle,
       spanBlock,
       onResize,
       onePixelPercent,
       spanMarkerRef,
       defocusSpan,
+      dimmed,
+      criticalSegments,
       store,
       onSpanHover,
       durationStyle,

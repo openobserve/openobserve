@@ -125,3 +125,48 @@ describe("AnomalyAlerting - openAddDestination", () => {
     openSpy.mockRestore();
   });
 });
+
+describe("AnomalyAlerting - direction and window share", () => {
+  const t = (key: string, named: Record<string, unknown> = {}) => i18n.global.t(key, named);
+
+  it("shows an unset direction as both, since NULL on the wire means both", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_direction: null }) });
+    expect((w.vm as any).directionModel).toBe("both");
+  });
+
+  it("writes the chosen direction back into the config", async () => {
+    const config = makeConfig({ alert_direction: "both" });
+    const w = await mountComp({ config });
+    (w.vm as any).directionModel = "above";
+    expect(config.alert_direction).toBe("above");
+  });
+
+  it("states the rule with the server defaults filled in for blank inputs", async () => {
+    const w = await mountComp({
+      config: makeConfig({
+        alert_window_buckets: 5,
+        alert_window_fire_pct: 80,
+        alert_window_recover_pct: null,
+      }),
+    });
+    expect(w.find('[data-test="anomaly-window-share-hint"]').text()).toBe(
+      t("alerts.anomaly.windowShareHint", { buckets: 5, fire: 80, recover: 80 }),
+    );
+  });
+
+  it("flags a recover share above the fire share instead of stating the rule", async () => {
+    const w = await mountComp({
+      config: makeConfig({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }),
+    });
+    const errors = w.findAll('[data-test="anomaly-window-share-error"]');
+    expect(errors.map((e) => e.text())).toEqual([t("alerts.anomaly.windowRecoverRange")]);
+    expect(w.find('[data-test="anomaly-window-share-hint"]').exists()).toBe(false);
+  });
+
+  it("flags a bucket count below 1", async () => {
+    const w = await mountComp({ config: makeConfig({ alert_window_buckets: 0 }) });
+    expect(w.find('[data-test="anomaly-window-share-error"]').text()).toBe(
+      t("alerts.anomaly.windowBucketsRange"),
+    );
+  });
+});

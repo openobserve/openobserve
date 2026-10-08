@@ -49,6 +49,9 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+// Imported after the mock above so it resolves to the mocked module.
+import searchService from "@/services/search";
+
 const baseFormData = () => ({
   stream_name: "test-stream",
   stream_type: "logs",
@@ -455,6 +458,77 @@ describe("PreviewAlert - refreshData method", () => {
     await nextTick();
 
     expect(w.vm.chartData).not.toBe(w.vm.dashboardPanelData?.data);
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - fetchQuerySchema stream guard", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  // Reproduces the production 400: the alert editor can mount (and this
+  // watcher fire) before the user has picked a stream, firing result_schema
+  // with no real stream/stream_type behind the query.
+  it("does not call result_schema when stream_name is missing", async () => {
+    const formData = baseFormData() as any;
+    formData.stream_name = "";
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "sql",
+      formData,
+    });
+
+    w.vm.refreshData();
+    await flushPromises();
+
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("does not call result_schema when stream_type is missing", async () => {
+    const formData = baseFormData() as any;
+    formData.stream_type = "";
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "sql",
+      formData,
+    });
+
+    w.vm.refreshData();
+    await flushPromises();
+
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("calls result_schema once the form has a real stream", async () => {
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "sql",
+      formData: baseFormData(),
+    });
+
+    await flushPromises();
+
+    expect(searchService.result_schema).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("applies the same guard to the custom+aggregation path", async () => {
+    const formData = baseFormData() as any;
+    formData.stream_name = "";
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "custom",
+      isAggregationEnabled: true,
+      formData,
+    });
+
+    expect(() => w.vm.refreshData()).not.toThrow();
+    await flushPromises();
+
+    // The aggregation branch builds the chart locally and never reaches
+    // result_schema regardless, but it must not throw or leave stale state.
+    expect(searchService.result_schema).not.toHaveBeenCalled();
     w.unmount();
   });
 });
@@ -2472,5 +2546,82 @@ describe("PreviewAlert - SQL verdict under streaming aggregates", () => {
     await emitResultMetadata(w, [[{ hits: rows(2) }]]);
 
     expectVerdict(w, { matched: 2, gate: "2 >= 2", trigger: true, label: LABEL });
+  });
+});
+
+describe("PreviewAlert - Forecast mode", () => {
+  const T0 = 1700000000000;
+  const series = (name: string, values: string[]) => ({
+    name,
+    data: values.map((v, i) => [T0 + i * 15000, v]),
+  });
+
+  const mountForecast = (H = 7) =>
+    mountComp({
+      query: "forecast_query",
+      selectedTab: "promql",
+      formData: {
+        stream_name: "disk_used",
+        stream_type: "metrics",
+        is_real_time: "false",
+        trigger_condition: { period: 5, threshold: 1, operator: ">=" },
+        query_condition: {
+          promql_condition: { column: "value", operator: "<=", value: H },
+          promql_multi_alert: true,
+        },
+        _ui: { forecast: { U: "sum(disk_used)", T: 1500, direction: "rises", W: "2d", H } },
+      },
+    });
+
+  const emitSeries = async (w: VueWrapper<any>, ...s: any[]) => {
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: s },
+    });
+    await nextTick();
+  };
+
+  it("states the forecast verdict, not a threshold-mode count gate", async () => {
+    const w = await mountForecast();
+    await emitSeries(w, series("a", ["9", "3"]), series("b", ["36500", "36500"]));
+
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+    expect(w.vm.evaluationStatus?.reason).toBe(
+      i18n.global.t("alerts.forecast.previewReason", {
+        count: 1,
+        threshold: 1500,
+        horizon: i18n.global.t("alerts.forecast.dayCount", { n: 7 }, 7),
+      }),
+    );
+    expect(w.vm.evaluationStatus?.reason).not.toContain(">=");
+    w.unmount();
+  });
+
+  it("reports no series in time without a count comparison", async () => {
+    const w = await mountForecast(1);
+    await emitSeries(w, series("a", ["36500", "36500"]));
+
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(false);
+    expect(w.vm.evaluationStatus?.reason).toBe("0 series forecast to reach 1500 within 1 day");
+    w.unmount();
+  });
+
+  it("gives no verdict while the horizon is out of range, as the summary does", async () => {
+    for (const H of [0, 31, 2.5]) {
+      const w = await mountForecast(H);
+      await emitSeries(w, series("a", ["0", "0"]));
+      expect(w.vm.evaluationStatus).toBeNull();
+      w.unmount();
+    }
+  });
+
+  it("labels the charted series as days until the threshold", async () => {
+    const w = await mountForecast();
+    w.vm.refreshData();
+    await nextTick();
+
+    expect(w.vm.dashboardPanelData?.data?.queries?.[0]?.config?.promql_legend_fallback).toBe(
+      "days until 1500",
+    );
+    w.unmount();
   });
 });

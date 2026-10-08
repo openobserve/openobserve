@@ -402,11 +402,10 @@ export class LogsPage {
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-        // TracesAnalysisDashboard.vue now renders inside <ODrawer data-test="traces-analysis-dashboard-drawer">
-        // The drawer's panel exposes that data-test on the root element; close button is from ODrawer's slot.
-        this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
-        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
-        this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
+        // Drill down renders the dashboard embedded; the Search toggle replaces close.
+        this.logsAnalyzeDimensionsButton = '[data-test="logs-drilldown-toggle"]';
+        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-page"]';
+        this.analysisDashboardClose = '[data-test="logs-logs-toggle"]';
         // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
         this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
         this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
@@ -414,14 +413,14 @@ export class LogsPage {
         // OInput's inner native <input> field — required for `fill()` (the wrapper div above isn't editable)
         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
         // Analysis dashboard states
-        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-state"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
+        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-page"] [data-test="traces-analysis-dashboard-loading-indicator"]';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-page"] [data-test="traces-analysis-dashboard-error"]';
         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
         // Dimension checkboxes (any value)
         this.dimensionCheckboxAny = '[data-test^="dimension-checkbox-"]';
-        // Dashboard chart panel inside the analysis dashboard drawer (via data-test prefix)
-        this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-drawer"] [data-test^="dashboard-panel-"]';
+        // Dashboard chart panel inside the analysis dashboard page (via data-test prefix)
+        this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-page"] [data-test^="dashboard-panel-"]';
         // SQL Mode toggle (OSwitch) — sourced from SearchBar.vue
         this.sqlModeToggleBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
         // Inner <button role="switch"> rendered by OSwitch — carries data-state="checked|unchecked"
@@ -4517,6 +4516,20 @@ export class LogsPage {
         }
     }
 
+    /**
+     * Open the saved-function dropdown and apply one by name.
+     *
+     * The dropdown only renders while the transform editor is on, so call
+     * toggleVrlEditor() first.
+     */
+    async selectSavedFunction(name) {
+        await this.page.locator(this.logsSearchBarFunctionDropdown).first().click();
+        const item = this.page.locator(`[data-test="logs-search-saved-function-${name}"]`);
+        await item.waitFor({ state: 'visible', timeout: 15000 });
+        await item.click();
+        testLogger.info('Applied saved function from the logs dropdown', { name });
+    }
+
     async clickVrlEditor() {
         // Wait for the VRL editor host to be visible before driving Monaco.
         // The data-test matches both outer container and inner Monaco div, so use .first().
@@ -7316,8 +7329,9 @@ export class LogsPage {
      * Expect Analyze Dimensions button to NOT be visible
      */
     async expectAnalyzeDimensionsButtonNotVisible() {
-        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).not.toBeVisible({ timeout: 5000 });
-        testLogger.info('Analyze Dimensions button is not visible (as expected)');
+        // The Drill down toggle stays visible but is disabled where the old button was hidden (SQL mode)
+        await expect(this.page.locator(this.logsAnalyzeDimensionsButton)).toBeDisabled({ timeout: 5000 });
+        testLogger.info('Drill down toggle is disabled (as expected)');
     }
 
     /**
@@ -13151,6 +13165,136 @@ export class LogsPage {
                 text: (n.textContent || '').trim(),
             }))
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Results-table reads for the #15086 coverage specs.
+    //
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream
+    // each declared these selectors inline; every one of them already existed on
+    // this class (logsSearchResultLogsTable, searchBarRefreshButton,
+    // highlightedMatch, logsDetailTableSearchAroundBtn, logDetailDialog), so the
+    // specs were re-declaring page-object surface rather than extending it.
+    // -----------------------------------------------------------------------
+
+    /** The results table itself. */
+    resultsTable() {
+        return this.page.locator(this.logsSearchResultLogsTable);
+    }
+
+    /** Refreshes and waits for the results table to render. */
+    async runSearchAndWaitForResults(timeout = 30000) {
+        await this.page.locator(this.searchBarRefreshButton).click();
+        await expect(this.resultsTable()).toBeVisible({ timeout });
+    }
+
+    /** Body cells of one column in the results table. */
+    resultCells(column) {
+        return this.page.locator(
+            `${this.logsSearchResultLogsTable} td[data-test="o2-table-cell-${column}"]`
+        );
+    }
+
+    /** Highlighted strings inside one column's cells. */
+    highlightsIn(column) {
+        return this.resultCells(column).locator('.log-highlighted');
+    }
+
+    /**
+     * Highlight texts of one column, polled until they settle.
+     *
+     * Highlighting is applied asynchronously after the rows render
+     * (processHitsInChunks), so the table is visible — and even partly highlighted —
+     * before the final markup exists. Reading allInnerTexts() once races that and
+     * returns [] or a partial list.
+     */
+    expectHighlightsIn(column, timeout = 20000) {
+        return expect.poll(async () => this.highlightsIn(column).allInnerTexts(), { timeout });
+    }
+
+    /**
+     * Asserts nothing is highlighted, and keeps asserting it across a settled window.
+     *
+     * The same async pass is why this cannot be a single count(): a zero read before
+     * processHitsInChunks runs is indistinguishable from "never highlighted", so a
+     * one-shot assertion passes for the wrong reason and a regression that started
+     * highlighting negative filters would still go green. A retrying toHaveCount(0)
+     * does not help either — it is satisfied by its first check, which is exactly the
+     * read that is too early. Sampling until the window closes can tell them apart.
+     */
+    async expectNoHighlights(windowMs = 5000) {
+        const highlights = this.page.locator(this.highlightedMatch);
+        const deadline = Date.now() + windowMs;
+        let worst = 0;
+        do {
+            worst = Math.max(worst, await highlights.count());
+            await this.page.waitForTimeout(250);
+        } while (Date.now() < deadline);
+        expect(worst, 'a highlight appeared where a negative filter should mark nothing').toBe(0);
+    }
+
+    /** Column ids actually rendered in the results table, in order. */
+    async renderedColumnIds() {
+        return this.page
+            .locator(`${this.logsSearchResultLogsTable} td[data-test^="o2-table-cell-"]`)
+            .evaluateAll((cells) => [
+                ...new Set(
+                    cells.map((td) => td.getAttribute('data-test').replace('o2-table-cell-', ''))
+                ),
+            ]);
+    }
+
+    /** The rendered column set, polled: it is re-resolved on every search. */
+    expectRenderedColumnIds(timeout = 30000) {
+        return expect.poll(() => this.renderedColumnIds(), { timeout });
+    }
+
+    /** The per-row stream-name cells a multi-stream result set carries. */
+    streamNameCells() {
+        return this.resultCells('_stream_name');
+    }
+
+    /** The distinct stream names the results currently show. */
+    async distinctStreamNames() {
+        const cells = await this.streamNameCells().allInnerTexts();
+        return [...new Set(cells.map((c) => c.trim()))].filter(Boolean);
+    }
+
+    /** Opens the first row's detail and returns the stream name that row came from. */
+    async openFirstHitDetail(timeout = 20000) {
+        const streamCell = this.streamNameCells().first();
+        const hitStream = (await streamCell.innerText()).trim();
+        await streamCell.click();
+        await expect(this.page.locator(this.logDetailDialog)).toBeVisible({ timeout });
+        return hitStream;
+    }
+
+    searchAroundButton() {
+        return this.page.locator(this.logsDetailTableSearchAroundBtn);
+    }
+
+    /**
+     * Clicks Search around and resolves with the _around response.
+     *
+     * Reading the table straight after the click races the round trip: the pre-click
+     * table is still the previous result set, so an assertion about the new rows can be
+     * satisfied by the old ones.
+     */
+    async clickSearchAroundAwaitingResponse(timeout = 30000) {
+        const [response] = await Promise.all([
+            this.page.waitForResponse((r) => /_around/.test(r.url()), { timeout }),
+            this.searchAroundButton().click(),
+        ]);
+        return response;
+    }
+
+    /** Clicks Search around and resolves with the _around request (not its answer). */
+    async clickSearchAroundAwaitingRequest(timeout = 30000) {
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => /_around/.test(r.url()), { timeout }),
+            this.searchAroundButton().click(),
+        ]);
+        return request;
     }
 
 }

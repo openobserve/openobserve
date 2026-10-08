@@ -20,6 +20,8 @@ import {
   provide,
   nextTick,
   useAttrs,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -59,6 +61,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   portalTarget: undefined,
   anchor: undefined,
   anchorEdge: "top",
+  modal: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -66,6 +69,9 @@ const emit = defineEmits<DrawerEmits>();
 defineSlots<DrawerSlots>();
 
 const slots = useSlots();
+
+const ESCAPE_KEEPS_OPEN =
+  "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
 // Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
 // boolean-casts an absent `open` prop to `false`, locking reka-ui into
@@ -79,13 +85,45 @@ watch(
   },
 );
 
+// A kept-alive view's portal stays in <body> when the view is away, so it hides then and returns open.
+const hostAway = ref(false);
+// An inline drawer's DOM moves with its host, so only a portaled one needs hiding.
+const shown = computed(() => internalOpen.value && (props.inline || !hostAway.value));
+
+// Remounting on return re-records focus from wherever navigation left it, so keep the opener.
+let openedFrom: HTMLElement | null = null;
+let awaySinceOpen = false;
+watch(
+  internalOpen,
+  (open) => {
+    if (!open) return;
+    openedFrom = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    awaySinceOpen = false;
+  },
+  { immediate: true },
+);
+onDeactivated(() => {
+  hostAway.value = true;
+  if (internalOpen.value && !shown.value) awaySinceOpen = true;
+});
+onActivated(() => (hostAway.value = false));
+
+function handleCloseAutoFocus(event: Event) {
+  if (hostAway.value || awaySinceOpen) event.preventDefault();
+  if (hostAway.value || !awaySinceOpen) return;
+  awaySinceOpen = false;
+  if (openedFrom?.isConnected) openedFrom.focus();
+}
+
 function handleOpenChange(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  if (props.persistent || (!props.modal && target?.closest(ESCAPE_KEEPS_OPEN))) {
     e.preventDefault();
     return;
   }
@@ -93,7 +131,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
-  if (props.persistent) {
+  if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
   }
@@ -211,7 +249,7 @@ function measureAnchor() {
 }
 watchEffect(
   (cleanup) => {
-    if (!internalOpen.value || !props.anchor) {
+    if (!shown.value || !props.anchor) {
       anchorTop.value = 0;
       return;
     }
@@ -247,31 +285,44 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const AUTOFOCUS_TEXT_FIELDS = [
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+  "textarea:not([disabled])",
+].join(", ");
+const AUTOFOCUS_COMBOBOX = '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+
+function findAutoFocusTarget(root: Element): HTMLElement | null {
+  const scan = (selector: string): HTMLElement[] => {
+    const nested = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
+  };
+  const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
+    (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
+  );
+  if (textField) return textField;
+  return scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest("[data-no-autofocus]")) ?? null;
+}
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
     const body = bodyRef.value;
-    if (body) {
-      const candidates = body.querySelectorAll<HTMLElement>(
-        [
-          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          "textarea:not([disabled])",
-        ].join(", "),
-      );
-      const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
-      );
-      if (firstField) {
-        firstField.focus();
-        return;
-      }
+    const field = body ? findAutoFocusTarget(body) : null;
+    if (field) {
+      field.focus();
+      return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
+    const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
+    if (autofocus) {
+      autofocus.focus();
+      return;
+    }
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
+      return;
     }
+    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus();
   });
 }
 
@@ -291,7 +342,7 @@ function handleOpenAutoFocus(event: Event) {
 // body is below document in the DOM, this prevents the events from reaching
 // FocusScope's document-level handlers.
 watchEffect((cleanup) => {
-  if (!internalOpen.value) return;
+  if (!shown.value) return;
 
   function isPortalElement(el: Element | null): boolean {
     return !!el?.closest("[data-reka-popper-content-wrapper]");
@@ -329,7 +380,8 @@ const {
   detach: detachShadow,
 } = useScrollShadow(bodyRef);
 
-watch(internalOpen, (open) => {
+// The body unmounts while a kept-alive host is away, so its listeners follow what is shown.
+watch(shown, (open) => {
   if (open) {
     nextTick(() => {
       attachShadow();
@@ -342,7 +394,7 @@ watch(internalOpen, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="internalOpen" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
@@ -407,6 +459,7 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @close-auto-focus="handleCloseAutoFocus"
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">

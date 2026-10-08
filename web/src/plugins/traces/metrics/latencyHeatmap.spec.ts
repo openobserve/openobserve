@@ -1,0 +1,508 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, afterEach } from "vitest";
+import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import { convertToUtcTimestamp } from "@/utils/timezone";
+import {
+  DURATION_BOUNDS_US,
+  bucketBounds,
+  formatDurationBound,
+  buildLatencyHeatmapSql,
+  buildHeatmapGrid,
+  selectionFromBox,
+  instantToPickerMs,
+  durationBand,
+  composeFilter,
+  isRangeSelectionCurrent,
+  chartInterval,
+  selectionTerm,
+  type LatencyHeatmapHit,
+} from "./latencyHeatmap";
+
+let parser: any;
+
+async function getParser() {
+  if (parser) return parser;
+  const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
+  parser = new mod.default.Parser();
+  return parser;
+}
+
+const S = 1_000_000;
+const T0 = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
+
+const hit = (
+  secondsAfterT0: number,
+  bucket: number,
+  count: number,
+  errors = 0,
+): LatencyHeatmapHit => ({
+  x_axis: new Date((T0 + secondsAfterT0 * S) / 1000).toISOString().slice(0, 19),
+  duration_bucket: bucket,
+  span_count: count,
+  error_count: errors,
+});
+
+describe("bucketBounds", () => {
+  it("maps the bottom, second, top-bounded and open top buckets", () => {
+    expect(bucketBounds(0)).toEqual({ lo: 0, hi: 1 });
+    expect(bucketBounds(1)).toEqual({ lo: 1, hi: 2 });
+    expect(bucketBounds(27)).toEqual({ lo: 5e8, hi: 1e9 });
+    expect(bucketBounds(28)).toEqual({ lo: 1e9, hi: null });
+  });
+});
+
+describe("buildLatencyHeatmapSql", () => {
+  const bucketOf = (us: number) => DURATION_BOUNDS_US.filter((b) => b <= us).length;
+
+  it("orders the CASE so the first matching WHEN is the reference bucket", () => {
+    const sql = buildLatencyHeatmapSql("default", [], "15 second");
+    const whens = [...sql.matchAll(/WHEN duration < (\d+) THEN (\d+)/g)].map((m) => ({
+      bound: Number(m[1]),
+      bucket: Number(m[2]),
+    }));
+    const elseBucket = Number(sql.match(/ELSE (\d+) END/)![1]);
+    const sqlBucketOf = (us: number) => whens.find((w) => us < w.bound)?.bucket ?? elseBucket;
+    for (const us of [0, 1, 2, 4, 5, 999, 1000, 999_999, 1_000_000, 2e9]) {
+      expect(sqlBucketOf(us)).toBe(bucketOf(us));
+    }
+    expect(sql).toContain("WHEN duration < 1000 THEN 9");
+    expect(sql).toContain("ELSE 28 END");
+  });
+
+  it("groups by time and duration bucket with an explicit row limit", () => {
+    const sql = buildLatencyHeatmapSql("default", [], "15 second");
+    expect(sql).toContain("histogram(_timestamp, '15 second') AS x_axis");
+    expect(sql).toContain("count(*) AS span_count");
+    expect(sql).toContain("sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count");
+    expect(sql).toContain("GROUP BY x_axis, duration_bucket");
+    expect(sql).toContain("LIMIT 20000");
+  });
+
+  it("quotes the stream and joins filters into one WHERE", () => {
+    expect(buildLatencyHeatmapSql("my-stream", [], "15 second")).toContain('FROM "my-stream"');
+    expect(buildLatencyHeatmapSql("s", [], "15 second")).not.toMatch(/\bWHERE\b/);
+    expect(buildLatencyHeatmapSql("s", ["a", "b"], "15 second")).toContain(
+      'FROM "s" WHERE a AND b GROUP BY',
+    );
+  });
+});
+
+describe("chartInterval", () => {
+  const SEC = 1_000_000;
+  const at = (seconds: number) => chartInterval(T0, T0 + seconds * SEC);
+
+  it("mirrors the backend's histogram interval table at every boundary", () => {
+    const H = 3600;
+    const D = 24 * H;
+    const cases: [number, string, number][] = [
+      [9, "1 second", 1],
+      [10, "10 second", 10],
+      [30 * 60 - 1, "10 second", 10],
+      [30 * 60, "15 second", 15],
+      [H, "30 second", 30],
+      [2 * H, "1 minute", 60],
+      [6 * H, "1 hour", 3600],
+      [15 * D, "2 hour", 7200],
+      [21 * D, "3 hour", 3 * H],
+      [28 * D, "6 hour", 6 * H],
+      [30 * D, "12 hour", 12 * H],
+      [60 * D, "1 day", D],
+    ];
+    for (const [seconds, sql, intervalSeconds] of cases) {
+      expect(at(seconds)).toEqual({ sql, seconds: intervalSeconds });
+    }
+  });
+});
+
+describe("formatDurationBound", () => {
+  it("uses the largest unit that divides the value", () => {
+    expect(formatDurationBound(1)).toBe("1us");
+    expect(formatDurationBound(2)).toBe("2us");
+    expect(formatDurationBound(5000)).toBe("5ms");
+    expect(formatDurationBound(100_000_000)).toBe("100s");
+  });
+
+  it("round-trips every bound through the editor's duration parser", async () => {
+    const p = await getParser();
+    for (const us of DURATION_BOUNDS_US) {
+      const decoded = parseDurationWhereClause(
+        `duration >= '${formatDurationBound(us)}'`,
+        p,
+        "default",
+      );
+      expect(decoded).toMatch(new RegExp(`duration >= ${us}$`));
+    }
+  });
+});
+
+describe("buildHeatmapGrid", () => {
+  it("returns null for no hits", () => {
+    expect(buildHeatmapGrid([], 10, T0, T0 + 60 * S)).toBeNull();
+  });
+
+  it("fills empty time columns across the range, anchored on the returned bucket", () => {
+    const grid = buildHeatmapGrid([hit(20, 5, 3)], 10, T0 + 5 * S, T0 + 60 * S)!;
+    expect(grid.intervalUs).toBe(10 * S);
+    expect(grid.colStartUs).toEqual([0, 10, 20, 30, 40, 50].map((s) => T0 + s * S));
+    expect(grid.cells).toEqual([[2, 0, 1, 3, 0, 0]]);
+  });
+
+  it("keeps empty duration rows between two modes", () => {
+    const grid = buildHeatmapGrid([hit(0, 3, 1), hit(0, 9, 1)], 10, T0, T0 + 10 * S)!;
+    expect(grid.rows).toEqual([3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it("keeps bucket 0", () => {
+    const grid = buildHeatmapGrid([hit(0, 0, 2), hit(0, 2, 1)], 10, T0, T0 + 10 * S)!;
+    expect(grid.rows).toEqual([0, 1, 2]);
+    expect(grid.cells).toContainEqual([0, 0, 1, 2, 0, 0]);
+  });
+
+  it("builds rows only from hits that land inside the columns", () => {
+    const grid = buildHeatmapGrid(
+      [hit(10, 5, 1), hit(-600, 0, 9), hit(900, 28, 9)],
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    expect(grid.rows).toEqual([5]);
+    expect(grid.cells).toEqual([[1, 0, 1, 1, 0, 0]]);
+  });
+
+  it("returns null when no hit lands inside the columns", () => {
+    expect(buildHeatmapGrid([hit(-600, 4, 3), hit(900, 6, 3)], 10, T0, T0 + 30 * S)).toBeNull();
+  });
+
+  it("colours each cell by the square root of its share of its column's busiest cell", () => {
+    const counts = [4787, 2970, 1516, 1];
+    const grid = buildHeatmapGrid(
+      counts.map((count, row) => hit(10, 5 + row, count)),
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    const colour = grid.cells.map((c) => c[2]);
+    expect(colour[0]).toBe(1);
+    expect(colour[1]).toBeCloseTo(0.788, 3);
+    expect(colour[2]).toBeCloseTo(0.563, 3);
+    expect(colour[3]).toBeCloseTo(0.0145, 4);
+  });
+
+  it("normalises each column independently", () => {
+    const grid = buildHeatmapGrid(
+      [hit(0, 5, 100), hit(0, 6, 25), hit(10, 5, 25), hit(10, 6, 1)],
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    const at = (col: number, row: number) => grid.cells.find((c) => c[0] === col && c[1] === row)!;
+    expect(at(0, 1)[2]).toBeCloseTo(0.5, 10);
+    expect(at(1, 0)[2]).toBe(1);
+  });
+
+  it("puts the busiest cell of every column at exactly 1, including a column of one cell", () => {
+    const grid = buildHeatmapGrid(
+      [hit(0, 5, 7), hit(0, 6, 3), hit(10, 7, 1), hit(20, 5, 2), hit(20, 6, 9)],
+      10,
+      T0,
+      T0 + 30 * S,
+    )!;
+    for (const col of [0, 1, 2]) {
+      const inCol = grid.cells.filter((c) => c[0] === col).map((c) => c[2]);
+      expect(Math.max(...inCol)).toBe(1);
+    }
+  });
+
+  it("carries each cell's error share and error count at indices 4 and 5", () => {
+    const grid = buildHeatmapGrid([hit(10, 4, 20, 5), hit(10, 5, 8, 0)], 10, T0, T0 + 30 * S)!;
+    expect(grid.cells.map((c) => [c[3], c[4], c[5]])).toEqual([
+      [20, 0.25, 5],
+      [8, 0, 0],
+    ]);
+  });
+
+  it("keeps the raw count at index 3", () => {
+    const grid = buildHeatmapGrid([hit(10, 4, 99), hit(10, 5, 9)], 10, T0, T0 + 30 * S)!;
+    expect(grid.cells.map((c) => c[3])).toEqual([99, 9]);
+  });
+});
+
+describe("selectionFromBox", () => {
+  // Range 10:00:05–10:01:00 → columns 10:00:00 … 10:00:50; rows are buckets 3..9.
+  const grid = buildHeatmapGrid([hit(0, 3, 1), hit(50, 9, 1)], 10, T0 + 5 * S, T0 + 60 * S)!;
+
+  it("accepts index 0 and clamps the start to the search range", () => {
+    expect(selectionFromBox(grid, { start: 0, end: 0, start1: 0, end1: 0 })).toEqual({
+      timeStartUs: T0 + 5 * S,
+      timeEndUs: T0 + 10 * S,
+      durationLoUs: 5,
+      durationHiUs: 10,
+    });
+  });
+
+  it("normalises reversed and fractional indices", () => {
+    const sel = selectionFromBox(grid, { start: 3.4, end: 1.6, start1: 2.2, end1: 0.6 });
+    expect(sel.timeStartUs).toBe(T0 + 20 * S);
+    expect(sel.timeEndUs).toBe(T0 + 40 * S);
+    expect(sel.durationLoUs).toBe(10);
+    expect(sel.durationHiUs).toBe(50);
+  });
+
+  it("clamps out-of-range indices and the end time to the search range", () => {
+    const sel = selectionFromBox(grid, { start: -4, end: 99, start1: -1, end1: 99 });
+    expect(sel.timeStartUs).toBe(T0 + 5 * S);
+    expect(sel.timeEndUs).toBe(T0 + 60 * S);
+    expect(sel.durationLoUs).toBe(5);
+    expect(sel.durationHiUs).toBe(1000);
+  });
+
+  it("ends at the column start plus the interval", () => {
+    const sel = selectionFromBox(grid, { start: 2, end: 2, start1: 0, end1: 0 });
+    expect(sel.timeEndUs).toBe(T0 + 30 * S);
+  });
+
+  it("gives lo 0 for bucket 0 and hi null for bucket 28", () => {
+    const edges = buildHeatmapGrid([hit(0, 0, 1), hit(0, 28, 1)], 10, T0, T0 + 10 * S)!;
+    const sel = selectionFromBox(edges, { start: 0, end: 0, start1: 0, end1: 28 });
+    expect(sel.durationLoUs).toBe(0);
+    expect(sel.durationHiUs).toBeNull();
+  });
+
+  it("matches the spec's worked example", () => {
+    const at = (h: number, m: number, s: number) => Date.UTC(2026, 9, 6, h, m, s) * 1000;
+    const hits: LatencyHeatmapHit[] = [
+      { x_axis: "2026-10-06T10:00:00", duration_bucket: 16, span_count: 4 },
+      { x_axis: "2026-10-06T10:04:50", duration_bucket: 17, span_count: 2 },
+    ];
+    const g = buildHeatmapGrid(hits, 10, at(10, 0, 0), at(10, 5, 0))!;
+    const col = (h: number, m: number, s: number) => g.colStartUs.indexOf(at(h, m, s));
+    const sel = selectionFromBox(g, {
+      start: col(10, 2, 0),
+      end: col(10, 2, 30),
+      start1: g.rows.indexOf(16),
+      end1: g.rows.indexOf(17),
+    });
+    expect(sel).toEqual({
+      timeStartUs: at(10, 2, 0),
+      timeEndUs: at(10, 2, 40),
+      durationLoUs: 100_000,
+      durationHiUs: 500_000,
+    });
+    expect(durationBand(sel.durationLoUs, sel.durationHiUs)).toBe(
+      "duration >= '100ms' and duration < '500ms'",
+    );
+    expect(
+      composeFilter(
+        "service_name = 'a' or span_status = 'ERROR'",
+        durationBand(sel.durationLoUs, sel.durationHiUs),
+      ),
+    ).toBe(
+      "(service_name = 'a' or span_status = 'ERROR') and duration >= '100ms' and duration < '500ms'",
+    );
+  });
+});
+
+describe("durationBand / composeFilter", () => {
+  const band = "duration >= '100ms' and duration < '500ms'";
+
+  it("omits a null or zero lower side and a null upper side", () => {
+    expect(durationBand(100_000, 500_000)).toBe(band);
+    expect(durationBand(0, 1000)).toBe("duration < '1ms'");
+    expect(durationBand(null, 1000)).toBe("duration < '1ms'");
+    expect(durationBand(1e9, null)).toBe("duration >= '1000s'");
+    expect(durationBand(0, null)).toBe("");
+  });
+
+  it("returns the band alone for an empty baseline", () => {
+    expect(composeFilter("", band)).toBe(band);
+    expect(composeFilter("  ", band)).toBe(band);
+  });
+
+  it("returns the baseline unchanged for an empty band", () => {
+    expect(composeFilter("service_name = 'a'", "")).toBe("service_name = 'a'");
+  });
+
+  it("groups an OR baseline", () => {
+    expect(composeFilter("a = '1' or b = '2'", band)).toBe(`(a = '1' or b = '2') and ${band}`);
+  });
+
+  it("keeps and intersects a baseline duration condition", () => {
+    expect(composeFilter("duration >= '1ms'", band)).toBe(`(duration >= '1ms') and ${band}`);
+  });
+
+  it("restores the baseline exactly for a full-height box", () => {
+    const baseline = "service_name = 'a'  or x = 1";
+    expect(composeFilter(baseline, durationBand(0, null))).toBe(baseline);
+  });
+
+  it("composes a refinement from the carried-forward baseline, not the first band", () => {
+    const baseline = "service_name = 'a'";
+    const second = durationBand(200_000, 500_000);
+    const text = composeFilter(baseline, second);
+    expect(text).toBe(`(service_name = 'a') and ${second}`);
+    expect(text).not.toContain("'100ms'");
+  });
+});
+
+describe("instantToPickerMs", () => {
+  const instantMs = Date.UTC(2026, 9, 6, 10, 2, 0);
+  const pinnedTz = process.env.TZ;
+
+  afterEach(() => {
+    process.env.TZ = pinnedTz;
+  });
+
+  // What the picker does: format with browser-local getters, then parse that wall clock in the app zone.
+  const pickerRoundTrip = (pickerMs: number, appZone: string) => {
+    const d = new Date(pickerMs);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const text = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return convertToUtcTimestamp(text, appZone) / 1000;
+  };
+
+  it.each([
+    ["America/New_York", "Asia/Kolkata"],
+    ["Asia/Tokyo", "America/Los_Angeles"],
+    ["America/New_York", "UTC"],
+    ["Asia/Tokyo", "Asia/Tokyo"],
+  ])("lands the picker on the instant with browser zone %s and app zone %s", (host, app) => {
+    process.env.TZ = host;
+    // Guards against a runtime that ignores the TZ change, which would make the round trip vacuous.
+    expect(new Date(instantMs).getTimezoneOffset()).not.toBe(0);
+    expect(pickerRoundTrip(instantToPickerMs(instantMs, app), app)).toBe(instantMs);
+  });
+});
+
+describe("isRangeSelectionCurrent", () => {
+  const entry = {
+    panelTitle: "Duration",
+    start: 100_000,
+    end: 500_000,
+    timeStart: 10,
+    timeEnd: 20,
+    appliedStart: 1_000_000,
+    appliedEnd: 2_000_000,
+    baselineFilter: "service_name = 'a'",
+    stream: "default",
+    searchMode: "traces" as const,
+  };
+  const composed = "(service_name = 'a') and duration >= '100ms' and duration < '500ms'";
+  const current = (overrides: Record<string, unknown> = {}) => ({
+    startTime: 1_000_000,
+    endTime: 2_000_000,
+    stream: "default",
+    searchMode: "traces" as const,
+    editorText: composed,
+    ...overrides,
+  });
+
+  it("keeps a selection whose applied range, composed text, stream and mode all match", () => {
+    expect(isRangeSelectionCurrent(entry, current())).toBe(true);
+  });
+
+  it("keeps it when the editor adds only leading or trailing whitespace, as the editor trims", () => {
+    expect(isRangeSelectionCurrent(entry, current({ editorText: `  ${composed}\n` }))).toBe(true);
+  });
+
+  it("drops it when whitespace inside a quoted literal changes", () => {
+    const quoted = { ...entry, baselineFilter: "message = 'a b'" };
+    const typed = "(message = 'a  b') and duration >= '100ms' and duration < '500ms'";
+    expect(isRangeSelectionCurrent(quoted, current({ editorText: typed }))).toBe(false);
+  });
+
+  it("drops it for a different applied range", () => {
+    expect(isRangeSelectionCurrent(entry, current({ endTime: 2_000_001 }))).toBe(false);
+    expect(isRangeSelectionCurrent(entry, current({ startTime: 999_999 }))).toBe(false);
+  });
+
+  it("drops it when the band is removed from the editor", () => {
+    expect(isRangeSelectionCurrent(entry, current({ editorText: "service_name = 'a'" }))).toBe(
+      false,
+    );
+  });
+
+  it("drops it for an unrelated filter edit in the baseline part", () => {
+    const edited = composed.replace("'a'", "'b'");
+    expect(isRangeSelectionCurrent(entry, current({ editorText: edited }))).toBe(false);
+  });
+
+  it("drops it when Error Only appends a span_status term", () => {
+    const toggled = `${composed} and span_status = 'ERROR'`;
+    expect(isRangeSelectionCurrent(entry, current({ editorText: toggled }))).toBe(false);
+  });
+
+  it("keeps a both-null entry whose editor equals its baseline text", () => {
+    const full = { ...entry, start: null, end: null };
+    expect(isRangeSelectionCurrent(full, current({ editorText: "service_name = 'a'" }))).toBe(true);
+  });
+
+  it("drops it for a different stream", () => {
+    expect(isRangeSelectionCurrent(entry, current({ stream: "other" }))).toBe(false);
+  });
+
+  it("drops it for a different search mode", () => {
+    expect(isRangeSelectionCurrent(entry, current({ searchMode: "spans" }))).toBe(false);
+  });
+
+  const errorsEntry = { ...entry, panelTitle: "Errors", start: null, end: null };
+  const rateEntry = { ...entry, panelTitle: "Rate", start: null, end: null };
+
+  it("keeps an Errors entry whose editor is its baseline and the error term", () => {
+    const text = composeFilter("service_name = 'a'", "span_status = 'ERROR'");
+    expect(isRangeSelectionCurrent(errorsEntry, current({ editorText: text }))).toBe(true);
+  });
+
+  it("keeps a Rate entry whose editor equals its baseline", () => {
+    expect(isRangeSelectionCurrent(rateEntry, current({ editorText: "service_name = 'a'" }))).toBe(
+      true,
+    );
+  });
+
+  it("drops an Errors or Rate entry after an unrelated edit", () => {
+    const errorsText = "(service_name = 'b') and span_status = 'ERROR'";
+    expect(isRangeSelectionCurrent(errorsEntry, current({ editorText: errorsText }))).toBe(false);
+    expect(isRangeSelectionCurrent(rateEntry, current({ editorText: "service_name = 'b'" }))).toBe(
+      false,
+    );
+  });
+});
+
+describe("selectionTerm", () => {
+  const base = {
+    start: null,
+    end: null,
+    appliedStart: 1,
+    appliedEnd: 2,
+    baselineFilter: "",
+    stream: "default",
+    searchMode: "spans" as const,
+  };
+
+  it("is the duration band for a heatmap box", () => {
+    expect(selectionTerm({ ...base, panelTitle: "Duration", start: 100_000, end: 500_000 })).toBe(
+      "duration >= '100ms' and duration < '500ms'",
+    );
+  });
+
+  it("is the error status for an Errors brush", () => {
+    expect(selectionTerm({ ...base, panelTitle: "Errors" })).toBe("span_status = 'ERROR'");
+  });
+
+  it("is empty for a Rate brush, which selects time only", () => {
+    expect(selectionTerm({ ...base, panelTitle: "Rate" })).toBe("");
+  });
+});

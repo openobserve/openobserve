@@ -33,4 +33,6 @@ export interface OTabSlots {
   default?: () => unknown;
   /** Custom icon area — overrides the `icon` prop */
   icon?: () => unknown;
+  /** Controls beside the trigger (e.g. a toggle button), kept out of it so the tab never nests buttons. */
+  trailing?: () => unknown;
 }

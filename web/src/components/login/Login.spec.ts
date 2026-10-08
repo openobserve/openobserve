@@ -368,6 +368,42 @@ describe("Login", () => {
     expect(window.location.href).toBe("https://sso.example.com");
   });
 
+  describe("sign-up intent (screen_hint)", () => {
+    const DEX_URL =
+      "https://dex.example.com/dex/auth?client_id=o2&redirect_uri=https%3A%2F%2Fcloud.example.com%2Fweb%2Fcb&scope=openid%20profile";
+
+    const redirectFrom = async (path: string, dexUrl = DEX_URL) => {
+      const authService = await import("@/services/auth");
+      (authService.default.get_dex_login as any).mockResolvedValue(dexUrl);
+      await router.push(path);
+      wrapper?.unmount();
+      wrapper = mount(Login, { global: { plugins: [i18n, store, router] } });
+      await wrapper.vm.loginWithSSo();
+      await flushPromises();
+      return window.location.href;
+    };
+
+    it("appends screen_hint=signup and keeps the existing query byte-for-byte", async () => {
+      expect(await redirectFrom("/?mode=signup")).toBe(`${DEX_URL}&screen_hint=signup`);
+    });
+
+    it("adds a query when the dex URL has none", async () => {
+      expect(await redirectFrom("/?mode=signup", "https://sso.example.com/dex/auth")).toBe(
+        "https://sso.example.com/dex/auth?screen_hint=signup",
+      );
+    });
+
+    it("leaves the dex URL untouched without mode=signup", async () => {
+      expect(await redirectFrom("/")).toBe(DEX_URL);
+      expect(await redirectFrom("/?mode=login")).toBe(DEX_URL);
+    });
+
+    it("does not add a second screen_hint", async () => {
+      const hinted = `${DEX_URL}&screen_hint=signup`;
+      expect(await redirectFrom("/?mode=signup", hinted)).toBe(hinted);
+    });
+  });
+
   // Test 14: loginWithSSo handles errors gracefully
   it("should handle errors gracefully when get_dex_login fails", async () => {
     const authService = await import("@/services/auth");

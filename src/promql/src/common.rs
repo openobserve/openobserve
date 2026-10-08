@@ -73,7 +73,8 @@ pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> 
     let upper = data[index + 1];
 
     let fraction = quantile * (n - 1) as f64 - index as f64;
-    let quantile_value = lower + (upper - lower) * fraction;
+    // Prometheus lower*(1-w)+upper*w keeps Inf; the other form makes (Inf-Inf)=NaN.
+    let quantile_value = lower * (1.0 - fraction) + upper * fraction;
 
     Some(quantile_value)
 }
@@ -118,7 +119,7 @@ pub fn linear_regression(samples: &[Sample], intercept_time: i64) -> Option<(f64
 
     if constant_y {
         if initial_y.is_infinite() {
-            return None;
+            return Some((f64::NAN, f64::NAN));
         }
         return Some((0.0, initial_y));
     }
@@ -181,6 +182,8 @@ mod tests {
         assert_eq!(quantile_in_place(&mut [], -1.0), Some(f64::NEG_INFINITY));
         assert_eq!(quantile_in_place(&mut [], 2.0), Some(f64::INFINITY));
         assert!(quantile_in_place(&mut [], f64::NAN).unwrap().is_nan());
+        let infinite = [1.0, f64::INFINITY, f64::INFINITY];
+        assert_eq!(quantile(&infinite, 0.75), Some(f64::INFINITY));
     }
 
     #[test]
@@ -229,6 +232,26 @@ mod tests {
         // Test interpolation
         let data = vec![10.0, 20.0];
         assert_eq!(quantile(&data, 0.5), Some(15.0)); // Exact midpoint
+    }
+
+    // Regression #14924: Prometheus keeps Inf bounds; the old formula returns NaN.
+    #[test]
+    fn test_quantile_with_infinite_boundary_keeps_infinity() {
+        // 0 < weight < 1 with an infinite boundary: the two formulas differ.
+        let data = vec![1.0, f64::INFINITY, f64::INFINITY];
+        assert_eq!(quantile(&data, 0.75), Some(f64::INFINITY));
+
+        let data = vec![f64::NEG_INFINITY, f64::NEG_INFINITY, 1.0];
+        assert_eq!(quantile(&data, 0.25), Some(f64::NEG_INFINITY));
+
+        // weight==0 gives Inf*0=NaN under either formula (matches Prometheus), so nothing to pin.
+
+        // finite values are unaffected by the formula change
+        let data = vec![10.0, 20.0];
+        assert_eq!(quantile(&data, 0.5), Some(15.0));
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        assert_eq!(quantile(&data, 0.5), Some(3.0));
+        assert_eq!(quantile(&data, 0.75), Some(4.0));
     }
 
     #[test]
@@ -297,7 +320,8 @@ mod tests {
             Sample::new(1000, f64::INFINITY),
             Sample::new(2000, f64::INFINITY),
         ];
-        assert!(linear_regression(&samples, 0).is_none());
+        let (slope, intercept) = linear_regression(&samples, 0).unwrap();
+        assert!(slope.is_nan() && intercept.is_nan());
 
         // Test negative slope
         let samples = vec![
@@ -443,8 +467,8 @@ mod tests {
             Sample::new(1000, f64::INFINITY),
             Sample::new(2000, f64::INFINITY),
         ];
-        let result = linear_regression(&samples, 0);
-        assert!(result.is_none());
+        let (slope, intercept) = linear_regression(&samples, 0).unwrap();
+        assert!(slope.is_nan() && intercept.is_nan());
 
         // Test with empty samples
         let samples: Vec<Sample> = vec![];

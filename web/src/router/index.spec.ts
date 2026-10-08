@@ -29,6 +29,11 @@ vi.mock("@/composables/shared/router", () => ({
         component: { template: "<div>Login</div>" },
         meta: { titleKey: "login.login" },
       },
+      {
+        // Mirrors the /signup record in composables/shared/router.ts.
+        path: "/signup",
+        redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
+      },
     ],
     homeChildRoutes: [
       {
@@ -188,6 +193,12 @@ describe("router/index (factory)", () => {
       // Accessing protected router guard via beforeEach simulation
       const guards = (router as any).currentRoute;
       expect(guards).toBeDefined();
+    });
+
+    it("lands /signup on /login with mode=signup and the original query intact", async () => {
+      await router.push("/signup?utm_source=blog").catch(() => {});
+      expect(router.currentRoute.value.path).toBe("/login");
+      expect(router.currentRoute.value.query).toEqual({ utm_source: "blog", mode: "signup" });
     });
 
     it("should redirect to /login when navigating to a protected route without a session", async () => {

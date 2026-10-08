@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getDataValue } from "./aliasUtils";
+import { getFieldLabel } from "./fieldLabel";
 import {
   buildValueMappingCache,
   lookupValueMapping,
@@ -115,7 +116,9 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
 
   const isTransposeEnabled = panelSchema.config.table_transpose;
   const transposeColumn = columnData[0]?.alias || "";
-  const transposeColumnLabel = columnData[0]?.label || "";
+  const labelOf = (field: any) =>
+    getFieldLabel(field, panelSchema.config, panelSchema.queries?.[0]?.customQuery);
+  const transposeColumnLabel = labelOf(columnData[0]) || "";
   let columns;
 
   if (!isTransposeEnabled) {
@@ -129,9 +132,9 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
       );
       const actualField = fieldNameCache[aliasLower] || it.alias;
 
-      obj["name"] = it.label || it.alias;
+      obj["name"] = labelOf(it) || it.alias;
       obj["field"] = actualField;
-      obj["label"] = it.label || it.alias;
+      obj["label"] = labelOf(it) || it.alias;
       // override_config is keyed by alias; the TanStack column id is the data field.
       obj["alias"] = it.alias;
       obj["isNumeric"] = isNumber;
@@ -332,7 +335,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         acc[curr] = value;
         return acc;
       }, {});
-      obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
+      obj["label"] = labelOf(it) || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
   }
@@ -408,9 +411,10 @@ export const convertMultiQueryTableData = (
 
   // Collect field configs from all queries for known columns
   const knownAliases = new Map<string, any>();
+  const knownLabels = new Map<string, string>();
 
   // Helper: register a field's alias (deduped) and remember its config.
-  const addField = (f: any) => {
+  const addField = (f: any, customQuery: boolean) => {
     if (!f?.alias) return;
     if (!seenColumns.has(f.alias)) {
       orderedColumnNames.push(f.alias);
@@ -418,13 +422,16 @@ export const convertMultiQueryTableData = (
     }
     if (!knownAliases.has(f.alias)) {
       knownAliases.set(f.alias, f);
+      knownLabels.set(f.alias, getFieldLabel(f, panelSchema.config, customQuery));
     }
   };
 
   // 1) Q1..Qn X-axis fields, 2) Q1..Qn breakdown fields, 3) Q1..Qn Y-axis fields
-  panelSchema.queries.forEach((q: any) => (q.fields?.x || []).forEach(addField));
-  panelSchema.queries.forEach((q: any) => (q.fields?.breakdown || []).forEach(addField));
-  panelSchema.queries.forEach((q: any) => (q.fields?.y || []).forEach(addField));
+  (["x", "breakdown", "y"] as const).forEach((axis) =>
+    panelSchema.queries.forEach((q: any) =>
+      (q.fields?.[axis] || []).forEach((f: any) => addField(f, q.customQuery)),
+    ),
+  );
 
   // Then add dynamic (non-selected) response columns per query, if enabled.
   if (isDynamicColumns) {
@@ -466,8 +473,7 @@ export const convertMultiQueryTableData = (
 
   const isTransposeEnabled = panelSchema.config?.table_transpose;
   const transposeColumn = orderedColumnNames[0] || "";
-  const transposeColumnConfig = knownAliases.get(transposeColumn);
-  const transposeColumnLabel = transposeColumnConfig?.label || transposeColumn;
+  const transposeColumnLabel = knownLabels.get(transposeColumn) || transposeColumn;
 
   if (isTransposeEnabled && transposeColumn) {
     // Transpose: first column's values become column headers,
@@ -565,12 +571,11 @@ export const convertMultiQueryTableData = (
 
     // Transpose rows: each remaining column becomes a row
     const tableRows = remainingColumns.map((colName) => {
-      const fieldConfig = knownAliases.get(colName);
       const obj = uniqueTransposeColumns.reduce((acc: any, curr: any, reduceIndex: number) => {
         acc[curr] = getDataValue(allRows[reduceIndex], colName) ?? "";
         return acc;
       }, {} as any);
-      obj["label"] = fieldConfig?.label || colName;
+      obj["label"] = knownLabels.get(colName) || colName;
       return obj;
     });
 
@@ -592,7 +597,7 @@ export const convertMultiQueryTableData = (
     const col: any = {
       name: colName,
       field: colName,
-      label: fieldConfig?.label || colName,
+      label: knownLabels.get(colName) || colName,
       sortable: true,
       mono: isNumber || isTimestamp,
     };

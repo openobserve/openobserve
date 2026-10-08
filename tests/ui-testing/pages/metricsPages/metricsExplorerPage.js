@@ -50,9 +50,9 @@ export class MetricsExplorerPage {
         this.chartRenderer = '[data-test="chart-renderer"]';
 
         // ===== CARDS =====
-        // Card data-tests are name-suffixed (`…-card-select-cpu_usage`), so the
-        // "any card" locator matches on the stable prefix.
-        this.anyCardSelect = '[data-test^="metrics-explorer-card-select-"]';
+        // Card data-tests are name-suffixed (`…-card-details-cpu_usage`), so the
+        // "any card" locator matches on the stable prefix of the Drill down button.
+        this.anyCardSelect = '[data-test^="metrics-explorer-card-details-"]';
         // The same suffixing is why these are prefixes rather than whole selectors:
         // the metric name is only known at call time. Kept here so every selector
         // string still lives in one place.
@@ -70,6 +70,24 @@ export class MetricsExplorerPage {
         // name list is the request the 5-minute TanStack cache is meant to skip.
         this.streamListUrlPart = '/streams?type=metrics';
         this.promqlQueryUrlPart = '/prometheus/api/v1/query_range';
+
+        // ===== DETAIL VIEW (MetricDetailView / MetricBreakdown) =====
+        this.cardDetailsPrefix = 'metrics-explorer-card-details-';
+        this.detailRoot = '[data-test="metrics-detail"]';
+        this.detailTitle = '[data-test="metrics-detail-title"]';
+        this.detailClose = '[data-test="metrics-detail-close"]';
+        this.detailOpenVisualize = '[data-test="metrics-detail-open-visualize"]';
+        this.breakdownChart = '[data-test="metrics-breakdown-chart"]';
+        this.detailOverview = '[data-test="metrics-detail-overview"]';
+        this.detailCreateAlert = '[data-test="metrics-detail-create-alert"]';
+        this.alertContextMenuAbove = '[data-test="alert-context-menu-above"]';
+        this.alertStreamName = '[data-test="add-alert-stream-name-select-dropdown"]';
+        this.detailDrilldown = '[data-test="metrics-detail-drilldown"]';
+        this.detailDrilldownLock = '[data-test="metrics-detail-drilldown-lock"]';
+        this.tooltipContent = '[data-test="o-tooltip-content"]';
+        this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
+        this.breakdownBack = '[data-test="metrics-breakdown-back"]';
+        this.labelChipPrefix = 'metrics-explorer-label-chip-';
 
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
@@ -403,24 +421,18 @@ export class MetricsExplorerPage {
     }
 
     /**
-     * Drill into the first rendered card — the real path into Visualize.
-     *
-     * The card's action row (`…-card-actions-<name>`) is w-0 / opacity-0 at rest
-     * and expands only on group-hover / group-focus-within; at rest the resting
-     * "fn · unit" and freshness spans sit over it and intercept the click. So
-     * hover the card first — the same gesture a real user makes — which hides
-     * those spans and expands the row before clicking the drill-in button.
+     * Open the first rendered card in Visualize — the real path: the card's
+     * always-visible Drill down, then the detail view's Open in Visualize.
      */
     async openFirstCardInVisualize() {
-        const select = this.page.locator(this.anyCardSelect).first();
-        await select.waitFor({ state: 'attached', timeout: 30000 });
+        const drill = this.page.locator(this.anyCardSelect).first();
+        await drill.waitFor({ state: 'attached', timeout: 30000 });
+        await expect(drill).toBeVisible({ timeout: 10000 });
+        await drill.click();
 
-        const testId = await select.getAttribute('data-test');
-        const metricName = String(testId).replace('metrics-explorer-card-select-', '');
-        await this.page.locator(`[data-test="metrics-explorer-card-${metricName}"]`).hover();
-
-        await expect(select).toBeVisible({ timeout: 10000 });
-        await select.click();
+        const openVisualize = this.page.locator(this.detailOpenVisualize);
+        await expect(openVisualize).toBeVisible({ timeout: 30000 });
+        await openVisualize.click();
     }
 
     /** True once at least one card has rendered (grid is populated). */
@@ -461,6 +473,36 @@ export class MetricsExplorerPage {
      */
     cardChart(metric) {
         return this.cardRoot(metric).locator(this.cardChartCanvas).first();
+    }
+
+    /** Right-click a drawn chart, then "Alert when above"; the alert form opens on an Explorer prefill. */
+    async createAlertAboveFromChart(chart) {
+        // zrender stacks a hover canvas over the drawn one, so click their shared root instead.
+        await chart.locator('xpath=..').click({ button: 'right' });
+        await this.page.locator(this.alertContextMenuAbove).click();
+        await this.page.waitForURL(/alerts\/add.*prefill=explorer/, { timeout: 30000 });
+    }
+
+    /** The detail header's Create alert button; the alert form opens on an Explorer prefill. */
+    async createAlertFromDetailHeader() {
+        await this.page.locator(this.detailCreateAlert).click();
+        await this.page.waitForURL(/alerts\/add.*prefill=explorer/, { timeout: 30000 });
+    }
+
+    /** OSS: the drilldown is shown locked; its span, not the disabled button, carries the tooltip. */
+    async expectDrilldownLocked(tooltipText) {
+        const button = this.page.locator(this.detailDrilldown);
+        await expect(button).toBeVisible({ timeout: 30000 });
+        await expect(button).toBeDisabled();
+        await expect(button.locator(this.detailDrilldownLock)).toBeVisible();
+        await button.locator('xpath=..').hover();
+        await expect(this.page.locator(this.tooltipContent)).toContainText(tooltipText, {
+            timeout: 10000,
+        });
+    }
+
+    async expectAlertFormStream(metric) {
+        await expect(this.page.locator(this.alertStreamName)).toContainText(metric, { timeout: 30000 });
     }
 
     async expectCardNoData(metric, timeout = 60000) {
@@ -543,6 +585,74 @@ export class MetricsExplorerPage {
             el.click();
             el.click();
         });
+    }
+
+    /** Drill down is always visible on the card. */
+    async openMetricDetails(metric) {
+        await this.page.locator(`[data-test="${this.cardDetailsPrefix}${metric}"]`).click();
+    }
+
+    async expectDetailOpen(metric) {
+        await expect(this.page.locator(this.detailTitle)).toHaveText(metric, { timeout: 30000 });
+        await expect.poll(() => this.getQueryParam('metric'), { timeout: 15000 }).toBe(metric);
+    }
+
+    /** Detail tabs carry no data-test of their own; OTab stamps its name on the trigger. */
+    detailTab(name) {
+        return this.page.locator(`${this.detailRoot} [role="tab"][data-otab-name="${name}"]`);
+    }
+
+    async selectDetailTab(name) {
+        await this.detailTab(name).click();
+        await expect.poll(() => this.getQueryParam('tab'), { timeout: 15000 }).toBe(name);
+    }
+
+    /** A label's chart card in the Breakdown grid. */
+    breakdownCard(label) {
+        return this.page.locator(`[data-test="metrics-breakdown-card-${label}"]`);
+    }
+
+    /** The card's Drill down focuses that label: its chart plus its value table. */
+    async selectBreakdownLabel(label) {
+        await this.page.locator(`[data-test="metrics-breakdown-select-${label}"]`).click();
+        await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBe(label);
+    }
+
+    /** "All labels" — back from a focused label to the Breakdown grid. */
+    async backToBreakdownGrid() {
+        await this.page.locator(this.breakdownBack).click();
+        await expect.poll(() => this.getQueryParam('breakdown_label'), { timeout: 15000 }).toBeNull();
+    }
+
+    breakdownValue(label, value) {
+        return this.page.locator(`[data-test="metrics-breakdown-value-${label}-${value}"]`);
+    }
+
+    breakdownDistinct(label) {
+        return this.page.locator(`[data-test="metrics-breakdown-distinct-${label}"]`);
+    }
+
+    /** "Add to filter" (=) on one value of the Breakdown table. */
+    async addBreakdownFilter(label, value) {
+        await this.page.locator(`[data-test="metrics-breakdown-add-${label}-${value}"]`).click();
+    }
+
+    /** The filter bar's chip for a label matcher. */
+    labelChip(label) {
+        return this.page.locator(`[data-test="${this.labelChipPrefix}${label}"]`);
+    }
+
+    /** A related metric's chart card in the Related grid. */
+    relatedCard(metric) {
+        return this.page.locator(`[data-test="metrics-detail-related-card-${metric}"]`);
+    }
+
+    async openRelated(metric) {
+        await this.page.locator(`[data-test="metrics-detail-related-open-${metric}"]`).click();
+    }
+
+    async closeDetail() {
+        await this.page.locator(this.detailClose).click();
     }
 
     /* ------------------------------------------------------------- network */

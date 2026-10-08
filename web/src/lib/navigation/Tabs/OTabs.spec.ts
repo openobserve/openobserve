@@ -346,12 +346,106 @@ describe("OTabs", () => {
       expect(scrollBy).toHaveBeenCalledWith({ left: 308, behavior: "auto" });
     });
 
+    it("scrolls far enough to show the active tab's trailing controls", async () => {
+      mockViewport.lgUp = false;
+      (HTMLElement.prototype as any).scrollBy = scrollBy;
+      HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+        if (this.hasAttribute("data-otab-trailing")) return { left: 290, right: 400 } as DOMRect;
+        return { left: 0, right: this.getAttribute("role") === "tab" ? 290 : 300 } as DOMRect;
+      };
+      mount(OTabs, {
+        props: { modelValue: "tab1" },
+        slots: {
+          default: `<OTab name="tab1" label="Tab 1"><template #trailing><button>x</button></template></OTab>`,
+        },
+        global: { components: { OTab } },
+        attachTo: document.body,
+      });
+      await flushPromises();
+
+      expect(scrollBy).toHaveBeenCalledWith({ left: 108, behavior: "auto" });
+    });
+
     it("leaves the laptop strip where it is", async () => {
       stubGeometry();
       mountTabs({ modelValue: "tab3" });
       await flushPromises();
 
       expect(scrollBy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a tab with trailing controls", () => {
+    // jsdom lays nothing out: the trigger spans 3–63 and its trailing controls 63–93.
+    async function mountWithTrailing(stripWidth: number) {
+      const wrapper = mount(OTabs, {
+        props: { modelValue: "tab2" },
+        slots: {
+          default: `<OTab name="tab1" label="Tab 1"><template #trailing><button>x</button></template></OTab><OTab name="tab2" label="Tab 2" />`,
+        },
+        global: { components: { OTab } },
+        attachTo: document.body,
+      });
+      const place = (el: Element, left: number, width: number) => {
+        Object.defineProperty(el, "offsetLeft", { value: left });
+        Object.defineProperty(el, "offsetWidth", { value: width });
+      };
+      const [first, second] = wrapper.findAll('[role="tab"]').map((t) => t.element);
+      place(first, 3, 60);
+      place(wrapper.find("[data-otab-trailing]").element, 63, 30);
+      place(second, 0, 0);
+      const strip = wrapper.find(".overflow-x-auto").element;
+      Object.defineProperty(strip, "clientWidth", { value: stripWidth });
+      await wrapper.setProps({ modelValue: "tab1" });
+      await flushPromises();
+      strip.dispatchEvent(new Event("scroll"));
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("underlines the trigger and its trailing controls together", async () => {
+      const wrapper = await mountWithTrailing(500);
+      const bar = wrapper.find('[data-test="otabs-active-indicator"]').element as HTMLElement;
+      expect(bar.style.width).toBe("90px");
+      expect(bar.style.transform).toBe("translateX(3px)");
+    });
+
+    it("counts trailing controls when deciding the strip overflows", async () => {
+      const wrapper = await mountWithTrailing(80);
+      const arrow = wrapper.findAll('button[aria-hidden="true"]')[0].element as HTMLElement;
+      expect(arrow.style.display).not.toBe("none");
+    });
+  });
+
+  // --- Focusin with no target (bug: null-guard before getAttribute) ---
+
+  describe("focusin handling", () => {
+    // The real browser case this guards: focus moves away from a tab that was
+    // unmounted/removed from the DOM in the same tick, which can deliver a
+    // focusin event whose `target` is null by the time it reaches this
+    // listener. Vue binds native events via addEventListener directly on the
+    // DOM node, so there is no other way to reach that exact listener to
+    // reproduce it — intercepting addEventListener captures the real one.
+    it("does not throw when the focusin event has no target", () => {
+      let capturedHandler: ((event: FocusEvent) => void) | null = null;
+      const originalAddEventListener = HTMLElement.prototype.addEventListener;
+      const addEventListenerSpy = vi
+        .spyOn(HTMLElement.prototype, "addEventListener")
+        .mockImplementation(function (
+          this: HTMLElement,
+          type: string,
+          listener: EventListenerOrEventListenerObject,
+          options?: boolean | AddEventListenerOptions,
+        ) {
+          if (type === "focusin") capturedHandler = listener as (event: FocusEvent) => void;
+          return originalAddEventListener.call(this, type, listener, options);
+        });
+
+      mountTabs();
+      addEventListenerSpy.mockRestore();
+
+      expect(capturedHandler).not.toBeNull();
+      expect(() => capturedHandler!({ target: null } as unknown as FocusEvent)).not.toThrow();
     });
   });
 });

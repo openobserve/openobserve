@@ -57,10 +57,12 @@ import organizationService from "@/services/organizations";
 import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 
+import { toastRecords } from "@/lib/feedback/Toast/useToast";
 import {
   trialPeriodAllowedPath,
   trialPaywallAllowedPath,
   isTrialExpired,
+  isPaywalledDestination,
   isEmptyDataExempt,
   getUserInfo,
   invalidateLoginData,
@@ -162,6 +164,57 @@ describe("trialPeriodAllowedPath", () => {
 
   it("does not contain the settings shell", () => {
     expect(trialPeriodAllowedPath).not.toContain("settings");
+  });
+});
+
+describe("isPaywalledDestination", () => {
+  const EXPIRED = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
+  const guard = () => {};
+  const guardedLeaf = (name: string) => ({ name, matched: [{}, { beforeEnter: guard }] });
+
+  beforeEach(() => {
+    (config as any).isCloud = "true";
+  });
+
+  it.each(["logs", "dashboards", "alerts", "logstreams", "metrics"])(
+    "mutes %s when its leaf record runs a guard in an expired Cloud org",
+    (name) => {
+      expect(isPaywalledDestination(EXPIRED, guardedLeaf(name))).toBe(true);
+    },
+  );
+
+  // Home and Plans have no beforeEnter, so routeGuard never runs for them.
+  it("never mutes a destination whose leaf has no guard", () => {
+    expect(isPaywalledDestination(EXPIRED, { name: "home", matched: [{}] })).toBe(false);
+    expect(isPaywalledDestination(EXPIRED, { name: "plans", matched: [{}, {}] })).toBe(false);
+  });
+
+  // Entering /infra/databases from the rail runs the DbmShell parent's beforeEnter, so the child is blocked.
+  it("honours a guard on an ancestor record", () => {
+    expect(
+      isPaywalledDestination(EXPIRED, { name: "child", matched: [{ beforeEnter: guard }, {}] }),
+    ).toBe(true);
+  });
+
+  it("returns false for an unmatched location", () => {
+    expect(isPaywalledDestination(EXPIRED, { name: undefined, matched: [] })).toBe(false);
+  });
+
+  it.each(trialPaywallAllowedPath)("never mutes the allowed route %s", (name) => {
+    expect(isPaywalledDestination(EXPIRED, guardedLeaf(name))).toBe(false);
+  });
+
+  it("mutes nothing for a running trial or an untracked one", () => {
+    expect(isPaywalledDestination("", guardedLeaf("logs"))).toBe(false);
+    expect(isPaywalledDestination(null, guardedLeaf("logs"))).toBe(false);
+    expect(
+      isPaywalledDestination((Date.now() + 14 * 24 * 60 * 60 * 1000) * 1000, guardedLeaf("logs")),
+    ).toBe(false);
+  });
+
+  it("mutes nothing outside Cloud", () => {
+    (config as any).isCloud = "false";
+    expect(isPaywalledDestination(EXPIRED, guardedLeaf("logs"))).toBe(false);
   });
 });
 
@@ -398,6 +451,43 @@ describe("routeGuard", () => {
         zoConfig: { restricted_routes_on_empty_data: false },
       },
     });
+
+  describe("trial toast (AC-14, AC-26)", () => {
+    beforeEach(() => {
+      toastRecords.splice(0, toastRecords.length);
+    });
+
+    it("shows one info toast naming the blocked page right before the plans redirect", async () => {
+      (config as any).isCloud = "true";
+      vi.mocked(useStore).mockReturnValue(buildExpiredTrialStore() as any);
+
+      await routeGuard({ name: "logs", meta: { titleKey: "menu.search" } }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
+      const open = toastRecords.filter((r) => r.open);
+      expect(open).toHaveLength(1);
+      expect(open[0].variant).toBe("info");
+      expect(open[0].title).toBe("Your trial has ended");
+      expect(open[0].message).toContain("Logs needs a plan");
+    });
+
+    it("shows no toast for an allowed route, a running trial, or a non-Cloud build", async () => {
+      (config as any).isCloud = "true";
+      vi.mocked(useStore).mockReturnValue(buildExpiredTrialStore() as any);
+      await routeGuard({ name: "iam", meta: { titleKey: "menu.iam" } }, {}, mockNext);
+
+      vi.mocked(useStore).mockReturnValue(
+        buildMockStore({ state: { organizationData: { isDataIngested: true } } }) as any,
+      );
+      await routeGuard({ name: "logs", meta: { titleKey: "menu.search" } }, {}, mockNext);
+
+      (config as any).isCloud = "false";
+      vi.mocked(useStore).mockReturnValue(buildExpiredTrialStore() as any);
+      await routeGuard({ name: "logs", meta: { titleKey: "menu.search" } }, {}, mockNext);
+
+      expect(toastRecords.filter((r) => r.open)).toHaveLength(0);
+    });
+  });
 
   describe("when isCloud is false", () => {
     it("calls next() directly without trial check", async () => {
