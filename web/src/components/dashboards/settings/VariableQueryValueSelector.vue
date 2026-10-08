@@ -295,8 +295,9 @@ export default defineComponent({
         : SELECT_ALL_VALUE;
 
       selectedValue.value = newValue;
-      emit("update:modelValue", newValue);
+      // Multi-select applies on close (onPopupHide), like every other tick.
       if (!props.variableItem.multiSelect) {
+        emit("update:modelValue", newValue);
         await closePopUpWhenValueIsSet();
       }
     };

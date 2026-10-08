@@ -581,9 +581,12 @@ describe("VariableQueryValueSelector", () => {
 
       await wrapper.vm.toggleSelectAll();
 
-      // Dropdown stays open (close not called), but the value is still applied/emitted.
+      // Dropdown stays open and nothing applies until it closes, like any other tick.
       expect(mockRef.close).not.toHaveBeenCalled();
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.vm.selectedValue).toEqual(["_o2_all_"]);
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+
+      wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([["_o2_all_"]]);
     });
 
@@ -618,6 +621,9 @@ describe("VariableQueryValueSelector", () => {
 
       expect(wrapper.vm.selectedValue).toEqual([]);
       expect(mockRef.close).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+
+      wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([[]]);
     });
   });

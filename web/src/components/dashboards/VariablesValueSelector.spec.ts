@@ -2792,4 +2792,104 @@ describe("VariablesValueSelector", () => {
       expect(capturedSql).toContain("WHERE a = 'xyz789' AND b = 'abc123' AND c = 'api', 'web'");
     });
   });
+
+  describe("textbox debounce follows Auto Run", () => {
+    it("uses 1s normally and 300ms while the manager is in live mode", async () => {
+      const { useVariablesManager, LIVE_COMMIT_DEBOUNCE_MS } =
+        await import("@/composables/dashboard/useVariablesManager");
+      const manager = useVariablesManager(((key: string) => key) as never);
+      const config = {
+        showDynamicFilters: false,
+        list: [{ name: "search", type: "textbox", scope: "global", value: "abc" }],
+      };
+      await manager.initialize(config.list as any, {});
+
+      wrapper = createWrapper({
+        variablesConfig: config,
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+      const input = () =>
+        wrapper
+          .findAllComponents({ name: "OInput" })
+          .find((c) => c.props("debounce") !== undefined);
+
+      expect((wrapper.vm as any).textboxDebounce).toBe(1000);
+      expect(input()?.props("debounce")).toBe(1000);
+
+      manager.setLiveMode(true);
+      await nextTick();
+      expect((wrapper.vm as any).textboxDebounce).toBe(LIVE_COMMIT_DEBOUNCE_MS);
+      expect(input()?.props("debounce")).toBe(LIVE_COMMIT_DEBOUNCE_MS);
+    });
+  });
+
+  describe("a variable load that ends without data is finished", () => {
+    const config = {
+      showDynamicFilters: false,
+      list: [
+        {
+          name: "ns",
+          type: "query_values",
+          multiSelect: true,
+          query_data: {
+            field: "k8s_namespace_name",
+            stream: "s",
+            stream_type: "metrics",
+            max_record_size: 10,
+            filter: [],
+          },
+        },
+      ],
+    };
+
+    const loadWith = async (end: (payload: any, handlers: any) => void) => {
+      const { useVariablesManager } = await import("@/composables/dashboard/useVariablesManager");
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(config.list as any, {});
+      wrapper = createWrapper({
+        variablesConfig: config,
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(end);
+      const vm = wrapper.vm as any;
+      const ns = vm.variablesData.values.find((v: any) => v.name === "ns");
+      ns.isVariablePartialLoaded = false;
+      await vm.loadVariableOptions(ns);
+      await new Promise((r) => setTimeout(r, 0));
+      await nextTick();
+      return { manager, ns: manager.variablesData.global[0] as any };
+    };
+
+    const expectReleased = (manager: any, ns: any) => {
+      expect(ns.isLoading).toBe(false);
+      expect(ns.isVariableLoadingPending).toBe(false);
+      expect(ns.isVariablePartialLoaded).toBe(true);
+      expect(manager.isSettling.value).toBe(false);
+    };
+
+    it("an errored request releases the waiting panels", async () => {
+      const { manager, ns } = await loadWith((payload: any, handlers: any) => {
+        handlers.error(payload, { type: "error", content: { message: "boom" } });
+      });
+      expectReleased(manager, ns);
+    });
+
+    it("a cancelled request releases the waiting panels", async () => {
+      const { manager, ns } = await loadWith((payload: any, handlers: any) => {
+        handlers.data(payload, { type: "cancel_response", content: { trace_id: payload.traceId } });
+      });
+      expectReleased(manager, ns);
+    });
+
+    it("a stream that closes without any data releases the waiting panels", async () => {
+      const { manager, ns } = await loadWith((payload: any, handlers: any) => {
+        handlers.complete(payload, { code: 1000 });
+      });
+      expectReleased(manager, ns);
+    });
+  });
 });
