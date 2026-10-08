@@ -35,6 +35,7 @@ export const ITEM2_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.consentedScope", mode: "reset", owner: "item2", defaultValue: () => null },
   { path: "meta.runPending", mode: "reset", owner: "item2", defaultValue: () => false },
   { path: "meta.runOutcome", mode: "reset", owner: "item2", defaultValue: () => ({}) },
+  { path: "meta.runCancelled", mode: "reset", owner: "item2", defaultValue: () => ({}) },
   { path: "meta.editorDirty", mode: "reset", owner: "item2", defaultValue: () => false },
   { path: "meta.nlDetected", mode: "reset", owner: "item2", defaultValue: () => false },
   // A preference: resetting it from constants.ts would flip a default-on session off.

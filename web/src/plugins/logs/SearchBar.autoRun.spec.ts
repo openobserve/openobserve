@@ -21,6 +21,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import config from "@/aws-exports";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import searchService from "@/services/search";
 
 const { scheduleSearch, toastMock, getViewDetail } = vi.hoisted(() => ({
   scheduleSearch: vi.fn(),
@@ -374,6 +375,37 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(wrapper!.vm.autoRun.engine.isResultsStale()).toBe(false);
       await vi.waitFor(() => expect(logs).toHaveBeenCalled(), { timeout: 4000 });
       expect(logs.mock.calls.at(-1)[0]).toMatchObject({ reason: "saved-view", op: "full" });
+    });
+
+    const applyView = async (view: any) => {
+      getViewDetail.mockResolvedValueOnce({ status: 200, data: { data: view } });
+      wrapper!.vm.dateTimeRef = { setSavedDate: vi.fn() };
+      await wrapper!.vm.applySavedView({ view_id: "v1", view_name: "v" });
+      await flushPromises();
+    };
+
+    const viewOf = () => {
+      const view = JSON.parse(JSON.stringify(wrapper!.vm.getSearchObj()));
+      view.data.stream.selectedStream = ["app_logs"];
+      view.data.resultGrid = { ...(view.data.resultGrid ?? {}), colOrder: {}, colSizes: {} };
+      return view;
+    };
+
+    it("after a view apply with no run, Custom range says to run the query and never sends a reset request", async () => {
+      await router.replace({ name: "logs", query: {} });
+      const { searchObj } = await setup();
+      markExecuted();
+      searchObj.data.customDownloadQueryObj = { query: { sql: "x" } };
+      expect(wrapper!.vm.customRangeReason).toBeNull();
+      await applyView(viewOf());
+
+      expect(searchObj.meta.executed).toBeNull();
+      expect(wrapper!.vm.customRangeReason).toBe("Run the query to download");
+      const search = vi.spyOn(searchService, "search");
+      wrapper!.vm.downloadCustomInitialNumber = 1;
+      wrapper!.vm.downloadRangeData();
+      await flushPromises();
+      expect(search).not.toHaveBeenCalled();
     });
 
     it("never saves run state, the Auto Run preference or the download request", async () => {

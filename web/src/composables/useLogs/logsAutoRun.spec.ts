@@ -359,8 +359,13 @@ describe("transport binding (AC4.1, P2 records)", () => {
 
     const hist = { traceId: "t-h", type: "histogram", generationId: generation.id };
     run().bindPayload(hist);
-    launched();
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    vi.useFakeTimers();
+    try {
+      launched();
+      await vi.runAllTimersAsync();
+    } finally {
+      vi.useRealTimers();
+    }
     expect(generation.settled).toBe(false);
 
     run().finishPayload(hist);

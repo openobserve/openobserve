@@ -70,6 +70,12 @@
       "title": "Select a stream to get started",
       "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
+    "searchCancelled": {
+      "title": "Search cancelled",
+      "description": "No results were loaded. Run the query to load events.",
+      "action": "Run query",
+      "actionDesc": "Run the same query again"
+    },
     "noQueryApplied": {
       "title": "Run a query to see results",
       "description": "Adjust your filters and click 'Run query' to load events for this stream.",
@@ -1043,6 +1049,8 @@
     "autoRunSearchAroundActive": "Showing records around a line: run the query to return to results",
     "autoRunStaleTooltip": "Run the query to update results",
     "autoRunStaleChip": "Results out of date",
+    "runQueryToDownload": "Run the query to download",
+    "searchCancelledNotice": "Search cancelled.",
     "linePermalink": {
       "disabledFunction": "Turn off the function to link a single line",
       "disabledTimestampRewrite": "This query rewrites the timestamp",
