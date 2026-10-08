@@ -16,6 +16,7 @@
 // Shared by the live bar, the settings preview and the editor so all three paint a banner alike.
 
 import { BANNER_COLOR_PRESETS } from "@/constants/themes";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Props as OBannerProps } from "@/lib/feedback/Banner/OBanner.vue";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { pickReadableForeground } from "@/utils/theme";
@@ -37,6 +38,20 @@ export interface ResolvedBannerColors {
 
 export const TEXT_SIZES: BannerTextSize[] = ["small", "medium", "large"];
 
+/** Mirrors `BANNER_ICONS` on the server, which rejects anything else. */
+export const BANNER_ICONS: IconName[] = [
+  "info",
+  "warning",
+  "error",
+  "campaign",
+  "build",
+  "schedule",
+  "rocket-launch",
+  "lightbulb",
+  "security",
+  "update",
+];
+
 export const DEFAULT_TEXT_SIZE: BannerTextSize = "medium";
 
 /** Colour choices in the editor besides a preset key. */
@@ -47,6 +62,10 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export function isHexColor(value: unknown): value is string {
   return typeof value === "string" && HEX_COLOR.test(value);
+}
+
+export function isBannerIcon(value: unknown): value is IconName {
+  return BANNER_ICONS.includes(value as IconName);
 }
 
 export function isTextSize(value: unknown): value is BannerTextSize {
@@ -93,7 +112,9 @@ export function bannerVariant(variant?: BannerVariantName | string): OBannerProp
   }
 }
 
-export function bannerIcon(variant?: BannerVariantName | string): string {
+/** The authored icon when it is one we can draw, else the severity's own. */
+export function bannerIcon(variant?: BannerVariantName | string, icon?: string | null): IconName {
+  if (isBannerIcon(icon)) return icon;
   switch (variant) {
     case "critical":
       return "error";

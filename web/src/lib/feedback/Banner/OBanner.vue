@@ -38,7 +38,7 @@ export interface Props {
    * stay on one line.
    */
   preserveWhitespace?: boolean;
-  /** Text scale; unset keeps the layout's own (compact for a bar, `sm` inset). */
+  /** Text scale for the message and actions; unset keeps the layout's own. */
   textSize?: "small" | "medium" | "large";
   /** Runtime-chosen background and text colour, painted instead of the variant's tokens. */
   colors?: { background: string; text: string };
@@ -55,28 +55,11 @@ const props = withDefaults(defineProps<Props>(), {
 
 const slots = useSlots();
 
-const ariaRole = computed(
-  () =>
-    props.role ?? (props.variant === "error" || props.variant === "warning" ? "alert" : "status"),
-);
-
-const hasDefaultSlot = computed(() => !!slots.default);
-const hasIconSlot = computed(() => !!slots.icon);
-const hasActionsSlot = computed(() => !!slots.actions);
-const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
-const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
-
 const TEXT_SIZE_CLASS = {
   small: "text-compact",
   medium: "text-sm",
   large: "text-base",
 } as const;
-
-const textClass = computed(() =>
-  props.textSize ? TEXT_SIZE_CLASS[props.textSize] : props.bar ? "text-compact" : "text-sm",
-);
-
-const iconSize = computed(() => (props.textSize === "large" ? "md" : "sm"));
 
 // The colour is data, so it travels as the custom token's value rather than a literal style property.
 const colorStyle = computed<CSSProperties | undefined>(() =>
@@ -87,6 +70,17 @@ const colorStyle = computed<CSSProperties | undefined>(() =>
       }
     : undefined,
 );
+
+const ariaRole = computed(
+  () =>
+    props.role ?? (props.variant === "error" || props.variant === "warning" ? "alert" : "status"),
+);
+
+const hasDefaultSlot = computed(() => !!slots.default);
+const hasIconSlot = computed(() => !!slots.icon);
+const hasActionsSlot = computed(() => !!slots.actions);
+const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
+const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 
 const variantClass = computed(() => {
   switch (props.variant) {
@@ -140,10 +134,10 @@ const barVariantClass = computed(() => {
   <div
     :role="ariaRole"
     :data-test="dataTest"
+    :style="colorStyle"
     :class="[
+      textSize ? TEXT_SIZE_CLASS[textSize] : '',
       'flex',
-      // On the root so slotted actions inherit the same scale as the message.
-      textClass,
       bar ? 'w-full flex-row flex-wrap items-center gap-3 px-4' : '',
       bar ? (dense ? 'py-1' : 'py-2') : '',
       bar ? (center ? 'justify-center' : 'justify-between') : '',
@@ -152,7 +146,6 @@ const barVariantClass = computed(() => {
       bar ? '' : dense ? 'p-2' : 'p-4',
       colors ? 'bg-banner-custom-bg text-banner-custom-text' : bar ? barVariantClass : variantClass,
     ]"
-    :style="colorStyle"
   >
     <!-- `inlineActions` is the one-line layout — the outer row already centres,
          so the icon centres against the whole content block with it. Stacked
@@ -164,7 +157,7 @@ const barVariantClass = computed(() => {
         bar
           ? center
             ? 'min-w-0 items-center'
-            : 'min-w-0 grow basis-64 items-center'
+            : 'min-w-0 flex-1 items-center'
           : inlineActions
             ? 'min-w-0 flex-1 items-center max-md:min-w-48'
             : preserveWhitespace
@@ -182,13 +175,14 @@ const barVariantClass = computed(() => {
         :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']"
       >
         <slot name="icon">
-          <OIcon :name="icon" :size="iconSize" />
+          <OIcon :name="icon" :size="textSize === 'large' ? 'md' : 'sm'" />
         </slot>
       </div>
 
       <div
         :class="[
           bar ? '' : inlineActions ? 'min-w-0 flex-1' : 'flex-1',
+          textSize ? '' : bar ? 'text-compact' : 'text-sm',
           preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
         ]"
       >
@@ -198,10 +192,7 @@ const barVariantClass = computed(() => {
     </div>
 
     <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
-    <div
-      v-if="hasActionsSlot"
-      :class="bar ? 'ms-auto shrink-0' : inlineActions ? 'max-md:ms-auto' : ''"
-    >
+    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : ''">
       <slot name="actions" />
     </div>
   </div>

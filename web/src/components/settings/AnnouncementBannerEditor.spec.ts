@@ -17,11 +17,10 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
-import { useAnnouncementDraftPreview } from "@/composables/useAnnouncementDraftPreview";
 import announcements from "@/services/announcements";
 import AnnouncementBannerEditorForm from "./AnnouncementBannerEditorForm.vue";
 import { makeBannerSchema } from "./AnnouncementBannerEditor.schema";
-import { emptyDraft, type BannerDraft } from "./announcementDrafts";
+import { emptyDraft, type BannerDraft, type BannerStyle } from "./announcementDrafts";
 
 vi.mock("@/services/announcements", () => ({
   default: { getActive: vi.fn(), getConfig: vi.fn(), setConfig: vi.fn() },
@@ -148,9 +147,16 @@ describe("AnnouncementBannerEditorForm", () => {
     draft: Partial<BannerDraft> = {},
     index: number | null = null,
     original: Record<string, unknown> | null = index === null ? null : stored[index],
+    extra: { others?: BannerDraft[]; styles?: BannerStyle[] } = {},
   ) => {
     const wrapper = mount(AnnouncementBannerEditorForm, {
-      props: { draft: { ...emptyDraft(), ...draft }, index, others: [], original },
+      props: {
+        draft: { ...emptyDraft(), ...draft },
+        index,
+        others: extra.others ?? [],
+        original,
+        styles: extra.styles ?? [],
+      },
       global: { plugins: [i18n], provide: { store } },
       attachTo: document.body,
     });
@@ -163,12 +169,13 @@ describe("AnnouncementBannerEditorForm", () => {
     await flushPromises();
   };
 
-  const savedBanners = () => service.setConfig.mock.calls[0][1].banners;
+  const savedConfig = () => service.setConfig.mock.calls[0][1];
+  const savedBanners = () => savedConfig().banners;
 
   it("lays out every section and previews both theme modes", async () => {
     await mountForm({ message: "Both modes" });
 
-    for (const part of ["message", "variant", "appearance", "has-cta", "schedule", "audience"]) {
+    for (const part of ["message", "variant", "style", "icon", "has-cta", "schedule", "audience"]) {
       expect(
         document.querySelector(`[data-test="announcement-editor-${part}"]`),
         part,
@@ -203,19 +210,29 @@ describe("AnnouncementBannerEditorForm", () => {
 
     expect(savedBanners()[2]).toEqual({
       message: "New",
+      id: expect.stringMatching(/^banner-/),
       colors: { light: "#FEF3C7", dark: "#78350F" },
     });
   });
 
-  it("stores a duration as an absolute end so later saves cannot restart it", async () => {
+  it("sends a duration as typed, for the server to pin to an absolute end", async () => {
     const wrapper = await mountForm({ message: "Timed", schedule: "duration", duration: "2h" });
     await submit(wrapper);
 
-    const saved = savedBanners()[2];
-    expect(saved.duration).toBeUndefined();
-    const endsInMs = new Date(saved.ends_at).getTime() - Date.now();
-    expect(endsInMs).toBeGreaterThan(115 * 60_000);
-    expect(endsInMs).toBeLessThan(121 * 60_000);
+    expect(savedBanners()[2]).toMatchObject({ message: "Timed", duration: "2h" });
+  });
+
+  it("writes back config keys it does not edit", async () => {
+    service.getConfig.mockResolvedValue({
+      data: { banners: stored, styles: [{ id: "s", name: "S" }], future: { keep: true } },
+    });
+    const wrapper = await mountForm({ message: "Second", variant: "warning" }, 1);
+    await submit(wrapper);
+
+    expect(savedConfig()).toMatchObject({
+      styles: [{ id: "s", name: "S" }],
+      future: { keep: true },
+    });
   });
 
   it("shows the server's reason when the save is rejected", async () => {
@@ -282,12 +299,82 @@ describe("AnnouncementBannerEditorForm", () => {
     expect(paths).toContain("ctaText");
   });
 
-  it("shows the draft in the app's top bar until the editor closes", async () => {
-    const { draft } = useAnnouncementDraftPreview();
-    const wrapper = await mountForm({ message: "In the bar", variant: "warning" });
+  const release: BannerStyle = {
+    id: "style-1",
+    name: "Release",
+    base: "promo",
+    icon: "rocket-launch",
+    textSize: "large",
+    colorLight: "#DBEAFE",
+    colorDark: "#1E3A8A",
+  };
 
-    expect(draft.value).toMatchObject({ message: "In the bar", variant: "warning" });
-    wrapper.unmount();
-    expect(draft.value).toBeNull();
+  it("copies a saved style's look into the banner", async () => {
+    const wrapper = await mountForm({ message: "v2 is out" }, null, null, { styles: [release] });
+    (wrapper.vm as any).chooseStyle("style:style-1");
+    await flushPromises();
+    await submit(wrapper);
+
+    expect(savedBanners()[2]).toMatchObject({
+      variant: "promo",
+      icon: "rocket-launch",
+      text_size: "large",
+      colors: { light: "#DBEAFE", dark: "#1E3A8A" },
+      style: "style-1",
+    });
+  });
+
+  it("drops the style label once the look is changed", async () => {
+    const wrapper = await mountForm({ message: "v2" }, null, null, { styles: [release] });
+    (wrapper.vm as any).chooseStyle("style:style-1");
+    await flushPromises();
+    (wrapper.vm as any).form.setFieldValue("icon", "info");
+    await flushPromises();
+
+    expect((wrapper.vm as any).form.state.values.styleId).toBe("");
+  });
+
+  it("saves the current look as a style without touching the banners", async () => {
+    await mountForm({ message: "m", variant: "warning", icon: "build" });
+    document.querySelector<HTMLElement>('[data-test="announcement-editor-save-style"]')!.click();
+    await flushPromises();
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-test="announcement-editor-style-name"] input, input[data-test="announcement-editor-style-name"]',
+    )!;
+    input.value = "Maintenance";
+    input.dispatchEvent(new Event("input"));
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>(
+        '[data-test="announcement-editor-save-style-dialog"] [data-test="o-dialog-primary-btn"]',
+      )!
+      .click();
+    await flushPromises();
+
+    expect(savedConfig().banners).toEqual(stored);
+    expect(savedConfig().styles).toEqual([
+      { id: expect.stringMatching(/^style-/), name: "Maintenance", base: "warning", icon: "build" },
+    ]);
+  });
+
+  it("warns only when a critical banner reaches every org the promotion targets", async () => {
+    const critical = {
+      ...emptyDraft(),
+      message: "Down",
+      variant: "critical" as const,
+      orgs: ["a"],
+    };
+    const hidden = '[data-test="announcement-editor-preview-hidden"]';
+
+    await mountForm({ message: "Promo", variant: "promo", orgs: ["a"] }, null, null, {
+      others: [critical],
+    });
+    expect(document.querySelector(hidden)).not.toBeNull();
+
+    document.body.innerHTML = "";
+    await mountForm({ message: "Promo", variant: "promo", orgs: ["a", "b"] }, null, null, {
+      others: [critical],
+    });
+    expect(document.querySelector(hidden)).toBeNull();
   });
 });

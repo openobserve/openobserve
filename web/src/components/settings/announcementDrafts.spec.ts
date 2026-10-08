@@ -17,15 +17,18 @@ import { describe, expect, it } from "vitest";
 
 import {
   authoredFromDraft,
+  authoredFromStyle,
   bannerStatus,
   configFromDrafts,
   draftFromAuthored,
   draftsFromConfig,
   emptyDraft,
+  isHiddenByCritical,
+  newBannerId,
   parseDurationMs,
+  stylesFromConfig,
   toLocalInput,
   toRfc3339,
-  withResolvedDuration,
 } from "./announcementDrafts";
 
 describe("parseDurationMs", () => {
@@ -263,19 +266,52 @@ describe("bannerStatus", () => {
   });
 });
 
-describe("withResolvedDuration", () => {
-  it("turns a duration into an end time counted from now", () => {
-    const now = new Date("2026-10-08T12:00").getTime();
-    const draft = withResolvedDuration(
-      { ...emptyDraft(), schedule: "duration", duration: "90m" },
-      now,
-    );
+describe("isHiddenByCritical", () => {
+  const critical = (orgs: string[]) => ({ ...emptyDraft(), variant: "critical" as const, orgs });
+  const promo = (orgs: string[]) => ({ ...emptyDraft(), variant: "promo" as const, orgs });
 
-    expect(draft).toMatchObject({ schedule: "window", startsAt: "", endsAt: "2026-10-08T13:30" });
+  it("hides a promotion only where a live critical banner also shows", () => {
+    expect(isHiddenByCritical(promo([]), [critical([])])).toBe(true);
+    expect(isHiddenByCritical(promo(["a"]), [critical(["a", "b"])])).toBe(true);
+    expect(isHiddenByCritical(promo(["a", "c"]), [critical(["a"])])).toBe(false);
+    expect(isHiddenByCritical(promo([]), [critical(["a"])])).toBe(false);
+    expect(isHiddenByCritical({ ...promo([]), variant: "info" }, [critical([])])).toBe(false);
   });
 
-  it("leaves other schedules alone", () => {
-    const draft = { ...emptyDraft(), schedule: "always" as const };
-    expect(withResolvedDuration(draft)).toBe(draft);
+  it("ignores critical banners that are not live", () => {
+    const ended = { ...critical([]), schedule: "window" as const, endsAt: "2000-01-01T00:00" };
+    expect(isHiddenByCritical(promo([]), [ended])).toBe(false);
+  });
+});
+
+describe("styles", () => {
+  it("round-trips a saved style and drops what it cannot use", () => {
+    const authored = {
+      id: "s1",
+      name: "Release",
+      base: "promo",
+      icon: "rocket-launch",
+      text_size: "large",
+      colors: { light: "#DBEAFE", dark: "#1E3A8A" },
+    };
+    const [style] = stylesFromConfig({ styles: [authored, { id: "", name: "x" }, "junk"] });
+
+    expect(authoredFromStyle(style)).toEqual(authored);
+    expect(stylesFromConfig({ styles: [{ id: "a", name: "A", icon: "skull" }] })[0]).toMatchObject({
+      base: "info",
+      icon: "",
+      textSize: "medium",
+    });
+  });
+
+  it("keeps the style a banner was copied from, and its icon", () => {
+    const draft = draftFromAuthored({ message: "m", icon: "build", style: "s1" });
+    expect(draft).toMatchObject({ icon: "build", styleId: "s1" });
+    expect(authoredFromDraft(draft)).toEqual({ message: "m", icon: "build", style: "s1" });
+  });
+
+  it("mints distinct ids", () => {
+    expect(newBannerId()).not.toBe(newBannerId());
+    expect(newBannerId("style")).toMatch(/^style-/);
   });
 });

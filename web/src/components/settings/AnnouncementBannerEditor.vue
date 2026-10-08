@@ -17,11 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <AnnouncementBannerEditorForm
     v-if="target"
-    :key="routeKey"
+    :key="formKey"
     :draft="target.draft"
     :index="target.index"
     :others="target.others"
     :original="target.original"
+    :styles="styles"
+    @reload="reload"
   />
   <div
     v-else
@@ -39,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -52,6 +54,8 @@ import AnnouncementBannerEditorForm from "./AnnouncementBannerEditorForm.vue";
 import {
   draftFromAuthored,
   emptyDraft,
+  newBannerId,
+  stylesFromConfig,
   type AuthoredBanner,
   type BannerDraft,
 } from "./announcementDrafts";
@@ -66,16 +70,22 @@ const configQuery = useQuery(() =>
   Object.assign(announcementConfigQuery(metaOrg.value), { enabled: !!metaOrg.value }),
 );
 
+const styles = computed(() => stylesFromConfig(configQuery.data.value));
+
 const queryIndex = (key: "index" | "duplicate") => {
   const raw = route.query[key];
   const parsed = typeof raw === "string" ? Number.parseInt(raw, 10) : Number.NaN;
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 };
 
-// A fresh form per target and per reload, so edits never carry across banners or stale data.
-const routeKey = computed(
-  () => `${JSON.stringify(route.query)}:${configQuery.dataUpdatedAt.value}`,
-);
+// Remounts only on a new target or an explicit reload; a refetch after saving a style must keep the edits.
+const reloadCount = ref(0);
+const formKey = computed(() => `${JSON.stringify(route.query)}:${reloadCount.value}`);
+
+const reload = async () => {
+  await configQuery.refetch();
+  reloadCount.value += 1;
+};
 
 interface EditorTarget {
   draft: BannerDraft;
@@ -101,8 +111,12 @@ const target = computed<EditorTarget | null>(() => {
     };
   }
   if (copyIndex !== null && copyIndex < drafts.length) {
-    // A copy needs its own dismissal key, or dismissing one would hide both.
-    return { draft: { ...drafts[copyIndex], id: "" }, index: null, others: drafts, original: null };
+    return {
+      draft: { ...drafts[copyIndex], id: newBannerId() },
+      index: null,
+      others: drafts,
+      original: null,
+    };
   }
   return { draft: emptyDraft(), index: null, others: drafts, original: null };
 });

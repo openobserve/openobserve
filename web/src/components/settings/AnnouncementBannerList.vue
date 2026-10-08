@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variant="banner.draft.variant"
             :text-size="banner.draft.textSize"
             :colors="{ light: banner.draft.colorLight, dark: banner.draft.colorDark }"
+            :icon="banner.draft.icon"
             :mode="isDark ? 'dark' : 'light'"
             :inert-actions="{
               ctaText: banner.draft.hasCta ? banner.draft.ctaText : '',
@@ -97,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-severity="{ row }">
             <OBadge :variant="SEVERITY_BADGE[row.draft.variant]" size="sm">
-              {{ t(`announcements.variants.${row.draft.variant}`) }}
+              {{ row.severityLabel }}
             </OBadge>
           </template>
           <template #cell-status="{ row }">
@@ -159,14 +160,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AnnouncementBar from "@/components/announcements/AnnouncementBar.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useAnnouncementDraftPreview } from "@/composables/useAnnouncementDraftPreview";
 import { useTheme } from "@/composables/useTheme";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -176,10 +176,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  announcementConfigQuery,
-  saveAnnouncementConfigMutation,
-} from "@/services/announcements.queries";
+import { announcementConfigQuery } from "@/services/announcements.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import { orderBanners } from "@/utils/announcementOrder";
@@ -187,11 +184,18 @@ import { bannerMessageText } from "@/utils/announcementMarkdown";
 import {
   bannerStatus,
   draftFromAuthored,
+  isHiddenByCritical,
+  stylesFromConfig,
   type AuthoredBanner,
   type BannerDraft,
   type BannerStatus,
 } from "./announcementDrafts";
 import { audienceSummary, relativeTo, scheduleSummary } from "./announcementSummaries";
+import {
+  AnnouncementConflictError,
+  sameAuthored,
+  useAnnouncementConfigUpdate,
+} from "./useAnnouncementConfigUpdate";
 
 /** `hidden`: live, but a promo the bar suppresses while a critical banner is up. */
 type RowStatus = BannerStatus | "hidden";
@@ -201,6 +205,7 @@ interface BannerRow {
   draft: BannerDraft;
   authored: Record<string, unknown>;
   text: string;
+  severityLabel: string;
   status: RowStatus;
   statusLabel: string;
   statusHint?: string;
@@ -231,15 +236,13 @@ const store = useStore();
 const router = useRouter();
 const { isDark } = useTheme();
 const { isMobile } = useBreakpoint();
-const queryClient = useQueryClient();
 
 const metaOrg = computed<string>(() => store.state.zoConfig?.meta_org ?? "");
 
 const configQuery = useQuery(() =>
   Object.assign(announcementConfigQuery(metaOrg.value), { enabled: !!metaOrg.value }),
 );
-const saveConfig = useMutation(() => saveAnnouncementConfigMutation(metaOrg.value));
-const { notifyConfigChanged } = useAnnouncementDraftPreview();
+const { update } = useAnnouncementConfigUpdate();
 
 // The dialog closes itself before it emits `ok`, so the target must outlive the open flag.
 const deleteOpen = ref(false);
@@ -254,18 +257,22 @@ const rows = computed<BannerRow[]>(() => {
   const drafts = (configQuery.data.value?.banners ?? []).map((banner) =>
     draftFromAuthored(banner as AuthoredBanner),
   );
-  const criticalLive = drafts.some((d) => d.variant === "critical" && bannerStatus(d) === "live");
+  const styleNames = new Map(
+    stylesFromConfig(configQuery.data.value).map((style) => [style.id, style.name]),
+  );
 
   return drafts.map((draft, index) => {
     const base = bannerStatus(draft);
+    const others = drafts.filter((_, i) => i !== index);
     const status: RowStatus =
-      base === "live" && criticalLive && draft.variant === "promo" ? "hidden" : base;
+      base === "live" && isHiddenByCritical(draft, others) ? "hidden" : base;
     const endsSoon = base === "live" && draft.schedule === "window" && draft.endsAt;
     return {
       index,
       draft,
       authored: configQuery.data.value!.banners[index],
       text: bannerMessageText(draft.message),
+      severityLabel: styleNames.get(draft.styleId) ?? t(`announcements.variants.${draft.variant}`),
       status,
       statusLabel:
         status === "hidden"
@@ -338,24 +345,18 @@ const removeBanner = async () => {
   const expected = rows.value.find((row) => row.index === index)?.authored;
 
   try {
-    // Re-read and confirm the target, so a change saved elsewhere meanwhile is neither lost nor misaimed.
-    const latest = await queryClient.fetchQuery({
-      ...announcementConfigQuery(metaOrg.value),
-      staleTime: 0,
+    await update((latest) => {
+      if (!sameAuthored(latest.banners[index], expected)) throw new AnnouncementConflictError();
+      return { ...latest, banners: latest.banners.filter((_, i) => i !== index) };
     });
-    if (JSON.stringify(latest.banners[index]) !== JSON.stringify(expected)) {
-      toast({ variant: "error", message: t("announcements.editor.conflict") });
-      return;
-    }
-
-    const banners = latest.banners.filter((_, i) => i !== index);
-    await saveConfig.mutateAsync({ banners });
-    notifyConfigChanged();
     toast({ variant: "success", message: t("announcements.list.deleted") });
   } catch (error: any) {
     toast({
       variant: "error",
-      message: raw(error?.response?.data?.message) || t("announcements.settings.saveFailed"),
+      message:
+        error instanceof AnnouncementConflictError
+          ? t("announcements.editor.conflict")
+          : raw(error?.response?.data?.message) || t("announcements.settings.saveFailed"),
     });
   }
 };

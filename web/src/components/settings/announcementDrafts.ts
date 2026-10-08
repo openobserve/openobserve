@@ -23,6 +23,7 @@
 
 import {
   DEFAULT_TEXT_SIZE,
+  isBannerIcon,
   isHexColor,
   isTextSize,
   type BannerTextSize,
@@ -58,6 +59,22 @@ export interface BannerDraft {
   /** `#RRGGBB` background per theme mode; empty keeps the severity's colours. */
   colorLight: string;
   colorDark: string;
+  /** One of `BANNER_ICONS`; empty keeps the severity's icon. */
+  icon: string;
+  /** The saved style this banner's look was copied from, for labelling only. */
+  styleId: string;
+}
+
+/** A saved look the editor copies into a banner; editing it later leaves existing banners alone. */
+export interface BannerStyle {
+  id: string;
+  name: string;
+  /** The severity a banner with this style behaves as, for ordering and hiding promotions. */
+  base: BannerVariantName;
+  icon: string;
+  textSize: BannerTextSize;
+  colorLight: string;
+  colorDark: string;
 }
 
 export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
@@ -79,7 +96,14 @@ export function emptyDraft(): BannerDraft {
     textSize: DEFAULT_TEXT_SIZE,
     colorLight: "",
     colorDark: "",
+    icon: "",
+    styleId: "",
   };
+}
+
+/** A fresh dismissal key, so a new or duplicated banner is never dismissed along with another. */
+export function newBannerId(prefix = "banner"): string {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 const DURATION_UNIT_MS: Record<string, number> = {
@@ -161,6 +185,8 @@ export interface AuthoredBanner {
   orgs?: unknown;
   text_size?: unknown;
   colors?: { light?: unknown; dark?: unknown } | null;
+  icon?: unknown;
+  style?: unknown;
 }
 
 function str(value: unknown): string {
@@ -219,6 +245,9 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
   if (isHexColor(light)) draft.colorLight = light;
   if (isHexColor(dark)) draft.colorDark = dark;
 
+  if (isBannerIcon(banner.icon)) draft.icon = banner.icon;
+  draft.styleId = str(banner.style);
+
   return draft;
 }
 
@@ -271,6 +300,9 @@ export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
   if (draft.colorDark) colors.dark = draft.colorDark.toUpperCase();
   if (Object.keys(colors).length) banner.colors = colors;
 
+  if (draft.icon) banner.icon = draft.icon;
+  if (draft.styleId) banner.style = draft.styleId;
+
   return banner;
 }
 
@@ -292,17 +324,55 @@ export function bannerStatus(draft: BannerDraft, now: number = Date.now()): Bann
   return "live";
 }
 
-/** Pins a duration to an absolute end, since a stored `duration` restarts on every later save. */
-export function withResolvedDuration(draft: BannerDraft, now: number = Date.now()): BannerDraft {
-  if (draft.schedule !== "duration") return draft;
+/** A promotion every one of whose organizations also sees a live critical banner, so it never shows. */
+export function isHiddenByCritical(
+  draft: BannerDraft,
+  others: BannerDraft[],
+  now: number = Date.now(),
+): boolean {
+  if (draft.variant !== "promo") return false;
 
-  const durationMs = parseDurationMs(draft.duration);
-  if (!durationMs) return draft;
+  const critical = others.filter(
+    (d) => d.variant === "critical" && bannerStatus(d, now) === "live",
+  );
+  if (critical.some((d) => !d.orgs.length)) return true;
+  if (!critical.length || !draft.orgs.length) return false;
 
-  return {
-    ...draft,
-    schedule: "window",
-    startsAt: "",
-    endsAt: toLocalInput(new Date(now + durationMs).toISOString()),
+  const covered = new Set(critical.flatMap((d) => d.orgs));
+  return draft.orgs.every((org) => covered.has(org));
+}
+
+export function stylesFromConfig(parsed: unknown): BannerStyle[] {
+  const styles = (parsed as { styles?: unknown } | null)?.styles;
+  if (!Array.isArray(styles)) return [];
+
+  return styles
+    .filter((style): style is Record<string, any> => typeof style === "object" && style !== null)
+    .filter((style) => str(style.id) && str(style.name))
+    .map((style) => ({
+      id: str(style.id),
+      name: str(style.name),
+      base: VARIANTS.includes(style.base) ? style.base : "info",
+      icon: isBannerIcon(style.icon) ? style.icon : "",
+      textSize: isTextSize(style.text_size) ? style.text_size : DEFAULT_TEXT_SIZE,
+      colorLight: isHexColor(style.colors?.light) ? style.colors.light : "",
+      colorDark: isHexColor(style.colors?.dark) ? style.colors.dark : "",
+    }));
+}
+
+export function authoredFromStyle(style: BannerStyle): Record<string, unknown> {
+  const authored: Record<string, unknown> = {
+    id: style.id,
+    name: style.name.trim(),
+    base: style.base,
   };
+  if (style.icon) authored.icon = style.icon;
+  if (style.textSize !== DEFAULT_TEXT_SIZE) authored.text_size = style.textSize;
+
+  const colors: Record<string, string> = {};
+  if (style.colorLight) colors.light = style.colorLight.toUpperCase();
+  if (style.colorDark) colors.dark = style.colorDark.toUpperCase();
+  if (Object.keys(colors).length) authored.colors = colors;
+
+  return authored;
 }

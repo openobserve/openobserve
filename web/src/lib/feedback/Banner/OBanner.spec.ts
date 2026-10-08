@@ -43,12 +43,21 @@ describe("OBanner — preserveWhitespace", () => {
 
 describe("OBanner — textSize and colors", () => {
   it("keeps the compact bar scale unless a size is asked for", () => {
-    const bar = mount(OBanner, { props: { bar: true }, global: { stubs } });
-    expect(bar.classes()).toContain("text-compact");
+    const bar = mount(OBanner, {
+      props: { bar: true },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(bar.classes()).not.toContain("text-base");
+    expect(bar.html()).toContain("text-compact");
 
-    const large = mount(OBanner, { props: { bar: true, textSize: "large" }, global: { stubs } });
+    const large = mount(OBanner, {
+      props: { bar: true, textSize: "large" },
+      slots: { default: "m" },
+      global: { stubs },
+    });
     expect(large.classes()).toContain("text-base");
-    expect(large.classes()).not.toContain("text-compact");
+    expect(large.html()).not.toContain("text-compact");
   });
 
   it("paints runtime colours in place of the variant's tokens", () => {

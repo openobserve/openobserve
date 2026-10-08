@@ -22,14 +22,21 @@ import { announcementKeys } from "./announcements.querykeys";
 /** The authored config, exactly as stored. Read from the meta org only. */
 export interface AnnouncementConfig {
   banners: Record<string, unknown>[];
+  styles: Record<string, unknown>[];
+  /** Keys this UI does not edit, written back untouched. */
+  [key: string]: unknown;
 }
 
 export const announcementConfigQuery = (org: string) =>
   queryOptions({
     queryKey: announcementKeys.config(org),
     queryFn: async (): Promise<AnnouncementConfig> => {
-      const data = (await announcements.getConfig(org)).data;
-      return { banners: Array.isArray(data?.banners) ? data.banners : [] };
+      const data = (await announcements.getConfig(org)).data ?? {};
+      return {
+        ...data,
+        banners: Array.isArray(data.banners) ? data.banners : [],
+        styles: Array.isArray(data.styles) ? data.styles : [],
+      };
     },
     staleTime: NORMAL_STALE_TIME,
   });

@@ -234,9 +234,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "disabled:opacity-60",
   ].join(" "),
   // banner-dismiss: Inline text-link style for the actions inside an OBanner bar.
-  // Inherits the banner's own text color and size so it reads correctly on every variant.
+  // Inherits the banner's own text color so it reads correctly on every variant.
   "banner-dismiss": [
-    "bg-transparent border-0 text-inherit underline font-bold text-[length:inherit]! whitespace-nowrap",
+    "bg-transparent border-0 text-inherit underline font-bold text-compact whitespace-nowrap",
     "h-auto! p-0!",
     "enabled:hover:opacity-80",
     "disabled:opacity-60",

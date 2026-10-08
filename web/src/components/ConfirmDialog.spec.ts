@@ -45,7 +45,7 @@ const ODialogStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
-    "primaryButtonVariant",
+    "primaryButtonColor",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
@@ -56,7 +56,7 @@ const ODialogStub = {
       :data-title="title"
       :data-primary-label="primaryButtonLabel"
       :data-secondary-label="secondaryButtonLabel"
-      :data-primary-color="primaryButtonVariant"
+      :data-primary-color="primaryButtonColor"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -257,11 +257,11 @@ describe("ConfirmDialog", () => {
     expect(dialog.props("primaryButtonLabel")).toBe("Delete");
   });
 
-  it("renders a destructive okColor as ODialog's destructive primary variant", () => {
+  it("renders custom okColor prop on ODialog primary button", () => {
     wrapper.unmount();
     wrapper = buildWrapper({ okColor: "destructive" });
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primaryButtonColor")).toBe("destructive");
   });
 
   it("preserves default OK label when okLabel is not provided", () => {

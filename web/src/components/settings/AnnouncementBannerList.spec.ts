@@ -120,6 +120,7 @@ describe("AnnouncementBannerList", () => {
         { message: "**Outage** now", variant: "critical" },
         { message: "Over", ends_at: expect.any(String) },
       ],
+      styles: [],
     });
   });
 

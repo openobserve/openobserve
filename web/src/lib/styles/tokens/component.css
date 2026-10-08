@@ -795,7 +795,7 @@
   --color-panel-bar-border: var(--color-grey-300);
 }
 
-/* The attribute lets a preview render light banners inside a dark app; see AnnouncementBannerPreview. */
+/* The attribute lets a preview render light banners inside a dark app; see AnnouncementBannerPreviewPanel. */
 :root,
 [data-banner-theme="light"] {
   /* ── Banner (OBanner) ──────────────────────────────────── */

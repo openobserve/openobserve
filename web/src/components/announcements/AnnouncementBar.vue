@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OBanner
     bar
     :variant="bannerVariant(variant)"
-    :icon="bannerIcon(variant)"
+    :icon="bannerIcon(variant, icon)"
     :text-size="textSize ?? DEFAULT_TEXT_SIZE"
     :colors="bannerColorsFor(colors, mode)"
     :data-test="dataTest"
@@ -60,6 +60,7 @@ const props = defineProps<{
   variant?: string;
   textSize?: BannerTextSize;
   colors?: BannerColors;
+  icon?: string;
   /** Which of the authored colours to paint; the live bar passes the app's current mode. */
   mode: BannerThemeMode;
   /** Draws the button text and Dismiss as they will appear, without making them clickable. */

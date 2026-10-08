@@ -41,6 +41,7 @@ export interface Banner {
   cta?: BannerCta;
   text_size?: BannerTextSize;
   colors?: BannerColors;
+  icon?: string;
 }
 
 /** The banner as it arrives from the API, before its copy is branded via `raw()`. */
@@ -59,6 +60,9 @@ const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const MAX_TIMER_MS = 60 * 60 * 1000;
 
 const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
+
+// Module scope so a save in Settings reaches the bar mounted in the layout.
+const configVersion = ref(0);
 
 function readDismissed(): string[] {
   try {
@@ -204,6 +208,7 @@ export function useAnnouncementBanners() {
   // Switching orgs changes which banners apply, so refetch rather than carrying
   // the previous org's set across.
   watch(orgIdentifier, () => void fetchBanners());
+  watch(configVersion, () => void fetchBanners());
 
   onScopeDispose(() => {
     if (pollTimer) clearInterval(pollTimer);
@@ -216,4 +221,9 @@ export function useAnnouncementBanners() {
     start,
     refresh: fetchBanners,
   };
+}
+
+/** Makes every mounted bar refetch now rather than at its next poll. */
+export function notifyAnnouncementsChanged(): void {
+  configVersion.value += 1;
 }

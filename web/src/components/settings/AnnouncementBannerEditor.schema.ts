@@ -50,6 +50,8 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
       textSize: z.enum(["small", "medium", "large"]),
       colorLight: z.string().optional(),
       colorDark: z.string().optional(),
+      icon: z.string().optional(),
+      styleId: z.string().optional(),
     })
     .superRefine((value, ctx) => {
       if (value.schedule === "duration" && !parseDurationMs(value.duration ?? "")) {

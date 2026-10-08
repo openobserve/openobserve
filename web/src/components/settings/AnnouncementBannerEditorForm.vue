@@ -40,26 +40,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           type="submit"
           :form="FORM_ID"
-          :loading="saveConfig.isPending.value"
+          :loading="isPending"
           data-test="announcement-editor-save"
           >{{ saveLabel }}</OButton
         >
       </template>
 
-      <!-- Phones get one scrolling column; a split leaves neither pane wide enough to use. -->
-      <component
-        :is="isMobile ? StackedPanes : OSplitter"
-        v-bind="
-          isMobile
-            ? {}
-            : { limits: [35, 70], separatorClass: 'field-list-separator', class: 'h-full' }
-        "
+      <OSplitter
         v-model="splitPct"
+        class="h-full"
+        unit="%"
+        :horizontal="isMobile"
+        :limits="[35, 70]"
+        separator-class="field-list-separator"
       >
         <template #before>
-          <div
-            class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-6 py-5 max-md:h-auto max-md:shrink-0 max-md:overflow-visible max-md:px-4"
-          >
+          <div class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-6 py-5 max-md:px-4">
             <OBanner
               v-if="saveError"
               variant="error-soft"
@@ -80,165 +76,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBanner>
 
             <OFormSection :title="t('announcements.editor.sections.message')">
-              <div class="flex flex-col gap-2" data-test="announcement-editor-message-field">
-                <div
-                  class="flex flex-wrap items-center gap-1"
-                  data-test="announcement-editor-toolbar"
-                >
-                  <OButton
-                    v-for="action in formatActions"
-                    :key="action.format"
-                    variant="ghost"
-                    size="icon-sm"
-                    :icon-left="action.icon"
-                    :aria-label="action.label"
-                    :title="action.label"
-                    :data-test="`announcement-editor-toolbar-${action.format}`"
-                    @click="applyFormat(action.format)"
-                  />
-                  <OPopover side="bottom" align="start" content-class="p-1.5">
-                    <template #trigger>
-                      <OButton
-                        variant="ghost"
-                        size="icon-sm"
-                        icon-left="add-reaction"
-                        :aria-label="t('announcements.editor.toolbar.emoji')"
-                        :title="t('announcements.editor.toolbar.emoji')"
-                        data-test="announcement-editor-toolbar-emoji"
-                      />
-                    </template>
-                    <div
-                      class="grid grid-cols-6 gap-0.5"
-                      data-test="announcement-editor-emoji-grid"
-                    >
-                      <OButton
-                        v-for="emoji in EMOJIS"
-                        :key="emoji.name"
-                        variant="ghost"
-                        size="icon-sm"
-                        :aria-label="t(`announcements.editor.emoji.${emoji.name}`)"
-                        :title="t(`announcements.editor.emoji.${emoji.name}`)"
-                        :data-test="`announcement-editor-emoji-${emoji.name}`"
-                        @click="insertEmoji(emoji.char)"
-                        >{{ raw(emoji.char) }}</OButton
-                      >
-                    </div>
-                  </OPopover>
-                </div>
-                <div ref="messageFieldRef">
-                  <OFormInput
-                    name="message"
-                    type="textarea"
-                    :rows="3"
-                    :label="t('announcements.form.message')"
-                    :placeholder="t('announcements.form.messagePlaceholder')"
-                    :help-text="t('announcements.editor.messageHelp')"
-                    required
-                    data-test="announcement-editor-message"
-                  />
-                </div>
-                <span
-                  :class="[
-                    'self-end text-xs',
-                    messageLength > MESSAGE_MAX_LENGTH
-                      ? 'text-input-error-text'
-                      : 'text-text-secondary',
-                  ]"
-                  data-test="announcement-editor-message-count"
-                >
-                  {{
-                    t("announcements.editor.characters", {
-                      count: messageLength,
-                      max: MESSAGE_MAX_LENGTH,
-                    })
-                  }}
-                </span>
-              </div>
-            </OFormSection>
-
-            <OFormSection :title="t('announcements.editor.sections.severity')">
-              <OFormOptionGroup
-                name="variant"
-                type="radio"
-                :options="variantOptions"
-                data-test="announcement-editor-variant"
-              />
-            </OFormSection>
-
-            <OFormSection :title="t('announcements.editor.sections.audience')">
               <div class="flex flex-col gap-4">
-                <OOptionGroup
-                  :model-value="audience"
-                  type="radio"
-                  orientation="horizontal"
-                  :label="t('announcements.form.orgs')"
-                  :options="audienceOptions"
-                  data-test="announcement-editor-audience"
-                  @update:model-value="chooseAudience"
-                />
-                <OFormSelect
-                  v-if="audience === 'some'"
-                  name="orgs"
-                  multiple
-                  :label="t('announcements.editor.orgsPick')"
-                  :options="orgOptions"
-                  data-test="announcement-editor-orgs"
-                />
-                <OFormSwitch
-                  name="dismissible"
-                  :label="t('announcements.form.dismissible')"
-                  data-test="announcement-editor-dismissible"
-                />
-                <OSwitch
-                  v-if="!isNew && values.dismissible"
-                  v-model="resetDismissals"
-                  :label="t('announcements.editor.resetDismissals')"
-                  data-test="announcement-editor-reset-dismissals"
-                />
-              </div>
-            </OFormSection>
-
-            <OFormSection :title="t('announcements.editor.sections.schedule')">
-              <div class="flex flex-col gap-4">
-                <OFormSelect
-                  name="schedule"
-                  :label="t('announcements.form.schedule')"
-                  :options="scheduleOptions"
-                  data-test="announcement-editor-schedule"
-                />
-                <OFormInput
-                  v-if="values.schedule === 'duration'"
-                  name="duration"
-                  :label="t('announcements.form.duration')"
-                  :placeholder="t('announcements.form.durationPlaceholder')"
-                  :help-text="t('announcements.editor.durationHelp')"
-                  field-width="sm"
-                  data-test="announcement-editor-duration"
-                />
-                <div v-if="values.schedule === 'window'" class="flex flex-col gap-2">
-                  <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-                    <OFormInput
-                      name="startsAt"
-                      type="datetime-local"
-                      :label="t('announcements.form.startsAt')"
-                      data-test="announcement-editor-starts-at"
+                <div class="flex flex-col gap-2" data-test="announcement-editor-message-field">
+                  <div
+                    class="flex flex-wrap items-center gap-1"
+                    data-test="announcement-editor-toolbar"
+                  >
+                    <OButton
+                      v-for="action in formatActions"
+                      :key="action.format"
+                      variant="ghost"
+                      size="icon-sm"
+                      :icon-left="action.icon"
+                      :aria-label="action.label"
+                      :title="action.label"
+                      :data-test="`announcement-editor-toolbar-${action.format}`"
+                      @click="applyFormat(action.format)"
                     />
+                    <OPopover side="bottom" align="start" content-class="p-1.5">
+                      <template #trigger>
+                        <OButton
+                          variant="ghost"
+                          size="icon-sm"
+                          icon-left="add-reaction"
+                          :aria-label="t('announcements.editor.toolbar.emoji')"
+                          :title="t('announcements.editor.toolbar.emoji')"
+                          data-test="announcement-editor-toolbar-emoji"
+                        />
+                      </template>
+                      <div
+                        class="grid grid-cols-6 gap-0.5"
+                        data-test="announcement-editor-emoji-grid"
+                      >
+                        <OButton
+                          v-for="emoji in EMOJIS"
+                          :key="emoji.name"
+                          variant="ghost"
+                          size="icon-sm"
+                          :aria-label="t(`announcements.editor.emoji.${emoji.name}`)"
+                          :title="t(`announcements.editor.emoji.${emoji.name}`)"
+                          :data-test="`announcement-editor-emoji-${emoji.name}`"
+                          @click="insertEmoji(emoji.char)"
+                          >{{ raw(emoji.char) }}</OButton
+                        >
+                      </div>
+                    </OPopover>
+                  </div>
+                  <div ref="messageFieldRef">
                     <OFormInput
-                      name="endsAt"
-                      type="datetime-local"
-                      :label="t('announcements.form.endsAt')"
-                      data-test="announcement-editor-ends-at"
+                      name="message"
+                      type="textarea"
+                      :rows="3"
+                      :label="t('announcements.form.message')"
+                      :placeholder="t('announcements.form.messagePlaceholder')"
+                      :help-text="t('announcements.editor.messageHelp')"
+                      required
+                      data-test="announcement-editor-message"
                     />
                   </div>
-                  <span class="text-text-secondary text-xs">
-                    {{ t("announcements.form.timezoneHint", { zone: timeZone }) }}
+                  <span
+                    :class="[
+                      'self-end text-xs',
+                      messageLength > MESSAGE_MAX_LENGTH
+                        ? 'text-input-error-text'
+                        : 'text-text-secondary',
+                    ]"
+                    data-test="announcement-editor-message-count"
+                  >
+                    {{
+                      t("announcements.editor.characters", {
+                        count: messageLength,
+                        max: MESSAGE_MAX_LENGTH,
+                      })
+                    }}
                   </span>
+                </div>
+
+                <OFormSwitch
+                  name="hasCta"
+                  :label="t('announcements.form.hasCta')"
+                  data-test="announcement-editor-has-cta"
+                />
+                <div v-if="values.hasCta" class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+                  <OFormInput
+                    name="ctaText"
+                    :label="t('announcements.form.ctaText')"
+                    :placeholder="t('announcements.form.ctaTextPlaceholder')"
+                    data-test="announcement-editor-cta-text"
+                  />
+                  <OFormInput
+                    name="ctaUrl"
+                    :label="t('announcements.form.ctaUrl')"
+                    :placeholder="t('announcements.form.ctaUrlPlaceholder')"
+                    data-test="announcement-editor-cta-url"
+                  />
                 </div>
               </div>
             </OFormSection>
 
-            <OFormSection :title="t('announcements.editor.sections.appearance')">
-              <div class="flex flex-col gap-5" data-test="announcement-editor-appearance">
+            <OFormSection :title="t('announcements.editor.sections.style')">
+              <div class="flex flex-col gap-5" data-test="announcement-editor-style">
+                <OOptionGroup
+                  :model-value="styleChoice"
+                  type="radio"
+                  :label="t('announcements.form.styleChoice')"
+                  :options="styleOptions"
+                  data-test="announcement-editor-variant"
+                  @update:model-value="chooseStyle"
+                />
+
                 <OFormToggleGroup
                   name="textSize"
                   :label="t('announcements.form.textSize')"
@@ -254,6 +200,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ option.label }}
                   </OToggleGroupItem>
                 </OFormToggleGroup>
+
+                <div class="flex flex-col gap-2">
+                  <span class="text-text-label text-xs font-medium">
+                    {{ t("announcements.form.icon") }}
+                  </span>
+                  <div
+                    class="flex flex-wrap items-center gap-1"
+                    role="radiogroup"
+                    :aria-label="t('announcements.form.icon')"
+                    data-test="announcement-editor-icon"
+                  >
+                    <OButton
+                      variant="outline"
+                      size="xs"
+                      role="radio"
+                      :active="!values.icon"
+                      :aria-checked="!values.icon"
+                      data-test="announcement-editor-icon-default"
+                      @click="form.setFieldValue('icon', '')"
+                      >{{ t("announcements.form.iconDefault") }}</OButton
+                    >
+                    <OButton
+                      v-for="icon in BANNER_ICONS"
+                      :key="icon"
+                      variant="outline"
+                      size="icon-sm"
+                      role="radio"
+                      :icon-left="icon"
+                      :active="values.icon === icon"
+                      :aria-checked="values.icon === icon"
+                      :aria-label="icon"
+                      :title="icon"
+                      :data-test="`announcement-editor-icon-${icon}`"
+                      @click="form.setFieldValue('icon', icon)"
+                    />
+                  </div>
+                </div>
 
                 <div class="flex flex-col gap-2">
                   <span class="text-text-label text-xs font-medium">
@@ -286,81 +269,187 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="announcement-editor-color-dark"
                   />
                 </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    icon-left="bookmark-add"
+                    data-test="announcement-editor-save-style"
+                    @click="openSaveStyle"
+                    >{{ t("announcements.styles.saveAs") }}</OButton
+                  >
+                  <OButton
+                    v-if="selectedStyle"
+                    variant="ghost-destructive"
+                    size="sm"
+                    icon-left="delete"
+                    data-test="announcement-editor-delete-style"
+                    @click="deleteStyleOpen = true"
+                    >{{ t("announcements.styles.delete", { name: selectedStyle.name }) }}</OButton
+                  >
+                </div>
               </div>
             </OFormSection>
 
-            <OFormSection :title="t('announcements.editor.sections.cta')">
+            <OFormSection :title="t('announcements.editor.sections.whoWhen')">
               <div class="flex flex-col gap-4">
-                <OFormSwitch
-                  name="hasCta"
-                  :label="t('announcements.form.hasCta')"
-                  data-test="announcement-editor-has-cta"
+                <OOptionGroup
+                  :model-value="audience"
+                  type="radio"
+                  orientation="horizontal"
+                  :label="t('announcements.form.orgs')"
+                  :options="audienceOptions"
+                  data-test="announcement-editor-audience"
+                  @update:model-value="chooseAudience"
                 />
-                <div v-if="values.hasCta" class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-                  <OFormInput
-                    name="ctaText"
-                    :label="t('announcements.form.ctaText')"
-                    :placeholder="t('announcements.form.ctaTextPlaceholder')"
-                    data-test="announcement-editor-cta-text"
-                  />
-                  <OFormInput
-                    name="ctaUrl"
-                    :label="t('announcements.form.ctaUrl')"
-                    :placeholder="t('announcements.form.ctaUrlPlaceholder')"
-                    data-test="announcement-editor-cta-url"
-                  />
+                <OFormSelect
+                  v-if="audience === 'some'"
+                  name="orgs"
+                  multiple
+                  :label="t('announcements.editor.orgsPick')"
+                  :options="orgOptions"
+                  data-test="announcement-editor-orgs"
+                />
+
+                <OFormSelect
+                  name="schedule"
+                  :label="t('announcements.form.schedule')"
+                  :options="scheduleOptions"
+                  data-test="announcement-editor-schedule"
+                />
+                <div v-if="values.schedule === 'duration'" class="flex flex-col gap-2">
+                  <div class="flex flex-wrap items-end gap-2">
+                    <OFormInput
+                      name="duration"
+                      :label="t('announcements.form.duration')"
+                      :placeholder="t('announcements.form.durationPlaceholder')"
+                      field-width="sm"
+                      data-test="announcement-editor-duration"
+                    />
+                    <OButton
+                      v-for="span in DURATION_PICKS"
+                      :key="span"
+                      variant="outline"
+                      size="sm"
+                      :active="values.duration === span"
+                      :data-test="`announcement-editor-duration-${span}`"
+                      @click="form.setFieldValue('duration', span)"
+                      >{{ raw(span) }}</OButton
+                    >
+                  </div>
+                  <span class="text-text-secondary text-xs">{{ durationHint }}</span>
                 </div>
+                <div v-if="values.schedule === 'window'" class="flex flex-col gap-2">
+                  <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
+                    <OFormInput
+                      name="startsAt"
+                      type="datetime-local"
+                      :label="t('announcements.form.startsAt')"
+                      data-test="announcement-editor-starts-at"
+                    />
+                    <OFormInput
+                      name="endsAt"
+                      type="datetime-local"
+                      :label="t('announcements.form.endsAt')"
+                      data-test="announcement-editor-ends-at"
+                    />
+                  </div>
+                  <span class="text-text-secondary text-xs">
+                    {{ t("announcements.form.timezoneHint", { zone: timeZone }) }}
+                  </span>
+                </div>
+
+                <OFormSwitch
+                  name="dismissible"
+                  :label="t('announcements.form.dismissible')"
+                  data-test="announcement-editor-dismissible"
+                />
+                <OSwitch
+                  v-if="!isNew && values.dismissible"
+                  v-model="resetDismissals"
+                  :label="t('announcements.editor.resetDismissals')"
+                  data-test="announcement-editor-reset-dismissals"
+                />
               </div>
             </OFormSection>
           </div>
         </template>
 
         <template #after>
-          <div
-            class="bg-surface-subtle h-full min-h-0 overflow-y-auto p-5 max-md:h-auto max-md:shrink-0 max-md:overflow-visible max-md:p-4"
-          >
+          <div class="bg-surface-subtle h-full min-h-0 overflow-y-auto p-5 max-md:p-4">
             <AnnouncementBannerPreviewPanel
-              v-model:in-app="previewInApp"
               :banner="previewBanner"
-              :other-banners="otherLiveBanners"
+              :hidden="hiddenByCritical"
               data-test="announcement-editor-preview"
             />
           </div>
         </template>
-      </component>
+      </OSplitter>
     </OPageLayout>
   </OForm>
 
-  <ConfirmDialog
-    v-model="leaveConfirm.show"
+  <ODialog
+    v-model:open="saveStyleOpen"
+    size="sm"
+    :title="t('announcements.styles.saveTitle')"
+    :sub-title="
+      t('announcements.styles.saveHint', {
+        severity: t(`announcements.variants.${values.variant}`),
+      })
+    "
+    :primary-button-label="t('announcements.styles.saveConfirm')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-disabled="!styleName.trim()"
+    :primary-button-loading="isPending"
+    data-test="announcement-editor-save-style-dialog"
+    @click:secondary="saveStyleOpen = false"
+    @click:primary="saveStyle"
+  >
+    <OInput
+      v-model="styleName"
+      :label="t('announcements.styles.name')"
+      :placeholder="t('announcements.styles.namePlaceholder')"
+      :error-message="styleError || undefined"
+      data-test="announcement-editor-style-name"
+    />
+  </ODialog>
+
+  <ODialog
+    v-model:open="deleteStyleOpen"
+    size="sm"
+    :title="t('announcements.styles.deleteTitle', { name: selectedStyle?.name ?? '' })"
+    :sub-title="t('announcements.styles.deleteHint')"
+    :primary-button-label="t('common.delete')"
+    primary-button-variant="destructive"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-loading="isPending"
+    data-test="announcement-editor-delete-style-dialog"
+    @click:secondary="deleteStyleOpen = false"
+    @click:primary="deleteStyle"
+  />
+
+  <ODialog
+    v-model:open="leaveOpen"
+    size="sm"
     :title="t('announcements.editor.leaveTitle')"
-    :message="t('announcements.editor.leaveMessage')"
-    :ok-label="t('announcements.editor.leaveConfirm')"
-    :cancel-label="t('announcements.editor.keepEditing')"
-    ok-color="destructive"
-    @update:ok="resolveLeave(true)"
-    @update:cancel="resolveLeave(false)"
+    :sub-title="t('announcements.editor.leaveMessage')"
+    :primary-button-label="t('announcements.editor.leaveConfirm')"
+    primary-button-variant="destructive"
+    :secondary-button-label="t('announcements.editor.keepEditing')"
+    data-test="announcement-editor-leave-dialog"
+    @update:open="(open: boolean) => !open && resolveLeave(false)"
+    @click:secondary="resolveLeave(false)"
+    @click:primary="resolveLeave(true)"
   />
 </template>
 
 <script setup lang="ts">
-import {
-  computed,
-  defineComponent,
-  h,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { BANNER_COLOR_PRESETS } from "@/constants/themes";
-import { useAnnouncementDraftPreview } from "@/composables/useAnnouncementDraftPreview";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -375,22 +464,20 @@ import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormOptionGroup from "@/lib/forms/OptionGroup/OFormOptionGroup.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import {
-  announcementConfigQuery,
-  saveAnnouncementConfigMutation,
-} from "@/services/announcements.queries";
-import { announcementKeys } from "@/services/announcements.querykeys";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
+  BANNER_ICONS,
   CUSTOM_CHOICE,
   DEFAULT_CHOICE,
+  DEFAULT_TEXT_SIZE,
   TEXT_SIZES,
   colorChoiceFor,
 } from "@/utils/announcementAppearance";
@@ -400,6 +487,7 @@ import {
   type FormattedText,
   type MessageFormat,
 } from "@/utils/announcementMarkdown";
+import type { BannerVariantName } from "@/utils/announcementOrder";
 import {
   MESSAGE_MAX_LENGTH,
   makeBannerSchema,
@@ -412,29 +500,44 @@ import AnnouncementColorSwatches from "./AnnouncementColorSwatches.vue";
 import {
   VARIANTS,
   authoredFromDraft,
+  authoredFromStyle,
   bannerStatus,
-  withResolvedDuration,
+  isHiddenByCritical,
+  newBannerId,
+  parseDurationMs,
   type BannerDraft,
+  type BannerStyle,
 } from "./announcementDrafts";
+import {
+  AnnouncementConflictError,
+  sameAuthored,
+  useAnnouncementConfigUpdate,
+} from "./useAnnouncementConfigUpdate";
 
 const props = defineProps<{
   /** The banner being edited, already converted from the stored config. */
   draft: BannerDraft;
   /** Its position in the stored list, or null for a new banner. */
   index: number | null;
-  /** Every other stored banner, for the live-stack preview. */
+  /** Every other stored banner, to tell whether a critical one hides this promotion. */
   others: BannerDraft[];
   /** The banner exactly as stored when the editor opened, to detect a concurrent change on save. */
   original: Record<string, unknown> | null;
+  /** Saved styles; refreshed in place when one is added or deleted. */
+  styles: BannerStyle[];
 }>();
+
+const emit = defineEmits<{ (_e: "reload"): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
-const queryClient = useQueryClient();
 const { isMobile } = useBreakpoint();
+const { update, isPending } = useAnnouncementConfigUpdate();
 
 const FORM_ID = "announcement-banner-editor-form";
+const STYLE_CHOICE_PREFIX = "style:";
+const DURATION_PICKS = ["1h", "4h", "1d", "1w"];
 
 const EMOJIS = [
   { name: "siren", char: "🚨" },
@@ -451,28 +554,16 @@ const EMOJIS = [
   { name: "info", char: "ℹ️" },
 ] as const;
 
-/** One scrolling column holding the splitter's two panes, for phones. */
-const StackedPanes = defineComponent({
-  setup(_, { slots }) {
-    return () =>
-      h("div", { class: "flex h-full flex-col overflow-y-auto" }, [
-        slots.before?.(),
-        slots.after?.(),
-      ]);
-  },
-});
+// Captured once: the parent's copies refresh when a style is saved, and the conflict check must not move with them.
+const index = props.index;
+const original = props.original;
 
-const metaOrg = computed<string>(() => store.state.zoConfig?.meta_org ?? "");
-const isNew = computed(() => props.index === null);
+const isNew = computed(() => index === null);
 const splitPct = ref(55);
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const saveError = ref<I18nText | "">("");
 const conflict = ref(false);
 const resetDismissals = ref(false);
-
-const saveConfig = useMutation(() => saveAnnouncementConfigMutation(metaOrg.value));
-const { setDraft, notifyConfigChanged } = useAnnouncementDraftPreview();
-const previewInApp = ref(true);
 
 const VARIANT_HELP_KEYS = {
   info: "announcements.editor.variantHelp.info",
@@ -480,16 +571,6 @@ const VARIANT_HELP_KEYS = {
   critical: "announcements.editor.variantHelp.critical",
   promo: "announcements.editor.variantHelp.promo",
 } as const;
-
-const variantOptions = computed(() =>
-  VARIANTS.map((variant) => ({
-    label: t("announcements.editor.variantOption", {
-      name: t(`announcements.variants.${variant}`),
-      help: t(VARIANT_HELP_KEYS[variant]),
-    }),
-    value: variant,
-  })),
-);
 
 const TEXT_SIZE_LABEL_KEYS = {
   small: "announcements.form.textSizeSmall",
@@ -547,6 +628,8 @@ const draftFromValues = (values: BannerForm): BannerDraft => ({
   textSize: values.textSize,
   colorLight: values.colorLight?.trim() ?? "",
   colorDark: values.colorDark?.trim() ?? "",
+  icon: values.icon ?? "",
+  styleId: values.styleId ?? "",
 });
 
 let leavingAfterSave = false;
@@ -558,36 +641,31 @@ const form = useOForm<BannerForm>({
   onSubmit: async (values) => {
     saveError.value = "";
     conflict.value = false;
-    const draft = withResolvedDuration(draftFromValues(values));
-    if (resetDismissals.value) draft.id = `banner-${Date.now().toString(36)}`;
+    const draft = draftFromValues(values);
+    if (isNew.value && !draft.id) draft.id = newBannerId();
+    if (resetDismissals.value) draft.id = newBannerId();
     const banner = authoredFromDraft(draft);
 
     try {
-      // Re-read rather than trusting the cache, so a banner saved elsewhere meanwhile survives.
-      const latest = await queryClient.fetchQuery({
-        ...announcementConfigQuery(metaOrg.value),
-        staleTime: 0,
-      });
-      const banners = [...latest.banners];
-      if (props.index !== null) {
-        if (!sameBanner(banners[props.index], props.original)) {
-          conflict.value = true;
-          saveError.value = t("announcements.editor.conflict");
-          return;
+      await update((latest) => {
+        const banners = [...latest.banners];
+        if (index === null) {
+          banners.push(banner);
+        } else if (sameAuthored(banners[index], original)) {
+          banners[index] = banner;
+        } else {
+          throw new AnnouncementConflictError();
         }
-        banners[props.index] = banner;
-      } else {
-        banners.push(banner);
-      }
-
-      await saveConfig.mutateAsync({ banners });
-      notifyConfigChanged();
+        return { ...latest, banners };
+      });
       toast({ variant: "success", message: savedMessage(draft) });
       leavingAfterSave = true;
       goBack();
     } catch (error: any) {
-      saveError.value =
-        raw(error?.response?.data?.message) || t("announcements.settings.saveFailed");
+      conflict.value = error instanceof AnnouncementConflictError;
+      saveError.value = conflict.value
+        ? t("announcements.editor.conflict")
+        : raw(error?.response?.data?.message) || t("announcements.settings.saveFailed");
     }
   },
 });
@@ -596,10 +674,6 @@ const values = form.useStore((state) => state.values);
 const isDirty = form.useStore((state) => state.isDirty);
 
 const messageLength = computed(() => (values.value.message ?? "").length);
-
-// Comparing serialized forms is enough: both sides come straight from the same stored document.
-const sameBanner = (a: unknown, b: unknown) =>
-  a !== undefined && JSON.stringify(a) === JSON.stringify(b);
 
 const STATUS_LABEL_KEYS = {
   live: "announcements.editor.statusLive",
@@ -611,9 +685,7 @@ const storedStatusLabel = computed(() =>
   isNew.value ? undefined : t(STATUS_LABEL_KEYS[bannerStatus(props.draft)]),
 );
 
-const pendingStatus = computed(() =>
-  bannerStatus(withResolvedDuration(draftFromValues(values.value))),
-);
+const pendingStatus = computed(() => bannerStatus(draftFromValues(values.value)));
 
 const saveLabel = computed(() => {
   if (pendingStatus.value === "live") return t("announcements.editor.publishNow");
@@ -621,14 +693,21 @@ const saveLabel = computed(() => {
   return t("common.save");
 });
 
+const formatStamp = (ms: number) =>
+  new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+const durationHint = computed(() => {
+  const ms = parseDurationMs(values.value.duration ?? "");
+  return ms
+    ? t("announcements.form.durationEnds", { time: formatStamp(Date.now() + ms) })
+    : t("announcements.form.durationHelp");
+});
+
 const savedMessage = (draft: BannerDraft): I18nText => {
   const status = bannerStatus(draft);
   if (status === "scheduled") {
     return t("announcements.editor.savedScheduled", {
-      time: new Date(draft.startsAt).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }),
+      time: formatStamp(new Date(draft.startsAt).getTime()),
     });
   }
   if (status === "ended") return t("announcements.editor.savedEnded");
@@ -651,44 +730,80 @@ const previewBanner = computed<PreviewBanner>(() => ({
   textSize: values.value.textSize,
   colorLight: values.value.colorLight ?? "",
   colorDark: values.value.colorDark ?? "",
+  icon: values.value.icon ?? "",
   ctaText: values.value.hasCta ? (values.value.ctaText ?? "") : "",
   dismissible: values.value.dismissible,
 }));
 
-// The real top bar shows the draft too, so its width, theme and neighbours are exactly what users get.
-watch(
-  [previewInApp, previewBanner],
-  ([inApp, banner]) => {
-    setDraft(
-      inApp
-        ? {
-            id: "draft-preview",
-            message: raw(banner.message.trim() || t("announcements.preview.empty")),
-            variant: banner.variant,
-            dismissible: false,
-            text_size: banner.textSize,
-            colors: { light: banner.colorLight, dark: banner.colorDark },
-            cta: banner.ctaText ? { text: raw(banner.ctaText), url: "" } : undefined,
-          }
-        : null,
-      typeof props.original?.message === "string" ? props.original.message : null,
-    );
-  },
-  { immediate: true },
+const hiddenByCritical = computed(() =>
+  isHiddenByCritical(draftFromValues(values.value), props.others),
 );
 
-onBeforeUnmount(() => setDraft(null));
+// ── Style ─────────────────────────────────────────────────────────────────
 
-const otherLiveBanners = computed<PreviewBanner[]>(() =>
-  props.others
-    .filter((banner) => bannerStatus(banner) === "live")
-    .map((banner) => ({ ...banner, ctaText: banner.hasCta ? banner.ctaText : "" })),
+const selectedStyle = computed(() => props.styles.find((s) => s.id === values.value.styleId));
+
+const styleChoice = computed(() =>
+  selectedStyle.value ? `${STYLE_CHOICE_PREFIX}${selectedStyle.value.id}` : values.value.variant,
 );
 
-// ── Colour ────────────────────────────────────────────────────────────────
+const styleOptions = computed(() => [
+  ...VARIANTS.map((variant) => ({
+    label: t("announcements.editor.variantOption", {
+      name: t(`announcements.variants.${variant}`),
+      help: t(VARIANT_HELP_KEYS[variant]),
+    }),
+    value: variant,
+  })),
+  ...props.styles.map((style) => ({
+    label: t("announcements.styles.option", {
+      name: style.name,
+      severity: t(`announcements.variants.${style.base}`),
+    }),
+    value: `${STYLE_CHOICE_PREFIX}${style.id}`,
+  })),
+]);
 
 // Which swatch is lit is view state; the colours themselves live only in the form.
 const colorChoice = ref(colorChoiceFor(props.draft.colorLight, props.draft.colorDark));
+
+const applyLook = (look: Pick<BannerStyle, "icon" | "textSize" | "colorLight" | "colorDark">) => {
+  form.setFieldValue("icon", look.icon);
+  form.setFieldValue("textSize", look.textSize);
+  form.setFieldValue("colorLight", look.colorLight);
+  form.setFieldValue("colorDark", look.colorDark);
+  colorChoice.value = colorChoiceFor(look.colorLight, look.colorDark);
+};
+
+const chooseStyle = (choice: unknown) => {
+  const value = String(choice);
+  const style = props.styles.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === value);
+  if (style) {
+    form.setFieldValue("variant", style.base);
+    applyLook(style);
+    form.setFieldValue("styleId", style.id);
+    return;
+  }
+  form.setFieldValue("variant", value as BannerVariantName);
+  form.setFieldValue("styleId", "");
+  applyLook({ icon: "", textSize: DEFAULT_TEXT_SIZE, colorLight: "", colorDark: "" });
+};
+
+// A banner restyled after picking a saved style no longer matches it, so stop labelling it with that name.
+watch(
+  () => [values.value.icon, values.value.textSize, values.value.colorLight, values.value.colorDark],
+  () => {
+    const style = selectedStyle.value;
+    if (!style) return;
+    const v = values.value;
+    const same =
+      (v.icon ?? "") === style.icon &&
+      v.textSize === style.textSize &&
+      (v.colorLight ?? "").toUpperCase() === style.colorLight.toUpperCase() &&
+      (v.colorDark ?? "").toUpperCase() === style.colorDark.toUpperCase();
+    if (!same) form.setFieldValue("styleId", "");
+  },
+);
 
 const chooseColor = (choice: string) => {
   colorChoice.value = choice;
@@ -697,6 +812,61 @@ const chooseColor = (choice: string) => {
   const preset = BANNER_COLOR_PRESETS.find((p) => p.key === choice);
   form.setFieldValue("colorLight", choice === DEFAULT_CHOICE ? "" : (preset?.light ?? ""));
   form.setFieldValue("colorDark", choice === DEFAULT_CHOICE ? "" : (preset?.dark ?? ""));
+};
+
+const saveStyleOpen = ref(false);
+const deleteStyleOpen = ref(false);
+const styleName = ref("");
+const styleError = ref<I18nText | "">("");
+
+const openSaveStyle = () => {
+  styleName.value = "";
+  styleError.value = "";
+  saveStyleOpen.value = true;
+};
+
+const saveStyle = async () => {
+  const name = styleName.value.trim();
+  const v = values.value;
+  const style: BannerStyle = {
+    id: newBannerId("style"),
+    name,
+    base: v.variant,
+    icon: v.icon ?? "",
+    textSize: v.textSize,
+    colorLight: v.colorLight?.trim() ?? "",
+    colorDark: v.colorDark?.trim() ?? "",
+  };
+
+  try {
+    await update((latest) => ({ ...latest, styles: [...latest.styles, authoredFromStyle(style)] }));
+    form.setFieldValue("styleId", style.id);
+    saveStyleOpen.value = false;
+    toast({ variant: "success", message: t("announcements.styles.saved", { name }) });
+  } catch (error: any) {
+    styleError.value =
+      raw(error?.response?.data?.message) || t("announcements.settings.saveFailed");
+  }
+};
+
+const deleteStyle = async () => {
+  const style = selectedStyle.value;
+  if (!style) return;
+  try {
+    await update((latest) => ({
+      ...latest,
+      styles: latest.styles.filter((s) => s.id !== style.id),
+    }));
+    form.setFieldValue("styleId", "");
+    toast({ variant: "success", message: t("announcements.styles.deleted", { name: style.name }) });
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message: raw(error?.response?.data?.message) || t("announcements.settings.saveFailed"),
+    });
+  } finally {
+    deleteStyleOpen.value = false;
+  }
 };
 
 // ── Message toolbar ───────────────────────────────────────────────────────
@@ -744,36 +914,40 @@ const insertEmoji = (emoji: string) => {
 
 // ── Leaving ───────────────────────────────────────────────────────────────
 
-const leaveConfirm = ref<{ show: boolean; resolve: ((proceed: boolean) => void) | null }>({
-  show: false,
-  resolve: null,
-});
+const leaveOpen = ref(false);
+let leaveResolve: ((proceed: boolean) => void) | null = null;
 
 const resolveLeave = (proceed: boolean) => {
-  leaveConfirm.value.show = false;
-  leaveConfirm.value.resolve?.(proceed);
-  leaveConfirm.value.resolve = null;
+  leaveOpen.value = false;
+  leaveResolve?.(proceed);
+  leaveResolve = null;
 };
+
+const hasUnsavedChanges = () =>
+  !leavingAfterSave &&
+  (isDirty.value ||
+    resetDismissals.value ||
+    (audience.value === "some") !== !!props.draft.orgs.length);
 
 // A reload or tab close skips the router, so the browser's own prompt has to cover it.
 const warnOnUnload = (event: BeforeUnloadEvent) => {
-  if (leavingAfterSave || !isDirty.value) return;
-  event.preventDefault();
+  if (hasUnsavedChanges()) event.preventDefault();
 };
 
 onMounted(() => window.addEventListener("beforeunload", warnOnUnload));
 onBeforeUnmount(() => window.removeEventListener("beforeunload", warnOnUnload));
 
 onBeforeRouteLeave(() => {
-  if (leavingAfterSave || !isDirty.value) return true;
+  if (!hasUnsavedChanges()) return true;
   return new Promise<boolean>((resolve) => {
-    leaveConfirm.value = { show: true, resolve };
+    leaveResolve = resolve;
+    leaveOpen.value = true;
   });
 });
 
 const reload = () => {
   leavingAfterSave = true;
-  void queryClient.invalidateQueries({ queryKey: announcementKeys.config(metaOrg.value) });
+  emit("reload");
 };
 
 const goBack = () => {
@@ -784,5 +958,5 @@ const goBack = () => {
 };
 
 // Exposed so a test can drive the real submit and the toolbar without a browser selection.
-defineExpose({ form, applyFormat, insertEmoji });
+defineExpose({ form, applyFormat, insertEmoji, chooseStyle });
 </script>
