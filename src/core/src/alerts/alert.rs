@@ -3957,22 +3957,8 @@ fn process_row_templates_plain(
                 }
             }
         }
-        let alert_start_time_str = if alert_start_time > 0 {
-            Local
-                .timestamp_nanos(alert_start_time * 1000)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        } else {
-            String::from("N/A")
-        };
-        let alert_end_time_str = if alert_end_time > 0 {
-            Local
-                .timestamp_nanos(alert_end_time * 1000)
-                .format("%Y-%m-%dT%H:%M:%S")
-                .to_string()
-        } else {
-            String::from("N/A")
-        };
+        let alert_start_time_str = format_alert_time(alert_start_time);
+        let alert_end_time_str = format_alert_time(alert_end_time);
 
         let (stream_type_var, stream_name_var) =
             (alert.stream_type.as_str(), alert.stream_name.as_str());
@@ -4234,30 +4220,9 @@ async fn build_notification_context(
         use_given_time,
     );
 
-    let alert_start_time_str = if alert_start_time > 0 {
-        Local
-            .timestamp_nanos(alert_start_time * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
-    let alert_end_time_str = if alert_end_time > 0 {
-        Local
-            .timestamp_nanos(alert_end_time * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
-    let evaluation_timestamp_str = if evaluation_timestamp > 0 {
-        Local
-            .timestamp_nanos(evaluation_timestamp * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
+    let alert_start_time_str = format_alert_time(alert_start_time);
+    let alert_end_time_str = format_alert_time(alert_end_time);
+    let evaluation_timestamp_str = format_alert_time(evaluation_timestamp);
 
     let alert_type = if alert.is_real_time {
         "realtime"
@@ -4560,6 +4525,17 @@ pub fn get_alert_start_end_time(
         };
     }
     (alert_start_time, alert_end_time)
+}
+
+pub fn format_alert_time(micros: i64) -> String {
+    if micros > 0 {
+        Local
+            .timestamp_nanos(micros * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    }
 }
 fn format_agg_value(actual_value: Option<f64>) -> String {
     actual_value.map(|v| v.to_string()).unwrap_or_default()

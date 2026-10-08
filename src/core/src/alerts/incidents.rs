@@ -72,7 +72,7 @@ struct IncidentSend<'a> {
 /// non-alert identities (e.g. external alert sources) can be correlated using the
 /// same machinery. For the internal alert path this is built from an `Alert`.
 #[derive(Debug, Clone)]
-pub struct CorrelationSubject {
+pub struct CorrelationSubject<'a> {
     /// internal: `alert.get_unique_key()`; external: `external_alerts.id`
     pub id: String,
     pub name: String,
@@ -83,6 +83,7 @@ pub struct CorrelationSubject {
     /// carry `alert.priority` mapped through `determine_severity`, when set.
     /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    pub title_inputs: Option<super::incident_title::TitleInputs<'a>>,
 }
 
 /// An alert's incident correlation, and why its incident notification missed a destination.
@@ -545,26 +546,8 @@ async fn subject_notification_context(
     subject_name: &str,
     triggered_at: i64,
 ) -> crate::alerts::notifications::NotificationContext {
-    use chrono::TimeZone;
-
-    let org_name = match crate::common::infra::config::ORGANIZATIONS
-        .read()
-        .await
-        .get(org_id)
-    {
-        Some(org) => org.name.clone(),
-        None => org_id.to_string(),
-    };
-    let trigger_time_str = if triggered_at > 0 {
-        chrono::Local
-            .timestamp_nanos(triggered_at * 1000)
-            .format("%Y-%m-%dT%H:%M:%S")
-            .to_string()
-    } else {
-        String::from("N/A")
-    };
     crate::alerts::notifications::NotificationContext {
-        org_name,
+        org_name: org_display_name(org_id).await,
         alert_name: subject_name.to_string(),
         alert_status: crate::alerts::notifications::STATUS_FIRING.to_string(),
         alert_start_time: String::from("N/A"),
@@ -572,9 +555,18 @@ async fn subject_notification_context(
         alert_start_time_millis: String::from("N/A"),
         alert_end_time_millis: String::from("N/A"),
         alert_trigger_time: triggered_at,
-        alert_trigger_time_str: trigger_time_str,
+        alert_trigger_time_str: crate::alerts::alert::format_alert_time(triggered_at),
         ..Default::default()
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn org_display_name(org_id: &str) -> String {
+    crate::common::infra::config::ORGANIZATIONS
+        .read()
+        .await
+        .get(org_id)
+        .map_or_else(|| org_id.to_string(), |org| org.name.clone())
 }
 
 /// Send a notification for an incident severity change to all correlated alert destinations.
@@ -753,6 +745,12 @@ pub async fn correlate_alert_to_incident(
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
         severity,
+        title_inputs: Some(super::incident_title::TitleInputs {
+            alert,
+            result_row,
+            notify_rows,
+            labels: &labels,
+        }),
     };
 
     // Find or create incident
@@ -1001,6 +999,7 @@ pub async fn correlate_external_event(
         kind: AlertKind::External,
         base_destinations,
         severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+        title_inputs: None,
     };
 
     let triggered_at = external.last_seen_at;
@@ -1483,7 +1482,7 @@ async fn create_new_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
@@ -1503,8 +1502,23 @@ async fn create_new_incident(
         }
     };
 
-    let title =
-        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
+    // Rendered once here, so later firings that join the incident never retitle it.
+    let custom_title = match subject
+        .title_inputs
+        .as_ref()
+        .filter(|i| i.alert.incident_title_template.is_some())
+    {
+        Some(inputs) => super::incident_title::render(
+            inputs,
+            &org_display_name(org_id).await,
+            group_values,
+            triggered_at,
+        ),
+        None => None,
+    };
+    let title = custom_title.unwrap_or_else(|| {
+        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values)
+    });
 
     let incident = infra::table::alert_incidents::create_with_mute(
         org_id,
@@ -1625,7 +1639,7 @@ async fn create_new_incident(
 async fn escalate_severity(
     org_id: &str,
     incident: &infra::table::entity::alert_incidents::Model,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<bool, anyhow::Error> {
     let Some((current_severity, new_severity)) =
@@ -1721,7 +1735,7 @@ async fn find_or_create_incident(
     org_id: &str,
     group_values: &HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject,
+    subject: &CorrelationSubject<'_>,
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
