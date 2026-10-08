@@ -13,20 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use openobserve_core::{organization, users};
 #[cfg(feature = "cloud")]
 use openobserve_core::{
     organization::list_org_users_by_user,
     self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
 };
-#[cfg(feature = "enterprise")]
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::common::meta::user::RoleOrg,
+    o2_dex::config::get_config as get_dex_config,
+    openobserve_core::{organization, users},
+};
+#[cfg(feature = "enterprise")]
+use {
     crate::common::meta::user::TokenValidationResponse,
     config::meta::user::DBUser,
     jsonwebtoken::TokenData,
-    o2_dex::config::get_config as get_dex_config,
     o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
     o2_openfga::config::get_config as get_openfga_config,
     regex::Regex,
@@ -46,6 +48,7 @@ use {
 #[cfg(feature = "cloud")]
 use {
     config::{DEFAULT_ORG, META_ORG_ID, meta::user::UserRole, utils::rand::generate_random_string},
+    db::org_status,
     db::{org_users, organization::get_org_setting},
     o2_enterprise::enterprise::cloud::org_invites,
     o2_openfga::authorizer::authz::get_add_user_to_org_tuples,
@@ -416,7 +419,7 @@ pub async fn process_token(
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 fn parse_dn(dn: &str) -> Option<RoleOrg> {
     let mut org = "";
     let mut role = "";
@@ -855,6 +858,14 @@ pub async fn process_domain_org_mapping(
             .into_iter()
             .find(|m| m.domain.to_lowercase() == domain)
         {
+            if org_status::is_blocked(&mapped.org_id) {
+                log::info!(
+                    "user {user_email} supposed to be mapped to org {} but org status is blocked, so skipping",
+                    mapped.org_id
+                );
+                return Ok(false);
+            }
+
             log::info!("found domain org mapping for user {user_email}, processing");
             let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
                 anyhow::anyhow!(
@@ -862,7 +873,11 @@ pub async fn process_domain_org_mapping(
                     mapped.base_role
                 )
             })?;
-            if is_new_user {
+
+            let need_to_add_user =
+                org_users::get_cached_user_org(&mapped.org_id, user_email).is_none();
+
+            if is_new_user || need_to_add_user {
                 let mut new_tuples = Vec::new();
                 get_add_user_to_org_tuples(
                     &mapped.org_id,
@@ -872,30 +887,22 @@ pub async fn process_domain_org_mapping(
                 );
                 update_tuples(new_tuples, vec![]).await?;
                 org_users::add(
-                &mapped.org_id,
-                user_email,
-                base_role,
-                &generate_random_string(16),
-                Some(format!("rum{}", generate_random_string(16))),
-            )
-            .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to add new user {user_email} to org in domain org mapping processing : {e}"
+                    &mapped.org_id,
+                    user_email,
+                    base_role,
+                    &generate_random_string(16),
+                    Some(format!("rum{}", generate_random_string(16))),
                 )
-            })?;
+                .await?;
             }
-            // then if there is some user group to be added, add user to that group
             if let Some(claim_name) = mapped.role_claim_name
                 && let Some(v) = claims.get(&claim_name)
                 && let Some(arr) = v.as_array()
             {
                 let mut roles = HashSet::new();
                 for claim in arr {
-                    if let Some(parsed) = parse_dn(claim.as_str().unwrap_or_default()) {
-                        if let Some(role) = parsed.custom_role {
-                            roles.insert(role);
-                        }
+                    if let Some(role) = claim.as_str() {
+                        roles.insert(format_role_name_only(role));
                     }
                 }
                 let existing_roles = get_roles_for_org_user(&mapped.org_id, user_email).await;
@@ -911,8 +918,8 @@ pub async fn process_domain_org_mapping(
                     }
                 }
                 for role in &roles {
-                    if !existing_roles.contains(&role) {
-                        add_roles.push(format_role_name(&mapped.org_id, &role))
+                    if !existing_roles.contains(role) {
+                        add_roles.push(format_role_name(&mapped.org_id, role))
                     }
                 }
                 if !add_roles.is_empty() {
@@ -926,7 +933,7 @@ pub async fn process_domain_org_mapping(
                 }
                 if let Err(e) = update_tuples(add_tuples, remove_tuples).await {
                     log::error!(
-                        "error updating claimed based role tuples for user {user_email} org {} : {e}",
+                        "error updating claim based role tuples for user {user_email} org {} : {e}",
                         mapped.org_id
                     );
                 }
@@ -946,16 +953,16 @@ pub async fn process_domain_org_mapping(
                 );
             }
             log::info!("domain org mapping for user {user_email} successfully processed");
-            return Ok(true);
+            Ok(true)
         } else {
             log::info!("no domain org mapping found for user {user_email}, continuing normally");
-            return Ok(false);
+            Ok(false)
         }
     } else {
         log::warn!(
             "user email {user_email} could not be split correctly at @, skipping org domain mapping"
         );
-        return Ok(false);
+        Ok(false)
     }
 }
 

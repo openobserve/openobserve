@@ -164,8 +164,6 @@ pub async fn create(
     {
         field_found = true;
         for mapping in &mut mappings {
-            use o2_openfga::authorizer::groups::get_all_groups;
-
             if openobserve_core::organization::get_org(&mapping.org_id)
                 .await
                 .is_none()
@@ -192,12 +190,10 @@ pub async fn create(
                     mapping.base_role, mapping.org_id
                 ));
             }
-            if let Some(claim) = mapping.role_claim_name.as_ref() {
-                if claim.is_empty() {
-                    return MetaHttpResponse::bad_request(format!(
-                        "role claim name must not be empty",
-                    ));
-                }
+            if let Some(claim) = mapping.role_claim_name.as_ref()
+                && claim.is_empty()
+            {
+                return MetaHttpResponse::bad_request("role claim name must not be empty");
             }
 
             mapping.domain = mapping.domain.to_lowercase();
