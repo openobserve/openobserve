@@ -544,7 +544,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.alertTemplatesPage.ensureTemplateExists(templateName);
       await pm.alertDestinationsPage.ensureDestinationExists(
         destinationName,
-        "DEMO",
+        "https://example.com/webhook",
         templateName
       );
       testLogger.info("Alert infrastructure ready", {

@@ -5830,6 +5830,9 @@
     "valueMappingTypeLte": "Kleiner dan of gelijk aan",
     "valueMappingEmptyTitle": "Geen waardetoewijzingen",
     "valueMappingEmptyDescription": "Wijs waarden, bereiken of patronen toe aan weergavetekst en kleuren.",
+    "valueMappingRegexTooLong": "Gebruik maximaal 256 tekens voor het patroon.",
+    "valueMappingRegexUnsupported": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt.",
+    "htmlPanelEmbedBlocked": "Deze insluiting is geblokkeerd. Alleen https-pagina's van een andere site kunnen worden ingesloten.",
     "configSectionFieldOverrides": "Veldoverschrijvingen",
     "configSectionFieldOverridesTooltip": "Wijs eenheden toe aan de geselecteerde kolommen voor verbeterde datavisualisatie.",
     "addFieldOverride": "Veldoverride toevoegen",
@@ -10626,6 +10629,67 @@
     "searchTypeOthers": "Overige"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Duur",
+      "tooltipSpans": "{count} span | {count} spans",
+      "tooltipErrors": "{count} fout ({share}) | {count} fouten ({share})",
+      "colorBy": {
+        "label": "Kleur op",
+        "spans": "Spans",
+        "errors": "Fouten"
+      },
+      "noData": "Geen gegevens",
+      "unavailable": "De latentie-heatmap is niet beschikbaar voor deze zoekopdracht",
+      "loadFailed": "Kan de latentie-heatmap niet laden"
+    },
+    "comparison": {
+      "title": "Selectie vergelijken",
+      "baselineOutside": "Buiten de selectie",
+      "baselineBefore": "Net ervoor",
+      "sampleNote": "Selectie: {selection} · Basislijn: {baseline}",
+      "sampleNoteAll": "alle {count} span | alle {count} spans",
+      "sampleCapped": "{sampled} bemonsterd van {total} spans",
+      "noiseNote": "Verschillen onder {pts} punten vallen binnen de steekproefruis",
+      "loading": "Spans bemonsteren…",
+      "loadFailed": "Kan de selectie niet vergelijken",
+      "sampleOverflow": "De steekproef komt niet overeen met het aantal spans, bijvoorbeeld doordat er gegevens te laat zijn aangekomen. Probeer opnieuw om de telling te herhalen.",
+      "baselineCapped": "Basislijn beperkt tot {range}, tot 3 u aan weerszijden van de selectie",
+      "baselineLimited": "Basislijn beperkt tot {range} door de querylimiet van {hours} uur van deze stream",
+      "rangeClamped": "De server heeft het tijdsbereik ingekort, waardoor de vergelijking onvolledig zou zijn",
+      "rangeTooLong": "De selectie is langer dan de querylimiet van {hours} uur van deze stream",
+      "retry": "Opnieuw proberen",
+      "noSelectionTitle": "Selecteer spans om te vergelijken",
+      "noSelectionBody": "Teken een vak op de Duur-heatmap, of selecteer een bereik in de grafiek Fouten of Snelheid, en open vervolgens Drill-down.",
+      "emptySelection": "Geen spans in de selectie",
+      "emptyBaseline": "Geen spans in de basislijn",
+      "emptyBaselineHint": "Er kwam niets overeen met deze basislijn. Probeer in plaats daarvan {mode}.",
+      "scorePts": "Δ {pts} punten",
+      "presentIn": "aanwezig in {pct} van de selectie",
+      "filterTo": "Filter op deze waarde",
+      "exclude": "Deze waarde uitsluiten",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Selectie {pct}",
+      "baselineShare": "Basislijn {pct}",
+      "noValue": "(geen waarde)",
+      "emptyValue": "(leeg)",
+      "otherValues": "Overige ({count} waarde) | Overige ({count} waarden)",
+      "showMore": "Toon {count} extra veld | Toon {count} extra velden",
+      "mostlyEmpty": "Grotendeels leeg in de selectie ({count})",
+      "highCardinality": "Velden met hoge cardinaliteit ({count})",
+      "distinctInSample": "{count} afzonderlijke waarde in de steekproef | {count} afzonderlijke waarden in de steekproef",
+      "constantFields": "{count} veld heeft overal één enkele waarde | {count} velden hebben overal één enkele waarde",
+      "excludedFields": "Niet vergeleken: {fields}",
+      "summaryErrors": "Fouten · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "resultaten",
+    "metrics": {
+      "perSecond": {
+        "traces": "traces/s",
+        "spans": "spans/s"
+      }
+    },
     "errLabel": "FOUT",
     "agentDefaultVariant": "standaard",
     "agentNoEnv": "(Geen omgeving)",
@@ -11195,7 +11259,11 @@
       "unknownOperation": "Onbekende bewerking",
       "unknownService": "Onbekende service",
       "traceIdCopied": "Trace ID naar klembord gekopieerd",
-      "sessionIdCopied": "Sessie-ID gekopieerd naar klembord"
+      "sessionIdCopied": "Sessie-ID gekopieerd naar klembord",
+      "partial": "Sommige spans van deze trace konden niet worden gelezen. De waterval is mogelijk onvolledig.",
+      "truncated": "Toont de eerste span van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen. | Toont de eerste {count} spans van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen.",
+      "loadMore": "Laad de volgende span | Laad de volgende {size} spans",
+      "loadMoreFailed": "Kon niet meer spans van deze trace laden"
     },
     "traceTree": {
       "clickToExpand": "Klik om uit te vouwen",

@@ -2766,6 +2766,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha256",
+ "snap",
  "sqlparser",
  "sqlx",
  "strum 0.28.0",
@@ -10352,6 +10353,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tower",
 ]
 
 [[package]]

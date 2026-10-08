@@ -5830,6 +5830,9 @@
     "valueMappingTypeLte": "أقل من أو متساوي",
     "valueMappingEmptyTitle": "لا توجد خرائط قيمة.",
     "valueMappingEmptyDescription": "قيم الخرائط أو النطاقات أو الأنماط لعرض النصوص والألوان.",
+    "valueMappingRegexTooLong": "اجعل النمط 256 حرفًا أو أقل.",
+    "valueMappingRegexUnsupported": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية.",
+    "htmlPanelEmbedBlocked": "هذا التضمين محظور. يمكن تضمين صفحات https من موقع آخر فقط.",
     "configSectionFieldOverrides": "تنسيق الأعمدة",
     "configSectionFieldOverridesTooltip": "قم بتكوين أنواع الخلايا، الألوان، الوحدات، والقواعد الشرطية لكل عمود.",
     "addFieldOverride": "تكوين تنسيق الأعمدة",
@@ -10626,6 +10629,67 @@
     "searchTypeOthers": "آخرون"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "المدة",
+      "tooltipSpans": "{count} Span | {count} Span",
+      "tooltipErrors": "{count} خطأ ({share}) | {count} أخطاء ({share})",
+      "colorBy": {
+        "label": "التلوين حسب",
+        "spans": "Spans",
+        "errors": "الأخطاء"
+      },
+      "noData": "لا توجد بيانات",
+      "unavailable": "خريطة الحرارة للكمون غير متاحة لهذا البحث",
+      "loadFailed": "فشل تحميل خريطة الحرارة للكمون"
+    },
+    "comparison": {
+      "title": "مقارنة التحديد",
+      "baselineOutside": "خارج التحديد",
+      "baselineBefore": "مباشرة قبل",
+      "sampleNote": "التحديد: {selection} · خط الأساس: {baseline}",
+      "sampleNoteAll": "كل {count} Span | كل {count} Span",
+      "sampleCapped": "{sampled} عيّنة من أصل {total} Span",
+      "noiseNote": "الفروق الأقل من {pts} نقطة تقع ضمن ضجيج أخذ العينات",
+      "loading": "جارٍ أخذ عينات من Span…",
+      "loadFailed": "تعذّرت مقارنة التحديد",
+      "sampleOverflow": "لا تطابق العينة عدد Span، مثلًا بسبب وصول بيانات متأخرة. أعد المحاولة لإعادة العد.",
+      "baselineCapped": "خط الأساس محدود بـ {range}، حتى 3 ساعات على جانبي التحديد",
+      "baselineLimited": "خط الأساس محدود بـ {range} بسبب حد الاستعلام البالغ {hours} ساعة لهذا الجدول",
+      "rangeClamped": "قام الخادم بتقصير النطاق الزمني، لذا ستكون المقارنة غير مكتملة",
+      "rangeTooLong": "التحديد أطول من حد الاستعلام البالغ {hours} ساعة لهذا الجدول",
+      "retry": "إعادة المحاولة",
+      "noSelectionTitle": "حدّد Span للمقارنة",
+      "noSelectionBody": "ارسم مستطيلًا على خريطة الحرارة للمدة، أو اسحب على مخطط الأخطاء أو المعدل، ثم افتح التعمّق.",
+      "emptySelection": "لا يوجد Span في التحديد",
+      "emptyBaseline": "لا يوجد Span في خط الأساس",
+      "emptyBaselineHint": "لم يطابق أي شيء خط الأساس هذا. جرّب {mode} بدلًا من ذلك.",
+      "scorePts": "Δ {pts} نقطة",
+      "presentIn": "موجود في {pct} من التحديد",
+      "filterTo": "تصفية حسب هذه القيمة",
+      "exclude": "استبعاد هذه القيمة",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "التحديد {pct}",
+      "baselineShare": "خط الأساس {pct}",
+      "noValue": "(لا توجد قيمة)",
+      "emptyValue": "(فارغ)",
+      "otherValues": "أخرى ({count} قيمة) | أخرى ({count} قيم)",
+      "showMore": "عرض {count} حقل إضافي | عرض {count} حقول إضافية",
+      "mostlyEmpty": "فارغ في الغالب في التحديد ({count})",
+      "highCardinality": "حقول ذات تعددية عالية ({count})",
+      "distinctInSample": "{count} قيمة مميزة في العينة | {count} قيم مميزة في العينة",
+      "constantFields": "{count} حقل له قيمة واحدة في كل مكان | {count} حقول لها قيمة واحدة في كل مكان",
+      "excludedFields": "غير مقارن: {fields}",
+      "summaryErrors": "الأخطاء · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "النتائج",
+    "metrics": {
+      "perSecond": {
+        "traces": "آثار/ث",
+        "spans": "Spans/ث"
+      }
+    },
     "errLabel": "آه",
     "agentDefaultVariant": "الافتراضي",
     "agentNoEnv": "(لا يوجد إنبي)",
@@ -11195,7 +11259,11 @@
       "unknownOperation": "عملية غير معروفة",
       "unknownService": "خدمة غير معروفة",
       "traceIdCopied": "تم نسخ معرف التتبع إلى لوحة الحافظة",
-      "sessionIdCopied": "تم نسخ معرف الجلسة إلى الحافظة"
+      "sessionIdCopied": "تم نسخ معرف الجلسة إلى الحافظة",
+      "partial": "تعذّر قراءة بعض الـ Spans من هذا الأثر. قد يكون مخطط الشلال غير مكتمل.",
+      "truncated": "يُعرض أول Span من هذا الأثر، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد. | يُعرض أول {count} من الـ Spans لهذا الأثر، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد.",
+      "loadMore": "تحميل الـ Span التالي | تحميل {size} من الـ Spans التالية",
+      "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا الأثر"
     },
     "traceTree": {
       "clickToExpand": "انقر للتوسع",

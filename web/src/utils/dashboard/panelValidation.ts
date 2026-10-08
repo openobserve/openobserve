@@ -1,38 +1,7 @@
 import type { TranslateFn } from "@/types/i18n";
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
-import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
 import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
-
-// will find first valid mapped value based on given fieldToCheck
-export const findFirstValidMappedValue = (value: any, mappings: any[], fieldToCheck: string) => {
-  return mappings?.find((v: any) => {
-    let isMatch = false;
-
-    // Check based on type
-    if (v?.type == "value") {
-      isMatch = v?.value == value;
-    } else if (v?.type == "range") {
-      if (v?.from && v?.to && !Number.isNaN(+v?.from) && !Number.isNaN(+v?.to)) {
-        isMatch = +v?.from <= +value && +v?.to >= +value;
-      }
-    } else if (v?.type == "regex") {
-      try {
-        const { pattern, flags } = parseRegexPattern(v?.pattern ?? "");
-        isMatch = new RegExp(pattern, flags).test(value);
-      } catch {
-        // invalid regex pattern, skip
-      }
-    }
-
-    // If a match is found, check if the required field (color or text) is valid
-    if (isMatch && v[fieldToCheck] != null && v[fieldToCheck] !== "") {
-      return true;
-    }
-
-    return false;
-  });
-};
 
 /**
  * Validates a single condition item

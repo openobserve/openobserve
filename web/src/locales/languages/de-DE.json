@@ -5830,6 +5830,9 @@
     "valueMappingTypeLte": "Kleiner oder gleich",
     "valueMappingEmptyTitle": "Keine Wertzuordnungen",
     "valueMappingEmptyDescription": "Ordnen Sie Werte, Bereiche oder Muster Anzeigetexten und Farben zu.",
+    "valueMappingRegexTooLong": "Verwenden Sie für das Muster höchstens 256 Zeichen.",
+    "valueMappingRegexUnsupported": "Dieses Muster ist ungültig oder wird nicht unterstützt. Lookahead, Lookbehind und Rückverweise können nicht verwendet werden.",
+    "htmlPanelEmbedBlocked": "Diese Einbettung ist blockiert. Nur https-Seiten einer anderen Website können eingebettet werden.",
     "configSectionFieldOverrides": "Feldüberschreibungen",
     "configSectionFieldOverridesTooltip": "Ordnen Sie den ausgewählten Spalten Einheiten zu, um die Datenvisualisierung zu verbessern.",
     "addFieldOverride": "Feldüberschreibung hinzufügen",
@@ -10626,6 +10629,67 @@
     "searchTypeOthers": "Andere"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Dauer",
+      "tooltipSpans": "{count} Span | {count} Spans",
+      "tooltipErrors": "{count} Fehler ({share}) | {count} Fehler ({share})",
+      "colorBy": {
+        "label": "Farbe nach",
+        "spans": "Spans",
+        "errors": "Fehler"
+      },
+      "noData": "Keine Daten",
+      "unavailable": "Die Latenz-Heatmap ist für diese Suche nicht verfügbar",
+      "loadFailed": "Latenz-Heatmap konnte nicht geladen werden"
+    },
+    "comparison": {
+      "title": "Auswahl vergleichen",
+      "baselineOutside": "Außerhalb der Auswahl",
+      "baselineBefore": "Kurz davor",
+      "sampleNote": "Auswahl: {selection} · Basislinie: {baseline}",
+      "sampleNoteAll": "alle {count} Span | alle {count} Spans",
+      "sampleCapped": "{sampled} von {total} Spans gesampelt",
+      "noiseNote": "Unterschiede unter {pts} Pkt. liegen innerhalb des Sampling-Rauschens",
+      "loading": "Spans werden gesampelt…",
+      "loadFailed": "Auswahl konnte nicht verglichen werden",
+      "sampleOverflow": "Die Stichprobe stimmt nicht mit der Span-Anzahl überein, beispielsweise weil verspätete Daten eingetroffen sind. Erneut versuchen, um neu zu zählen.",
+      "baselineCapped": "Basislinie auf {range} begrenzt, bis zu 3 h beidseitig der Auswahl",
+      "baselineLimited": "Basislinie auf {range} begrenzt durch das {hours}-Stunden-Abfragelimit dieses Streams",
+      "rangeClamped": "Der Server hat den Zeitraum verkürzt, sodass der Vergleich unvollständig wäre",
+      "rangeTooLong": "Die Auswahl ist länger als das {hours}-Stunden-Abfragelimit dieses Streams",
+      "retry": "Erneut versuchen",
+      "noSelectionTitle": "Spans zum Vergleichen auswählen",
+      "noSelectionBody": "Ziehen Sie ein Rechteck auf der Dauer-Heatmap auf oder wählen Sie einen Bereich im Fehler- oder Rate-Diagramm aus, und öffnen Sie dann Drill down.",
+      "emptySelection": "Keine Spans in der Auswahl",
+      "emptyBaseline": "Keine Basislinien-Spans",
+      "emptyBaselineHint": "Nichts entsprach dieser Basislinie. Versuchen Sie stattdessen {mode}.",
+      "scorePts": "Δ {pts} Pkt.",
+      "presentIn": "in {pct} der Auswahl vorhanden",
+      "filterTo": "Auf diesen Wert filtern",
+      "exclude": "Diesen Wert ausschließen",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Auswahl {pct}",
+      "baselineShare": "Basislinie {pct}",
+      "noValue": "(kein Wert)",
+      "emptyValue": "(leer)",
+      "otherValues": "Sonstige ({count} Wert) | Sonstige ({count} Werte)",
+      "showMore": "{count} weiteres Feld anzeigen | {count} weitere Felder anzeigen",
+      "mostlyEmpty": "In der Auswahl überwiegend leer ({count})",
+      "highCardinality": "Felder mit hoher Kardinalität ({count})",
+      "distinctInSample": "{count} unterschiedlicher Wert in der Stichprobe | {count} unterschiedliche Werte in der Stichprobe",
+      "constantFields": "{count} Feld hat überall einen einzigen Wert | {count} Felder haben überall einen einzigen Wert",
+      "excludedFields": "Nicht verglichen: {fields}",
+      "summaryErrors": "Fehler · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "Ergebnisse",
+    "metrics": {
+      "perSecond": {
+        "traces": "Traces/s",
+        "spans": "Spans/s"
+      }
+    },
     "errLabel": "Fehler",
     "agentDefaultVariant": "Standard",
     "agentNoEnv": "(Keine Umgebung)",
@@ -11195,7 +11259,11 @@
       "unknownOperation": "Unbekannte Operation",
       "unknownService": "Unbekannter Dienst",
       "traceIdCopied": "Trace-ID in die Zwischenablage kopiert",
-      "sessionIdCopied": "Sitzungs-ID in die Zwischenablage kopiert"
+      "sessionIdCopied": "Sitzungs-ID in die Zwischenablage kopiert",
+      "partial": "Einige Spans dieses Traces konnten nicht gelesen werden. Das Wasserfalldiagramm ist möglicherweise unvollständig.",
+      "truncated": "Zeigt den ersten Span dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen. | Zeigt die ersten {count} Spans dieses Traces in Startzeit-Reihenfolge an. Spätere Spans sind noch nicht geladen.",
+      "loadMore": "Nächsten Span laden | Nächste {size} Spans laden",
+      "loadMoreFailed": "Weitere Spans dieses Traces konnten nicht geladen werden"
     },
     "traceTree": {
       "clickToExpand": "Zum Erweitern klicken",

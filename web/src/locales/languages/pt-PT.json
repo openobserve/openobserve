@@ -5830,6 +5830,9 @@
     "valueMappingTypeLte": "Menor ou igual a",
     "valueMappingEmptyTitle": "Nenhum mapeamento de valores",
     "valueMappingEmptyDescription": "Mapeie valores, intervalos ou padrões para o texto de exibição e cores.",
+    "valueMappingRegexTooLong": "Use no máximo 256 caracteres no padrão.",
+    "valueMappingRegexUnsupported": "Este padrão é inválido ou não é suportado. Não é possível usar lookahead, lookbehind nem referências anteriores.",
+    "htmlPanelEmbedBlocked": "Esta incorporação está bloqueada. Só é possível incorporar páginas https de outro site.",
     "configSectionFieldOverrides": "Substituições de campo",
     "configSectionFieldOverridesTooltip": "Mapeie as unidades para as colunas selecionadas para melhorar a visualização dos dados.",
     "addFieldOverride": "Adicionar substituição de campo",
@@ -10626,6 +10629,67 @@
     "searchTypeOthers": "Outros"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Duração",
+      "tooltipSpans": "{count} span | {count} spans",
+      "tooltipErrors": "{count} erro ({share}) | {count} erros ({share})",
+      "colorBy": {
+        "label": "Colorir por",
+        "spans": "Spans",
+        "errors": "Erros"
+      },
+      "noData": "Sem dados",
+      "unavailable": "O mapa de calor de latência não está disponível para esta pesquisa",
+      "loadFailed": "Falha ao carregar o mapa de calor de latência"
+    },
+    "comparison": {
+      "title": "Comparar seleção",
+      "baselineOutside": "Fora da seleção",
+      "baselineBefore": "Imediatamente antes",
+      "sampleNote": "Seleção: {selection} · Linha de base: {baseline}",
+      "sampleNoteAll": "todos os {count} span | todos os {count} spans",
+      "sampleCapped": "{sampled} amostrados de {total} spans",
+      "noiseNote": "Diferenças abaixo de {pts} pts estão dentro do ruído de amostragem",
+      "loading": "Amostrando spans…",
+      "loadFailed": "Não foi possível comparar a seleção",
+      "sampleOverflow": "A amostra não corresponde à contagem de spans, por exemplo porque chegaram dados atrasados. Tente novamente para recontar.",
+      "baselineCapped": "Linha de base limitada a {range}, até 3 h para cada lado da seleção",
+      "baselineLimited": "Linha de base limitada a {range} pelo limite de consulta de {hours} horas deste stream",
+      "rangeClamped": "O servidor encurtou o intervalo de tempo, então a comparação ficaria incompleta",
+      "rangeTooLong": "A seleção é maior que o limite de consulta de {hours} horas deste stream",
+      "retry": "Tentar novamente",
+      "noSelectionTitle": "Selecione spans para comparar",
+      "noSelectionBody": "Desenhe uma caixa no mapa de calor de Duração, ou selecione uma área no gráfico de Erros ou Taxa, e abra Detalhamento.",
+      "emptySelection": "Nenhum span na seleção",
+      "emptyBaseline": "Nenhum span de linha de base",
+      "emptyBaselineHint": "Nada correspondeu a esta linha de base. Tente {mode} em vez disso.",
+      "scorePts": "Δ {pts} pts",
+      "presentIn": "presente em {pct} da seleção",
+      "filterTo": "Filtrar por este valor",
+      "exclude": "Excluir este valor",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Seleção {pct}",
+      "baselineShare": "Linha de base {pct}",
+      "noValue": "(sem valor)",
+      "emptyValue": "(vazio)",
+      "otherValues": "Outro ({count} valor) | Outros ({count} valores)",
+      "showMore": "Mostrar mais {count} campo | Mostrar mais {count} campos",
+      "mostlyEmpty": "Majoritariamente vazio na seleção ({count})",
+      "highCardinality": "Campos de alta cardinalidade ({count})",
+      "distinctInSample": "{count} valor distinto na amostra | {count} valores distintos na amostra",
+      "constantFields": "{count} campo tem um único valor em todos os lugares | {count} campos têm um único valor em todos os lugares",
+      "excludedFields": "Não comparado: {fields}",
+      "summaryErrors": "Erros · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "resultados",
+    "metrics": {
+      "perSecond": {
+        "traces": "rastros/s",
+        "spans": "spans/s"
+      }
+    },
     "errLabel": "ERRO",
     "agentDefaultVariant": "padrão",
     "agentNoEnv": "(Sem ambiente)",
@@ -11195,7 +11259,11 @@
       "unknownOperation": "Operação Desconhecida",
       "unknownService": "Serviço Desconhecido",
       "traceIdCopied": "ID do Trace copiado para a área de transferência",
-      "sessionIdCopied": "ID da Sessão copiado para a área de transferência"
+      "sessionIdCopied": "ID da Sessão copiado para a área de transferência",
+      "partial": "Alguns spans deste rastro não puderam ser lidos. A cascata pode estar incompleta.",
+      "truncated": "Mostrando o primeiro span deste rastro, em ordem de horário de início. Spans posteriores ainda não foram carregados. | Mostrando os primeiros {count} spans deste rastro, em ordem de horário de início. Spans posteriores ainda não foram carregados.",
+      "loadMore": "Carregar o próximo span | Carregar os próximos {size} spans",
+      "loadMoreFailed": "Não foi possível carregar mais spans deste rastro"
     },
     "traceTree": {
       "clickToExpand": "Clique para expandir",

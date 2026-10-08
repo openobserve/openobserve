@@ -176,7 +176,7 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     spanIdFieldName: s?.span_id_field_name ?? "",
     toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
-    redInsightsEnabled: s?.red_insights_enabled ?? false,
+    redInsightsEnabled: s?.red_insights_enabled ?? true,
   };
 });
 
