@@ -88,18 +88,15 @@ pub(super) async fn load_metrics_index_file(
         },
     };
     let limit = cache_limit();
-    let cached = {
+    let lookup = {
         let mut cache = INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         cache.trim(limit);
-        cache.get(&key)
+        cache.lookup(&key)
     };
-    let entry = if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(&labels.requested))
-        .transpose()
-        .map_err(|error| DataFusionError::External(error.into()))?
-        .is_some_and(|missing| missing.is_empty())
-    {
+    let (cached, complete) = lookup
+        .classify(&labels.requested)
+        .map_err(|error| DataFusionError::External(error.into()))?;
+    let entry = if complete {
         cached.unwrap()
     } else {
         let loaded =

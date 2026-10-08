@@ -244,7 +244,6 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
       streamFields: null,
       logSamples: null,
       analysisType: null,
-      availableAnalysisTypes: null,
     },
     template: '<div data-test="drill-down-dashboard-stub" />',
   },
@@ -1386,7 +1385,6 @@ describe("Logs Index", async () => {
         baseFilter: "level = 'error'",
         logSamples: hits,
         analysisType: "volume",
-        availableAnalysisTypes: ["volume"],
       });
     });
 

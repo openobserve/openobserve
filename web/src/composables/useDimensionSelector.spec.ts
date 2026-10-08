@@ -16,7 +16,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { selectDimensionsFromData, selectTraceDimensions } from "./useDimensionSelector";
+import { selectDimensionsFromData } from "./useDimensionSelector";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -179,126 +179,6 @@ describe("useDimensionSelector", () => {
       for (let i = 0; i < 30; i++) fields[`field${i}`] = `v${i % 5}`;
       const samples = buildSamples(20, fields);
       const result = selectDimensionsFromData(samples, [], 8);
-      expect(result.length).toBeLessThanOrEqual(8);
-    });
-  });
-
-  // ─── selectTraceDimensions ────────────────────────────────────────────────
-
-  describe("selectTraceDimensions", () => {
-    it("returns an array", () => {
-      const result = selectTraceDimensions([]);
-      expect(Array.isArray(result)).toBe(true);
-    });
-
-    it("returns the hardcoded fallback list when no schema fields are provided", () => {
-      const result = selectTraceDimensions([]);
-      expect(result).toEqual(["service_name", "span_kind", "span_status", "operation_name"]);
-    });
-
-    it("returns the hardcoded fallback list when none of the schema fields are in the priority list", () => {
-      const schema = [{ name: "my_custom_field" }, { name: "another_field" }];
-      const result = selectTraceDimensions(schema);
-      expect(result).toEqual(["service_name", "span_kind", "span_status", "operation_name"]);
-    });
-
-    it("includes service_name when present in schema", () => {
-      const schema = [{ name: "service_name" }, { name: "span_kind" }];
-      const result = selectTraceDimensions(schema);
-      expect(result).toContain("service_name");
-    });
-
-    it("includes span_kind when present in schema", () => {
-      const schema = [{ name: "service_name" }, { name: "span_kind" }];
-      const result = selectTraceDimensions(schema);
-      expect(result).toContain("span_kind");
-    });
-
-    it("respects the prioritised order: service_name before span_kind before span_status", () => {
-      const schema = [{ name: "span_status" }, { name: "service_name" }, { name: "span_kind" }];
-      const result = selectTraceDimensions(schema);
-      const svcIdx = result.indexOf("service_name");
-      const kindIdx = result.indexOf("span_kind");
-      const statusIdx = result.indexOf("span_status");
-      expect(svcIdx).toBeLessThan(kindIdx);
-      expect(kindIdx).toBeLessThan(statusIdx);
-    });
-
-    it("respects the maxDimensions limit", () => {
-      const schema = [
-        { name: "service_name" },
-        { name: "span_kind" },
-        { name: "span_status" },
-        { name: "operation_name" },
-        { name: "http_method" },
-        { name: "http_status_code" },
-      ];
-      const result = selectTraceDimensions(schema, 3);
-      expect(result.length).toBeLessThanOrEqual(3);
-    });
-
-    it("includes HTTP-related trace fields when present", () => {
-      const schema = [
-        { name: "service_name" },
-        { name: "http_method" },
-        { name: "http_status_code" },
-        { name: "http_route" },
-      ];
-      const result = selectTraceDimensions(schema, 8);
-      expect(result).toContain("http_method");
-      expect(result).toContain("http_status_code");
-      expect(result).toContain("http_route");
-    });
-
-    it("includes database-related trace fields when present", () => {
-      const schema = [{ name: "service_name" }, { name: "db_system" }, { name: "db_operation" }];
-      const result = selectTraceDimensions(schema, 8);
-      expect(result).toContain("db_system");
-    });
-
-    it("includes k8s-related trace fields when present", () => {
-      const schema = [
-        { name: "service_name" },
-        { name: "k8s_namespace_name" },
-        { name: "k8s_pod_name" },
-      ];
-      const result = selectTraceDimensions(schema, 8);
-      expect(result).toContain("k8s_namespace_name");
-    });
-
-    it("does not include schema fields that are not in the OTel priority list", () => {
-      const schema = [{ name: "service_name" }, { name: "my_custom_dimension" }];
-      const result = selectTraceDimensions(schema, 8);
-      expect(result).not.toContain("my_custom_dimension");
-    });
-
-    it("uses default maxDimensions of 8 when not specified", () => {
-      const schema = Array.from({ length: 25 }, (_, i) => ({
-        name:
-          [
-            "service_name",
-            "span_kind",
-            "span_status",
-            "operation_name",
-            "http_method",
-            "http_status_code",
-            "http_route",
-            "http_target",
-            "db_system",
-            "db_operation",
-            "db_name",
-            "messaging_system",
-            "messaging_operation",
-            "rpc_system",
-            "rpc_service",
-            "rpc_method",
-            "host_name",
-            "container_name",
-            "k8s_pod_name",
-            "k8s_namespace_name",
-          ][i] || `extra_${i}`,
-      }));
-      const result = selectTraceDimensions(schema);
       expect(result.length).toBeLessThanOrEqual(8);
     });
   });

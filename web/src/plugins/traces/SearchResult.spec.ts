@@ -233,6 +233,30 @@ describe("SearchResult", () => {
       expect(wrapper.emitted("update:datetime")).toBeTruthy();
       expect(wrapper.emitted("update:datetime")[0]).toEqual([{ start, end }]);
     });
+
+    it("should relay the heatmap's editor-filter-set as metrics:editor-filter-set", async () => {
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("editor-filter-set", "(a = '1') and duration < '1ms'");
+
+      expect(wrapper.emitted("metrics:editor-filter-set")).toEqual([
+        ["(a = '1') and duration < '1ms'"],
+      ]);
+    });
+  });
+
+  describe("comparison relays", () => {
+    it("should relay the comparison's editor-filter-run as metrics:editor-filter-run", async () => {
+      const dashboard = wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+      await dashboard.vm.$emit("editor-filter-run", "(a = '1') and b = '2'");
+      expect(wrapper.emitted("metrics:editor-filter-run")).toEqual([["(a = '1') and b = '2'"]]);
+    });
+
+    it("should open the comparison through the metrics dashboard", () => {
+      const openComparison = vi.fn();
+      wrapper.vm.metricsDashboardRef = { openComparison };
+      wrapper.vm.openComparison();
+      expect(openComparison).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("loadMore / infinite scroll", () => {
@@ -368,7 +392,8 @@ describe("SearchResult", () => {
         "remove:searchTerm",
         "search:timeboxed",
         "get:traceDetails",
-        "metrics:filters-updated",
+        "metrics:editor-filter-set",
+        "metrics:editor-filter-run",
         "run-query",
         "remove-filter",
         "jump-to-stream-data",

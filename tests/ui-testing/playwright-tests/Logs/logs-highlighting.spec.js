@@ -27,6 +27,7 @@ const {
   waitForStreamListed,
 } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const PageManager = require('../../pages/page-manager.js');
 
 // Per-run suffix: a fixed name collides with concurrent runs in the shared org and
 // ingestion then fails with "stream [...] is being deleted". The e2e_ prefix keeps
@@ -43,45 +44,20 @@ const HL_LOGS = [
   { body: '<script>alert(1)</script> payload', tag_value: 'plain', case_id: 'markup' },
 ];
 
-const RESULTS_TABLE = '[data-test="logs-search-result-logs-table"]';
-
-/**
- * Highlighted strings inside one column's cells.
- *
- * In SQL mode the table renders every projected field into a single `source` cell, so
- * counting highlights there is what distinguishes a field-scoped filter (one hit, in
- * body's value) from a global one (two hits, body + tag_value) on the SAME row. Adding
- * each field as its own column instead is not reliable — the column set is re-resolved
- * on every search.
- */
-const highlightsIn = (page, column) =>
-  page.locator(`${RESULTS_TABLE} td[data-test="o2-table-cell-${column}"] .log-highlighted`);
-
-/**
- * Highlight texts, polled until they settle.
- *
- * Highlighting is applied asynchronously after the rows render (processHitsInChunks), so
- * the table is visible — and even partly highlighted — before the final markup exists.
- * Reading allInnerTexts() once races that and returns [] or a partial list.
- */
-const expectHighlights = (page, column) =>
-  expect.poll(async () => highlightsIn(page, column).allInnerTexts(), { timeout: 20000 });
-
 /**
  * Drives a search through the URL rather than the editor: the query lands base64-encoded
  * in `query`, exactly as a shared/bookmarked logs link does, which keeps the filter text
  * verbatim. Typing into the Monaco editor re-tokenises and is far flakier for a test
  * whose whole subject is the exact characters of the query.
  */
-async function runQuery(page, query, { sqlMode = false } = {}) {
+async function runQuery(pm, page, query, { sqlMode = false } = {}) {
   const url =
     `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}` +
     `&stream_type=logs&stream=${STREAM}&period=15m&quick_mode=false` +
     `&sql_mode=${sqlMode}&query=${Buffer.from(query).toString('base64')}`;
   await page.goto(url);
   await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
-  await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-  await expect(page.locator(RESULTS_TABLE)).toBeVisible({ timeout: 30000 });
+  await pm.logsPage.runSearchAndWaitForResults();
 }
 
 test.describe('Logs search-term highlighting', () => {
@@ -108,8 +84,11 @@ test.describe('Logs search-term highlighting', () => {
     }
   });
 
+  let pm;
+
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    pm = new PageManager(page);
     await navigateToBase(page);
   });
 
@@ -120,19 +99,19 @@ test.describe('Logs search-term highlighting', () => {
   test('str_match highlights an uppercase term verbatim', {
     tag: ['@logsHighlighting', '@logs', '@P0', '@all'],
   }, async ({ page }) => {
-    await runQuery(page, "str_match(body, 'ERROR')");
+    await runQuery(pm, page, "str_match(body, 'ERROR')");
 
     // The defect lowercased the highlight query, so a case-sensitive filter matched
     // the row but highlighted nothing. Case must survive verbatim.
-    await expectHighlights(page, 'body').toEqual(['ERROR']);
+    await pm.logsPage.expectHighlightsIn('body').toEqual(['ERROR']);
   });
 
   test('str_match is case-sensitive', {
     tag: ['@logsHighlighting', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
-    await runQuery(page, "str_match(body, 'error')");
+    await runQuery(pm, page, "str_match(body, 'error')");
 
-    const table = page.locator(RESULTS_TABLE);
+    const table = pm.logsPage.resultsTable();
     await expect(table).toContainText('error lowercase variant', { timeout: 20000 });
     // The uppercase row must not match a case-sensitive filter at all.
     await expect(table).not.toContainText('ERROR connection refused');
@@ -146,12 +125,13 @@ test.describe('Logs search-term highlighting', () => {
     tag: ['@logsHighlighting', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
     await runQuery(
+      pm,
       page,
       `SELECT body, tag_value FROM "${STREAM}" WHERE str_match_ignore_case(body, 'error')`,
       { sqlMode: true },
     );
 
-    await expectHighlights(page, 'source').toEqual(
+    await pm.logsPage.expectHighlightsIn('source').toEqual(
       expect.arrayContaining(['error', 'ERROR']),
     );
   });
@@ -159,21 +139,24 @@ test.describe('Logs search-term highlighting', () => {
   test('re_match highlights its regex match', {
     tag: ['@logsHighlighting', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
-    await runQuery(page, "re_match(body, '^ERROR')");
+    await runQuery(pm, page, "re_match(body, '^ERROR')");
 
-    await expectHighlights(page, 'body').toEqual(expect.arrayContaining(['ERROR']));
+    await pm.logsPage.expectHighlightsIn('body').toEqual(expect.arrayContaining(['ERROR']));
   });
 
   test('re_not_match highlights nothing', {
     tag: ['@logsHighlighting', '@logs', '@P2', '@all'],
   }, async ({ page }) => {
     // A negative filter has no matching text to mark; highlighting it would be wrong.
-    await runQuery(page, "re_not_match(body, 'ERROR')");
+    await runQuery(pm, page, "re_not_match(body, 'ERROR')");
 
-    await expect(page.locator(RESULTS_TABLE)).toContainText('kelvin reading stable', {
+    await expect(pm.logsPage.resultsTable()).toContainText('kelvin reading stable', {
       timeout: 20000,
     });
-    expect(await page.locator(`${RESULTS_TABLE} .log-highlighted`).count()).toBe(0);
+    // Every row the filter keeps must be rendered before the window opens, or the window
+    // could close while the table is still filling.
+    await expect(pm.logsPage.resultCells('body')).toHaveCount(3, { timeout: 20000 });
+    await pm.logsPage.expectNoHighlights();
   });
 
   // ---------------------------------------------------------------------------
@@ -186,25 +169,27 @@ test.describe('Logs search-term highlighting', () => {
     tag: ['@logsHighlighting', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
     await runQuery(
+      pm,
       page,
       `SELECT body, tag_value FROM "${STREAM}" WHERE str_match(body, 'kelvin')`,
       { sqlMode: true },
     );
 
-    await expectHighlights(page, 'source').toEqual(['kelvin']);
+    await pm.logsPage.expectHighlightsIn('source').toEqual(['kelvin']);
   });
 
   test('match_all stays global across fields', {
     tag: ['@logsHighlighting', '@logs', '@P1', '@all'],
   }, async ({ page }) => {
     await runQuery(
+      pm,
       page,
       `SELECT body, tag_value FROM "${STREAM}" WHERE match_all('kelvin')`,
       { sqlMode: true },
     );
 
     // Same row as the previous test; global highlighting marks tag_value too.
-    await expectHighlights(page, 'source').toEqual(['kelvin', 'kelvin']);
+    await pm.logsPage.expectHighlightsIn('source').toEqual(['kelvin', 'kelvin']);
   });
 
   // ---------------------------------------------------------------------------
@@ -215,11 +200,11 @@ test.describe('Logs search-term highlighting', () => {
     tag: ['@logsHighlighting', '@logs', '@P0', '@security', '@all'],
   }, async ({ page }) => {
     // Highlighting assembles HTML strings, so an unescaped value would inject.
-    await runQuery(page, "str_match(body, 'payload')");
+    await runQuery(pm, page, "str_match(body, 'payload')");
 
-    await expect(page.locator(RESULTS_TABLE)).toContainText('<script>alert(1)</script>', {
+    await expect(pm.logsPage.resultsTable()).toContainText('<script>alert(1)</script>', {
       timeout: 20000,
     });
-    expect(await page.locator(`${RESULTS_TABLE} script`).count()).toBe(0);
+    await expect(pm.logsPage.resultsTable().locator('script')).toHaveCount(0);
   });
 });

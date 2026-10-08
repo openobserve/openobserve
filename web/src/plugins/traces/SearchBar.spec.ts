@@ -143,17 +143,8 @@ const makeSearchObj = () =>
     loading: false,
     loadingStream: false,
     searchApplied: false,
-    config: {
-      refreshTimes: [
-        [
-          { label: "5 sec", value: 5 },
-          { label: "1 min", value: 60 },
-        ],
-      ],
-    },
+    config: {},
     meta: {
-      refreshInterval: 0,
-      refreshIntervalLabel: "Off",
       showFields: true,
       showQuery: true,
       showHistogram: true,
@@ -1424,31 +1415,6 @@ describe("SearchBar", () => {
         .findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
       expect(tooltip.props("content")).toBe("volumeInsights.analyzeTooltipTraces");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // [auto-generated] refreshTimeChange
-  // -------------------------------------------------------------------------
-  describe("refreshTimeChange", () => {
-    it("should update meta.refreshInterval and meta.refreshIntervalLabel", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      (wrapper.vm as any).refreshTimeChange({ value: 30, label: "30 sec" });
-
-      expect(searchObjInstance.meta.refreshInterval).toBe(30);
-      expect(searchObjInstance.meta.refreshIntervalLabel).toBe("30 sec");
-    });
-
-    it("should set btnRefreshInterval to false after the change", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      (wrapper.vm as any).btnRefreshInterval = true;
-      (wrapper.vm as any).refreshTimeChange({ value: 60, label: "1 min" });
-
-      expect((wrapper.vm as any).btnRefreshInterval).toBe(false);
     });
   });
 
