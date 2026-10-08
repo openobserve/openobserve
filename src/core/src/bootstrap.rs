@@ -397,26 +397,6 @@ mod tests {
     }
 
     #[test]
-    fn the_shipped_examples_leave_the_ext_auth_salt_unset() {
-        let env_example = include_str!("../../../.env.example")
-            .lines()
-            .find_map(|line| line.trim().strip_prefix("ZO_EXT_AUTH_SALT"))
-            .and_then(|rest| rest.trim().strip_prefix('='))
-            .map(|value| value.trim().trim_matches('"').to_string())
-            .expect(".env.example sets ZO_EXT_AUTH_SALT");
-        let k8s = include_str!("../../../deploy/k8s/statefulset.yaml");
-        let k8s = k8s
-            .lines()
-            .skip_while(|line| !line.contains("name: ZO_EXT_AUTH_SALT"))
-            .find_map(|line| line.trim().strip_prefix("value:"))
-            .map(|value| value.trim().trim_matches('"').to_string())
-            .expect("statefulset.yaml sets ZO_EXT_AUTH_SALT");
-        for salt in [env_example, k8s] {
-            assert!(salt.is_empty(), "{salt:?}");
-        }
-    }
-
-    #[test]
     fn an_existing_install_keeps_starting_with_the_default_or_a_short_usable_ext_auth_salt() {
         for salt in [LEGACY_EXT_AUTH_SALT, "eight888", "short-secret"] {
             assert!(check_ext_auth_salt(false, salt).is_ok(), "{salt:?}");

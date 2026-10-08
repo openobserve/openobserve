@@ -51,9 +51,6 @@ spec:
               value: root@example.com
             - name: ZO_ROOT_USER_PASSWORD
               value: Complexpass#123
-            # optional: 16 to 48 random bytes, e.g. from `openssl rand -hex 24`; unset, a new install generates one and stores it in the meta db
-            - name: ZO_EXT_AUTH_SALT
-              value: ""
             - name: ZO_DATA_DIR
               value: /data
           # command: ["/bin/bash", "-c", "while true; do sleep 1; done"]
