@@ -21,7 +21,6 @@ env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_EXT_AUTH_SALT: ci-only-ext-auth-salt-0123456789abcdef
   ZO_BASE_URL: http://localhost:5080
   WS_ZO_BASE_URL: ws://localhost:5080
   ZO_BASE_URL_SC: http://localhost:5080
