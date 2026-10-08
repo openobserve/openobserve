@@ -79,6 +79,7 @@ pub async fn queue(
         error: Set(None),
         updated_at: Set(now),
         kind: Set(KIND_BACKFILL.to_string()),
+        attempts: Set(0),
     }
     .insert(db)
     .await?;
@@ -105,6 +106,7 @@ pub async fn queue_remeasure(
         error: Set(None),
         updated_at: Set(now),
         kind: Set(KIND_REMEASURE.to_string()),
+        attempts: Set(0),
     };
     let inserted = slo_backfill_jobs::Entity::insert(job)
         .on_conflict(

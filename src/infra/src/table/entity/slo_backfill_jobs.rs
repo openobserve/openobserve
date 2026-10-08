@@ -57,6 +57,7 @@ pub struct Model {
     pub updated_at: i64,
     /// `backfill`, or `remeasure` (D8): no status deltas, and a `reconcile` when the walk ends.
     pub kind: String,
+    pub attempts: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

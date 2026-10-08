@@ -80,6 +80,18 @@ fn create_downtimes_table() -> TableCreateStatement {
         .col(ColumnDef::new(Downtimes::CancelledAt).big_integer())
         .col(ColumnDef::new(Downtimes::CancelledBy).string_len(256))
         .col(ColumnDef::new(Downtimes::DeletedAt).big_integer())
+        .col(ColumnDef::new(Downtimes::Notifications).json().null())
+        .col(
+            ColumnDef::new(Downtimes::OriginRegion)
+                .string_len(64)
+                .null(),
+        )
+        .col(
+            ColumnDef::new(Downtimes::Version)
+                .big_integer()
+                .not_null()
+                .default(0),
+        )
         .col(
             ColumnDef::new(Downtimes::CreatedBy)
                 .string_len(256)
@@ -165,6 +177,9 @@ enum Downtimes {
     CancelledAt,
     CancelledBy,
     DeletedAt,
+    Notifications,
+    OriginRegion,
+    Version,
     CreatedBy,
     CreatedAt,
     UpdatedBy,
@@ -174,6 +189,7 @@ enum Downtimes {
 #[cfg(test)]
 mod tests {
     use collapse::*;
+    use sea_orm::{ConnectionTrait, Database, Statement};
 
     use super::*;
 
@@ -201,6 +217,9 @@ mod tests {
                 "cancelled_at" bigint,
                 "cancelled_by" varchar(256),
                 "deleted_at" bigint,
+                "notifications" json NULL,
+                "origin_region" varchar(64) NULL,
+                "version" bigint NOT NULL DEFAULT 0,
                 "created_by" varchar(256) NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_by" varchar(256) NOT NULL,
@@ -224,5 +243,50 @@ mod tests {
             &create_org_ends_at_idx().to_string(PostgresQueryBuilder),
             r#"CREATE INDEX IF NOT EXISTS "downtimes_org_ends_at_idx" ON "downtimes" ("org", "ends_at")"#
         );
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_without_error_and_keeps_the_new_columns() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE folders (id char(27) PRIMARY KEY); INSERT INTO folders VALUES ('f1')",
+        )
+        .await
+        .unwrap();
+        let manager = SchemaManager::new(&db);
+
+        Migration.up(&manager).await.expect("first run");
+        Migration.up(&manager).await.expect("second run");
+
+        for column in ["notifications", "origin_region", "version"] {
+            assert!(manager.has_column("downtimes", column).await.unwrap());
+        }
+        db.execute(Statement::from_string(
+            sea_orm::DbBackend::Sqlite,
+            "INSERT INTO downtimes (id, org, folder_id, name, targets, repeat, starts_at, \
+             timezone, duration_secs, created_by, created_at, updated_by, updated_at) \
+             VALUES ('d1', 'acme', 'f1', 'n', '[]', 0, 1, 'UTC', 60, 'lin', 1, 'lin', 1)"
+                .to_owned(),
+        ))
+        .await
+        .expect("a row is insertable without the new columns");
+        let row = db
+            .query_one(Statement::from_string(
+                sea_orm::DbBackend::Sqlite,
+                "SELECT version FROM downtimes WHERE id = 'd1'".to_owned(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i64>("", "version").unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_down_drops_the_table() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        Migration.up(&manager).await.unwrap();
+        Migration.down(&manager).await.unwrap();
+        assert!(!manager.has_table("downtimes").await.unwrap());
     }
 }

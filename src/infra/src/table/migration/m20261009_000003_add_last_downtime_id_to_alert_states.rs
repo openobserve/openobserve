@@ -18,8 +18,8 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const TABLE: &str = "slo_backfill_jobs";
-const COLUMN: &str = "kind";
+const TABLE: &str = "alert_states";
+const COLUMN: &str = "last_downtime_id";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -38,8 +38,8 @@ impl MigrationTrait for Migration {
         manager
             .alter_table(
                 Table::alter()
-                    .table(SloBackfillJobs::Table)
-                    .drop_column(SloBackfillJobs::Kind)
+                    .table(AlertStates::Table)
+                    .drop_column(AlertStates::LastDowntimeId)
                     .to_owned(),
             )
             .await
@@ -48,31 +48,49 @@ impl MigrationTrait for Migration {
 
 fn add_column_statement() -> TableAlterStatement {
     Table::alter()
-        .table(SloBackfillJobs::Table)
+        .table(AlertStates::Table)
         .add_column(
-            ColumnDef::new(SloBackfillJobs::Kind)
-                .string_len(16)
-                .not_null()
-                .default("backfill"),
+            ColumnDef::new(AlertStates::LastDowntimeId)
+                .string_len(27)
+                .null(),
         )
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum SloBackfillJobs {
+enum AlertStates {
     Table,
-    Kind,
+    LastDowntimeId,
 }
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database};
+
     use super::*;
 
     #[test]
     fn postgres() {
         assert_eq!(
             &add_column_statement().to_string(PostgresQueryBuilder),
-            r#"ALTER TABLE "slo_backfill_jobs" ADD COLUMN "kind" varchar(16) NOT NULL DEFAULT 'backfill'"#
+            r#"ALTER TABLE "alert_states" ADD COLUMN "last_downtime_id" varchar(27) NULL"#
         );
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_without_adding_the_column_twice() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared("CREATE TABLE alert_states (id varchar(27) PRIMARY KEY)")
+            .await
+            .unwrap();
+        let manager = SchemaManager::new(&db);
+
+        Migration.up(&manager).await.expect("first run");
+        Migration.up(&manager).await.expect("second run");
+        assert!(manager.has_column(TABLE, COLUMN).await.unwrap());
+
+        Migration.down(&manager).await.unwrap();
+        Migration.down(&manager).await.unwrap();
+        assert!(!manager.has_column(TABLE, COLUMN).await.unwrap());
     }
 }

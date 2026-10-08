@@ -41,6 +41,12 @@ pub struct Downtime {
     /// Show a warning banner to everyone in the org while a window is active (D19).
     #[serde(default = "default_true")]
     pub show_banner: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notifications: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_region: Option<String>,
+    #[serde(default)]
+    pub version: i64,
     pub created_by: String,
     pub created_at: i64,
     pub updated_by: String,
@@ -402,6 +408,9 @@ mod tests {
             cancelled_at: None,
             cancelled_by: None,
             show_banner: true,
+            notifications: None,
+            origin_region: None,
+            version: 0,
             created_by: "lin".to_string(),
             created_at: 1,
             updated_by: "lin".to_string(),
@@ -468,7 +477,14 @@ mod tests {
     fn a_downtime_round_trips_with_every_optional_field_absent() {
         let d = minimal();
         let json = serde_json::to_value(&d).unwrap();
-        for absent in ["reason", "condition", "cancelled_at", "cancelled_by"] {
+        for absent in [
+            "reason",
+            "condition",
+            "cancelled_at",
+            "cancelled_by",
+            "notifications",
+            "origin_region",
+        ] {
             assert!(json.get(absent).is_none(), "{absent} must be skipped");
         }
         assert!(json["targets"][0].get("tags").is_none());

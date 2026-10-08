@@ -65,6 +65,8 @@ enum AlertIncidents {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database};
+
     use super::*;
 
     #[test]
@@ -73,5 +75,22 @@ mod tests {
             &add_column_statement().to_string(PostgresQueryBuilder),
             r#"ALTER TABLE "alert_incidents" ADD COLUMN "muted_by_downtime_id" varchar(27) NULL"#
         );
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_without_adding_the_column_twice() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared("CREATE TABLE alert_incidents (id varchar(27) PRIMARY KEY)")
+            .await
+            .unwrap();
+        let manager = SchemaManager::new(&db);
+
+        Migration.up(&manager).await.expect("first run");
+        Migration.up(&manager).await.expect("second run");
+        assert!(manager.has_column(TABLE, COLUMN).await.unwrap());
+
+        Migration.down(&manager).await.unwrap();
+        Migration.down(&manager).await.unwrap();
+        assert!(!manager.has_column(TABLE, COLUMN).await.unwrap());
     }
 }
