@@ -4,6 +4,7 @@
  */
 
 import { gt } from "@/types/i18n";
+import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 
 /**
  * Translator accepted by the summary helpers.
@@ -59,6 +60,7 @@ export function generateAlertSummary(
 
   const parts: string[] = [];
   const isRealTime = formData.is_real_time === "true" || formData.is_real_time === true;
+  const forecast = formData._ui?.forecast ?? null;
 
   // Escape user-controlled strings before embedding in HTML (XSS prevention)
   const esc = (s: string) =>
@@ -98,7 +100,9 @@ export function generateAlertSummary(
   let queryText = "";
 
   // Get query from different sources
-  if (previewQuery && previewQuery.trim()) {
+  if (forecast) {
+    queryText = String(forecast.U ?? "").trim();
+  } else if (previewQuery && previewQuery.trim()) {
     // Use previewQuery if available (already formatted by previewAlert)
     queryText = previewQuery;
   } else if (generatedSqlQuery && generatedSqlQuery.trim()) {
@@ -132,6 +136,14 @@ export function generateAlertSummary(
     parts.push(
       `✓ ${translate("alerts.summary.triggersWhen")}: ${translate("alerts.summary.eventsDetected")} ${translate("alerts.summary.inRealTime")}`,
     );
+  } else if (forecast) {
+    parts.push(
+      `✓ ${translate("alerts.forecast.basedOn")}: ${clickable(translate(`alerts.forecast.window${forecast.W}`), "query")}`,
+    );
+    const trigger = forecastPhrase(forecast, "trigger", translate);
+    if (trigger) {
+      parts.push(`✓ ${translate("alerts.summary.triggersWhen")}: ${clickable(trigger, "query")}`);
+    }
   } else {
     // Scheduled alert summary
     if (formData.trigger_condition?.period) {
@@ -366,6 +378,24 @@ function hoursText(n: number, t: SummaryTranslate): string {
   return t("alerts.summary.hourCount", { n }, n === 1 ? 1 : 2);
 }
 
+/** The forecast condition as a summary or trigger phrase, or "" until its threshold and horizon are usable. */
+function forecastPhrase(forecast: any, kind: "summary" | "trigger", t: SummaryTranslate): string {
+  const threshold = forecast.T;
+  const days = Number(forecast.H);
+  if (threshold === "" || threshold === null || !Number.isFinite(Number(threshold))) return "";
+  if (!isForecastHorizonValid(days)) return "";
+  const falls = forecast.direction === "falls";
+  const key =
+    kind === "summary"
+      ? falls
+        ? "alerts.forecast.summaryFalls"
+        : "alerts.forecast.summaryRises"
+      : falls
+        ? "alerts.forecast.triggerFalls"
+        : "alerts.forecast.triggerRises";
+  return t(key, { threshold, horizon: t("alerts.forecast.dayCount", { n: days }, days) });
+}
+
 /**
  * Generate a plain English summary of the alert
  */
@@ -387,8 +417,10 @@ function generatePlainEnglishSummary(
     const threshold = formData.trigger_condition?.threshold;
     const operator = formData.trigger_condition?.operator;
     const period = formData.trigger_condition?.period;
+    const forecast = formData._ui?.forecast ?? null;
+    const forecastSentence = forecast ? forecastPhrase(forecast, "summary", t) : "";
 
-    if (threshold !== undefined && operator && period) {
+    if (forecast ? forecastSentence : threshold !== undefined && operator && period) {
       // One whole message per operator, each carrying the threshold as a VALUE.
       // "more than 5 events" and "5 events or more" put the number in different
       // places, so the phrase cannot be assembled here out of a word and a number.
@@ -414,15 +446,16 @@ function generatePlainEnglishSummary(
       // "10-minute" is an English compound, so minutes and hours get a message each.
       const inMinutes = period < 60;
       parts.push(
-        t(
-          inMinutes
-            ? "alerts.summary.plainEnglish.alertMeWhenMinutes"
-            : "alerts.summary.plainEnglish.alertMeWhenHours",
-          {
-            condition: conditionPhrase,
-            count: inMinutes ? period : Math.floor(period / 60),
-          },
-        ),
+        forecastSentence ||
+          t(
+            inMinutes
+              ? "alerts.summary.plainEnglish.alertMeWhenMinutes"
+              : "alerts.summary.plainEnglish.alertMeWhenHours",
+            {
+              condition: conditionPhrase,
+              count: inMinutes ? period : Math.floor(period / 60),
+            },
+          ),
       );
 
       // Add pending period phrase if configured (0 = fires immediately, the

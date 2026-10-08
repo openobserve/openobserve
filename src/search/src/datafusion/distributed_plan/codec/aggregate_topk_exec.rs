@@ -31,12 +31,15 @@ pub fn try_decode(
     inputs: &[Arc<dyn ExecutionPlan>],
     _registry: &dyn FunctionRegistry,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    Ok(Arc::new(AggregateTopkExec::new(
+    if inputs.len() != 1 {
+        return internal_err!("AggregateTopkExec expected 1 input, got {}", inputs.len());
+    }
+    Ok(Arc::new(AggregateTopkExec::try_new(
         inputs[0].clone(),
         &node.sort_field,
         node.descending,
         node.limit,
-    )))
+    )?))
 }
 
 pub fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
@@ -105,12 +108,12 @@ mod tests {
             Arc::new(EmptyExec::new(Arc::clone(&schema))),
             Arc::clone(&schema),
         )?;
-        let plan: Arc<dyn ExecutionPlan> = Arc::new(AggregateTopkExec::new(
+        let plan: Arc<dyn ExecutionPlan> = Arc::new(AggregateTopkExec::try_new(
             Arc::new(agg_plan) as Arc<dyn ExecutionPlan>,
             "COUNT(1)",
             false,
             10,
-        ));
+        )?);
 
         // encode
         let proto = super::super::get_physical_extension_codec();
@@ -127,6 +130,37 @@ mod tests {
         assert_eq!(plan.limit(), plan2.limit());
         assert_eq!(plan.descending(), plan2.descending());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_decode_without_input_is_error() -> Result<()> {
+        use datafusion_proto::protobuf::{
+            PhysicalExtensionNode, PhysicalPlanNode, physical_plan_node::PhysicalPlanType,
+        };
+
+        let node = cluster_rpc::PhysicalPlanNode {
+            plan: Some(cluster_rpc::physical_plan_node::Plan::AggregateTopk(
+                cluster_rpc::AggregateTopkExecNode {
+                    sort_field: "a".to_string(),
+                    descending: true,
+                    limit: 10,
+                },
+            )),
+        };
+        let bytes = PhysicalPlanNode {
+            physical_plan_type: Some(PhysicalPlanType::Extension(PhysicalExtensionNode {
+                node: node.encode_to_vec(),
+                inputs: vec![],
+            })),
+        }
+        .encode_to_vec();
+        let codec = super::super::get_physical_extension_codec();
+        let ctx = datafusion::prelude::SessionContext::new();
+
+        let ret = physical_plan_from_bytes_with_extension_codec(&bytes, &ctx.task_ctx(), &codec);
+
+        assert!(ret.is_err());
         Ok(())
     }
 }

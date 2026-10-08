@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import { defineComponent, ref, h } from "vue";
 import * as cookies from "@/utils/cookies";
@@ -2045,5 +2047,42 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
 
   it("shows the menu when both isEnterprise and isCloud are true and the flag is on", () => {
     expect(isAiObservabilityMenuVisible("true", "true", true)).toBe(true);
+  });
+
+  // The rail is built inside setup() from literals, so the icon set is pinned on the source.
+  describe("rail icons (AC-20)", () => {
+    const source = readFileSync(resolve(__dirname, "./MainLayout.vue"), "utf8");
+    const icons = [...source.matchAll(/^\s*icon: "([^"]+)",/gm)].map((m) => m[1]);
+
+    it("keeps every rail icon from BASE except Profiles, which moves to memory", () => {
+      expect(icons).toEqual([
+        "home",
+        "search",
+        "bar-chart",
+        "account-tree",
+        "devices",
+        "insights",
+        "dashboard",
+        "window",
+        "shield-alert-outline",
+        "target",
+        "data-plus-line",
+        "manage-accounts",
+        "settings",
+        "notifications-active",
+        "schema",
+        "auto-awesome",
+        "radar",
+        "memory",
+        "description",
+      ]);
+    });
+
+    it("gives Traces and Profiles different icons from the existing set", () => {
+      const traces = /title: t\("menu\.traces"\),\s*icon: "([^"]+)"/.exec(source)?.[1];
+      const profiles = /title: t\("menu\.profiles"\),\s*icon: "([^"]+)"/.exec(source)?.[1];
+      expect(traces).toBe("account-tree");
+      expect(profiles).toBe("memory");
+    });
   });
 });

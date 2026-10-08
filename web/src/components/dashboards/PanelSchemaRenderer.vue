@@ -252,6 +252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :x="contextMenuPosition.x"
         :y="contextMenuPosition.y"
         :value="contextMenuValue"
+        :panel-query-index="contextMenuData?.panelQueryIndex"
+        :series-role="contextMenuData?.seriesRole"
+        :unit="panelSchema?.config?.unit"
+        :unit-custom="panelSchema?.config?.unit_custom"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />
@@ -310,7 +314,11 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { usePanelAlertCreation, usePanelDownload } from "@/composables/dashboard/usePanelActions";
+import {
+  forecastPointOf,
+  usePanelAlertCreation,
+  usePanelDownload,
+} from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
@@ -467,6 +475,12 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    /** The registered alert source a right-click alert names, so its toast says where it came from. */
+    alertSource: {
+      default: "panel",
+      required: false,
+      type: String,
+    },
     runId: {
       type: String,
       default: null,
@@ -603,10 +617,13 @@ export default defineComponent({
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
-    // Returns array of hidden query indices (e.g., [0, 2] means queries 0 and 2 are hidden)
-    // Returns [] if no page key or no hiddenQueries - which means no filtering
-    const hiddenQueries = computed(() => {
-      return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
+    // The editor's live toggles win in the editor; elsewhere the saved hide flags apply.
+    const hiddenQueries = computed((): number[] => {
+      if (dashboardPanelDataForHiding)
+        return dashboardPanelDataForHiding.layout?.hiddenQueries || [];
+      return (panelSchema.value?.queries ?? []).flatMap((query: any, i: number) =>
+        query?.config?.hide ? [i] : [],
+      );
     });
 
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
@@ -733,6 +750,7 @@ export default defineComponent({
       allowAnnotationsAdd,
       allowAnnotationsAPI,
       allowAlertCreation,
+      alertSource,
       runId,
       tabId,
       tabName,
@@ -804,6 +822,14 @@ export default defineComponent({
       t,
     );
 
+    // Shifted results follow the primaries ([A, B, A', B']), so an array index is not a query index.
+    const isHiddenAt = (index: number) =>
+      hiddenQueries.value.includes(
+        panelSchema.value?.queryType === "promql"
+          ? (metadata.value?.queries?.[index]?.panelQueryIndex ?? index)
+          : index,
+      );
+
     // Filter data based on hiddenQueries for PromQL panels
     const filteredData = computed(() => {
       // If no data, return as is
@@ -817,11 +843,26 @@ export default defineComponent({
       }
 
       // Filter out hidden queries by index (works for both SQL and PromQL)
-      const filtered = data.value.filter(
-        (_: any, index: number) => !hiddenQueries.value.includes(index),
-      );
+      const filtered = data.value.filter((_: any, index: number) => !isHiddenAt(index));
 
       return filtered;
+    });
+
+    // PromQL: metadata.queries and resultMetaData stay index-aligned with filteredData.
+    const filtersPromQLMeta = () =>
+      panelSchema.value?.queryType === "promql" && hiddenQueries.value?.length > 0;
+    const filteredMetadata = computed(() => {
+      const queries = metadata.value?.queries;
+      if (!filtersPromQLMeta() || !Array.isArray(queries)) return metadata.value;
+      return {
+        ...metadata.value,
+        queries: queries.filter((_: any, index: number) => !isHiddenAt(index)),
+      };
+    });
+    const filteredResultMetaData = computed(() => {
+      const rmd = resultMetaData.value;
+      if (!filtersPromQLMeta() || !Array.isArray(rmd)) return rmd;
+      return rmd.filter((_: any, index: number) => !isHiddenAt(index));
     });
 
     // Keep metric sparkline hits index-aligned with filteredData (same filter).
@@ -1103,7 +1144,7 @@ export default defineComponent({
       contextMenuPosition,
       contextMenuValue,
       onChartContextMenu,
-      onChartDomContextMenu,
+      onChartDomContextMenu: openAlertContextMenu,
       hideContextMenu,
       handleCreateAlert,
     } = usePanelAlertCreation({
@@ -1115,7 +1156,25 @@ export default defineComponent({
       store,
       router,
       emit,
+      visibleQueryIndexes,
+      hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
+      alertSource,
     });
+    // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
+    const onChartDomContextMenu = (event: any) => {
+      const series =
+        typeof event?.seriesIndex === "number"
+          ? panelData.value?.options?.series?.[event.seriesIndex]
+          : undefined;
+      openAlertContextMenu({
+        ...event,
+        panelQueryIndex: series?._panelQueryIndex,
+        seriesRole: series?._seriesRole,
+        ...(series?._seriesRole === "forecast"
+          ? { forecastPoint: forecastPointOf(series, event.dataIndex) }
+          : {}),
+      });
+    };
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -1212,6 +1271,8 @@ export default defineComponent({
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
     });
+    // Conversions can resolve out of order; only the most recently started may land.
+    let conversionGeneration = 0;
     const convertPanelDataCommon = async (applyOverlay = false) => {
       // Preserve the previously rendered chart during a reload. While loading,
       // if the new data buffer has no rows yet but a chart is already rendered,
@@ -1229,6 +1290,10 @@ export default defineComponent({
       }
 
       if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
+        const generation = ++conversionGeneration;
+        // A stream error set while awaiting is newer than this conversion's data.
+        const superseded = () =>
+          generation !== conversionGeneration || !!errorDetail?.value?.message;
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -1236,13 +1301,15 @@ export default defineComponent({
             store,
             chartPanelRef,
             hoveredSeriesState,
-            resultMetaData,
-            metadata.value,
+            filteredResultMetaData,
+            filteredMetadata.value,
             chartPanelStyle.value,
             annotations,
             loading.value,
             filteredSparklineData.value,
           );
+          // Superseded while awaiting: its data is older than what is coming.
+          if (superseded()) return;
 
           // Apply overlay BEFORE assigning to panelData.value.
           // This ensures a single watcher trigger with the overlaid options,
@@ -1355,6 +1422,7 @@ export default defineComponent({
             code: "",
           };
         } catch (error: any) {
+          if (superseded()) return;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1482,6 +1550,8 @@ export default defineComponent({
           data.value?.length > 0 &&
           (data.value[0]?.result?.length > 0 ||
             (Array.isArray(data.value[0]) && data.value[0].length > 0));
+        // An emptied buffer is a new run: no conversion started before it may land.
+        if (!data.value?.length) conversionGeneration++;
 
         if (loading.value) {
           // ---- STREAMING (chunks arriving) ----

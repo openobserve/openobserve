@@ -47,6 +47,47 @@ pub static ARR_SORT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     )
 });
 
+/// Overflowed numbers rank beyond every finite value so the order stays transitive.
+enum NumberOrderClass {
+    NegOverflow(std::cmp::Reverse<String>),
+    // Every i64 and u64 fits, so integers above 2^53 keep their exact order.
+    Int(i128),
+    // JSON numbers are never NaN, so the hand-written Ord via total_cmp is sound.
+    Float(f64),
+    PosOverflow(String),
+}
+
+impl PartialEq for NumberOrderClass {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for NumberOrderClass {}
+
+impl Ord for NumberOrderClass {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::NegOverflow(a), Self::NegOverflow(b)) => a.cmp(b),
+            (Self::Int(a), Self::Int(b)) => a.cmp(b),
+            (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
+            (Self::Int(a), Self::Float(b)) => int_float_cmp(*a, *b),
+            (Self::Float(a), Self::Int(b)) => int_float_cmp(*b, *a).reverse(),
+            (Self::PosOverflow(a), Self::PosOverflow(b)) => a.cmp(b),
+            (Self::NegOverflow(_), _) => Ordering::Less,
+            (_, Self::NegOverflow(_)) => Ordering::Greater,
+            (Self::PosOverflow(_), _) => Ordering::Greater,
+            (_, Self::PosOverflow(_)) => Ordering::Less,
+        }
+    }
+}
+
+impl PartialOrd for NumberOrderClass {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// arrsort function for datafusion
 pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarValue> {
     log::debug!("Inside arrsort");
@@ -76,22 +117,7 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
                             if field.is_empty() {
                                 None
                             } else {
-                                field.sort_by(|a, b| {
-                                    // Assuming the array having elements of same type
-                                    if a.is_f64() {
-                                        a.as_f64().unwrap().total_cmp(b.as_f64().as_ref().unwrap())
-                                    } else if a.is_i64() {
-                                        a.as_i64().unwrap().cmp(b.as_i64().as_ref().unwrap())
-                                    } else if a.is_u64() {
-                                        a.as_u64().unwrap().cmp(b.as_u64().as_ref().unwrap())
-                                    } else if a.is_string() {
-                                        a.as_str().unwrap().cmp(b.as_str().unwrap())
-                                    } else if a.is_boolean() {
-                                        a.as_bool().unwrap().cmp(b.as_bool().as_ref().unwrap())
-                                    } else {
-                                        Ordering::Less
-                                    }
-                                });
+                                field.sort_by(json_total_cmp);
                                 json::to_string(&field).ok()
                             }
                         } else {
@@ -105,6 +131,62 @@ pub fn arr_sort_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Column
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.
     Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+}
+
+/// Rank used to order values of different JSON types in [`json_total_cmp`].
+fn type_rank(value: &json::Value) -> u8 {
+    match value {
+        json::Value::Null => 0,
+        json::Value::Bool(_) => 1,
+        json::Value::Number(_) => 2,
+        json::Value::String(_) => 3,
+        json::Value::Array(_) => 4,
+        json::Value::Object(_) => 5,
+    }
+}
+
+/// Total order over arbitrary JSON values, shared by `arrsort` and `arr_descending`.
+pub(crate) fn json_total_cmp(a: &json::Value, b: &json::Value) -> Ordering {
+    match (a, b) {
+        (json::Value::Number(a), json::Value::Number(b)) => number_total_cmp(a, b),
+        (json::Value::String(a), json::Value::String(b)) => a.cmp(b),
+        (json::Value::Bool(a), json::Value::Bool(b)) => a.cmp(b),
+        (json::Value::Null, json::Value::Null) => Ordering::Equal,
+        _ => type_rank(a).cmp(&type_rank(b)),
+    }
+}
+
+/// Numbers with no f64 form sort as signed infinity so mixed comparisons stay transitive.
+fn number_total_cmp(a: &json::Number, b: &json::Number) -> Ordering {
+    number_order_class(a).cmp(&number_order_class(b))
+}
+
+fn number_order_class(n: &json::Number) -> NumberOrderClass {
+    if let Some(i) = n.as_i64() {
+        return NumberOrderClass::Int(i.into());
+    }
+    if let Some(u) = n.as_u64() {
+        return NumberOrderClass::Int(u.into());
+    }
+    match n.as_f64() {
+        Some(f) => NumberOrderClass::Float(f),
+        None => {
+            let text = n.to_string();
+            if text.starts_with('-') {
+                NumberOrderClass::NegOverflow(std::cmp::Reverse(text))
+            } else {
+                NumberOrderClass::PosOverflow(text)
+            }
+        }
+    }
+}
+
+/// Exact `i` vs `f`: round-to-nearest keeps any strict order, and a tie means `f` is integral.
+fn int_float_cmp(i: i128, f: f64) -> Ordering {
+    match (i as f64).total_cmp(&f) {
+        Ordering::Equal => i.cmp(&(f as i128)),
+        ord => ord,
+    }
 }
 
 #[cfg(test)]
@@ -356,5 +438,174 @@ mod tests {
         // Test with multiple arguments
         let result = ctx.sql("select arrsort('a', 'b') as ret").await;
         assert!(result.is_err());
+    }
+
+    fn call_arr_sort(json_array: &str) -> String {
+        let input = StringArray::from(vec![json_array]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_sort_impl(&args).unwrap();
+        match result {
+            ColumnarValue::Array(out) => out
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .value(0)
+                .to_string(),
+            _ => panic!("expected array result"),
+        }
+    }
+
+    #[test]
+    fn test_arr_sort_mixed_number_and_string_does_not_panic() {
+        call_arr_sort(r#"[1.5,"a"]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_float_and_int_does_not_panic() {
+        call_arr_sort(r#"[2.5,1]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_negative_and_huge_unsigned_does_not_panic() {
+        call_arr_sort(r#"[-1,18446744073709551615]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_null_mixed_with_strings_does_not_panic() {
+        call_arr_sort(r#"[null,"a","b"]"#);
+    }
+
+    #[test]
+    fn test_arr_sort_large_shuffled_mixed_type_array_does_not_panic() {
+        use rand::prelude::SliceRandom;
+
+        let mut values: Vec<json::Value> = Vec::with_capacity(200);
+        for i in 0..200 {
+            values.push(match i % 7 {
+                0 => json::Value::from(i as i64),
+                1 => json::Value::from(i as f64 + 0.5),
+                2 => json::Value::from(format!("s{i}")),
+                3 => json::Value::Bool(i % 2 == 0),
+                4 => json::Value::Null,
+                // arbitrary_precision numbers with no f64 representation, one per sign.
+                5 => json::from_str::<json::Value>(&format!("{i}e400")).unwrap(),
+                _ => json::from_str::<json::Value>(&format!("-{i}e400")).unwrap(),
+            });
+        }
+        values.shuffle(&mut rand::rng());
+        let json_array = json::to_string(&values).unwrap();
+        call_arr_sort(&json_array);
+    }
+
+    fn parse_number(text: &str) -> json::Number {
+        match json::from_str::<json::Value>(text).unwrap() {
+            json::Value::Number(n) => n,
+            other => panic!("expected a number, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_number_total_cmp_orders_overflow_against_finite_correctly() {
+        let a = parse_number("100.0");
+        let b = parse_number("1e400");
+        let c = parse_number("50");
+
+        assert_eq!(number_total_cmp(&a, &b), Ordering::Less, "100.0 < 1e400");
+        assert_eq!(number_total_cmp(&b, &c), Ordering::Greater, "1e400 > 50");
+        assert_eq!(number_total_cmp(&a, &c), Ordering::Greater, "100.0 > 50");
+    }
+
+    #[test]
+    fn test_number_total_cmp_is_transitive_over_all_triples() {
+        let texts = [
+            "1e400",
+            "-1e400",
+            "100.0",
+            "50",
+            "-3",
+            "2e300",
+            "-2e300",
+            "0",
+            "-0.5",
+            "0.5",
+            "9007199254740992",
+            "9007199254740993",
+            "9007199254740992.0",
+            "18446744073709551615",
+            "18446744073709551616.0",
+            "-1",
+            "-9223372036854775808",
+            "1727000000000000001",
+            "1727000000000000002",
+        ];
+        let numbers: Vec<json::Number> = texts.iter().map(|t| parse_number(t)).collect();
+
+        for a in &numbers {
+            for b in &numbers {
+                assert_eq!(
+                    number_total_cmp(a, b),
+                    number_total_cmp(b, a).reverse(),
+                    "{a} vs {b} is not antisymmetric"
+                );
+                for c in &numbers {
+                    let ab = number_total_cmp(a, b);
+                    let bc = number_total_cmp(b, c);
+                    let ac = number_total_cmp(a, c);
+                    if ab != Ordering::Greater && bc != Ordering::Greater {
+                        let want = if ab == Ordering::Equal {
+                            bc
+                        } else {
+                            Ordering::Less
+                        };
+                        assert_eq!(ac, want, "{a} vs {b} is {ab:?}, {b} vs {c} is {bc:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_arr_sort_orders_integers_above_2_pow_53_exactly() {
+        assert_eq!(
+            call_arr_sort("[1727000000000000002,1727000000000000001]"),
+            "[1727000000000000001,1727000000000000002]"
+        );
+        assert_eq!(
+            call_arr_sort("[9007199254740993,9007199254740992]"),
+            "[9007199254740992,9007199254740993]"
+        );
+    }
+
+    #[test]
+    fn test_number_total_cmp_breaks_int_float_ties_exactly() {
+        let cmp = |a: &str, b: &str| number_total_cmp(&parse_number(a), &parse_number(b));
+        assert_eq!(
+            cmp("9007199254740993", "9007199254740992.0"),
+            Ordering::Greater
+        );
+        assert_eq!(
+            cmp("9007199254740992", "9007199254740992.0"),
+            Ordering::Equal
+        );
+        assert_eq!(
+            cmp("18446744073709551615", "18446744073709551616.0"),
+            Ordering::Less
+        );
+        assert_eq!(cmp("-1", "18446744073709551615"), Ordering::Less);
+        assert_eq!(
+            cmp("-9223372036854775808", "-9223372036854775807"),
+            Ordering::Less
+        );
+        assert_eq!(cmp("2.5", "2"), Ordering::Greater);
+    }
+
+    #[test]
+    fn test_arr_sort_with_overflow_numbers_is_deterministic_and_ordered() {
+        let result = call_arr_sort(r#"[1e400,-1e400,100.0,50,2e300,-3]"#);
+        assert_eq!(result, "[-1e+400,-3,50,100.0,2e+300,1e+400]");
+
+        // Sorting again from a different input order must yield the same order (determinism).
+        let result2 = call_arr_sort(r#"[50,-1e400,2e300,-3,1e400,100.0]"#);
+        assert_eq!(result, result2);
     }
 }

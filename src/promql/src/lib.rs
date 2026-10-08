@@ -19,6 +19,20 @@
 //! Cluster routing, caching, WAL access, and request orchestration live in the
 //! separate `promql-service` crate.
 
+mod aggregations;
+pub mod ast;
+mod binary;
+pub mod common;
+pub mod engine;
+pub mod exec;
+mod functions;
+mod parser;
+mod scalar_param;
+mod series_loader;
+mod series_stream;
+mod streaming_eval;
+pub mod utils;
+
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -28,23 +42,10 @@ use async_trait::async_trait;
 use config::meta::{promql::MetricsBlockScan, search::ScanStats};
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
 use hashbrown::HashSet;
+pub use parser::parse;
 use promql_parser::label::Matchers;
-use tokio::sync::oneshot;
-
-mod aggregations;
-pub mod ast;
-mod binary;
-pub mod common;
-pub mod engine;
-pub mod exec;
-mod functions;
-mod scalar_param;
-mod series_loader;
-mod series_stream;
-mod streaming_eval;
-pub mod utils;
-
 pub use series_stream::blocks::load_metrics_block_index;
+use tokio::sync::oneshot;
 
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s

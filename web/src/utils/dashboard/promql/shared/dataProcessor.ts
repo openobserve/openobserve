@@ -17,6 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./types";
 import { buildPromqlSeriesNames } from "./legendBuilder";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
+import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -24,18 +25,26 @@ import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
  * @param searchQueryData - Array of PromQL API responses (one per query)
  * @param panelSchema - Panel configuration schema
  * @param store - Vuex store instance
+ * @param shift - each expanded result's panel query index and name suffix (alignShiftedPromQLResults)
  * @returns Processed data array ready for chart-specific conversion
  */
 export async function processPromQLData(
   searchQueryData: PromQLResponse[],
   panelSchema: any,
   store: any,
+  shift: { parentQueryIndex?: number[]; nameSuffixes?: string[] } = {},
 ): Promise<ProcessedPromQLData[]> {
   const result: ProcessedPromQLData[] = [];
+  const queryIndexOf = (index: number) => shift.parentQueryIndex?.[index] ?? index;
 
   // Apply series limit
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
-  const limitedData = applySeriesLimit(searchQueryData, seriesLimit);
+  const limitedData = applySeriesLimit(
+    searchQueryData,
+    seriesLimit,
+    queryIndexOf,
+    shift.nameSuffixes,
+  );
 
   // Named through the same builder the line/bar path uses, so a panel flipped
   // from Line to Stacked keeps its legend, its tooltip and its per-series colour
@@ -45,8 +54,8 @@ export async function processPromQLData(
       metrics: ((queryData?.data?.result || queryData?.result) ?? [])
         .map((metric: any) => metric?.metric)
         .filter(Boolean),
-      template: panelSchema.queries?.[index]?.config?.promql_legend,
-      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+      template: panelSchema.queries?.[queryIndexOf(index)]?.config?.promql_legend,
+      fallback: legendFallbackOf(panelSchema.queries, queryIndexOf(index)),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -67,7 +76,9 @@ export async function processPromQLData(
     }
 
     const series = resultData.map((metric: any) => {
-      const seriesName = seriesNames.get(metric.metric) ?? "";
+      const suffix = shift.nameSuffixes?.[index];
+      const baseName = seriesNames.get(metric.metric) ?? "";
+      const seriesName = suffix ? `${baseName} (${suffix})` : baseName;
 
       // Extract values (matrix has values[], vector has value)
       const values = metric.values || (metric.value ? [metric.value] : []);
@@ -89,8 +100,9 @@ export async function processPromQLData(
     result.push({
       timestamps: formattedTimestamps,
       series,
-      queryIndex: index,
-      queryConfig: panelSchema.queries[index]?.config || {},
+      queryIndex: queryIndexOf(index),
+      seriesRole: shift.nameSuffixes?.[index] ? "shifted" : "primary",
+      queryConfig: panelSchema.queries[queryIndexOf(index)]?.config || {},
     });
   });
 
@@ -146,33 +158,47 @@ function formatTimestamps(
 }
 
 /**
- * Limit number of series per query to prevent performance issues
+ * Limit number of series per query to prevent performance issues; a shifted series follows its primary.
  *
  * @param data - Array of PromQL responses
  * @param limit - Maximum number of series to keep per query
+ * @param queryIndexOf - panel query index of each expanded result
+ * @param nameSuffixes - shift suffix of each expanded result ("" for a primary)
  * @returns Limited data array
  */
-function applySeriesLimit(data: PromQLResponse[], limit: number): PromQLResponse[] {
-  return data.map((queryData) => {
+function applySeriesLimit(
+  data: PromQLResponse[],
+  limit: number,
+  queryIndexOf: (index: number) => number = (index) => index,
+  nameSuffixes: string[] = [],
+): PromQLResponse[] {
+  const resultOf = (queryData: PromQLResponse) => queryData?.data?.result || queryData?.result;
+  const withResult = (queryData: PromQLResponse, result: any[]): PromQLResponse => {
     // Handle both standard PromQL format and OpenObserve format
-    if (queryData?.data?.result) {
-      // Standard PromQL format
-      return {
-        ...queryData,
-        data: {
-          ...queryData.data,
-          result: queryData.data.result.slice(0, limit),
-        },
-      };
-    } else if (queryData?.result) {
-      // OpenObserve format
-      return {
-        ...queryData,
-        result: queryData.result.slice(0, limit),
-      };
-    }
+    if (queryData?.data?.result) return { ...queryData, data: { ...queryData.data, result } };
+    return { ...queryData, result };
+  };
 
-    return queryData;
+  const limited = data.map((queryData, index) => {
+    const result = resultOf(queryData);
+    return !result || nameSuffixes[index]
+      ? queryData
+      : withResult(queryData, result.slice(0, limit));
+  });
+
+  const kept = new Map<number, Set<any>>();
+  limited.forEach((queryData, index) => {
+    const result = resultOf(queryData);
+    if (nameSuffixes[index] || !result?.length || kept.has(queryIndexOf(index))) return;
+    kept.set(queryIndexOf(index), new Set(result.map((m: any) => m?.metric)));
+  });
+
+  return limited.map((queryData, index) => {
+    const result = resultOf(queryData);
+    if (!result || !nameSuffixes[index]) return queryData;
+    const primaries = kept.get(queryIndexOf(index));
+    const survivors = primaries ? result.filter((m: any) => primaries.has(m?.metric)) : result;
+    return withResult(queryData, survivors.slice(0, limit));
   });
 }
 

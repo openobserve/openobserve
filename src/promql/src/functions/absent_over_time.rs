@@ -16,7 +16,9 @@
 use config::meta::promql::value::{EvalContext, Labels, Value};
 use datafusion::error::{DataFusionError, Result};
 
-use super::{SeriesRange, absent::absent_series, present_over_time::PresentOverTimeFunc};
+use super::{
+    SeriesRange, absent::absent_series, drop_stale_markers, present_over_time::PresentOverTimeFunc,
+};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
 pub(crate) fn absent_over_time(
@@ -37,7 +39,7 @@ pub(crate) fn absent_over_time(
     let timestamps = eval_ctx.timestamps();
     let mut present = vec![false; timestamps.len()];
     let mut missing = timestamps.len();
-    for series in &matrix {
+    for mut series in matrix {
         if missing == 0 {
             return Ok(Value::None);
         }
@@ -48,6 +50,7 @@ pub(crate) fn absent_over_time(
                 DataFusionError::Internal("absent_over_time: series without a range".into())
             })?
             .range;
+        drop_stale_markers(&mut series.samples, &PresentOverTimeFunc);
         for (slot, _) in SeriesRange::new(
             &series.samples,
             &PresentOverTimeFunc,
@@ -152,6 +155,14 @@ mod tests {
             reported(&result),
             vec![(2000, 1.0), (6000, 1.0), (8000, 1.0)]
         );
+    }
+
+    #[test]
+    fn test_absent_over_time_counts_a_marker_only_window_as_absent() {
+        let mut marked = series(&[3000]);
+        marked.samples[0].value = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let result = absent_over_time_test_helper(Value::Matrix(vec![marked])).unwrap();
+        assert_eq!(reported(&result), vec![(3000, 1.0)]);
     }
 
     #[test]

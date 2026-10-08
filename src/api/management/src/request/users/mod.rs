@@ -848,7 +848,7 @@ pub async fn get_presigned_url(
 
     let cfg = get_config();
     let time = chrono::Utc::now().timestamp();
-    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
+    let password_ext_salt = &config::get_ext_auth_salt();
 
     let base_url = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
     let url = generate_presigned_url(
@@ -943,16 +943,16 @@ pub async fn get_auth(
                     }
                 };
 
-                match query.get("exp_in") {
-                    Some(exp_in_str) => {
-                        expires_in = exp_in_str.parse::<i64>().unwrap();
+                match query.get("exp_in").and_then(|v| v.parse::<i64>().ok()) {
+                    Some(exp_in) => {
+                        expires_in = exp_in;
                     }
                     None => {
                         audit_unauthorized_error(audit_message).await;
                         return unauthorized_error(resp);
                     }
                 };
-                if chrono::Utc::now().timestamp() - req_ts > expires_in {
+                if AuthTokensExt::is_expired(req_ts, expires_in) {
                     audit_unauthorized_error(audit_message).await;
                     return unauthorized_error(resp);
                 }
@@ -1018,6 +1018,12 @@ pub async fn get_auth(
                 "email": name,
                 "name": name,
             });
+            let Some(expiry) =
+                time::OffsetDateTime::now_utc().checked_add(time::Duration::seconds(expires_in))
+            else {
+                audit_unauthorized_error(audit_message).await;
+                return unauthorized_error(resp);
+            };
             let cookie_name = "auth_tokens";
             let auth_cookie = if req_ts == 0 {
                 let access_token =
@@ -1028,7 +1034,6 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
-                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -1046,7 +1051,6 @@ pub async fn get_auth(
                 };
 
                 log::debug!("Setting cookie for user: {name} - {cookie_name}");
-                let expiry = time::OffsetDateTime::now_utc() + time::Duration::seconds(expires_in);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
@@ -1314,6 +1318,21 @@ pub async fn list_invitations(Headers(_): Headers<UserEmail>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn login_with_a_non_numeric_exp_in_is_unauthorized() {
+        let query = HashMap::from([
+            ("auth".to_string(), "x".to_string()),
+            (
+                "request_time".to_string(),
+                chrono::Utc::now().timestamp().to_string(),
+            ),
+            ("exp_in".to_string(), "abc".to_string()),
+        ]);
+        let resp = get_auth(http::HeaderMap::new(), Query(query)).await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
 
     #[test]
     fn test_presigned_url_generator_default() {

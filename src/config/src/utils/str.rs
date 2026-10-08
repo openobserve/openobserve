@@ -113,6 +113,17 @@ pub fn mask_secret(secret: &str) -> String {
     format!("{head}****{tail}")
 }
 
+/// Render a license key as `abc*****xyz`; anything shorter than 7 characters is masked whole.
+pub fn mask_license_key(key: &str) -> String {
+    let chars: Vec<char> = key.chars().collect();
+    if chars.len() < 7 {
+        return "*****".to_string();
+    }
+    let head: String = chars[..3].iter().collect();
+    let tail: String = chars[chars.len() - 3..].iter().collect();
+    format!("{head}*****{tail}")
+}
+
 pub trait StringExt {
     fn find(&self, needle: &str) -> bool;
     fn optional(&self) -> Option<String>;
@@ -154,9 +165,35 @@ impl StringExt for String {
     }
 }
 
+/// Compares in time independent of where the inputs differ; only the length can leak.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mask_license_key_never_panics() {
+        let panicking: Vec<&str> = ["", "abc", "é日本語x"]
+            .into_iter()
+            .filter(|key| std::panic::catch_unwind(|| mask_license_key(key)).is_err())
+            .collect();
+        assert!(panicking.is_empty(), "panicked on {panicking:?}");
+
+        for (key, masked) in [
+            ("", "*****"),
+            ("abc", "*****"),
+            ("abcdef", "*****"),
+            ("é日本語x", "*****"),
+            ("abcdefg", "abc*****efg"),
+            ("eyJhbGciOiJFUzI1NiJ9.payload.sig", "eyJ*****sig"),
+            ("é日本語xyz語日é", "é日本*****語日é"),
+        ] {
+            assert_eq!(mask_license_key(key), masked, "{key:?}");
+        }
+    }
 
     #[test]
     fn test_is_ofga_unsupported() {
@@ -507,6 +544,15 @@ mod tests {
         assert_eq!("Hello世界".to_string().truncate_utf8(9), "Hello世"); // Still before second Chinese character
         assert_eq!("Hello世界".to_string().truncate_utf8(10), "Hello世"); // Still before second Chinese character
         assert_eq!("Hello世界".to_string().truncate_utf8(11), "Hello世界"); // After both Chinese characters
+    }
+
+    #[test]
+    fn test_constant_time_eq_matches_only_equal() {
+        assert!(constant_time_eq(b"abc", b"abc"));
+        assert!(constant_time_eq(b"", b""));
+        assert!(!constant_time_eq(b"abc", b"abd"));
+        assert!(!constant_time_eq(b"abc", b"ab"));
+        assert!(!constant_time_eq(b"", b"a"));
     }
 
     #[test]

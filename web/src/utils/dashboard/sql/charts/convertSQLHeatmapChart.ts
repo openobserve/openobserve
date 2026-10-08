@@ -17,6 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatDate, isTimeSeries } from "../../dateTimeUtils";
 import { getDataValue } from "../../aliasUtils";
+import { getFieldLabel } from "../../fieldLabel";
 import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 import {
@@ -115,7 +116,11 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     (options.series = [
       {
         ...defaultSeriesProps,
-        name: panelSchema?.queries[0]?.fields?.z[0].label,
+        name: getFieldLabel(
+          panelSchema?.queries[0]?.fields?.z[0],
+          panelSchema?.config,
+          panelSchema?.queries[0]?.customQuery,
+        ),
         // Without a cell border a dense heatmap collapses into solid bands.
         itemStyle: heatmapCellItemStyle(store),
 

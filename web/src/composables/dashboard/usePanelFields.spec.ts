@@ -179,9 +179,9 @@ describe("usePanelFields", () => {
       expect(panelData.data.queries[0].fields.x[0].alias).toBe("custom_field");
     });
 
-    it("generates label using generateLabelFromName for non-custom query", () => {
+    it("leaves the label blank so the chart generates it from the field", () => {
       fields.addXAxisItem({ name: "my_field" });
-      expect(panelData.data.queries[0].fields.x[0].label).toBe("My Field");
+      expect(panelData.data.queries[0].fields.x[0].label).toBe("");
     });
   });
 
@@ -525,10 +525,11 @@ describe("usePanelFields", () => {
         "table",
       );
       // table: x fields go into x, breakdown fields stay in breakdown (for pivot table mode)
-      const xNames = panelData.data.queries[0].fields.x.map((f: any) => f.label);
-      const breakdownNames = panelData.data.queries[0].fields.breakdown.map((f: any) => f.label);
-      expect(xNames).toContain("Col1");
-      expect(breakdownNames).toContain("Col2");
+      const fieldOf = (f: any) => f.args[0].value.field;
+      const xNames = panelData.data.queries[0].fields.x.map(fieldOf);
+      const breakdownNames = panelData.data.queries[0].fields.breakdown.map(fieldOf);
+      expect(xNames).toContain("col1");
+      expect(breakdownNames).toContain("col2");
     });
   });
 

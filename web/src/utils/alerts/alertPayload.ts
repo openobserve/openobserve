@@ -308,7 +308,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   ) {
     delete (payload.trigger_condition as any).warning_threshold;
   }
-  if (getSelectedTab.value !== "promql") {
+  // Forecast mode has no warning value: its condition is the horizon in days.
+  if (getSelectedTab.value !== "promql" || (formData as any)._ui?.forecast) {
     delete (payload.query_condition as any).promql_warning_value;
   }
   // Realtime alerts carry no warning family at all (D12) — and the form hides

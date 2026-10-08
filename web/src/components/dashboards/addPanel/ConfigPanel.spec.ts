@@ -35,6 +35,7 @@ vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
 });
 
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -328,6 +329,91 @@ describe("ConfigPanel", () => {
     it("is absent outside PromQL mode", () => {
       wrapper = createWrapper({ dashboardPanelData: promqlPanel("line") }, { promqlMode: false });
       expect(wrapper.find('[data-test="dashboard-config-show-exemplars"]').exists()).toBe(false);
+    });
+  });
+
+  describe("Axis labels mode", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Axis Labels"));
+
+    it("offers Auto, Show and Hide and writes config.axis_label_mode", async () => {
+      const panel = panelOf("bar", { axis_label_mode: "auto" });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(toggleOf()?.props("modelValue")).toBe("auto");
+      expect(toggleOf()?.text()).toContain("AutoShowHide");
+      await toggleOf()?.vm.$emit("update:modelValue", "hide");
+      expect(panel.data.config.axis_label_mode).toBe("hide");
+    });
+
+    it("reads Auto for a panel saved before the mode existed", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(toggleOf()?.props("modelValue")).toBe("auto");
+    });
+
+    it.each(["table", "pie", "metric", "heatmap"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(toggleOf()).toBeUndefined();
+    });
+
+    it("is absent in PromQL mode", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(toggleOf()).toBeUndefined();
+    });
+  });
+
+  describe("Time shift (Comparison against)", () => {
+    const shiftedPanel = (queryType: string) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type: "line",
+        queries: [
+          {
+            query: "rate(x[5m])",
+            fields: { breakdown: [] },
+            config: { query_type: queryType, time_shift: [{ offSet: "1d" }] },
+          },
+        ],
+      },
+    });
+
+    const offsetPickers = () =>
+      wrapper
+        .findAllComponents(CustomDateTimePicker)
+        .filter((picker: any) => picker.props("isFirstEntry") === false);
+
+    it("offers the section for a PromQL range query, without the month unit", () => {
+      wrapper = createWrapper({ dashboardPanelData: shiftedPanel("range") }, { promqlMode: true });
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-time-shift-add-btn"]').exists(),
+      ).toBe(true);
+      expect(offsetPickers()).toHaveLength(1);
+      expect(offsetPickers()[0].props("excludeMonths")).toBe(true);
+    });
+
+    it("hides the section for a PromQL instant query", () => {
+      wrapper = createWrapper(
+        { dashboardPanelData: shiftedPanel("instant") },
+        { promqlMode: true },
+      );
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-time-shift-add-btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("keeps the month unit for SQL", () => {
+      wrapper = createWrapper({ dashboardPanelData: shiftedPanel("range") }, { promqlMode: false });
+      expect(offsetPickers()[0].props("excludeMonths")).toBe(false);
     });
   });
 
