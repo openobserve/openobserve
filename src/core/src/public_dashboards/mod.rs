@@ -708,7 +708,13 @@ pub async fn create(
         access_count: 0,
     };
     pd_table::insert(&model).await?;
-    register_trigger(org, &id, now).await?;
+    if let Err(e) = register_trigger(org, &id, now).await {
+        // A link with no trigger would never build and stay "Preparing", so the insert is undone.
+        if let Err(undo) = pd_table::delete(org, &id).await {
+            log::error!("public dashboard {id} left without a trigger: {undo}");
+        }
+        return Err(e);
+    }
     if let Err(e) = rebuild_one(&model).await {
         log::warn!("public dashboard initial build failed for {id}: {e}");
     }
