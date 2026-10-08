@@ -86,7 +86,6 @@ mod tests {
         START.call_once(|| unsafe {
             env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
-            env::set_var("ZO_EXT_AUTH_SALT", "test-only-ext-auth-salt-0123456789");
             env::set_var("ZO_LOCAL_MODE", "true");
             env::set_var("ZO_MAX_FILE_SIZE_ON_DISK", "1");
             env::set_var("ZO_FILE_PUSH_INTERVAL", "1");

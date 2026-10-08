@@ -81,14 +81,12 @@ Get started in minutes without managing infrastructure. The free tier includes u
 ### 🐳 Docker
 
 ```bash
-export ZO_EXT_AUTH_SALT="$(openssl rand -hex 24)"  # save it: the same value must be used on every restart
 docker run -d \
       --name openobserve \
       -v $PWD/data:/data \
       -p 5080:5080 \
       -e ZO_ROOT_USER_EMAIL="root@example.com" \
       -e ZO_ROOT_USER_PASSWORD="Complexpass#123" \
-      -e ZO_EXT_AUTH_SALT="$ZO_EXT_AUTH_SALT" \
       public.ecr.aws/zinclabs/openobserve:latest
 ```
 

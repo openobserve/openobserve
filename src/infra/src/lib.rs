@@ -59,15 +59,6 @@ pub async fn get_db_schema_version() -> Result<u64, anyhow::Error> {
     Ok(k)
 }
 
-/// Whether a node already booted on this meta store: every boot since 2023 stores the instance id.
-pub async fn db_has_data() -> Result<bool, anyhow::Error> {
-    match db::get_db().await.count("/instance/").await {
-        Ok(rows) => Ok(rows > 0),
-        Err(e) if is_db_schema_version_missing(&e) => Ok(false),
-        Err(e) => Err(e.into()),
-    }
-}
-
 /// Whether the error means the version is genuinely not stored yet (vs the
 /// database being unreachable or overloaded).
 fn is_db_schema_version_missing(e: &errors::Error) -> bool {
