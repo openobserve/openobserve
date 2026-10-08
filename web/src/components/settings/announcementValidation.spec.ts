@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { validateBanner } from "./AnnouncementBannerDialog.validation";
+import { validateBanner } from "./announcementValidation";
 import { emptyDraft, type BannerDraft } from "./announcementDrafts";
 
 /** Messages are wired through i18n in the component; the key is enough here. */
@@ -94,5 +94,27 @@ describe("validateBanner", () => {
 
   it("ignores CTA fields while the CTA is off", () => {
     expect(issuesFor(draft({ message: "m", hasCta: false, ctaUrl: "not-a-url" }))).toEqual([]);
+  });
+
+  it("accepts empty colours and six-digit hexes", () => {
+    expect(issuesFor(draft({ message: "m" }))).toEqual([]);
+    expect(issuesFor(draft({ message: "m", colorLight: "#dbeafe", colorDark: "#1E3A8A" }))).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a colour the server would reject", () => {
+    expect(issuesFor(draft({ message: "m", colorLight: "#FFF" }))).toContain("colorLight");
+    expect(issuesFor(draft({ message: "m", colorDark: "1E3A8A" }))).toContain("colorDark");
+    expect(issuesFor(draft({ message: "m", colorDark: "navy" }))).toContain("colorDark");
+  });
+
+  it("caps the button text at 30 characters", () => {
+    const cta = { hasCta: true, ctaUrl: "https://x.dev" };
+
+    expect(issuesFor(draft({ message: "m", ...cta, ctaText: "x".repeat(30) }))).toEqual([]);
+    expect(issuesFor(draft({ message: "m", ...cta, ctaText: "x".repeat(31) }))).toEqual([
+      "ctaText",
+    ]);
   });
 });

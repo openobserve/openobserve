@@ -143,6 +143,33 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "announcements",
+          children: [
+            {
+              path: "",
+              name: "announcementBanners",
+              component: () => import("@/components/settings/AnnouncementBannerList.vue"),
+              meta: {
+                title: "Announcement Banners",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "edit",
+              name: "announcementBannerEditor",
+              component: () => import("@/components/settings/AnnouncementBannerEditor.vue"),
+              meta: {
+                title: "Announcement Banner",
+              },
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ],
+        },
+        {
           path: "regex_patterns",
           name: "regexPatterns",
           component: () => import("@/components/settings/RegexPatternList.vue"),

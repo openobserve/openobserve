@@ -22,30 +22,34 @@
  * directly than a dependency would.
  */
 
+import { isHexColor } from "@/utils/announcementAppearance";
+
 import { parseDurationMs, type BannerDraft } from "./announcementDrafts";
+
+export const CTA_TEXT_MAX = 30;
 
 /** Field name → message. Empty means the draft is publishable. */
 export type BannerErrors = Partial<Record<keyof BannerDraft, string>>;
 
 export function validateBanner(
   draft: BannerDraft,
-  t: (_key: string) => string,
+  t: (_key: string, _params?: Record<string, unknown>) => string,
 ): BannerErrors {
   const errors: BannerErrors = {};
 
   if (!draft.message.trim()) {
-    errors.message = t("announcements.form.messageRequired");
+    errors.message = t("announcements.editor.messageRequired");
   }
 
   // Only the fields the chosen schedule actually uses are checked — a leftover
   // bad duration from a previous choice must not block a save.
   if (draft.schedule === "duration" && !parseDurationMs(draft.duration ?? "")) {
-    errors.duration = t("announcements.form.durationInvalid");
+    errors.duration = t("announcements.editor.durationInvalid");
   }
 
   if (draft.schedule === "window") {
     if (!draft.startsAt && !draft.endsAt) {
-      errors.startsAt = t("announcements.form.windowRequired");
+      errors.startsAt = t("announcements.editor.windowRequired");
     }
     // The API rejects a backwards window; catching it here saves a round trip.
     if (
@@ -53,18 +57,27 @@ export function validateBanner(
       draft.endsAt &&
       new Date(draft.endsAt).getTime() <= new Date(draft.startsAt).getTime()
     ) {
-      errors.endsAt = t("announcements.form.windowBackwards");
+      errors.endsAt = t("announcements.editor.windowBackwards");
     }
   }
 
   if (draft.hasCta) {
     if (!draft.ctaText?.trim()) {
-      errors.ctaText = t("announcements.form.ctaTextRequired");
+      errors.ctaText = t("announcements.editor.ctaTextRequired");
+    } else if (draft.ctaText.trim().length > CTA_TEXT_MAX) {
+      errors.ctaText = t("announcements.editor.ctaTextTooLong", { max: CTA_TEXT_MAX });
     }
     const url = draft.ctaUrl?.trim() ?? "";
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      errors.ctaUrl = t("announcements.form.ctaUrlInvalid");
+      errors.ctaUrl = t("announcements.editor.ctaUrlInvalid");
     }
+  }
+
+  if (draft.colorLight && !isHexColor(draft.colorLight)) {
+    errors.colorLight = t("announcements.editor.colorInvalid");
+  }
+  if (draft.colorDark && !isHexColor(draft.colorDark)) {
+    errors.colorDark = t("announcements.editor.colorInvalid");
   }
 
   return errors;

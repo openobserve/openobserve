@@ -17,9 +17,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   authoredFromDraft,
-  configFromDrafts,
   draftFromAuthored,
   draftsFromConfig,
+  indexedDraftsFromConfig,
   emptyDraft,
   parseDurationMs,
   toLocalInput,
@@ -70,6 +70,38 @@ describe("draftFromAuthored", () => {
     expect(draft.dismissible).toBe(true);
     expect(draft.hasCta).toBe(false);
     expect(draft.orgs).toEqual([]);
+  });
+
+  it("defaults the appearance to medium text and the variant's colours", () => {
+    const draft = draftFromAuthored({ message: "Heads up" });
+
+    expect(draft.textSize).toBe("medium");
+    expect(draft.colorLight).toBe("");
+    expect(draft.colorDark).toBe("");
+  });
+
+  it("reads text size and colours, uppercasing the hex", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      text_size: "large",
+      colors: { light: "#1d4ed8", dark: "#93C5FD" },
+    });
+
+    expect(draft.textSize).toBe("large");
+    expect(draft.colorLight).toBe("#1D4ED8");
+    expect(draft.colorDark).toBe("#93C5FD");
+  });
+
+  it("falls back to defaults for an unknown size or a colour that is not a hex", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      text_size: "huge",
+      colors: { light: "red", dark: "#FFF" },
+    });
+
+    expect(draft.textSize).toBe("medium");
+    expect(draft.colorLight).toBe("");
+    expect(draft.colorDark).toBe("");
   });
 
   it("reads a duration-only banner as a duration schedule", () => {
@@ -128,6 +160,17 @@ describe("draftsFromConfig", () => {
 
     expect(drafts.map((d) => d.message)).toEqual(["keep"]);
   });
+
+  it("keeps each draft's stored index so an edit replaces the right entry", () => {
+    const entries = indexedDraftsFromConfig({
+      banners: [{ message: "  " }, { message: "second" }, null, { message: "fourth" }],
+    });
+
+    expect(entries.map((entry) => [entry.index, entry.draft.message])).toEqual([
+      [1, "second"],
+      [3, "fourth"],
+    ]);
+  });
 });
 
 describe("authoredFromDraft", () => {
@@ -137,10 +180,36 @@ describe("authoredFromDraft", () => {
     expect(authoredFromDraft(draft)).toEqual({ message: "Just this" });
   });
 
-  it("writes a duration only in duration mode", () => {
-    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "1h" };
+  it("stores a duration as an absolute end so a later save cannot restart it", () => {
+    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "2h" };
+    const now = new Date(2026, 7, 12, 2, 0, 30).getTime();
 
-    expect(authoredFromDraft(draft)).toEqual({ message: "m", duration: "1h" });
+    const authored = authoredFromDraft(draft, now);
+
+    expect(authored).not.toHaveProperty("duration");
+    expect(authored).not.toHaveProperty("starts_at");
+    expect(authored.ends_at).toMatch(/^2026-08-12T04:00:30[+-]\d{2}:\d{2}$/);
+    expect(new Date(authored.ends_at as string).getTime()).toBe(now + 2 * 3_600_000);
+  });
+
+  it("reopens a saved duration as an end-only window", () => {
+    const now = new Date(2026, 7, 12, 2, 0).getTime();
+    const authored = authoredFromDraft(
+      { ...emptyDraft(), message: "m", schedule: "duration", duration: "90m" },
+      now,
+    );
+
+    const draft = draftFromAuthored(authored);
+
+    expect(draft.schedule).toBe("window");
+    expect(draft.startsAt).toBe("");
+    expect(draft.endsAt).toBe("2026-08-12T03:30");
+  });
+
+  it("writes nothing for an unparseable duration", () => {
+    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "x" };
+
+    expect(authoredFromDraft(draft)).toEqual({ message: "m" });
   });
 
   it("writes offset timestamps only in window mode", () => {
@@ -181,6 +250,37 @@ describe("authoredFromDraft", () => {
   });
 });
 
+describe("authoredFromDraft appearance", () => {
+  it("omits a medium text size and empty colours", () => {
+    const authored = authoredFromDraft({ ...emptyDraft(), message: "m" });
+
+    expect(authored).not.toHaveProperty("text_size");
+    expect(authored).not.toHaveProperty("colors");
+  });
+
+  it("writes a non-default size and only the modes that have a colour", () => {
+    const authored = authoredFromDraft({
+      ...emptyDraft(),
+      message: "m",
+      textSize: "small",
+      colorLight: "#dbeafe",
+    });
+
+    expect(authored.text_size).toBe("small");
+    expect(authored.colors).toEqual({ light: "#DBEAFE" });
+  });
+
+  it("drops a colour that is not a hex rather than sending it", () => {
+    const authored = authoredFromDraft({ ...emptyDraft(), message: "m", colorDark: "blue" });
+
+    expect(authored).not.toHaveProperty("colors");
+  });
+});
+
+const roundTrip = (config: unknown) => ({
+  banners: draftsFromConfig(config).map((draft) => authoredFromDraft(draft)),
+});
+
 describe("the form/JSON round trip", () => {
   it("returns the same config it was given", () => {
     const config = {
@@ -188,18 +288,22 @@ describe("the form/JSON round trip", () => {
         { message: "Outage", variant: "critical", dismissible: false },
         { message: "Webinar", variant: "promo", cta: { text: "Join", url: "https://x.dev" } },
         { message: "Scoped", orgs: ["acme"] },
-        { message: "Timed", duration: "1h" },
+        {
+          message: "Styled",
+          text_size: "large",
+          colors: { light: "#1D4ED8", dark: "#93C5FD" },
+        },
+        { message: "Dark only", text_size: "small", colors: { dark: "#14532D" } },
       ],
     };
 
-    expect(configFromDrafts(draftsFromConfig(config))).toEqual(config);
+    expect(roundTrip(config)).toEqual(config);
   });
 
   it("survives a second trip unchanged", () => {
-    // Convergence matters: an author toggling between Form and JSON must not
-    // watch their config drift a little further on every switch.
-    const once = configFromDrafts(draftsFromConfig({ banners: [{ message: "Stable" }] }));
+    // A config must not drift a little further on every save.
+    const once = roundTrip({ banners: [{ message: "Stable" }] });
 
-    expect(configFromDrafts(draftsFromConfig(once))).toEqual(once);
+    expect(roundTrip(once)).toEqual(once);
   });
 });

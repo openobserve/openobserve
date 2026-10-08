@@ -21,6 +21,12 @@
  * author's work when it is wrong — is stated and tested in one place.
  */
 
+import {
+  DEFAULT_TEXT_SIZE,
+  isHexColor,
+  isTextSize,
+  type BannerTextSize,
+} from "@/utils/announcementAppearance";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 
 /**
@@ -48,6 +54,10 @@ export interface BannerDraft {
   ctaUrl: string;
   /** Empty means every organization. */
   orgs: string[];
+  textSize: BannerTextSize;
+  /** Background hex per theme mode; empty means the variant's own fill. */
+  colorLight: string;
+  colorDark: string;
 }
 
 export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
@@ -66,6 +76,9 @@ export function emptyDraft(): BannerDraft {
     ctaText: "",
     ctaUrl: "",
     orgs: [],
+    textSize: DEFAULT_TEXT_SIZE,
+    colorLight: "",
+    colorDark: "",
   };
 }
 
@@ -111,18 +124,8 @@ export function toLocalInput(value?: string | null): string {
   );
 }
 
-/**
- * A `datetime-local` value as RFC 3339 carrying the browser's offset.
- *
- * The offset is what makes this safe to send: the API rejects a naive timestamp
- * rather than guessing a zone, so the picker has to supply one.
- */
-export function toRfc3339(value: string): string {
-  if (!value) return "";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
+/** A date as RFC 3339 in the browser's offset; the API rejects a naive timestamp. */
+export function formatRfc3339(date: Date): string {
   // getTimezoneOffset is minutes *behind* UTC, so the sign is inverted.
   const offsetMinutes = -date.getTimezoneOffset();
   const sign = offsetMinutes < 0 ? "-" : "+";
@@ -130,9 +133,19 @@ export function toRfc3339(value: string): string {
 
   return (
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}:00` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}` +
     `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`
   );
+}
+
+/** A `datetime-local` value as RFC 3339 carrying the browser's offset. */
+export function toRfc3339(value: string): string {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return formatRfc3339(date);
 }
 
 /** One authored banner, as loose as it arrives from the API. */
@@ -146,6 +159,8 @@ interface AuthoredBanner {
   dismissible?: unknown;
   cta?: { text?: unknown; url?: unknown } | null;
   orgs?: unknown;
+  text_size?: unknown;
+  colors?: { light?: unknown; dark?: unknown } | null;
 }
 
 function str(value: unknown): string {
@@ -196,21 +211,43 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
     draft.orgs = banner.orgs.filter((org): org is string => typeof org === "string");
   }
 
+  if (isTextSize(banner.text_size)) draft.textSize = banner.text_size;
+
+  const colors = banner.colors;
+  if (colors && typeof colors === "object") {
+    if (isHexColor(colors.light)) draft.colorLight = colors.light.toUpperCase();
+    if (isHexColor(colors.dark)) draft.colorDark = colors.dark.toUpperCase();
+  }
+
   return draft;
 }
 
-/**
- * Drafts for every banner in a parsed config. Entries without a message are
- * dropped — they cannot be saved anyway, and the API names them by index.
- */
-export function draftsFromConfig(parsed: unknown): BannerDraft[] {
-  const banners = (parsed as { banners?: unknown } | null)?.banners;
-  if (!Array.isArray(banners)) return [];
+/** A stored banner's draft, keyed by its position in the stored list. */
+export interface IndexedDraft {
+  index: number;
+  draft: BannerDraft;
+  /** The stored object as loaded, so a write can detect that someone else changed it. */
+  raw: unknown;
+}
 
-  return banners
-    .filter((banner): banner is AuthoredBanner => typeof banner === "object" && banner !== null)
-    .filter((banner) => str(banner.message).trim())
-    .map(draftFromAuthored);
+/** The stored banner list, as loose as it arrives. */
+export function rawBanners(parsed: unknown): unknown[] {
+  const banners = (parsed as { banners?: unknown } | null)?.banners;
+  return Array.isArray(banners) ? banners : [];
+}
+
+/** Drafts for every usable banner, keeping the stored index so edits address the right entry. */
+export function indexedDraftsFromConfig(parsed: unknown): IndexedDraft[] {
+  return rawBanners(parsed).flatMap((banner, index) =>
+    typeof banner === "object" && banner !== null && str((banner as AuthoredBanner).message).trim()
+      ? [{ index, draft: draftFromAuthored(banner as AuthoredBanner), raw: banner }]
+      : [],
+  );
+}
+
+/** Drafts for every banner in a parsed config; entries without a message are dropped. */
+export function draftsFromConfig(parsed: unknown): BannerDraft[] {
+  return indexedDraftsFromConfig(parsed).map((entry) => entry.draft);
 }
 
 /**
@@ -219,15 +256,18 @@ export function draftsFromConfig(parsed: unknown): BannerDraft[] {
  * Defaults are omitted rather than written out, so the stored config stays the
  * short document a person would have written by hand.
  */
-export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
+export function authoredFromDraft(
+  draft: BannerDraft,
+  nowMs: number = Date.now(),
+): Record<string, unknown> {
   const banner: Record<string, unknown> = { message: draft.message.trim() };
 
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
 
-  if (draft.schedule === "duration" && draft.duration.trim()) {
-    banner.duration = draft.duration.trim();
-  }
+  // Stored as an absolute end, because a stored `duration` re-anchors at "now" on every later PUT.
+  const durationMs = draft.schedule === "duration" ? parseDurationMs(draft.duration) : null;
+  if (durationMs) banner.ends_at = formatRfc3339(new Date(nowMs + durationMs));
   if (draft.schedule === "window") {
     if (draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
     if (draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
@@ -241,9 +281,35 @@ export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
 
   if (draft.orgs.length) banner.orgs = [...draft.orgs];
 
+  if (draft.textSize !== DEFAULT_TEXT_SIZE) banner.text_size = draft.textSize;
+
+  const colors: Record<string, string> = {};
+  if (isHexColor(draft.colorLight)) colors.light = draft.colorLight.toUpperCase();
+  if (isHexColor(draft.colorDark)) colors.dark = draft.colorDark.toUpperCase();
+  if (Object.keys(colors).length) banner.colors = colors;
+
   return banner;
 }
 
-export function configFromDrafts(drafts: BannerDraft[]): { banners: Record<string, unknown>[] } {
-  return { banners: drafts.map(authoredFromDraft) };
+export interface PreviewBanner {
+  message: string;
+  variant: BannerVariantName;
+  dismissible: boolean;
+  cta: { text: string; url: string } | null;
+  text_size: BannerTextSize;
+  colors: { light: string; dark: string };
+}
+
+export function previewFromDraft(draft: BannerDraft): PreviewBanner {
+  return {
+    message: draft.message,
+    variant: draft.variant,
+    dismissible: draft.dismissible,
+    cta:
+      draft.hasCta && draft.ctaText.trim()
+        ? { text: draft.ctaText.trim(), url: draft.ctaUrl.trim() }
+        : null,
+    text_size: draft.textSize,
+    colors: { light: draft.colorLight, dark: draft.colorDark },
+  };
 }

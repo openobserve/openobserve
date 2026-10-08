@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 
 import config from "@/aws-exports";
 import announcements from "@/services/announcements";
+import type { BannerColors, BannerTextSize } from "@/utils/announcementAppearance";
 import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
 
 export type BannerVariant = BannerVariantName;
@@ -29,7 +30,7 @@ export interface BannerCta {
 
 export interface Banner {
   id: string;
-  /** Operator-authored, so it is not translatable — rendered as plain text. */
+  /** Operator-authored, so not translatable; rendered as limited inline markdown. */
   message: string;
   variant: BannerVariant;
   /** Microseconds. Absent means "already showing" / "until removed". */
@@ -37,6 +38,8 @@ export interface Banner {
   ends_at?: number;
   dismissible: boolean;
   cta?: BannerCta;
+  text_size?: BannerTextSize;
+  colors?: BannerColors;
 }
 
 /** Poll cadence. The server reads these from an in-memory cache, so this is cheap. */
