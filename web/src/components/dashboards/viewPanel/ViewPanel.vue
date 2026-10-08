@@ -20,13 +20,9 @@
       <div
         class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
       >
-        <span
-          class="truncate"
-          :title="isMobile ? dashboardPanelData.data.title : undefined"
-          data-test="dashboard-viewpanel-title"
-        >
+        <OTruncatedText data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
-        </span>
+        </OTruncatedText>
         <ExemplarToggle
           v-if="viewExemplarsEligible"
           class="ms-2 shrink-0"
@@ -199,7 +195,6 @@ import {
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -228,6 +223,7 @@ import {
   useExemplarOverride,
 } from "@/composables/dashboard/useExemplarOverride";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -251,6 +247,7 @@ export default defineComponent({
     OButton,
     OTooltip,
     ExemplarToggle,
+    OTruncatedText,
   },
   props: {
     panelId: {
@@ -284,7 +281,6 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18nTyped();
-    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const store = useStore();
 
@@ -833,7 +829,6 @@ export default defineComponent({
     });
 
     return {
-      isMobile,
       t,
       setTimeForVariables,
       dateTimeForVariables,

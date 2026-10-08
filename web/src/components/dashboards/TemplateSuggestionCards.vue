@@ -40,6 +40,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps<{
   activeFolderId: string;
@@ -186,9 +187,9 @@ onMounted(() => {
         @keydown.enter.prevent="onHostMetricsClick"
       >
         <OTag variant="success-soft" icon="monitor-heart" size="sm" />
-        <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
+        <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">
           {{ raw("Host Metrics") }}
-        </span>
+        </OTruncatedText>
         <OTag
           v-if="hostsDetected"
           variant="primary-soft"
@@ -213,9 +214,9 @@ onMounted(() => {
           :icon="getCategoryInfo(dashboard).icon"
           size="sm"
         />
-        <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
+        <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">
           {{ raw(dashboard.displayName) }}
-        </span>
+        </OTruncatedText>
         <OTag
           v-if="cardBadged(dashboard)"
           variant="primary-soft"

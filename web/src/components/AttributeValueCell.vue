@@ -15,7 +15,7 @@
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>
-    <span class="truncate ps-1">{{ value }}</span>
+    <OTruncatedText class="ps-1">{{ value }}</OTruncatedText>
   </div>
 </template>
 
@@ -26,6 +26,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default {
   name: "AttributeValueCell",
@@ -33,6 +34,7 @@ export default {
     OButton,
     ODropdown,
     OIcon,
+    OTruncatedText,
   },
   props: {
     field: {

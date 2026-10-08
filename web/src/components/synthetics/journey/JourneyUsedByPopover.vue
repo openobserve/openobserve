@@ -22,6 +22,7 @@ import { syntheticsEditRoute } from "@/utils/synthetics/routes";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const VISIBLE_ROWS = 5;
 
@@ -86,10 +87,10 @@ function editRoute(reference: { id: string; folder_id: string }) {
             class="rounded-default hover:bg-surface-subtle flex min-w-0 flex-col px-2 py-1"
             :data-test="`synthetics-journey-used-by-row-${reference.id}`"
           >
-            <span class="text-text-body truncate text-sm">{{ reference.name }}</span>
-            <span class="text-text-secondary truncate text-xs">{{
+            <OTruncatedText class="text-text-body text-sm">{{ reference.name }}</OTruncatedText>
+            <OTruncatedText class="text-text-secondary text-xs">{{
               folderName(reference.folder_id)
-            }}</span>
+            }}</OTruncatedText>
           </router-link>
         </li>
       </ul>

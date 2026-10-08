@@ -79,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`edit-role-module-rail-group-${group.id}`"
             @click="toggleGroup(group.id)"
           >
-            <span class="min-w-0 flex-1 truncate">
+            <OTruncatedText class="flex-1">
               {{ group.label }} {{ countLabel(group.modules.length) }}
-            </span>
+            </OTruncatedText>
             <OButton
               variant="ghost"
               size="icon-xs"
@@ -146,6 +146,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export type RailModule = {
   key: string;

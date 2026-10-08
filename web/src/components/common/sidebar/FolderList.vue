@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="mobileDrawerOpen = true"
       >
         <template #icon-left><OIcon name="folder-outline" size="sm" /></template>
-        <span class="max-w-52 truncate">{{ activeFolderName || t("dashboard.folders") }}</span>
+        <OTruncatedText class="max-w-52">{{
+          activeFolderName || t("dashboard.folders")
+        }}</OTruncatedText>
       </OButton>
       <OButton
         variant="ghost"
@@ -106,11 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :favorite="tab.folderId === FAVORITES_FOLDER_ID"
                   :data-test="`dashboard-folder-icon-${tab.name}`"
                 />
-                <span
-                  class="folder-name min-w-0 flex-1 truncate text-left"
-                  :title="tab.name"
+                <OTruncatedText
+                  class="folder-name flex-1 text-left"
                   :data-test="`dashboard-folder-name-${tab.name}`"
-                  >{{ tab.name }}</span
+                  >{{ tab.name }}</OTruncatedText
                 >
                 <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
                  matching the row, and OTab only paints a hover background on
@@ -185,6 +186,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 // @ts-nocheck
 import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -216,6 +218,7 @@ export default defineComponent({
     ODrawer,
     ODropdown,
     ODropdownItem,
+    OTruncatedText,
   },
   props: {
     type: {

@@ -22,12 +22,13 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { defaultDestinationNodeWarningKey } from "@/utils/pipelines/constants";
-import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
+import { buildConditionPreview } from "@/utils/conditionPreview";
 import { formatNodeErrorText } from "@/utils/pipelines/nodeErrors";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 
 // Shapes are derived from the pipeline runtime (`useDnD` reactive store + API
@@ -298,10 +299,6 @@ const deleteNode = (id: string) => {
   openCancelDialog(id);
 };
 
-// Condition preview reuses the shared util (also used by workflow nodes).
-const getTruncatedConditions = (conditionData: unknown) =>
-  getTruncatedConditionsUtil(conditionData);
-
 const confirmDialogMeta = ref({
   show: false,
   // raw("") is only the empty placeholder — the real values are assigned from t().
@@ -424,12 +421,13 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           {{ data.destination_name }}
         </div>
 
-        <div
+        <OTruncatedText
           v-else-if="data.node_type == 'condition'"
-          class="w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
+          as="div"
+          class="w-auto max-w-44 text-left text-sm! leading-[1.4]! font-bold!"
         >
-          {{ getTruncatedConditions(data.condition || data.conditions) }}
-        </div>
+          {{ buildConditionPreview(data.condition || data.conditions) }}
+        </OTruncatedText>
       </template>
 
       <!-- Error badge (function nodes) + delete button, shared across types -->

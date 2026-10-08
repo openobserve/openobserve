@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
                       />
                     </template>
-                    <span class="max-w-56 truncate">{{ view.view_name }}</span>
+                    <OTruncatedText class="max-w-56">{{ view.view_name }}</OTruncatedText>
                     <template #icon-right>
                       <OButton
                         variant="ghost"
@@ -1763,9 +1763,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
+                  <OTruncatedText
+                    as="div"
+                    class="w-full cursor-pointer text-sm"
                     :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                     @click.stop="
                       applySavedView(row);
@@ -1773,7 +1773,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ value }}
-                  </div>
+                  </OTruncatedText>
                 </template>
                 <template #cell-actions="{ row }">
                   <div class="flex items-center gap-0.5">
@@ -1872,9 +1872,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="border-border my-1 border-t" />
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
+                  <OTruncatedText
+                    as="div"
+                    class="w-full cursor-pointer text-sm"
                     :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
                     @click.stop="
                       applySavedView(row);
@@ -1882,7 +1882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ value }}
-                  </div>
+                  </OTruncatedText>
                 </template>
                 <template #cell-actions="{ row }">
                   <div class="flex items-center gap-0.5">
@@ -2065,6 +2065,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -2164,6 +2165,7 @@ export default defineComponent({
     OFormToggleGroup,
     OSpinner,
     OTooltip,
+    OTruncatedText,
     OInput,
     OSearchInput,
     OSelect,

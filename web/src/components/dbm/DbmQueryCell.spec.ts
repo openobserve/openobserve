@@ -34,18 +34,15 @@ describe("DbmQueryCell", () => {
   /**
    * The statement TRUNCATES rather than wrapping: a three-line SQL row would
    * push the numbers beside it out of alignment and destroy the column scan.
-   * The whole statement stays reachable through the title attribute.
    */
-  it("truncates the statement and keeps the full text in the title", () => {
-    const line = mountCell({ titleAttr: "SELECT * FROM orders WHERE id = $1" }).get("span");
+  it("truncates the statement and shows it in a tooltip only when cut", () => {
+    const line = mountCell().get("span");
 
+    expect(line.attributes("data-test")).toBe("o-truncated-text");
     expect(line.classes()).toEqual(
       expect.arrayContaining(["text-text-code", "min-w-0", "truncate", "font-mono", "text-xs"]),
     );
-    // Full statement rides OTooltip's content, not a native title attr.
-    expect(String(line.findComponent(OTooltip).props("content"))).toBe(
-      "SELECT * FROM orders WHERE id = $1",
-    );
+    expect(line.findComponent(OTooltip).props("overflowOnly")).toBe(true);
     expect(line.text()).toBe("SELECT * FROM orders");
   });
 
