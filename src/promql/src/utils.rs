@@ -397,14 +397,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_matchers_regex_uses_anchored_promql_semantics() {
-        use promql_parser::label::Matcher;
-
         let (df, _) = make_string_df();
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::Re(regex::Regex::new("api.*").unwrap()),
-            name: "service".to_string(),
-            value: "api.*".to_string(),
-        }]);
+        let matchers = parsed_matchers(r#"m{service=~"api.*"}"#);
         let batches = apply_matchers(df, &matchers)
             .unwrap()
             .collect()
@@ -419,14 +413,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_matchers_negative_regex() {
-        use promql_parser::label::Matcher;
-
         let (df, _) = make_string_df();
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::NotRe(regex::Regex::new("api.*").unwrap()),
-            name: "service".to_string(),
-            value: "api.*".to_string(),
-        }]);
+        let matchers = parsed_matchers(r#"m{service!~"api.*"}"#);
         let batches = apply_matchers(df, &matchers)
             .unwrap()
             .collect()
@@ -458,8 +446,8 @@ mod tests {
             Matcher::new(MatchOp::Equal, "env", "prod"),
             Matcher::new(MatchOp::Equal, "env", ""),
             Matcher::new(MatchOp::NotEqual, "env", "prod"),
-            Matcher::new(MatchOp::Re(".*".parse().unwrap()), "env", ".*"),
-            Matcher::new(MatchOp::NotRe("prod".parse().unwrap()), "env", "prod"),
+            parsed_matchers(r#"m{env=~".*"}"#).matchers.remove(0),
+            parsed_matchers(r#"m{env!~"prod"}"#).matchers.remove(0),
         ] {
             let rows = apply_matchers(
                 ctx.read_batch(batch.clone()).unwrap(),
@@ -475,14 +463,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_matchers_exact_regex_supports_utf8_view() {
-        use promql_parser::label::Matcher;
-
         let (df, _) = make_string_view_df();
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::Re(regex::Regex::new("api").unwrap()),
-            name: "service".to_string(),
-            value: "api".to_string(),
-        }]);
+        let matchers = parsed_matchers(r#"m{service=~"api"}"#);
         let batches = apply_matchers(df, &matchers)
             .unwrap()
             .collect()
@@ -497,14 +479,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_apply_matchers_prefix_regex_supports_utf8_view() {
-        use promql_parser::label::Matcher;
-
         let (df, _) = make_string_view_df();
-        let matchers = Matchers::new(vec![Matcher {
-            op: MatchOp::Re(regex::Regex::new("api.*").unwrap()),
-            name: "service".to_string(),
-            value: "api.*".to_string(),
-        }]);
+        let matchers = parsed_matchers(r#"m{service=~"api.*"}"#);
         let batches = apply_matchers(df, &matchers)
             .unwrap()
             .collect()
@@ -586,5 +562,14 @@ mod tests {
         assert_eq!(offset_micros(&past), 60_000_000);
         let ahead = Some(Offset::Neg(Duration::from_secs(30)));
         assert_eq!(offset_micros(&ahead), -30_000_000);
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
     }
 }
