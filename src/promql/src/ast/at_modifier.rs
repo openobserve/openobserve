@@ -81,7 +81,7 @@ pub fn resolve_query(
     end: i64,
     step: i64,
 ) -> Result<Option<String>, String> {
-    if !query.contains('@') && !WINDOW_FUNCS.iter().any(|name| query.contains(name)) {
+    if !query.contains('@') && !calls_window_func(query) {
         return Ok(None);
     }
     let mut expr = promql_parser::parser::parse(query)?;
@@ -174,6 +174,15 @@ pub(crate) fn rebase_at(expr: &mut Expr, reference: i64) {
 }
 
 /// Replaces `start()`, `end()`, `range()` and `step()` with the window they read, in seconds.
+/// A window function name followed by `(`; PromQL allows space before the paren.
+fn calls_window_func(query: &str) -> bool {
+    WINDOW_FUNCS.iter().any(|name| {
+        query
+            .match_indices(name)
+            .any(|(at, _)| query[at + name.len()..].trim_start().starts_with('('))
+    })
+}
+
 fn resolve_window_funcs(expr: &mut Expr, start: i64, end: i64, step: i64) -> bool {
     let (start, end) = (to_millis(start), to_millis(end));
     // an instant query has no step, whatever the request carries
@@ -498,6 +507,15 @@ mod tests {
         assert_eq!(
             resolve_query("start @ start() + step()", T, T, 0).unwrap(),
             Some("start @ 1600000000.000 + 0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_query_parses_only_for_a_window_function_call() {
+        assert_eq!(resolve_query("backend_up{", 0, T, 0).unwrap(), None);
+        assert_eq!(
+            resolve_query("a + step ()", T, T, 0).unwrap(),
+            Some("a + 0".to_string())
         );
     }
 }
