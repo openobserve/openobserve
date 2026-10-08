@@ -1449,8 +1449,29 @@ describe("configUtils", () => {
       });
     });
 
-    it("should return false when promqlMode is true", () => {
-      expect(shouldShowTimeShift({ data: { type: "area" } }, true, "dashboards")).toBe(false);
+    it("should return true in promql mode for range queries", () => {
+      expect(
+        shouldShowTimeShift(
+          { data: { type: "area", queries: [{ config: { query_type: "range" } }] } },
+          true,
+          "dashboards",
+        ),
+      ).toBe(true);
+    });
+
+    it("should return false in promql mode when any query is instant", () => {
+      expect(
+        shouldShowTimeShift(
+          {
+            data: {
+              type: "line",
+              queries: [{ config: { query_type: "range" } }, { config: { query_type: "instant" } }],
+            },
+          },
+          true,
+          "dashboards",
+        ),
+      ).toBe(false);
     });
 
     it("should return false when pageKey is logs", () => {

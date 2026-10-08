@@ -313,7 +313,6 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - **Filtering** (`filterMode`: `"client"` | `"server"`, default `"client"`)
   - `globalFilter` (string) `v-model`, `globalFilterPlaceholder` (default `"Search..."`)
   - `showGlobalFilter` (boolean, default `true`) — built-in search bar
-  - `footerTitle` (string) — bold "N footerTitle" count label in the footer
 
 - **Selection** (`selection`: `"none"` | `"single"` | `"multiple"`, default `"none"`)
   - `selectedIds` (string[]) `v-model:selectedIds`
@@ -433,7 +432,49 @@ arrow, the rows re-order, and the order is wrong.
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 
-**Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `bottom` (scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
+**Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
+
+#### Footer
+
+**A footer is never hand-built.** Every paginated `OTable` draws the same bar, the
+same one-row height in every state: the pager ("Showing x – y of z", page size,
+page buttons) on the end edge, and on the start edge the first of these that
+applies — otherwise nothing, not even a wrapper:
+
+1. **Rows selected and `#selection-actions` provided** → "N of M selected", a
+   divider, then the slot. M is `data.length` in client mode and `totalCount` in
+   server mode, with a `+` when `totalCountExact` is false; when N exceeds M the
+   text is "N selected".
+2. **`#footer-note` provided** → the note, in the bar's small secondary text, in
+   the width left of the pager.
+
+Neither renders while the table is loading, and both live in the built-in bar:
+with `pagination="none"` or a `#pagination-bar` there is no bar, so they render
+nothing. There is **no total label** — the `footerTitle` prop and the bare row
+count are gone, and so are `#bottom` and `customPaginationBar`.
+
+- **`#selection-actions`** takes the bulk-action buttons and nothing else: no
+  wrapper, no `v-if` on the selection length, no margin / height / padding
+  classes. Every button is `size="sm"`, a destructive action comes last, and no
+  label carries a count — the bar already prints it, once.
+- **`#footer-note`** is for what the pager cannot say: a cap or truncation,
+  partial data, "filtered x of y", a second figure, a conclusion. A line that only
+  restates the row total is not a note — delete it. Put the `v-if` on the
+  `<template>` so the note exists only in the states where it says more, and give
+  it one root element; a root with `max-md:hidden` leaves no empty row on a phone.
+- **`#pagination-bar`** (scope: `currentPage`, `pageSize`, `totalPages`,
+  `totalRows`, `isFirstPage`, `isLastPage`, `setPageSize`, `firstPage`, `prevPage`,
+  `nextPage`, `lastPage`) replaces the built-in bar with a pager the caller draws,
+  and still renders with `pagination="none"`. Only the dashboard panel table
+  (`TableRenderer.vue`) needs it — a list page never does.
+
+The slot content adds no padding, height or typography: the bar owns all three.
+Below md the count and actions take a full row above the pager and a note takes
+its own row. A leftover `#bottom` fails `npm run type-check:app`; because vue-tsc
+never reads a `// @ts-nocheck` file, `OTable.callSites.spec.ts` also scans every
+SFC for the removed `#bottom`, `footer-title` and `custom-pagination-bar`, and for
+footer slots on a table without the built-in bar (`pagination="none"` or
+`#pagination-bar`).
 
 **Exposed (template ref):** `table` (TanStack instance), `toggleAllRows`, `clearSelection`, `resetColumnSizes`, `resetColumnOrder`, `resetPersistedColumns`, `scrollToTop`, `getRows`
 
@@ -477,7 +518,6 @@ const columns: OTableColumnDef[] = [
     selection="multiple"
     v-model:selected-ids="selectedIds"
     :page-size="50"
-    footer-title="Dashboards"
     @row-click="openRow"
   >
     <template #cell="{ column, row, value }">
@@ -489,6 +529,16 @@ const columns: OTableColumnDef[] = [
           @click.stop="edit(row.original)"
         />
       </template>
+    </template>
+
+    <!-- The footer shows "N of M selected" and these buttons only while rows are selected. -->
+    <template #selection-actions>
+      <OButton variant="outline" size="sm" icon-left="download" @click="exportSelected">
+        {{ t("common.export") }}
+      </OButton>
+      <OButton variant="outline-destructive" size="sm" icon-left="delete" @click="deleteSelected">
+        {{ t("common.delete") }}
+      </OButton>
     </template>
   </OTable>
 </template>

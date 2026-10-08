@@ -154,12 +154,16 @@ export class AlertManagement {
         await this.page.locator(`[data-test="to-be-clone-stream-type-option"][data-test-value="${streamType}"]`).first().click();
         await this.page.waitForTimeout(1000);
 
-        // Stream name is a searchable OSelect: open, type to filter, click the match.
+        // Stream name is a searchable OSelect: open, type to filter, click the
+        // match by data-test-value scoped to the popover's own options — not
+        // page-wide getByText, which also matches the box's own pre-filled
+        // display text once the source alert's stream name is carried over.
         await this.page.locator('[data-test="to-be-clone-stream-name"] [data-test$="-trigger"]').first().click();
+        await this.page.locator('[data-test="to-be-clone-stream-name-popover"]').first().waitFor({ state: 'visible', timeout: 5000 });
         await this.page.waitForTimeout(500);
         await this.page.keyboard.type(streamName, { delay: 30 });
         await this.page.waitForTimeout(1000);
-        await this.page.getByText(streamName, { exact: true }).click();
+        await this.page.locator(`[data-test="to-be-clone-stream-name-option"][data-test-value="${streamName}"]`).first().click();
 
         if (options.folderId) {
             await this.page

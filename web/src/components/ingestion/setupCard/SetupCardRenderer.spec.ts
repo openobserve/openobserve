@@ -25,6 +25,8 @@ import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import type { RichCardContent } from "./types";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
@@ -36,6 +38,7 @@ vi.mock("@/services/stream", () => ({
   default: { nameList: (...a: any[]) => nameListMock(...a) },
 }));
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 const store = createStore({
   state: {
@@ -52,7 +55,7 @@ const router = createRouter({
 const SUBS = { url: "https://o2.example.com", org: "test-org", token: "tok" };
 
 const CONTENT: RichCardContent = {
-  provider: { name: "Demo", tagline: "A demo card.", logo: "", tone: "#000" },
+  provider: { id: "demo", name: "Demo", tagline: "A demo card.", logo: "", tone: "#000" },
   steps: [
     {
       id: "install",
@@ -324,6 +327,28 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
     expect(wrapper.emitted("detected")).toHaveLength(1);
   });
 
+  it("tracks data_source_connected with the provider id, not its label, on connect", async () => {
+    vi.mocked(analytics.track).mockClear();
+    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
+    wrapper = mountCard(hostContent());
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("data_source_connected", {
+      provider: "demo",
+      stream_type: "metrics",
+    });
+  });
+
+  it("does not track data_source_connected when the check finds nothing", async () => {
+    vi.mocked(analytics.track).mockClear();
+    nameListMock.mockResolvedValue({ data: { list: [] } });
+    wrapper = mountCard(hostContent());
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(analytics.track).not.toHaveBeenCalledWith("data_source_connected", expect.anything());
+  });
+
   it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
     nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
@@ -423,5 +448,23 @@ describe("SetupCardRenderer — step-note jump links", () => {
     // ...and the payload survives only as inert escaped text, never an href.
     expect(html).not.toContain('href="javascript:');
     expect(wrapper.find(".step-note").text()).toContain("javascript:alert(1)");
+  });
+});
+
+describe("SetupCardRenderer — product analytics", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("tracks snippet_copied with the current route when a step is copied", () => {
+    wrapper = mountCard();
+
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy");
+
+    expect(analytics.track).toHaveBeenCalledWith("snippet_copied", {
+      route: router.currentRoute.value.name,
+    });
   });
 });

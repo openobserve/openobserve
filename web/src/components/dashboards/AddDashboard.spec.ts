@@ -26,6 +26,9 @@ vi.mock("@/services/dashboards", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 // Mock commons utility
 vi.mock("@/utils/commons", () => ({
   getAllDashboards: vi.fn().mockResolvedValue([]),
@@ -283,6 +286,27 @@ describe("AddDashboard", () => {
 
       expect(dashboardService.create).not.toHaveBeenCalled();
       expect(wrapper.emitted("updated")).toBeFalsy();
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks dashboard_created once the new dashboard is created", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("does not track dashboard_created when creation fails", async () => {
+      vi.mocked(dashboardService.create).mockRejectedValueOnce(new Error("Creation failed"));
+      vi.mocked(analytics.track).mockClear();
+
+      wrapper = createWrapper();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard", description: "" });
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 

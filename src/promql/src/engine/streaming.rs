@@ -15,7 +15,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::value::*;
+use config::meta::promql::{is_stale_marker, value::*};
 use datafusion::error::{DataFusionError, Result};
 use futures::future::pending;
 use infra::errors::ErrorCodes;
@@ -77,19 +77,25 @@ struct InstantSelectorFunc {
 impl functions::RangeFunc for InstantSelectorFunc {
     fn name(&self) -> &'static str {
         if self.output.keep_metric_name() {
-            functions::KEEP_METRIC_NAME_FUNC
+            "last_over_time"
         } else {
             "timestamp"
         }
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        let sample = samples.last()?;
+        let sample = samples
+            .last()
+            .filter(|sample| !is_stale_marker(sample.value))?;
         // Streaming windows shift sample times by the offset; projection needs the stored time.
         Some(
             self.output
                 .project(&Sample::new(sample.timestamp - self.offset, sample.value)),
         )
+    }
+
+    fn reads_stale_markers(&self) -> bool {
+        true
     }
 }
 
@@ -372,7 +378,7 @@ mod tests {
     use config::{
         TIMESTAMP_COL_NAME,
         meta::{
-            promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+            promql::{HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL, is_stale_marker},
             search::ScanStats,
         },
     };
@@ -451,7 +457,7 @@ mod tests {
         Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
-            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
             Field::new("instance", DataType::Utf8, true),
             Field::new(NAME_LABEL, DataType::Utf8, true),
         ]))
@@ -482,7 +488,11 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
                 Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
-                Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
+                // a stale marker is stored as a NULL value
+                Arc::new(Float64Array::from_iter(
+                    rows.iter()
+                        .map(|row| (!is_stale_marker(row.2)).then_some(row.2)),
+                )),
                 Arc::new(StringArray::from_iter_values(
                     rows.iter().map(|row| if row.1 == 7 { "a" } else { "b" }),
                 )),
@@ -830,6 +840,11 @@ mod tests {
             "topk by(instance) (1, m)",
             "bottomk by(nope) (1, m)",
             "topk(5, m)",
+            "limitk(1, rate(m[1m]))",
+            "limitk by(instance) (1, m)",
+            "limitk(1, m offset 30s)",
+            "limit_ratio(0.5, rate(m[1m]))",
+            "limit_ratio(-0.5, m)",
         ] {
             let expected = generic_topk(provider(false, false), query).await;
             let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
@@ -928,6 +943,8 @@ mod tests {
             "increase(m[1m] offset 30s)",
             "last_over_time(m[40s])",
             "count_over_time(m{instance=\"a\"}[1m])",
+            "first_over_time(m[1m] offset 30s)",
+            "mad_over_time(m[1m])",
         ] {
             let expected = generic_range_func(provider(false, false), query).await;
             let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
@@ -1221,6 +1238,119 @@ mod tests {
                     );
                     assert_eq!(samples, expected, "{query}, streams {streams}");
                 }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ts_of_over_time_is_the_stored_sample_time() {
+        let cases = [
+            ("ts_of_last_over_time(m[1m])", [1063.7, 1108.7, 1153.7], 2),
+            (
+                "ts_of_last_over_time(m[1m] offset 30s)",
+                [1033.7, 1078.7, 1123.7],
+                2,
+            ),
+            (
+                "ts_of_first_over_time(m[1m] offset 30s)",
+                [1003.7, 1033.7, 1078.7],
+                2,
+            ),
+            (
+                "ts_of_max_over_time(m[1m] offset -10s)",
+                [1078.7, 1123.7, 1168.7],
+                2,
+            ),
+            (
+                "ts_of_min_over_time((m[1m] offset 30s))",
+                [1003.7, 1033.7, 1078.7],
+                2,
+            ),
+            (
+                "max(ts_of_last_over_time(m[1m] offset 30s))",
+                [1033.7, 1078.7, 1123.7],
+                1,
+            ),
+            (
+                "ts_of_last_over_time(m[1m:15s] offset 30s)",
+                [1035.0, 1080.0, 1125.0],
+                2,
+            ),
+        ];
+        let (start, step) = (BASE + 70 * SECOND, 45 * SECOND);
+        for (query, values, count) in cases {
+            let steps = [70, 115, 160].map(|second| BASE + second * SECOND);
+            let expected: Vec<(i64, f64)> = steps.into_iter().zip(values).collect();
+            for streams in [true, false] {
+                let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
+                let expr = promql_parser::parser::parse(query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = canonical(value);
+                assert_eq!(series.len(), count, "{query}, streams {streams}");
+                for (_, samples) in series {
+                    assert_eq!(samples, expected, "{query}, streams {streams}");
+                }
+            }
+        }
+        // left-open window: `[11s300ms]` at 1180 s just misses the sample at 1168.7 s
+        for (range, expected) in [("11s400ms", Some(1168.7)), ("11s300ms", None)] {
+            for streams in [true, false] {
+                let instant = BASE + 180 * SECOND;
+                let mut engine = engine_at(provider_off_the_second(streams), 30, instant, 0, None);
+                let query = format!("ts_of_first_over_time(m[{range}])");
+                let expr = promql_parser::parser::parse(&query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let first = match value {
+                    Value::None => None,
+                    value => canonical(value).first().map(|(_, samples)| samples[0].1),
+                };
+                assert_eq!(first, expected, "{query}, streams {streams}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_first_and_mad_over_time_values_and_names() {
+        let cases = [
+            ("first_over_time(m[1m])", [3.0, 12.0, 21.0], 2, true),
+            ("max(first_over_time(m[1m]))", [3.0, 12.0, 21.0], 1, false),
+            // 3, 6, 9 and 12 in every window: median 7.5, deviations 4.5, 1.5, 1.5, 4.5
+            ("mad_over_time(m[1m])", [3.0, 3.0, 3.0], 2, false),
+            ("max(mad_over_time(m[1m]))", [3.0, 3.0, 3.0], 1, false),
+        ];
+        let (start, step) = (BASE + 70 * SECOND, 45 * SECOND);
+        for (query, values, count, named) in cases {
+            let steps = [70, 115, 160].map(|second| BASE + second * SECOND);
+            let expected: Vec<(i64, f64)> = steps.into_iter().zip(values).collect();
+            for streams in [true, false] {
+                let mut engine = engine_at(provider_off_the_second(streams), 30, start, step, None);
+                let expr = promql_parser::parser::parse(query).unwrap();
+                let (value, _) = engine.exec(&expr).await.unwrap();
+                let series = canonical(value);
+                assert_eq!(series.len(), count, "{query}, streams {streams}");
+                for (labels, samples) in series {
+                    let has_name = labels.iter().any(|(name, _)| name == NAME_LABEL);
+                    assert_eq!(has_name, named, "{query}, streams {streams}: {labels:?}");
+                    assert_eq!(samples, expected, "{query}, streams {streams}");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ts_of_over_time_under_at_is_the_stored_sample_time() {
+        for (query, expected) in [
+            ("ts_of_last_over_time(m[1m] @ 1100)", 1100.0),
+            ("ts_of_first_over_time(m[1m] @ 1100)", 1060.0),
+            ("ts_of_last_over_time(m[1m] @ 1100 offset 20s)", 1080.0),
+            ("ts_of_max_over_time(m[1m] @ 1110 offset 20s)", 1080.0),
+        ] {
+            for streams in [true, false] {
+                assert_eq!(
+                    pinned_values(streams, query).await,
+                    on_every_step(expected),
+                    "{query}, streams {streams}"
+                );
             }
         }
     }
@@ -1526,6 +1656,170 @@ mod tests {
                 .expect_err(query)
                 .to_string();
             assert!(err.contains(expected), "{query}: {err}");
+        }
+    }
+
+    /// `a` samples every 20 s to 100 s, then with `marker` goes stale at 120 s; `b` never ends.
+    fn stale_provider(streams: bool, marker: bool) -> StreamingProvider {
+        let mut rows: Vec<(i64, u64, f64)> = (0..=5)
+            .map(|step| (BASE + step * 20 * SECOND, 7, (step * 3) as f64))
+            .collect();
+        if marker {
+            rows.push((BASE + 120 * SECOND, 7, f64::from_bits(STALE_NAN_BITS)));
+        }
+        rows.extend(
+            (0..10).map(|step| (BASE + step * 20 * SECOND, u64::MAX / 2, (step * 3) as f64)),
+        );
+        provider_rows(streams, false, &rows)
+    }
+
+    fn series_samples(value: Value, instance: &str) -> Vec<(i64, f64)> {
+        canonical(value)
+            .into_iter()
+            .find(|(labels, _)| labels.contains(&("instance".to_string(), instance.to_string())))
+            .map(|(_, samples)| samples)
+            .unwrap_or_default()
+    }
+
+    #[tokio::test]
+    async fn test_stale_marker_ends_the_series_at_once() {
+        let at = |seconds: i64| BASE + seconds * SECOND;
+        for streams in [true, false] {
+            let context = format!("streams: {streams}");
+            let ended = eval_query(stale_provider(streams, true), 30, "m")
+                .await
+                .unwrap();
+            assert_eq!(
+                series_samples(ended.clone(), "a"),
+                vec![(at(60), 9.0)],
+                "{context}"
+            );
+            assert_eq!(series_samples(ended, "b").len(), 3, "{context}");
+            let held = eval_query(stale_provider(streams, false), 30, "m")
+                .await
+                .unwrap();
+            assert_eq!(series_samples(held, "a").len(), 3, "{context}");
+
+            let count = eval_query(stale_provider(streams, true), 30, "count(m)")
+                .await
+                .unwrap();
+            assert_eq!(
+                canonical(count)[0].1,
+                vec![(at(60), 2.0), (at(120), 1.0), (at(180), 1.0)],
+                "{context}"
+            );
+            let timestamps = eval_query(stale_provider(streams, true), 30, "timestamp(m)")
+                .await
+                .unwrap();
+            let timestamps: Vec<_> = canonical(timestamps)
+                .into_iter()
+                .map(|(_, samples)| samples.len())
+                .collect();
+            assert_eq!(timestamps, vec![1, 3], "{context}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_functions_ignore_stale_markers() {
+        let queries = [
+            "rate(m[2m])",
+            "increase(m[2m])",
+            "rate(m[1m])",
+            "last_over_time(m[10m])",
+            "count_over_time(m[10m])",
+            "sum(rate(m[2m]))",
+            "sum(count_over_time(m[10m]))",
+        ];
+        for streams in [true, false] {
+            for query in queries {
+                let context = format!("{query} (streams: {streams})");
+                let marked = eval_query(stale_provider(streams, true), 30, query)
+                    .await
+                    .unwrap();
+                let unmarked = eval_query(stale_provider(streams, false), 30, query)
+                    .await
+                    .unwrap();
+                assert_same_matrix(unmarked, marked, &context);
+            }
+            let last = eval_query(stale_provider(streams, true), 30, "last_over_time(m[10m])")
+                .await
+                .unwrap();
+            assert_eq!(
+                series_samples(last, "a").last(),
+                Some(&(BASE + 180 * SECOND, 15.0))
+            );
+            let count = eval_query(stale_provider(streams, true), 30, "count_over_time(m[10m])")
+                .await
+                .unwrap();
+            assert_eq!(
+                series_samples(count, "a").last(),
+                Some(&(BASE + 180 * SECOND, 6.0))
+            );
+        }
+    }
+
+    /// The values an instant query answers at `BASE + seconds`, all series together.
+    async fn instant_values(provider: StreamingProvider, query: &str, seconds: i64) -> Vec<f64> {
+        enable_streaming();
+        let at = BASE + seconds * SECOND;
+        let eval_ctx = EvalContext::new(at, at, 0, "test_trace".into());
+        let mut ctx = PromqlContext::new(
+            create_test_query_ctx("test_trace", "test_org", 30),
+            provider,
+            vec![],
+        );
+        ctx.start = at;
+        ctx.end = at;
+        let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
+        let expr = promql_parser::parser::parse(query).unwrap();
+        match engine.exec(&expr).await.unwrap().0 {
+            Value::None => vec![],
+            value => canonical(value)
+                .into_iter()
+                .flat_map(|(_, samples)| samples.into_iter().map(|(_, value)| value))
+                .collect(),
+        }
+    }
+
+    /// Ported from Prometheus `promqltest/testdata/staleness.test`, with 3.x left-open windows.
+    #[tokio::test]
+    async fn test_upstream_staleness_cases() {
+        let stale = f64::from_bits(STALE_NAN_BITS);
+        // load 10s: metric 0 1 stale 2
+        let marked = [(0, 0.0), (10, 1.0), (20, stale), (30, 2.0)];
+        let marked: Vec<_> = marked
+            .iter()
+            .map(|&(s, v)| (BASE + s * SECOND, 7, v))
+            .collect();
+        // load 10s: metric 0
+        let single = [(BASE, 7, 0.0)];
+        type Case<'a> = (&'a [(i64, u64, f64)], &'a str, i64, &'a [f64]);
+        let cases: [Case; 15] = [
+            (&marked, "m", 10, &[1.0]),
+            (&marked, "m", 20, &[]),
+            (&marked, "m", 30, &[2.0]),
+            (&marked, "m", 40, &[2.0]),
+            (&marked, "m", 329, &[2.0]),
+            (&marked, "m", 330, &[]),
+            (&marked, "count_over_time(m[1m])", 30, &[3.0]),
+            (&marked, "count_over_time(m[1s])", 10, &[1.0]),
+            (&marked, "count_over_time(m[10s])", 10, &[1.0]),
+            (&marked, "count_over_time(m[1s])", 20, &[]),
+            (&marked, "count_over_time(m[10s])", 20, &[]),
+            (&single, "m", 0, &[0.0]),
+            (&single, "m", 150, &[0.0]),
+            (&single, "m", 299, &[0.0]),
+            (&single, "m", 300, &[]),
+        ];
+        for streams in [true, false] {
+            for (rows, query, seconds, expected) in cases {
+                let provider = provider_rows(streams, false, rows);
+                assert_eq!(
+                    instant_values(provider, query, seconds).await,
+                    expected,
+                    "{query} at {seconds}s (streams: {streams})"
+                );
+            }
         }
     }
 }

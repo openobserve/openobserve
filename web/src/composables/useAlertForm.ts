@@ -26,7 +26,7 @@ import {
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, debounce } from "lodash-es";
+import { cloneDeep, debounce, set } from "lodash-es";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
@@ -37,7 +37,7 @@ import {
 } from "@/services/anomaly_detection.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
 import useStreams from "@/composables/useStreams";
@@ -95,7 +95,12 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import type { AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import {
+  forecastModeFields,
+  parseForecastAlertPromql,
+  type ForecastAlert,
+} from "@/utils/alerts/forecastAlert";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -107,8 +112,10 @@ import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import {
+  anomalyBandWidthPrefill,
   anomalyBudgetPerDay,
   anomalyIntervalSeconds,
+  anomalyWindowShareErrors,
   type AnomalyIntervalUnit,
   type AnomalyStoredIntervals,
 } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
@@ -268,6 +275,39 @@ export const anomalyIntervalPayload = (
   return { histogram_interval, schedule_interval, detection_window_seconds };
 };
 
+const numberOrNull = (v: unknown): number | null =>
+  v === "" || v === null || v === undefined ? null : Number(v);
+
+/** Band width and delivery-policy fields; a blank input goes out as null, which the server reads as its default. */
+export const anomalyBandPayload = (
+  c: {
+    band_width?: unknown;
+    alert_direction?: string | null;
+    alert_window_buckets?: unknown;
+    alert_window_fire_pct?: unknown;
+    alert_window_recover_pct?: unknown;
+  },
+  budgetMode: boolean,
+) => ({
+  // The server rejects a band width beside a budget: the override would leave the budget controller inert.
+  band_width: budgetMode ? null : numberOrNull(c.band_width),
+  alert_direction: c.alert_direction ?? "both",
+  alert_window_buckets: numberOrNull(c.alert_window_buckets),
+  alert_window_fire_pct: numberOrNull(c.alert_window_fire_pct),
+  alert_window_recover_pct: numberOrNull(c.alert_window_recover_pct),
+});
+
+/**
+ * Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+ * Band/percentile mode must send an explicit null (not omit the field): the update endpoint's
+ * `alert_budget_per_day` is a double-Option, so an absent field means "leave as-is" and a
+ * previously stored budget would never clear.
+ */
+export const anomalySensitivityPayload = (budgetPerDay: number | null, threshold: unknown) =>
+  budgetPerDay !== null
+    ? { alert_budget_per_day: budgetPerDay }
+    : { threshold, alert_budget_per_day: null };
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -285,11 +325,18 @@ export const defaultAnomalyConfig = () => ({
   // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
   detection_window_value: 3,
   detection_window_unit: "h" as AnomalyIntervalUnit,
-  training_window_days: 14,
+  training_window_days: 28,
   retrain_interval_days: 7,
   threshold: 97,
   // Set only when the backend stored a budget; undefined/null = percentile mode.
   alert_budget_per_day: undefined as number | undefined,
+  // Null is Auto: the trained k decides. A number overrides it live.
+  band_width: null as number | string | null,
+  alert_direction: "both" as "both" | "above" | "below",
+  alert_window_buckets: 1 as number | string | null,
+  alert_window_fire_pct: 100 as number | string | null,
+  // Null means recover at the fire share.
+  alert_window_recover_pct: null as number | string | null,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -298,7 +345,7 @@ export const defaultAnomalyConfig = () => ({
   enabled: true,
   last_error: undefined as string | undefined,
   // Set only by the config API (§4.8); the UI keys the health badge on it, never on error-string prefixes.
-  notice_class: null as "window_floor" | "window_skip" | "hybrid_fallback" | "retrain" | null,
+  notice_class: null as "window_floor" | "window_skip" | "retrain" | null,
   last_detection_run: undefined as number | undefined,
   next_run_at: undefined as number | undefined,
   // Feature 2: anomaly configs carry the same triage metadata as alerts.
@@ -306,6 +353,30 @@ export const defaultAnomalyConfig = () => ({
   priority: null as number | null,
   tags: [] as string[],
 });
+
+/** A saved alert's forecast fields, when its PromQL is a generated forecast query. */
+export const formForecastOf = (alert: any): ForecastAlert | null =>
+  alert?.query_condition?.type === "promql"
+    ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
+    : null;
+
+/** Seeds a form value from a PromQL prefill; a generated forecast query opens Forecast mode. */
+export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
+  data.query_condition.type = "promql";
+  data.query_condition.promql = prefill.promql ?? "";
+  if (prefill.promqlCondition) {
+    data.query_condition.promql_condition = { ...prefill.promqlCondition };
+  }
+  if (prefill.promqlMultiAlert !== undefined) {
+    data.query_condition.promql_multi_alert = prefill.promqlMultiAlert;
+  }
+  const forecast = formForecastOf(data);
+  data._ui = { ...data._ui, forecast };
+  if (forecast) {
+    Object.entries(forecastModeFields(forecast)).forEach(([path, value]) => set(data, path, value));
+  }
+  return data;
+};
 
 // ─── Composable ─────────────────────────────────────────────────────────────
 
@@ -425,6 +496,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
+        forecast: formForecastOf(obj),
       },
       _meta:
         obj?._meta ??
@@ -583,18 +655,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...filterLines.map((l: string, i: number) => (i === 0 ? l.replace(/^\s+AND /, "  ") : l)),
         ].join("\n")
       : "";
-    const autoSeasonality = c.training_window_days >= 7 ? "week" : "day";
-    const seasonalSelect =
-      autoSeasonality === "week"
-        ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
-        : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
-    const seasonalGroup = autoSeasonality === "week" ? ", hour, dow" : ", hour";
     return [
       `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
-      `       ${fn} AS value${seasonalSelect}`,
+      `       ${fn} AS value`,
       `FROM ${stream}`,
       where,
-      `GROUP BY time_bucket${seasonalGroup}`,
+      `GROUP BY time_bucket`,
       `ORDER BY time_bucket`,
     ]
       .filter(Boolean)
@@ -1736,11 +1802,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
 
       if (prefill.queryType === "promql") {
-        data.query_condition.type = "promql";
-        data.query_condition.promql = prefill.promql ?? "";
-        if (prefill.promqlCondition) {
-          data.query_condition.promql_condition = { ...prefill.promqlCondition };
-        }
+        applyPromqlPrefill(data, prefill);
       } else if (prefill.queryType === "custom" && prefill.conditions) {
         data.query_condition.type = "custom";
         data.query_condition.conditions = cloneDeep(prefill.conditions);
@@ -1926,6 +1988,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     }
 
+    if (Object.values(anomalyWindowShareErrors(anomalyConfig.value)).some((e) => e !== null)) {
+      activeTab.value = "anomaly-alerting";
+      toast({
+        variant: "error",
+        message: t("alerts.messages.fixHighlightedFields"),
+      });
+      return;
+    }
+
     if (
       anomalyConfig.value.alert_enabled &&
       anomalyConfig.value.alert_destination_ids.length === 0
@@ -2010,10 +2081,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
-          ...(budgetPerDay !== null
-            ? { alert_budget_per_day: budgetPerDay }
-            : { threshold: c.threshold }),
+          ...anomalySensitivityPayload(budgetPerDay, c.threshold),
+          ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
         },
       };
@@ -2321,7 +2390,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         button: "Update Alert",
         page: "Alerts",
       });
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Alert",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -2359,7 +2428,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         button: "Create Alert",
         page: "Alerts",
       });
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Save Alert",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -2949,6 +3018,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
+          band_width: anomalyBandWidthPrefill(data),
           filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,

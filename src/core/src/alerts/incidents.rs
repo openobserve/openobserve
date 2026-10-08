@@ -2133,7 +2133,7 @@ pub async fn enrich_with_topology(
 
 /// Whether the service graph knows the `from -> to` dependency around `at`.
 async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
-    if crate::traces::service_graph::use_v4_source(org_id).await {
+    if crate::traces::service_graph::use_v4_source(org_id, None).await {
         dependency_edge_type_v4(org_id, from, to, at).await
     } else {
         dependency_edge_type_v1(org_id, from, to).await
@@ -2381,7 +2381,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     let cfg = get_config();
     let will_run = cfg.incidents.enabled
         && cfg.incidents.rca_enabled
-        && !cfg.ai.agent_url.is_empty()
+        && cfg.ai.has_agent_target()
         && !rca_service::l0_off_for_incident(org_id, incident_id).await;
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
@@ -2431,7 +2431,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(()); // Not an error - just not configured
     }
 
-    if config.ai.agent_url.is_empty() {
+    if !config.ai.has_agent_target() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
         // §6: no verdict is coming, so nothing may go on holding a page for
         // one. Every guard below reaches this same state.

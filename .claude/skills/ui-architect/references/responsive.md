@@ -199,8 +199,12 @@ The recipe every list toolbar follows:
   item is conditional, `v-if` the whole `ODropdown` on "any item applies" so a row never
   opens an empty menu. Hover-only buttons with no click action (a preview tooltip) have
   no menu counterpart.
-- **Footer on one row**: the plain "N items" count is `max-md:hidden` — the pager's
-  "x – y of z" already says it. Bulk-action buttons stay.
+- **The footer is `OTable`'s own, never hand-built**: there is no "N items" total
+  label at any width — the pager's "x – y of z" already says it. Bulk actions go
+  in `#selection-actions` and a note in `#footer-note`; below md the selected
+  count and the actions take a full row above the pager, and a note takes its own
+  row. Give a note that should not show on a phone a `max-md:hidden` root and it
+  leaves no empty row.
 
 ## Stat strips and KPI cards: one row
 

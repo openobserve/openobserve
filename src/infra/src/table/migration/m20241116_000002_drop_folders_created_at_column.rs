@@ -37,6 +37,10 @@ impl MigrationTrait for Migration {
 
 // Removes the old created_at column.
 async fn drop_created_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    // gone on a re-run, and the KSUID rebuild recreates folders without it
+    if !manager.has_column("folders", "created_at").await? {
+        return Ok(());
+    }
     manager
         .alter_table(
             Table::alter()
@@ -57,9 +61,11 @@ enum Folders {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::Database;
     use sea_orm_migration::MigrationName;
 
     use super::*;
+    use crate::table::migration::m20241114_000001_create_folders_table as create_folders;
 
     #[test]
     fn test_migration_name() {
@@ -67,5 +73,28 @@ mod tests {
             Migration.name(),
             "m20241116_000002_drop_folders_created_at_column"
         );
+    }
+
+    #[tokio::test]
+    async fn test_up_drops_created_at() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        create_folders::Migration.up(&manager).await.unwrap();
+        assert!(manager.has_column("folders", "created_at").await.unwrap());
+        Migration.up(&manager).await.unwrap();
+        assert!(!manager.has_column("folders", "created_at").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_up_reruns_once_created_at_is_gone() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        create_folders::Migration.up(&manager).await.unwrap();
+        Migration.up(&manager).await.unwrap();
+        Migration
+            .up(&manager)
+            .await
+            .expect("re-running must not fail on the dropped column");
+        assert!(!manager.has_column("folders", "created_at").await.unwrap());
     }
 }

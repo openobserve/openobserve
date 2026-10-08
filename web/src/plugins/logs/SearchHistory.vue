@@ -262,13 +262,8 @@
           </div>
         </template>
 
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-              {{ resultTotal }} {{ t("search_history.results") }}
-            </div>
-            <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
-          </div>
+        <template v-if="dataToBeLoaded.length > 0" #footer-note>
+          <span>{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></span>
         </template>
       </OTable>
     </div>
@@ -420,8 +415,6 @@ export default defineComponent({
 
     onUnmounted(() => {});
 
-    const resultTotal = ref<number>(0);
-
     const pageSize = ref(100);
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
@@ -500,9 +493,6 @@ export default defineComponent({
         );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
-        if (filteredHits.length > 0) {
-          resultTotal.value = filteredHits.length;
-        }
         columnsToBeRendered.value = generateColumns();
         filteredHits.forEach((hit: any) => {
           //adding uuid to each which will be used to track the expanded "row"
@@ -781,7 +771,6 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       pageSize,
       pageSizeOptions,
       activeTab,

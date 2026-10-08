@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
+import analytics from "@/services/product_analytics";
 
 const mocks = vi.hoisted(() => ({
   loadAlertFile: vi.fn(),
@@ -94,6 +95,7 @@ vi.mock("@/composables/usePrebuiltDestinations", async () => {
 });
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mocks.toast }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import LibraryInstallDialog from "./LibraryInstallDialog.vue";
 
@@ -298,6 +300,7 @@ describe("LibraryInstallDialog", () => {
     // IntersectionObserver#takeRecords as module-scope mocks, and a global reset
     // strips their implementations for the rest of the file.
     Object.values(mocks).forEach((mock) => mock.mockReset());
+    vi.mocked(analytics.track).mockClear();
     mocks.listDestinations.mockResolvedValue({
       data: [{ name: "ops-slack" }, { name: "oncall-pagerduty" }],
     });
@@ -917,6 +920,30 @@ describe("LibraryInstallDialog", () => {
       expect(installed?.[0]?.[0]).toEqual({
         entryIds: ["k8s/pod-oom-killed", "k8s/cert-expiring"],
       });
+    });
+
+    it("tracks library_alert_installed with the number this run installed", async () => {
+      mocks.createAlert
+        .mockResolvedValueOnce({ data: {} })
+        .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
+        .mockResolvedValueOnce({ data: {} });
+
+      const wrapper = await mountDialog();
+      await advanceAllToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("library_alert_installed", { count: 2 });
+    });
+
+    it("does not track library_alert_installed when every install fails", async () => {
+      mocks.createAlert.mockRejectedValue({ response: { data: { message: "boom" } } });
+
+      const wrapper = await mountDialog();
+      await advanceAllToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
 
     it("reports a clean batch and offers nothing to retry", async () => {

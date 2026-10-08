@@ -119,7 +119,7 @@ vi.mock("@/services/anomaly_detection", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 
 const stubs = {
@@ -839,9 +839,13 @@ describe("AddAlert (OForm owner)", () => {
       expect(payload.stream_name).toBe("_rundata");
       expect(payload.anomaly_config).toBeTruthy();
       expect(payload.anomaly_config.query_mode).toBe("filters");
-      // Percentile mode: threshold on the wire, and never the budget key.
+      // Percentile mode: threshold on the wire, and the budget sent as an explicit
+      // null rather than omitted. The update endpoint's `alert_budget_per_day` is a
+      // double-Option, so an absent key means "leave as-is" and a stored budget
+      // could never clear; create reads the same null as None, so one payload
+      // shape serves both.
       expect(payload.anomaly_config.threshold).toBe(97);
-      expect(payload.anomaly_config).not.toHaveProperty("alert_budget_per_day");
+      expect(payload.anomaly_config.alert_budget_per_day).toBeNull();
     });
 
     it("budget mode sends alert_budget_per_day and omits threshold — the API rejects both", async () => {

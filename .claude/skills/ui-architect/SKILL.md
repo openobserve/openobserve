@@ -541,7 +541,14 @@ read it once, it is the backbone of everything below.
      the top.
    - **Tables keep every column** and scroll within the frame (OTable does it);
      inline row actions get `max-md:hidden` plus one `md:hidden` kebab mirroring them
-     with `<data-test>-menu` items; the footer count is `max-md:hidden`.
+     with `<data-test>-menu` items.
+   - **The table footer is never hand-built.** `OTable` draws the one bar every
+     list shares: the pager on the end edge and, on the start edge, nothing —
+     unless rows are selected (the "N of M selected" count plus the page's bulk
+     actions from `#selection-actions`) or the page has something the pager cannot
+     say (`#footer-note`). There is no total label; the pager's "x – y of z" is the
+     count. Below md the count and actions take a row above the pager and a note
+     takes its own row; a note whose root is `max-md:hidden` leaves no row.
    - **Nothing clipped, nothing hover-only.** Popups use library components and
      `min(<w>, calc(100vw - 1.5rem))` widths; an `h-full` pane beside a stacked
      sibling gets `max-md:h-auto max-md:min-h-0`; hover-revealed controls get
@@ -561,7 +568,7 @@ and each domain has its own reference below.
 | --- | --- | --- |
 | **Server data (fetch & cache)** | Every read is a declared `queryOptions()` in `services/<domain>.queries.ts` (reuse the existing one if the list is already declared), keyed with `orgKey`, on its **module's** `staleTime` tier from `cachePolicy.ts`; components `useQuery` it (rows as a `computed`) — never `http`/axios, never a Vuex copy of a server list. Writes are `mutationOptions()` with `meta.invalidates`. A user refresh forces **every** read on the view; mount, paging and search read the cache. | [data-fetching](references/data-fetching.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
-| **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
+| **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY in two cases: chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit (convert once the schema renderer forwards clicks), or a chart needing a fixed grid that keeps empty rows/columns, or box-selection mapping from category indices back to values, which the dashboard converters cannot express (e.g. `TracesLatencyHeatmap.vue`). Annotate the site with a one-line why. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
@@ -675,8 +682,10 @@ considering the UI done:
 - [ ] **Every data chart goes through `PanelSchemaRenderer`** (panel schema) — no
       `echarts.init` / `<v-chart>` / ApexCharts / D3 / hand-rolled `<canvas>`/`<svg>`
       plot in a feature page. Low-level `panels/ChartRenderer.vue` only as the
-      annotated escape hatch for chart-click forwarding. Sparklines/progress/data
-      bars stay `OSparkline`/`OProgressBar`/`ODataBarCell` (not charts).
+      annotated escape hatch for chart-click forwarding, or for a fixed grid / box
+      mapping the converters can't express (`TracesLatencyHeatmap.vue`).
+      Sparklines/progress/data bars stay `OSparkline`/`OProgressBar`/`ODataBarCell`
+      (not charts).
 - [ ] **Server mode was checked against the backend**: every `sortable: true`
       column has a real sort key in the handler (an unknown key falls back
       silently and orders by something else), and any page-relative device
@@ -697,6 +706,14 @@ considering the UI done:
       (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
       columns hidden by default via `:column-visibility`.
+- [ ] **The table footer is `OTable`'s, never hand-built** — bulk actions on
+      selected rows are in `#selection-actions` (the buttons only: no wrapper, no
+      `v-if` on the selection length, no margin/height/padding classes, every
+      button `size="sm"`, a destructive action last, no count in a label); a line
+      the pager cannot say (a cap, partial data, "filtered x of y") is in
+      `#footer-note`, with the `v-if` on the `<template>` so it renders only while
+      it says more; nothing restates the row total. See
+      [core-controls-table § Footer](references/core-controls-table.md).
 - [ ] Every empty/zero state is a single `OEmptyState` (never a hand-rolled
       `<div>` + centered text + button). Use a `preset` + **`:filtered`**
       (search/filter active) + `@action` resetting on `clear-filters`; `#error` if

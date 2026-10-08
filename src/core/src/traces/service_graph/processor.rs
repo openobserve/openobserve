@@ -30,8 +30,10 @@ use {
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
-    if crate::db::service_graph::is_v1_stopped().await {
-        log::info!("[ServiceGraph] v1 stopped: service-graph edges are no longer computed");
+    if super::v1_stopped() {
+        log::info!(
+            "[ServiceGraph] v1 stopped by O2_SERVICE_GRAPH_V1_STOP: edges are no longer computed"
+        );
         return Ok(());
     }
     // get last offset

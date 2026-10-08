@@ -340,6 +340,15 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
     ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::sequence::SequenceDepth::new(),
+    ));
+    ctx.register_udaf(AggregateUDF::from(
+        super::udaf::sequence::SequenceStepTimes::new(),
+    ));
+    ctx.register_udwf(datafusion::logical_expr::WindowUDF::from(
+        super::udaf::sequence::SequenceStepMatch::new(),
+    ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
 
     #[cfg(feature = "enterprise")]

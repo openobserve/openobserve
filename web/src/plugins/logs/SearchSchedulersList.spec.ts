@@ -830,7 +830,6 @@ describe("SearchSchedulersList Component", () => {
 
     it("should have loading and result tracking", () => {
       expect(typeof wrapper.vm.isLoading).toBe("boolean");
-      expect(typeof wrapper.vm.resultTotal).toBe("number");
       expect(typeof wrapper.vm.showSearchResults).toBe("boolean");
     });
 

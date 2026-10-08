@@ -38,6 +38,19 @@ pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
 }
 
+/// Streams O2 writes itself; a closed list, since user stream names may start with `_` too.
+pub fn is_internal_stream(stream_name: &str) -> bool {
+    is_internal_rollup_stream(stream_name)
+        || matches!(
+            stream_name,
+            super::redaction::REDACTION_EVIDENCE_STREAM
+                | super::evaluator::EVALUATOR_STREAM
+                | super::llm_scores::LLM_SCORES_STREAM
+                | super::llm_experiments::LLM_EXPERIMENT_STREAM
+                | "_anomalies"
+        )
+}
+
 /// Outcome of a single scheduled evaluation — "did it fire?".
 ///
 /// Part III of `alerts.md`. Replaces the former `TriggerDataStatus`, whose
@@ -1451,6 +1464,32 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Search), "Search");
         assert_eq!(format!("{}", UsageEvent::Functions), "Functions");
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
+    }
+
+    #[test]
+    fn test_is_internal_stream() {
+        for name in [
+            "_o2_db_stats",
+            "_o2_dbm_server",
+            "_agent_signals",
+            "_redaction_evidence",
+            "_evaluator",
+            "_llm_scores",
+            "_llm_experiment",
+            "_anomalies",
+        ] {
+            assert!(is_internal_stream(name), "{name}");
+        }
+        // User streams, including `_`-prefixed ones, are kept.
+        for name in [
+            "default",
+            "_orders",
+            "_orders_logs",
+            "_anomalies_v2",
+            "_rumlog",
+        ] {
+            assert!(!is_internal_stream(name), "{name}");
+        }
     }
 
     #[test]

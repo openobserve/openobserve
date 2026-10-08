@@ -240,7 +240,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -504,7 +504,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Passcode",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -550,7 +550,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
@@ -568,7 +568,7 @@ export default defineComponent({
     const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
 
     const generateRUMToken = () => {
-      // Held rather than returned inline: the `segment.track` call below must
+      // Held rather than returned inline: the `analytics.track` call below must
       // still run synchronously, exactly as it did before.
       const request = createRumToken
         .mutateAsync()
@@ -593,7 +593,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Generate RUM Token",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -627,7 +627,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update RUM Token",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,

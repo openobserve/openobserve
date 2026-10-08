@@ -290,7 +290,6 @@ function rowTitle(e: EvidenceEvent): string {
     expansion="multiple"
     horizontal-scroll
     v-model:expanded-ids="expandedIds"
-    :footer-title="t('synthetics.evidence.footerEvents')"
     data-test="synthetics-evidence-events"
   >
     <!-- First column, because it is the axis every other cell is read against:

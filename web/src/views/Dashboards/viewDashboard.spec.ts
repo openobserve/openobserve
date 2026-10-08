@@ -247,6 +247,10 @@ vi.mock("moment-timezone", () => ({
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+import ShareButton from "@/components/common/ShareButton.vue";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("ViewDashboard", () => {
   let wrapper: any;
@@ -1458,6 +1462,55 @@ describe("ViewDashboard", () => {
       // Test config and loading state properties exist
       expect(wrapper.vm.config).toBeDefined();
       expect(wrapper.vm.arePanelsLoading).toBeDefined();
+    });
+  });
+
+  describe("product analytics", () => {
+    const mountWithOverflowActions = () =>
+      createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+        },
+      });
+
+    it("tracks dashboard_shared once the share link is copied", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("copy:success", { url: "x", type: "short" });
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_shared");
+    });
+
+    it("does not track dashboard_shared when only the short URL was created", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("shorten:success", { shortUrl: "x" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track dashboard_shared when the copy fails", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper
+        .findComponent(ShareButton)
+        .vm.$emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track dashboard_shared when shortening fails", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("shorten:error", { error: "x" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

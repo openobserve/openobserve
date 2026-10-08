@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import template from "@/services/alert_templates";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -356,6 +359,63 @@ describe("alert_templates service", () => {
       await expect(template.get_system_templates({ org_identifier: "org123" })).rejects.toThrow(
         "Server error",
       );
+    });
+  });
+
+  describe("product analytics", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      [
+        "create",
+        "post",
+        () => template.create({ org_identifier: "org1", data: {} }),
+        ["alert_template_created"],
+      ],
+      [
+        "update",
+        "put",
+        () => template.update({ org_identifier: "org1", template_name: "t", data: {} }),
+        ["alert_template_updated"],
+      ],
+      [
+        "delete",
+        "delete",
+        () => template.delete({ org_identifier: "org1", template_name: "t" }),
+        ["alert_template_deleted", { count: 1 }],
+      ],
+      [
+        "bulkDelete",
+        "delete",
+        () => template.bulkDelete("org1", { ids: ["a", "b"] }),
+        ["alert_template_deleted", { count: 2 }],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([["bulkDelete", "delete", () => template.bulkDelete("org1", { ids: ["a"] })]] as Array<
+      [string, string, () => Promise<unknown>]
+    >)("%s does not track when nothing was affected", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+      await call();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

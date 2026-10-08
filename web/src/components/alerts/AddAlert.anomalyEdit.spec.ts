@@ -84,7 +84,7 @@ vi.mock("@/services/anomaly_detection", () => ({
   },
 }));
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 
 import AddAlert from "@/components/alerts/AddAlert.vue";

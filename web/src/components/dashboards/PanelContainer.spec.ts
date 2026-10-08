@@ -855,6 +855,121 @@ describe("PanelContainer", () => {
       expect(prefill.name).toBe("Alert_from_My_Panel");
     });
 
+    it("uses the executed query, and lets the user pick between two queries", async () => {
+      const twoQueries = {
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: 'avg(disk_used{host=~"$host"})',
+            fields: { stream: "disk_used", stream_type: "metrics" },
+          },
+          {
+            query: "sum(rate(io_ops[$__rate_interval]))",
+            tabName: "IO",
+            fields: { stream: "io_ops", stream_type: "metrics" },
+          },
+        ],
+      };
+      const metaData = {
+        queries: [
+          { query: 'avg(disk_used{host=~"a"})', panelQueryIndex: 0 },
+          { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1 },
+        ],
+      };
+      wrapper = createWrapper({ data: twoQueries });
+      await wrapper.vm.metaDataValue(metaData);
+
+      const first = wrapper.vm.buildPanelAlertPrefill();
+      expect(first.promql).toBe('avg(disk_used{host=~"a"})');
+      expect(first.queryChoices.map((c: any) => c.query)).toEqual([
+        'avg(disk_used{host=~"a"})',
+        "sum(rate(io_ops[1m]))",
+      ]);
+
+      const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
+      expect(second.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(second.streamName).toBe("io_ops");
+      expect(second.queryIndex).toBe(1);
+    });
+
+    describe("with a formula and hidden inputs", () => {
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
+      const formulaPanel = (hideA: boolean) => ({
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: "sum(rate(errors[$__rate_interval]))",
+            fields: { stream: "errors", stream_type: "metrics" },
+            config: { ref: "A", hide: hideA },
+          },
+          {
+            query: "sum(rate(requests[$__rate_interval]))",
+            fields: { stream: "requests", stream_type: "metrics" },
+            config: { ref: "B", hide: true },
+          },
+          {
+            query: "",
+            tabName: "Ratio",
+            fields: { stream_type: "metrics" },
+            config: { formula: "A / B * 100" },
+          },
+        ],
+      });
+      const metaData = {
+        queries: [
+          { query: "sum(rate(errors[1m]))", panelQueryIndex: 0 },
+          { query: "sum(rate(requests[1m]))", panelQueryIndex: 1, notSent: true },
+          { query: combined, panelQueryIndex: 2 },
+        ],
+      };
+
+      it("alerts on the formula, its only visible query, with its inputs' metrics", async () => {
+        wrapper = createWrapper({ data: formulaPanel(true) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.promql).toBe(combined);
+        expect(prefill.queryChoices).toBeUndefined();
+        expect(prefill.streamCandidates.map((c: any) => c.name)).toEqual(["errors", "requests"]);
+      });
+
+      it("keeps the action for a formula whose inputs carry no stream pick", () => {
+        const panel = formulaPanel(true);
+        panel.queries.forEach((query: any) => (query.fields.stream = ""));
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeNull();
+      });
+
+      it("disables the action when every query is hidden", () => {
+        const panel = formulaPanel(true);
+        panel.queries[2].config.hide = true;
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+      });
+
+      it("offers only the visible queries in the picker", async () => {
+        wrapper = createWrapper({ data: formulaPanel(false) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.queryChoices.map((c: any) => c.index)).toEqual([0, 2]);
+        expect(prefill.promql).toBe("sum(rate(errors[1m]))");
+        expect(wrapper.vm.buildPanelAlertPrefill({ queryIndex: 2 }).promql).toBe(combined);
+      });
+    });
+
+    it("offers no query choice for a single-query panel", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
+        },
+      });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+    });
+
     it("disables the action when the panel has no queries", async () => {
       wrapper = createWrapper({ data: { ...mockPanelData, queries: [] } });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
@@ -867,6 +982,19 @@ describe("PanelContainer", () => {
       };
       wrapper = createWrapper({ data: panelWithoutStream });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+    });
+
+    it("enables the action when only a later query has a stream", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [
+            { query: "SELECT 1", fields: {} },
+            { query: "SELECT * FROM test", fields: { stream: "test-stream" } },
+          ],
+        },
+      });
+      expect(wrapper.vm.alertDisabledReason).toBeNull();
     });
 
     it("enables the action for a panel with a query and a stream", async () => {
@@ -1618,6 +1746,26 @@ describe("PanelContainer", () => {
       expect(
         wrapper.find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`).exists(),
       ).toBe(true);
+    });
+
+    it("removes the panel immediately from the direct delete button, without a confirm", async () => {
+      wrapper = createWrapper({ simplifiedPanelView: true, viewOnly: false });
+
+      await wrapper
+        .find(`[data-test="dashboard-delete-panel-${mockPanelData.title}-btn"]`)
+        .trigger("click");
+
+      expect(wrapper.emitted("onDeletePanel")?.[0]).toEqual([mockPanelData.id]);
+      expect(wrapper.vm.confirmDeletePanelDialog).toBe(false);
+    });
+
+    it("keeps the delete confirmation for regular dashboard panels", async () => {
+      wrapper = createWrapper({ simplifiedPanelView: false, viewOnly: false });
+
+      await wrapper.vm.onPanelModifyClick("DeletePanel");
+
+      expect(wrapper.vm.confirmDeletePanelDialog).toBe(true);
+      expect(wrapper.emitted("onDeletePanel")).toBeFalsy();
     });
 
     it("should hide direct delete button when simplifiedPanelView is false", () => {

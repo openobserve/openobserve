@@ -158,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (searchQuery = '')"
             />
           </template>
-          <template #bottom />
           <template
             v-for="col in apiLimitCrudColumnIds"
             :key="col"
@@ -246,7 +245,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (searchQuery = '')"
             />
           </template>
-          <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
           </template>
@@ -463,7 +461,6 @@ export default defineComponent({
     const { isDark } = useTheme();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
-    const resultTotal = ref<number>(0);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
@@ -735,7 +732,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           //here we are getting the role limits for the selected organization
           await getRolesByOrganization();
@@ -806,10 +802,8 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
-          resultTotal.value = apiLimitsRows.value.length;
         }
       } else if (activeTab.value === "role-limits") {
         await getRolesByOrganization();
@@ -884,7 +878,6 @@ export default defineComponent({
         } else {
           apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
         }
-        resultTotal.value = apiLimitsRows.value.length;
       }
     };
     //this is used to save the changes and switch the tab
@@ -934,7 +927,6 @@ export default defineComponent({
           update: 10,
           delete: 10,
         }));
-        resultTotal.value = rolesLimitRows.value.length;
         isRolesLoading.value = false;
       } catch (error) {
         isRolesLoading.value = false;
@@ -1032,7 +1024,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else if (activeTab.value === "role-limits") {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1102,7 +1093,6 @@ export default defineComponent({
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
-          resultTotal.value = apiLimitsRows.value.length;
         } else {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1482,7 +1472,6 @@ export default defineComponent({
             newTimeUnit,
           );
         }
-        resultTotal.value = apiLimitsRows.value.length;
       } else if (activeTab.value === "role-limits" && openedRole.value) {
         const storeKey = `${openedRole.value}_${newTimeUnit}`;
         if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
@@ -1520,7 +1509,6 @@ export default defineComponent({
       typeTabs,
       editTable,
       searchQuery,
-      resultTotal,
       rolesLimitRows,
       rolesColumns,
       apiLimitsRows,

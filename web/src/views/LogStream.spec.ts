@@ -21,6 +21,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
+import analytics from "@/services/product_analytics";
 
 // Mock services
 vi.mock("@/services/stream", async (importOriginal) => {
@@ -61,7 +62,7 @@ vi.mock("@/composables/useStreams", () => ({
   })),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -1150,6 +1151,64 @@ describe("LogStream Component", () => {
         expect(t("common.name")).toBeTruthy();
         expect(t("common.actions")).toBeTruthy();
       }
+    });
+  });
+
+  describe("stream_deleted analytics", () => {
+    const streams = [
+      { name: "s1", stream_type: "logs", _rowKey: "s1-logs" },
+      { name: "s2", stream_type: "logs", _rowKey: "s2-logs" },
+      { name: "s3", stream_type: "metrics", _rowKey: "s3-metrics" },
+    ];
+
+    it("tracks one stream_deleted for a confirmed single delete", async () => {
+      mockStreamService.delete.mockResolvedValue({ data: { code: 200 } });
+      await wrapper.vm.confirmDeleteAction({ row: { name: "s1", stream_type: "logs" } });
+
+      wrapper.vm.deleteStream();
+      await flushPromises();
+
+      expect(analytics.track).toHaveBeenCalledWith("stream_deleted", {
+        stream_type: "logs",
+        count: 1,
+      });
+    });
+
+    it("does not track a single delete the server did not confirm", async () => {
+      mockStreamService.delete.mockResolvedValue({ data: { code: 500 } });
+      await wrapper.vm.confirmDeleteAction({ row: { name: "s1", stream_type: "logs" } });
+
+      wrapper.vm.deleteStream();
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("stream_deleted", expect.anything());
+    });
+
+    it("tracks one stream_deleted per bulk delete, counting only confirmed deletions", async () => {
+      mockStreamService.delete
+        .mockResolvedValueOnce({ data: { code: 200 } })
+        .mockResolvedValueOnce({ data: { code: 500 } })
+        .mockResolvedValueOnce({ data: { code: 200 } });
+      wrapper.vm.logStream = streams;
+      wrapper.vm.selectedIds = streams.map((s) => s._rowKey);
+
+      wrapper.vm.deleteBatchStream();
+      await flushPromises();
+
+      const calls = vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "stream_deleted");
+      expect(calls).toEqual([["stream_deleted", { stream_type: "mixed", count: 2 }]]);
+    });
+
+    it("does not track a bulk delete in which nothing was deleted", async () => {
+      mockStreamService.delete.mockResolvedValue({ data: { code: 500 } });
+      wrapper.vm.logStream = streams;
+      wrapper.vm.selectedIds = streams.map((s) => s._rowKey);
+
+      wrapper.vm.deleteBatchStream();
+      await flushPromises();
+
+      expect(mockStreamService.delete).toHaveBeenCalledTimes(3);
+      expect(analytics.track).not.toHaveBeenCalledWith("stream_deleted", expect.anything());
     });
   });
 });

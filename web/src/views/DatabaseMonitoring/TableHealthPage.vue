@@ -216,15 +216,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </section>
         </template>
 
-        <template #bottom>
-          <div
-            class="text-text-secondary flex w-full items-center gap-2.5"
-            data-test="dbm-table-health-status-bar"
-          >
-            <span class="max-md:hidden">{{ countLine }}</span>
-          </div>
-        </template>
-
         <template #empty>
           <!-- A search that matched nothing is not an absence of tables. -->
           <OEmptyState
@@ -410,8 +401,6 @@ const disclosures = computed(() =>
     tupleCountDisclosure({ tuples_are_estimated: tuplesAreEstimated.value }, t),
   ].filter((line): line is NonNullable<typeof line> => line != null),
 );
-
-const countLine = computed(() => t("dbm.tableHealth.countLine", { count: rows.value.length }));
 
 /**
  * The "to start collecting" steps, in the checklist shape DbmLockEmptyState
