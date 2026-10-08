@@ -142,10 +142,14 @@ describe("AlertInsights - rendering", () => {
     expect(w.find('[data-test="tab-overview"]').exists()).toBe(true);
   });
 
-  it("does not render enterprise tabs when isEnterprise is false", async () => {
+  it("shows enterprise tabs locked (not hidden) when isEnterprise is false", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="tab-frequency"]').exists()).toBe(false);
-    expect(w.find('[data-test="tab-correlation"]').exists()).toBe(false);
+    const frequencyTab = w.find('[data-test="tab-frequency"]');
+    const correlationTab = w.find('[data-test="tab-correlation"]');
+    expect(frequencyTab.exists()).toBe(true);
+    expect(frequencyTab.attributes("aria-disabled")).toBe("true");
+    expect(correlationTab.exists()).toBe(true);
+    expect(correlationTab.attributes("aria-disabled")).toBe("true");
   });
 
   it("renders the quality tab", async () => {

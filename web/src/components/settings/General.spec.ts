@@ -88,6 +88,7 @@ import settingsService from "@/services/settings";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -414,6 +415,68 @@ describe("General", () => {
 
       const enterpriseSection = wrapper.find("#enterpriseFeature");
       expect(enterpriseSection.exists()).toBe(false);
+    });
+  });
+
+  // customBranding is self-hosted-only (cloudOffers: false): OSS sees the
+  // section locked-but-visible (disabled controls + lock), pure Cloud doesn't
+  // see it at all — same split as the other cloudOffers:false gates (e.g.
+  // cipherKeys in settings/index.vue).
+  describe("Custom branding gating", () => {
+    const originalIsEnterprise = config.isEnterprise;
+    const originalIsCloud = config.isCloud;
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      config.isCloud = originalIsCloud;
+    });
+
+    it("should keep the branding section visible but locked on OSS", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
+      const lockedText = wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]');
+      expect(lockedText.exists()).toBe(true);
+      // OInput's own `data-test` lands on its wrapper div (inheritAttrs: false);
+      // `disabled` is only a real attribute on the input it renders inside.
+      expect(lockedText.find("input").attributes("disabled")).toBeDefined();
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_dark_img_file_upload_locked"]').exists(),
+      ).toBe(true);
+      // The functional controls must not render alongside the locked ones.
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should hide the branding section entirely on a pure Cloud build", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const wrapper = createWrapper();
+
+      expect(wrapper.find("#enterpriseFeature").exists()).toBe(false);
+    });
+
+    it("should render the functional (unlocked) controls on Enterprise", () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      expect(
+        wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
+      ).toBe(false);
     });
   });
 

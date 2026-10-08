@@ -148,9 +148,15 @@ onMounted(() => {
       };
       parentEl.value.addEventListener("mouseenter", show);
       parentEl.value.addEventListener("mouseleave", hide);
+      // Keyboard-focus parity with hover, so a Tab-reachable trigger (e.g. an
+      // inert locked tile) can surface its tooltip without a pointer.
+      parentEl.value.addEventListener("focus", show);
+      parentEl.value.addEventListener("blur", hide);
       cleanupFn = () => {
         parentEl.value?.removeEventListener("mouseenter", show);
         parentEl.value?.removeEventListener("mouseleave", hide);
+        parentEl.value?.removeEventListener("focus", show);
+        parentEl.value?.removeEventListener("blur", hide);
       };
     }
   }

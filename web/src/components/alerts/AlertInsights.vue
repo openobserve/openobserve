@@ -56,16 +56,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="tab-overview"
         />
         <OTab
-          v-if="isEnterprise"
           name="frequency"
           :label="t('alerts.insights.tabs.frequency')"
           data-test="tab-frequency"
+          :disable="!insightsAccess.allowed"
+          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
+        />
+        <LockedFeatureTooltip
+          v-if="!insightsAccess.allowed"
+          :message="insightsAccess.message"
+          :title="t('alerts.insights.tabs.frequency')"
         />
         <OTab
-          v-if="isEnterprise"
           name="correlation"
           :label="t('alerts.insights.tabs.correlation')"
           data-test="tab-correlation"
+          :disable="!insightsAccess.allowed"
+          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
+        />
+        <LockedFeatureTooltip
+          v-if="!insightsAccess.allowed"
+          :message="insightsAccess.message"
+          :title="t('alerts.insights.tabs.correlation')"
         />
         <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
       </OTabs>
@@ -261,7 +273,6 @@ import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
 import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
-import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -269,14 +280,19 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
 
-// Check if enterprise features are enabled
-const isEnterprise = config.isEnterprise === "true";
+// Frequency/Correlation tabs — shown locked (not hidden) in builds that
+// don't unlock it.
+const insightsAccess = computed(() =>
+  checkFeatureAccess("alertInsights", buildFeatureGateContext(store.state.zoConfig)),
+);
 
 // Composable
 const {
@@ -708,9 +724,14 @@ watch(currentTab, async () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Check if there's a tab in query params
-  if (route.query.tab) {
-    currentTab.value = route.query.tab as string;
+  // Check if there's a tab in query params. Defense in depth: a locked tab
+  // is disabled in the UI, but a direct link with ?tab=frequency/correlation
+  // shouldn't be able to land on it while locked.
+  const queryTab = route.query.tab as string | undefined;
+  const isLockedTab =
+    (queryTab === "frequency" || queryTab === "correlation") && !insightsAccess.value.allowed;
+  if (queryTab && !isLockedTab) {
+    currentTab.value = queryTab;
   }
 
   // Fetch alerts list once on mount

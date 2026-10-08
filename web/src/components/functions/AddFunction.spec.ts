@@ -129,50 +129,60 @@ describe("AddFunction.vue Branch Coverage", () => {
     });
   const getForm = (wrapper: any) => (wrapper.findComponent(OForm).vm as any).form;
 
-  // JavaScript functions are an enterprise/cloud entitlement; OSS stays VRL-only.
-  // The gate drives the VRL/JS radio options, which in turn drive the editor
-  // language + placeholder — so getting it wrong silently mislabels the editor.
+  // JavaScript functions are an enterprise/cloud entitlement; OSS shows the
+  // option locked (not hidden) instead of omitting it, so the gate now drives
+  // a `disabled` flag on the option rather than the option's presence.
   describe("JS entitlement gate (enterprise/cloud only)", () => {
     const values = (wrapper: any) =>
       ((wrapper.vm as any).transformTypeOptions as any[]).map((o) => o.value);
+    const jsOption = (wrapper: any) =>
+      ((wrapper.vm as any).transformTypeOptions as any[]).find((o) => o.value === "1");
 
     beforeEach(() => {
       (config as any).isEnterprise = "false";
       (config as any).isCloud = "false";
     });
 
-    it("OSS: offers VRL only — no JavaScript option", () => {
-      expect(values(mountAddFunction())).toEqual(["0"]);
-    });
-
-    it("enterprise: offers VRL + JavaScript", () => {
-      (config as any).isEnterprise = "true";
-      expect(values(mountAddFunction())).toEqual(["0", "1"]);
-    });
-
-    it("cloud: offers VRL + JavaScript", () => {
-      (config as any).isCloud = "true";
-      expect(values(mountAddFunction())).toEqual(["0", "1"]);
-    });
-
-    it("is no longer tied to the _meta org (any enterprise org gets JS)", () => {
-      // the old rule keyed ONLY off selectedOrganization === "_meta"; the store
-      // here is "test-org", so JS must appear purely from the entitlement.
-      (config as any).isEnterprise = "true";
-      expect(values(mountAddFunction())).toContain("1");
-    });
-
-    it("OSS _meta org still gets JS (pre-existing SSO claim-parsing behavior)", () => {
-      // _meta predates the enterprise entitlement — it must keep JS on OSS.
-      const wrapper = mountAddFunction(defaultProps, "_meta");
+    it("OSS: offers VRL + a locked JavaScript option", () => {
+      const wrapper = mountAddFunction();
       expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(true);
     });
 
-    it("OSS non-_meta org gets no JS", () => {
-      expect(values(mountAddFunction(defaultProps, "some-org"))).toEqual(["0"]);
+    it("enterprise: offers VRL + an unlocked JavaScript option", () => {
+      (config as any).isEnterprise = "true";
+      const wrapper = mountAddFunction();
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(false);
     });
 
-    it("OSS but EDITING an existing JS function: keeps the JS option", () => {
+    it("cloud: offers VRL + an unlocked JavaScript option", () => {
+      (config as any).isCloud = "true";
+      const wrapper = mountAddFunction();
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(false);
+    });
+
+    it("is no longer tied to the _meta org (any enterprise org unlocks JS)", () => {
+      // the old rule keyed ONLY off selectedOrganization === "_meta"; the store
+      // here is "test-org", so JS must unlock purely from the entitlement.
+      (config as any).isEnterprise = "true";
+      expect(jsOption(mountAddFunction()).disabled).toBe(false);
+    });
+
+    it("OSS _meta org still gets an unlocked JS option (pre-existing SSO claim-parsing behavior)", () => {
+      // _meta predates the enterprise entitlement — it must keep JS unlocked on OSS.
+      const wrapper = mountAddFunction(defaultProps, "_meta");
+      expect(jsOption(wrapper).disabled).toBe(false);
+    });
+
+    it("OSS non-_meta org gets a locked JS option", () => {
+      const wrapper = mountAddFunction(defaultProps, "some-org");
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(true);
+    });
+
+    it("OSS but EDITING an existing JS function: keeps the JS option unlocked", () => {
       // otherwise the radio renders with nothing selected and the editor would
       // silently fall back to VRL for a JS function.
       const wrapper = mountAddFunction({
@@ -180,16 +190,17 @@ describe("AddFunction.vue Branch Coverage", () => {
         isUpdated: true,
         modelValue: { ...defaultProps.modelValue, transType: "1" },
       });
-      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(false);
     });
 
-    it("OSS editing a VRL function: still no JS option", () => {
+    it("OSS editing a VRL function: JS option stays locked", () => {
       const wrapper = mountAddFunction({
         ...defaultProps,
         isUpdated: true,
         modelValue: { ...defaultProps.modelValue, transType: "0" },
       });
-      expect(values(wrapper)).toEqual(["0"]);
+      expect(values(wrapper)).toEqual(["0", "1"]);
+      expect(jsOption(wrapper).disabled).toBe(true);
     });
   });
 

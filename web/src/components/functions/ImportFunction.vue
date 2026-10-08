@@ -185,6 +185,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (val: any) => updateTransType(String(val), errorMessage.itemIndex)
                         "
                       />
+                      <!-- Same lock affordance as FunctionsToolbar's VRL/JS
+                           toggle for this exact choice — explains why
+                           JavaScript is disabled instead of leaving it mute. -->
+                      <LockedFeatureTooltip
+                        v-if="!isJsAllowed"
+                        :message="t('enterpriseFeature.locked', { feature: raw('JavaScript') })"
+                        icon="function"
+                        :title="raw('JavaScript')"
+                      />
                     </div>
 
                     <div v-else-if="errorMessage.field === 'params'" class="w-75 py-2">
@@ -237,6 +246,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import BaseImport from "../common/BaseImport.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { functionNameRegex } from "./AddFunction.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import jsTransformService from "@/services/jstransform";
@@ -264,6 +274,7 @@ export default defineComponent({
     OButton,
     OSeparator,
     BaseImport,
+    LockedFeatureTooltip,
     OInput: defineAsyncComponent(() => import("@/lib/forms/Input/OInput.vue")),
     OSelect: defineAsyncComponent(() => import("@/lib/forms/Select/OSelect.vue")),
     OCheckbox: defineAsyncComponent(() => import("@/lib/forms/Checkbox/OCheckbox.vue")),
@@ -321,11 +332,12 @@ export default defineComponent({
         store.state.selectedOrganization?.identifier === "_meta",
     );
 
-    const transTypeOptions = computed(() => {
-      const options = [{ label: t("function.vrl"), value: "0" }];
-      if (isJsAllowed.value) options.push({ label: raw("JavaScript"), value: "1" });
-      return options;
-    });
+    // JavaScript always appears in the dropdown — shown disabled (not
+    // hidden) in builds that don't unlock it, same as the Add form's toggle.
+    const transTypeOptions = computed(() => [
+      { label: t("function.vrl"), value: "0" },
+      { label: raw("JavaScript"), value: "1", disabled: !isJsAllowed.value },
+    ]);
 
     // Set at each call site, so one declared mutation covers both create and override.
     const isOverride = ref(false);
@@ -447,6 +459,9 @@ export default defineComponent({
     };
 
     const updateTransType = (transType: string, index: number) => {
+      // Defense in depth — the JS option's own `disabled` already blocks
+      // selecting it, but that attribute can be stripped via devtools.
+      if (transType === "1" && !isJsAllowed.value) return;
       userSelectedTransType.value[index] = transType;
       writeField(index, "transType", transType);
     };
@@ -704,6 +719,8 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      isJsAllowed,
       baseImportRef,
       isImporting,
       functionErrors,

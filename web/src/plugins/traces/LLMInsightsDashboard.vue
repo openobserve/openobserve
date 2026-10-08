@@ -40,7 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="llm-insights"
       all-agents
       agent-skeleton
-      :show-agent-toggle="isEnterpriseOrCloud"
+      :show-agent-toggle="genAiAgentMappingAccess.allowed"
+      :agent-toggle-locked-message="
+        !genAiAgentMappingAccess.allowed ? genAiAgentMappingAccess.message : undefined
+      "
       :show-version="!compareMode"
       :labels="{
         agent: t('traces.lLMInsightsDashboard.agent'),
@@ -64,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              affordance when it can't apply is cleaner (ui-architect empty-affordance
              rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          v-if="isEnterpriseOrCloud && canCompare && !compareMode"
+          v-if="genAiAgentMappingAccess.allowed && canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
@@ -77,6 +80,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
         </OTooltip>
+        <!-- OSS can't reach Agent mode at all, so `canCompare` (which needs
+             real agent-version data) is never meaningful here — show the
+             entry locked instead of hiding it, same treatment as the Agent
+             toggle above. -->
+        <template v-else-if="!genAiAgentMappingAccess.allowed && !compareMode">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="compare-arrows"
+            icon-right="lock"
+            disabled
+            data-test="llm-insights-compare-locked"
+          >
+            {{ t("traces.lLMInsightsDashboard.compareEntry") }}
+          </OButton>
+          <LockedFeatureTooltip
+            :message="genAiAgentMappingAccess.message"
+            :title="t('traces.lLMInsightsDashboard.compareEntry')"
+          />
+        </template>
         <!-- Exit compare lives in the SAME spot as the enter affordance, so the
              two toggle in place — the user leaves compare where they entered it. -->
         <OButton
@@ -93,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AiScopeBar>
 
     <VersionCompareView
-      v-if="isEnterpriseOrCloud && compareMode"
+      v-if="genAiAgentMappingAccess.allowed && compareMode"
       :version-list="compareVersionList"
       :stream="effectiveStream"
       :windows="versionCompare.windows.value"
@@ -316,7 +339,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
 import analytics from "@/services/product_analytics";
-import config from "@/aws-exports";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 const { t } = useI18nTyped();
 const { lgUp } = useBreakpoint();
@@ -386,17 +410,22 @@ const switching = ref(false);
 const MODE_LS_KEY = "llmInsights_filterMode";
 // Cloud registers the SAME enterprise route tree and backend as an enterprise
 // build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
-// a true OSS build lacks the agent-mapping API this gates. Matches the
-// predicate already used for this exact purpose in Index.vue/SessionsPage.vue.
-const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
+// a true OSS build lacks the agent-mapping API this gates. Goes through the
+// shared `genAiAgentMapping` registry entry (also used by SessionsList.vue
+// and the Settings Gen AI Agent Mapping tab) so a future backend flag only
+// has to change in one place (see enterpriseFeatures.ts).
+const genAiAgentMappingAccess = checkFeatureAccess(
+  "genAiAgentMapping",
+  buildFeatureGateContext(store.state.zoConfig),
+);
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).
 // Agent mode calls the enterprise-only agent-mapping API (and gates version
-// compare), so OSS is pinned to Stream regardless of the URL/localStorage —
-// there's no toggle to reach Agent from anyway.
+// compare), so OSS is pinned to Stream regardless of the URL/localStorage — the
+// toggle to reach Agent is locked, not gone, but clicking it is a no-op.
 const filterMode = ref<"stream" | "agent">(
-  !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
+  !genAiAgentMappingAccess.allowed ? "stream" : urlType === "stream" ? "stream" : "agent",
 );
 // Env/name/version to seed the cascade with once the list loads: the URL
 // deep-link first, else the persisted last selection. Resolved into

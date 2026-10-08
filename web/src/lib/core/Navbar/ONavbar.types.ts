@@ -25,6 +25,14 @@ export interface NavItem {
   display?: boolean;
   hide?: boolean;
   badge?: number;
+  /**
+   * Present but unreachable — an enterprise/cloud-only item in a build that
+   * doesn't unlock it. Rendered dimmed with `lockedMessage` as a tooltip and
+   * inert on click, instead of being spliced out of the rail. Set from
+   * `checkFeatureAccess()` in utils/enterpriseFeatures.ts.
+   */
+  locked?: boolean;
+  lockedMessage?: I18nText;
 }
 
 /**
@@ -88,6 +96,14 @@ export interface SubnavChild {
   gate?: string;
   /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
   beta?: boolean;
+  /**
+   * Set at RENDER time (ONavGroup.vue), not in the static NAV_GROUPS/NAV_SUBNAV
+   * tables: when `gate` corresponds to a registered `FeatureKey`
+   * (utils/enterpriseFeatures.ts) and that feature isn't unlocked, the child
+   * is kept rather than filtered out, dimmed, and inert on click.
+   */
+  locked?: boolean;
+  lockedMessage?: I18nText;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */

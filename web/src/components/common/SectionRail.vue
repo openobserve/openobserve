@@ -98,18 +98,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- `justify-center!`: the vertical tab hardcodes `justify-start`, and
                two utilities for one property resolve by stylesheet order, not
                class order — without the marker the icon stays left-aligned. -->
-          <OTab
-            v-for="item in group.items"
-            :key="item.key"
-            :name="item.key"
-            :label="collapsed ? undefined : item.label"
-            :tooltip="collapsed ? item.label : undefined"
-            :icon="item.icon"
-            :data-test="item.dataTest"
-            class="w-full"
-            :class="collapsed ? 'justify-center!' : undefined"
-            @click="navigate(item.to)"
-          />
+          <template v-for="item in group.items" :key="item.key">
+            <OTab
+              :name="item.key"
+              :label="collapsed ? undefined : item.label"
+              :tooltip="!item.locked && collapsed ? item.label : undefined"
+              :icon="item.icon"
+              :suffix-icon="item.locked && !collapsed ? 'lock' : undefined"
+              :disable="item.locked"
+              :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
+              class="w-full"
+              :class="collapsed ? 'justify-center!' : undefined"
+              @click="!item.locked && navigate(item.to)"
+            />
+            <!-- The richer locked tooltip (pitch + Upgrade CTA) — a sibling, not
+                 OTab's own plain-text `tooltip`, because only this one supports
+                 a clickable link. Anchors to the OTab immediately before it. -->
+            <LockedFeatureTooltip
+              v-if="item.locked && item.lockedMessage"
+              :message="item.lockedMessage"
+              :icon="item.icon"
+              :title="item.label"
+              :show-upgrade-cta="item.lockedShowUpgradeCta !== false"
+            />
+          </template>
         </template>
       </OTabs>
     </div>
@@ -126,6 +138,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 
 const router = useRouter();

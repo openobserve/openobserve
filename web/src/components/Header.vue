@@ -221,13 +221,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="header-utility-icons flex items-center gap-x-2">
-          <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
+          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group. -->
-          <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
+           org selector so it reads as the primary action in this group.
+           Shown locked (not hidden) in builds that don't unlock it. -->
+          <template v-if="aiButtonVisible">
             <OButton
               variant="ghost"
               size="icon-toolbar"
+              :disabled="!aiAccess.allowed"
               @click="toggleAIChat"
               data-test="menu-link-ai-item"
               class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
@@ -239,13 +241,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :src="getBtnLogo"
                 class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
+              <span
+                v-if="!aiAccess.allowed"
+                aria-hidden="true"
+                class="bg-surface-overlay text-text-secondary border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+              >
+                <OIcon name="lock" size="xs" class="size-2.5!" />
+              </span>
               <OTooltip
+                v-if="aiAccess.allowed"
                 side="bottom"
                 align="center"
                 :content="t('menu.aiAssistant')"
                 shortcut-id="aiChatToggle"
               />
             </OButton>
+            <LockedFeatureTooltip
+              v-if="!aiAccess.allowed"
+              :message="aiAccess.message"
+              icon="auto-awesome"
+              :title="t('menu.aiAssistant')"
+              side="bottom"
+            />
           </template>
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
@@ -451,12 +468,15 @@ import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -474,6 +494,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    LockedFeatureTooltip,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -577,11 +598,34 @@ export default defineComponent({
       }).href;
     });
 
-    // Enterprise upgrade dialog state
-    const showEnterpriseDialog = ref(false);
+    // Enterprise upgrade dialog state — a module-level singleton (see the
+    // composable) so a locked feature's tooltip link elsewhere in the app can
+    // open the SAME dialog instance this header button does.
+    const { isOpen: showEnterpriseDialog, open: openEnterpriseDialog } =
+      useEnterpriseUpgradeDialog();
 
     // Language sub-menu state (nested submenu pattern matching original UX)
     const showLanguageSubmenu = ref(false);
+
+    // AI chat toggle — shown locked (not hidden) in builds that don't unlock
+    // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
+    // reasoning as QueryEditor.vue's floating AI icon: an entitled org that's
+    // turned AI off still never sees the button at all.
+    //
+    // NOT `buildFeatureGateContext()` — that reads the `@/aws-exports`
+    // singleton directly, but this component takes edition info as its own
+    // `config` PROP (so a host can inject it / tests can override it) rather
+    // than importing the module. Build the context from the prop instead.
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", {
+        isEnterprise: props.config.isEnterprise === "true",
+        isCloud: props.config.isCloud === "true",
+        rbac: props.store.state.zoConfig?.rbac_enabled !== false,
+      }),
+    );
+    const aiButtonVisible = computed(
+      () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
+    );
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -623,6 +667,9 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // Defense in depth — the button's own `disabled` already blocks this,
+      // but that attribute can be stripped via devtools.
+      if (!aiAccess.value.allowed) return;
       emit("toggleAIChat");
     };
 
@@ -669,11 +716,6 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
-    // Open enterprise upgrade dialog
-    const openEnterpriseDialog = () => {
-      showEnterpriseDialog.value = true;
-    };
-
     return {
       isDark,
       t,
@@ -689,6 +731,8 @@ export default defineComponent({
       homeUrl,
       goToAbout,
       toggleAIChat,
+      aiAccess,
+      aiButtonVisible,
       openSlack,
       navigateToOpenAPI,
       navigateToDocs,

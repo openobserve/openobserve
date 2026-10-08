@@ -42,6 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destination-options="destinationOptions"
         :workflow-options="workflowOptions"
         :workflows-enabled="workflowsEnabled"
+        :workflows-locked="workflowsLocked"
+        :workflows-lock-message="workflowsAccess.message"
         :error="!!error"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
@@ -75,7 +77,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import config from "@/aws-exports";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 type RawOption = string | { label: I18nText; value: string };
 
@@ -119,14 +121,20 @@ const tooltipText = computed<I18nText>(() =>
   props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : raw(props.tooltip),
 );
 
-// The family must support workflows AND the deployment must serve them —
-// build gate plus the backend /config flag, the same combined test the
-// sidebar and routes use.
+// Edition entitlement and the backend /config runtime flag are separate
+// gates — same split MainLayout's nav-rail Workflows entry uses: an edition
+// that doesn't unlock workflows stays visible but LOCKED (upgrading fixes
+// it); a deployment that simply hasn't turned the runtime flag on stays
+// HIDDEN (upgrading wouldn't change that).
+const workflowsAccess = useLockedAffordance("workflows");
+const workflowsRuntimeEnabled = computed(() => store.state.zoConfig?.workflows_enabled === true);
 const workflowsEnabled = computed(
-  () =>
-    props.supportsWorkflows &&
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
-    store.state.zoConfig?.workflows_enabled === true,
+  () => props.supportsWorkflows && workflowsAccess.value.allowed && workflowsRuntimeEnabled.value,
+);
+// Shown (disabled) instead of hidden outright when the family supports
+// workflows but this edition doesn't unlock them.
+const workflowsLocked = computed(
+  () => props.supportsWorkflows && !workflowsAccess.value.allowed,
 );
 
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);

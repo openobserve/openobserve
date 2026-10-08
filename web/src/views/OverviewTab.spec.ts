@@ -569,10 +569,44 @@ describe("OverviewTab", () => {
     });
   });
 
+  // Incidents/Services are gated behind the `incidents` FeatureKey (shared by
+  // both — Services is the service-graph half of the same bundle). On a build
+  // that doesn't unlock it, the real content is replaced by a locked
+  // placeholder card, not omitted outright — this pins that it's still
+  // discoverable from OSS rather than silently absent.
+  describe("locked sections on a build without the incidents license", () => {
+    const INCIDENTS_LOCKED = '[data-test="overview-incidents-locked"]';
+    const SERVICES_LOCKED = '[data-test="overview-services-locked"]';
+
+    it("should show a locked placeholder for Incidents and Services instead of hiding them", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(INCIDENTS).exists()).toBe(false);
+      expect(wrapper.find(SERVICES).exists()).toBe(false);
+      expect(wrapper.find(INCIDENTS_LOCKED).exists()).toBe(true);
+      expect(wrapper.find(SERVICES_LOCKED).exists()).toBe(true);
+      expect(wrapper.find(INCIDENTS_LOCKED).text()).toContain(
+        i18n.global.t("enterpriseFeature.pitch.incidents"),
+      );
+      expect(wrapper.find(SERVICES_LOCKED).text()).toContain(
+        i18n.global.t("enterpriseFeature.pitch.incidents"),
+      );
+    });
+
+    it("should never fetch incidents/services data when the feature is locked", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(incidentsService.list).not.toHaveBeenCalled();
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+    });
+  });
+
   describe("enterprise sections", () => {
     beforeEach(() => {
-      // `config` is a plain object read by the `isEnterpriseOrCloud` computed on
-      // first render; flipping it before mount is the only way to reach the
+      // `config` is a plain object read by `incidentsAccess` (useLockedAffordance)
+      // on first render; flipping it before mount is the only way to reach the
       // enterprise-gated branches. The outer afterEach restores it.
       config.isEnterprise = "true";
       store.commit("setConfig", {

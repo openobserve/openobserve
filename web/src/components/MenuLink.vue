@@ -18,7 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
        and submenu-group triggers (<button>, used by ONavGroup) all share the
        exact same tile markup and styling — a group tile is literally a MenuLink. -->
-  <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
+  <component
+    :is="rootComponent"
+    v-bind="{ ...$attrs, ...rootProps }"
+    :class="rootClass"
+    @click="onRootClick"
+  >
     <div
       class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
     >
@@ -67,6 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="chevron-right" size="xs" class="max-md:size-4.5!" />
     </span>
   </component>
+  <!-- Sibling, NOT nested: child-mode OTooltip anchors to the element right
+       before it, so nesting would shrink the hoverable region to whatever
+       precedes it instead of the whole tile. -->
+  <LockedFeatureTooltip
+    v-if="locked && lockedMessage"
+    :message="lockedMessage"
+    :icon="icon || undefined"
+    :title="title"
+  />
 </template>
 
 <script lang="ts">
@@ -76,11 +90,15 @@ import { useRouter, RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
-  components: { OIcon },
+  // Two root-level nodes (tile + sibling tooltip) disable Vue's automatic
+  // $attrs/listener inheritance unconditionally; bind $attrs explicitly below.
+  inheritAttrs: false,
+  components: { OIcon, LockedFeatureTooltip },
   props: {
     title: {
       type: String as unknown as PropType<I18nText>,
@@ -148,6 +166,18 @@ export default defineComponent({
     submenu: {
       type: Boolean,
       default: false,
+    },
+
+    // Present but unreachable — an enterprise/cloud-only item in a build that
+    // doesn't unlock it (see utils/enterpriseFeatures.ts). Dimmed, inert on
+    // click, and shows `lockedMessage` as a tooltip instead of navigating.
+    locked: {
+      type: Boolean,
+      default: false,
+    },
+    lockedMessage: {
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
   },
   emits: ["trigger"],
@@ -228,18 +258,30 @@ export default defineComponent({
       return !!c && (typeof c === "function" || Object.keys(c).length > 0);
     });
 
-    // Resolve the root element/component for the current mode.
+    // Locked wins over everything else. A real `RouterLink` can't be made
+    // inert via `onRootClick`'s preventDefault — RouterLink's own click
+    // handler runs before the parent's `@click` fallthrough listener (vue-
+    // router merges its `navigate` first) — so a plain `div` is the only way
+    // to guarantee no navigation.
     const rootComponent = computed(() =>
-      props.external ? "a" : props.asTrigger ? "button" : RouterLink,
+      props.locked ? "div" : props.external ? "a" : props.asTrigger ? "button" : RouterLink,
     );
 
     // Attributes bound to the root, per mode. Kept in one place so the three
     // modes can never drift apart visually.
     const rootProps = computed<Record<string, any>>(() => {
       const common: Record<string, any> = {
-        "data-test": `menu-link-${props.link}-item`,
+        "data-test": props.locked
+          ? `menu-link-${props.link}-item-locked`
+          : `menu-link-${props.link}-item`,
         "aria-label": ariaLabel.value,
+        "aria-disabled": props.locked || undefined,
       };
+      if (props.locked) {
+        // A plain `div` carries no native tabindex — add one so keyboard
+        // users can still reach it (and its tooltip) by Tab.
+        return { ...common, role: "link", tabindex: 0 };
+      }
       if (props.external) {
         return {
           ...common,
@@ -274,9 +316,11 @@ export default defineComponent({
       "max-md:flex max-md:min-h-11 max-md:items-center max-md:px-2 max-md:py-2",
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
-      isActive.value
-        ? activePillClass.value
-        : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
+      props.locked
+        ? "cursor-not-allowed opacity-60 text-tabs-inactive-text border-s-2 border-transparent bg-transparent"
+        : isActive.value
+          ? activePillClass.value
+          : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
@@ -290,6 +334,10 @@ export default defineComponent({
     ]);
 
     const onRootClick = (event: MouseEvent) => {
+      if (props.locked) {
+        event.preventDefault();
+        return;
+      }
       if (props.external) {
         event.preventDefault();
         openWebPage(props.link);

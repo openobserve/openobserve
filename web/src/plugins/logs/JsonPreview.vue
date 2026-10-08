@@ -25,12 +25,20 @@
         size="xs"
         variant="outline"
         class="me-2 mb-1.5"
+        :disabled="!correlationAccess.allowed"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
         <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
-        <OTooltip :content="t('search.viewRelatedTooltip')" />
+        <OIcon v-if="!correlationAccess.allowed" name="lock" size="xs" class="ms-1" />
+        <OTooltip v-if="correlationAccess.allowed" :content="t('search.viewRelatedTooltip')" />
       </OButton>
+      <LockedFeatureTooltip
+        v-if="showViewRelatedBtn && !correlationAccess.allowed"
+        :message="correlationAccess.message"
+        icon="link"
+        :title="t('search.viewRelated')"
+      />
       <!-- Stream picker and its action read as one control, sized to sit level
            with the toolbar buttons above rather than towering over them. -->
       <div
@@ -139,25 +147,44 @@
             </ODropdownItem>
           </template>
           <ODropdownItem
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            v-if="store.state.zoConfig.ai_enabled"
             data-test="send-to-ai-chat-btn"
+            :disabled="!aiAssistantAccess.allowed"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
+            <template v-if="!aiAssistantAccess.allowed" #icon-right>
+              <OIcon name="lock" size="xs" class="shrink-0" />
+            </template>
           </ODropdownItem>
+          <LockedFeatureTooltip
+            v-if="store.state.zoConfig.ai_enabled && !aiAssistantAccess.allowed"
+            :message="aiAssistantAccess.message"
+            icon="smart-toy"
+            :title="t('logs.jsonPreview.sendToAiChat')"
+          />
           <ODropdownItem
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
             data-test="redirect-to-regex-pattern-btn"
+            :disabled="!regexPatternsAccess.allowed"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
               <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
+            <template v-if="!regexPatternsAccess.allowed" #icon-right>
+              <OIcon name="lock" size="xs" class="shrink-0" />
+            </template>
           </ODropdownItem>
+          <LockedFeatureTooltip
+            v-if="!regexPatternsAccess.allowed"
+            :message="regexPatternsAccess.message"
+            icon="pattern"
+            :title="t('regex_patterns.create_regex_pattern_field')"
+          />
         </ODropdown>
 
         <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
@@ -211,7 +238,7 @@
     </div>
     <ODialog
       data-test="json-preview-regex-pattern-dialog"
-      v-if="config.isEnterprise == 'true'"
+      v-if="regexPatternsAccess.allowed"
       v-model:open="typeOfRegexPattern"
       size="lg"
       :title="t('logs.jsonPreview.regexPatternTypeTitle')"
@@ -254,6 +281,8 @@ import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import config from "@/aws-exports";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -342,6 +371,7 @@ export default {
     OTooltip,
     OInput,
     OSelect,
+    LockedFeatureTooltip,
   },
   emits: [
     "copy",
@@ -509,6 +539,20 @@ export default {
     let multiStreamFields: any = ref([]);
 
     const showViewRelatedBtn = ref(false);
+    // Shown locked (not hidden) in builds that don't unlock it — see
+    // LockedFeatureTooltip's doc comment for the shared pattern.
+    const correlationAccess = computed(() =>
+      checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Same locked-visible treatment for the per-field "Send to AI Chat" and
+    // "Create regex pattern" menu items below — `ai_enabled` is a separate
+    // runtime toggle layered on top (hide, not lock) for the AI item only.
+    const aiAssistantAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const regexPatternsAccess = computed(() =>
+      checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
+    );
 
     // Initialize service correlation composable
     const { isCorrelationAvailable } = useServiceCorrelation();
@@ -517,24 +561,29 @@ export default {
     // The actual metric availability check happens when the button is clicked (in SearchResult.vue)
     onMounted(async () => {
       try {
-        // Gate correlation feature behind enterprise check to avoid 403 errors
-        if (config.isEnterprise !== "true") {
+        // Show button if we're in detail view (sidebar or expanded) AND
+        // service_streams is enabled in config AND hideViewRelated prop is
+        // not set (used by DetailTable drawer to hide the button).
+        // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
+        const isDetailView = props.mode === "sidebar" || props.mode === "expanded";
+        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
+        const wantsButton = isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+
+        if (!wantsButton) {
           showViewRelatedBtn.value = false;
           return;
         }
 
-        // Show button if correlation is available AND we're in detail view (sidebar or expanded)
-        // AND service_streams is enabled in config
-        // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
-        // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
-        const isDetailView = props.mode === "sidebar" || props.mode === "expanded";
-        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
-
-        if (isDetailView && serviceStreamsEnabled) {
-          const available = await isCorrelationAvailable();
-          showViewRelatedBtn.value =
-            available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+        if (!correlationAccess.value.allowed) {
+          // Locked — show it locked, but skip the correlation-availability
+          // probe entirely: that call hits a backend route an OSS build 403s
+          // on, so there's nothing useful to check before unlocking.
+          showViewRelatedBtn.value = true;
+          return;
         }
+
+        const available = await isCorrelationAvailable();
+        showViewRelatedBtn.value = available;
       } catch (err) {
         console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
@@ -708,6 +757,9 @@ export default {
     };
 
     const openCorrelation = () => {
+      // Defense in depth — the button's own `disabled` already blocks this,
+      // but that attribute can be stripped via devtools.
+      if (!correlationAccess.value.allowed) return;
       emit("show-correlation", props.value);
     };
 
@@ -877,6 +929,9 @@ export default {
       activeTab,
       showViewTraceBtn,
       showViewRelatedBtn,
+      correlationAccess,
+      aiAssistantAccess,
+      regexPatternsAccess,
       queryEditorRef,
       previewId,
       loading,

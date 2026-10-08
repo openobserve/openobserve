@@ -89,6 +89,41 @@ describe("MenuLink", async () => {
     windowOpen.mockRestore();
   });
 
+  // Regression test: the template gained a second root-level node
+  // (LockedFeatureTooltip, sibling to the tile) so Vue no longer
+  // auto-inherits $attrs onto the tile — a parent's `@click`/`@mouseenter`
+  // (ONavbar.vue, ONavGroup.vue both rely on this) would silently stop
+  // firing without the explicit `v-bind="{...$attrs, ...rootProps}"` fix.
+  it("forwards a parent-bound click listener to the tile (fragment-root attrs regression)", async () => {
+    const onClick = vi.fn();
+    const w = mount(MenuLink, {
+      props: { title: "Logs", link: "/logs" },
+      attrs: { onClick },
+      global: {
+        plugins: [i18n, mockRouter],
+        provide: { store },
+      },
+    });
+    await w.find('[data-test="menu-link-/logs-item"]').trigger("click");
+    expect(onClick).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("forwards a parent-bound mouseenter listener to the tile (fragment-root attrs regression)", async () => {
+    const onMouseenter = vi.fn();
+    const w = mount(MenuLink, {
+      props: { title: "Logs", link: "/logs" },
+      attrs: { onMouseenter },
+      global: {
+        plugins: [i18n, mockRouter],
+        provide: { store },
+      },
+    });
+    await w.find('[data-test="menu-link-/logs-item"]').trigger("mouseenter");
+    expect(onMouseenter).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
   it("should render icon when icon prop is provided", async () => {
     await wrapper.setProps({ icon: "home" });
     expect(wrapper.findComponent(OIcon).exists()).toBe(true);

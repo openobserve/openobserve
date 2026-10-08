@@ -47,15 +47,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
           </OToggleGroupItem>
           <OToggleGroupItem
-            v-if="config.isEnterprise == 'true'"
+            v-if="serviceGraphAccess.visible"
             data-test="traces-service-graph-toggle"
             value="service-graph"
             size="sm"
-            :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
+            :disabled="!serviceGraphAccess.allowed"
+            :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
+            :tooltip="
+              serviceGraphAccess.allowed && shouldHideToggleText
+                ? t('traces.serviceGraphTab')
+                : undefined
+            "
           >
             <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
             <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
           </OToggleGroupItem>
+          <LockedFeatureTooltip
+            v-if="serviceGraphAccess.visible && !serviceGraphAccess.allowed"
+            :message="serviceGraphAccess.message"
+            icon="share"
+            :title="t('traces.serviceGraphTab')"
+          />
           <OToggleGroupItem
             data-test="traces-search-mode-services-catalog-btn"
             value="services-catalog"
@@ -509,6 +521,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -559,6 +573,7 @@ export default defineComponent({
     OSwitch,
     OSelect,
     OTooltip,
+    LockedFeatureTooltip,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     SyntaxGuide,
   },
@@ -1119,6 +1134,7 @@ export default defineComponent({
         !searchObj.data.errorMsg?.trim()?.length &&
         !!searchObj.searchApplied,
     );
+    const serviceGraphAccess = useLockedAffordance("enterprise");
 
     return {
       t,
@@ -1165,6 +1181,7 @@ export default defineComponent({
       updateSavedViewFromCurrent,
       deleteTracesSavedView,
       applySavedView,
+      serviceGraphAccess,
     };
   },
   computed: {

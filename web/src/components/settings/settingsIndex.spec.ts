@@ -424,13 +424,13 @@ describe("SettingsIndex.vue", () => {
       expect(findEntry(wrapper)?.visible).toBe(false);
     });
 
-    it("is hidden in an OSS build even in the meta org", () => {
-      // The API only exists behind the enterprise feature, so the entry would lead nowhere.
+    it("shows locked (not hidden) in an OSS build, even in the meta org", () => {
       config.isEnterprise = "false";
       isMetaOrgRef.value = true;
       wrapper = createWrapper();
 
-      expect(findEntry(wrapper)?.visible).toBe(false);
+      expect(findEntry(wrapper)?.visible).toBe(true);
+      expect(findEntry(wrapper)?.locked).toBe(true);
     });
 
     it("sends an enterprise non-meta org back to General", () => {

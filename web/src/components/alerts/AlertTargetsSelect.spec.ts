@@ -120,6 +120,20 @@ describe("AlertTargetsSelect", () => {
       ]);
     });
 
+    it("locked: the Workflows header still shows with nothing selectable beneath it", () => {
+      const wrapper = createWrapper({
+        destinationOptions: ["slack"],
+        workflowOptions: [{ label: "Escalate", value: "wf-1" }],
+        workflowsEnabled: false,
+        workflowsLocked: true,
+      });
+      expect(select(wrapper).props("options")).toEqual([
+        { header: true, label: "Destinations" },
+        { label: "slack", value: "dest:slack" },
+        { header: true, label: "Workflows" },
+      ]);
+    });
+
     it("normalizes {label,value} destination options", () => {
       const wrapper = createWrapper({
         destinationOptions: [{ label: "Slack #ops", value: "slack" }],
@@ -332,6 +346,20 @@ describe("AlertTargetsSelect", () => {
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("create-workflow")).toHaveLength(1);
+    });
+
+    // Discoverable instead of absent: the family supports workflow routing
+    // but this edition doesn't unlock it, so the button stays visible, just
+    // disabled, with the FeatureKey's message behind a lock tooltip.
+    it("shows a disabled, locked Create Workflow button when the edition doesn't unlock it", () => {
+      const wrapper = createWrapper({
+        workflowsEnabled: false,
+        workflowsLocked: true,
+        workflowsLockMessage: "Upgrade to unlock workflows",
+      });
+      const btn = wrapper.find('[data-test="create-workflow-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
     });
   });
 

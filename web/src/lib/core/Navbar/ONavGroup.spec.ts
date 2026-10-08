@@ -9,6 +9,11 @@ import ONavGroup from "./ONavGroup.vue";
 import type { SubnavChild } from "./ONavbar.types";
 import { NAV_GROUPS } from "./navGroups";
 
+// OSS by default — exercises the locked-not-hidden path for FeatureKey-gated
+// children (e.g. `gate: "enterprise"` on Service Graph). None of the other
+// tests in this file use a FeatureKey gate, so this has no effect on them.
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "false", isCloud: "false" } }));
+
 // Hover debounce delays — keep in sync with OPEN_DELAY / CLOSE_DELAY in
 // ONavGroup.vue. The tests drive them with fake timers.
 const OPEN_DELAY = 120;
@@ -930,6 +935,86 @@ describe("ONavGroup", () => {
       expect(query.get("query")).toBe("c2VydmljZQ==");
     });
   });
+
+  describe("locked FeatureKey-gated child (e.g. Service Graph in OSS)", () => {
+    // Mirrors the real traces children, with `gate: "enterprise"` on Service
+    // Graph — the actual shape from navGroups.ts, unlike `tracesChildren`
+    // above which has no gate and so never exercises the locked path.
+    const lockedTracesChildren: SubnavChild[] = [
+      { titleKey: "traces.spansTab", icon: "layers", name: "traces", tab: "spans" },
+      {
+        titleKey: "menu.serviceGraph",
+        icon: "share",
+        name: "traces",
+        tab: "service-graph",
+        gate: "enterprise",
+      },
+    ];
+
+    async function mountLocked(path: string) {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+        ],
+      });
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "traces",
+          title: "Traces",
+          icon: "account-tree",
+          children: lockedTracesChildren,
+          parentItem: { link: "/traces", title: "Traces", icon: "account-tree", name: "traces" },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return { wrapper: w, router };
+    }
+
+    it("renders the locked child as a non-navigating element, not a router-link", async () => {
+      const { wrapper: w } = await mountLocked("/traces");
+      const el = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
+      expect(el.element.tagName).toBe("DIV");
+      expect(el.attributes("href")).toBeUndefined();
+      expect(el.attributes("aria-disabled")).toBe("true");
+      wrapper = w;
+    });
+
+    // The actual bug reported: clicking the locked item while viewing an
+    // unrelated page (e.g. Logs) must NOT navigate anywhere — not to Service
+    // Graph, and not to a fallback tab like Spans.
+    it("does not navigate when the locked child is clicked", async () => {
+      const { wrapper: w, router } = await mountLocked("/");
+      expect(router.currentRoute.value.fullPath).toBe("/");
+
+      await w.get('[data-test="nav-group-item-traces-service-graph-locked"]').trigger("click");
+      await flushPromises();
+
+      expect(router.currentRoute.value.fullPath).toBe("/");
+      wrapper = w;
+    });
+
+    it("still lets the UNLOCKED sibling child navigate normally", async () => {
+      const { wrapper: w, router } = await mountLocked("/");
+
+      await w.get('[data-test="nav-group-item-traces-spans"]').trigger("click");
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe("traces");
+      expect(router.currentRoute.value.query.tab).toBe("spans");
+      wrapper = w;
+    });
+  });
+
   describe("Experience flyout", () => {
     const view = { template: "<div />" };
     const experienceChildren = NAV_GROUPS.find((g) => g.key === "experience")!.children;
