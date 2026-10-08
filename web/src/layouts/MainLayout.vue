@@ -850,6 +850,18 @@ export default defineComponent({
       );
     };
 
+    const updateAutoObserveMenu = () => {
+      if (config.isEnterprise != "true") return;
+      if (linksList.value.some((link) => link.name === "autoobserve")) return;
+      const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+      linksList.value.splice(alertIndex === -1 ? linksList.value.length : alertIndex, 0, {
+        title: t("menu.autoobserve"),
+        icon: "navigation",
+        link: "/autoobserve",
+        name: "autoobserve",
+      });
+    };
+
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       syncGatedMenuEntry("workflows", "workflows", isWorkflowsEnabled.value, "alertList", {
@@ -953,6 +965,7 @@ export default defineComponent({
     // A separate top-level rail item here would be a second gate to keep in
     // sync.
     const filterMenus = () => {
+      updateAutoObserveMenu();
       updateIncidentsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
