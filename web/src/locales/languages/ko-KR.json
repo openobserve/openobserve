@@ -1319,7 +1319,12 @@
     "kubernetes2": "쿠버네티스 2",
     "topQueries": "상위 쿼리",
     "profiles": "프로파일",
-    "productAnalytics": "제품 분석"
+    "productAnalytics": "제품 분석",
+    "trialEndedTitle": "체험판이 종료되었습니다",
+    "trialPageNeedsPlan": "{page}에는 플랜이 필요합니다",
+    "trialPageNeedsPlanToast": "{page}에는 플랜이 필요합니다. 계속 사용하려면 이 페이지에서 플랜을 선택하세요.",
+    "trialChoosePlanToast": "{product}을(를) 계속 사용하려면 이 페이지에서 플랜을 선택하세요.",
+    "trialFlyoutNote": "체험판이 종료되었습니다. 잠금 표시가 있는 페이지는 플랜이 필요합니다."
   },
   "profiles": {
     "title": "프로파일",

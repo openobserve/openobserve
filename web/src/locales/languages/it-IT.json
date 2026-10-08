@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Query principali",
     "profiles": "Profili",
-    "productAnalytics": "Analisi di prodotto"
+    "productAnalytics": "Analisi di prodotto",
+    "trialEndedTitle": "La tua prova è terminata",
+    "trialPageNeedsPlan": "{page} richiede un piano",
+    "trialPageNeedsPlanToast": "{page} richiede un piano. Scegline uno in questa pagina per continuare a usarlo.",
+    "trialChoosePlanToast": "Scegli un piano in questa pagina per continuare a usare {product}.",
+    "trialFlyoutNote": "La tua prova è terminata. Le pagine con un lucchetto richiedono un piano."
   },
   "profiles": {
     "title": "Profili",

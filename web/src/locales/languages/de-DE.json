@@ -1290,7 +1290,7 @@
     "help": "Hilfe",
     "dashboard": "Dashboards",
     "data": "Daten",
-    "alerts": "Warnmeldungen",
+    "alerts": "Alarme",
     "incidents": "Vorfälle",
     "docs": "Dokumentation",
     "billings": "Abrechnungen",
@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Top-Abfragen",
     "profiles": "Profile",
-    "productAnalytics": "Produktanalyse"
+    "productAnalytics": "Produktanalyse",
+    "trialEndedTitle": "Ihre Testphase ist beendet",
+    "trialPageNeedsPlan": "{page} benötigt einen Plan",
+    "trialPageNeedsPlanToast": "{page} benötigt einen Plan. Wählen Sie einen auf dieser Seite, um sie weiter zu nutzen.",
+    "trialChoosePlanToast": "Wählen Sie einen Plan auf dieser Seite, um {product} weiter zu nutzen.",
+    "trialFlyoutNote": "Ihre Testphase ist beendet. Seiten mit einem Schloss benötigen einen Plan."
   },
   "profiles": {
     "title": "Profile",
@@ -7574,7 +7579,7 @@
       "linkUrlInvalid": "Link \"{label}\": {reason}",
       "linkUrlNotAUrl": "Geben Sie eine gültige URL ein — z. B. https://example.com/runbook, einen Pfad wie /web/logs oder eine {'{'}Variable{'}'}."
     },
-    "header": "Warnmeldungen",
+    "header": "Alarme",
     "subtitle": "Alarmregeln und Benachrichtigungskanäle",
     "searchThisFolder": "Dieser Ordner",
     "searchAllFolders": "Alle Ordner",

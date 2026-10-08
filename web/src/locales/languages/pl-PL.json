@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Najczęstsze zapytania",
     "profiles": "Profile",
-    "productAnalytics": "Analityka produktu"
+    "productAnalytics": "Analityka produktu",
+    "trialEndedTitle": "Twój okres próbny zakończył się",
+    "trialPageNeedsPlan": "{page} wymaga planu",
+    "trialPageNeedsPlanToast": "{page} wymaga planu. Wybierz plan na tej stronie, aby dalej z niego korzystać.",
+    "trialChoosePlanToast": "Wybierz plan na tej stronie, aby dalej korzystać z {product}.",
+    "trialFlyoutNote": "Twój okres próbny zakończył się. Strony z ikoną blokady wymagają planu."
   },
   "profiles": {
     "title": "Profile",

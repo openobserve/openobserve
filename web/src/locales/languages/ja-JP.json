@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "トップクエリ",
     "profiles": "プロファイル",
-    "productAnalytics": "プロダクト分析"
+    "productAnalytics": "プロダクト分析",
+    "trialEndedTitle": "トライアルが終了しました",
+    "trialPageNeedsPlan": "{page}にはプランが必要です",
+    "trialPageNeedsPlanToast": "{page}にはプランが必要です。引き続き使用するには、このページでプランを選択してください。",
+    "trialChoosePlanToast": "{product}を引き続き使用するには、このページでプランを選択してください。",
+    "trialFlyoutNote": "トライアルが終了しました。ロックが付いたページにはプランが必要です。"
   },
   "profiles": {
     "title": "プロファイル",

@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "热门查询",
     "profiles": "性能分析",
-    "productAnalytics": "产品分析"
+    "productAnalytics": "产品分析",
+    "trialEndedTitle": "您的试用已结束",
+    "trialPageNeedsPlan": "{page} 需要订阅计划",
+    "trialPageNeedsPlanToast": "{page} 需要订阅计划。请在本页选择一个计划以继续使用。",
+    "trialChoosePlanToast": "请在本页选择一个计划以继续使用 {product}。",
+    "trialFlyoutNote": "您的试用已结束。带锁标记的页面需要订阅计划。"
   },
   "profiles": {
     "title": "性能分析",

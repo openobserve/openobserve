@@ -1319,7 +1319,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Top Queries",
     "profiles": "Profiles",
-    "productAnalytics": "Product Analytics"
+    "productAnalytics": "Product Analytics",
+    "trialEndedTitle": "Your trial has ended",
+    "trialPageNeedsPlan": "{page} needs a plan",
+    "trialPageNeedsPlanToast": "{page} needs a plan. Choose one on this page to keep using it.",
+    "trialChoosePlanToast": "Choose a plan on this page to keep using {product}.",
+    "trialFlyoutNote": "Your trial has ended. Pages with a lock need a plan."
   },
   "profiles": {
     "title": "Profiles",
