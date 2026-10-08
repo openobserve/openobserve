@@ -250,7 +250,7 @@ impl DbAdapter for PostgresAdapter {
         // Get column info for proper null type binding
         let column_infos = self.get_columns(table).await?;
 
-        // Conflict on the target's key: partitioned file_list tables have none, unlike SQLite's `id`
+        // Conflict on the target's key: partitioned file_list tables have none, unlike SQLite's id
         let target_keys = self.get_primary_keys(table).await?;
         let sql = build_upsert_sql(table, columns, &target_keys);
 
