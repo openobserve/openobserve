@@ -40,7 +40,9 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   tiles at the top of a list/dashboard. Data-driven via `:items`
   (`{ key, label, value, icon, tone, max?, trend?, selectable?, dataTest }`);
   `tone` (`success | warning | error | primary | info | orange | neutral`) is the
-  single colour knob. `max` draws a proportion bar (share of total). The tone icon
+  single colour knob. Pass `:loading` so values hold a skeleton until the first
+  load lands instead of reading "0" (copy-and-values.md § Loading is not zero).
+  `max` draws a proportion bar (share of total). The tone icon
   sits in a **rounded-square chip** (`rounded-default`) — every icon chip in the
   app is a rounded square, never a circle (`rounded-full`). Set `selectable` +
   `:selected-key` + `@select` to make tiles **double as filters**. Compose
