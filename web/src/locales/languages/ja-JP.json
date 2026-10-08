@@ -8079,6 +8079,19 @@
     "wouldTrigger": "トリガーする",
     "wouldNotTrigger": "トリガーされない",
     "queryBuilder": "ビルダー",
+    "saveModeDialog": {
+      "title": "クエリモードを選択",
+      "leadAllSetUp": "{first}、{second}、{third}はすべて設定済みです。",
+      "leadBothSetUp": "{first}と{second}はどちらも設定済みです。",
+      "leadSelectedEmptyOneOther": "{selected}が選択されていますが空です。{other}は設定済みです。",
+      "leadSelectedEmptyTwoOthers": "{selected}が選択されていますが空です。{first}と{second}は設定済みです。",
+      "noFilters": "フィルターがないため、{stream}のすべての行が対象になります",
+      "noQuery": "クエリがまだ記述されていません",
+      "noteOneOtherUnused": "{pick}モードのみ実行されます。{other}モードは使用されません。",
+      "noteOnlyPick": "{pick}モードのみ実行されます。",
+      "noteTwoOthersUnused": "{pick}モードのみ実行されます。{first}モードと{second}モードは使用されません。",
+      "saveWithMode": "{mode}モードで保存"
+    },
     "conditions": {
       "condition": "コンディション",
       "conditionGroup": "条件グループ",

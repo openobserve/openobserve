@@ -8074,6 +8074,19 @@
     "wouldTrigger": "會觸發",
     "wouldNotTrigger": "不會觸發",
     "queryBuilder": "建構器",
+    "saveModeDialog": {
+      "title": "選擇查詢模式",
+      "leadAllSetUp": "{first}、{second} 和 {third} 都已設定完成。",
+      "leadBothSetUp": "{first} 和 {second} 都已設定完成。",
+      "leadSelectedEmptyOneOther": "已選取 {selected}，但內容為空。{other} 已設定完成。",
+      "leadSelectedEmptyTwoOthers": "已選取 {selected}，但內容為空。{first} 和 {second} 已設定完成。",
+      "noFilters": "沒有篩選條件，因此 {stream} 中的每一列都會計入",
+      "noQuery": "尚未撰寫查詢",
+      "noteOneOtherUnused": "只會執行 {pick} 模式。{other} 模式不會使用。",
+      "noteOnlyPick": "只會執行 {pick} 模式。",
+      "noteTwoOthersUnused": "只會執行 {pick} 模式。{first} 和 {second} 模式不會使用。",
+      "saveWithMode": "以 {mode} 模式儲存"
+    },
     "conditions": {
       "condition": "條件",
       "conditionGroup": "條件群組",

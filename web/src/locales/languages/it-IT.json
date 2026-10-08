@@ -8079,6 +8079,19 @@
     "wouldTrigger": "INNESCHEREBBE",
     "wouldNotTrigger": "NON SI INNESCHEREBBE",
     "queryBuilder": "Costruttore",
+    "saveModeDialog": {
+      "title": "Scegli la modalità query",
+      "leadAllSetUp": "{first}, {second} e {third} sono tutti configurati.",
+      "leadBothSetUp": "{first} e {second} sono entrambi configurati.",
+      "leadSelectedEmptyOneOther": "{selected} è selezionato ma vuoto. {other} è configurato.",
+      "leadSelectedEmptyTwoOthers": "{selected} è selezionato ma vuoto. {first} e {second} sono configurati.",
+      "noFilters": "Nessun filtro, quindi ogni riga in {stream} viene conteggiata",
+      "noQuery": "Nessuna query ancora scritta",
+      "noteOneOtherUnused": "Viene eseguita solo la modalità {pick}. La modalità {other} non viene utilizzata.",
+      "noteOnlyPick": "Viene eseguita solo la modalità {pick}.",
+      "noteTwoOthersUnused": "Viene eseguita solo la modalità {pick}. Le modalità {first} e {second} non vengono utilizzate.",
+      "saveWithMode": "Salva con la modalità {mode}"
+    },
     "conditions": {
       "condition": "Condizione",
       "conditionGroup": "Gruppo di condizioni",
