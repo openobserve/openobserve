@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { shallowMount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { mount, shallowMount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("vue-router", () => ({ useRoute: () => ({ params: { slug: "abc" } }) }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ params: { slug: "abc" }, query: {} }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
 vi.mock("@/services/public_dashboards", () => ({
   default: { getConfig: vi.fn(), getData: vi.fn() },
 }));
@@ -26,6 +29,7 @@ vi.mock("@/services/public_dashboards", () => ({
 import service from "@/services/public_dashboards";
 import PublicDashboard from "@/views/Dashboards/PublicDashboard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
+import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
@@ -80,6 +84,31 @@ const pickRange = (w: VueWrapper, key: string) =>
 const okSnapshot = (data: unknown) => ({
   status: 200,
   data: { panels: { p1: { state: { state: "ok" }, data } } },
+});
+const ABSOLUTE = {
+  key: "a1000000-86401000000",
+  type: "absolute",
+  start: 1_000_000,
+  end: 86_401_000_000,
+};
+const mockAbsoluteLink = () => {
+  vi.mocked(service.getConfig).mockResolvedValue({
+    data: {
+      ...CONFIG,
+      ranges: [ABSOLUTE],
+      default_key: ABSOLUTE.key,
+      available_keys: [ABSOLUTE.key],
+    },
+    status: 200,
+  } as never);
+  vi.mocked(service.getData).mockResolvedValue({
+    status: 200,
+    data: { built_at: 1_800_000_000_000_000, panels: { p1: { state: { state: "ok" }, data: [] } } },
+  } as never);
+};
+const panelsConfig = (panels: Array<Record<string, unknown>>) => ({
+  ...CONFIG,
+  layout: [{ tabId: "t1", name: "Overview", panels }],
 });
 
 describe("PublicDashboard viewer", () => {
@@ -280,39 +309,79 @@ describe("PublicDashboard viewer", () => {
     expect(find(w, "dashboards-public-dashboard-next-refresh").text()).toBe("Next refresh in 7s");
   });
 
-  it("shows an absolute range's fixed window without a countdown or polling", async () => {
+  it("shows an absolute range's fixed window without a countdown, checking status each minute", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_800_000_020_000);
-    const absolute = {
-      key: "a1000000-86401000000",
-      type: "absolute",
-      start: 1_000_000,
-      end: 86_401_000_000,
-    };
+    mockAbsoluteLink();
+    const w = mountWithActions();
+    await flushPromises();
+    expect(service.getData).toHaveBeenCalledWith("abc", ABSOLUTE.key);
+    expect(grid(w).props("currentTimeObj").__global.start_time.getTime()).toBe(1000);
+    expect(grid(w).props("currentTimeObj").__global.end_time.getTime()).toBe(86_401_000);
+    expect(has(w, "dashboards-public-dashboard-next-refresh")).toBe(false);
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a pause to a viewer on an absolute range within a minute", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
+    mockAbsoluteLink();
+    const w = buildWrapper();
+    await flushPromises();
+    expect(grid(w).exists()).toBe(true);
+
+    vi.mocked(service.getConfig).mockRejectedValue({ response: { status: 503 } });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(w.text()).toContain("turned off right now");
+  });
+
+  it("shows a revoke to a viewer on a day-long cadence within a minute", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
     vi.mocked(service.getConfig).mockResolvedValue({
-      data: {
-        ...CONFIG,
-        ranges: [absolute],
-        default_key: absolute.key,
-        available_keys: [absolute.key],
-      },
+      data: { ...CONFIG, refresh_secs: 86_400 },
       status: 200,
     } as never);
     vi.mocked(service.getData).mockResolvedValue({
       status: 200,
-      data: {
-        built_at: 1_800_000_000_000_000,
-        panels: { p1: { state: { state: "ok" }, data: [] } },
-      },
+      data: { built_at: 1_800_000_000_000_000, panels: { p1: { state: { state: "ok" } } } },
     } as never);
-    const w = mountWithActions();
+    const w = buildWrapper();
     await flushPromises();
-    expect(service.getData).toHaveBeenCalledWith("abc", absolute.key);
-    expect(grid(w).props("currentTimeObj").__global.start_time.getTime()).toBe(1000);
-    expect(grid(w).props("currentTimeObj").__global.end_time.getTime()).toBe(86_401_000);
-    expect(has(w, "dashboards-public-dashboard-next-refresh")).toBe(false);
-    await vi.advanceTimersByTimeAsync(120_000);
+    expect(grid(w).exists()).toBe(true);
+
+    vi.mocked(service.getConfig).mockRejectedValue({ response: { status: 503 } });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(w.text()).toContain("turned off right now");
+
+    vi.mocked(service.getConfig).mockRejectedValue({ response: { status: 404 } });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(w.text()).toContain("doesn't exist or was turned off");
+    const calls = vi.mocked(service.getConfig).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(calls);
+  });
+
+  it("does not re-read nonstop on a month-long cadence", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_800_000_020_000);
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: { ...CONFIG, refresh_secs: 2_592_000 },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { built_at: 1_800_000_000_000_000, panels: { p1: { state: { state: "ok" } } } },
+    } as never);
+    buildWrapper();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(59_000);
     expect(service.getConfig).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(241_000);
+    expect(service.getConfig).toHaveBeenCalledTimes(6);
   });
 
   it("offers the time range picker only when viewers can switch", async () => {
@@ -459,6 +528,129 @@ describe("PublicDashboard viewer", () => {
     await flushPromises();
     const p1 = grid(w).props("injectedPanelData").p1;
     expect(p1.data).toEqual([]);
-    expect(p1.errorDetail.message).toContain("isn't available on the public view");
+    expect(p1.errorDetail.message).toBe("This panel isn't available on the public view.");
+    // The renderer replaces the message of a non-4xx error with "Error Loading Data".
+    expect(p1.errorDetail.code).toMatch(/^4/);
+  });
+
+  it("renders markdown and HTML panels from the layout without an error", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: panelsConfig([
+        { id: "md", type: "markdown", markdownContent: "# Hi" },
+        { id: "html", type: "html", htmlContent: "<b>Hi</b>" },
+      ]),
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: { md: { state: { state: "not_available", reason: "no_query" } } } },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const injected = grid(w).props("injectedPanelData");
+    for (const id of ["md", "html"]) {
+      expect(injected[id]).toEqual({ data: [], metadata: { queries: [] }, resultMetaData: [] });
+    }
+  });
+
+  it("shows a custom chart as not available on the public view", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: panelsConfig([{ id: "cc", type: "custom_chart" }]),
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: {} },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const cc = grid(w).props("injectedPanelData").cc;
+    expect(cc.errorDetail.message).toBe("This panel isn't available on the public view.");
+    expect(cc.errorDetail.code).toMatch(/^4/);
+  });
+
+  it("shows a panel added since the last build as coming with the next update", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: panelsConfig([
+        { id: "p1", type: "line" },
+        { id: "new", type: "line" },
+      ]),
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([[{ y: 1 }]]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const injected = grid(w).props("injectedPanelData");
+    expect(injected.p1.data).toEqual([[{ y: 1 }]]);
+    expect(injected.p1.errorDetail).toBeUndefined();
+    expect(injected.new.errorDetail.message).toBe("This panel will appear after the next update.");
+    expect(injected.new.errorDetail.code).toMatch(/^4/);
+  });
+
+  it("gets its messages and markdown content past the real panel renderer", async () => {
+    const panels = [
+      { id: "p1", type: "line", queryType: "sql", queries: [], config: {} },
+      { id: "new", type: "line", queryType: "sql", queries: [], config: {} },
+      { id: "cc", type: "custom_chart", queryType: "sql", queries: [], config: {} },
+      {
+        id: "md",
+        type: "markdown",
+        queryType: "sql",
+        queries: [],
+        config: {},
+        markdownContent: "# Hi",
+      },
+    ];
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: panelsConfig(panels),
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue({
+      status: 200,
+      data: { panels: { p1: { state: { state: "not_available", reason: "unauthorized" } } } },
+    } as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const injected = grid(w).props("injectedPanelData");
+    const render = async (panelSchema: (typeof panels)[number]) => {
+      const r = mount(PanelSchemaRenderer, {
+        props: {
+          selectedTimeObj: { start_time: new Date(0), end_time: new Date(1000) },
+          panelSchema,
+          variablesData: { values: [] },
+          injectedPromqlData: injected[panelSchema.id],
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          stubs: {
+            ChartRenderer: true,
+            MarkdownRenderer: {
+              props: ["markdownContent"],
+              template: "<div data-test='md'>{{ markdownContent }}</div>",
+            },
+          },
+        },
+      });
+      await flushPromises();
+      return r;
+    };
+    const error = (r: VueWrapper) => r.find('[data-test="panel-schema-renderer-error-message"]');
+    const notAvailable = "This panel isn't available on the public view.";
+    expect(error(await render(panels[0])).text()).toBe(notAvailable);
+    expect(error(await render(panels[1])).text()).toBe(
+      "This panel will appear after the next update.",
+    );
+    expect(error(await render(panels[2])).text()).toBe(notAvailable);
+    const md = await render(panels[3]);
+    expect(error(md).exists()).toBe(false);
+    expect(md.find('[data-test="md"]').text()).toBe("# Hi");
   });
 });

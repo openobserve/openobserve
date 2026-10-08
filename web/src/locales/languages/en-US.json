@@ -5299,6 +5299,7 @@
       "footerNote": "Read-only view. Anyone with the link can see this dashboard.",
       "footerNoteRefresh": "Read-only view, refreshed every {interval}. Anyone with the link can see this dashboard.",
       "panelNotAvailable": "This panel isn't available on the public view.",
+      "panelPreparing": "This panel will appear after the next update.",
       "shareTooltip": "Publish publicly",
       "publicLink": "Public link",
       "linkHint": "Anyone with this link can view a read-only, periodically refreshed copy. No sign-in required.",

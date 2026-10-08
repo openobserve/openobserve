@@ -253,26 +253,41 @@ const currentTimeObj = computed(() => {
   return { __global: { start_time: new Date(startMs), end_time: new Date(endMs) } };
 });
 
-// Each panel renders its snapshot instead of querying; withheld panels carry a message.
+const emptyPanelData = () => ({ data: [], metadata: { queries: [] }, resultMetaData: [] });
+
+// The renderer prints only a 4xx error's own message; any other code reads "Error Loading Data".
+const panelNotice = (message: I18nText) => ({
+  ...emptyPanelData(),
+  errorDetail: { message, code: "403" },
+});
+
+// Markdown and HTML carry their content in the layout, so they need no snapshot.
+const CONTENT_PANEL_TYPES = ["markdown", "html"];
+
+const panelEntry = (panel: { id: string; type?: string }) => {
+  if (CONTENT_PANEL_TYPES.includes(panel.type ?? "")) return emptyPanelData();
+  // A custom chart runs the author's script, so it is never built for the public view.
+  if (panel.type === "custom_chart") {
+    return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
+  }
+  const snap = snapshot.value?.panels?.[panel.id];
+  // A panel added since the last build has no entry until the next rebuild.
+  if (!snap) return panelNotice(t("dashboard.publicDashboard.panelPreparing"));
+  if (snap.state?.state !== "ok") {
+    return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
+  }
+  return {
+    data: snap.data ?? [],
+    metadata: snap.metadata ?? { queries: [] },
+    resultMetaData: snap.resultMetaData ?? [],
+  };
+};
+
+// Each panel renders its snapshot instead of querying.
 const injectedPanelData = computed(() => {
   const out: Record<string, unknown> = {};
   for (const tab of tabs.value) {
-    for (const panel of tab?.panels ?? []) {
-      const snap = snapshot.value?.panels?.[panel.id];
-      out[panel.id] =
-        snap?.state?.state === "ok"
-          ? {
-              data: snap.data ?? [],
-              metadata: snap.metadata ?? { queries: [] },
-              resultMetaData: snap.resultMetaData ?? [],
-            }
-          : {
-              data: [],
-              metadata: { queries: [] },
-              resultMetaData: [],
-              errorDetail: { message: t("dashboard.publicDashboard.panelNotAvailable"), code: "" },
-            };
-    }
+    for (const panel of tab?.panels ?? []) out[panel.id] = panelEntry(panel);
   }
   return out;
 });
@@ -405,8 +420,8 @@ const load = async () => {
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const refreshSecs = computed(() => Number(config.value?.refresh_secs) || 0);
 const hasRelative = computed(() => ranges.value.some((r) => r.type === "relative"));
-// An absolute range never changes, so it shows no countdown and the page stops polling for it.
-const pollsForSelection = computed(
+// An absolute range's data never changes, so it shows no countdown and is not aimed at rebuilds.
+const rebuildsSelection = computed(
   () => refreshSecs.value > 0 && selectedRange.value?.type !== "absolute",
 );
 const footerNote = computed<I18nText>(() =>
@@ -417,9 +432,8 @@ const footerNote = computed<I18nText>(() =>
     : t("dashboard.publicDashboard.footerNote"),
 );
 
-// Re-read on the author's "Refresh every" cadence — the same interval the snapshot rebuilds on.
+// Config is re-read before data so every read also sees a paused, revoked, expired or edited link.
 const refresh = async () => {
-  if (state.value === "notfound" || state.value === "expired") return;
   try {
     const res = await publicDashboardsService.getConfig(slug);
     applyConfig(res.data ?? {});
@@ -439,34 +453,38 @@ const REBUILD_GRACE_MS = 2000;
 const PREPARING_POLL_MS = 5000;
 // A late rebuild is re-checked this often, so the countdown doesn't sit at "Refreshing" for a whole cadence.
 const OVERDUE_POLL_MS = 15000;
+// A pause, revoke, expiry or edit must reach every open page this soon, whatever the cadence or range.
+const STATUS_CHECK_MS = 60000;
+const FINAL_STATES: ViewState[] = ["notfound", "expired"];
 
 // Date.now() isn't reactive, so the countdown reads this ticking copy.
 const nowMs = ref(Date.now());
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 const nextRefreshLabel = computed<I18nText | "">(() => {
-  if (!builtAt.value || !pollsForSelection.value) return "";
+  if (!builtAt.value || !rebuildsSelection.value) return "";
   const left = Math.ceil((builtAt.value / 1000 + refreshSecs.value * 1000 - nowMs.value) / 1000);
   return left > 0
     ? t("dashboard.publicDashboard.nextRefreshIn", { time: raw(durationFormatter(left)) })
     : t("dashboard.publicDashboard.refreshingNow");
 });
 
-// Aim the next read just after the next rebuild is due; overdue re-checks sooner, missing waits a cadence, failed backs off.
+// Aim the next read just after the next rebuild is due, never later than the status check; overdue re-checks sooner, failed backs off.
 const nextRefreshDelay = (): number => {
   if (failures.value > 0) {
     return RETRY_DELAYS_MS[Math.min(failures.value, RETRY_DELAYS_MS.length) - 1];
   }
+  if (state.value === "preparing") return PREPARING_POLL_MS;
+  if (!rebuildsSelection.value || !builtAt.value) return STATUS_CHECK_MS;
   const cadenceMs = refreshSecs.value * 1000;
-  if (state.value === "preparing") return Math.min(cadenceMs, PREPARING_POLL_MS);
-  if (!builtAt.value) return cadenceMs;
   const due = builtAt.value / 1000 + cadenceMs + REBUILD_GRACE_MS - Date.now();
   if (due <= 0) return Math.min(cadenceMs, OVERDUE_POLL_MS);
-  return due <= cadenceMs + REBUILD_GRACE_MS ? due : cadenceMs;
+  // Also keeps a month-long cadence under setTimeout's ~24.8-day limit, past which it fires at once.
+  return Math.min(due, STATUS_CHECK_MS);
 };
 
 const scheduleRefresh = () => {
   if (refreshTimer) clearTimeout(refreshTimer);
-  if (!pollsForSelection.value && state.value !== "preparing" && failures.value === 0) return;
+  if (FINAL_STATES.includes(state.value)) return;
   refreshTimer = setTimeout(async () => {
     // Paused while the tab is hidden, so a background tab never polls.
     if (!document.hidden) await refresh();
