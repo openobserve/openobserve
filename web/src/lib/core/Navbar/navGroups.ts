@@ -300,6 +300,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         ],
       },
       { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.kubernetes2", icon: "hub", name: "infraKubernetes2" },
     ],
   },
   {
@@ -371,6 +372,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: PA_ROUTES.shell,
         requires: PA_ROUTES.shell,
         activeOnRoutes: Object.values(PA_ROUTES),
+        beta: true,
       },
     ],
   },
@@ -518,6 +520,7 @@ export function groupNavLinks(
   const emitGroup = (def: NavGroupDef) => {
     if (emittedGroups.has(def.key)) return;
     emittedGroups.add(def.key);
+    const children = groupChildren.get(def.key)!;
     result.push({
       type: "linkGroup",
       item: {
@@ -526,7 +529,9 @@ export function groupNavLinks(
         link: def.parentLink,
         name: def.key,
       },
-      children: groupChildren.get(def.key)!,
+      children,
+      // The removed children still light the tile and retarget its link.
+      filtered: def.children.filter((c) => !children.includes(c)),
     });
     // Groups anchored after THIS group (e.g. Data follows Reliability).
     emitAnchored(def.key);

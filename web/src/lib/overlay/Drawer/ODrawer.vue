@@ -61,6 +61,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   portalTarget: undefined,
   anchor: undefined,
   anchorEdge: "top",
+  modal: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -68,6 +69,9 @@ const emit = defineEmits<DrawerEmits>();
 defineSlots<DrawerSlots>();
 
 const slots = useSlots();
+
+const ESCAPE_KEEPS_OPEN =
+  "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
 // Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
 // boolean-casts an absent `open` prop to `false`, locking reka-ui into
@@ -117,7 +121,9 @@ function handleOpenChange(v: boolean) {
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  if (props.persistent || (!props.modal && target?.closest(ESCAPE_KEEPS_OPEN))) {
     e.preventDefault();
     return;
   }
@@ -125,7 +131,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
-  if (props.persistent) {
+  if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
   }
@@ -279,31 +285,44 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const AUTOFOCUS_TEXT_FIELDS = [
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+  "textarea:not([disabled])",
+].join(", ");
+const AUTOFOCUS_COMBOBOX = '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+
+function findAutoFocusTarget(root: Element): HTMLElement | null {
+  const scan = (selector: string): HTMLElement[] => {
+    const nested = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
+  };
+  const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
+    (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
+  );
+  if (textField) return textField;
+  return scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest("[data-no-autofocus]")) ?? null;
+}
 
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
     const body = bodyRef.value;
-    if (body) {
-      const candidates = body.querySelectorAll<HTMLElement>(
-        [
-          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          "textarea:not([disabled])",
-        ].join(", "),
-      );
-      const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
-      );
-      if (firstField) {
-        firstField.focus();
-        return;
-      }
+    const field = body ? findAutoFocusTarget(body) : null;
+    if (field) {
+      field.focus();
+      return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
+    const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
+    if (autofocus) {
+      autofocus.focus();
+      return;
+    }
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
+      return;
     }
+    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus();
   });
 }
 
@@ -375,7 +394,7 @@ watch(shown, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="shown" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />

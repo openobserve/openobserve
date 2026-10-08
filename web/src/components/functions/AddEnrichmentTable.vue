@@ -15,227 +15,190 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    data-test="add-enrichment-table-page"
-    class="h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+  <ODialog
+    data-test="add-enrichment-table-dialog"
+    :open="open"
+    size="md"
     :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
-    title-data-test="add-enrichment-table-title"
-    :back="{
-      label: t('function.enrichmentTables'),
-      onClick: () => $emit('cancel:hideform'),
-      dataTest: 'add-enrichment-table-back-btn',
-    }"
+    :secondary-button-label="t('function.cancel')"
+    :primary-button-label="t('function.save')"
+    form-id="add-enrichment-table-form"
+    @update:open="onOpenChange"
+    @click:secondary="$emit('cancel:hideform')"
   >
-    <!-- Inline page form. Save lives in the footer INSIDE the <OForm>, so it is a
-         native type="submit" (Enter submits) — no form-id needed. -->
     <OForm
       id="add-enrichment-table-form"
       :form="addEnrichmentTableForm"
-      class="flex min-h-0 flex-1 flex-col"
-      v-slot="{ isSubmitting }"
+      class="flex flex-col gap-5"
     >
-      <!-- Form content -->
-      <div class="bg-card-glass-bg mb-2 flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
-        <div class="flex max-w-[40rem] flex-col gap-4">
-          <OFormInput
-            name="name"
-            data-test="add-enrichment-table-name"
-            :label="t('function.name')"
-            required
-            :readonly="isUpdating"
-            :disabled="isUpdating"
-          />
+      <OFormInput
+        name="name"
+        data-test="add-enrichment-table-name"
+        :label="t('common.name')"
+        required
+        :readonly="isUpdating"
+        :disabled="isUpdating"
+      />
 
-          <!-- Data Source Selection (only for new tables) -->
-          <div v-if="!isUpdating" class="flex flex-col gap-2">
-            <div class="text-text-label font-bold">{{ t("function.dataSource") }}</div>
-            <OFormOptionGroup
-              name="source"
-              data-test="add-enrichment-table-source"
-              :options="sourceOptions"
-              orientation="horizontal"
-            />
-          </div>
+      <!-- Data Source Selection (only for new tables) -->
+      <div v-if="!isUpdating" class="flex flex-col gap-2">
+        <div class="text-text-label font-bold">{{ t("function.dataSource") }}</div>
+        <OFormOptionGroup
+          name="source"
+          data-test="add-enrichment-table-source"
+          :options="sourceOptions"
+          orientation="horizontal"
+        />
+      </div>
 
-          <!-- Upload File Option (file-based tables, add or update) -->
-          <OFormFile
-            v-if="formData.source === 'file'"
-            name="file"
-            data-test="add-enrichment-table-file"
-            :label="t('function.uploadCSVFile')"
-            accept=".csv"
-          />
+      <!-- Upload File Option (file-based tables, add or update) -->
+      <OFormFile
+        v-if="formData.source === 'file'"
+        name="file"
+        data-test="add-enrichment-table-file"
+        :label="t('function.uploadCSVFile')"
+        accept=".csv"
+      />
 
-          <!-- Append Toggle for File Upload (only when updating file-based tables) -->
-          <OFormSwitch
-            v-if="isUpdating && formData.source === 'file'"
-            name="append"
-            data-test="add-enrichment-table-append-switch"
-            :label="t('function.appendData')"
-          />
+      <!-- Append Toggle for File Upload (only when updating file-based tables) -->
+      <OFormSwitch
+        v-if="isUpdating && formData.source === 'file'"
+        name="append"
+        data-test="add-enrichment-table-append-switch"
+        :label="t('function.appendData')"
+      />
 
-          <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
-          <div v-if="isUpdating && formData.source === 'url'" class="flex flex-col gap-2">
-            <div class="text-text-label font-bold">{{ t("function.updateModeLabel") }}</div>
-            <OFormOptionGroup
-              name="updateMode"
-              data-test="add-enrichment-table-update-mode"
-              :options="updateModeOptions"
-              orientation="horizontal"
-            />
-          </div>
+      <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
+      <div v-if="isUpdating && formData.source === 'url'" class="flex flex-col gap-2">
+        <div class="text-text-label font-bold">{{ t("function.updateModeLabel") }}</div>
+        <OFormOptionGroup
+          name="updateMode"
+          data-test="add-enrichment-table-update-mode"
+          :options="updateModeOptions"
+          orientation="horizontal"
+        />
+      </div>
 
-          <!-- Show existing URLs (only when updating URL-based tables) -->
-          <div
-            v-if="
-              isUpdating &&
-              formData.source === 'url' &&
-              formData.urlJobs &&
-              formData.urlJobs.length > 0
-            "
-            class="flex flex-col gap-2"
-          >
-            <div class="text-text-label text-compact font-bold">
-              {{ t("function.existingUrlsCount", { count: formData.urlJobs.length }) }}
-            </div>
-            <div
-              class="rounded-default border-card-glass-border bg-surface-panel flex flex-col gap-1 border p-2"
-            >
-              <div v-for="(job, index) in formData.urlJobs" :key="job.id">
-                <div class="flex items-center gap-2">
-                  <span class="text-text-secondary text-xs font-medium"
-                    >{{ Number(index) + 1 }}.</span
-                  >
-                  <OIcon
-                    :name="
-                      job.status === 'completed'
-                        ? 'check-circle'
-                        : job.status === 'failed'
-                          ? 'warning'
-                          : job.status === 'processing'
-                            ? 'sync'
-                            : 'schedule'
-                    "
-                    size="sm"
-                    :class="[
-                      job.status === 'processing' ? 'animate-[spin_2s_linear_infinite]' : '',
-                      job.status === 'completed'
-                        ? 'text-status-positive'
-                        : job.status === 'failed'
-                          ? 'text-status-negative'
-                          : job.status === 'processing'
-                            ? 'text-accent'
-                            : 'text-icon-color',
-                    ]"
-                  />
-                  <div class="text-text-secondary text-compact break-all">
-                    {{ job.url }}
-                  </div>
-                </div>
-                <OSeparator v-if="Number(index) < formData.urlJobs.length - 1" class="my-1" />
+      <!-- Show existing URLs (only when updating URL-based tables) -->
+      <div
+        v-if="
+          isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0
+        "
+        class="flex flex-col gap-2"
+      >
+        <div class="text-text-label text-compact font-bold">
+          {{ t("function.existingUrlsCount", { count: formData.urlJobs.length }) }}
+        </div>
+        <div
+          class="rounded-default border-card-glass-border bg-surface-panel flex flex-col gap-1 border p-2"
+        >
+          <div v-for="(job, index) in formData.urlJobs" :key="job.id">
+            <div class="flex items-center gap-2">
+              <span class="text-text-secondary text-xs font-medium">{{ Number(index) + 1 }}.</span>
+              <OIcon
+                :name="
+                  job.status === 'completed'
+                    ? 'check-circle'
+                    : job.status === 'failed'
+                      ? 'warning'
+                      : job.status === 'processing'
+                        ? 'sync'
+                        : 'schedule'
+                "
+                size="sm"
+                :class="[
+                  job.status === 'processing' ? 'animate-[spin_2s_linear_infinite]' : '',
+                  job.status === 'completed'
+                    ? 'text-status-positive'
+                    : job.status === 'failed'
+                      ? 'text-status-negative'
+                      : job.status === 'processing'
+                        ? 'text-accent'
+                        : 'text-icon-color',
+                ]"
+              />
+              <div class="text-text-secondary text-compact break-all">
+                {{ job.url }}
               </div>
             </div>
+            <OSeparator v-if="Number(index) < formData.urlJobs.length - 1" class="my-1" />
           </div>
-
-          <!-- Mode explanation (always show for URL-based tables in edit mode) -->
-          <div
-            v-if="isUpdating && formData.source === 'url'"
-            class="text-text-secondary rounded-default p-3 text-sm"
-            :class="{
-              'bg-status-info-bg': formData.updateMode === 'reload',
-              'bg-status-success-bg': formData.updateMode === 'append',
-              'bg-status-warning-bg': formData.updateMode === 'replace_failed',
-              'bg-status-error-bg': formData.updateMode === 'replace',
-            }"
-          >
-            <template v-if="formData.updateMode === 'reload'">
-              <strong>{{ t("function.reloadModeLabel") }}</strong>
-              {{ t("function.reloadModeDescription") }}
-            </template>
-            <template v-else-if="formData.updateMode === 'append'">
-              <strong>{{ t("function.appendModeLabel") }}</strong>
-              {{ t("function.appendModeDescription") }}
-              <div class="text-status-warning-text mt-2">
-                <strong>{{ t("function.importantLabel") }}</strong>
-                {{ t("function.appendModeWarning") }}
-              </div>
-            </template>
-            <template v-else-if="formData.updateMode === 'replace_failed'">
-              <strong>{{ t("function.replaceFailedUrlLabel") }}</strong>
-              {{ t("function.replaceFailedUrlDescription") }}
-            </template>
-            <template v-else-if="formData.updateMode === 'replace'">
-              <strong>{{ t("function.replaceModeLabel") }}</strong>
-              {{ t("function.replaceModeDescription") }}
-            </template>
-          </div>
-
-          <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
-          <OFormInput
-            v-if="
-              isUpdating &&
-              formData.source === 'url' &&
-              (formData.updateMode === 'append' ||
-                formData.updateMode === 'replace_failed' ||
-                formData.updateMode === 'replace')
-            "
-            name="url"
-            data-test="add-enrichment-table-new-url"
-            :label="
-              formData.updateMode === 'append'
-                ? t('functions.newCsvFileUrl')
-                : t('functions.replacementCsvFileUrl')
-            "
-            :placeholder="raw('https://example.com/data.csv')"
-            :help-text="
-              formData.updateMode === 'append'
-                ? t('functions.newCsvFileUrlHelp')
-                : t('functions.replacementCsvFileUrlHelp')
-            "
-          />
-
-          <!-- From URL Option (only for new tables) -->
-          <OFormInput
-            v-if="!isUpdating && formData.source === 'url'"
-            name="url"
-            data-test="add-enrichment-table-url"
-            :label="t('function.csvFileUrlLabel')"
-            :placeholder="raw('https://example.com/data.csv')"
-            :help-text="t('function.csvUrlHelpText')"
-          />
-
-          <pre
-            v-if="compilationErr"
-            class="text-status-error-text text-sm font-bold whitespace-pre-wrap"
-            >{{ compilationErr }}</pre>
         </div>
       </div>
 
-      <!-- Footer -->
+      <!-- Mode explanation (always show for URL-based tables in edit mode) -->
       <div
-        class="bg-card-glass-bg border-border-default -mx-2.5 flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
+        v-if="isUpdating && formData.source === 'url'"
+        class="text-text-secondary rounded-default p-3 text-sm"
+        :class="{
+          'bg-status-info-bg': formData.updateMode === 'reload',
+          'bg-status-success-bg': formData.updateMode === 'append',
+          'bg-status-warning-bg': formData.updateMode === 'replace_failed',
+          'bg-status-error-bg': formData.updateMode === 'replace',
+        }"
       >
-        <OButton
-          data-test="add-enrichment-table-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          :disabled="isSubmitting"
-          @click="$emit('cancel:hideform')"
-        >
-          {{ t("function.cancel") }}
-        </OButton>
-        <OButton
-          data-test="add-enrichment-table-save-btn"
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          :loading="isSubmitting"
-        >
-          {{ t("function.save") }}
-        </OButton>
+        <template v-if="formData.updateMode === 'reload'">
+          <strong>{{ t("function.reloadModeLabel") }}</strong>
+          {{ t("function.reloadModeDescription") }}
+        </template>
+        <template v-else-if="formData.updateMode === 'append'">
+          <strong>{{ t("function.appendModeLabel") }}</strong>
+          {{ t("function.appendModeDescription") }}
+          <div class="text-status-warning-text mt-2">
+            <strong>{{ t("function.importantLabel") }}</strong>
+            {{ t("function.appendModeWarning") }}
+          </div>
+        </template>
+        <template v-else-if="formData.updateMode === 'replace_failed'">
+          <strong>{{ t("function.replaceFailedUrlLabel") }}</strong>
+          {{ t("function.replaceFailedUrlDescription") }}
+        </template>
+        <template v-else-if="formData.updateMode === 'replace'">
+          <strong>{{ t("function.replaceModeLabel") }}</strong>
+          {{ t("function.replaceModeDescription") }}
+        </template>
       </div>
+
+      <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
+      <OFormInput
+        v-if="
+          isUpdating &&
+          formData.source === 'url' &&
+          (formData.updateMode === 'append' ||
+            formData.updateMode === 'replace_failed' ||
+            formData.updateMode === 'replace')
+        "
+        name="url"
+        data-test="add-enrichment-table-new-url"
+        :label="
+          formData.updateMode === 'append'
+            ? t('functions.newCsvFileUrl')
+            : t('functions.replacementCsvFileUrl')
+        "
+        :placeholder="raw('https://example.com/data.csv')"
+        :help-text="
+          formData.updateMode === 'append'
+            ? t('functions.newCsvFileUrlHelp')
+            : t('functions.replacementCsvFileUrlHelp')
+        "
+      />
+
+      <!-- From URL Option (only for new tables) -->
+      <OFormInput
+        v-if="!isUpdating && formData.source === 'url'"
+        name="url"
+        data-test="add-enrichment-table-url"
+        :label="t('function.csvFileUrlLabel')"
+        :placeholder="raw('https://example.com/data.csv')"
+        :help-text="t('function.csvUrlHelpText')"
+      />
+
+      <pre
+        v-if="compilationErr"
+        class="text-status-error-text text-sm font-bold whitespace-pre-wrap"
+        >{{ compilationErr }}</pre>
     </OForm>
-  </OPageLayout>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -245,7 +208,6 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import analytics from "../../services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -256,7 +218,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import {
   makeAddEnrichmentTableSchema,
   type AddEnrichmentTableForm,
@@ -277,16 +239,19 @@ export default defineComponent({
   name: "AddEnrichmentTable",
   components: {
     OSeparator,
-    OButton,
+    ODialog,
     OForm,
     OFormInput,
     OFormFile,
     OFormOptionGroup,
     OFormSwitch,
     OIcon,
-    OPageLayout,
   },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -518,6 +483,10 @@ export default defineComponent({
       }
     };
 
+    const onOpenChange = (value: boolean) => {
+      if (!value) emit("cancel:hideform");
+    };
+
     return {
       t,
       raw,
@@ -530,6 +499,7 @@ export default defineComponent({
       editorobj,
       isFetchingStreams,
       onSubmit,
+      onOpenChange,
       sourceOptions,
       updateModeOptions,
       // Returned so the Options-API template can see it (a module-level import

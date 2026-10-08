@@ -96,7 +96,11 @@ vi.mock("vue-router", () => ({
 // ── Component stubs ────────────────────────────────────────────────────────────
 
 const globalStubs = {
-  AddEnrichmentTable: { template: '<div data-test="add-enrichment-table-stub" />' },
+  AddEnrichmentTable: {
+    name: "AddEnrichmentTable",
+    template: '<div data-test="add-enrichment-table-stub" />',
+    props: ["open", "modelValue", "isUpdating"],
+  },
   NoData: { template: '<div data-test="no-data-stub">No Data</div>' },
   ConfirmDialog: {
     template: '<div data-test="confirm-dialog-stub" />',
@@ -397,6 +401,23 @@ describe("EnrichmentTableList", () => {
       expect(vm.showAddJSTransformDialog).toBe(true);
     });
 
+    it("opens the form as a dialog over the list and remounts it on each open", async () => {
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.showAddUpdateFn(null);
+      await flushPromises();
+      const firstKey = vm.formKey;
+      expect(wrapper.find('[data-test="enrichment-tables-list-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "AddEnrichmentTable" }).props("open")).toBe(true);
+
+      vm.hideForm();
+      vm.showAddUpdateFn({ name: "t1" });
+      await flushPromises();
+      expect(vm.formKey).toBe(firstKey + 1);
+    });
+
     it("showAddUpdateFn(null) sets isUpdated to false (new)", async () => {
       const wrapper = mountComponent();
       await flushPromises();
@@ -607,7 +628,7 @@ describe("EnrichmentTableList", () => {
       expect(restorePage).toHaveBeenCalledWith(3);
     });
 
-    it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {
+    it("keeps OTable mounted on its page while the form dialog is open and after Cancel", async () => {
       mockGetStreams.mockResolvedValue(manyTables);
       const wrapper = mountComponent();
       await flushPromises();
@@ -617,9 +638,9 @@ describe("EnrichmentTableList", () => {
       await flushPromises();
       expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
 
-      vm.showAddJSTransformDialog = true;
+      vm.showAddUpdateFn(null);
       await flushPromises();
-      expect(vm.oTableRef).toBeNull();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
 
       vm.hideForm();
       await flushPromises();

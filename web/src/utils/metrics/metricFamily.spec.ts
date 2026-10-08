@@ -288,6 +288,11 @@ describe("labels", () => {
     expect(buildMetricCards([fallback("m_total")])[0].labels).toBeUndefined();
   });
 
+  // `schema: []` from a fetchSchema=false load means not fetched; as "no labels" it beat labelsByStream.
+  it("leaves labels undefined when the landing load sends an empty schema", () => {
+    expect(buildMetricCards([{ ...fallback("m_total"), schema: [] }])[0].labels).toBeUndefined();
+  });
+
   it("keeps the internal exemplars column out of the label list", () => {
     const stream: MetricStream = {
       ...fallback("m_bucket"),

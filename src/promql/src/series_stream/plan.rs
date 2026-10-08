@@ -48,7 +48,7 @@ use super::{SeriesSource, blocks, hash_sorted::HashSortedSeriesStream};
 use crate::{
     ScanSource,
     aggregations::AggOp,
-    functions::KEEP_METRIC_NAME_FUNC,
+    functions::keeps_metric_name,
     utils::{apply_matchers, apply_time_window},
 };
 
@@ -220,7 +220,7 @@ pub(crate) fn group_label_columns(
                 && name != VALUE_LABEL
                 && name != EXEMPLARS_LABEL
                 // range functions strip the metric name before aggregation
-                && (name != NAME_LABEL || func_name == KEEP_METRIC_NAME_FUNC)
+                && (name != NAME_LABEL || keeps_metric_name(func_name))
                 && schema.field_with_name(name).is_ok()
         })
         .cloned()
@@ -249,7 +249,7 @@ pub(crate) fn series_label_columns(
                 && (label_selector.is_empty()
                     || label_selector.contains(name)
                     || name == BUCKET_LABEL)
-                && (name != NAME_LABEL || func_name == KEEP_METRIC_NAME_FUNC)
+                && (name != NAME_LABEL || keeps_metric_name(func_name))
         })
         .collect();
     cols.sort();

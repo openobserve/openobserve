@@ -60,7 +60,9 @@ mod tests {
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
-    use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
+    use openobserve_api_grpc::handler::grpc::{
+        auth::check_internal_auth, flight::FlightServiceImpl,
+    };
     use openobserve_api_http::handler::http::router::{
         basic_routes, config_routes, service_routes,
     };
@@ -84,6 +86,7 @@ mod tests {
         START.call_once(|| unsafe {
             env::set_var("ZO_ROOT_USER_EMAIL", "root@example.com");
             env::set_var("ZO_ROOT_USER_PASSWORD", "Complexpass#123");
+            env::set_var("ZO_EXT_AUTH_SALT", "test-only-ext-auth-salt-0123456789");
             env::set_var("ZO_LOCAL_MODE", "true");
             env::set_var("ZO_MAX_FILE_SIZE_ON_DISK", "1");
             env::set_var("ZO_FILE_PUSH_INTERVAL", "1");
@@ -185,7 +188,7 @@ mod tests {
 
         log::info!("starting gRPC server at {}", gaddr);
         tonic::transport::Server::builder()
-            .layer(tonic::service::InterceptorLayer::new(check_auth))
+            .layer(tonic::service::InterceptorLayer::new(check_internal_auth))
             .add_service(search_svc)
             .add_service(flight_svc)
             .serve(gaddr)
@@ -315,6 +318,18 @@ mod tests {
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         infra::init().await.unwrap();
+        #[cfg(feature = "enterprise")]
+        let master_key = Some(
+            o2_enterprise::enterprise::common::config::get_config()
+                .encryption
+                .master_key
+                .clone(),
+        );
+        #[cfg(not(feature = "enterprise"))]
+        let master_key: Option<String> = None;
+        infra::table::cipher::boot(master_key.as_deref())
+            .await
+            .unwrap();
         openobserve_core::bootstrap::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();

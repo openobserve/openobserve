@@ -96,6 +96,16 @@ describe("service_streams service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${ORG}/alerts/deduplication/semantic-groups`,
+        undefined,
+      );
+    });
+
+    it("forwards silentForbidden to the request config", () => {
+      getSemanticGroups(ORG, { silentForbidden: true });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        `/api/${ORG}/alerts/deduplication/semantic-groups`,
+        { silentForbidden: true },
       );
     });
 
@@ -125,6 +135,7 @@ describe("service_streams service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${ORG}/alerts/deduplication/semantic-groups`,
+        undefined,
       );
     });
   });
@@ -234,6 +245,7 @@ describe("service_streams service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/acme-corp/alerts/deduplication/semantic-groups",
+        undefined,
       );
     });
 

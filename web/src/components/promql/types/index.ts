@@ -84,6 +84,8 @@ export interface PromqlStepSpec {
   group: string;
   /** Help prose for the step. */
   documentation?: I18nText;
+  /** Kept so saved panels still render it, but no longer offered or mapped onto. */
+  retired?: boolean;
 }
 
 /** A query as the builder holds it, before it is rendered to PromQL text. */

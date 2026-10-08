@@ -44,23 +44,37 @@ const openGroupKey = moduleRef<string | null>(null);
  * teleported to <body> (escapes the rail's overflow clip), styled like O2's
  * native dropdown, and positioned flush against the rail's right edge.
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, type LocationQueryRaw } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
-import type { SubnavChild } from "./ONavbar.types";
+import { RailNavigationMarkKey, type SubnavChild } from "./ONavbar.types";
+import {
+  AIM_IDLE,
+  REST_TOLERANCE,
+  aim,
+  isAimingAtOpenFlyout,
+  releasePointerTracking,
+  retainPointerTracking,
+} from "./hoverIntent";
+import type { Point } from "./hoverIntent";
+import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useTrialPaywall } from "@/composables/useTrialPaywall";
 
 const props = defineProps<{
   groupKey: string;
   title: I18nText;
   icon: string;
   children: SubnavChild[];
+  /** Children that `requires`/`gate` removed upstream: they still light and retarget the tile. */
+  filteredChildren?: SubnavChild[];
   /** When set, the tile navigates here on click and the flyout is hover-only. */
   parentItem?: { link: string; title: string; icon: string; name: string };
 }>();
@@ -207,10 +221,10 @@ function childPath(name: string): string | null {
 //
 // Exact route-name match wins outright; otherwise the DEEPEST path prefix wins,
 // so a nested route is attributed to its own section, not a shallower sibling.
-const activeChild = computed<SubnavChild | null>(() => {
+function resolveActiveChild(children: SubnavChild[]): SubnavChild | null {
   const route = router.currentRoute.value;
 
-  const exactTab = props.children.find(
+  const exactTab = children.find(
     (c) => c.tab && route.name === c.name && route.query.tab === c.tab,
   );
   if (exactTab) return exactTab;
@@ -219,18 +233,18 @@ const activeChild = computed<SubnavChild | null>(() => {
   // rendered as in-page tabs (Databases owns dbmQueries / dbmQueryDetail).
   // Checked before the prefix pass below, which would otherwise attribute a
   // detail route to whichever child has the longest matching path.
-  const routeAlias = props.children.find((c) => c.activeOnRoutes?.includes(route.name as string));
+  const routeAlias = children.find((c) => c.activeOnRoutes?.includes(route.name as string));
   if (routeAlias) return routeAlias;
 
-  const exact = props.children.find((c) => route.name === c.name && !c.tab);
+  const exact = children.find((c) => route.name === c.name && !c.tab);
   if (exact) return exact;
 
-  const routeDefault = props.children.find((c) => c.defaultForRoute && route.name === c.name);
+  const routeDefault = children.find((c) => c.defaultForRoute && route.name === c.name);
   if (routeDefault) return routeDefault;
 
   let best: SubnavChild | null = null;
   let bestLen = 0;
-  for (const child of props.children) {
+  for (const child of children) {
     if (child.tab) continue; // query-tab children only match by exact name
     const base = childPath(child.name);
     if (!base || base === "/") continue;
@@ -241,7 +255,12 @@ const activeChild = computed<SubnavChild | null>(() => {
     }
   }
   return best;
-});
+}
+
+// A page reached by URL still lights its group when its child was filtered out.
+const activeChild = computed<SubnavChild | null>(
+  () => resolveActiveChild(props.children) ?? resolveActiveChild(props.filteredChildren ?? []),
+);
 
 function isChildActive(child: SubnavChild): boolean {
   return activeChild.value === child;
@@ -261,22 +280,51 @@ function childTo(child: SubnavChild) {
   return { name: child.name, query };
 }
 
-// Anchor-child rule (design 4.7): parentLink holds unless the child resolving to it gates out — then first visible child, so a DBM-off Infra tile can't bounce onto Traces.
+function childLabel(child: SubnavChild): I18nText {
+  return child.title ? raw(child.title) : t(child.titleKey);
+}
+
+// Anchor-child rule (design 4.7): parentLink holds unless the child resolving to it is not visible — then first visible child, so a DBM-off Infra tile can't bounce onto Traces.
 const tileLink = computed(() => {
   const parent = props.parentItem;
   if (!parent) return "";
-  const anchor = props.children.find((c) => childPath(c.name) === parent.link);
+  const declared = [...props.children, ...(props.filteredChildren ?? [])];
+  const anchor = declared.find((c) => childPath(c.name) === parent.link);
   if (!anchor || visibleChildren.value.includes(anchor)) return parent.link;
   const first = visibleChildren.value[0];
   return first ? (childPath(first.name) ?? parent.link) : parent.link;
 });
 
+// ── Trial paywall ─────────────────────────────────────────────────────────
+const { isPaywalled } = useTrialPaywall();
+
+function isChildPaywalled(child: SubnavChild): boolean {
+  return isPaywalled(childTo(child));
+}
+
+// A pure-group trigger has no route of its own, so only a link-mode tile can be muted.
+const tilePaywalled = computed(
+  () => isLinkMode.value && tileLink.value !== "" && isPaywalled(tileLink.value),
+);
+
+const showTrialNote = computed(() => visibleChildren.value.some((c) => isChildPaywalled(c)));
+
+const trialNoteId = computed(() => `${props.groupKey}-trial-note`);
+
+function itemDescriptionId(child: SubnavChild, prefix = ""): string {
+  return `${prefix}${props.groupKey}-${childKey(child)}-paywall`;
+}
+
 function childDataTest(child: SubnavChild): string {
   return `nav-group-item-${child.name}${child.tab ? `-${child.tab}` : ""}`;
 }
 
+function tileElement(): HTMLElement | null {
+  return wrapperRef.value?.querySelector<HTMLElement>("a, button") ?? null;
+}
+
 function focusTile() {
-  wrapperRef.value?.querySelector<HTMLElement>("a, button")?.focus();
+  tileElement()?.focus();
 }
 
 // ── Open / close ──────────────────────────────────────────────────────────
@@ -342,17 +390,52 @@ function close() {
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
 }
 
-function scheduleOpen() {
+// Where the pointer last came to rest on the tile; the open timer counts from here.
+let restAnchor: Point | null = null;
+
+function scheduleOpen(event?: MouseEvent) {
   // Some touch browsers emit a synthetic mouseenter, which would open a group the user only scrolled past.
   if (isMobile.value) return;
+  restAnchor = event ? { x: event.clientX, y: event.clientY } : null;
   clearTimers();
-  openTimer = setTimeout(() => open(), OPEN_DELAY);
+  // A neighbour whose flyout the pointer is still travelling towards keeps its turn.
+  const tryOpen = () => {
+    if (openGroupKey.value && openGroupKey.value !== props.groupKey && isAimingAtOpenFlyout()) {
+      openTimer = setTimeout(tryOpen, AIM_IDLE);
+      return;
+    }
+    open();
+  };
+  openTimer = setTimeout(tryOpen, OPEN_DELAY);
 }
 
-function scheduleClose() {
+// A pointer still moving across the tile is scanning, not choosing: re-arm until it rests.
+function onTileMousemove(event: MouseEvent) {
+  if (isMobile.value || isOpen.value || !openTimer) return;
+  const here = { x: event.clientX, y: event.clientY };
+  if (restAnchor && Math.hypot(here.x - restAnchor.x, here.y - restAnchor.y) <= REST_TOLERANCE) {
+    return;
+  }
+  scheduleOpen(event);
+}
+
+function scheduleClose(event?: MouseEvent) {
+  restAnchor = null;
   if (isPinned.value || isMobile.value) return;
   clearTimers();
-  closeTimer = setTimeout(() => close(), CLOSE_DELAY);
+  if (isOpen.value) {
+    const leftTile = !!event && !!wrapperRef.value?.contains(event.target as Node);
+    aim.exit = leftTile && event ? { x: event.clientX, y: event.clientY } : null;
+    aim.flyout = leftTile ? flyoutRef.value : null;
+  }
+  const tryClose = () => {
+    if (aim.flyout === flyoutRef.value && isAimingAtOpenFlyout()) {
+      closeTimer = setTimeout(tryClose, AIM_IDLE);
+      return;
+    }
+    close();
+  };
+  closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
 function onTriggerClick() {
@@ -364,19 +447,33 @@ function onTriggerClick() {
   }
 }
 
-function onLinkClick() {
+// detail 0 is a keyboard activation: Enter navigates, so nothing should stay open.
+function onLinkClick(event?: MouseEvent) {
+  if (event?.detail === 0) {
+    close();
+    return;
+  }
   open();
 }
 
+function isRtl(): boolean {
+  return document.documentElement.dir === "rtl";
+}
+
+function focusFirstItem() {
+  nextTick(() => {
+    flyoutRef.value?.querySelector<HTMLElement>("a[data-test^='nav-group-item-']")?.focus();
+  });
+}
+
 function onTileKeydown(event: KeyboardEvent) {
-  // ArrowRight opens the flyout; Up/Down are left to the rail's own navigation.
-  if (event.key === "ArrowRight") {
+  // The arrow towards the flyout opens it; Up/Down are left to the rail's own navigation.
+  const openKey = isRtl() ? "ArrowLeft" : "ArrowRight";
+  if (event.key === openKey) {
     event.preventDefault();
     event.stopPropagation();
     if (!isOpen.value) open();
-    nextTick(() => {
-      flyoutRef.value?.querySelector<HTMLElement>("a[data-test^='nav-group-item-']")?.focus();
-    });
+    focusFirstItem();
   } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     if (isOpen.value) close();
   } else if (event.key === "Escape") {
@@ -400,11 +497,28 @@ function onScrollOrResize() {
   if (isOpen.value) close();
 }
 
+// Only a scroll that moves the tile (the rail or an ancestor) detaches the flyout from it.
+function onScroll(event: Event) {
+  if (isMobile.value) return;
+  const target = event.target;
+  if (target instanceof Node && target !== document && !target.contains(wrapperRef.value)) return;
+  onScrollOrResize();
+}
+
 let openedAt = { w: 0, h: 0 };
+let tracksPointer = false;
 
 // Pages dispatch synthetic resize events to reflow charts; only a real viewport change moves the tile.
 function onResize() {
   if (window.innerWidth !== openedAt.w || window.innerHeight !== openedAt.h) onScrollOrResize();
+}
+
+function removeOpenListeners() {
+  document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+  window.removeEventListener("resize", onResize);
+  window.removeEventListener("scroll", onScroll, true);
+  if (tracksPointer) releasePointerTracking();
+  tracksPointer = false;
 }
 
 watch(isOpen, (open) => {
@@ -412,24 +526,46 @@ watch(isOpen, (open) => {
     openedAt = { w: window.innerWidth, h: window.innerHeight };
     document.addEventListener("pointerdown", onDocumentPointerDown, true);
     window.addEventListener("resize", onResize);
-    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("scroll", onScroll, true);
+    if (!tracksPointer) retainPointerTracking();
+    tracksPointer = true;
   } else {
-    document.removeEventListener("pointerdown", onDocumentPointerDown, true);
-    window.removeEventListener("resize", onResize);
-    window.removeEventListener("scroll", onScrollOrResize, true);
+    removeOpenListeners();
   }
 });
 
 onBeforeUnmount(() => {
   clearTimers();
-  document.removeEventListener("pointerdown", onDocumentPointerDown, true);
-  window.removeEventListener("resize", onResize);
-  window.removeEventListener("scroll", onScrollOrResize, true);
+  removeOpenListeners();
   if (openGroupKey.value === props.groupKey) openGroupKey.value = null;
 });
 
+// Tab leaves the menu the way Tab from the tile would; Shift+Tab returns to the tile.
+function onFlyoutTab(event: KeyboardEvent) {
+  event.preventDefault();
+  close();
+  if (event.shiftKey) {
+    focusTile();
+    return;
+  }
+  (findContentFocusTarget() ?? tileElement())?.focus();
+}
+
 function onFlyoutKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape" || event.key === "ArrowLeft") {
+  if (event.key === "Tab") {
+    onFlyoutTab(event);
+    return;
+  }
+  // Links do not activate on Space natively; route it through click so detail stays 0.
+  if (event.key === " ") {
+    event.preventDefault();
+    (event.target as HTMLElement | null)
+      ?.closest<HTMLElement>("a[data-test^='nav-group-item-']")
+      ?.click();
+    return;
+  }
+  const closeKey = isRtl() ? "ArrowRight" : "ArrowLeft";
+  if (event.key === "Escape" || event.key === closeKey) {
     event.preventDefault();
     close();
     focusTile();
@@ -453,8 +589,14 @@ function onFlyoutKeydown(event: KeyboardEvent) {
   items[nextIdx]?.focus();
 }
 
-function onChildClick() {
+// The flyout is teleported, so the rail's capture listener never sees this click.
+const markRailNavigation = inject(RailNavigationMarkKey, null);
+
+// Keyboard choice (detail 0) returns focus to the tile; a mouse choice leaves it to the page.
+function onChildClick(event: MouseEvent) {
+  markRailNavigation?.(event);
   close();
+  if (event.detail === 0) nextTick(() => focusTile());
 }
 
 // Focus the hovered item so Enter activates it natively — but never yank
@@ -473,6 +615,7 @@ function onChildMouseenter(event: MouseEvent) {
     class="nav-group relative shrink-0"
     @mouseenter="scheduleOpen"
     @mouseleave="scheduleClose"
+    @mousemove="onTileMousemove"
   >
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.
          `active` is driven by "is any child active" so a group tile (e.g. Data,
@@ -486,6 +629,7 @@ function onChildMouseenter(event: MouseEvent) {
       :link="tileLink"
       :active="isGroupActive"
       :expanded="isOpen"
+      :paywalled="tilePaywalled"
       @click="onLinkClick"
       @keydown="onTileKeydown"
     />
@@ -498,6 +642,7 @@ function onChildMouseenter(event: MouseEvent) {
       :link="`group-${groupKey}`"
       :active="isGroupActive"
       :expanded="isOpen"
+      :paywalled="tilePaywalled"
       @click="onTriggerClick"
       @keydown="onTileKeydown"
     />
@@ -508,8 +653,17 @@ function onChildMouseenter(event: MouseEvent) {
       :data-test="`nav-group-inline-${groupKey}`"
       role="menu"
       :aria-label="title"
+      :aria-describedby="showTrialNote ? `inline-${trialNoteId}` : undefined"
       class="border-border-default ms-3 mt-0.5 mb-1 flex flex-col gap-0.5 border-s ps-2"
     >
+      <div
+        v-if="showTrialNote"
+        :id="`inline-${trialNoteId}`"
+        :data-test="`nav-group-inline-${groupKey}-trial-note`"
+        class="text-text-secondary px-2 pt-1 pb-1 text-xs"
+      >
+        {{ t("menu.trialFlyoutNote") }}
+      </div>
       <template v-for="block in flyoutBlocks" :key="`inline-${block.key}`">
         <div
           v-if="block.kind === 'group'"
@@ -536,12 +690,35 @@ function onChildMouseenter(event: MouseEvent) {
               isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
             ]"
             :aria-current="isChildActive(child) ? 'page' : undefined"
+            :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
+            :aria-describedby="
+              isChildPaywalled(child) ? itemDescriptionId(child, 'inline-') : undefined
+            "
             @click="onChildClick"
           >
-            <OIcon :name="child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
-            <span class="leading-tight">{{
-              child.title ? raw(child.title) : t(child.titleKey)
-            }}</span>
+            <OIcon
+              :name="child.icon"
+              size="sm"
+              class="shrink-0"
+              :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+            />
+            <span class="leading-tight">{{ childLabel(child) }}</span>
+            <BetaBadge v-if="child.beta" size="xs" />
+            <OIcon
+              v-if="isChildPaywalled(child)"
+              name="lock"
+              size="xs"
+              class="text-text-secondary ms-auto shrink-0"
+              :data-test="`${childDataTest(child)}-lock`"
+              aria-hidden="true"
+            />
+            <span
+              v-if="isChildPaywalled(child)"
+              :id="itemDescriptionId(child, 'inline-')"
+              class="sr-only"
+            >
+              {{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}
+            </span>
           </router-link>
         </div>
 
@@ -557,12 +734,35 @@ function onChildMouseenter(event: MouseEvent) {
             isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
           ]"
           :aria-current="isChildActive(block.child) ? 'page' : undefined"
+          :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
+          :aria-describedby="
+            isChildPaywalled(block.child) ? itemDescriptionId(block.child, 'inline-') : undefined
+          "
           @click="onChildClick"
         >
-          <OIcon :name="block.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
-          <span class="leading-tight">{{
-            block.child.title ? raw(block.child.title) : t(block.child.titleKey)
-          }}</span>
+          <OIcon
+            :name="block.child.icon"
+            size="sm"
+            class="shrink-0"
+            :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
+          />
+          <span class="leading-tight">{{ childLabel(block.child) }}</span>
+          <BetaBadge v-if="block.child.beta" size="xs" />
+          <OIcon
+            v-if="isChildPaywalled(block.child)"
+            name="lock"
+            size="xs"
+            class="text-text-secondary ms-auto shrink-0"
+            :data-test="`${childDataTest(block.child)}-lock`"
+            aria-hidden="true"
+          />
+          <span
+            v-if="isChildPaywalled(block.child)"
+            :id="itemDescriptionId(block.child, 'inline-')"
+            class="sr-only"
+          >
+            {{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}
+          </span>
         </router-link>
       </template>
     </div>
@@ -576,6 +776,7 @@ function onChildMouseenter(event: MouseEvent) {
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"
         :aria-label="title"
+        :aria-describedby="showTrialNote ? trialNoteId : undefined"
         class="nav-group-flyout rounded-default border-dropdown-border bg-dropdown-bg min-w-52 border p-1 shadow-md"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
@@ -594,6 +795,14 @@ function onChildMouseenter(event: MouseEvent) {
              move between the two. -->
         <div class="px-3 pt-1.5 pb-1 text-sm font-semibold" :class="flyoutTextClass">
           {{ title }}
+        </div>
+        <div
+          v-if="showTrialNote"
+          :id="trialNoteId"
+          :data-test="`nav-group-flyout-${groupKey}-trial-note`"
+          class="text-text-secondary max-w-56 px-3 pb-1.5 text-xs"
+        >
+          {{ t("menu.trialFlyoutNote") }}
         </div>
         <template v-for="(block, blockIndex) in flyoutBlocks" :key="block.key">
           <!-- A labelled group: the heading names it via aria-labelledby and is
@@ -629,15 +838,32 @@ function onChildMouseenter(event: MouseEvent) {
                   : 'hover:bg-dropdown-item-hover-bg',
               ]"
               :aria-current="isChildActive(child) ? 'page' : undefined"
+              :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
+              :aria-describedby="isChildPaywalled(child) ? itemDescriptionId(child) : undefined"
               @click="onChildClick"
               @mouseenter="onChildMouseenter"
             >
               <!-- Icon color is locked to the text color so it never picks up a
                    primary tint via currentColor inheritance. -->
-              <OIcon :name="child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
-              <span class="leading-none">{{
-                child.title ? raw(child.title) : t(child.titleKey)
-              }}</span>
+              <OIcon
+                :name="child.icon"
+                size="sm"
+                class="shrink-0"
+                :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
+              />
+              <span class="leading-none">{{ childLabel(child) }}</span>
+              <BetaBadge v-if="child.beta" size="xs" />
+              <OIcon
+                v-if="isChildPaywalled(child)"
+                name="lock"
+                size="xs"
+                class="text-text-secondary ms-auto shrink-0"
+                :data-test="`${childDataTest(child)}-lock`"
+                aria-hidden="true"
+              />
+              <span v-if="isChildPaywalled(child)" :id="itemDescriptionId(child)" class="sr-only">
+                {{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}
+              </span>
             </router-link>
           </div>
 
@@ -657,13 +883,36 @@ function onChildMouseenter(event: MouseEvent) {
                 : 'hover:bg-dropdown-item-hover-bg',
             ]"
             :aria-current="isChildActive(block.child) ? 'page' : undefined"
+            :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
+            :aria-describedby="
+              isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
+            "
             @click="onChildClick"
             @mouseenter="onChildMouseenter"
           >
-            <OIcon :name="block.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
-            <span class="leading-none">{{
-              block.child.title ? raw(block.child.title) : t(block.child.titleKey)
-            }}</span>
+            <OIcon
+              :name="block.child.icon"
+              size="sm"
+              class="shrink-0"
+              :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
+            />
+            <span class="leading-none">{{ childLabel(block.child) }}</span>
+            <BetaBadge v-if="block.child.beta" size="xs" />
+            <OIcon
+              v-if="isChildPaywalled(block.child)"
+              name="lock"
+              size="xs"
+              class="text-text-secondary ms-auto shrink-0"
+              :data-test="`${childDataTest(block.child)}-lock`"
+              aria-hidden="true"
+            />
+            <span
+              v-if="isChildPaywalled(block.child)"
+              :id="itemDescriptionId(block.child)"
+              class="sr-only"
+            >
+              {{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}
+            </span>
           </router-link>
         </template>
       </div>

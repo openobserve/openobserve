@@ -846,6 +846,15 @@ describe("TraceTree", () => {
       const spanBlocks = wrapper.findAllComponents({ name: "span-block" });
       expect(spanBlocks.length).toBe(0);
     });
+
+    it("passes showCriticalPath through to every span block", async () => {
+      await wrapper.setProps({ showCriticalPath: true });
+      await flushPromises();
+
+      const spanBlocks = wrapper.findAllComponents({ name: "span-block" });
+      expect(spanBlocks.length).toBe(mockSpans.length);
+      spanBlocks.forEach((block: any) => expect(block.props("showCriticalPath")).toBe(true));
+    });
   });
 
   describe("Error handling", () => {

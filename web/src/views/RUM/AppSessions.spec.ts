@@ -48,6 +48,7 @@ const mockStreamData = {
     { name: "resource_url", type: "UTF8" },
     { name: "application_id", type: "UTF8" },
     { name: "env", type: "UTF8" },
+    { name: "session_has_replay", type: "UTF8" },
   ],
 };
 
@@ -518,6 +519,33 @@ describe("AppSessions.vue", () => {
     it("should keep the base filter out of the sidebar query prop", () => {
       const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
       expect(fieldList.props("query")).not.toContain("session_has_replay");
+    });
+
+    it("falls back to an always-false filter instead of referencing session_has_replay when the org's schema lacks it (o2-enterprise#2799)", async () => {
+      // getStream was destructured at setup, so reconfigure the same mock instance, not a new vi.fn().
+      mockStreams.getStream.mockResolvedValueOnce({
+        schema: mockStreamData.schema.filter((f) => f.name !== "session_has_replay"),
+      });
+      // schemaMapping only adds keys, so a stale true from the first fetch must be cleared first.
+      wrapper.vm.schemaMapping = {};
+      await wrapper.vm.getStreamFields();
+      await nextTick();
+
+      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
+      expect(fieldList.props("baseFilter")).toBe("1 = 0");
+
+      vi.mocked(searchService.search).mockClear();
+      const capturedSqls: string[] = [];
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        capturedSqls.push(params?.query?.query?.sql ?? "");
+        return { data: { hits: [] } };
+      });
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+      const mainQuerySql = capturedSqls.find((sql) => sql.includes('FROM "_rumdata"'));
+      expect(mainQuerySql).toContain("WHERE 1 = 0");
+      expect(mainQuerySql).not.toContain("session_has_replay");
     });
   });
 

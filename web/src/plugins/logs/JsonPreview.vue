@@ -168,12 +168,12 @@
               v-if="getContentSize(value[key]) > 50000"
               :data="value[key]"
               :field-key="`json_preview_${key}`"
-              :query-string="highlightQuery"
+              :query-string="scopeHighlightQuery(highlightQuery, String(key))"
               :simple-mode="false" /><LogsHighLighting
               v-else
               :data="getDisplayValue(key, value[key])"
               :show-braces="false"
-              :query-string="highlightQuery" /></span
+              :query-string="scopeHighlightQuery(highlightQuery, String(key))" /></span
           ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
@@ -242,6 +242,7 @@ import {
 } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -857,6 +858,7 @@ export default {
     };
 
     return {
+      scopeHighlightQuery,
       t,
       copyLogToClipboard,
       getImageURL,

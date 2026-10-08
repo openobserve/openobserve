@@ -163,6 +163,13 @@ import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
+import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
+import {
+  alertCreationDialog,
+  closeAlertCreationDialog,
+} from "@/composables/alerts/useAlertCreation";
 
 describe("PanelSchemaRenderer", () => {
   let wrapper: any;
@@ -2015,6 +2022,158 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuValue).toBe(75);
     });
 
+    it("hides the chart tooltip when the alert menu opens, from a series or from empty chart area", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      const dispatchAction = vi.fn();
+      wrapper.vm.chartRendererRef = { chart: { dispatchAction } };
+      wrapper.vm.panelData = { options: { series: [{ name: "a", _panelQueryIndex: 0 }] } };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0, dataIndex: 1 });
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+
+      expect(dispatchAction).toHaveBeenCalledTimes(2);
+      expect(dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+    });
+
+    it("keeps the chart tooltip on a right-click when alert creation is off", () => {
+      wrapper = createWrapper({ allowAlertCreation: false });
+      const dispatchAction = vi.fn();
+      wrapper.vm.chartRendererRef = { chart: { dispatchAction } };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+
+      expect(dispatchAction).not.toHaveBeenCalled();
+    });
+
+    it("resolves the clicked series to its panel query and role", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary" },
+            { name: "b (1 day ago)", _panelQueryIndex: 1, _seriesRole: "shifted" },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+
+      expect(wrapper.vm.contextMenuData).toMatchObject({
+        value: 3,
+        panelQueryIndex: 1,
+        seriesRole: "shifted",
+      });
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
+    });
+
+    it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", null],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.7, seriesIndex: 1, dataIndex: 3 });
+
+      expect(wrapper.vm.contextMenuData).toMatchObject({
+        seriesRole: "forecast",
+        forecastPoint: {
+          rangeEndValue: 0.45,
+          startTime: 160,
+          startValue: 0.5,
+          endValue: 0.7,
+          clickedTime: 280,
+        },
+      });
+    });
+
+    it("measures a forecast line from the range end, past the points that close the seam", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _fitStartIndex: 1,
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", 0.4],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.7, seriesIndex: 1, dataIndex: 3 });
+
+      expect(wrapper.vm.contextMenuData.forecastPoint).toMatchObject({
+        startTime: 160,
+        startValue: 0.5,
+        endValue: 0.7,
+      });
+    });
+
+    it("measures a right-click on a seam point from the range end, at the shortest horizon", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _fitStartIndex: 1,
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", 0.4],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.4, seriesIndex: 1, dataIndex: 0 });
+
+      const point = wrapper.vm.contextMenuData.forecastPoint;
+      expect(point).toMatchObject({ startTime: 160, startValue: 0.5, clickedTime: 100 });
+      // The clicked value is the target, as on any forecast point; H from before the range end clamps.
+      expect(wrapper.vm.contextMenuData.value).toBe(0.4);
+      expect(
+        forecastAlertFromChart({ ...point, U: "x", T: 0.4, rangeSeconds: 3600 }),
+      ).toMatchObject({ direction: "falls", H: FORECAST_MIN_DAYS });
+    });
+
     it("should hide context menu", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 
@@ -2438,6 +2597,437 @@ describe("PanelSchemaRenderer", () => {
       });
       await flushPromises();
       expect(wrapper.vm.metricCopiedIdx).toBe(1);
+    });
+  });
+
+  // A time shift appends shifted streams after the primaries: [A, B, A', B'].
+  describe("hidden PromQL queries with time-shifted results", () => {
+    const PAGE_KEY = "time-shift-hidden-queries";
+    const entry = (name: string) => ({ resultType: "matrix", result: [{ metric: { q: name } }] });
+    const metaEntry = (panelQueryIndex: number, gapMs = 0) => ({
+      panelQueryIndex,
+      timeRangeGap: { seconds: gapMs, periodAsStr: gapMs ? "1 day ago" : "" },
+    });
+
+    const mountWithHidden = async (hiddenQueries: number[]) => {
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([entry("A"), entry("B"), entry("A1d"), entry("B1d")]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000), metaEntry(1, 86_400_000)],
+        }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }], [{ step: 4 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      const w = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-ts",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: PAGE_KEY,
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      getPanelDataForPageKey(PAGE_KEY).layout.hiddenQueries = hiddenQueries;
+      await flushPromises();
+      return w;
+    };
+
+    const lastConversion = () => {
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      return { data: call[1], resultMetaData: (call[5] as any)?.value, metadata: call[6] };
+    };
+
+    afterEach(() => {
+      getPanelDataForPageKey(PAGE_KEY).layout.hiddenQueries = [];
+    });
+
+    it("hiding query B also hides B's shifted results, keeping data and metadata aligned", async () => {
+      wrapper = await mountWithHidden([1]);
+
+      const { data, metadata, resultMetaData } = lastConversion();
+      expect(data.map((d: any) => d.result[0].metric.q)).toEqual(["A", "A1d"]);
+      expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([0, 0]);
+      expect(metadata.queries[1].timeRangeGap.seconds).toBe(86_400_000);
+      expect(resultMetaData.map((r: any) => r[0].step)).toEqual([1, 3]);
+    });
+
+    it("hiding query A keeps B and B's shifted results", async () => {
+      wrapper = await mountWithHidden([0]);
+
+      const { data, metadata } = lastConversion();
+      expect(data.map((d: any) => d.result[0].metric.q)).toEqual(["B", "B1d"]);
+      expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
+    });
+  });
+
+  describe("the saved hide flag", () => {
+    const entry = (name: string) => ({ resultType: "matrix", result: [{ metric: { q: name } }] });
+    const metaEntry = (panelQueryIndex: number, gapMs = 0) => ({
+      panelQueryIndex,
+      timeRangeGap: { seconds: gapMs, periodAsStr: gapMs ? "1 day ago" : "" },
+    });
+
+    it("hides a query saved with config.hide on a dashboard, outside the editor", async () => {
+      const loaded = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: loaded,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000)] }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-saved-hide",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { hide: true } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      loaded.value = [entry("A"), entry("B"), entry("A1d")];
+      await flushPromises();
+
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      expect(call[1].map((d: any) => d.result[0].metric.q)).toEqual(["A", "A1d"]);
+      expect(call[6].queries.map((m: any) => m.panelQueryIndex)).toEqual([0, 0]);
+    });
+
+    it("right-click on empty chart area alerts on the formula, not its saved-hidden inputs", async () => {
+      closeAlertCreationDialog();
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m])))";
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([entry("A"), entry("B"), entry("F")]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [
+            { ...metaEntry(0), query: "sum(rate(errors[1m]))" },
+            { ...metaEntry(1), query: "sum(rate(requests[1m]))" },
+            { ...metaEntry(2), query: combined },
+          ],
+        }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 1 }], [{ step: 1 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          id: "panel-formula",
+          type: "line",
+          queryType: "promql",
+          queries: [
+            {
+              query: "sum(rate(errors[1m]))",
+              fields: { stream: "errors", stream_type: "metrics" },
+              config: { ref: "A", hide: true },
+            },
+            {
+              query: "sum(rate(requests[1m]))",
+              fields: { stream: "requests", stream_type: "metrics" },
+              config: { ref: "B", hide: true },
+            },
+            { query: "", fields: { stream_type: "metrics" }, config: { formula: "A / B" } },
+          ],
+          config: {},
+        },
+      });
+      await flushPromises();
+
+      wrapper.vm.handleCreateAlert({ condition: "above", threshold: 1 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.promql).toBe(combined);
+      expect(prefill?.queryChoices).toBeUndefined();
+      expect(prefill?.streamCandidates?.map((c: any) => c.name)).toEqual(["errors", "requests"]);
+    });
+
+    it("in the editor, follows the editor's live hide state over the applied panel's", async () => {
+      const loaded = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: loaded,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000)] }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-saved-hide",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { hide: true } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: "saved-hide-editor",
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      getPanelDataForPageKey("saved-hide-editor").layout.hiddenQueries = [0];
+      loaded.value = [entry("A"), entry("B"), entry("A1d")];
+      await flushPromises();
+
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      expect(call[1].map((d: any) => d.result[0].metric.q)).toEqual(["B"]);
+      expect(call[6].queries.map((m: any) => m.panelQueryIndex)).toEqual([1]);
+    });
+  });
+  // A chunk conversion landing after the final one must not overwrite it.
+  describe("conversions finishing out of order", () => {
+    const PAGE_KEY = "conversion-race";
+    const primary = {
+      resultType: "matrix",
+      result: [{ metric: { host: "a" }, values: [[1, "1"]] }],
+    };
+    const shifted = {
+      resultType: "matrix",
+      result: [{ metric: { host: "a" }, values: [[1, "2"]] }],
+    };
+    const optionsWith = (...names: string[]) => ({
+      chartType: "line",
+      options: { series: names.map((name) => ({ name, data: [[1, 1]] })) },
+      extras: {},
+    });
+
+    const mountRacing = async () => {
+      const data = ref<any[]>([]);
+      const loading = ref(false);
+      const errorDetail = ref({ message: "", code: "" });
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data,
+        loading,
+        errorDetail,
+        metadata: ref({
+          queries: [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
+            {
+              panelQueryIndex: 0,
+              timeRangeGap: { seconds: 600_000, periodAsStr: "10 Minutes ago" },
+            },
+          ],
+        }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-race",
+            type: "line",
+            queryType: "promql",
+            queries: [{ query: "x", fields: {}, config: { time_shift: [{ offSet: "10m" }] } }],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: PAGE_KEY,
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      return { data, loading, errorDetail };
+    };
+
+    it("keeps the latest conversion when an earlier, slower one resolves after it", async () => {
+      const { data, loading } = await mountRacing();
+
+      // A streamed chunk with only the primary: its conversion is slow.
+      let resolveChunk!: (v: any) => void;
+      vi.mocked(convertPanelData).mockImplementationOnce(
+        () => new Promise((resolve) => (resolveChunk = resolve)),
+      );
+      loading.value = true;
+      data.value = [primary];
+      await flushPromises();
+
+      // The final render with both streams resolves at once.
+      vi.mocked(convertPanelData).mockResolvedValueOnce(optionsWith("a", "a (10 Minutes ago)"));
+      data.value = [primary, shifted];
+      loading.value = false;
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual([
+        "a",
+        "a (10 Minutes ago)",
+      ]);
+
+      // The stale chunk lands last.
+      resolveChunk(optionsWith("a"));
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual([
+        "a",
+        "a (10 Minutes ago)",
+      ]);
+    });
+
+    // Run 1 has rendered a chart and has a chunk conversion in flight when run 2 resets the buffer.
+    const startRunTwoOverPendingChunk = async (data: any, loading: any) => {
+      vi.mocked(convertPanelData).mockResolvedValueOnce(optionsWith("run1"));
+      data.value = [primary];
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual(["run1"]);
+
+      loading.value = true;
+      const chunk: { resolve: (v: any) => void; reject: (e: any) => void } = {} as any;
+      vi.mocked(convertPanelData).mockImplementationOnce(
+        () => new Promise((resolve, reject) => Object.assign(chunk, { resolve, reject })),
+      );
+      data.value = [primary, shifted];
+      await flushPromises();
+
+      data.value = [];
+      await flushPromises();
+      return chunk;
+    };
+
+    it("drops a previous run's conversion that resolves after the next run reset", async () => {
+      const { data, loading } = await mountRacing();
+      const chunk = await startRunTwoOverPendingChunk(data, loading);
+
+      chunk.resolve(optionsWith("stale"));
+      await flushPromises();
+      expect(wrapper.vm.panelData.options.series.map((s: any) => s.name)).toEqual(["run1"]);
+    });
+
+    it("drops a previous run's conversion error that lands after the next run reset", async () => {
+      const { data, loading, errorDetail } = await mountRacing();
+      const chunk = await startRunTwoOverPendingChunk(data, loading);
+
+      chunk.reject(new Error("stale failure"));
+      await flushPromises();
+      expect(errorDetail.value.message).toBe("");
+    });
+
+    it("keeps a stream error set while a conversion is still awaiting", async () => {
+      const { data, loading, errorDetail } = await mountRacing();
+      loading.value = true;
+      const chunk: { resolve: (v: any) => void } = {} as any;
+      vi.mocked(convertPanelData).mockImplementationOnce(
+        () => new Promise((resolve) => Object.assign(chunk, { resolve })),
+      );
+      data.value = [primary];
+      await flushPromises();
+
+      errorDetail.value = { message: "stream failed", code: "500" };
+      chunk.resolve(optionsWith("late"));
+      await flushPromises();
+      expect(errorDetail.value.message).toBe("stream failed");
     });
   });
 });

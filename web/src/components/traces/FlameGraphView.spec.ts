@@ -866,6 +866,75 @@ describe("FlameGraphView", () => {
       expect(wrapper.vm.hasData).toBe(true);
     });
 
+    it("computes the max depth of 200,000 spans without a RangeError", () => {
+      // A parent chain keeps row placement linear, so the test measures maxDepth, not layout.
+      const spans = Array.from({ length: 200_000 }, (_, i) =>
+        createMockSpan({
+          span_id: `span-${i}`,
+          parent_span_id: i === 0 ? "" : `span-${i - 1}`,
+          depth: i % 13,
+          startOffsetMs: 0,
+          durationMs: 1,
+        }),
+      );
+      wrapper = mount(FlameGraphView, {
+        props: { spans, traceDuration: 100, selectedSpanId: null },
+      });
+      expect(wrapper.vm.maxDepth).toBe(12);
+    }, 60_000);
+
+    it("places a 20,000-level parent chain on 20,000 rows", () => {
+      const chain = Array.from({ length: 20_000 }, (_, i) =>
+        createMockSpan({
+          span_id: `span-${i}`,
+          parent_span_id: i === 0 ? "" : `span-${i - 1}`,
+          depth: i,
+          startOffsetMs: i * 0.001,
+          durationMs: 100 - i * 0.002,
+        }),
+      );
+      wrapper = mount(FlameGraphView, {
+        props: { spans: chain, traceDuration: 100, selectedSpanId: null },
+      });
+      const { rowMap, maxRow } = wrapper.vm.visualLayout;
+      expect(rowMap.size).toBe(20_000);
+      expect(maxRow).toBe(19_999);
+      expect(rowMap.get("span-12345")).toBe(12_345);
+    });
+
+    it("keeps the pre-order row placement of a branching tree", () => {
+      const tree = [
+        createMockSpan({ span_id: "a", depth: 0, startOffsetMs: 0, durationMs: 100 }),
+        createMockSpan({
+          span_id: "b",
+          parent_span_id: "a",
+          depth: 1,
+          startOffsetMs: 0,
+          durationMs: 50,
+        }),
+        createMockSpan({
+          span_id: "c",
+          parent_span_id: "a",
+          depth: 1,
+          startOffsetMs: 10,
+          durationMs: 50,
+        }),
+        createMockSpan({
+          span_id: "d",
+          parent_span_id: "b",
+          depth: 2,
+          startOffsetMs: 5,
+          durationMs: 25,
+        }),
+      ];
+      wrapper = mount(FlameGraphView, {
+        props: { spans: tree, traceDuration: 100, selectedSpanId: null },
+      });
+      const { rowMap, maxRow } = wrapper.vm.visualLayout;
+      expect(Object.fromEntries(rowMap)).toEqual({ a: 0, b: 1, d: 2, c: 3 });
+      expect(maxRow).toBe(3);
+    });
+
     it("should handle very deep trace (many depth levels)", () => {
       const deepSpans = Array.from({ length: 10 }, (_, i) =>
         createMockSpan({
