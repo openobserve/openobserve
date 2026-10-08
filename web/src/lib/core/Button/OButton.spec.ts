@@ -132,6 +132,19 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
   });
 
+  // Destination previews are fixed-light brand replicas: the label must use the
+  // fixed brand foreground, not text-text-inverse, which turns near-black in dark mode.
+  it.each([
+    ["preview-slack", "text-brand-slack-foreground"],
+    ["preview-teams", "text-brand-teams-foreground"],
+    ["preview-email", "text-brand-email-foreground"],
+    ["preview-opsgenie", "text-brand-email-ink-foreground"],
+  ] as const)("paints the %s label with %s", (variant, label) => {
+    const wrapper = mount(OButton, { props: { variant } });
+    expect(wrapper.classes()).toContain(label);
+    expect(wrapper.classes()).not.toContain("text-text-inverse");
+  });
+
   // --- Size classes ---
 
   it("applies md size classes by default", () => {

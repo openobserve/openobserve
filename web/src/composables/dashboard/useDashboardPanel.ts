@@ -168,6 +168,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
+        hide: false,
       },
     };
     // Seed the new query's default builder fields synchronously (mirrors the
@@ -235,6 +236,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     (newQueryType) => {
       if (newQueryType === "promql") {
         dashboardPanelData.layout.vrlFunctionToggle = false;
+      } else {
+        // A formula is PromQL-only; outside PromQL it would hide the query text from the editor.
+        dashboardPanelData.data.queries.forEach((query: any) => {
+          if (query?.config && "formula" in query.config) delete query.config.formula;
+        });
       }
     },
   );

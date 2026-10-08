@@ -23,14 +23,6 @@ use tonic::{Response, Status};
 
 use crate::service::profiles::{ProfilesExportError, handle_otlp_request};
 
-fn export_error_to_status(err: ProfilesExportError) -> Status {
-    match err {
-        ProfilesExportError::TrialPeriodExpired(msg) => Status::resource_exhausted(msg),
-        ProfilesExportError::Unavailable(msg) => Status::unavailable(msg),
-        ProfilesExportError::Internal(err) => Status::internal(err.to_string()),
-    }
-}
-
 #[derive(Default)]
 pub struct ProfilesServer;
 
@@ -112,9 +104,26 @@ impl ProfilesService for ProfilesServer {
     }
 }
 
+fn export_error_to_status(err: ProfilesExportError) -> Status {
+    match err {
+        ProfilesExportError::InvalidArgument(msg) => Status::invalid_argument(msg),
+        ProfilesExportError::TrialPeriodExpired(msg) => Status::resource_exhausted(msg),
+        ProfilesExportError::Unavailable(msg) => Status::unavailable(msg),
+        ProfilesExportError::Internal(err) => Status::internal(err.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn malformed_dictionary_returns_invalid_argument() {
+        let message = "dictionary.stack_table[0] must be the zero value";
+        let status = export_error_to_status(ProfilesExportError::InvalidArgument(message.into()));
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        assert_eq!(status.message(), message);
+    }
 
     #[test]
     fn test_profiles_server_default() {

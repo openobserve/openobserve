@@ -39,7 +39,7 @@ export function useTableSorting<TData>(
         emit("sort-change", { column: "", order: "asc" });
       }
     }
-    // Client-side sorting is handled by TanStack internally via toggleSorting
+    // Client mode emits from useTableCore's onSortingChange, once TanStack has toggled.
   }
 
   function getSortIcon(columnId: string): "asc" | "desc" | "none" {
