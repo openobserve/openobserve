@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Top-Abfragen",
     "profiles": "Profile",
-    "productAnalytics": "Produktanalyse"
+    "productAnalytics": "Produktanalyse",
+    "trialEndedTitle": "Ihre Testphase ist beendet",
+    "trialPageNeedsPlan": "{page} benötigt einen Plan",
+    "trialPageNeedsPlanToast": "{page} benötigt einen Plan. Wählen Sie einen auf dieser Seite, um sie weiter zu nutzen.",
+    "trialChoosePlanToast": "Wählen Sie einen Plan auf dieser Seite, um {product} weiter zu nutzen.",
+    "trialFlyoutNote": "Ihre Testphase ist beendet. Seiten mit einem Schloss benötigen einen Plan."
   },
   "profiles": {
     "title": "Profile",

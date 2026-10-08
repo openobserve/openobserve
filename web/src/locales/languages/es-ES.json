@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Consultas principales",
     "profiles": "Perfiles",
-    "productAnalytics": "Analítica de producto"
+    "productAnalytics": "Analítica de producto",
+    "trialEndedTitle": "Tu período de prueba ha finalizado",
+    "trialPageNeedsPlan": "{page} necesita un plan",
+    "trialPageNeedsPlanToast": "{page} necesita un plan. Elige uno en esta página para seguir usándolo.",
+    "trialChoosePlanToast": "Elige un plan en esta página para seguir usando {product}.",
+    "trialFlyoutNote": "Tu período de prueba ha finalizado. Las páginas con un candado necesitan un plan."
   },
   "profiles": {
     "title": "Perfiles",

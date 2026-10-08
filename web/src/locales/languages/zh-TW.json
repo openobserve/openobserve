@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "熱門查詢",
     "profiles": "效能剖析",
-    "productAnalytics": "產品分析"
+    "productAnalytics": "產品分析",
+    "trialEndedTitle": "您的試用期已結束",
+    "trialPageNeedsPlan": "{page} 需要方案",
+    "trialPageNeedsPlanToast": "{page} 需要方案。請在此頁面選擇一個方案以繼續使用。",
+    "trialChoosePlanToast": "請在此頁面選擇方案，以繼續使用 {product}。",
+    "trialFlyoutNote": "您的試用期已結束。上鎖的頁面需要方案。"
   },
   "profiles": {
     "title": "效能剖析",

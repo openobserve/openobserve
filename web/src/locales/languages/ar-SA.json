@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "أهم الاستعلامات",
     "profiles": "التوصيف",
-    "productAnalytics": "تحليلات المنتج"
+    "productAnalytics": "تحليلات المنتج",
+    "trialEndedTitle": "انتهت فترة التجربة الخاصة بك",
+    "trialPageNeedsPlan": "{page} يحتاج إلى خطة",
+    "trialPageNeedsPlanToast": "{page} يحتاج إلى خطة. اختر واحدة في هذه الصفحة لمواصلة استخدامه.",
+    "trialChoosePlanToast": "اختر خطة في هذه الصفحة لمواصلة استخدام {product}.",
+    "trialFlyoutNote": "انتهت فترة التجربة الخاصة بك. الصفحات التي تحمل قفلًا تحتاج إلى خطة."
   },
   "profiles": {
     "title": "التوصيف",

@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "En Çok Kullanılan Sorgular",
     "profiles": "Profiller",
-    "productAnalytics": "Ürün Analitiği"
+    "productAnalytics": "Ürün Analitiği",
+    "trialEndedTitle": "Deneme süreniz sona erdi",
+    "trialPageNeedsPlan": "{page} için bir plan gerekli",
+    "trialPageNeedsPlanToast": "{page} için bir plan gerekli. Kullanmaya devam etmek için bu sayfadan bir plan seçin.",
+    "trialChoosePlanToast": "{product} kullanmaya devam etmek için bu sayfadan bir plan seçin.",
+    "trialFlyoutNote": "Deneme süreniz sona erdi. Kilit simgesi olan sayfalar için bir plan gerekir."
   },
   "profiles": {
     "title": "Profiller",

@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Top Queries",
     "profiles": "Profielen",
-    "productAnalytics": "Productanalyse"
+    "productAnalytics": "Productanalyse",
+    "trialEndedTitle": "Je proefperiode is afgelopen",
+    "trialPageNeedsPlan": "{page} heeft een plan nodig",
+    "trialPageNeedsPlanToast": "{page} heeft een plan nodig. Kies er een op deze pagina om deze te blijven gebruiken.",
+    "trialChoosePlanToast": "Kies een plan op deze pagina om {product} te blijven gebruiken.",
+    "trialFlyoutNote": "Je proefperiode is afgelopen. Pagina's met een slot hebben een plan nodig."
   },
   "profiles": {
     "title": "Profielen",

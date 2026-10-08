@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Топ запросов",
     "profiles": "Профили",
-    "productAnalytics": "Продуктовая аналитика"
+    "productAnalytics": "Продуктовая аналитика",
+    "trialEndedTitle": "Ваш пробный период завершён",
+    "trialPageNeedsPlan": "Для {page} нужен план",
+    "trialPageNeedsPlanToast": "Для {page} нужен план. Выберите план на этой странице, чтобы продолжить работу.",
+    "trialChoosePlanToast": "Выберите план на этой странице, чтобы продолжить использовать {product}.",
+    "trialFlyoutNote": "Ваш пробный период завершён. Для страниц со значком замка нужен план."
   },
   "profiles": {
     "title": "Профили",

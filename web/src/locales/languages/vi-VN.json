@@ -1318,7 +1318,12 @@
     "kubernetes2": "Kubernetes 2",
     "topQueries": "Truy vấn hàng đầu",
     "profiles": "Profiles",
-    "productAnalytics": "Phân tích sản phẩm"
+    "productAnalytics": "Phân tích sản phẩm",
+    "trialEndedTitle": "Bản dùng thử của bạn đã kết thúc",
+    "trialPageNeedsPlan": "{page} cần một gói dịch vụ",
+    "trialPageNeedsPlanToast": "{page} cần một gói dịch vụ. Hãy chọn một gói trên trang này để tiếp tục sử dụng.",
+    "trialChoosePlanToast": "Hãy chọn một gói trên trang này để tiếp tục sử dụng {product}.",
+    "trialFlyoutNote": "Bản dùng thử của bạn đã kết thúc. Các trang có biểu tượng khóa cần một gói dịch vụ."
   },
   "profiles": {
     "title": "Profiles",
