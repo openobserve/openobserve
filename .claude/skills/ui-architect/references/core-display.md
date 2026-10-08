@@ -289,6 +289,44 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 </OCollapsible>
 ```
 
+**Rich list row** — one item per row: name + status on line 1, the detail on one
+truncated line, the full detail when opened (copy-and-values.md § One line per item).
+The `#trigger` slot hides the built-in chevron, so draw one and rotate it on `open`;
+hide the truncated line while open so it is not said twice.
+
+```vue
+<OCollapsible>
+  <template #trigger="{ open }">
+    <span class="flex min-w-0 flex-1 flex-col gap-1">
+      <span class="flex items-baseline gap-x-3 max-md:flex-col">
+        <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{ row.label }}</OText>
+        <OText variant="meta" as="span" nowrap>{{ row.status }}</OText>
+      </span>
+      <OText v-if="!open" variant="meta" truncate>{{ row.detail }}</OText>
+    </span>
+    <OIcon
+      name="expand-more"
+      size="sm"
+      class="text-text-secondary shrink-0 transition-transform duration-200"
+      :class="open ? 'rotate-180' : 'rotate-0'"
+    />
+  </template>
+  <p class="px-2 pb-2 leading-5 break-words">
+    <OText variant="meta">{{ row.detail }}</OText>
+  </p>
+</OCollapsible>
+```
+
+- **A control beside the trigger:** the body renders inside the root, so a sibling
+  placed after an `OCollapsible` sits beside the whole open body, not the trigger.
+  When a control must stay on the trigger's line (an info button beside "38 panels
+  hidden"), use an `OButton` toggle (`icon-right` `expand-more`/`expand-less`,
+  `:aria-expanded`, `aria-controls`) and render the body below with `v-if`.
+- **Nothing interactive inside `#trigger`** — it is already a button. A Set-up
+  action for a row goes beside the `OCollapsible`, not in its trigger.
+- **In specs**, open an uncontrolled one by clicking its trigger `button`;
+  `setValue(true)` on the component does nothing without a bound `v-model`.
+
 **Family:** Built on reka-ui `Collapsible*` + `OIcon`; accordion coordination via `useCollapsibleGroup`. Standalone.
 
 ---
@@ -328,6 +366,10 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 **Slots:** `illustration`, `title`, `description`, `actions`, `extra`
 **Emits:** `action` (`(id?: string)`), `secondaryAction`
+**In a scroll pane:** the root is `overflow-hidden`, so as a flex child of a
+`flex-col overflow-y-auto` pane it shrinks and clips its own `#extra` list instead of
+letting the pane scroll — pass `class="shrink-0"` and centre with
+`justify-center-safe` on the pane. A list in `#extra` follows "one line per item".
 **Example:**
 
 ```vue
@@ -497,12 +539,13 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   - `label` — 12px medium, `<span>` default (form/column sub-labels)
   - `meta` — 12px normal secondary, `<span>` default (timestamps, counts, hints)
   - `mono` — 12px IBM Plex Mono, `<span>` default (cron, IDs, field names — non-linked)
-- `as` (string — override the rendered element)
+- `as` (string — override the rendered element). There is **no `tag` prop**: `<OText tag="h2">` renders the variant's default element (a `<p>` for `body`) and passes `tag` through as a dead attribute, so a "heading" is not one.
 - `truncate` (boolean, default `false` — ellipsis on overflow)
 - `nowrap` (boolean, default `false` — prevent wrapping)
 
 **Slots:** `default`
 **Emits:** none
+**No class merging.** OText applies its variant's size, weight, colour and leading as plain classes and does not merge yours, so `class="text-xl"` on a `body` OText fights its `text-sm` by stylesheet order. Change the `variant`; when no variant fits, set the property on a wrapping element the OText inherits from (`<p class="leading-5"><OText variant="mono">…</OText></p>`).
 **Example:**
 
 ```vue
