@@ -18,6 +18,7 @@ import useManagementRoutes from "./useManagementRoutes";
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import enLocale from "@/locales/languages/en-US.json";
+import store from "@/stores";
 
 /** Every `meta.titleKey` in a route tree, children included. */
 const collectTitleKeys = (routes: any[]): string[] =>
@@ -35,6 +36,10 @@ vi.mock("@/aws-exports", () => ({
     isEnterprise: "false",
     isCloud: "false",
   },
+}));
+
+vi.mock("@/stores", () => ({
+  default: { state: { zoConfig: {} as Record<string, unknown> } },
 }));
 
 // Mock the routeGuard function
@@ -569,9 +574,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 23 children routes when enterprise is enabled", () => {
+    it("should have exactly 24 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor)
+      expect(routes[0].children).toHaveLength(24); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings)
     });
 
     it("should have the announcement banner list and editor routes when enterprise", () => {
@@ -659,9 +664,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 24 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 25 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(24); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor) + 1 cloud
+      expect(routes[0].children).toHaveLength(25); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -806,6 +811,38 @@ describe("useManagementRoutes", () => {
       config.isCloud = "false";
 
       expect(findRoute(useManagementRoutes()).path).toBe("password_policy");
+    });
+  });
+
+  describe("telephonySettings route", () => {
+    const children = () => useManagementRoutes()[0].children;
+    const findRoute = () => children().find((child: any) => child.name === "telephonySettings");
+
+    it("is an enterprise route beside pipeline destinations that lazy-loads the page", () => {
+      config.isEnterprise = "true";
+      const names = children().map((child: any) => child.name);
+      expect(names.indexOf("telephonySettings")).toBe(names.indexOf("pipelineDestinations") + 1);
+      expect(findRoute().path).toBe("telephony");
+      expect(findRoute().meta).toEqual({ titleKey: "telephony.title" });
+      expect(typeof findRoute().component).toBe("function");
+    });
+
+    it("is absent in an OSS build", () => {
+      config.isEnterprise = "false";
+      expect(findRoute()).toBeUndefined();
+    });
+
+    it.each([
+      [false, true],
+      [true, false],
+      [undefined, false],
+    ])("with oncall_enabled %s, redirects home: %s", (enabled, redirected) => {
+      config.isEnterprise = "true";
+      store.state.zoConfig = { oncall_enabled: enabled };
+      const next = vi.fn();
+      findRoute().beforeEnter({}, {}, next);
+      expect(next.mock.calls.some(([to]) => to === "/")).toBe(redirected);
+      expect(vi.mocked(routeGuard).mock.calls.length).toBe(redirected ? 0 : 1);
     });
   });
 

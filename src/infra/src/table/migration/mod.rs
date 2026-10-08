@@ -217,6 +217,8 @@ mod m20261009_000003_add_last_downtime_id_to_alert_states;
 mod m20261009_000004_add_kind_to_slo_backfill_jobs;
 mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
+mod m20261013_000001_create_oncall_phone_verifications;
+mod m20261013_000002_create_org_telephony;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -563,6 +565,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261009_000004_add_kind_to_slo_backfill_jobs::Migration),
             Box::new(m20261009_000005_create_downtime_notifications::Migration),
             Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
+            Box::new(m20261013_000001_create_oncall_phone_verifications::Migration),
+            Box::new(m20261013_000002_create_org_telephony::Migration),
         ]
     }
 }
@@ -625,6 +629,7 @@ mod tests {
         (101, "m20261009_000004_add_kind_to_slo_backfill_jobs"),
         (102, "m20261009_000005_create_downtime_notifications"),
         (103, "m20261012_000001_create_alert_calibration_configs"),
+        (104, "m20261013_000002_create_org_telephony"),
     ];
 
     #[test]

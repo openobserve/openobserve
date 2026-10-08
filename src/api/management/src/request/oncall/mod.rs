@@ -42,6 +42,10 @@ const CONFIG: &str = "oncall";
 #[cfg(feature = "enterprise")]
 const RESPONSES: &str = "oncall_responses";
 
+/// The org's own phone provider account is an org setting, so it takes the settings lock.
+#[cfg(feature = "enterprise")]
+const SETTINGS: &str = "settings";
+
 /// A second lock behind `route_permissions`, which is first-match-wins and silently shadowable.
 #[cfg(feature = "enterprise")]
 async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) -> bool {
@@ -49,6 +53,16 @@ async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) 
         org_id, org_id, user_id, resource, permission, None, true, false, false,
     )
     .await
+}
+
+/// Fails closed: any verb but GET on `/telephony` changes how the org is paged, so it needs PUT.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn telephony_permission(method: &axum::http::Method) -> &'static str {
+    if method == axum::http::Method::GET {
+        "GET"
+    } else {
+        "PUT"
+    }
 }
 
 // ── Request bodies ────────────────────────────────────────────────────────────
@@ -184,6 +198,11 @@ pub struct SetContactRequest {
     pub push_token: Option<Option<String>>,
     #[serde(default, deserialize_with = "double_option")]
     pub quiet_hours: Option<Option<String>>,
+}
+
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct ConfirmContactCodeRequest {
+    pub code: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -418,6 +437,13 @@ pub struct AckQuery {
     pub token: String,
 }
 
+/// The form Twilio posts to a `<Gather>` action; a missing `Digits` reads as no key pressed.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct VoiceAckForm {
+    #[serde(rename = "Digits")]
+    pub digits: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RemoveMemberQuery {
     pub user_email: String,
@@ -486,6 +512,16 @@ pub struct OwnershipStatsQuery {
     pub offset: Option<u64>,
 }
 
+/// A missing or blank `auth_token` keeps the stored one; no `Debug`, since it carries the token.
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct PutTelephonyRequest {
+    pub provider: String,
+    pub account_sid: String,
+    #[serde(default)]
+    pub auth_token: Option<String>,
+    pub from_number: String,
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 /// The `sea-orm` text carries SQL fragments, and every endpoint here is open to the whole org.
@@ -514,6 +550,12 @@ fn to_response(e: anyhow::Error) -> Response {
             StatusCode::CONFLICT
         }
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
+        Some(OncallError::Verification(refusal)) => return refusal_response(refusal),
+        Some(OncallError::Telephony(refusal)) => {
+            let body =
+                serde_json::json!({ "message": refusal.to_string(), "reason": refusal.reason });
+            return (StatusCode::BAD_REQUEST, axum::Json(body)).into_response();
+        }
         None => StatusCode::INTERNAL_SERVER_ERROR,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {
@@ -521,6 +563,33 @@ fn to_response(e: anyhow::Error) -> Response {
     }
     // Every remaining status is an `OncallError` whose message is written for the caller.
     MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
+}
+
+/// The reason travels as a code so a client can word it, and the numbers so it need not parse.
+#[cfg(feature = "enterprise")]
+fn refusal_response(
+    refusal: &o2_enterprise::enterprise::oncall::service::VerificationRefusal,
+) -> Response {
+    use o2_enterprise::enterprise::oncall::service::RefusalReason as R;
+    let status = match refusal.reason {
+        R::TooSoon | R::UserDailyLimit | R::NumberDailyLimit => StatusCode::TOO_MANY_REQUESTS,
+        R::ProviderUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+        R::WrongCode
+        | R::Expired
+        | R::TooManyTries
+        | R::NoCode
+        | R::NoProvider
+        | R::NoPhone
+        | R::NumberRejected => StatusCode::BAD_REQUEST,
+    };
+    let mut body = serde_json::json!({ "message": refusal.to_string(), "reason": refusal.reason });
+    if let Some(n) = refusal.tries_left {
+        body["tries_left"] = n.into();
+    }
+    if let Some(n) = refusal.retry_after_secs {
+        body["retry_after_secs"] = n.into();
+    }
+    (status, axum::Json(body)).into_response()
 }
 
 #[utoipa::path(
@@ -1594,6 +1663,47 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/ack/voice/{token}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "AcknowledgeOnCallPageByVoice",
+    summary = "Acknowledge a page from a key pressed on its phone call",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("token" = String, Path, description = "Signed acknowledgement token"),
+    ),
+    responses((status = 200, description = "TwiML for the call", content_type = "text/xml")),
+)]
+/// Always 200 with TwiML: Twilio treats any 4xx or 5xx from a `<Gather>` action as error 11200.
+pub async fn voice_ack(
+    Path((org_id, token)): Path<(String, String)>,
+    axum::Form(form): axum::Form<VoiceAckForm>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let twiml = o2_enterprise::enterprise::oncall::service::voice_acknowledge(
+            &org_id,
+            &token,
+            form.digits.as_deref().unwrap_or_default(),
+            config::utils::time::now_micros(),
+        )
+        .await;
+        axum::response::Response::builder()
+            .status(StatusCode::OK)
+            .header(axum::http::header::CONTENT_TYPE, "text/xml")
+            .body(axum::body::Body::from(twiml))
+            .unwrap()
+            .into_response()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, token, form);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -3544,19 +3654,20 @@ pub async fn delete_unavailability(
 
 // ── Contact profiles (U27, `architecture/03` §5) ──────────────────────────────
 
-/// Your own always, others only with the config permission: a whole org's numbers are not open.
-#[cfg(feature = "enterprise")]
-async fn may_touch_contacts(org_id: &str, caller: &str, subject: &str, verb: &str) -> bool {
+/// A contact is touched only by its owner, and only while they are an org member. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn own_contact(is_member: bool, caller: &str, subject: &str) -> bool {
     // Case-insensitive: a login is not case-sensitive, and a refusal here loses a phone number.
-    if caller.eq_ignore_ascii_case(subject) {
-        return true;
-    }
-    allowed(org_id, caller, CONFIG, verb).await
+    is_member && caller.eq_ignore_ascii_case(subject)
 }
 
 /// `unverified` is the point: somebody who saved a number must not learn otherwise at 3am.
 #[cfg(feature = "enterprise")]
-fn contact_body(contact: &config::meta::oncall::Contact) -> serde_json::Value {
+fn contact_body(
+    contact: &config::meta::oncall::Contact,
+    phone_provider_available: bool,
+    press4_available: bool,
+) -> serde_json::Value {
     let mut value = serde_json::json!(contact);
     if let Some(obj) = value.as_object_mut() {
         obj.insert(
@@ -3571,6 +3682,11 @@ fn contact_body(contact: &config::meta::oncall::Contact) -> serde_json::Value {
             "push_is_pageable".to_string(),
             contact.push_is_pageable().into(),
         );
+        obj.insert(
+            "phone_provider_available".to_string(),
+            phone_provider_available.into(),
+        );
+        obj.insert("press4_available".to_string(), press4_available.into());
     }
     value
 }
@@ -3595,17 +3711,26 @@ pub async fn get_contact(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await
-            || !may_touch_contacts(&org_id, &user_email.user_id, &subject_email, "GET").await
-        {
+        let caller = &user_email.user_id;
+        let is_member =
+            o2_enterprise::enterprise::oncall::service::is_org_member(&org_id, caller).await;
+        if !own_contact(is_member, caller, &subject_email) {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match infra::table::oncall_user_contacts::get(&org_id, &subject_email).await {
             // An empty profile, not a 404: the branch a 404 forces is one that renders nothing.
             Ok(found) => {
-                MetaHttpResponse::json(contact_body(&found.unwrap_or_else(|| {
+                let contact = found.unwrap_or_else(|| {
                     config::meta::oncall::Contact::empty(&org_id, &subject_email)
-                })))
+                });
+                let available =
+                    o2_enterprise::enterprise::oncall::service::phone_provider_available(&org_id)
+                        .await;
+                MetaHttpResponse::json(contact_body(
+                    &contact,
+                    available,
+                    o2_enterprise::enterprise::oncall::service::press4_available(),
+                ))
             }
             Err(e) => internal_error("get_contact", &e),
         }
@@ -3617,7 +3742,7 @@ pub async fn get_contact(
     }
 }
 
-/// No SMS or voice transport exists yet, so every number saved here lands unverified.
+/// A new number pages only once proved, by its texted code or by this person in another org.
 #[utoipa::path(
     put,
     path = "/{org_id}/oncall/contacts/{user_email}",
@@ -3645,9 +3770,10 @@ pub async fn set_contact(
     {
         use infra::table::oncall_user_contacts::ContactPatch;
 
-        if !allowed(&org_id, &user_email.user_id, RESPONSES, "PUT").await
-            || !may_touch_contacts(&org_id, &user_email.user_id, &subject_email, "PUT").await
-        {
+        let caller = &user_email.user_id;
+        let is_member =
+            o2_enterprise::enterprise::oncall::service::is_org_member(&org_id, caller).await;
+        if !own_contact(is_member, caller, &subject_email) {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         // An empty string clears: a stored "" would look like a number to anything reading it.
@@ -3655,7 +3781,7 @@ pub async fn set_contact(
             None => None,
             Some(None) => Some(None),
             Some(Some(raw)) if raw.trim().is_empty() => Some(None),
-            Some(Some(raw)) => match config::meta::oncall::normalize_phone(&raw) {
+            Some(Some(raw)) => match config::meta::oncall::to_e164(&raw) {
                 Ok(p) => Some(Some(p)),
                 Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
             },
@@ -3677,8 +3803,114 @@ pub async fn set_contact(
         )
         .await
         {
-            Ok(contact) => MetaHttpResponse::json(contact_body(&contact)),
+            Ok(contact) => {
+                o2_enterprise::enterprise::oncall::replicate::contact(
+                    &org_id,
+                    &contact.user_email,
+                    contact.phone.clone(),
+                    contact.phone_verified_at,
+                )
+                .await;
+                let available =
+                    o2_enterprise::enterprise::oncall::service::phone_provider_available(&org_id)
+                        .await;
+                MetaHttpResponse::json(contact_body(
+                    &contact,
+                    available,
+                    o2_enterprise::enterprise::oncall::service::press4_available(),
+                ))
+            }
             Err(e) => internal_error("set_contact", &e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, subject_email, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/contacts/{user_email}/verify",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SendOnCallContactCode",
+    summary = "Text a verification code to a person's saved phone",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "The person's email"),
+    ),
+    responses(
+        (status = 204, description = "Code sent"),
+        (status = 400, description = "No phone saved, no provider, or the number cannot receive texts", content_type = "application/json", body = Object),
+        (status = 429, description = "Too many codes; carries retry_after_secs", content_type = "application/json", body = Object),
+        (status = 503, description = "The provider could not send now", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn send_contact_code(
+    Path((org_id, subject_email)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::service;
+
+        let caller = &user_email.user_id;
+        let is_member = service::is_org_member(&org_id, caller).await;
+        if !own_contact(is_member, caller, &subject_email) {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let now = config::utils::time::now_micros();
+        match service::send_phone_code(&org_id, &subject_email, now).await {
+            Ok(()) => StatusCode::NO_CONTENT.into_response(),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, subject_email);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/contacts/{user_email}/verify/confirm",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ConfirmOnCallContactCode",
+    summary = "Verify a person's phone with the code texted to it",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "The person's email"),
+    ),
+    request_body(content = ConfirmContactCodeRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Verified; carries phone_verified_at", content_type = "application/json", body = Object),
+        (status = 400, description = "Wrong, expired or missing code", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn confirm_contact_code(
+    Path((org_id, subject_email)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ValidatedJson(body): ValidatedJson<ConfirmContactCodeRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::service;
+
+        let caller = &user_email.user_id;
+        let is_member = service::is_org_member(&org_id, caller).await;
+        if !own_contact(is_member, caller, &subject_email) {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let now = config::utils::time::now_micros();
+        match service::confirm_phone_code(&org_id, &subject_email, &body.code, now).await {
+            Ok(at) => MetaHttpResponse::json(serde_json::json!({ "phone_verified_at": at })),
+            Err(e) => to_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
@@ -3708,14 +3940,22 @@ pub async fn delete_contact(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if !allowed(&org_id, &user_email.user_id, RESPONSES, "DELETE").await
-            || !may_touch_contacts(&org_id, &user_email.user_id, &subject_email, "DELETE").await
-        {
+        let caller = &user_email.user_id;
+        let is_member =
+            o2_enterprise::enterprise::oncall::service::is_org_member(&org_id, caller).await;
+        if !own_contact(is_member, caller, &subject_email) {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match infra::table::oncall_user_contacts::delete(&org_id, &subject_email).await {
             // Reported, not silently 200: deleting a missing profile means a stale screen.
-            Ok(deleted) => MetaHttpResponse::json(serde_json::json!({ "deleted": deleted })),
+            Ok(deleted) => {
+                o2_enterprise::enterprise::oncall::replicate::contact_deleted(
+                    &org_id,
+                    &subject_email,
+                )
+                .await;
+                MetaHttpResponse::json(serde_json::json!({ "deleted": deleted }))
+            }
             Err(e) => internal_error("delete_contact", &e),
         }
     }
@@ -4274,6 +4514,147 @@ pub async fn promote_to_incident(
     }
 }
 
+/// Never carries a token or the deployment's Account SID.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/telephony",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetTelephony",
+    summary = "Get the org's phone provider account and the deployment's fallback",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_telephony(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(
+            &org_id,
+            &user_email.user_id,
+            SETTINGS,
+            telephony_permission(&axum::http::Method::GET),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::telephony_settings::get_telephony(&org_id).await {
+            Ok(view) => MetaHttpResponse::json(view),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Saved only once Twilio reports the account active, and never without a master key.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/telephony",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SetTelephony",
+    summary = "Connect or update the org's own phone provider account",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = PutTelephonyRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid, refused by Twilio, or no master key", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn put_telephony(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ValidatedJson(body): ValidatedJson<PutTelephonyRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::telephony_settings::{PutTelephony, put_telephony};
+
+        if !allowed(
+            &org_id,
+            &user_email.user_id,
+            SETTINGS,
+            telephony_permission(&axum::http::Method::PUT),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let req = PutTelephony {
+            provider: body.provider,
+            account_sid: body.account_sid,
+            auth_token: body.auth_token,
+            from_number: body.from_number,
+        };
+        match put_telephony(&org_id, req, config::utils::time::now_micros()).await {
+            Ok(view) => MetaHttpResponse::json(view),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Pages fall back to the deployment's account afterwards, if it has one.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/telephony",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DeleteTelephony",
+    summary = "Disconnect the org's own phone provider account",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn delete_telephony(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(
+            &org_id,
+            &user_email.user_id,
+            SETTINGS,
+            telephony_permission(&axum::http::Method::DELETE),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::telephony_settings::delete_telephony(&org_id).await
+        {
+            Ok(deleted) => MetaHttpResponse::json(serde_json::json!({ "deleted": deleted })),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4402,7 +4783,7 @@ mod tests {
     #[test]
     fn test_every_session_handler_is_gated() {
         // Exempt: served from `basic_routes` with no session, gated by the token in the handler.
-        const TOKEN_AUTHENTICATED: [&str; 2] = ["acknowledge", "ack_page"];
+        const TOKEN_AUTHENTICATED: [&str; 3] = ["acknowledge", "ack_page", "voice_ack"];
 
         let source = include_str!("mod.rs");
         let mut ungated = Vec::new();
@@ -4426,7 +4807,8 @@ mod tests {
             if TOKEN_AUTHENTICATED.contains(&name) {
                 continue;
             }
-            if !body.contains("if !allowed(") {
+            // `own_contact` is the gate for the self-only contact handlers (A2).
+            if !body.contains("if !allowed(") && !body.contains("if !own_contact(") {
                 ungated.push(name.to_string());
             }
         }
@@ -4614,7 +4996,7 @@ mod tests {
         assert_eq!(nothing.phone, None);
     }
 
-    /// No SMS or voice transport exists yet, so the body must say a number is unverified.
+    /// An unproved number never pages, so the body must say it is unverified.
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_a_saved_number_is_reported_as_unverified() {
@@ -4622,7 +5004,7 @@ mod tests {
 
         let mut contact = Contact::empty("default", "ana@o2.ai");
         contact.phone = Some("+15550100".to_string());
-        let body = contact_body(&contact);
+        let body = contact_body(&contact, false, false);
 
         assert_eq!(body["phone"], "+15550100");
         assert_eq!(body["unverified"][0], "phone");
@@ -4633,7 +5015,7 @@ mod tests {
         );
 
         contact.phone_verified_at = Some(1_700_000_000_000_000i64);
-        let body = contact_body(&contact);
+        let body = contact_body(&contact, false, false);
         assert_eq!(body["phone_is_pageable"], true);
         assert_eq!(body["unverified"].as_array().unwrap().len(), 0);
     }
@@ -4644,10 +5026,133 @@ mod tests {
     fn test_a_person_with_no_profile_still_has_a_body() {
         use config::meta::oncall::Contact;
 
-        let body = contact_body(&Contact::empty("default", "new@o2.ai"));
+        let body = contact_body(&Contact::empty("default", "new@o2.ai"), false, false);
         assert_eq!(body["user_email"], "new@o2.ai");
         assert_eq!(body["phone_is_pageable"], false);
         assert_eq!(body["unverified"].as_array().unwrap().len(), 0);
+    }
+
+    /// A3: the body says whether a code can be sent and whether pressing 4 can work.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_contact_body_says_whether_a_code_can_be_sent() {
+        use config::meta::oncall::Contact;
+
+        let contact = Contact::empty("default", "ana@o2.ai");
+        for (available, press4) in [(true, false), (false, true)] {
+            let body = contact_body(&contact, available, press4);
+            assert_eq!(body["phone_provider_available"], available);
+            assert_eq!(body["press4_available"], press4);
+        }
+    }
+
+    /// V8: the status comes from the reason, and a field the refusal lacks is omitted, not null.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_verification_refusal_maps_to_status_reason_and_fields() {
+        use config::meta::oncall::WaitLimit;
+        use o2_enterprise::enterprise::oncall::service::{
+            OncallError, RefusalReason as R, VerificationRefusal as V,
+        };
+
+        let bad = StatusCode::BAD_REQUEST;
+        let many = StatusCode::TOO_MANY_REQUESTS;
+        let minute = 30 * 1_000_000;
+        let cases = [
+            (V::wrong_code(4), bad, "wrong_code", Some(4), None),
+            (V::new(R::Expired), bad, "expired", None, None),
+            (V::new(R::TooManyTries), bad, "too_many_tries", None, None),
+            (V::new(R::NoCode), bad, "no_code", None, None),
+            (
+                V::wait(WaitLimit::Gap, minute),
+                many,
+                "too_soon",
+                None,
+                Some(30),
+            ),
+            (
+                V::wait(WaitLimit::User, minute),
+                many,
+                "user_daily_limit",
+                None,
+                Some(30),
+            ),
+            (
+                V::wait(WaitLimit::Number, minute),
+                many,
+                "number_daily_limit",
+                None,
+                Some(30),
+            ),
+            (V::new(R::NoProvider), bad, "no_provider", None, None),
+            (V::new(R::NoPhone), bad, "no_phone", None, None),
+            (
+                V::new(R::NumberRejected),
+                bad,
+                "number_rejected",
+                None,
+                None,
+            ),
+            (
+                V::new(R::ProviderUnavailable),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "provider_unavailable",
+                None,
+                None,
+            ),
+        ];
+        for (refusal, status, reason, tries_left, retry_after_secs) in cases {
+            let message = refusal.to_string();
+            let resp = to_response(OncallError::Verification(refusal).into());
+            assert_eq!(resp.status(), status, "{reason}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let got: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            let mut want = serde_json::json!({ "message": message, "reason": reason });
+            if let Some(n) = tries_left {
+                want["tries_left"] = n.into();
+            }
+            if let Some(n) = retry_after_secs {
+                want["retry_after_secs"] = n.into();
+            }
+            assert_eq!(got, want, "{reason}");
+        }
+    }
+
+    /// P14: every telephony refusal is a 400 whose code lets the page word it.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_a_telephony_refusal_maps_to_400_with_reason() {
+        use o2_enterprise::enterprise::oncall::{
+            service::OncallError,
+            telephony_settings::{TelephonyReason as R, TelephonyRefusal},
+        };
+
+        let cases = [
+            (R::BadProvider, "bad_provider"),
+            (R::BadSid, "bad_sid"),
+            (R::BadFromNumber, "bad_from_number"),
+            (R::TokenRequired, "token_required"),
+            (R::NoMasterKey, "no_master_key"),
+            (R::AccountRejected, "account_rejected"),
+            (R::Unreadable, "unreadable"),
+        ];
+        for (reason, wire) in cases {
+            let refusal = TelephonyRefusal { reason };
+            let message = refusal.to_string();
+            let resp = to_response(OncallError::Telephony(refusal).into());
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "{wire}");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let got: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                got,
+                serde_json::json!({ "message": message, "reason": wire }),
+                "{wire}"
+            );
+        }
     }
 
     #[test]
@@ -5008,5 +5513,116 @@ mod tests {
     fn test_the_absence_query_is_entirely_optional() {
         let q: UnavailabilityQuery = serde_json::from_str("{}").unwrap();
         assert!(q.user_email.is_none() && q.from.is_none() && q.to.is_none());
+    }
+
+    /// C24: a contact is only ever its owner's, and only while they belong to the org.
+    #[test]
+    fn test_only_a_member_touches_their_own_contact() {
+        let cases = [
+            (true, "ana@o2.ai", "ana@o2.ai", true),
+            (true, "ana@o2.ai", "bob@o2.ai", false),
+            (true, "Ana@O2.ai", "ana@o2.ai", true),
+            (false, "ana@o2.ai", "ana@o2.ai", false),
+        ];
+        for (is_member, caller, subject, want) in cases {
+            assert_eq!(
+                own_contact(is_member, caller, subject),
+                want,
+                "member={is_member} caller={caller} subject={subject}"
+            );
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn assert_not_supported(resp: Response) {
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("Not Supported"));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_get_contact_is_not_supported_without_enterprise() {
+        let path = Path(("default".to_string(), "ana@o2.ai".to_string()));
+        assert_not_supported(get_contact(path).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_set_contact_is_not_supported_without_enterprise() {
+        let path = Path(("default".to_string(), "ana@o2.ai".to_string()));
+        let body: SetContactRequest = serde_json::from_str(r#"{"phone":"+15550100199"}"#).unwrap();
+        assert_not_supported(set_contact(path, ValidatedJson(body)).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_delete_contact_is_not_supported_without_enterprise() {
+        let path = Path(("default".to_string(), "ana@o2.ai".to_string()));
+        assert_not_supported(delete_contact(path).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_send_contact_code_is_not_supported_without_enterprise() {
+        let path = Path(("default".to_string(), "ana@o2.ai".to_string()));
+        assert_not_supported(send_contact_code(path).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_confirm_contact_code_is_not_supported_without_enterprise() {
+        let path = Path(("default".to_string(), "ana@o2.ai".to_string()));
+        let body: ConfirmContactCodeRequest = serde_json::from_str(r#"{"code":"123456"}"#).unwrap();
+        assert_not_supported(confirm_contact_code(path, ValidatedJson(body)).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_voice_ack_is_not_supported_without_enterprise() {
+        let path = Path(("default".to_string(), "tok".to_string()));
+        let form = axum::Form(VoiceAckForm {
+            digits: Some("4".to_string()),
+        });
+        assert_not_supported(voice_ack(path, form).await).await;
+    }
+
+    /// Disconnecting stops the org's own phone pages, so it needs the same write as connecting.
+    #[test]
+    fn test_telephony_permission_is_get_put_put() {
+        use axum::http::Method;
+        let cases = [
+            (Method::GET, "GET"),
+            (Method::PUT, "PUT"),
+            (Method::DELETE, "PUT"),
+        ];
+        for (method, want) in cases {
+            assert_eq!(telephony_permission(&method), want, "{method}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_get_telephony_is_not_supported_without_enterprise() {
+        assert_not_supported(get_telephony(Path("default".to_string())).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_put_telephony_is_not_supported_without_enterprise() {
+        let body: PutTelephonyRequest = serde_json::from_str(
+            r#"{"provider":"twilio","account_sid":"AC1","auth_token":"t","from_number":"+14155550100"}"#,
+        )
+        .unwrap();
+        let path = Path("default".to_string());
+        assert_not_supported(put_telephony(path, ValidatedJson(body)).await).await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_delete_telephony_is_not_supported_without_enterprise() {
+        assert_not_supported(delete_telephony(Path("default".to_string())).await).await;
     }
 }

@@ -157,6 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
       </div>
 
+      <OnCallPhoneCard ref="phoneRef" />
+
       <OnCallMyDeliveries ref="deliveriesRef" :team-names="teamNames" />
     </OContent>
   </OPageLayout>
@@ -168,6 +170,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
+import OnCallPhoneCard from "@/components/oncall/OnCallPhoneCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
@@ -249,12 +252,13 @@ function openTeam(teamId: string) {
 
 const refreshing = ref(false);
 const deliveriesRef = ref<{ refresh: () => Promise<void> } | null>(null);
+const phoneRef = ref<{ refresh: () => Promise<void> } | null>(null);
 
 /// Named, so the click event cannot land on `force`.
 async function refreshPage() {
   refreshing.value = true;
   try {
-    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh()]);
+    await Promise.all([fetchMine(true), deliveriesRef.value?.refresh(), phoneRef.value?.refresh()]);
   } finally {
     refreshing.value = false;
   }

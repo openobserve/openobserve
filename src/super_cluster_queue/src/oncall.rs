@@ -34,6 +34,13 @@
 use infra::{errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, OncallMessage};
 
+/// What a replicated telephony account PUT does in this region.
+#[derive(Debug, PartialEq)]
+enum TelephonyPutAction {
+    Store,
+    SkipNoKey,
+}
+
 /// Applies a decodable on-call message, drops the rest. [weak: dropped; the next save re-sends it]
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let key = msg.key.clone();
@@ -181,8 +188,73 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
             table::super_cluster_oncall::clear_unavailability_for_user(&org_id, &user_email)
                 .await?;
         }
+        OncallMessage::ContactPut {
+            org_id,
+            user_email,
+            phone,
+            phone_verified_at,
+        } => {
+            log::debug!("[SUPER_CLUSTER:oncall] Put contact org={org_id} user={user_email}");
+            table::super_cluster_oncall::put_contact(
+                &org_id,
+                &user_email,
+                phone,
+                phone_verified_at,
+            )
+            .await?;
+        }
+        OncallMessage::ContactDelete { org_id, user_email } => {
+            log::debug!("[SUPER_CLUSTER:oncall] Delete contact org={org_id} user={user_email}");
+            table::oncall_user_contacts::delete(&org_id, &user_email).await?;
+        }
+        OncallMessage::TelephonyAccountPut {
+            org_id,
+            provider,
+            account_sid,
+            auth_token,
+            from_number,
+        } => {
+            let account = table::org_telephony::StoredAccount {
+                provider,
+                account_sid,
+                auth_token: auth_token.0,
+                from_number,
+            };
+            put_telephony_account(&org_id, &account).await?;
+        }
+        OncallMessage::TelephonyAccountDelete { org_id } => {
+            log::debug!("[SUPER_CLUSTER:oncall] Delete telephony account org={org_id}");
+            table::org_telephony::delete(&org_id).await?;
+        }
     }
     Ok(())
+}
+
+/// Stores the account, or logs and skips it with no AES key. [weak: as `org_telephony::put`]
+async fn put_telephony_account(
+    org_id: &str,
+    account: &table::org_telephony::StoredAccount,
+) -> Result<()> {
+    match telephony_put_action(table::cipher::is_encrypting()) {
+        TelephonyPutAction::Store => {
+            log::debug!("[SUPER_CLUSTER:oncall] Put telephony account org={org_id}");
+            table::org_telephony::put(org_id, account, config::utils::time::now_micros()).await?;
+        }
+        // Erroring would block the queue forever; the source region keeps the account.
+        TelephonyPutAction::SkipNoKey => log::error!(
+            "[SUPER_CLUSTER:oncall] telephony account for org={org_id} not stored: O2_MASTER_ENCRYPTION_KEY is not set in AES mode"
+        ),
+    }
+    Ok(())
+}
+
+/// Decides whether a replicated telephony account can be stored here. [pure]
+fn telephony_put_action(encrypting: bool) -> TelephonyPutAction {
+    if encrypting {
+        TelephonyPutAction::Store
+    } else {
+        TelephonyPutAction::SkipNoKey
+    }
 }
 
 #[cfg(test)]
@@ -201,5 +273,106 @@ mod tests {
             MessageType::OncallTable,
         );
         assert!(process(msg).await.is_ok());
+    }
+
+    /// Migrates the meta store once per binary; concurrent SQLite migrations collide.
+    async fn meta_store() {
+        static ONCE: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            infra::db_init().await.expect("meta store");
+            infra::table::migrate().await.expect("migrations");
+        })
+        .await;
+    }
+
+    fn oncall_msg(key: &str, payload: &str) -> Message {
+        Message::new(
+            key.to_string(),
+            Some(payload.as_bytes().to_vec().into()),
+            None,
+            true,
+            MessageType::OncallTable,
+        )
+    }
+
+    #[tokio::test]
+    async fn contact_put_and_delete_messages_apply() {
+        meta_store().await;
+        let org = format!("org_{}", config::ider::uuid());
+        let key = format!("/oncall/{org}/contacts/ana@o2.ai");
+        let put = format!(
+            r#"{{"ContactPut":{{"org_id":"{org}","user_email":"ana@o2.ai","phone":"+15550100","phone_verified_at":700}}}}"#
+        );
+
+        process(oncall_msg(&key, &put)).await.unwrap();
+
+        let contact = table::oncall_user_contacts::get(&org, "ana@o2.ai")
+            .await
+            .unwrap()
+            .expect("the put inserted the profile");
+        assert_eq!(contact.phone.as_deref(), Some("+15550100"));
+        assert_eq!(contact.phone_verified_at, Some(700));
+
+        let delete =
+            format!(r#"{{"ContactDelete":{{"org_id":"{org}","user_email":"ana@o2.ai"}}}}"#);
+        process(oncall_msg(&key, &delete)).await.unwrap();
+
+        assert!(
+            table::oncall_user_contacts::get(&org, "ana@o2.ai")
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    /// Installs an AES master key once; it is process-global, so no test here runs keyless.
+    fn encrypting() {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            table::cipher::install_master_key(Ok(table::cipher::MasterKeyMode::Aes(vec![7; 64])))
+                .expect("no other test installs a master key");
+        });
+    }
+
+    #[test]
+    fn a_telephony_put_is_stored_only_when_encrypting() {
+        for (encrypting, expected) in [
+            (true, TelephonyPutAction::Store),
+            (false, TelephonyPutAction::SkipNoKey),
+        ] {
+            assert_eq!(telephony_put_action(encrypting), expected, "{encrypting}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_p13_a_replicated_telephony_account_resolves_and_its_delete_removes_it() {
+        meta_store().await;
+        encrypting();
+        let org = format!("org_{}", config::ider::uuid());
+        let key = format!("/oncall/{org}/telephony");
+        let put = format!(
+            r#"{{"TelephonyAccountPut":{{"org_id":"{org}","provider":"twilio","account_sid":"AC123","auth_token":"tok-secret","from_number":"+15550100"}}}}"#
+        );
+
+        process(oncall_msg(&key, &put)).await.unwrap();
+
+        let account = table::org_telephony::get(&org)
+            .await
+            .unwrap()
+            .expect("the put stored the account");
+        assert_eq!(
+            [
+                account.provider.as_str(),
+                &account.account_sid,
+                &account.auth_token,
+                &account.from_number
+            ],
+            ["twilio", "AC123", "tok-secret", "+15550100"]
+        );
+
+        let delete = format!(r#"{{"TelephonyAccountDelete":{{"org_id":"{org}"}}}}"#);
+        process(oncall_msg(&key, &delete)).await.unwrap();
+
+        assert!(table::org_telephony::get(&org).await.unwrap().is_none());
     }
 }

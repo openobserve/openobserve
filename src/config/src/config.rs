@@ -101,7 +101,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 101: create downtimes; muted_by_downtime_id, last_downtime_id, slo_backfill_jobs kind/attempts.
 // 102: create downtime_notifications.
 // 103: create alert_calibration_configs.
-pub const DB_SCHEMA_VERSION: u64 = 103;
+// 104: create oncall_phone_verifications and org_telephony.
+pub const DB_SCHEMA_VERSION: u64 = 104;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

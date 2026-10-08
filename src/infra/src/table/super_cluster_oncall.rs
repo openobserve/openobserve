@@ -58,6 +58,7 @@ use sea_orm::{
 use super::entity::{
     oncall_overrides, oncall_ownership_rules, oncall_policies, oncall_response_events,
     oncall_responses, oncall_schedules, oncall_team_members, oncall_teams, oncall_unavailability,
+    oncall_user_contacts,
 };
 use crate::{db::get_orm_client_rw, errors};
 
@@ -277,6 +278,23 @@ pub async fn clear_unavailability_for_user(
     // stays readable as one list.
     super::oncall_unavailability::delete_by_user(org_id, user_email).await?;
     Ok(())
+}
+
+/// Applies a person's phone and its proof as sent, keeping every other field. [strong]
+pub async fn put_contact(
+    org_id: &str,
+    user_email: &str,
+    phone: Option<String>,
+    phone_verified_at: Option<i64>,
+) -> Result<(), errors::Error> {
+    put_contact_in(
+        get_orm_client_rw().await,
+        org_id,
+        user_email,
+        phone,
+        phone_verified_at,
+    )
+    .await
 }
 
 /// Applies a team's escalation policy.
@@ -528,6 +546,42 @@ async fn put_event_in<C: ConnectionTrait>(
     Ok(())
 }
 
+async fn put_contact_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+    phone: Option<String>,
+    phone_verified_at: Option<i64>,
+) -> Result<(), errors::Error> {
+    let existing = oncall_user_contacts::Entity::find()
+        .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
+        .filter(oncall_user_contacts::Column::UserEmail.eq(user_email))
+        .one(conn)
+        .await?;
+    // The proof is applied as received: the source already decided it, and V5 may have copied it.
+    let Some(existing) = existing else {
+        oncall_user_contacts::ActiveModel {
+            id: Set(config::ider::uuid()),
+            org_id: Set(org_id.to_string()),
+            user_email: Set(user_email.to_string()),
+            phone: Set(phone),
+            phone_verified_at: Set(phone_verified_at),
+            push_token: Set(None),
+            push_verified_at: Set(None),
+            quiet_hours: Set(None),
+            updated_at: Set(config::utils::time::now_micros()),
+        }
+        .insert(conn)
+        .await?;
+        return Ok(());
+    };
+    let mut model: oncall_user_contacts::ActiveModel = existing.into();
+    model.phone = Set(phone);
+    model.phone_verified_at = Set(phone_verified_at);
+    model.update(conn).await?;
+    Ok(())
+}
+
 /// A content-dedup predicate an absent value can actually satisfy. `col.eq(None)`
 /// renders `col = NULL`, which matches nothing — so the columns a non-delivery
 /// entry leaves empty would fail their own dedup check and every redelivery
@@ -569,6 +623,7 @@ mod tests {
         for stmt in [
             schema.create_table_from_entity(oncall_responses::Entity),
             schema.create_table_from_entity(oncall_response_events::Entity),
+            schema.create_table_from_entity(oncall_user_contacts::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
@@ -931,5 +986,95 @@ mod tests {
             .unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].body, "on it");
+    }
+
+    async fn stored_contact(db: &DatabaseConnection) -> oncall_user_contacts::Model {
+        let mut rows = oncall_user_contacts::Entity::find().all(db).await.unwrap();
+        assert_eq!(rows.len(), 1, "one profile per (org, person)");
+        rows.remove(0)
+    }
+
+    #[tokio::test]
+    async fn test_a_contact_put_for_a_new_person_inserts_their_profile() {
+        let db = db().await;
+
+        put_contact_in(
+            &db,
+            "acme",
+            "ana@o2.ai",
+            Some("+15550100".into()),
+            Some(700),
+        )
+        .await
+        .unwrap();
+
+        let row = stored_contact(&db).await;
+        assert_eq!(
+            (row.org_id.as_str(), row.user_email.as_str()),
+            ("acme", "ana@o2.ai")
+        );
+        assert_eq!(row.phone.as_deref(), Some("+15550100"));
+        assert_eq!(row.phone_verified_at, Some(700));
+        assert_eq!((row.push_token, row.quiet_hours), (None, None));
+    }
+
+    /// S2 carries only the phone and its proof, so a put must not erase what it does not carry.
+    #[tokio::test]
+    async fn test_a_contact_put_keeps_the_fields_it_does_not_carry() {
+        let db = db().await;
+        let existing = oncall_user_contacts::Model {
+            id: "c_1".into(),
+            org_id: "acme".into(),
+            user_email: "ana@o2.ai".into(),
+            phone: Some("+15550100".into()),
+            phone_verified_at: None,
+            push_token: Some("tok".into()),
+            push_verified_at: Some(5),
+            quiet_hours: Some("22:00-07:00".into()),
+            updated_at: 1,
+        };
+        oncall_user_contacts::ActiveModel::from(existing.clone())
+            .insert(&db)
+            .await
+            .unwrap();
+
+        put_contact_in(
+            &db,
+            "acme",
+            "ana@o2.ai",
+            Some("+15550100".into()),
+            Some(700),
+        )
+        .await
+        .unwrap();
+
+        let want = oncall_user_contacts::Model {
+            phone_verified_at: Some(700),
+            ..existing
+        };
+        assert_eq!(stored_contact(&db).await, want);
+    }
+
+    /// The proof is applied as sent, never recomputed against the new number.
+    #[tokio::test]
+    async fn test_a_contact_put_with_a_new_number_keeps_the_proof_it_carries() {
+        let db = db().await;
+        put_contact_in(&db, "acme", "ana@o2.ai", Some("+15550100".into()), None)
+            .await
+            .unwrap();
+
+        put_contact_in(
+            &db,
+            "acme",
+            "ana@o2.ai",
+            Some("+15550199".into()),
+            Some(900),
+        )
+        .await
+        .unwrap();
+
+        let row = stored_contact(&db).await;
+        assert_eq!(row.phone.as_deref(), Some("+15550199"));
+        assert_eq!(row.phone_verified_at, Some(900));
     }
 }

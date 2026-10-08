@@ -220,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aliases="aliases"
         :loading="testing"
         :sending="sendingTest"
+        :can-configure="canConfigure"
         :embedded="true"
         @run="runPreview"
         @send-test="sendTestPage"
@@ -277,6 +278,7 @@ import type { UnroutedFilters } from "@/components/oncall/OnCallUnroutedQueue.vu
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -471,6 +473,7 @@ const ruleUpdate = useMutation(() => updateOwnershipRuleMutation(orgId.value));
 const ruleDelete = useMutation(() => deleteOwnershipRuleMutation(orgId.value));
 const signalDismiss = useMutation(() => dismissUnroutedSignalMutation(orgId.value));
 const testPageWrite = useMutation(() => testPageMutation(orgId.value));
+const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
 
 /// Cache-first; a force expires the entry before the fetch, so it costs one request, not two.
 async function read<T>(
@@ -837,6 +840,7 @@ async function sendTestPage(value: { team_id: string; priority: string }) {
         : t("oncall.testPageNobody", { reason: raw(res.data?.not_sent_because ?? "") }),
     });
   } catch (err) {
+    noteConfigurationDenied(err);
     failed(err, t("oncall.testPageFailed"));
   } finally {
     sendingTest.value = false;
