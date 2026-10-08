@@ -196,6 +196,19 @@ describe("OButton", () => {
     expect(classes).toContain("w-12");
   });
 
+  it("sizes xs-grouped one border-pair (0.125rem) shorter than xs", () => {
+    expect(mount(OButton, { props: { size: "xs" } }).classes()).toContain("h-7");
+    const classes = mount(OButton, { props: { size: "xs-grouped" } }).classes();
+    expect(classes).toContain("h-6.5");
+    expect(classes).not.toContain("h-7");
+  });
+
+  it("sizes icon-xs-grouped as a 1.625rem square", () => {
+    const classes = mount(OButton, { props: { size: "icon-xs-grouped" } }).classes();
+    expect(classes).toContain("size-6.5");
+    expect(classes).toContain("p-0");
+  });
+
   // --- Keyboard ---
 
   it("emits click on Enter key (native button behaviour)", async () => {

@@ -1639,6 +1639,27 @@ describe("SearchBar", () => {
       expect(separator.props("vertical")).toBe(true);
     });
 
+    it("is as tall as Reset and More: a hairline border around 1.625rem children", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const group = wrapper.find('[data-test="traces-search-bar-saved-views"]');
+      expect(group.classes()).toContain("border");
+      expect(group.classes()).toContain("p-0");
+      expect(group.find('[data-test="traces-search-bar-saved-views-btn"]').classes()).toContain(
+        "h-6.5",
+      );
+      expect(
+        group.find('[data-test="traces-search-bar-saved-views-create-btn"]').classes(),
+      ).toContain("size-6.5");
+      for (const neighbour of [
+        "traces-search-bar-reset-filters-btn",
+        "traces-search-bar-more-menu-btn",
+      ]) {
+        expect(wrapper.find(`[data-test="${neighbour}"]`).classes()).toContain("h-7");
+      }
+    });
+
     it.each(["service-graph", "services-catalog"])("is hidden on the %s tab", async (mode) => {
       searchObjInstance.meta.searchMode = mode as any;
       wrapper = mountSearchBar();

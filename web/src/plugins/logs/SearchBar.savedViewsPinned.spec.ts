@@ -63,14 +63,14 @@ describe("SearchBar — pinned saved views", () => {
     vi.restoreAllMocks();
   });
 
-  it("gives the list trigger the padded sm-toolbar size with an icon and a caret", async () => {
+  it("gives the list trigger the grouped xs size with an icon and a caret", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
     const trigger = group()
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "logs-search-bar-saved-views-pinned-list-btn")!;
-    expect(trigger.props("size")).toBe("sm-toolbar");
+    expect(trigger.props("size")).toBe("xs-grouped");
     const icons = trigger.findAllComponents({ name: "OIcon" }).map((c) => c.props("name"));
     expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
   });
@@ -86,6 +86,23 @@ describe("SearchBar — pinned saved views", () => {
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').exists(),
     ).toBe(true);
+  });
+
+  it("is as tall as the xs toolbar buttons: a hairline border around 1.625rem children", async () => {
+    wrapper = mountSearchBar(1600);
+    await flushPromises();
+
+    expect(group().classes()).toContain("border");
+    expect(group().classes()).toContain("p-0");
+    expect(
+      group().find('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').classes(),
+    ).toContain("h-6.5");
+    expect(
+      group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').classes(),
+    ).toContain("size-6.5");
+    expect(wrapper!.find('[data-test="logs-search-bar-reset-filters-btn"]').classes()).toContain(
+      "h-7",
+    );
   });
 
   it("moves the group into the More menu when the toolbar has no room", async () => {

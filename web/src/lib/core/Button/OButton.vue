@@ -276,6 +276,9 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  // Inside a 1px-bordered OButtonGroup: 26px + 2 × 1px border = the 28px xs height of its neighbours.
+  "xs-grouped": "h-6.5 ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  "icon-xs-grouped": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
