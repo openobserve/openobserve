@@ -317,7 +317,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="statusClass(result.status)"
               />
               <div class="min-w-0 flex-1">
-                <div class="text-text-heading truncate text-sm">{{ result.title }}</div>
+                <OTruncatedText as="div" class="text-text-heading text-sm">{{
+                  result.title
+                }}</OTruncatedText>
                 <div
                   v-if="result.message"
                   class="text-status-negative text-xs"
@@ -412,6 +414,7 @@ import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

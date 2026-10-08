@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="schedule" size="md" />
           </div>
-          <div class="min-w-0 flex-1">
+          <div class="@container min-w-0 flex-1">
             <div
               data-test="metrics-summary-card-label"
               class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="metrics-summary-card-value"
-              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars,1)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
+              :style="{ '--chars': String(metrics.totalTime).length }"
             >
               {{ metrics.totalTime }}
             </div>
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="format-list-numbered" size="md" />
           </div>
-          <div class="min-w-0 flex-1">
+          <div class="@container min-w-0 flex-1">
             <div
               data-test="metrics-summary-card-label"
               class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
@@ -58,7 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="metrics-summary-card-value"
-              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars,1)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
+              :style="{ '--chars': String(metrics.totalRows).length }"
             >
               {{ metrics.totalRows }}
             </div>
@@ -72,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="memory" size="md" />
           </div>
-          <div class="min-w-0 flex-1">
+          <div class="@container min-w-0 flex-1">
             <div
               data-test="metrics-summary-card-label"
               class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
@@ -81,7 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="metrics-summary-card-value"
-              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars,1)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
+              :style="{ '--chars': String(metrics.peakMemory).length }"
             >
               {{ metrics.peakMemory }}
             </div>

@@ -17,11 +17,12 @@
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
       <div class="flex items-center justify-between gap-2">
-        <div
-          class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold max-lg:hidden"
+        <OTruncatedText
+          as="div"
+          class="kpi-label text-2xs text-text-secondary leading-normal font-semibold max-lg:hidden"
         >
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
-        </div>
+        </OTruncatedText>
         <span
           class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
         >
@@ -99,6 +100,7 @@ import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { KpiCard } from "../composables/useQualityData";
 import useBreakpoint from "@/composables/useBreakpoint";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const { lgUp } = useBreakpoint();
 

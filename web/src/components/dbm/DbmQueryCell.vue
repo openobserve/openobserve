@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   The pattern four list tables share: one truncated monospace line carrying the
   SQL, and a smaller line beneath naming the engine and the places, separated by
   faint middots. The statement stays truncated rather than wrapping because a
-  three-line SQL row destroys the scannability of the column beside it; the full
-  text rides in the title attribute.
+  three-line SQL row destroys the scannability of the column beside it.
 
   Deliberately NOT used by three other cells that look similar and are not:
   deadlocks renders a query PAIR with a ⇄ between two statements, blocked
@@ -32,15 +31,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex min-w-0 flex-col gap-px">
-    <span class="text-text-code min-w-0 truncate font-mono text-xs">
-      <OTooltip v-if="titleAttr" :content="raw(titleAttr)" />
+    <OTruncatedText class="text-text-code font-mono text-xs">
       {{ text || raw("—") }}
-    </span>
-    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
+    </OTruncatedText>
+    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
       <OTag v-if="dbSystem" type="dbSystem" :value="dbSystem" size="xs" />
-      <template v-for="item in shownItems" :key="item.key">
+      <template v-if="shownItems.length">
         <span class="opacity-45">·</span>
-        <span :class="item.class">{{ item.label }}</span>
+        <OTruncatedText :tooltip="shownItemsText">
+          <template v-for="(item, index) in shownItems" :key="item.key">
+            <span v-if="index > 0" class="px-1 opacity-45">·</span>
+            <span :class="item.class">{{ item.label }}</span>
+          </template>
+        </OTruncatedText>
       </template>
       <slot />
     </div>
@@ -51,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
 /**
@@ -69,8 +72,6 @@ const props = withDefaults(
   defineProps<{
     /** The statement. Empty renders the em-dash placeholder rather than a blank row. */
     text: I18nText;
-    /** Full text for the title attribute — the truncated line is not the whole story. */
-    titleAttr?: string;
     /**
      * Engine tag. Optional because the slowest-calls list can hold a call whose
      * system never arrived, and an empty tag there would read as a system.
@@ -78,9 +79,11 @@ const props = withDefaults(
     dbSystem?: string | null;
     metaItems?: DbmQueryCellMeta[];
   }>(),
-  { titleAttr: undefined, dbSystem: null, metaItems: () => [] },
+  { dbSystem: null, metaItems: () => [] },
 );
 
 /** A blank fact prints as a bare middot, which reads as missing data rather than absent. */
 const shownItems = computed(() => props.metaItems.filter((item) => item.label));
+// The on-screen gaps are padding, so the element's own text would run the items together.
+const shownItemsText = computed(() => raw(shownItems.value.map((item) => item.label).join(" · ")));
 </script>

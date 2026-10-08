@@ -2,11 +2,13 @@
 import type { TextProps, TextSlots } from "./OText.types";
 import { Primitive } from "reka-ui";
 import { computed } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = withDefaults(defineProps<TextProps>(), {
   variant: "body",
   truncate: false,
   nowrap: false,
+  tooltip: undefined,
 });
 
 defineSlots<TextSlots>();
@@ -94,7 +96,12 @@ const classes = computed(() => [
 </script>
 
 <template>
-  <Primitive :as="resolvedAs" :class="classes">
+  <Primitive
+    :as="resolvedAs"
+    :class="classes"
+    :data-o-tooltip-off="truncate && tooltip === false ? '' : undefined"
+  >
+    <OTooltip v-if="truncate && tooltip !== false" overflow-only :content="tooltip || undefined" />
     <slot />
   </Primitive>
 </template>

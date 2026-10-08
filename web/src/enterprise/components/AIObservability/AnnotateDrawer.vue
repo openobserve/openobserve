@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-4">
       <div class="flex items-center gap-2">
-        <span class="text-text-heading min-w-0 truncate text-sm font-semibold">
+        <OTruncatedText class="text-text-heading text-sm font-semibold">
           {{ targetLabel }}
-        </span>
+        </OTruncatedText>
         <OTag variant="default-soft" shape="rounded" class="ms-auto shrink-0">
           {{ t("aiObservability.annotate.viaAnnotation") }}
         </OTag>
@@ -96,9 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`annotate-drawer-dimension-${dimension.id}`"
         >
           <div class="flex items-center gap-2">
-            <span class="text-text-heading min-w-0 truncate font-mono text-sm font-semibold">
+            <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">
               {{ raw(dimension.name) }}
-            </span>
+            </OTruncatedText>
             <OTag variant="default-soft" shape="rounded" class="shrink-0">
               {{ raw(dimension.dataType) }}
             </OTag>
@@ -201,6 +201,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, { type LlmScoreConfigOption } from "@/services/llm-queues.service";
 import llmAnnotationsService, { type AnnotationScope } from "@/services/llm-annotations.service";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AnnotateDrawer" });
 
