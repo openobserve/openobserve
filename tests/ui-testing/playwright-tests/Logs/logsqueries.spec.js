@@ -77,7 +77,7 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.fillSavedViewName("e2etimestamp");
     await pm.logsPage.clickSavedViewDialogSaveContent();
     await pm.logsPage.clickSavedViewArrow();
-    await pm.logsPage.clickSavedViewByLabel(/timestamp/);
+    await pm.logsPage.clickSavedViewByLabel('e2etimestamp');
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
     await pm.logsPage.fillSavedViewSearchInput('e2e');

@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="traces-search-bar-saved-views-create-btn"
               variant="ghost"
-              size="icon-xs-grouped"
+              size="icon-panel"
               @click="openSaveViewDialog"
             >
               <OIcon name="save" size="sm" />
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
     <SavedViewsListDialog
       v-model:open="savedViewsDialogOpen"
-      module="traces"
+      data-test-prefix="traces-saved-views-dialog"
       :views="tracesSavedViews"
       :favorite-ids="favoriteIds"
       :favorite-views="favoriteViews"

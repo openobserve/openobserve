@@ -57,7 +57,7 @@ describe("SavedViewsListDialog", () => {
         views,
         favoriteIds: [],
         favoriteViews: [],
-        module: "traces",
+        dataTestPrefix: "traces-saved-views-dialog",
         ...props,
       },
       global: {
@@ -168,7 +168,15 @@ describe("SavedViewsListDialog", () => {
     const favorites = find("traces-saved-views-dialog-favorites-table");
     expect(favorites.exists()).toBe(true);
     expect(favorites.text()).toContain("search.favoriteViews");
-    expect(favorites.findComponent({ name: "OSeparator" }).exists()).toBe(false);
+    const header = favorites.element.firstElementChild as HTMLElement;
+    expect(header.textContent!.trim()).toBe("search.favoriteViews");
+    const below = header.nextElementSibling as HTMLElement;
+    for (const el of [header, below]) {
+      expect(el.tagName).not.toBe("HR");
+      expect(el.className).not.toMatch(/(^|\s)border(-[tb])?(\s|$)/);
+    }
+    expect(favorites.element.childElementCount).toBe(2);
+    expect(favorites.find("hr").exists()).toBe(false);
     expect(
       favorites.find('[data-test="traces-saved-views-dialog-favorites-apply-t2"]').text(),
     ).toBe("slow payments");
@@ -229,33 +237,48 @@ describe("SavedViewsListDialog", () => {
     expect(cell.find(".truncate").exists()).toBe(false);
   });
 
-  it("keeps every Logs data-test value for module logs", async () => {
-    wrapper = mountDialog({ module: "logs", favoriteIds: ["t2"], favoriteViews: [views[1]] });
+  it("derives every data-test from dataTestPrefix", async () => {
+    const p = "logs-saved-views-dialog";
+    wrapper = mountDialog({ dataTestPrefix: p, favoriteIds: ["t2"], favoriteViews: [views[1]] });
     await flushPromises();
 
     const expected = [
-      "saved-views-list-dialog",
-      "logs-search-saved-view-list",
-      "log-search-saved-view-field-search-input",
-      "log-search-saved-view-list-fields-table",
-      "log-search-saved-view-favorite-list-fields-table",
-      "logs-search-bar-apply-checkout errors-saved-view-btn",
-      "logs-search-bar-dialog-favorite-saved-view-row-slow payments",
-      "logs-search-bar-favorite-t1-saved-view-btn",
-      "logs-search-bar-update-t1-saved-view-btn",
-      "logs-search-bar-delete-t1-saved-view-btn",
-      "logs-search-bar-update-t1-saved-view-btn-menu",
-      "logs-search-bar-delete-t1-saved-view-btn-menu",
-      "logs-search-bar-saved-view-row-more-actions",
-      "logs-search-bar-update-t2-favorite-saved-view-btn",
-      "logs-search-bar-delete-t2-favorite-saved-view-btn",
-      "logs-search-bar-update-t2-favorite-saved-view-btn-menu",
-      "logs-search-bar-delete-t2-favorite-saved-view-btn-menu",
-      "logs-search-bar-favorite-saved-view-row-more-actions",
+      p,
+      `${p}-list`,
+      `${p}-search`,
+      `${p}-search-field`,
+      `${p}-table`,
+      `${p}-favorites-table`,
+      `${p}-apply-t1`,
+      `${p}-favorite-t1`,
+      `${p}-update-t1`,
+      `${p}-delete-t1`,
+      `${p}-more-actions-t1`,
+      `${p}-update-t1-menu`,
+      `${p}-delete-t1-menu`,
+      `${p}-favorites-apply-t2`,
+      `${p}-favorites-favorite-t2`,
+      `${p}-favorites-update-t2`,
+      `${p}-favorites-delete-t2`,
+      `${p}-favorites-more-actions-t2`,
+      `${p}-favorites-update-t2-menu`,
+      `${p}-favorites-delete-t2-menu`,
     ];
     for (const id of expected) {
       expect(wrapper.find(`[data-test="${id}"]`).exists(), id).toBe(true);
     }
+    expect(find(`${p}-apply-t1`).attributes("data-test-view-name")).toBe("checkout errors");
+    expect(find(`${p}-favorites-apply-t2`).attributes("data-test-view-name")).toBe("slow payments");
     expect(wrapper.find('[data-test^="traces-"]').exists()).toBe(false);
+  });
+
+  it("re-renders data-test values when dataTestPrefix changes", async () => {
+    wrapper = mountDialog();
+    await wrapper.setProps({ dataTestPrefix: "other-dialog" });
+
+    expect(find("other-dialog").exists()).toBe(true);
+    expect(find("other-dialog-table").exists()).toBe(true);
+    expect(find("other-dialog-apply-t1").exists()).toBe(true);
+    expect(find("traces-saved-views-dialog-table").exists()).toBe(false);
   });
 });

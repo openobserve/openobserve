@@ -56,7 +56,7 @@ const props = withDefaults(
     favoriteIds: string[];
     favoriteViews: SavedViewRow[];
     loading?: boolean;
-    module: "logs" | "traces";
+    dataTestPrefix: string;
   }>(),
   { loading: false },
 );
@@ -73,48 +73,22 @@ const search = defineModel<string>("search", { default: "" });
 
 const { t } = useI18nTyped();
 
-// Logs values are pinned by the e2e page objects (tests/ui-testing/pages/logsPages/logsPage.js).
-const LOGS_TEST_IDS: DialogTestIds = {
-  root: "saved-views-list-dialog",
-  list: "logs-search-saved-view-list",
-  search: "log-search-saved-view-field-search-input",
-  loading: "logs-search-saved-view-list-loading",
-  empty: "logs-search-saved-view-list-empty",
-  table: (pane) =>
-    pane === "all"
-      ? "log-search-saved-view-list-fields-table"
-      : "log-search-saved-view-favorite-list-fields-table",
-  apply: (pane, row) =>
-    pane === "all"
-      ? `logs-search-bar-apply-${row.view_name}-saved-view-btn`
-      : `logs-search-bar-dialog-favorite-saved-view-row-${row.view_name}`,
-  favorite: (_pane, row) => `logs-search-bar-favorite-${row.view_id}-saved-view-btn`,
-  update: (pane, row) =>
-    `logs-search-bar-update-${row.view_id}-${pane === "all" ? "" : "favorite-"}saved-view-btn`,
-  remove: (pane, row) =>
-    `logs-search-bar-delete-${row.view_id}-${pane === "all" ? "" : "favorite-"}saved-view-btn`,
-  more: (pane) =>
-    pane === "all"
-      ? "logs-search-bar-saved-view-row-more-actions"
-      : "logs-search-bar-favorite-saved-view-row-more-actions",
-};
+const paneTestId = (pane: Pane) =>
+  pane === "all" ? props.dataTestPrefix : `${props.dataTestPrefix}-favorites`;
 
-const tracesPrefix = (pane: Pane) =>
-  pane === "all" ? "traces-saved-views-dialog" : "traces-saved-views-dialog-favorites";
-
-const TRACES_TEST_IDS: DialogTestIds = {
-  root: "traces-saved-views-dialog",
-  list: "traces-saved-views-dialog-list",
-  search: "traces-saved-views-dialog-search",
-  loading: "traces-saved-views-dialog-loading",
-  empty: "traces-saved-views-dialog-empty",
-  table: (pane) => `${tracesPrefix(pane)}-table`,
-  apply: (pane, row) => `${tracesPrefix(pane)}-apply-${row.view_id}`,
-  favorite: (pane, row) => `${tracesPrefix(pane)}-favorite-${row.view_id}`,
-  update: (pane, row) => `${tracesPrefix(pane)}-update-${row.view_id}`,
-  remove: (pane, row) => `${tracesPrefix(pane)}-delete-${row.view_id}`,
-  more: (pane, row) => `${tracesPrefix(pane)}-more-actions-${row.view_id}`,
-};
+const ids = computed<DialogTestIds>(() => ({
+  root: props.dataTestPrefix,
+  list: `${props.dataTestPrefix}-list`,
+  search: `${props.dataTestPrefix}-search`,
+  loading: `${props.dataTestPrefix}-loading`,
+  empty: `${props.dataTestPrefix}-empty`,
+  table: (pane) => `${paneTestId(pane)}-table`,
+  apply: (pane, row) => `${paneTestId(pane)}-apply-${row.view_id}`,
+  favorite: (pane, row) => `${paneTestId(pane)}-favorite-${row.view_id}`,
+  update: (pane, row) => `${paneTestId(pane)}-update-${row.view_id}`,
+  remove: (pane, row) => `${paneTestId(pane)}-delete-${row.view_id}`,
+  more: (pane, row) => `${paneTestId(pane)}-more-actions-${row.view_id}`,
+}));
 
 // `meta.isAction` gives the right-aligned action cell; the column-level `isAction` would also pin it with a sticky shadow.
 const columns = [
@@ -136,8 +110,6 @@ const columns = [
 
 const HOVER_REVEAL =
   "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 max-md:opacity-100";
-
-const ids = computed(() => (props.module === "logs" ? LOGS_TEST_IDS : TRACES_TEST_IDS));
 
 const filteredViews = computed(() => {
   const term = search.value.trim().toLowerCase();
@@ -226,6 +198,7 @@ const applyView = (row: SavedViewRow) => {
               class="w-full min-w-0 cursor-pointer truncate text-sm"
               :title="value"
               :data-test="ids.apply(pane.key, row)"
+              :data-test-view-name="row.view_name"
               @click.stop="applyView(row)"
             >
               {{ value }}

@@ -276,9 +276,8 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
-  // Inside a 1px-bordered OButtonGroup: 26px + 2 × 1px border = the 28px xs height of its neighbours.
+  // Sized so a bordered OButtonGroup's outer height matches an ungrouped `xs` sibling.
   "xs-grouped": "h-6.5 ps-2 pe-2 text-xs gap-1.5 rounded-default",
-  "icon-xs-grouped": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
@@ -305,7 +304,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
   "icon-toolbar": "size-[1.875rem] shrink-0 p-0 rounded-default gap-x-0",
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
-  "icon-panel": "size-[1.625rem] shrink-0 p-0 rounded-default gap-x-0",
+  "icon-panel": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
   "sidebar-button": "h-8 w-3 shrink-0 p-0 rounded-default overflow-hidden gap-x-0",
 };

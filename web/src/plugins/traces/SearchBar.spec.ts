@@ -1843,7 +1843,7 @@ describe("SearchBar", () => {
         });
       });
 
-      it("passes the traces module, views and favourites to the dialog", async () => {
+      it("passes the traces data-test prefix, views and favourites to the dialog", async () => {
         localStorage.setItem(
           "savedViews",
           JSON.stringify({ t1: tracesView, l1: { ...logsView, org_id: "default" } }),
@@ -1851,7 +1851,7 @@ describe("SearchBar", () => {
         wrapper = mountSearchBar();
         await flushPromises();
 
-        expect(dialog().props("module")).toBe("traces");
+        expect(dialog().props("dataTestPrefix")).toBe("traces-saved-views-dialog");
         expect(dialog().props("loading")).toBe(false);
         expect(dialog().props("favoriteIds")).toEqual(["t1"]);
         expect(dialog().props("favoriteViews")).toEqual([tracesView]);

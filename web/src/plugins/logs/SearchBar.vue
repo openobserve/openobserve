@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
               variant="ghost"
-              size="icon-xs-grouped"
+              size="icon-panel"
               @click="fnSavedView"
             >
               <OIcon name="save" size="sm" />
@@ -1722,7 +1722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <SavedViewsListDialog
       v-model:open="savedViewsListDialog"
       v-model:search="searchObj.data.savedViewFilterFields"
-      module="logs"
+      data-test-prefix="logs-saved-views-dialog"
       :views="searchObj.data.savedViews"
       :favorite-ids="favoriteViews"
       :favorite-views="localSavedViews"
