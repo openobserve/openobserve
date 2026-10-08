@@ -87,7 +87,7 @@ impl RangeTokens {
 /// Parses `query` into the tree, or returns the parser's message.
 pub fn parse_tree(query: &str) -> Result<Value, String> {
     let (neutral, tokens) = RangeTokens::neutralise(query);
-    let expr = promql_parser::parser::parse(&neutral)?;
+    let expr = crate::parse(&neutral)?;
     Ok(node(&expr, &tokens))
 }
 
@@ -394,6 +394,25 @@ mod tests {
         let parsed = tree("rate(x[$__interval]) + rate(y[1000000007ms])");
         assert_eq!(parsed["lhs"]["args"][0]["range"], json!("$__interval"));
         assert_ne!(parsed["rhs"]["args"][0]["range"], json!("$__interval"));
+    }
+
+    #[test]
+    fn smoothing_functions_keep_their_names_in_the_tree() {
+        for name in ["holt_winters", "double_exponential_smoothing"] {
+            let parsed = tree(&format!("{name}(m[5m], 0.5, 0.3)"));
+            assert_eq!(parsed["func"], json!(name));
+            assert_eq!(parsed["args"][0]["range"], json!("5m"));
+        }
+    }
+
+    #[test]
+    fn rejects_binary_fill_modifiers_in_the_tree() {
+        for query in ["a + fill(0) b", "sum(a + fill_right(0) b)"] {
+            assert_eq!(
+                parse_tree(query).unwrap_err(),
+                "Unsupported binary fill modifier"
+            );
+        }
     }
 
     #[test]

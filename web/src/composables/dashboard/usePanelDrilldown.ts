@@ -18,6 +18,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import { getFieldLabel } from "@/utils/dashboard/fieldLabel";
 import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
@@ -821,7 +822,8 @@ export function usePanelDrilldown({
                 ...(query.fields.z || []),
               ];
               panelFields.forEach((field: any) => {
-                fields[field.label] = drilldownParams[1][0][field.alias];
+                fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
+                  drilldownParams[1][0][field.alias];
                 fields[field.alias] = drilldownParams[1][0][field.alias];
               });
             });
@@ -945,7 +947,8 @@ export function usePanelDrilldown({
           const panelFields: any = [...query.fields.x, ...query.fields.y, ...query.fields.z];
           panelFields.forEach((field: any) => {
             // we have label and alias, use both in dynamic values
-            fields[field.label] = drilldownParams[1][0][field.alias];
+            fields[getFieldLabel(field, panelSchema.value.config, query.customQuery)] =
+              drilldownParams[1][0][field.alias];
             fields[field.alias] = drilldownParams[1][0][field.alias];
           });
         });

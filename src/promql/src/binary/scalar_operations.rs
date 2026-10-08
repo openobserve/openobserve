@@ -18,7 +18,7 @@ use promql_parser::parser::token;
 
 /// Supported operation between two float type values.
 pub fn scalar_binary_operations(
-    token: u8,
+    token: token::TokenId,
     lhs: f64,
     rhs: f64,
     return_bool: bool,
@@ -162,13 +162,13 @@ mod tests {
 
     #[test]
     fn test_unknown_arithmetic_token_returns_err() {
-        let r = scalar_binary_operations(0u8, 1.0, 2.0, false, false);
+        let r = scalar_binary_operations(0, 1.0, 2.0, false, false);
         assert!(r.is_err());
     }
 
     #[test]
     fn test_unknown_comparison_token_returns_err() {
-        let r = scalar_binary_operations(0u8, 1.0, 2.0, false, true);
+        let r = scalar_binary_operations(0, 1.0, 2.0, false, true);
         assert!(r.is_err());
     }
 }

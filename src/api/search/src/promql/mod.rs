@@ -181,7 +181,7 @@ async fn query(
 
         use crate::service::auth::AuthExtractor;
 
-        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
+        let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[trace_id: {trace_id}] parse promql error: {e}");
@@ -481,7 +481,7 @@ async fn query_range(
             return MetaHttpResponse::too_many_requests(e);
         }
 
-        let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
+        let ast = match promql::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
                 log::error!("[trace_id: {trace_id}] parse promql error: {e}");
@@ -1218,7 +1218,7 @@ fn validate_metadata_params(
 ) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
     let selector = match matcher {
         None => None,
-        Some(matcher) => match parser::parse(&matcher) {
+        Some(matcher) => match promql::parse(&matcher) {
             Err(err) => {
                 let err = format!("parse promql error: {err}");
                 log::error!("{err}");
@@ -1366,7 +1366,7 @@ pub async fn parse_tree(
 }
 
 fn format_query(query: &str) -> Response {
-    let expr = match promql_parser::parser::parse(query) {
+    let expr = match promql::parse(query) {
         Ok(expr) => expr,
         Err(err) => {
             return (
@@ -1727,7 +1727,7 @@ fn generate_search_partition(query: &str, start: i64, end: i64, step: i64) -> Ve
 }
 
 fn get_max_lookback_window(query: &str) -> i64 {
-    let ast = match promql_parser::parser::parse(query) {
+    let ast = match promql::parse(query) {
         Ok(ast) => ast,
         Err(_) => {
             return 0;

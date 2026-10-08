@@ -23,6 +23,7 @@ import {
 } from "../../chartDimensionUtils";
 import { ColorModeWithoutMinMax, getSQLMinMaxValue, getGridLineStyle } from "../../colorPalette";
 import { getDataValue } from "../../aliasUtils";
+import { getAxisLabel } from "../../fieldLabel";
 import {
   createBaseLegendConfig,
   getChartDimensions,
@@ -331,7 +332,9 @@ export function buildSQLContext(
   const panelHeightPx = chartPanelRef?.value?.offsetHeight ?? 0;
   const xAxisNameFits = !panelHeightPx || panelHeightPx >= 150;
 
-  const hasXAxisName = xAxisNameFits && panelSchema?.queries?.[0]?.fields?.x?.[0]?.label;
+  const axisLabelOf = (field: any) => getAxisLabel(field, panelSchema?.config);
+
+  const hasXAxisName = xAxisNameFits && axisLabelOf(panelSchema?.queries?.[0]?.fields?.x?.[0]);
 
   // Drop the y-axis name on panels too narrow for name inset (36) + labels +
   // right margin (20) + a usable plot (~84); below that ECharts squeezes the
@@ -342,7 +345,7 @@ export function buildSQLContext(
   const hasYAxisName =
     yAxisNameFits &&
     panelSchema?.queries?.[0]?.fields?.y?.length == 1 &&
-    panelSchema?.queries?.[0]?.fields?.y?.[0]?.label;
+    axisLabelOf(panelSchema?.queries?.[0]?.fields?.y?.[0]);
 
   // Check if x-axis will be time-based by looking for timestamp fields
   const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
