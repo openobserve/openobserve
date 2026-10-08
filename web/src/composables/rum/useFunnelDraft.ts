@@ -184,15 +184,15 @@ export function useFunnelSaveBlockers(opts: {
     }
     return null;
   });
-  // An unchanged opened funnel would only bump its version.
+  // An unchanged opened funnel would only bump its version; a deleted step stays editable otherwise.
   const saveBlocked = computed<I18nText | null>(() => {
     const opened = pa.openedFunnel.value;
     if (!opened) return copyBlocked.value;
-    if (hasDeletedStep(pa.funnel.value, opts.events, opts.eventsReady)) {
-      return t("rum.analytics.saved.deletedStepFirst");
+    if (signature(pa.funnel.value) === signature(opened.def)) {
+      return hasDeletedStep(pa.funnel.value, opts.events, opts.eventsReady)
+        ? t("rum.analytics.saved.deletedStepFirst")
+        : t("rum.analytics.saved.noChanges");
     }
-    if (signature(pa.funnel.value) === signature(opened.def))
-      return t("rum.analytics.saved.noChanges");
     return uncompiled.value;
   });
   return { sql, uncompiled, copyBlocked, saveBlocked };
