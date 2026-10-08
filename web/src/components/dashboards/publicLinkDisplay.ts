@@ -92,6 +92,22 @@ export function publicLinkExpiry(
 }
 
 // A pasted public URL is matched by its slug, the only part of it that identifies the link.
+/** The plain message for a refused public-link write, or null when the error isn't a 403. */
+export function forbiddenMessage(
+  e: unknown,
+  t: TranslateFn,
+  missingPermission: I18nText,
+): I18nText | null {
+  const response = (e as { response?: { status?: number; data?: { message?: unknown } } } | null)
+    ?.response;
+  if (response?.status !== 403) return null;
+  // The dashboard edit-access check answers with a JSON message; a missing role permission doesn't.
+  const message = response.data?.message;
+  return typeof message === "string" && message.includes("edit access")
+    ? t("dashboard.publicLinks.editAccessRequired")
+    : missingPermission;
+}
+
 export function publicLinkSearchTerm(input: string): string {
   const q = input.trim();
   return (q.match(/\/public\/dashboards\/([^/?#\s]+)/)?.[1] ?? q).toLowerCase();

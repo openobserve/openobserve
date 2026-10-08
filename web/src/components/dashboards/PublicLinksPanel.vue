@@ -589,6 +589,7 @@ import {
   longRange,
   publicLinkColumns,
   publicLinkSearchTerm,
+  forbiddenMessage,
   publicLinkUrl as publicUrl,
   refreshLabel,
 } from "./publicLinkDisplay";
@@ -860,10 +861,6 @@ function serverMessage(e: unknown): I18nText {
   return raw((e as { response?: { data?: { message?: string } } })?.response?.data?.message);
 }
 
-function isForbidden(e: unknown): boolean {
-  return (e as { response?: { status?: number } } | null)?.response?.status === 403;
-}
-
 // The list refetch the mutation started must land first, or the row still offers the action it just ran.
 async function runRowAction(
   link: PublicLink,
@@ -877,7 +874,10 @@ async function runRowAction(
     await run();
     await linksQuery.refetch({ cancelRefetch: false });
   } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || failed);
+    showErrorNotification(
+      forbiddenMessage(e, t, t("dashboard.publicLinks.actionForbidden")) ??
+        (serverMessage(e) || failed),
+    );
   } finally {
     busyRows.delete(link.id);
   }
@@ -988,15 +988,16 @@ async function submit(value: PublicLinkForm) {
       view.value = "created";
     }
   } catch (e: unknown) {
-    if (isForbidden(e)) {
-      showErrorNotification(
-        editing.value
-          ? t("dashboard.publicLinks.editForbidden")
-          : t("dashboard.publicLinks.createForbidden"),
-      );
-    } else {
-      showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.publishFailed"));
-    }
+    const refused = forbiddenMessage(
+      e,
+      t,
+      editing.value
+        ? t("dashboard.publicLinks.editForbidden")
+        : t("dashboard.publicLinks.createForbidden"),
+    );
+    showErrorNotification(
+      refused ?? (serverMessage(e) || t("dashboard.publicDashboard.publishFailed")),
+    );
   }
 }
 

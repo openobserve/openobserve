@@ -6740,6 +6740,8 @@
       "panelVariables": "Panel: {name}",
       "frozenVariablesNote": "The public link always loads the dashboard with the values selected here. Viewers can see them but can't change them.",
       "variablesLoading": "Loading variable values…",
+      "editAccessRequired": "You need edit access to this dashboard to manage its public links.",
+      "actionForbidden": "You don't have permission to change public links. Ask an admin.",
       "createForbidden": "You don't have permission to create public links. Ask an admin.",
       "editForbidden": "You don't have permission to edit public links. Ask an admin."
     }

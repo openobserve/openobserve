@@ -338,6 +338,7 @@ import {
   hasRelativeRange,
   publicLinkColumns,
   publicLinkSearchTerm,
+  forbiddenMessage,
   publicLinkUrl,
   refreshLabel,
 } from "./publicLinkDisplay";
@@ -484,7 +485,10 @@ async function runRowAction(
     await run();
     await linksQuery.refetch({ cancelRefetch: false });
   } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || failed);
+    showErrorNotification(
+      forbiddenMessage(e, t, t("dashboard.publicLinks.actionForbidden")) ??
+        (serverMessage(e) || failed),
+    );
   } finally {
     busyRows.delete(link.id);
   }

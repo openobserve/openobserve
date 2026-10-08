@@ -488,16 +488,46 @@ describe("PublicLinksPanel", () => {
     );
   });
 
-  it("shows the server's reason when an action is refused", async () => {
+  it.each([
+    [
+      {
+        status: 403,
+        data: { message: "you need edit access to this dashboard to manage its public links" },
+      },
+      "You need edit access to this dashboard to manage its public links.",
+    ],
+    [
+      { status: 403, data: "Unauthorized Access" },
+      "You don't have permission to change public links. Ask an admin.",
+    ],
+    [{ status: 500, data: { message: "boom" } }, "boom"],
+  ])("explains a refused action in plain words (%o)", async (response, shown) => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
-    vi.mocked(admin.pause).mockRejectedValue({
-      response: { status: 403, data: { message: "no edit" } },
-    });
+    vi.mocked(admin.pause).mockRejectedValue({ response });
     const w = build();
     await flushPromises();
     await w.find('[data-test="dashboards-public-links-panel-l1-pause-menu"]').trigger("click");
     await flushPromises();
-    expect(notify.error).toHaveBeenCalledWith("no edit");
+    expect(notify.error).toHaveBeenCalledWith(shown);
+  });
+
+  it("names the missing dashboard edit access when creating is refused for it", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    vi.mocked(admin.create).mockRejectedValue({
+      response: {
+        status: 403,
+        data: { message: "you need edit access to this dashboard to manage its public links" },
+      },
+    });
+    const w = build({ variablesConfig: undefined });
+    await flushPromises();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "NOC wall");
+    await submit(w);
+    expect(notify.error).toHaveBeenCalledWith(
+      "You need edit access to this dashboard to manage its public links.",
+    );
   });
 
   it("saves an expired link without a new date and sends its expiry back unchanged", async () => {

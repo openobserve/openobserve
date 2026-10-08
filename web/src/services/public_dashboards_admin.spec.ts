@@ -49,8 +49,9 @@ describe("public_dashboards_admin service", () => {
   it("lists the org's links and a dashboard's links", async () => {
     await service.listOrg("org1");
     await service.list("org1", "dash1");
-    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/public_dashboards");
-    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links");
+    const silent = { silentForbidden: true };
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/public_dashboards", silent);
+    expect(mockHttp.get).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links", silent);
   });
 
   it("creates with POST and edits one link with PUT, without the global 403 toast", async () => {
@@ -74,11 +75,23 @@ describe("public_dashboards_admin service", () => {
     await service.resume("org1", "dash1", "l1");
     await service.rebuild("org1", "dash1", "l1");
     await service.revoke("org1", "dash1", "l1");
-    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/pause");
-    expect(mockHttp.post).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1/resume");
+    expect(mockHttp.post).toHaveBeenCalledWith(
+      "/api/org1/dashboards/dash1/public_links/l1/pause",
+      undefined,
+      { silentForbidden: true },
+    );
+    expect(mockHttp.post).toHaveBeenCalledWith(
+      "/api/org1/dashboards/dash1/public_links/l1/resume",
+      undefined,
+      { silentForbidden: true },
+    );
     expect(mockHttp.post).toHaveBeenCalledWith(
       "/api/org1/dashboards/dash1/public_links/l1/rebuild",
+      undefined,
+      { silentForbidden: true },
     );
-    expect(mockHttp.delete).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1");
+    expect(mockHttp.delete).toHaveBeenCalledWith("/api/org1/dashboards/dash1/public_links/l1", {
+      silentForbidden: true,
+    });
   });
 });

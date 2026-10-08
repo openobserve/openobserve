@@ -63,25 +63,26 @@ export interface PublicLink {
 const linksPath = (org: string, dashboardId: string) =>
   `/api/${org}/dashboards/${dashboardId}/public_links`;
 
+// Every public-links screen shows its own message for a 403, so the global toast would repeat it.
+const silent = { silentForbidden: true };
+
 const public_dashboards_admin = {
-  listOrg: (org: string) => http().get<{ list: PublicLink[] }>(`/api/${org}/public_dashboards`),
+  listOrg: (org: string) =>
+    http().get<{ list: PublicLink[] }>(`/api/${org}/public_dashboards`, silent),
   list: (org: string, dashboardId: string) =>
-    http().get<{ list: PublicLink[] }>(linksPath(org, dashboardId)),
-  // The form shows its own message on a 403, so the global toast would repeat it.
+    http().get<{ list: PublicLink[] }>(linksPath(org, dashboardId), silent),
   create: (org: string, dashboardId: string, config: PublicLinkConfig) =>
-    http().post<PublicLink>(linksPath(org, dashboardId), config, { silentForbidden: true }),
+    http().post<PublicLink>(linksPath(org, dashboardId), config, silent),
   update: (org: string, dashboardId: string, linkId: string, config: PublicLinkConfig) =>
-    http().put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config, {
-      silentForbidden: true,
-    }),
+    http().put<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}`, config, silent),
   pause: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`),
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/pause`, undefined, silent),
   resume: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`),
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/resume`, undefined, silent),
   rebuild: (org: string, dashboardId: string, linkId: string) =>
-    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/rebuild`),
+    http().post<PublicLink>(`${linksPath(org, dashboardId)}/${linkId}/rebuild`, undefined, silent),
   revoke: (org: string, dashboardId: string, linkId: string) =>
-    http().delete(`${linksPath(org, dashboardId)}/${linkId}`),
+    http().delete(`${linksPath(org, dashboardId)}/${linkId}`, silent),
 };
 
 export default public_dashboards_admin;
