@@ -52,11 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #title>
           <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+          <OBadge
+            v-if="isEditingLayout"
+            variant="primary-soft"
+            size="sm"
+            icon="edit"
+            class="ms-2 align-middle"
+            data-test="dashboard-edit-badge"
+            >{{ t("dashboard.layoutEdit.editing") }}</OBadge
+          >
         </template>
         <template #actions>
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
           <OButton
-            v-if="!isFullscreen"
+            v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
             variant="outline"
             size="icon-toolbar"
@@ -155,6 +164,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
           </OButtonGroup>
+          <OButton
+            v-if="!isFullscreen && !isEditingLayout"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            icon-left="edit"
+            :aria-label="t('dashboard.layoutEdit.enter')"
+            data-test="dashboard-edit-btn"
+            @click="enterLayoutEdit"
+          >
+            <template v-if="!isMobile">{{ t("dashboard.layoutEdit.edit") }}</template>
+            <OTooltip :content="t('dashboard.layoutEdit.enter')" />
+          </OButton>
+          <template v-if="isEditingLayout">
+            <div v-if="!isMobile" class="flex h-5 items-stretch">
+              <OSeparator vertical />
+            </div>
+            <template v-if="!isMobile">
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="undo"
+                :disabled="!canUndoLayout || isSavingLayout"
+                :aria-label="t('dashboard.layoutEdit.undo')"
+                data-test="dashboard-edit-undo-btn"
+                @click="undoLayout"
+              >
+                <OTooltip
+                  :content="t('dashboard.layoutEdit.undo')"
+                  shortcut-id="dashboardLayoutUndo"
+                />
+              </OButton>
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="redo"
+                :disabled="!canRedoLayout || isSavingLayout"
+                :aria-label="t('dashboard.layoutEdit.redo')"
+                data-test="dashboard-edit-redo-btn"
+                @click="redoLayout"
+              >
+                <OTooltip
+                  :content="t('dashboard.layoutEdit.redo')"
+                  shortcut-id="dashboardLayoutRedo"
+                />
+              </OButton>
+              <span
+                class="text-text-secondary text-xs whitespace-nowrap"
+                aria-live="polite"
+                data-test="dashboard-edit-changes-count"
+                >{{
+                  t("dashboard.layoutEdit.changes", { count: layoutChangeCount }, layoutChangeCount)
+                }}</span
+              >
+              <OButton
+                variant="ghost"
+                size="sm-toolbar"
+                icon-left="close"
+                :disabled="isSavingLayout"
+                data-test="dashboard-edit-discard-btn"
+                @click="requestExitLayoutEdit"
+              >
+                {{ t("dashboard.layoutEdit.discard") }}
+                <OTooltip
+                  :content="t('dashboard.layoutEdit.discardTooltip')"
+                  shortcut-id="dashboardLayoutExit"
+                />
+              </OButton>
+            </template>
+            <OButton
+              variant="primary"
+              size="sm-toolbar"
+              icon-left="check"
+              :disabled="layoutChangeCount === 0"
+              :loading="isSavingLayout"
+              data-test="dashboard-edit-save-btn"
+              @click="saveLayout"
+            >
+              {{ t("dashboard.layoutEdit.save") }}
+              <OTooltip
+                :content="t('dashboard.layoutEdit.saveTooltip')"
+                shortcut-id="dashboardSave"
+              />
+            </OButton>
+          </template>
         </template>
 
         <template #actions-overflow>
@@ -167,100 +261,137 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
-          <ExportDashboard
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            :dashboardId="currentDashboardData.data?.dashboardId"
-          />
-          <ShareButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            :url="dashboardShareURL"
-            @copy:success="onDashboardShared"
-            variant="outline"
-            size="icon-toolbar"
-            data-test="dashboard-share-btn"
-          />
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            data-test="dashboard-setting-btn"
-            @click="openSettingsDialog"
-            icon-left="settings"
-          >
-            <OTooltip :content="t('dashboard.setting')" />
-          </OButton>
-          <OButton
-            variant="outline"
-            size="icon-toolbar"
-            @click="printDashboard"
-            data-test="dashboard-print-btn"
-          >
-            <template #icon-left
-              ><OIcon :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
-            /></template>
-            <OTooltip
-              :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')"
+          <!-- These save, print or reload outside the draft, so edit mode hides them until Save or Discard. -->
+          <template v-if="!isEditingLayout">
+            <ExportDashboard
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :dashboardId="currentDashboardData.data?.dashboardId"
             />
-          </OButton>
-          <OButton
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            @click="toggleFullscreen"
-            data-test="dashboard-fullscreen-btn"
-          >
-            <template #icon-left
-              ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
-            /></template>
-            <OTooltip
-              :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')"
-              shortcut-id="dashboardFullscreen"
+            <ShareButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :url="dashboardShareURL"
+              @copy:success="onDashboardShared"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-share-btn"
             />
-          </OButton>
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            @click="openScheduledReports"
-            data-test="view-dashboard-scheduled-reports"
-          >
-            <template #icon-left><OIcon name="description" size="sm" /></template>
-            <OTooltip :content="t('dashboard.scheduledDashboards')" />
-          </OButton>
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            size="icon-toolbar"
-            data-test="dashboard-json-edit-btn"
-            @click="openJsonEditor"
-            icon-left="code"
-          >
-            <OTooltip :content="t('dashboard.editJson')" />
-          </OButton>
-          <!-- Pin as org-wide home dashboard: a low-frequency, set-once
-                 action, so it sits at the far right, icon-only. Filled pin +
-                 highlighted variant signal the "already home" state. -->
-          <OButton
-            v-if="!isFullscreen"
-            v-show="store.state.printMode !== true"
-            :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-            size="icon-toolbar"
-            :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
-            @click="toggleHomeDashboard"
-            data-test="dashboard-view-set-home-btn"
-            :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-          >
-            <OTooltip
-              :content="
-                isHome(dashboardId) ? t('dashboard.removeFromHome') : t('dashboard.setAsHomeDesc')
-              "
-            />
-          </OButton>
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-setting-btn"
+              @click="openSettingsDialog"
+              icon-left="settings"
+            >
+              <OTooltip :content="t('dashboard.setting')" />
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              @click="printDashboard"
+              data-test="dashboard-print-btn"
+            >
+              <template #icon-left
+                ><OIcon :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
+              /></template>
+              <OTooltip
+                :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')"
+              />
+            </OButton>
+            <OButton
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              @click="toggleFullscreen"
+              data-test="dashboard-fullscreen-btn"
+            >
+              <template #icon-left
+                ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
+              /></template>
+              <OTooltip
+                :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')"
+                shortcut-id="dashboardFullscreen"
+              />
+            </OButton>
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              @click="openScheduledReports"
+              data-test="view-dashboard-scheduled-reports"
+            >
+              <template #icon-left><OIcon name="description" size="sm" /></template>
+              <OTooltip :content="t('dashboard.scheduledDashboards')" />
+            </OButton>
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-json-edit-btn"
+              @click="openJsonEditor"
+              icon-left="code"
+            >
+              <OTooltip :content="t('dashboard.editJson')" />
+            </OButton>
+            <!-- Pin as org-wide home dashboard: a low-frequency, set-once
+                   action, so it sits at the far right, icon-only. Filled pin +
+                   highlighted variant signal the "already home" state. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="icon-toolbar"
+              :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              <OTooltip
+                :content="
+                  isHome(dashboardId) ? t('dashboard.removeFromHome') : t('dashboard.setAsHomeDesc')
+                "
+              />
+            </OButton>
+          </template>
+          <template v-if="isEditingLayout && isMobile">
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="undo"
+              :disabled="!canUndoLayout || isSavingLayout"
+              :aria-label="t('dashboard.layoutEdit.undo')"
+              data-test="dashboard-edit-undo-btn"
+              @click="undoLayout"
+            >
+              <OTooltip :content="t('dashboard.layoutEdit.undo')" />
+            </OButton>
+            <OButton
+              variant="outline"
+              size="icon-toolbar"
+              icon-left="redo"
+              :disabled="!canRedoLayout || isSavingLayout"
+              :aria-label="t('dashboard.layoutEdit.redo')"
+              data-test="dashboard-edit-redo-btn"
+              @click="redoLayout"
+            >
+              <OTooltip :content="t('dashboard.layoutEdit.redo')" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="sm-toolbar"
+              icon-left="close"
+              :disabled="isSavingLayout"
+              data-test="dashboard-edit-discard-btn"
+              @click="requestExitLayoutEdit"
+            >
+              {{ t("dashboard.layoutEdit.discard") }}
+            </OButton>
+          </template>
         </template>
 
         <RenderDashboardCharts
@@ -274,6 +405,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @variablesManagerReady="onVariablesManagerReady"
           :initialVariableValues="initialVariableValues"
           :viewOnly="store.state.printMode"
+          :layoutMode="layoutMode"
+          @layoutChange="onLayoutChange"
           :dashboardData="currentDashboardData.data"
           :folderId="route.query.folder"
           :reportId="reportId"
@@ -328,6 +461,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
         />
+
+        <ODialog
+          :open="discardDialog.open"
+          size="sm"
+          :title="t('dashboard.layoutEdit.discardTitle')"
+          :secondary-button-label="
+            discardDialog.reason === 'leave'
+              ? t('dashboard.layoutEdit.stay')
+              : t('dashboard.layoutEdit.keepEditing')
+          "
+          :primary-button-label="
+            discardDialog.reason === 'leave'
+              ? t('dashboard.layoutEdit.discardAndLeave')
+              : t('dashboard.layoutEdit.discard')
+          "
+          primary-button-variant="destructive"
+          initial-focus="secondary"
+          data-test="dashboard-edit-discard-dialog"
+          @update:open="(open) => !open && settleDiscard(false)"
+          @click:secondary="settleDiscard(false)"
+          @click:primary="settleDiscard(true)"
+        >
+          {{
+            discardDialog.reason === "leave"
+              ? t(
+                  "dashboard.layoutEdit.leaveMessage",
+                  { count: layoutChangeCount },
+                  layoutChangeCount,
+                )
+              : t(
+                  "dashboard.layoutEdit.discardMessage",
+                  { count: layoutChangeCount },
+                  layoutChangeCount,
+                )
+          }}
+        </ODialog>
       </OPageLayout>
     </div>
   </div>
@@ -379,6 +548,10 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useLayoutEditDraft } from "@/composables/dashboard/useLayoutEditDraft";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
@@ -425,6 +598,9 @@ export default defineComponent({
     ODropdownItem,
     OIcon,
     OTooltip,
+    OBadge,
+    OSeparator,
+    ODialog,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -854,19 +1030,105 @@ export default defineComponent({
       selectedPanelConfig.value.data = JSON.parse(JSON.stringify(panelData));
     };
 
+    // The layout dialog only exists in edit mode, so its result is one draft step, never a save.
     const savePanelLayout = async (layout) => {
-      const panel = getPanelFromTab(selectedTabId.value, selectedPanelConfig.value.data.id);
-      if (panel) panel.layout = layout;
+      const panel = getPanelFromTab(selectedTabId.value, selectedPanelConfig.value.data?.id);
 
       selectedPanelConfig.value.show = false;
       selectedPanelConfig.value.data = null;
 
+      if (!panel || !layout || !isEditingLayout.value) return;
+      panel.layout = layout;
+
       await nextTick();
-
-      window.dispatchEvent(new Event("resize"));
-
-      await renderDashboardChartsRef?.value?.saveDashboardData?.execute?.();
+      renderDashboardChartsRef.value?.syncGridToLayout?.();
+      layoutDraft.record();
     };
+
+    // ===== Layout edit mode =====
+    const layoutDraft = useLayoutEditDraft(() => currentDashboardData.data, {
+      onApply: () => renderDashboardChartsRef.value?.syncGridToLayout?.(),
+    });
+    const isEditingLayout = layoutDraft.isEditing;
+    const layoutChangeCount = layoutDraft.changeCount;
+    const canUndoLayout = layoutDraft.canUndo;
+    const canRedoLayout = layoutDraft.canRedo;
+    const layoutMode = computed(() => (isEditingLayout.value ? "edit" : "view"));
+    const isSavingLayout = ref(false);
+
+    const enterLayoutEdit = () => {
+      if (store.state.printMode) return;
+      layoutDraft.start();
+    };
+
+    const onLayoutChange = () => {
+      layoutDraft.record();
+    };
+
+    const undoLayout = () => {
+      if (!isSavingLayout.value) layoutDraft.undo();
+    };
+
+    const redoLayout = () => {
+      if (!isSavingLayout.value) layoutDraft.redo();
+    };
+
+    const saveLayout = async () => {
+      if (!layoutDraft.isDirty.value || isSavingLayout.value) return;
+      isSavingLayout.value = true;
+      try {
+        // saveDashboardData owns the toast and the 409 path; a failed save keeps the draft.
+        const saved = await renderDashboardChartsRef.value?.saveDashboardData?.execute?.();
+        if (saved) layoutDraft.finish();
+      } finally {
+        isSavingLayout.value = false;
+      }
+    };
+
+    const discardDialog = reactive({ open: false, reason: "exit" as "exit" | "leave" });
+    let resolveDiscard: ((confirmed: boolean) => void) | null = null;
+
+    const confirmDiscard = (reason: "exit" | "leave") =>
+      new Promise<boolean>((resolve) => {
+        resolveDiscard?.(false);
+        resolveDiscard = resolve;
+        discardDialog.reason = reason;
+        discardDialog.open = true;
+      });
+
+    const settleDiscard = (confirmed: boolean) => {
+      discardDialog.open = false;
+      const resolve = resolveDiscard;
+      resolveDiscard = null;
+      resolve?.(confirmed);
+    };
+
+    const requestExitLayoutEdit = async () => {
+      if (!isEditingLayout.value || isSavingLayout.value) return;
+      if (layoutDraft.isDirty.value && !(await confirmDiscard("exit"))) return;
+      layoutDraft.discard();
+    };
+
+    // Esc belongs to an open dialog or menu first; the layout only hears it when nothing else would.
+    const onLayoutEscape = () => {
+      if (!isEditingLayout.value || discardDialog.open) return;
+      if (document.querySelector('[role="dialog"][data-state="open"], [role="menu"]')) return;
+      requestExitLayoutEdit();
+    };
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!layoutDraft.isDirty.value) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    // A reload or drilldown swaps the dashboard object, which the draft no longer describes.
+    watch(
+      () => currentDashboardData.data,
+      (_next, previous) => {
+        if (isEditingLayout.value) layoutDraft.discard(previous);
+      },
+    );
 
     // ===== Panel Time Configuration =====
 
@@ -1729,6 +1991,7 @@ export default defineComponent({
 
     onMounted(() => {
       document.addEventListener("fullscreenchange", onFullscreenChange);
+      window.addEventListener("beforeunload", onBeforeUnload);
     });
 
     // Force remount key — bumped on AI dashboard events to force RenderDashboardCharts to remount
@@ -1754,6 +2017,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+      window.removeEventListener("beforeunload", onBeforeUnload);
 
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
@@ -1771,8 +2035,23 @@ export default defineComponent({
     });
 
     // printMode hides the app shell globally, so leaving by browser Back (not ✕) must still clear it.
-    onBeforeRouteLeave(() => {
+    const clearPrintModeOnLeave = () => {
       if (store.state.printMode) setPrint(false);
+    };
+
+    // Unsaved layout edits are the store's cached dashboard object, so a confirmed leave must roll them back.
+    onBeforeRouteLeave(() => {
+      if (!layoutDraft.isDirty.value) {
+        layoutDraft.finish();
+        clearPrintModeOnLeave();
+        return;
+      }
+      return confirmDiscard("leave").then((confirmed) => {
+        if (!confirmed) return false;
+        layoutDraft.discard();
+        clearPrintModeOnLeave();
+        return true;
+      });
     });
 
     const currentTimeObjPerPanel = ref({});
@@ -1841,18 +2120,37 @@ export default defineComponent({
       {
         id: "dashboardAddPanel",
         handler: () => {
-          if (isInputFocused()) return;
+          if (isInputFocused() || isEditingLayout.value) return;
           addPanelData();
         },
       },
       {
         id: "dashboardSave",
-        handler: () => savePanelLayout(null),
+        handler: () => {
+          if (isInputFocused() || !isEditingLayout.value) return;
+          saveLayout();
+        },
+      },
+      {
+        id: "dashboardLayoutUndo",
+        handler: () => {
+          if (isEditingLayout.value) undoLayout();
+        },
+      },
+      {
+        id: "dashboardLayoutRedo",
+        handler: () => {
+          if (isEditingLayout.value) redoLayout();
+        },
+      },
+      {
+        id: "dashboardLayoutExit",
+        handler: onLayoutEscape,
       },
       {
         id: "dashboardFullscreen",
         handler: () => {
-          if (isInputFocused()) return;
+          if (isInputFocused() || isEditingLayout.value) return;
           toggleFullscreen();
         },
       },
@@ -1931,6 +2229,20 @@ export default defineComponent({
       selectedPanelConfig,
       savePanelLayout,
       renderDashboardChartsRef,
+      isEditingLayout,
+      layoutChangeCount,
+      canUndoLayout,
+      canRedoLayout,
+      layoutMode,
+      isSavingLayout,
+      enterLayoutEdit,
+      onLayoutChange,
+      undoLayout,
+      redoLayout,
+      saveLayout,
+      requestExitLayoutEdit,
+      discardDialog,
+      settleDiscard,
       folderNameFromFolderId,
       showJsonEditorDialog,
       openJsonEditor,

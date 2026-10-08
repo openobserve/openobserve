@@ -726,6 +726,50 @@ describe("TabList", () => {
     });
   });
 
+  describe("Layout edit mode", () => {
+    it("locks reordering in view mode but keeps rename and add", () => {
+      wrapper = createWrapper({ layoutMode: "view" });
+
+      expect(wrapper.findComponent({ name: "OTabs" }).props("reorderable")).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-add-btn"]').exists()).toBe(true);
+    });
+
+    it("allows reordering in edit mode and hides rename and add", () => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+
+      expect(wrapper.findComponent({ name: "OTabs" }).props("reorderable")).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-add-btn"]').exists()).toBe(false);
+    });
+
+    it("does not start a rename on double-click in edit mode", async () => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+
+      await wrapper.find('[data-test="dashboard-tab-tab2-name"]').trigger("dblclick");
+
+      expect(wrapper.vm.editingTabId).toBeNull();
+    });
+
+    it("drafts a reorder from OTabs without saving it", async () => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+
+      wrapper
+        .findComponent({ name: "OTabs" })
+        .vm.$emit("reorder", { from: "tab3", to: "tab1", before: true });
+      await flushPromises();
+
+      expect(wrapper.props("dashboardData").tabs.map((tab: any) => tab.tabId)).toEqual([
+        "tab3",
+        "tab1",
+        "tab2",
+      ]);
+      expect(wrapper.emitted("layoutChange")).toHaveLength(1);
+      expect(mockUpdateDashboard).not.toHaveBeenCalled();
+      expect(mockShowPositiveNotification).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Inline rename", () => {
     it("should show a rename input for the tab being edited", async () => {
       wrapper = createWrapper();

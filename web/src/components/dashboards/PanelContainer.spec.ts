@@ -1227,6 +1227,90 @@ describe("PanelContainer", () => {
       // Check the method exists
       expect(wrapper.vm.onPanelModifyClick).toBeDefined();
     });
+
+    describe("layout modes", () => {
+      const menuStubs = {
+        ODropdown: {
+          name: "ODropdown",
+          template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+        },
+        ODropdownItem: {
+          name: "ODropdownItem",
+          template: '<div class="o-dropdown-item-stub" v-bind="$attrs"><slot /></div>',
+        },
+      };
+      const menuIds = () =>
+        wrapper
+          .findAllComponents({ name: "ODropdownItem" })
+          .map((item: any) => item.attributes("data-test"));
+
+      it("keeps every action except Edit layout in view mode", () => {
+        wrapper = createWrapper({ layoutMode: "view" }, menuStubs);
+
+        expect(menuIds()).not.toContain("dashboard-edit-layout");
+        expect(menuIds()).toEqual(
+          expect.arrayContaining([
+            "dashboard-edit-panel",
+            "dashboard-duplicate-panel",
+            "dashboard-delete-panel",
+            "dashboard-move-to-another-panel",
+          ]),
+        );
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(false);
+      });
+
+      it("offers only Edit layout in edit mode", () => {
+        wrapper = createWrapper({ layoutMode: "edit" }, menuStubs);
+
+        expect(menuIds()).toEqual(["dashboard-edit-layout"]);
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(true);
+      });
+
+      it("drops the hover controls and refresh from the bar in edit mode so the title keeps the room", async () => {
+        wrapper = createWrapper({ layoutMode: "edit" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        await wrapper.vm.$nextTick();
+
+        const fullscreen = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+        expect(fullscreen.classes()).toContain("hidden");
+        expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').classes()).toContain("shrink-0");
+      });
+
+      it("keeps the hover controls and refresh in view mode", async () => {
+        wrapper = createWrapper({ layoutMode: "view" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        await wrapper.vm.$nextTick();
+
+        const fullscreen = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+        expect(fullscreen.exists()).toBe(true);
+        expect(fullscreen.classes()).not.toContain("hidden");
+        expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(true);
+      });
+
+      it("keeps the full menu when no layout mode is given", () => {
+        wrapper = createWrapper({}, menuStubs);
+
+        expect(menuIds()).toEqual(
+          expect.arrayContaining(["dashboard-edit-panel", "dashboard-edit-layout"]),
+        );
+      });
+
+      it.each([
+        ["view", true],
+        ["edit", false],
+      ])("the hover Delete key opens the delete confirm in %s mode: %s", async (mode, opens) => {
+        wrapper = createWrapper({ layoutMode: mode });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(opens);
+      });
+    });
   });
 
   describe("Variables Data Management", () => {
