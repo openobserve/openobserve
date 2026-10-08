@@ -8079,6 +8079,19 @@
     "wouldTrigger": "TETİKLEYECEKTİ",
     "wouldNotTrigger": "TETİKLEMEYECEK",
     "queryBuilder": "inşaatçı",
+    "saveModeDialog": {
+      "title": "Sorgu Modunu Seçin",
+      "leadAllSetUp": "{first}, {second} ve {third} tümü ayarlandı.",
+      "leadBothSetUp": "{first} ve {second} ikisi de ayarlandı.",
+      "leadSelectedEmptyOneOther": "{selected} seçildi ancak boş. {other} ayarlandı.",
+      "leadSelectedEmptyTwoOthers": "{selected} seçildi ancak boş. {first} ve {second} ayarlandı.",
+      "noFilters": "Filtre yok, bu nedenle {stream} içindeki her satır sayılır",
+      "noQuery": "Henüz sorgu yazılmadı",
+      "noteOneOtherUnused": "Yalnızca {pick} modu çalışır. {other} modu kullanılmaz.",
+      "noteOnlyPick": "Yalnızca {pick} modu çalışır.",
+      "noteTwoOthersUnused": "Yalnızca {pick} modu çalışır. {first} ve {second} modları kullanılmaz.",
+      "saveWithMode": "{mode} Modu ile Kaydet"
+    },
     "conditions": {
       "condition": "Durum",
       "conditionGroup": "Durum Grubu",

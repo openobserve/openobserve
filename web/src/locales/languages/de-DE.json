@@ -8079,6 +8079,19 @@
     "wouldTrigger": "WÜRDE AUSLÖSEN",
     "wouldNotTrigger": "WÜRDE NICHT AUSLÖSEN",
     "queryBuilder": "Baumeister",
+    "saveModeDialog": {
+      "title": "Abfragemodus wählen",
+      "leadAllSetUp": "{first}, {second} und {third} sind alle eingerichtet.",
+      "leadBothSetUp": "{first} und {second} sind beide eingerichtet.",
+      "leadSelectedEmptyOneOther": "{selected} ist ausgewählt, aber leer. {other} ist eingerichtet.",
+      "leadSelectedEmptyTwoOthers": "{selected} ist ausgewählt, aber leer. {first} und {second} sind eingerichtet.",
+      "noFilters": "Keine Filter, daher zählt jede Zeile in {stream}",
+      "noQuery": "Noch keine Abfrage geschrieben",
+      "noteOneOtherUnused": "Nur der {pick}-Modus wird ausgeführt. Der {other}-Modus wird nicht verwendet.",
+      "noteOnlyPick": "Nur der {pick}-Modus wird ausgeführt.",
+      "noteTwoOthersUnused": "Nur der {pick}-Modus wird ausgeführt. Die Modi {first} und {second} werden nicht verwendet.",
+      "saveWithMode": "Mit {mode}-Modus speichern"
+    },
     "conditions": {
       "condition": "Zustand",
       "conditionGroup": "Konditionsgruppe",

@@ -8079,6 +8079,19 @@
     "wouldTrigger": "DÉCLENCHERAIT",
     "wouldNotTrigger": "NE DÉCLENCHERAIT PAS",
     "queryBuilder": "Constructeur",
+    "saveModeDialog": {
+      "title": "Choisir le mode de requête",
+      "leadAllSetUp": "{first}, {second} et {third} sont tous configurés.",
+      "leadBothSetUp": "{first} et {second} sont tous deux configurés.",
+      "leadSelectedEmptyOneOther": "{selected} est sélectionné mais vide. {other} est configuré.",
+      "leadSelectedEmptyTwoOthers": "{selected} est sélectionné mais vide. {first} et {second} sont configurés.",
+      "noFilters": "Aucun filtre, donc chaque ligne de {stream} compte",
+      "noQuery": "Aucune requête écrite pour l'instant",
+      "noteOneOtherUnused": "Seul le mode {pick} s'exécute. Le mode {other} n'est pas utilisé.",
+      "noteOnlyPick": "Seul le mode {pick} s'exécute.",
+      "noteTwoOthersUnused": "Seul le mode {pick} s'exécute. Les modes {first} et {second} ne sont pas utilisés.",
+      "saveWithMode": "Enregistrer avec le mode {mode}"
+    },
     "conditions": {
       "condition": "État",
       "conditionGroup": "Groupe de conditions",

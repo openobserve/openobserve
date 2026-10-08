@@ -8079,6 +8079,19 @@
     "wouldTrigger": "会触发",
     "wouldNotTrigger": "不会触发",
     "queryBuilder": "生成器",
+    "saveModeDialog": {
+      "title": "选择查询模式",
+      "leadAllSetUp": "{first}、{second} 和 {third} 均已设置。",
+      "leadBothSetUp": "{first} 和 {second} 均已设置。",
+      "leadSelectedEmptyOneOther": "已选择 {selected} 但内容为空。{other} 已设置。",
+      "leadSelectedEmptyTwoOthers": "已选择 {selected} 但内容为空。{first} 和 {second} 已设置。",
+      "noFilters": "没有过滤器，因此 {stream} 中的每一行都会计入",
+      "noQuery": "尚未编写查询",
+      "noteOneOtherUnused": "仅运行 {pick} 模式。{other} 模式未使用。",
+      "noteOnlyPick": "仅运行 {pick} 模式。",
+      "noteTwoOthersUnused": "仅运行 {pick} 模式。{first} 和 {second} 模式未使用。",
+      "saveWithMode": "以 {mode} 模式保存"
+    },
     "conditions": {
       "condition": "状况",
       "conditionGroup": "条件组",

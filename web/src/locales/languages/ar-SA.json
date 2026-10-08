@@ -8079,6 +8079,19 @@
     "wouldTrigger": "كان سيفعل ذلك",
     "wouldNotTrigger": "لم يكن ذلك يفعل",
     "queryBuilder": "باني",
+    "saveModeDialog": {
+      "title": "اختر وضع الاستعلام",
+      "leadAllSetUp": "{first} و{second} و{third} جميعها مُهيأة.",
+      "leadBothSetUp": "{first} و{second} كلاهما مُهيأ.",
+      "leadSelectedEmptyOneOther": "{selected} محدد لكنه فارغ. {other} مُهيأ.",
+      "leadSelectedEmptyTwoOthers": "{selected} محدد لكنه فارغ. {first} و{second} مُهيآن.",
+      "noFilters": "لا توجد عوامل تصفية، لذا تُحتسب كل صفوف {stream}",
+      "noQuery": "لم تتم كتابة أي استعلام بعد",
+      "noteOneOtherUnused": "يعمل وضع {pick} فقط. لا يُستخدم وضع {other}.",
+      "noteOnlyPick": "يعمل وضع {pick} فقط.",
+      "noteTwoOthersUnused": "يعمل وضع {pick} فقط. لا يُستخدَم وضعا {first} و{second}.",
+      "saveWithMode": "حفظ بوضع {mode}"
+    },
     "conditions": {
       "condition": "الحالة",
       "conditionGroup": "مجموعة الحالة",

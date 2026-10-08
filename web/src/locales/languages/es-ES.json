@@ -8079,6 +8079,19 @@
     "wouldTrigger": "DESENCADENARÍA",
     "wouldNotTrigger": "NO SE ACTIVARÍA",
     "queryBuilder": "Constructor",
+    "saveModeDialog": {
+      "title": "Elegir modo de consulta",
+      "leadAllSetUp": "{first}, {second} y {third} están todos configurados.",
+      "leadBothSetUp": "{first} y {second} están ambos configurados.",
+      "leadSelectedEmptyOneOther": "{selected} está seleccionado pero vacío. {other} está configurado.",
+      "leadSelectedEmptyTwoOthers": "{selected} está seleccionado pero vacío. {first} y {second} están configurados.",
+      "noFilters": "Sin filtros, por lo que cuenta cada fila de {stream}",
+      "noQuery": "Aún no se ha escrito ninguna consulta",
+      "noteOneOtherUnused": "Solo se ejecuta el modo {pick}. El modo {other} no se usa.",
+      "noteOnlyPick": "Solo se ejecuta el modo {pick}.",
+      "noteTwoOthersUnused": "Solo se ejecuta el modo {pick}. Los modos {first} y {second} no se usan.",
+      "saveWithMode": "Guardar con modo {mode}"
+    },
     "conditions": {
       "condition": "Condición",
       "conditionGroup": "Grupo de condiciones",

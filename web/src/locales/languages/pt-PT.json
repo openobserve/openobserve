@@ -8079,6 +8079,19 @@
     "wouldTrigger": "DESENCADEARIA",
     "wouldNotTrigger": "NÃO ACIONARIA",
     "queryBuilder": "Construtor",
+    "saveModeDialog": {
+      "title": "Escolher modo de consulta",
+      "leadAllSetUp": "{first}, {second} e {third} estão todos configurados.",
+      "leadBothSetUp": "{first} e {second} estão ambos configurados.",
+      "leadSelectedEmptyOneOther": "{selected} está selecionado, mas vazio. {other} está configurado.",
+      "leadSelectedEmptyTwoOthers": "{selected} está selecionado, mas vazio. {first} e {second} estão configurados.",
+      "noFilters": "Sem filtros, então cada linha em {stream} conta",
+      "noQuery": "Nenhuma consulta escrita ainda",
+      "noteOneOtherUnused": "Apenas o modo {pick} é executado. O modo {other} não é usado.",
+      "noteOnlyPick": "Apenas o modo {pick} é executado.",
+      "noteTwoOthersUnused": "Apenas o modo {pick} é executado. Os modos {first} e {second} não são usados.",
+      "saveWithMode": "Salvar com o modo {mode}"
+    },
     "conditions": {
       "condition": "Condição",
       "conditionGroup": "Grupo de condições",

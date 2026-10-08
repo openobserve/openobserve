@@ -8079,6 +8079,19 @@
     "wouldTrigger": "트리거할 것이다",
     "wouldNotTrigger": "트리거하지 않을 것입니다",
     "queryBuilder": "건축업자",
+    "saveModeDialog": {
+      "title": "쿼리 모드 선택",
+      "leadAllSetUp": "{first}, {second}, {third} 모두 설정되었습니다.",
+      "leadBothSetUp": "{first} 및 {second} 모두 설정되었습니다.",
+      "leadSelectedEmptyOneOther": "{selected}이(가) 선택되었지만 비어 있습니다. {other}이(가) 설정되었습니다.",
+      "leadSelectedEmptyTwoOthers": "{selected}이(가) 선택되었지만 비어 있습니다. {first} 및 {second}이(가) 설정되었습니다.",
+      "noFilters": "필터가 없으므로 {stream}의 모든 행이 집계됩니다",
+      "noQuery": "아직 작성된 쿼리가 없습니다",
+      "noteOneOtherUnused": "{pick} 모드만 실행됩니다. {other} 모드는 사용되지 않습니다.",
+      "noteOnlyPick": "{pick} 모드만 실행됩니다.",
+      "noteTwoOthersUnused": "{pick} 모드만 실행됩니다. {first} 및 {second} 모드는 사용되지 않습니다.",
+      "saveWithMode": "{mode} 모드로 저장"
+    },
     "conditions": {
       "condition": "상태",
       "conditionGroup": "조건 그룹",
