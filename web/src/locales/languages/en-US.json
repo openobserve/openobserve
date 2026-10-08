@@ -10342,9 +10342,9 @@
       "organizationRequired": "Organization is required",
       "baseRole": "Base role",
       "baseRoleHelp": "The role matching users are given in that organization.",
-      "userGroup": "User group",
-      "userGroupPlaceholder": "Group name",
-      "userGroupHelp": "Optional. Matching users also join this group in that organization.",
+      "roleClaimName": "Role claim",
+      "roleClaimNamePlaceholder": "Claim name, e.g. groups",
+      "roleClaimNameHelp": "Optional. Token claim listing the user's custom roles; on every login, their custom roles in that organization are synced to it.",
       "duplicateDomain": "A mapping for this domain already exists",
       "confirmRemove": "Are you sure you want to delete the mapping for {domain}?",
       "deleteTitle": "Delete Mapping"

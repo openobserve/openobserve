@@ -10342,9 +10342,9 @@
       "organizationRequired": "L'organizzazione è obbligatoria",
       "baseRole": "Ruolo di base",
       "baseRoleHelp": "Il ruolo assegnato agli utenti corrispondenti in tale organizzazione.",
-      "userGroup": "Gruppo di utenti",
-      "userGroupPlaceholder": "Nome del gruppo",
-      "userGroupHelp": "Facoltativo. Gli utenti corrispondenti vengono aggiunti anche a questo gruppo in tale organizzazione.",
+      "roleClaimName": "Claim dei ruoli",
+      "roleClaimNamePlaceholder": "Nome del claim, ad es. groups",
+      "roleClaimNameHelp": "Facoltativo. Claim del token che elenca i ruoli personalizzati dell'utente; a ogni accesso i suoi ruoli personalizzati in tale organizzazione vengono sincronizzati con esso.",
       "duplicateDomain": "Esiste già una mappatura per questo dominio",
       "confirmRemove": "Sei sicuro di voler eliminare la mappatura per {domain}?",
       "deleteTitle": "Elimina mappatura"

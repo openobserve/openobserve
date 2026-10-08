@@ -10342,9 +10342,9 @@
       "organizationRequired": "組織は必須です",
       "baseRole": "基本ロール",
       "baseRoleHelp": "一致するユーザーがその組織で付与されるロール。",
-      "userGroup": "ユーザーグループ",
-      "userGroupPlaceholder": "グループ名",
-      "userGroupHelp": "任意。一致するユーザーはその組織内でこのグループにも参加します。",
+      "roleClaimName": "ロールクレーム",
+      "roleClaimNamePlaceholder": "クレーム名（例: groups）",
+      "roleClaimNameHelp": "任意。ユーザーのカスタムロールを列挙するトークンクレーム。ログインのたびに、その組織でのカスタムロールがこれに同期されます。",
       "duplicateDomain": "このドメインのマッピングはすでに存在します",
       "confirmRemove": "{domain} のマッピングを削除してもよろしいですか？",
       "deleteTitle": "マッピングを削除"

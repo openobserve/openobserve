@@ -10342,9 +10342,9 @@
       "organizationRequired": "L'organisation est requise",
       "baseRole": "Rôle de base",
       "baseRoleHelp": "Le rôle attribué aux utilisateurs correspondants dans cette organisation.",
-      "userGroup": "Groupe d'utilisateurs",
-      "userGroupPlaceholder": "Nom du groupe",
-      "userGroupHelp": "Facultatif. Les utilisateurs correspondants rejoignent également ce groupe dans cette organisation.",
+      "roleClaimName": "Claim de rôles",
+      "roleClaimNamePlaceholder": "Nom du claim, par ex. groups",
+      "roleClaimNameHelp": "Facultatif. Claim du jeton listant les rôles personnalisés de l'utilisateur ; à chaque connexion, ses rôles personnalisés dans cette organisation y sont synchronisés.",
       "duplicateDomain": "Une correspondance pour ce domaine existe déjà",
       "confirmRemove": "Êtes-vous sûr de vouloir supprimer la correspondance pour {domain} ?",
       "deleteTitle": "Supprimer la correspondance"

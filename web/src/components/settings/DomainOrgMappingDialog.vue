@@ -60,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <OFormInput
-        data-test="settings-domain-org-mapping-group-input"
-        name="user_group"
-        :label="t('settings.domainOrgMappings.userGroup')"
-        :placeholder="t('settings.domainOrgMappings.userGroupPlaceholder')"
-        :help-text="t('settings.domainOrgMappings.userGroupHelp')"
+        data-test="settings-domain-org-mapping-role-claim-input"
+        name="role_claim_name"
+        :label="t('settings.domainOrgMappings.roleClaimName')"
+        :placeholder="t('settings.domainOrgMappings.roleClaimNamePlaceholder')"
+        :help-text="t('settings.domainOrgMappings.roleClaimNameHelp')"
       />
     </OForm>
   </ODialog>
@@ -137,7 +137,7 @@ const mappingDefaults = computed((): DomainOrgMappingForm => {
     domain: props.mapping.domain ?? "",
     org_id: props.mapping.org_id ?? "",
     base_role: props.mapping.base_role ?? base.base_role,
-    user_group: props.mapping.user_group ?? "",
+    role_claim_name: props.mapping.role_claim_name ?? "",
   };
 });
 
@@ -168,7 +168,7 @@ function onSubmit(value: DomainOrgMappingForm) {
     org_id: value.org_id.trim(),
     base_role: value.base_role,
     // Omitted rather than "" so the payload matches the optional backend field.
-    user_group: value.user_group?.trim() || undefined,
+    role_claim_name: value.role_claim_name?.trim() || undefined,
   });
   emit("update:open", false);
 }

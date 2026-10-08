@@ -60,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mt-1 flex flex-wrap items-center gap-1">
               <OTag type="userRole" :value="badgeRole(mapping.base_role)" />
               <OTag
-                v-if="mapping.user_group"
+                v-if="mapping.role_claim_name"
                 type="fieldTag"
-                :data-test="`settings-domain-org-mappings-item-group-${index}`"
+                :data-test="`settings-domain-org-mappings-item-role-claim-${index}`"
               >
-                <span class="truncate text-xs">{{ mapping.user_group }}</span>
+                <span class="truncate text-xs">{{ mapping.role_claim_name }}</span>
               </OTag>
             </div>
           </div>

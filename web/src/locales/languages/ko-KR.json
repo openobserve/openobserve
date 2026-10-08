@@ -10342,9 +10342,9 @@
       "organizationRequired": "조직은 필수입니다",
       "baseRole": "기본 역할",
       "baseRoleHelp": "해당 조직에서 일치하는 사용자에게 부여되는 역할입니다.",
-      "userGroup": "사용자 그룹",
-      "userGroupPlaceholder": "그룹 이름",
-      "userGroupHelp": "선택 사항입니다. 일치하는 사용자는 해당 조직에서 이 그룹에도 가입됩니다.",
+      "roleClaimName": "역할 클레임",
+      "roleClaimNamePlaceholder": "클레임 이름(예: groups)",
+      "roleClaimNameHelp": "선택 사항입니다. 사용자의 사용자 지정 역할을 나열하는 토큰 클레임으로, 로그인할 때마다 해당 조직의 사용자 지정 역할이 이에 맞춰 동기화됩니다.",
       "duplicateDomain": "이 도메인에 대한 매핑이 이미 존재합니다",
       "confirmRemove": "{domain}에 대한 매핑을 삭제하시겠습니까?",
       "deleteTitle": "매핑 삭제"

@@ -10342,9 +10342,9 @@
       "organizationRequired": "Organizacja jest wymagana",
       "baseRole": "Rola podstawowa",
       "baseRoleHelp": "Rola przyznawana pasującym użytkownikom w tej organizacji.",
-      "userGroup": "Grupa użytkowników",
-      "userGroupPlaceholder": "Nazwa grupy",
-      "userGroupHelp": "Opcjonalne. Pasujący użytkownicy dołączają także do tej grupy w tej organizacji.",
+      "roleClaimName": "Claim ról",
+      "roleClaimNamePlaceholder": "Nazwa claimu, np. groups",
+      "roleClaimNameHelp": "Opcjonalne. Claim tokena zawierający niestandardowe role użytkownika; przy każdym logowaniu jego niestandardowe role w tej organizacji są z nim synchronizowane.",
       "duplicateDomain": "Mapowanie dla tej domeny już istnieje",
       "confirmRemove": "Czy na pewno chcesz usunąć mapowanie dla {domain}?",
       "deleteTitle": "Usuń mapowanie"
