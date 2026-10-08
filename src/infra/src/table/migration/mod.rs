@@ -209,10 +209,9 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
-mod m20261007_000001_scope_alert_dedup_state_by_org;
-mod m20260923_000001_create_ai_chat_sessions;
 mod m20261006_000001_create_ai_chat_shares;
 mod m20261007_000001_create_ai_chat_turns;
+mod m20261007_000001_scope_alert_dedup_state_by_org;
 mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;

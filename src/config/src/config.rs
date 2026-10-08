@@ -97,7 +97,6 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 98: key alert_dedup_state by (org_id, fingerprint).
 // 99: create ai_chat_sessions (server-side AI chat persistence).
 // 100: create ai_chat_shares and add fork columns to ai_chat_sessions.
-pub const DB_SCHEMA_VERSION: u64 = 102;
 // 101: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
 // 102: add redact_tools to ai_chat_shares.
 pub const DB_SCHEMA_VERSION: u64 = 102;

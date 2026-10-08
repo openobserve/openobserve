@@ -340,78 +340,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         );
                     }
                 }
-                if pending.alert_folders {
-                    match migrations::migrate_alert_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Alert folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating alert folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.workflow_folders {
-                    match migrations::migrate_workflow_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Workflow folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating workflow folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.prompt_folders {
-                    match migrations::migrate_prompt_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Prompt folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating prompt folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.report_folders {
-                    match migrations::migrate_report_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Report folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating report folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.anomaly_detection {
-                    match migrations::migrate_anomaly_detection().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.stream_names {
-                    match migrations::migrate_stream_names().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Stream names migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating stream names to openfga: {e}"
-                            );
-                        }
-                    }
-                }
+                run_pending_object_migrations(&pending).await;
             }
 
             // Check if there are init ofga tuples that needs to be added now
@@ -445,6 +374,69 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to release lock");
 
     Ok(())
+}
+
+async fn run_pending_object_migrations(pending: &PendingMigrations) {
+    if pending.alert_folders {
+        match migrations::migrate_alert_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Alert folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating alert folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.workflow_folders {
+        match migrations::migrate_workflow_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating workflow folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.prompt_folders {
+        match migrations::migrate_prompt_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Prompt folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating prompt folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.report_folders {
+        match migrations::migrate_report_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Report folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating report folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.anomaly_detection {
+        match migrations::migrate_anomaly_detection().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating anomaly detection to openfga: {e}");
+            }
+        }
+    }
+    if pending.stream_names {
+        match migrations::migrate_stream_names().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Stream names migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating stream names to openfga: {e}");
+            }
+        }
+    }
 }
 
 /// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
