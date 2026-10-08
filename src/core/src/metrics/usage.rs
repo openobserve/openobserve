@@ -685,10 +685,21 @@ fn alert_outcome(metric: &str, alert: &Alert) -> Outcome {
     if condition.query_type == QueryType::PromQL {
         return promql_outcome(metric, condition.promql.as_deref());
     }
-    outcome_of(alert.stream_type == StreamType::Metrics && alert.stream_name == metric)
+    if alert.stream_type == StreamType::Metrics && alert.stream_name == metric {
+        return Outcome::Match;
+    }
+    // an SQL alert may join streams besides the one it is filed under
+    match condition.sql.as_deref().map(str::trim) {
+        Some(sql) if condition.query_type == QueryType::SQL && !sql.is_empty() => {
+            sql_outcome(metric, sql, alert.stream_type.as_str())
+        }
+        _ => Outcome::NoMatch,
+    }
 }
 
 fn slo_hits(metric: &str, slo: &Slo) -> Hits {
+    let on_stream =
+        |stream: &str, stream_type: &str| outcome_of(stream_type == "metrics" && stream == metric);
     let mut hits = Hits::default();
     match &slo.definition.sli_config {
         SliConfig::Count {
@@ -697,12 +708,33 @@ fn slo_hits(metric: &str, slo: &Slo) -> Hits {
             hits.add(promql_outcome(metric, Some(good)));
             hits.add(promql_outcome(metric, Some(total)));
         }
+        SliConfig::Count {
+            source:
+                CountSource::SingleQuery {
+                    stream,
+                    stream_type,
+                    ..
+                },
+        } => hits.add(on_stream(stream, stream_type)),
+        SliConfig::Count {
+            source: CountSource::DualQuery { good, total },
+        } => {
+            hits.add(on_stream(&good.stream, &good.stream_type));
+            hits.add(on_stream(&total.stream, &total.stream_type));
+        }
         SliConfig::TimeSlice {
             query_language: QueryLanguage::PromQl,
             query,
             ..
         } => hits.add(promql_outcome(metric, Some(query))),
-        _ => {}
+        // an SQL slice is an aggregate without a FROM; its stream is declared
+        SliConfig::TimeSlice {
+            query_language: QueryLanguage::Sql,
+            stream,
+            stream_type,
+            ..
+        } => hits.add(on_stream(stream, stream_type)),
+        SliConfig::Alert { .. } => {}
     }
     hits
 }
@@ -1067,6 +1099,48 @@ mod tests {
         );
         assert!(slo_hits(METRIC, &slice).listing().is_some());
         assert!(slo_hits("other", &slice).listing().is_none());
+    }
+
+    #[test]
+    fn an_sql_alert_matches_a_metric_its_query_joins() {
+        let mut alert = sql_alert(StreamType::Logs, "app_logs");
+        alert.query_condition.sql = Some(
+            r#"SELECT a.k FROM "app_logs" a JOIN "metrics"."http_requests_total" m ON a.k = m.k"#
+                .to_string(),
+        );
+        assert_eq!(alert_outcome(METRIC, &alert), Outcome::Match);
+        alert.query_condition.sql = Some(r#"SELECT * FROM "app_logs""#.to_string());
+        assert_eq!(alert_outcome(METRIC, &alert), Outcome::NoMatch);
+    }
+
+    #[test]
+    fn sql_slos_match_on_their_declared_metrics_stream() {
+        let single = |stream_type: &str| {
+            slo(
+                "f",
+                json!({"sli_type": "count", "config": {"source": {"mode": "single_query", "query": {
+                    "stream": METRIC, "stream_type": stream_type, "good_expr": "code < 500"
+                }}}}),
+            )
+        };
+        let dual = slo(
+            "f",
+            json!({"sli_type": "count", "config": {"source": {"mode": "dual_query", "query": {
+                "good": {"stream": "other", "stream_type": "metrics", "sql": "SELECT 1"},
+                "total": {"stream": METRIC, "stream_type": "metrics", "sql": "SELECT 1"}
+            }}}}),
+        );
+        let slice = slo(
+            "f",
+            json!({"sli_type": "time_slice", "config": {
+                "stream": METRIC, "stream_type": "metrics", "query_language": "sql",
+                "query": "SELECT p95(v) AS zo_slo_value", "comparator": "<", "threshold": 1.0
+            }}),
+        );
+        for found in [single("metrics"), dual, slice] {
+            assert!(slo_hits(METRIC, &found).listing().is_some());
+        }
+        assert!(slo_hits(METRIC, &single("logs")).listing().is_none());
     }
 
     #[test]
