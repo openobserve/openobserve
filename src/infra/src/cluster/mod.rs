@@ -732,8 +732,7 @@ fn all_support_staleness_markers(nodes: &[Node]) -> bool {
 mod tests {
     use super::*;
 
-    // a registry entry as written by a release that predates staleness markers
-    fn old_node(status: &str) -> Node {
+    fn pre_marker_node(status: &str) -> Node {
         json::from_str(&format!(
             r#"{{"id":2,"uuid":"old","name":"old","http_addr":"","grpc_addr":"","role":["Querier"],"cpu_num":1,"status":"{status}","version":"v1.1.0-rc2"}}"#
         ))
@@ -745,24 +744,27 @@ mod tests {
         let new = Node::default();
         let stored: Node = json::from_str(&json::to_string(&new).unwrap()).unwrap();
         assert!(stored.staleness_markers);
-        assert!(!old_node("Online").staleness_markers);
+        assert!(!pre_marker_node("Online").staleness_markers);
         assert!(all_support_staleness_markers(&[new.clone(), stored]));
         assert!(!all_support_staleness_markers(&[
             new.clone(),
-            old_node("Online")
+            pre_marker_node("Online")
         ]));
-        assert!(!all_support_staleness_markers(&[new, old_node("Offline")]));
+        assert!(!all_support_staleness_markers(&[
+            new,
+            pre_marker_node("Offline")
+        ]));
         assert!(!all_support_staleness_markers(&[]));
     }
 
     #[test]
     fn test_staleness_markers_gate_latches_open() {
         let new = Node::default();
-        latch_staleness_markers(&[new.clone(), old_node("Online")]);
+        latch_staleness_markers(&[new.clone(), pre_marker_node("Online")]);
         assert!(!STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
         latch_staleness_markers(std::slice::from_ref(&new));
         assert!(STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
-        latch_staleness_markers(&[new, old_node("Online")]);
+        latch_staleness_markers(&[new, pre_marker_node("Online")]);
         assert!(STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
     }
 
