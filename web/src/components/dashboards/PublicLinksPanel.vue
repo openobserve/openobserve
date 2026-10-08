@@ -228,7 +228,7 @@
         <OFormDate
           name="expires"
           clearable
-          :min="today"
+          :min="expiresMin"
           :label="t('dashboard.publicDashboard.expiresOptional')"
           :help-text="t('dashboard.publicLinks.expiresHelp')"
           data-test="dashboards-public-links-panel-expires-input"
@@ -689,6 +689,12 @@ const editing = ref<PublicLink | null>(null);
 // The backend checks an expiry only when it changes, so an expired link stays editable until its date is touched.
 const storedExpires = computed(() =>
   editing.value?.expires_at ? expiryDate(editing.value.expires_at, timezone.value) : "",
+);
+// The browser's own date check would otherwise block saving an expired link's unchanged date.
+const expiresMin = computed(() =>
+  storedExpires.value !== "" && storedExpires.value < today.value
+    ? storedExpires.value
+    : today.value,
 );
 const createdLink = ref<PublicLink | null>(null);
 // Remounts the variable pickers so each form opens on its own seed.

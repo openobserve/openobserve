@@ -497,6 +497,7 @@ describe("PublicLinksPanel", () => {
     vi.mocked(admin.update).mockResolvedValue({ data: expired } as never);
     const w = build({ editLinkId: "l1", variablesConfig: undefined });
     await flushPromises();
+    expect(w.findComponent({ name: "OFormDate" }).props("min")).toBe("2020-01-01");
 
     await submit(w);
     expect(admin.update).toHaveBeenCalledTimes(1);
