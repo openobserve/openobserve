@@ -40,6 +40,8 @@ export function useTableSelection<TData>(
     },
   );
 
+  const selectedCount = computed(() => localSelectedIds.value.size);
+
   function getRowId(row: TData): string {
     const key = keyField.value;
     if (typeof key === "function") return key(row);
@@ -129,6 +131,7 @@ export function useTableSelection<TData>(
     isMultiple,
     isSingle,
     keyField,
+    selectedCount,
     getRowId,
     isRowSelected,
     toggleRow,

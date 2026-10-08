@@ -37,7 +37,11 @@ const LABEL_WIDTH_CLASS = {
   md: "w-32",
 } as const;
 
-const labelClass = computed(() => LABEL_WIDTH_CLASS[props.labelWidth]);
+// A gutter no track writes into is dead width, which a phone cannot spare for the plot.
+const gutterClass = computed(() => [
+  LABEL_WIDTH_CLASS[props.labelWidth],
+  props.tracks.some((track) => track.label) ? "" : "max-md:hidden",
+]);
 
 const guides = computed(() => props.dayColumns.map((offset) => clamp01(offset)));
 
@@ -115,7 +119,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
 
       <!-- Axis — labels sit above the plot area, aligned to the same 0-1 scale. -->
       <div v-if="ticks.length" class="flex items-end">
-        <div v-if="!laneHeaders" :class="[labelClass, 'shrink-0']" />
+        <div v-if="!laneHeaders" :class="[gutterClass, 'shrink-0']" />
         <div
           :class="[
             'text-text-secondary text-2xs relative min-w-0 flex-1',
@@ -155,7 +159,7 @@ const pillSide = (offset: number) => (offset > 0.85 ? "-translate-x-full -ms-1.5
         <slot v-if="laneHeaders" name="track-header" :track="track" />
         <div
           v-else
-          :class="[labelClass, 'text-text-secondary flex shrink-0 items-center truncate text-xs']"
+          :class="[gutterClass, 'text-text-secondary flex shrink-0 items-center truncate text-xs']"
         >
           {{ track.label }}
         </div>

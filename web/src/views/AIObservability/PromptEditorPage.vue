@@ -622,11 +622,15 @@ async function save(value: PromptEditorForm) {
   const entityId = prompt.value?.entityId;
   const fingerprint = contentFingerprint.value;
   try {
-    const discoveredMatches = await llmPromptsService.match(orgId.value, {
-      type: type.value,
-      payload: payload.value,
-      config: configValue.value,
-    });
+    const discoveredMatches = await llmPromptsService.match(
+      orgId.value,
+      {
+        type: type.value,
+        payload: payload.value,
+        config: configValue.value,
+      },
+      folderId.value,
+    );
     if (
       requestedOrg !== orgId.value ||
       entityId !== prompt.value?.entityId ||

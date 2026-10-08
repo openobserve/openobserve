@@ -91,7 +91,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 92: add recovery_destinations to alerts.
 // 93: create oncall_response_reports.
 // 94: create synthetics_refs.
-pub const DB_SCHEMA_VERSION: u64 = 94;
+// 95: add band settings to anomaly_detection_config.
+// 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
+// 97: create query_history.
+// 98: key alert_dedup_state by (org_id, fingerprint).
+pub const DB_SCHEMA_VERSION: u64 = 98;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -407,6 +411,10 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
+static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+static STORED_EXT_AUTH_SALT: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+/// Installs older than the stored salt hash with this value: rotating it breaks their logins.
+pub const LEGACY_EXT_AUTH_SALT: &str = "openobserve";
 
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
@@ -561,6 +569,39 @@ pub fn get_instance_id() -> String {
         Some(id) => id.clone(),
         None => "".to_string(),
     }
+}
+
+/// Caches the internal gRPC token stored in the meta db; empty means none is stored.
+pub fn cache_stored_grpc_token(token: &str) {
+    STORED_GRPC_TOKEN.store(Arc::new(token.to_owned()));
+}
+
+pub fn get_stored_grpc_token() -> String {
+    STORED_GRPC_TOKEN.load().to_string()
+}
+
+/// Caches the ext auth salt stored in the meta db; empty means none is stored.
+pub fn cache_stored_ext_auth_salt(salt: &str) {
+    STORED_EXT_AUTH_SALT.store(Arc::new(salt.to_owned()));
+}
+
+pub fn get_stored_ext_auth_salt() -> String {
+    STORED_EXT_AUTH_SALT.load().to_string()
+}
+
+pub fn get_ext_auth_salt() -> String {
+    select_ext_auth_salt(
+        &get_config().auth.ext_auth_salt,
+        &get_stored_ext_auth_salt(),
+    )
+}
+
+fn select_ext_auth_salt(env_salt: &str, stored_salt: &str) -> String {
+    [env_salt, stored_salt]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .unwrap_or(LEGACY_EXT_AUTH_SALT)
+        .to_string()
 }
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
@@ -1400,6 +1441,8 @@ pub struct ReportServer {
     pub addr: String,
     #[env_config(name = "ZO_REPORT_SERVER_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_REPORT_SERVER_SECRET", default = "")]
+    pub secret: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1472,7 +1515,8 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
-    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
+    /// Empty: a new install generates one and stores it in the meta db.
+    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "")]
     pub ext_auth_salt: String,
     #[env_config(
         name = "ZO_ALERT_CHART_SIGNING_KEY",
@@ -1722,12 +1766,6 @@ pub struct Search {
     )]
     pub feature_pushdown_filter_enabled: bool,
     #[env_config(
-        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
-        default = false,
-        help = "Enable pushdown filter for metrics queries"
-    )]
-    pub feature_metrics_pushdown_filter_enabled: bool,
-    #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
         help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
@@ -1742,7 +1780,7 @@ pub struct Search {
     #[env_config(
         name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
         default = 0,
-        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 2% of node memory clamped to 128-1024 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
+        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 5% of node memory clamped to 128-4096 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
     )]
     pub metrics_blocks_cache_max_size: usize,
     #[env_config(
@@ -1895,6 +1933,12 @@ pub struct Common {
     // This will completely skip ssrf checks, not just localhost
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
+    /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
+    #[env_config(name = "ZO_SSRF_ALLOWED_CIDRS", default = "")]
+    pub ssrf_allowed_cidrs: String,
+    /// Comma-separated hostnames only send-only destinations may resolve privately; needs restart.
+    #[env_config(name = "ZO_SSRF_ALLOWED_HOSTS", default = "")]
+    pub ssrf_allowed_hosts: String,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
@@ -2292,6 +2336,12 @@ pub struct Common {
     )]
     pub sdr_detect_policy_enabled: bool,
     #[env_config(
+        name = "ZO_SDR_FAIL_CLOSED",
+        default = false,
+        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+    )]
+    pub sdr_fail_closed: bool,
+    #[env_config(
         name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
         default = 300,
         help = "Seconds between redaction-evidence heartbeat rows per (org, stream). A heartbeat records that scanning was active even when nothing matched."
@@ -2423,6 +2473,12 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(
+        name = "ZO_FIREHOSE_DECOMPRESSED_LIMIT",
+        default = 0,
+        help = "Bytes the gzip records of one Kinesis Firehose request may inflate to; 0 means 640 MiB"
+    )]
+    pub firehose_decompressed_limit: usize,
     #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
     // 0 falls back to default
     pub js_function_max_execution_time_secs: u64,
@@ -2648,6 +2704,18 @@ pub struct Limit {
         help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
     )]
     pub alert_eval_ledger_retention_days: i64,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_ENABLED",
+        default = true,
+        help = "Records the queries users run in their query history. When false nothing is stored and the history lists empty; existing entries are kept until deleted or reaped."
+    )]
+    pub query_history_enabled: bool,
+    #[env_config(
+        name = "ZO_QUERY_HISTORY_RETENTION_DAYS",
+        default = 14,
+        help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less keeps every entry forever; it does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
+    )]
+    pub query_history_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(
@@ -3185,7 +3253,7 @@ pub struct Log {
     pub local_time_format: String,
 }
 
-#[derive(Serialize, Debug, EnvConfig, Default)]
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Nats {
     #[env_config(name = "ZO_NATS_ADDR", default = "localhost:4222")]
     pub addr: String,
@@ -3253,6 +3321,49 @@ pub struct Nats {
         default = ""
     )]
     pub kv_watch_modules: String,
+}
+
+impl std::fmt::Debug for Nats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            addr,
+            prefix,
+            user,
+            replicas,
+            history,
+            deliver_policy,
+            connect_timeout,
+            lock_wait_timeout,
+            subscription_capacity,
+            queue_max_age,
+            event_max_age,
+            lock_max_age,
+            queue_max_size,
+            event_storage,
+            v211_support,
+            kv_watch_modules,
+            password: _,
+        } = self;
+        f.debug_struct("Nats")
+            .field("addr", addr)
+            .field("prefix", prefix)
+            .field("user", user)
+            .field("password", &"[REDACTED]")
+            .field("replicas", replicas)
+            .field("history", history)
+            .field("deliver_policy", deliver_policy)
+            .field("connect_timeout", connect_timeout)
+            .field("lock_wait_timeout", lock_wait_timeout)
+            .field("subscription_capacity", subscription_capacity)
+            .field("queue_max_age", queue_max_age)
+            .field("event_max_age", event_max_age)
+            .field("lock_max_age", lock_max_age)
+            .field("queue_max_size", queue_max_size)
+            .field("event_storage", event_storage)
+            .field("v211_support", v211_support)
+            .field("kv_watch_modules", kv_watch_modules)
+            .finish()
+    }
 }
 
 #[derive(Serialize, Debug, Default, EnvConfig)]
@@ -3346,6 +3457,12 @@ pub struct Prometheus {
     /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
     #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
+    #[env_config(
+        name = "ZO_METRICS_STALENESS_MARKERS_ENABLED",
+        default = true,
+        help = "Store Prometheus staleness markers and end a series at its marker in PromQL. Off drops markers on ingest and ignores stored ones on read. Upgrade every node with this off before turning it on."
+    )]
+    pub staleness_markers_enabled: bool,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
@@ -3721,6 +3838,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.http_worker_max_blocking == 0 {
         cfg.limit.http_worker_max_blocking = 256;
+    }
+    // A Firehose HTTP request is at most 64 MiB and CloudWatch gzip inflates about 10x
+    if cfg.limit.firehose_decompressed_limit == 0 {
+        cfg.limit.firehose_decompressed_limit = 640 * 1024 * 1024;
     }
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
@@ -4352,7 +4473,7 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
     match configured {
-        0 => (mem_total / SIZE_IN_MB as usize / 50).clamp(128, 1024),
+        0 => (mem_total / SIZE_IN_MB as usize / 20).clamp(128, 4096),
         1..=9 => 0,
         size => size,
     }
@@ -4860,11 +4981,26 @@ mod tests {
     }
 
     #[test]
+    fn nats_debug_redacts_password() {
+        let nats = super::Nats {
+            addr: "nats:4222".to_string(),
+            user: "nats-user".to_string(),
+            password: "NATS-PASSWORD-VALUE".to_string(),
+            ..Default::default()
+        };
+        let printed = format!("{nats:?}");
+        assert!(!printed.contains("NATS-PASSWORD-VALUE"), "{printed}");
+        assert!(printed.contains("nats:4222"));
+    }
+
+    #[test]
     fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
         let gib = 1024 * 1024 * 1024;
-        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 128);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 983);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 64 * gib), 1024);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 2 * gib), 128);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 204);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 2457);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 80 * gib), 4096);
+        assert_eq!(metrics_blocks_cache_size_mb(0, 128 * gib), 4096);
         assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
         assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
@@ -6033,6 +6169,19 @@ mod tests {
     }
 
     #[test]
+    fn test_check_limit_config_firehose_decompressed_limit() {
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.req_payload_limit = 200;
+        cfg.limit.firehose_decompressed_limit = 0;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.firehose_decompressed_limit, 640 * 1024 * 1024);
+
+        cfg.limit.firehose_decompressed_limit = 300;
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.firehose_decompressed_limit, 300);
+    }
+
+    #[test]
     fn test_check_limit_config_ingest_time_conversion() {
         let mut cfg = Config::init().unwrap();
         cfg.limit.ingest_allowed_upto = 1;
@@ -6239,5 +6388,12 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn test_select_ext_auth_salt_prefers_env_then_stored_then_legacy() {
+        assert_eq!(select_ext_auth_salt("env", "stored"), "env");
+        assert_eq!(select_ext_auth_salt("", "stored"), "stored");
+        assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
     }
 }

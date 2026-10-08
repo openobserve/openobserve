@@ -1,6 +1,9 @@
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
+
+// The dropdown trigger intermittently drops the opening click, so it is re-tried.
+const HELP_MENU_OPEN_ATTEMPTS = 3;
 import { openNavFlyoutChild } from '../commonActions.js';
 
 class EnrichmentPage {
@@ -20,11 +23,9 @@ class EnrichmentPage {
         // ────────────────────────────────────────────────────────────────────
         // Add / Update enrichment table form locators (AddEnrichmentTable.vue)
         // ────────────────────────────────────────────────────────────────────
-        this.addPage = page.locator('[data-test="add-enrichment-table-page"]');
-        this.addTitle = page.locator('[data-test="add-enrichment-table-title"]');
-        this.addBackBtn = page.locator('[data-test="add-enrichment-table-back-btn"]');
-        this.addCancelBtn = page.locator('[data-test="add-enrichment-table-cancel-btn"]');
-        this.addSaveBtn = page.locator('[data-test="add-enrichment-table-save-btn"]');
+        this.addPage = page.locator('[data-test="add-enrichment-table-dialog"]');
+        this.addCancelBtn = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-secondary-btn"]');
+        this.addSaveBtn = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-primary-btn"]');
         this.nameField = page.locator('[data-test="add-enrichment-table-name-field"]');
         // OOptionGroup root + per-option data-test forwarded by OOptionGroup
         this.sourceGroup = page.locator('[data-test="add-enrichment-table-source"]');
@@ -246,7 +247,23 @@ class EnrichmentPage {
      */
     async clickHelpMenuItem() {
         await this.helpMenuItem.waitFor({ state: 'visible', timeout: 10000 });
-        await this.helpMenuItem.click();
+
+        // The trigger intermittently swallows the first click and stays closed, which
+        // then reads as the menu's items being missing rather than never rendered.
+        // `data-state` is the dropdown's own signal, so it separates the two.
+        for (let attempt = 1; attempt <= HELP_MENU_OPEN_ATTEMPTS; attempt++) {
+            await this.helpMenuItem.click();
+            try {
+                await expect(this.helpMenuItem)
+                    .toHaveAttribute('data-state', 'open', { timeout: 3000 });
+                return;
+            } catch (e) {
+                testLogger.warn(`clickHelpMenuItem: menu still closed after attempt ${attempt}`);
+            }
+        }
+        throw new Error(
+            `help menu did not open after ${HELP_MENU_OPEN_ATTEMPTS} attempts`
+        );
     }
 
     /**
@@ -1043,16 +1060,16 @@ abc, err = get_enrichment_table_record("${fileName}", {
             throw new Error(`Edit button for table "${tableName}" not visible — URL job may still be processing.`);
         }
         await editBtn.click();
-        // Edit form mounts immediately — wait for the add/update page wrapper
+        // Edit form mounts immediately — wait for the add/update dialog
         await this.addPage.waitFor({ state: 'visible', timeout: 10000 });
         testLogger.debug('Edit button clicked');
     }
 
     async verifyUpdateMode() {
         testLogger.debug('Verifying update mode form is visible');
-        // Wait for the update form: the add-enrichment-table-page mounts both
-        // for "Add" and "Update" — title differs but page data-test does not.
-        // Use the page locator + name field as ready signals.
+        // Wait for the update form: the add-enrichment-table-dialog mounts both
+        // for "Add" and "Update" — title differs but dialog data-test does not.
+        // Use the dialog locator + name field as ready signals.
         await this.addPage.waitFor({ state: 'visible', timeout: 30000 });
         // Verify the name field is present (always rendered in both modes)
         await this.nameField.waitFor({ state: 'visible', timeout: 10000 });
@@ -1226,7 +1243,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         const urlWrapper = this.page.locator('[data-test="add-enrichment-table-url"]');
         await urlWrapper.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Snapshot the entire add-enrichment-table-page subtree for diagnostics
+        // Snapshot the entire add-enrichment-table-dialog subtree for diagnostics
         // — the error may be rendered in a parent container if Vue's reactivity
         // routes through a slot/template.
         await expect.poll(async () => {

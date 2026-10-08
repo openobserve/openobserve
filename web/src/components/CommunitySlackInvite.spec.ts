@@ -29,10 +29,10 @@ vi.mock("@/aws-exports", () => ({
   default: mockConfig,
 }));
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import CommunitySlackInvite from "./CommunitySlackInvite.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
@@ -298,7 +298,7 @@ describe("CommunitySlackInvite", () => {
 
       wrapper = buildWrapper();
 
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "community_slack_prompt_shown",
         expect.objectContaining({ source: "standalone_day2" }),
       );
@@ -344,7 +344,7 @@ describe("CommunitySlackInvite", () => {
 
       await joinBtn.trigger("click");
 
-      expect(segment.track).toHaveBeenCalledWith(
+      expect(analytics.track).toHaveBeenCalledWith(
         "community_slack_prompt_joined",
         expect.objectContaining({ source: "standalone_day2" }),
       );

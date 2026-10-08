@@ -61,7 +61,8 @@
       "dashboard-config-trellis.spec.js",
       "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
-      "dashboard-config-markline.spec.js"
+      "dashboard-config-markline.spec.js",
+      "dashboard-config-unit-locale.spec.js"
     ],
     "disabled": []
   },
@@ -103,6 +104,7 @@
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
       "dashboards-form-validation.spec.js",
+      "dashboard-panel-unsaved-changes.spec.js",
       "dashboard-refresh-without-cache.spec.js",
       "dashboard-print-layout.spec.js",
       "dashboardPagination.spec.js"
@@ -221,7 +223,8 @@
       "js-transform-type.spec.js",
       "row-expansion.spec.js",
       "enrichment-table-url.spec.js",
-      "functions-form-validation.spec.js"
+      "functions-form-validation.spec.js",
+      "functions-import-export.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -237,6 +240,7 @@
       "landingPage.spec.js",
       "datetime-picker-copy-paste.spec.js",
       "dateTime.spec.js",
+      "dateTimeCustomRange.spec.js",
       "otableSelectCell.spec.js",
       "shared-components-form-validation.spec.js",
       "ai-toolsets-form-validation.spec.js",
@@ -315,7 +319,10 @@
       "ftsDefaultColumn.spec.js",
       "logsVisualizePersistence.spec.js",
       "streamNotFound.spec.js",
-      "logsRefreshCacheDropdown.spec.js"
+      "logsRefreshCacheDropdown.spec.js",
+      "logs-highlighting.spec.js",
+      "logs-search-around-multistream.spec.js",
+      "logs-default-columns.spec.js"
     ],
     "disabled": [
       {
@@ -375,7 +382,16 @@
       "metrics-table-column-order.spec.js",
       "metrics-promql-builder.spec.js",
       "metrics-share-deep-link.spec.js",
-      "metrics-explorer-share-visualize.spec.js"
+      "metrics-explorer-share-visualize.spec.js",
+      "metrics-explorer-stream-cache.spec.js",
+      "metrics-promql-time-shift.spec.js",
+      "metrics-explorer-detail-view.spec.js",
+      "metrics-query-history.spec.js",
+      "metrics-explorer-create-alert.spec.js",
+      "metrics-explorer-drilldown.spec.js",
+      "metrics-explorer-used-in.spec.js",
+      "metrics-promql-builder-roundtrip.spec.js",
+      "metrics-promql-formula.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -442,6 +458,19 @@
     "disabled": []
   },
   {
+    "testfolder": "RUM-Analytics",
+    "_comment": "RUM Product Analytics on the real query engine. The specs seed three weeks of back-dated _rumdata (retention, funnels, paths) under a per-run application_id, so this shard accepts 60 days of backdated ingestion; the workflow default of 5 hours would drop the history while still answering 200. Own instance, not merged into RUM. workers 1: both specs drive long analytics searches, which contend on a debug build.",
+    "actual_folder": "RUM-Analytics",
+    "browser": "chrome",
+    "ingest_allowed_upto": "1440",
+    "workers": 1,
+    "run_files": [
+      "rum-product-analytics.spec.js",
+      "rum-product-analytics-engine.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "RUM-Token",
     "_comment": "rum-token.spec.js RESETS the org RUM token; running it beside the dataflow specs (workers run files in parallel) would 401 their in-flight SDK beacons. Own shard = own isolated instance \u2014 do NOT merge back into RUM.",
     "actual_folder": "RUM",
@@ -484,8 +513,9 @@
       "traceQueryEditor.spec.js",
       "traceErrorFilter.spec.js",
       "traceDetails.spec.js",
+      "traceDetailsPaging.spec.js",
       "traceAdvancedFiltering.spec.js",
-      "tracesAnalyzeDimensions.spec.js",
+      "tracesTriageLoop.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",

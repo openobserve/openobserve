@@ -57,6 +57,11 @@ pub async fn get_nats_client() -> &'static Client {
         .unwrap_or_else(|e| panic!("{e}"))
 }
 
+/// Like [`get_nats_client`], but reports a failed connect instead of panicking.
+pub async fn try_get_nats_client() -> Result<&'static Client> {
+    NATS_CLIENT.get_or_try_init(connect).await
+}
+
 async fn get_bucket_by_key<'a>(
     prefix: &'a str,
     key: &'a str,

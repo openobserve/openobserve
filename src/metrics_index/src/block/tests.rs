@@ -16,10 +16,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use arrow::{
-    array::{
-        ArrayRef, Float64Array, Int64Array, RecordBatch, StringArray, StringViewArray, UInt32Array,
-        UInt64Array,
-    },
+    array::{Float64Array, Int64Array, RecordBatch, StringArray, StringViewArray, UInt64Array},
     datatypes::{DataType, Field, Schema},
 };
 use bytes::Bytes;
@@ -254,6 +251,47 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
 }
 
 #[test]
+fn null_value_is_written_as_the_stale_marker() {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("__hash__", DataType::UInt64, false),
+        Field::new("_timestamp", DataType::Int64, false),
+        Field::new("value", DataType::Float64, true),
+        Field::new("label_a", DataType::Utf8, true),
+    ]));
+    let input = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(UInt64Array::from(vec![1, 1, 2])),
+            Arc::new(Int64Array::from(vec![10, 20, 10])),
+            Arc::new(Float64Array::from(vec![Some(1.0), None, None])),
+            Arc::new(StringArray::from(vec![Some("a"), Some("a"), Some("b")])),
+        ],
+    )
+    .unwrap();
+    let parent = ParentMetadata {
+        rows: 3,
+        compressed_size: 123,
+    };
+    let mut writer = BlockWriter::new(
+        Vec::new(),
+        schema,
+        vec!["label_a".into()],
+        parent.clone(),
+        MAX_BLOCK_ROWS,
+    )
+    .unwrap();
+    writer.write(&input).unwrap();
+    let blob = writer.finish().unwrap();
+
+    let index = decode_file(&blob, &parent, &["label_a".into()]).unwrap();
+    let stale = config::meta::promql::STALE_NAN_BITS;
+    assert_eq!(
+        decoded_rows(&blob, &index),
+        vec![(1, 10, 1f64.to_bits()), (1, 20, stale), (2, 10, stale)]
+    );
+}
+
+#[test]
 fn numeric_parent_and_projection_are_validated() {
     let blob = fixture();
     let mut wrong = parent();
@@ -269,23 +307,61 @@ fn numeric_parent_and_projection_are_validated() {
     assert!(decode_file(&blob, &parent(), &["value".into()]).is_err());
 }
 
-fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
-    let (mut data, header_start) = header_data(blob);
-    let trailer = trailer_of(blob);
-    let mut offset = trailer.directory_start(blob.len() as u64) as usize;
-    let mut result = blob[..offset].to_vec();
-    for (i, section) in data.directory.iter_mut().enumerate() {
-        let frame = &blob[offset..offset + section.compressed as usize];
-        offset += section.compressed as usize;
-        if i == column {
-            let (replaced, frame) = super::compact::encode_frame(value.as_ref()).unwrap();
-            *section = replaced;
-            result.extend_from_slice(&frame);
-        } else {
-            result.extend_from_slice(frame);
-        }
+fn varints(values: &[u64]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for value in values {
+        super::compact::put_varint(&mut out, *value);
     }
-    assert_eq!(offset, header_start);
+    out
+}
+
+/// Raw varint bytes of each directory column.
+fn directory_columns(blob: &[u8]) -> Vec<Vec<u8>> {
+    let (data, _) = header_data(blob);
+    let mut offset = trailer_of(blob).directory_start(blob.len() as u64) as usize;
+    let mut decoder = super::compact::frame_decoder().unwrap();
+    data.directory
+        .iter()
+        .map(|section| {
+            let frame = &blob[offset..offset + section.compressed as usize];
+            offset += section.compressed as usize;
+            super::compact::decode_frame(&mut decoder, frame, section.raw as usize).unwrap()
+        })
+        .collect()
+}
+
+fn directory_values(blob: &[u8], column: usize) -> Vec<u64> {
+    let raw = &directory_columns(blob)[column];
+    let mut pos = 0;
+    let mut values = Vec::new();
+    while pos < raw.len() {
+        values.push(super::compact::get_varint(raw, &mut pos).unwrap());
+    }
+    values
+}
+
+/// Rewrites directory column `column` as `raw`, inserting `padding` zero bytes after block 0.
+fn rebuild(blob: &[u8], column: usize, raw: &[u8], padding: usize) -> Vec<u8> {
+    let (mut data, _) = header_data(blob);
+    let trailer = trailer_of(blob);
+    let first_block_end = index(blob, &[]).unwrap().blocks.block(0).block_range().end as usize;
+    let directory_start = trailer.directory_start(blob.len() as u64) as usize;
+    let mut result = blob[..first_block_end].to_vec();
+    result.extend(std::iter::repeat_n(0, padding));
+    result.extend_from_slice(&blob[first_block_end..directory_start]);
+    for (i, (section, mut bytes)) in data
+        .directory
+        .iter_mut()
+        .zip(directory_columns(blob))
+        .enumerate()
+    {
+        if i == column {
+            bytes = raw.to_vec();
+        }
+        let (replaced, frame) = super::compact::encode_frame(&bytes).unwrap();
+        *section = replaced;
+        result.extend_from_slice(&frame);
+    }
     let directory_len = data
         .directory
         .iter()
@@ -295,39 +371,38 @@ fn replace_column(blob: &[u8], column: usize, value: ArrayRef) -> Vec<u8> {
     result
 }
 
+fn replace_column(blob: &[u8], column: usize, values: &[u64]) -> Vec<u8> {
+    rebuild(blob, column, &varints(values), 0)
+}
+
 #[test]
 fn completed_header_does_not_hide_invalid_directory() {
     let blob = fixture();
-    let corrupt = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![0, 2, 2, 1])));
-    assert!(index(&corrupt, &[]).is_err());
-    let corrupt = replace_column(
-        &blob,
-        1,
-        Arc::new(UInt64Array::from(vec![u64::MAX, 2, 4, 6])),
-    );
-    assert!(index(&corrupt, &[]).is_err());
-    let corrupt = replace_column(
-        &blob,
-        6,
-        Arc::new(UInt32Array::from(vec![u32::MAX, 1, 1, 1])),
-    );
-    assert!(index(&corrupt, &[]).is_err());
-    let bad_rows = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
-    assert!(index(&bad_rows, &[]).is_err());
-    let parsed = index(&blob, &[]).unwrap();
-    let mut offsets: Vec<_> = parsed
-        .blocks
-        .iter()
-        .map(|block| block.block_offset)
-        .collect();
-    offsets[1] += 1;
-    assert!(
-        index(
-            &replace_column(&blob, 5, Arc::new(UInt64Array::from(offsets))),
-            &[]
-        )
-        .is_err()
-    );
+    assert_eq!(directory_values(&blob, 1), [2, 2, 2, 1]);
+    assert!(index(&replace_column(&blob, 1, &[2, 2, 2, 1]), &[]).is_ok());
+    for (column, values) in [
+        (1, vec![0, 2, 2, 1]),
+        (1, vec![2, 2, 2, 2]),
+        (1, vec![2, 2, 2]),
+        (1, vec![2, 2, 2, 1, 1]),
+        (1, vec![u64::from(u32::MAX) + 2, 2, 2, 1]),
+        (0, vec![1, 0, u64::MAX - 1, u64::MAX]),
+        (3, vec![0, 0, 0, 1]),
+        (3, vec![u64::MAX, 0, 0, 0]),
+    ] {
+        assert!(
+            index(&replace_column(&blob, column, &values), &[]).is_err(),
+            "{column} {values:?}"
+        );
+    }
+    let mut lengths = directory_values(&blob, 4);
+    lengths[1] += 1;
+    assert!(index(&replace_column(&blob, 4, &lengths), &[]).is_err());
+    lengths[1] = u64::MAX;
+    assert!(index(&replace_column(&blob, 4, &lengths), &[]).is_err());
+    let mut unused = directory_columns(&blob)[2].clone();
+    unused.push(0x80);
+    assert!(index(&rebuild(&blob, 2, &unused, 0), &[]).is_err());
 }
 
 #[test]
@@ -417,41 +492,27 @@ fn projected_labels_do_not_retain_unrequested_large_buffers() {
 }
 
 #[test]
-fn excessive_compressed_length_is_rejected() {
+fn excessive_block_length_is_rejected() {
     let blob = fixture();
     let index = index(&blob, &[]).unwrap();
     let mut block = index.blocks.block(0).clone();
     let range = block.block_range();
-    block.block_length =
-        u32::try_from(max_compressed_block_len(block.row_count).unwrap() + 1).unwrap();
+    block.block_length = u32::try_from(max_block_len(block.row_count).unwrap() + 1).unwrap();
     let error = decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap_err();
     assert!(
         error
             .to_string()
-            .contains("compressed block length exceeds")
+            .contains("block length exceeds format bound")
     );
-    let mut lengths: Vec<_> = index.blocks.iter().map(|b| b.block_length).collect();
-    let delta = block.block_length - lengths[0];
-    lengths[0] = block.block_length;
-    let changed = replace_column(&blob, 6, Arc::new(UInt32Array::from(lengths)));
-    let offsets: Vec<_> = index
-        .blocks
-        .iter()
-        .enumerate()
-        .map(|(i, b)| b.block_offset + if i == 0 { 0 } else { u64::from(delta) })
-        .collect();
-    let changed = replace_column(&changed, 5, Arc::new(UInt64Array::from(offsets)));
-    let (data, header_start) = header_data(&changed);
-    let trailer = trailer_of(&changed);
-    let mut padded = changed[..range.end as usize].to_vec();
-    padded.extend(std::iter::repeat_n(0, delta as usize));
-    padded.extend_from_slice(&changed[range.end as usize..header_start]);
-    append_header(&mut padded, &data, trailer.label_len, trailer.directory_len);
+    let mut lengths = directory_values(&blob, 4);
+    let delta = u64::from(block.block_length) - lengths[0];
+    lengths[0] = u64::from(block.block_length);
+    let padded = rebuild(&blob, 4, &varints(&lengths), delta as usize);
     let error = super::tests::index(&padded, &[]).unwrap_err();
     assert!(
         error
             .to_string()
-            .contains("compressed block length exceeds")
+            .contains("block length exceeds format bound")
     );
 }
 
@@ -566,6 +627,55 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
 }
 
 #[test]
+fn writer_roundtrips_every_block_size_and_splits_long_series() {
+    let mut rows: Vec<Row> = Vec::new();
+    for (series, count) in [1usize, 2, 3, 64, 65, 8192, 8193, 20_000]
+        .into_iter()
+        .enumerate()
+    {
+        for i in 0..count {
+            let value = match series % 4 {
+                0 => (i as f64).to_bits(),
+                1 => ((i % 7) as f64 / 10.0).to_bits(),
+                2 => (i as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15),
+                _ if i % 11 == 0 => 0x7ff0_0000_0000_0002,
+                _ => 1.5f64.to_bits(),
+            };
+            rows.push((
+                series as u64,
+                1_000 + i as i64 * 15_000,
+                value,
+                None,
+                Some(""),
+            ));
+        }
+    }
+    let parent = ParentMetadata {
+        rows: rows.len() as u64,
+        compressed_size: 123,
+    };
+    let mut writer = BlockWriter::new(
+        Vec::new(),
+        schema(),
+        vec!["label_a".into(), "label_b".into()],
+        parent.clone(),
+        MAX_BLOCK_ROWS,
+    )
+    .unwrap();
+    writer.write(&batch(&rows)).unwrap();
+    let blob = writer.finish().unwrap();
+    let index = decode_file(&blob, &parent, &[]).unwrap();
+    assert_eq!(
+        index.blocks.row_counts().collect::<Vec<_>>(),
+        [1, 2, 3, 64, 65, 8192, 8192, 1, 8192, 8192, 3616]
+    );
+    assert_eq!(
+        decoded_rows(&blob, &index),
+        rows.iter().map(|r| (r.0, r.1, r.2)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn header_rejects_truncation_corruption_and_excessive_claims() {
     let blob = fixture();
     for n in 0..blob.len() {
@@ -587,15 +697,23 @@ fn header_rejects_truncation_corruption_and_excessive_claims() {
                 (h["labels"][0]["compressed"].as_u64().unwrap() - 1).into()
         },
         &|h| h["directory"][0]["raw"] = u64::MAX.into(),
-        &|h| h["directory"][6]["compressed"] = 0.into(),
+        &|h| h["directory"][4]["compressed"] = 0.into(),
         &|h| h["labels"][0]["compressed"] = u64::MAX.into(),
         &|h| h["labels"][1]["raw"] = 4.into(),
         &|h| h["labels"][1]["name"] = "label_a".into(),
-        &|h| h["directory"].as_array_mut().unwrap().truncate(6),
+        &|h| h["directory"].as_array_mut().unwrap().truncate(4),
         &|h| {
-            let extra = h["directory"][6].clone();
+            let extra = h["directory"][4].clone();
             h["directory"].as_array_mut().unwrap().push(extra);
         },
+        &|h| {
+            let extra = h["directory"][4].clone();
+            let directory = h["directory"].as_array_mut().unwrap();
+            directory.push(extra.clone());
+            directory.push(extra);
+        },
+        &|h| h["directory"][1]["raw"] = 3.into(),
+        &|h| h["directory"][1]["raw"] = 41.into(),
         &|h| h["row_group_size"] = 0.into(),
     ] {
         let mut h = json.clone();
@@ -608,6 +726,46 @@ fn header_rejects_truncation_corruption_and_excessive_claims() {
     let mut unparsable = blob.clone();
     unparsable[header_start] = b'[';
     assert!(decode_file(&unparsable, &parent(), &[]).is_err());
+}
+
+#[test]
+fn header_rejects_legacy_directory_and_column_sizes_outside_varint_bounds() {
+    let blob = fixture();
+    let (header, header_start) = header_data(&blob);
+    let trailer = trailer_of(&blob);
+    let json = serde_json::to_value(&header).unwrap();
+    let blocks = json["blocks"].as_u64().unwrap();
+    for (edit, message) in [
+        (
+            &(|h: &mut serde_json::Value| {
+                let extra = h["directory"][4].clone();
+                let directory = h["directory"].as_array_mut().unwrap();
+                directory.push(extra.clone());
+                directory.push(extra);
+            }) as &dyn Fn(&mut serde_json::Value),
+            "invalid directory column count",
+        ),
+        (
+            &|h| h["directory"][2]["raw"] = (blocks - 1).into(),
+            "directory column size",
+        ),
+        (
+            &|h| h["directory"][2]["raw"] = (blocks * 10 + 1).into(),
+            "directory column size",
+        ),
+        (
+            &|h| h["labels"][0]["raw"] = (blocks + 3).into(),
+            "MIDX label shorter than its rows",
+        ),
+    ] {
+        let mut h = json.clone();
+        edit(&mut h);
+        let data: super::header::HeaderData = serde_json::from_value(h).unwrap();
+        let mut bad = blob[..header_start].to_vec();
+        append_header(&mut bad, &data, trailer.label_len, trailer.directory_len);
+        let error = Header::parse(&bad, bad.len() as u64, &parent()).unwrap_err();
+        assert!(error.to_string().contains(message), "{error}");
+    }
 }
 
 #[test]
@@ -950,7 +1108,7 @@ fn vortex_finalizer_rejects_invalid_source_metadata() {
 }
 
 #[test]
-fn sample_block_requires_one_complete_frame() {
+fn sample_block_rejects_trailing_and_truncated_bytes() {
     let blob = fixture();
     let parsed = index(&blob, &[]).unwrap();
     let mut block = parsed.blocks.block(0);

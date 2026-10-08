@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import destination from "@/services/alert_destination";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -479,5 +482,89 @@ describe("alert_destination service", () => {
         destination.test({ org_identifier: "org123", data: { type: "webhook" } }),
       ).rejects.toThrow("Connection refused");
     });
+  });
+
+  describe("product analytics", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      [
+        "create",
+        "post",
+        () => destination.create({ org_identifier: "org1", data: {} }),
+        ["alert_destination_created", { module: "alert" }],
+      ],
+      [
+        "create pipeline",
+        "post",
+        () => destination.create({ org_identifier: "org1", data: {}, module: "pipeline" }),
+        ["alert_destination_created", { module: "pipeline" }],
+      ],
+      [
+        "update",
+        "put",
+        () => destination.update({ org_identifier: "org1", destination_name: "d", data: {} }),
+        ["alert_destination_updated", { module: "alert" }],
+      ],
+      [
+        "delete",
+        "delete",
+        () => destination.delete({ org_identifier: "org1", destination_name: "d" }),
+        ["alert_destination_deleted", { count: 1 }],
+      ],
+      [
+        "bulkDelete",
+        "delete",
+        () => destination.bulkDelete("org1", { ids: ["a", "b"] }),
+        ["alert_destination_deleted", { count: 2 }],
+      ],
+      [
+        "test",
+        "post",
+        () => destination.test({ org_identifier: "org1", data: {} }),
+        ["alert_destination_test_completed", { success: true }],
+      ],
+      [
+        "exchangeSlackOAuth",
+        "post",
+        () => destination.exchangeSlackOAuth({ org_identifier: "org1", code: "c", state: "s" }),
+        ["alert_destination_slack_connected"],
+      ],
+      [
+        "testSend",
+        "post",
+        () => destination.testSend({ org_identifier: "org1", destination_name: "d", data: {} }),
+        ["alert_template_test_sent"],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["bulkDelete", "delete", () => destination.bulkDelete("org1", { ids: ["a"] })],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track when nothing was affected",
+      async (_label, verb, call) => {
+        mockHttpInstance[verb].mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
   });
 });

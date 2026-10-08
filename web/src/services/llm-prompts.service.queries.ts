@@ -9,9 +9,10 @@ import prompts, {
 } from "./llm-prompts.service";
 import { llmPromptKeys } from "./llm-prompts.service.querykeys";
 
-export const llmPromptsQuery = (org: string) => ({
-  queryKey: llmPromptKeys.list(org),
-  queryFn: () => prompts.list(org, { includeArchived: true }),
+// Omit `folderId` to list every folder, which needs the org-wide Prompt Folders grant.
+export const llmPromptsQuery = (org: string, folderId?: string) => ({
+  queryKey: llmPromptKeys.list(org, folderId),
+  queryFn: () => prompts.list(org, { includeArchived: true, folderId }),
   staleTime: MEDIUM_STALE_TIME,
 });
 

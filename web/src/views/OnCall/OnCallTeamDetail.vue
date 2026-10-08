@@ -254,7 +254,7 @@
         <!-- What the schedule WILL do, then the rotations that decide it, then
              the editor. Reading before editing: the timeline is resolved by the
              engine, so it answers "is this right" in a way the draft cannot. -->
-        <OTabPanel name="schedule">
+        <OTabPanel name="schedule" layout="flex-col" stretch>
           <!-- Only what the chart cannot be acted on for. Who is on, until
                when and who is next are on the lane the reader is already
                looking at; restating them here gave the reader two renderings
@@ -266,12 +266,15 @@
             @add-people="activeTab = 'members'"
           />
 
-          <OContent y class="flex flex-col gap-5">
+          <OContent y class="flex h-full min-h-0 flex-1 flex-col gap-5">
             <!-- Every act on a rotation arrives here, and every one of them opens
                  the SAME drawer: a rotation is one form, and which button was
                  pressed only decides what it opens on. The chart draws every
                  rotation the team has: the picker that used to scope it to one
-                 hid lanes on exactly the teams whose lanes are worth comparing. -->
+                 hid lanes on exactly the teams whose lanes are worth comparing.
+                 flex-1 so it takes the tab's own floor, which is what lets the
+                 Covers panel below sit pinned at the bottom rather than right
+                 under the calendar. -->
             <OnCallScheduleTimeline
               v-model:window="scheduleWindow"
               :rotations="teamRotations"
@@ -280,6 +283,7 @@
               :viewer-timezone="store.state.timezone"
               :loading="segmentsLoading"
               :can-cover="hasMembers !== false && canConfigure"
+              class="min-h-0 flex-1"
               @fill-gap="onFillGap"
               @add="openScheduleEditor({ mode: 'new' })"
               @edit="openScheduleEditor({ mode: 'edit', id: $event })"
@@ -445,6 +449,7 @@ import { destinationKeys } from "@/services/alert_destination.querykeys";
 import { oncallKeys } from "@/services/oncall.querykeys";
 import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import { userKeys } from "@/services/users.querykeys";
+import analytics from "@/services/product_analytics";
 import {
   createOverrideMutation,
   deleteOverrideMutation,
@@ -1156,6 +1161,7 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
     firstId = created.data?.id ?? null;
 
     await coverWrite.mutateAsync(value.second);
+    analytics.track("oncall_override_created", { kind: "swap" });
 
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
@@ -1217,6 +1223,7 @@ async function saveCover(value: {
   coverSaving.value = true;
   try {
     await coverWrite.mutateAsync(value);
+    analytics.track("oncall_override_created", { kind: "cover" });
     coverOpen.value = false;
     coverGap.value = null;
     // The message is "{name} covers {team} · {range}" and it was called with no

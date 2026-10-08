@@ -165,7 +165,7 @@ import type {
 } from "@/utils/awsIntegrations";
 import { generateCloudFormationURL } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import dashboardsService from "@/services/dashboards";
 import { createDashboardMutation } from "@/services/dashboards.queries";
 import { folderKeys } from "@/services/common.querykeys";
@@ -269,7 +269,7 @@ export default defineComponent({
       showComponentContent.value = true;
 
       // Track analytics
-      segment.track("AWS Component Config Opened", {
+      analytics.track("AWS Component Config Opened", {
         service: props.integration.name,
         platform: option.name,
         integration_id: props.integration.id,
@@ -343,7 +343,7 @@ export default defineComponent({
         window.open(cloudFormationURL, "_blank", "noopener,noreferrer");
 
         // Track analytics
-        segment.track("AWS Integration Started", {
+        analytics.track("AWS Integration Started", {
           service: props.integration.name,
           category: props.integration.category,
           integration_id: props.integration.id,
@@ -419,6 +419,7 @@ export default defineComponent({
       }
 
       await createDashboard.mutateAsync({ json: dashboardJson, folderId });
+      analytics.track("dashboard_created");
     };
 
     const handleAddDashboard = async () => {
@@ -501,7 +502,7 @@ export default defineComponent({
             });
 
             // Track analytics
-            segment.track("AWS Dashboard Replaced", {
+            analytics.track("AWS Dashboard Replaced", {
               service: props.integration.name,
               integration_id: props.integration.id,
             });
@@ -542,7 +543,7 @@ export default defineComponent({
         });
 
         // Track analytics
-        segment.track("AWS Dashboard Imported", {
+        analytics.track("AWS Dashboard Imported", {
           service: props.integration.name,
           integration_id: props.integration.id,
         });
@@ -564,7 +565,7 @@ export default defineComponent({
       }
 
       // Track analytics
-      segment.track("AWS Documentation Opened", {
+      analytics.track("AWS Documentation Opened", {
         service: props.integration.name,
         integration_id: props.integration.id,
         documentation_url: props.integration.documentationUrl,

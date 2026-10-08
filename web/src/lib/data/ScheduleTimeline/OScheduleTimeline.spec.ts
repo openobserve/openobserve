@@ -78,6 +78,17 @@ describe("OScheduleTimeline", () => {
     expect(w.text()).toContain("Base rotation");
   });
 
+  // An unlabelled gutter is dead width a phone needs for the plot; a labelled one must stay at every width.
+  it("drops the gutter on phones only when no track is labelled", () => {
+    const gutterOf = (tracks: ScheduleTrack[]) =>
+      mount(OScheduleTimeline, { props: { tracks } })
+        .find("[data-test='o2-schedule-track-t1'] > div")
+        .classes();
+
+    expect(gutterOf([track({ label: raw("") })])).toContain("max-md:hidden");
+    expect(gutterOf([track()])).not.toContain("max-md:hidden");
+  });
+
   it("renders axis ticks only when supplied", () => {
     const without = mount(OScheduleTimeline, { props: { tracks: [track()] } });
     expect(without.text()).not.toContain("Mon");

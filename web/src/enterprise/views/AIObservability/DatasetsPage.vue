@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :forbidden="forbidden"
         @row-click="openDetail"
-        :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"

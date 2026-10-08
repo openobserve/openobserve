@@ -144,9 +144,10 @@ pub struct SavedStreamSettings {
 
 /// Validate, normalize, and persist stream settings stored in schema metadata.
 ///
-/// This is the canonical settings write path for both the stream service and schema
-/// auto-evolution. Callers should only publish the returned settings to local caches after this
-/// function succeeds.
+/// This is the canonical settings write path outside schema auto-evolution, which persists through
+/// `save_stream_settings_with_schema` and publishes to the caches itself. On success it also
+/// refreshes this node's latest-schema and settings caches, so callers need not publish the
+/// returned settings themselves.
 pub async fn save_stream_settings(
     org_id: &str,
     stream_name: &str,
@@ -157,7 +158,48 @@ pub async fn save_stream_settings(
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .map_err(|_| StreamSettingsError::NotFound("stream not found".to_string()))?;
-    persist_stream_settings(org_id, stream_name, stream_type, &schema, settings).await
+    let saved =
+        persist_stream_settings(org_id, stream_name, stream_type, &schema, settings).await?;
+    refresh_local_stream_cache(org_id, stream_name, stream_type).await;
+    Ok(saved)
+}
+
+/// Reload this node's latest-schema and settings caches for a stream from the DB after a settings
+/// write. The schema versions cache (`STREAM_SCHEMAS`) is left to the watcher.
+///
+/// The schema watcher refreshes these caches too, but asynchronously, so without this a read on
+/// this node right after the write can still be served the previous settings, and a following
+/// settings update would start from them. Reading back from the DB, rather than caching the
+/// settings just written, picks up whatever a concurrent writer committed before the read. As with
+/// the unconditional cache insert in `handle_diff_schema`, the read and the insert are not atomic:
+/// a write or delete that commits in between, and that the watcher has already applied, can be
+/// overwritten here until the stream's next write. Other nodes catch up only through the watcher.
+async fn refresh_local_stream_cache(org_id: &str, stream_name: &str, stream_type: StreamType) {
+    let schema = match infra::schema::get_from_db(org_id, stream_name, stream_type).await {
+        Ok(schema) => schema,
+        Err(e) => {
+            log::warn!(
+                "refresh stream cache after settings write [{org_id}/{stream_type}/{stream_name}]: {e}"
+            );
+            return;
+        }
+    };
+    if schema.fields().is_empty() && schema.metadata().is_empty() {
+        return;
+    }
+    let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+    let settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if (settings.store_original_data || settings.index_original_data)
+        && let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone())
+    {
+        entry.insert(SnowflakeIdGenerator::new(
+            LOCAL_NODE_ID.load(Ordering::Relaxed),
+        ));
+    }
+    let mut w = STREAM_SCHEMAS_LATEST.write().await;
+    w.insert(cache_key.clone(), SchemaCache::new(schema));
+    drop(w);
+    infra::schema::put_stream_settings(cache_key, Arc::new(settings)).await;
 }
 
 async fn save_stream_settings_with_schema(
@@ -1327,6 +1369,62 @@ mod tests {
         let adopted = map.get(stream_name).unwrap().schema();
         assert_eq!(adopted.fields().len(), 2);
         assert!(adopted.field_with_name("city").is_ok());
+    }
+
+    /// A settings save must be visible to this node's next read, without waiting for the watcher.
+    /// The watcher is not running in unit tests, so only the synchronous refresh can update the
+    /// caches here.
+    #[tokio::test]
+    async fn test_save_stream_settings_refreshes_local_cache() {
+        let org_id = "cache_refresh_org";
+        let stream_name = "settings_read_after_write";
+        let stream_type = StreamType::Logs;
+        let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        infra::db::create_table().await.unwrap();
+        let old_settings = StreamSettings {
+            enable_distinct_fields: false,
+            ..Default::default()
+        };
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "settings".to_string(),
+            json::to_string(&old_settings).unwrap(),
+        );
+        infra::schema::update_setting(org_id, stream_name, stream_type, metadata)
+            .await
+            .unwrap();
+
+        // Prime both caches with the old settings, as an earlier read would.
+        infra::schema::get_cache(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        let before = infra::schema::get_settings(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        assert!(!before.enable_distinct_fields);
+
+        let settings = StreamSettings {
+            enable_distinct_fields: true,
+            ..Default::default()
+        };
+        save_stream_settings(org_id, stream_name, stream_type, settings)
+            .await
+            .unwrap();
+
+        let schema = infra::schema::get(org_id, stream_name, stream_type)
+            .await
+            .unwrap();
+        assert!(
+            unwrap_stream_settings(&schema)
+                .unwrap()
+                .enable_distinct_fields
+        );
+        assert!(
+            infra::schema::get_stream_settings_atomic(&cache_key)
+                .unwrap()
+                .enable_distinct_fields
+        );
     }
 
     #[tokio::test]

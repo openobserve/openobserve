@@ -16,6 +16,7 @@
 import { generateTraceContext } from "@/utils/zincutils";
 import { patchLargeNumbersInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   OrgTraceTimeRangeResponse,
   TraceTimeRangeOptions,
@@ -372,6 +373,8 @@ const search = {
     start_time,
     end_time,
     hint_ts,
+    after_start_time,
+    after_span_id,
   }: {
     org_identifier: string;
     stream_name: string;
@@ -379,11 +382,15 @@ const search = {
     start_time?: number;
     end_time?: number;
     hint_ts?: number;
+    after_start_time?: string;
+    after_span_id?: string;
   }) => {
     const params = new URLSearchParams();
     if (start_time != null) params.set("start_time", String(start_time));
     if (end_time != null) params.set("end_time", String(end_time));
     if (hint_ts != null) params.set("hint_ts", String(hint_ts));
+    if (after_start_time != null) params.set("after_start_time", after_start_time);
+    if (after_span_id != null) params.set("after_span_id", after_span_id);
     const query = params.toString();
     const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
     return http().get(url);
@@ -506,7 +513,12 @@ const search = {
     const use_cache: boolean =
       (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     const url = `/api/${org_identifier}/search_jobs?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
-    return http({ headers: { traceparent } }).post(url, query);
+    return http({ headers: { traceparent } })
+      .post(url, query)
+      .then((res) => {
+        analytics.track("search_job_created", { stream_type: page_type });
+        return res;
+      });
   },
   cancel_scheduled_search: ({
     org_identifier,

@@ -18,7 +18,8 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream, synthetics,
+    gen_ai, keys, kv, rum_analytics, service_accounts, service_streams, short_url, status, stream,
+    synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -96,6 +97,7 @@ use crate::{
         openobserve_api_search::promql::labels_get,
         openobserve_api_search::promql::label_values,
         openobserve_api_search::promql::format_query_get,
+        openobserve_api_search::promql::parse_tree,
         enrichment_table::save_enrichment_table,
         enrichment_table::save_enrichment_table_from_url,
         rum::ingest::log,
@@ -113,6 +115,10 @@ use crate::{
         openobserve_api_search::search::saved_view::get_view,
         openobserve_api_search::search::saved_view::get_views,
         openobserve_api_search::search::saved_view::update_view,
+        openobserve_api_management::request::query_history::record,
+        openobserve_api_management::request::query_history::list,
+        openobserve_api_management::request::query_history::star,
+        openobserve_api_management::request::query_history::delete,
         openobserve_api_management::request::folders::delete_folder,
         openobserve_api_management::request::folders::create_folder,
         openobserve_api_management::request::folders::list_folders,
@@ -275,6 +281,7 @@ use crate::{
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
+        openobserve_api_management::request::metrics_usage::get_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -318,6 +325,17 @@ use crate::{
         synthetics::job_resolve,
         synthetics::job_lease,
         synthetics::job_ack,
+        rum_analytics::list_named_events,
+        rum_analytics::create_named_event,
+        rum_analytics::get_named_event,
+        rum_analytics::update_named_event,
+        rum_analytics::delete_named_event,
+        rum_analytics::named_event_funnels,
+        rum_analytics::list_funnels,
+        rum_analytics::create_funnel,
+        rum_analytics::get_funnel,
+        rum_analytics::update_funnel,
+        rum_analytics::delete_funnel,
     ),
     components(
         schemas(
@@ -458,6 +476,9 @@ use crate::{
             meta::saved_view::DeleteViewResponse,
             meta::saved_view::CreateViewResponse,
             meta::saved_view::UpdateViewRequest,
+            openobserve_api_management::request::query_history::QueryHistoryRequest,
+            openobserve_api_management::request::query_history::QueryHistoryStarRequest,
+            openobserve_api_management::request::query_history::QueryHistoryEntry,
             meta::user::UpdateUser,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
@@ -520,6 +541,22 @@ use crate::{
             config::meta::synthetics::SyntheticVariable,
             config::meta::synthetics::SyntheticListItem,
             config::meta::synthetics::SyntheticListResponse,
+            // RUM Product Analytics
+            openobserve_core::rum_pa::NamedEvent,
+            openobserve_core::rum_pa::Rule,
+            openobserve_core::rum_pa::ViewOp,
+            openobserve_core::rum_pa::SavedFunnel,
+            openobserve_core::rum_pa::FunnelDef,
+            openobserve_core::rum_pa::FunnelRef,
+            openobserve_core::rum_pa::CreateNamedEvent,
+            openobserve_core::rum_pa::UpdateNamedEvent,
+            openobserve_core::rum_pa::CreateFunnel,
+            openobserve_core::rum_pa::UpdateFunnel,
+            openobserve_core::rum_pa::NamedEventList,
+            openobserve_core::rum_pa::SavedFunnelList,
+            openobserve_core::rum_pa::FunnelRefList,
+            openobserve_core::rum_pa::Current,
+            openobserve_core::rum_pa::RumPaErrorBody,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -530,6 +567,7 @@ use crate::{
         (name = "Dashboards", description = "Dashboard operations"),
         (name = "Search", description = "Search/Query operations"),
         (name = "Saved Views", description = "Collection of saved search views for easy retrieval"),
+        (name = "Query History", description = "The caller's own query history"),
         (name = "Alerts", description = "Alerts retrieval & management operations"),
         (name = "Incidents", description = "Alert incident correlation & management operations"),
         (name = "AI", description = "AI agent chat analysis and SRE agent operations (enterprise)"),
@@ -538,6 +576,7 @@ use crate::{
         (name = "Streams", description = "Stream retrieval & management operations"),
         (name = "Users", description = "Users retrieval & management operations"),
         (name = "KV", description = "Key Value retrieval & management operations"),
+        (name = "Product Analytics", description = "RUM Product Analytics named events and saved funnels"),
         (name = "Metrics", description = "Metrics data ingestion operations"),
         (name = "Traces", description = "Traces data ingestion operations"),
         (name = "Profiles", description = "Profiles query and discovery operations"),
@@ -848,6 +887,25 @@ mod tests {
     }
 
     #[test]
+    fn query_history_paths_are_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap();
+        for (path, method) in [
+            ("/api/{org_id}/query_history", "post"),
+            ("/api/{org_id}/query_history", "get"),
+            ("/api/{org_id}/query_history/{id}", "patch"),
+            ("/api/{org_id}/query_history/{id}", "delete"),
+        ] {
+            let op = paths
+                .get(path)
+                .and_then(|p| p.get(method))
+                .unwrap_or_else(|| panic!("{method} {path} is not documented"));
+            assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
+            assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
         let prompt_paths = api
@@ -860,5 +918,68 @@ mod tests {
             prompt_paths.is_empty(),
             "OSS Prompt paths: {prompt_paths:?}"
         );
+    }
+
+    #[test]
+    fn rum_analytics_paths_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec["paths"].as_object().unwrap();
+        for (path, methods) in [
+            (
+                "/api/{org_id}/rum/analytics/named_events",
+                &["get", "post"][..],
+            ),
+            (
+                "/api/{org_id}/rum/analytics/named_events/{id}",
+                &["get", "put", "delete"][..],
+            ),
+            (
+                "/api/{org_id}/rum/analytics/named_events/{id}/funnels",
+                &["get"][..],
+            ),
+            ("/api/{org_id}/rum/analytics/funnels", &["get", "post"][..]),
+            (
+                "/api/{org_id}/rum/analytics/funnels/{id}",
+                &["get", "put", "delete"][..],
+            ),
+        ] {
+            for method in methods {
+                let op = &paths[path][*method];
+                assert!(op.is_object(), "{method} {path} missing");
+                assert_eq!(
+                    op["tags"],
+                    serde_json::json!(["Product Analytics"]),
+                    "{method} {path}"
+                );
+                for status in ["400", "500"] {
+                    assert!(
+                        op["responses"].get(status).is_some(),
+                        "{method} {path} {status}"
+                    );
+                }
+            }
+        }
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in [
+            "NamedEvent",
+            "Rule",
+            "SavedFunnel",
+            "FunnelDef",
+            "CreateNamedEvent",
+            "UpdateNamedEvent",
+            "CreateFunnel",
+            "UpdateFunnel",
+            "RumPaErrorBody",
+        ] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
+        }
+        let tags: Vec<&str> = spec["tags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+        assert!(tags.contains(&"Product Analytics"), "{tags:?}");
+        assert!(!tags.contains(&"RUM"), "{tags:?}");
     }
 }

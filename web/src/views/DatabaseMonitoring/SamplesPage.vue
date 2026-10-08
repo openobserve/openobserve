@@ -133,6 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-samples-table"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-samples-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #subheader>
           <!-- The scatter — inside the table frame because it draws exactly
                the rows below it. Hidden while empty: an axis with no points
@@ -209,12 +217,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <template #bottom>
-          <div
-            class="text-text-secondary flex w-full items-center gap-2.5"
+        <template v-if="countLine || streamsFailed > 0" #footer-note>
+          <!-- With no partial-data warning the whole note hides below md, so the table leaves it no empty row. -->
+          <span
+            class="flex items-center gap-2.5"
+            :class="streamsFailed > 0 ? '' : 'max-md:hidden'"
             data-test="dbm-samples-status-bar"
           >
-            <span class="max-md:hidden">{{ countLine }}</span>
+            <span v-if="countLine" class="max-md:hidden">{{ countLine }}</span>
             <span
               v-if="streamsFailed > 0"
               class="text-status-warning-text"
@@ -222,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("dbm.samples.partial") }}
             </span>
-          </div>
+          </span>
         </template>
 
         <template #empty>
@@ -326,10 +336,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-user="{ row }">
             <span class="text-text-body block truncate text-xs">{{ raw(row.db_user || "—") }}</span>
           </template>
-          <template #bottom>
-            <div v-if="serverTruncated" class="text-text-secondary px-page-edge py-1.5 text-xs">
-              {{ t("dbm.samples.serverList.truncated", { count: serverRows.length }) }}
-            </div>
+          <template v-if="serverTruncated" #footer-note>
+            <span>{{ t("dbm.samples.serverList.truncated", { count: serverRows.length }) }}</span>
           </template>
         </OTable>
       </section>
@@ -571,6 +579,8 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     id: "query",
     accessorKey: "queryText",
     header: t("dbm.samples.columns.query"),
+    // Unsized, it took an even share and truncated every statement inside its SELECT list.
+    size: 480,
     sortable: false,
   },
   {
@@ -652,6 +662,7 @@ const serverColumns = computed<OTableColumnDef<ServerSampleTableRow>[]>(() => [
     id: "query",
     accessorKey: "query",
     header: t("dbm.samples.serverList.columns.query"),
+    size: 480,
     sortable: false,
   },
   {
@@ -890,12 +901,13 @@ const syncUrl = () => {
  * — never a bare count that reads as everything. The truncation claim is
  * about the SERVER's read, so it is stated over the unfiltered row count.
  */
-const countLine = computed<I18nText>(() => {
+const countLine = computed<I18nText | null>(() => {
   const total = allRows.value.length;
   if (truncated.value) return t("dbm.samples.counts.truncated", { count: total });
+  // A complete, unfiltered read is exactly the pager's own total, so the footer has nothing to add.
   return search.value.trim()
     ? t("dbm.samples.counts.filtered", { count: rows.value.length, total })
-    : t("dbm.samples.counts.complete", { count: total });
+    : null;
 });
 
 // ─── Pivots ──────────────────────────────────────────────────────────────────

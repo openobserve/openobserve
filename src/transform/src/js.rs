@@ -19,37 +19,28 @@ use std::{
 };
 
 use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
-use hashlink::LruCache;
 use rquickjs::{Context, Runtime};
 
 thread_local! {
     /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
     static JS_DEADLINE: Cell<Option<Instant>> = const { Cell::new(None) };
 
-    // a function can change its context's globals, so an org never runs in another org's context
-    static JS_ORG_CONTEXTS: RefCell<LruCache<String, Context>> =
-        RefCell::new(LruCache::new(JS_ORG_CONTEXTS_PER_THREAD));
+    /// Recently used contexts on this thread; one per org and function so no two share globals.
+    static JS_CONTEXTS: RefCell<Vec<CachedJsContext>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
 const DEFAULT_JS_EXEC_TIMEOUT_SECS: u64 = 5;
 
-const JS_ORG_CONTEXTS_PER_THREAD: usize = 8;
+/// Contexts kept per thread, each with its own runtime; an idle one holds about 100 KiB.
+const JS_CONTEXT_CACHE_SIZE: usize = 64;
 
-/// Builds a new runtime for each context, so every org has a memory limit of its own.
-fn new_js_context() -> Result<Context, std::io::Error> {
-    let rt = Runtime::new()
-        .map_err(|e| std::io::Error::other(format!("Failed to create JS runtime: {e}")))?;
-    rt.set_memory_limit(10 * 1024 * 1024);
-    rt.set_max_stack_size(512 * 1024);
-    // A non-yielding function (e.g. `while(true){}`) would otherwise pin the thread forever.
-    rt.set_interrupt_handler(Some(Box::new(|| {
-        JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
-    })));
-    // rquickjs can't register globals one by one, so dangerous ones are kept out by the denylist
-    Context::full(&rt)
-        .map_err(|e| std::io::Error::other(format!("Failed to create JS context: {e}")))
-}
+const JS_MEMORY_LIMIT_BYTES: usize = 10 * 1024 * 1024;
+
+/// Heap all cached contexts on a thread may hold; the running one can add its own limit on top.
+const JS_CONTEXT_CACHE_BUDGET_BYTES: usize = 32 * 1024 * 1024;
+
+const JS_MAX_STACK_SIZE_BYTES: usize = 512 * 1024;
 
 /// Compiled JS function configuration
 #[derive(Clone, Debug)]
@@ -87,9 +78,16 @@ impl Drop for JsDeadlineGuard {
     }
 }
 
-/// Only checks that a runtime and context can be created; each org builds its own on first use.
+struct CachedJsContext {
+    org_id: String,
+    function: String,
+    context: Context,
+    heap_bytes: usize,
+}
+
+/// Verifies that a sandboxed JS runtime and context can be created.
 pub fn init_js_runtime() -> Result<(), String> {
-    new_js_context().map(|_| ()).map_err(|e| e.to_string())
+    new_js_context().map(|_| ())
 }
 
 /// Compile and validate a JS function
@@ -108,6 +106,9 @@ fn compile_js_function_inner(
         return Err(std::io::Error::other("JavaScript function cannot be empty"));
     }
 
+    // Phase 1 + Phase 2 Security: Comprehensive pattern blocking
+    // Use centrally-defined security patterns from o2-enterprise
+    // These patterns are statically initialized and reused across all compilations
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::auth::js_security;
@@ -172,10 +173,9 @@ fn compile_js_function_inner(
     let var_name = if is_result_array { "rows" } else { "row" };
     let test_value = if is_result_array { "[]" } else { "{}" };
 
-    // not on the hot path, so the function is validated in a context of its own, not its org's
-    let ctx = new_js_context()?;
     // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
-    ctx.with(|ctx| {
+    let context = new_js_context().map_err(std::io::Error::other)?;
+    context.with(|ctx| {
         let test_code = format!(
             r#"
                 (function() {{
@@ -252,29 +252,23 @@ pub fn apply_js_fn(
     org_id: &str,
     stream_name: &[String],
 ) -> (json::Value, Option<String>) {
-    // an org may see leftovers of its own earlier records, never another org's (#14868)
-    let ctx = JS_ORG_CONTEXTS.with(|contexts| -> Result<Context, std::io::Error> {
-        let mut contexts = contexts.borrow_mut();
-        if let Some(ctx) = contexts.get(org_id) {
-            return Ok(ctx.clone());
-        }
-        let ctx = new_js_context()?;
-        contexts.insert(org_id.to_string(), ctx.clone());
-        Ok(ctx)
-    });
-    let ctx = match ctx {
-        Ok(ctx) => ctx,
-        Err(e) => {
-            log::error!(
-                "{}/{:?} failed to create JS context: {}",
-                org_id,
-                stream_name,
-                e
-            );
-            return (row, Some(format!("Failed to initialize JS context: {e}")));
-        }
+    let context = match cached_js_context(org_id, &js_config.function) {
+        Ok(context) => context,
+        Err(e) => return (row, Some(e)),
     };
-    ctx.with(|ctx| {
+    let result = eval_js_fn(&context, js_config, row, org_id, stream_name);
+    account_js_context(org_id, &js_config.function, &context);
+    result
+}
+
+fn eval_js_fn(
+    context: &Context,
+    js_config: &JSRuntimeConfig,
+    row: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<String>) {
+    context.with(|ctx| {
         let globals = ctx.globals();
 
         let input_json = match serde_json::to_string(&row) {
@@ -397,6 +391,62 @@ pub fn apply_js_fn(
     })
 }
 
+fn new_js_context() -> Result<Context, String> {
+    let rt = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {e}"))?;
+    rt.set_memory_limit(JS_MEMORY_LIMIT_BYTES);
+    rt.set_max_stack_size(JS_MAX_STACK_SIZE_BYTES);
+    // A non-yielding function (e.g. `while(true){}`) would otherwise pin the thread forever.
+    rt.set_interrupt_handler(Some(Box::new(|| {
+        JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
+    })));
+    // Context::full still exposes eval and Function; only the source denylist keeps them out.
+    Context::full(&rt).map_err(|e| format!("Failed to create JS context: {e}"))
+}
+
+fn cached_js_context(org_id: &str, function: &str) -> Result<Context, String> {
+    JS_CONTEXTS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(pos) = cache
+            .iter()
+            .position(|c| c.org_id == org_id && c.function == function)
+        {
+            let entry = cache.remove(pos);
+            let context = entry.context.clone();
+            cache.push(entry);
+            return Ok(context);
+        }
+        let context = new_js_context()?;
+        if cache.len() >= JS_CONTEXT_CACHE_SIZE {
+            cache.remove(0);
+        }
+        cache.push(CachedJsContext {
+            org_id: org_id.to_string(),
+            function: function.to_string(),
+            context: context.clone(),
+            heap_bytes: 0,
+        });
+        Ok(context)
+    })
+}
+
+/// Records what the context just used holds, then evicts least recently used ones over budget.
+fn account_js_context(org_id: &str, function: &str, context: &Context) {
+    let heap_bytes = usize::try_from(context.runtime().memory_usage().malloc_size).unwrap_or(0);
+    JS_CONTEXTS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(entry) = cache
+            .iter_mut()
+            .find(|c| c.org_id == org_id && c.function == function)
+        {
+            entry.heap_bytes = heap_bytes;
+        }
+        let mut held: usize = cache.iter().map(|c| c.heap_bytes).sum();
+        while held > JS_CONTEXT_CACHE_BUDGET_BYTES && cache.len() > 1 {
+            held -= cache.remove(0).heap_bytes;
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -480,155 +530,13 @@ mod tests {
         for src in payloads {
             let start = Instant::now();
             let _guard = JsDeadlineGuard::new(Duration::from_millis(100));
-            let ctx = new_js_context().expect("context");
-            let result: Result<String, _> = ctx.with(|ctx| ctx.eval(src));
+            let result: Result<String, _> = new_js_context().unwrap().with(|ctx| ctx.eval(src));
             assert!(result.is_err(), "infinite loop must be interrupted: {src}");
             assert!(
                 start.elapsed() < Duration::from_secs(5),
                 "interrupt must fire near the deadline, not hang: {src}"
             );
         }
-    }
-
-    #[test]
-    fn js_builtin_mutation_does_not_survive_the_next_call() {
-        // the wrapper JSON.parses each input first; implicit globals throw, so the hook uses JSON
-        let attacker = r#"
-            var _orig = JSON.parse;
-            if (!JSON.hooked) {
-                JSON.hooked = true;
-                JSON.parse = function (s) { JSON.grab = (JSON.grab || "") + s; return _orig(s); };
-            }
-            row.ran = true;
-            row.leaked = JSON.grab || "";
-        "#;
-        let benign = "row.ok = true;";
-
-        let attacker_cfg = compile_js_function(attacker, "org_a").unwrap();
-        let benign_cfg = compile_js_function(benign, "org_b").unwrap();
-
-        let (out1, err1) = apply_js_fn(
-            &attacker_cfg,
-            json!({"org": "a", "n": 1}),
-            "org_a",
-            &["a".to_string()],
-        );
-        assert!(err1.is_none(), "call 1 should succeed: {err1:?}");
-        assert_eq!(
-            out1["ran"], true,
-            "positive control: the function must have run"
-        );
-
-        let (_out2, err2) = apply_js_fn(
-            &benign_cfg,
-            json!({"org": "b", "secret": "ORG_B_SECRET_42"}),
-            "org_b",
-            &["b".to_string()],
-        );
-        assert!(err2.is_none(), "call 2 should succeed: {err2:?}");
-
-        let (out3, err3) = apply_js_fn(
-            &attacker_cfg,
-            json!({"org": "a", "n": 2}),
-            "org_a",
-            &["a".to_string()],
-        );
-        assert!(err3.is_none(), "call 3 should succeed: {err3:?}");
-        assert_eq!(
-            out3["ran"], true,
-            "positive control: the function must have run"
-        );
-
-        let leaked = out3.get("leaked").and_then(|v| v.as_str()).unwrap_or("");
-        assert!(
-            !leaked.contains("ORG_B_SECRET_42"),
-            "org A's function saw org B's row across calls: {leaked:?}"
-        );
-        // org A keeps its context, so its hook is still installed and saw org A's next row
-        assert!(
-            leaked.contains("\"n\":2"),
-            "positive control: org A's hook must have seen org A's own row: {leaked:?}"
-        );
-    }
-
-    #[test]
-    fn js_global_object_mutation_does_not_leak_to_another_org() {
-        // adding a property to a global object is allowed in strict mode
-        let writer = "JSON.stash = 'leaked'; row.saw = (typeof JSON.stash !== 'undefined');";
-        let reader = "row.saw = (typeof JSON.stash !== 'undefined');";
-        let writer_cfg = compile_js_function(writer, "writer_org").unwrap();
-        let reader_cfg = compile_js_function(reader, "reader_org").unwrap();
-
-        let (w, we) = apply_js_fn(&writer_cfg, json!({}), "writer_org", &["s".to_string()]);
-        assert!(we.is_none(), "writer should succeed: {we:?}");
-        assert_eq!(w["saw"], true, "the writer sees the property it just added");
-
-        let (r, re) = apply_js_fn(&reader_cfg, json!({}), "reader_org", &["s".to_string()]);
-        assert!(re.is_none(), "reader should succeed: {re:?}");
-        assert_eq!(
-            r["saw"], false,
-            "a global-object property set by one org must not be visible to another"
-        );
-    }
-
-    const COUNT_CALLS: &str = "JSON.calls = (JSON.calls || 0) + 1; row.calls = JSON.calls;";
-
-    /// How many times `org`'s current context has run `cfg`, this call included.
-    fn count_calls(cfg: &JSRuntimeConfig, org: &str) -> json::Value {
-        let (out, err) = apply_js_fn(cfg, json!({}), org, &["s".to_string()]);
-        assert!(err.is_none(), "{org}: {err:?}");
-        out["calls"].clone()
-    }
-
-    #[test]
-    fn js_context_is_reused_by_its_org_and_not_seen_by_another() {
-        let cfg = compile_js_function(COUNT_CALLS, "reuse_a").unwrap();
-        assert_eq!(count_calls(&cfg, "reuse_a"), 1);
-        assert_eq!(
-            count_calls(&cfg, "reuse_b"),
-            1,
-            "org B must not see org A's changes"
-        );
-        assert_eq!(
-            count_calls(&cfg, "reuse_a"),
-            2,
-            "org A's context must be reused, not rebuilt"
-        );
-    }
-
-    #[test]
-    fn js_context_of_the_least_recently_used_org_is_rebuilt() {
-        let cfg = compile_js_function(COUNT_CALLS, "lru_0").unwrap();
-        for org in 0..JS_ORG_CONTEXTS_PER_THREAD {
-            count_calls(&cfg, &format!("lru_{org}"));
-        }
-        assert_eq!(count_calls(&cfg, "lru_0"), 2);
-        let extra = format!("lru_{JS_ORG_CONTEXTS_PER_THREAD}");
-        assert_eq!(count_calls(&cfg, &extra), 1);
-        assert_eq!(
-            count_calls(&cfg, "lru_1"),
-            1,
-            "the least recently used org starts over"
-        );
-        assert_eq!(
-            count_calls(&cfg, "lru_0"),
-            3,
-            "an org used since it was added keeps its context"
-        );
-    }
-
-    #[test]
-    fn js_memory_limit_applies_to_each_org_on_its_own() {
-        // two orgs keep 6 MiB each, which fits only if each has a 10 MiB runtime of its own
-        let keep = "(JSON.keep = JSON.keep || []).push('x'.repeat(6 << 20)); row.kept = true;";
-        let cfg = compile_js_function(keep, "mem_a").unwrap();
-        let apply = |org: &str| apply_js_fn(&cfg, json!({}), org, &["s".to_string()]).1;
-        assert_eq!(apply("mem_a"), None, "org A's first 6 MiB must fit");
-        assert_eq!(apply("mem_b"), None, "org B must not share org A's limit");
-        assert!(
-            apply("mem_a").is_some(),
-            "a second 6 MiB must go over org A's own limit"
-        );
     }
 
     #[test]
@@ -990,6 +898,10 @@ for (var i = 0; i < filtered.length; i++) {
         assert_eq!(output_array[1]["value"], 80);
     }
 
+    // ============================================================================
+    // Phase 2 Security Hardening Tests
+    // ============================================================================
+
     #[test]
     fn test_security_block_globalthis() {
         let func = r#"globalThis.escape = function() { return "hacked"; };"#;
@@ -1174,14 +1086,42 @@ for (var i = 0; i < filtered.length; i++) {
     }
 
     #[test]
-    fn test_security_context_base_removes_dangerous_globals() {
-        // Test that dangerous globals are not available in Context::base()
+    fn test_functions_do_not_share_globals_across_orgs() {
+        let stream = ["s".to_string()];
+        let hook = compile_js_function(
+            "if (!JSON.captured) { const p = JSON.parse; JSON.captured = []; \
+             JSON.parse = function(s) { JSON.captured.push(s); return p(s); }; \
+             Array.prototype.map = function() { return ['tampered']; }; }",
+            "org_a",
+        )
+        .unwrap();
+        let (_, error) = apply_js_fn(&hook, json!({}), "org_a", &stream);
+        assert!(error.is_none(), "{error:?}");
 
-        // Try to use eval (should fail at runtime if not caught by pattern blocking)
+        let other_org_fn =
+            compile_js_function("row.mapped = [1, 2].map(x => x * 2);", "org_b").unwrap();
+        let (other_org_out, error) =
+            apply_js_fn(&other_org_fn, json!({"secret": "s3cr3t"}), "org_b", &stream);
+        assert!(error.is_none(), "{error:?}");
+
+        let reader = compile_js_function(
+            "row.captured = JSON.captured ? JSON.captured.join('|') : null;",
+            "org_a",
+        )
+        .unwrap();
+        let (reader_out, error) = apply_js_fn(&reader, json!({}), "org_a", &stream);
+        assert!(error.is_none(), "{error:?}");
+        assert_eq!(
+            (&other_org_out["mapped"], &reader_out["captured"]),
+            (&json!([2, 4]), &json!(null))
+        );
+    }
+
+    #[test]
+    fn test_security_eval_blocked_by_denylist() {
+        // Context::full still provides eval, so the source denylist is the only guard.
         let func_eval = r#"
             try {
-                // This should fail because eval is not available in Context::base()
-                // But our pattern blocking should catch it first
                 row.result = eval("1 + 1");
             } catch(e) {
                 row.error = "eval not available";
@@ -1192,5 +1132,43 @@ for (var i = 0; i < filtered.length; i++) {
         let result = compile_js_function(func_eval, "test_org");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("eval("));
+    }
+
+    #[test]
+    fn test_interleaved_functions_keep_their_contexts() {
+        let functions: Vec<_> = (0..12)
+            .map(|i| {
+                let src = format!("Math.calls{i} = (typeof Math.calls{i} === 'undefined' ? 0 : Math.calls{i}) + 1; row.calls = Math.calls{i};");
+                compile_js_function(&src, "test_org").unwrap()
+            })
+            .collect();
+        for round in 1..=2 {
+            for f in &functions {
+                let (out, err) = apply_js_fn(f, json!({}), "test_org", &[]);
+                assert!(err.is_none(), "{err:?}");
+                assert_eq!(out["calls"], json!(round), "{}", f.function);
+            }
+        }
+    }
+
+    #[test]
+    fn test_cached_contexts_stay_within_the_thread_budget() {
+        for i in 0..12 {
+            let src = format!(
+                "Math.kept{i} = (typeof Math.kept{i} === 'undefined') ? [] : Math.kept{i}; Math.kept{i}.push('x'.repeat(6 * 1024 * 1024)); row.kept = Math.kept{i}.length;"
+            );
+            let f = compile_js_function(&src, "test_org").unwrap();
+            let (_, err) = apply_js_fn(&f, json!({}), "test_org", &[]);
+            assert!(err.is_none(), "{err:?}");
+            let held: i64 = JS_CONTEXTS.with(|cache| {
+                cache
+                    .borrow()
+                    .iter()
+                    .map(|c| c.context.runtime().memory_usage().malloc_size)
+                    .sum()
+            });
+            let bound = (JS_CONTEXT_CACHE_BUDGET_BYTES + JS_MEMORY_LIMIT_BYTES) as i64;
+            assert!(held <= bound, "after {} functions: {held} > {bound}", i + 1);
+        }
     }
 }

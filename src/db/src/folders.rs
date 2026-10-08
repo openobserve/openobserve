@@ -124,10 +124,8 @@ pub async fn save_folder(
     }
 
     let (_id, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
-    if folder_type != FolderType::Prompts {
-        let folder_type_ofga = folder_type_ofga_name(folder_type);
-        set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
-    }
+    let folder_type_ofga = folder_type_ofga_name(folder_type);
+    set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -171,14 +169,12 @@ pub async fn ensure_default_folder(
         return Ok(folder);
     }
 
-    if folder_type != FolderType::Prompts {
-        set_ownership(
-            org_id,
-            folder_type_ofga_name(folder_type),
-            Authz::new(&folder.folder_id),
-        )
-        .await;
-    }
+    set_ownership(
+        org_id,
+        folder_type_ofga_name(folder_type),
+        Authz::new(&folder.folder_id),
+    )
+    .await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -251,7 +247,7 @@ pub async fn list_folders(
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
         FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
-        FolderType::Prompts => "",
+        FolderType::Prompts => OFGA_MODELS.get("prompt_folders").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
     let folder_ofga_model = "";
@@ -401,10 +397,8 @@ pub async fn delete_folder(
     }
 
     table::folders::delete(org_id, folder_id, folder_type).await?;
-    if folder_type != FolderType::Prompts {
-        let folder_type_ofga = folder_type_ofga_name(folder_type);
-        remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
-    }
+    let folder_type_ofga = folder_type_ofga_name(folder_type);
+    remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -430,7 +424,7 @@ fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
         FolderType::Workflows => "workflow_folder",
-        FolderType::Prompts => "",
+        FolderType::Prompts => "prompt_folders",
     }
 }
 
@@ -449,9 +443,6 @@ async fn permitted_folders(
     user_id: Option<&str>,
     folder_type: FolderType,
 ) -> Result<Option<Vec<String>>, FolderError> {
-    if folder_type == FolderType::Prompts {
-        return Ok(None);
-    }
     let (folder_ofga_model, child_ofga_model) = match folder_type {
         FolderType::Dashboards => (
             OFGA_MODELS.get("folders").unwrap().key,
@@ -473,7 +464,9 @@ async fn permitted_folders(
             OFGA_MODELS.get("workflow_folder").unwrap().key,
             OFGA_MODELS.get("workflows").unwrap().key,
         ),
-        FolderType::Prompts => unreachable!("prompt folders are not modeled in OpenFGA"),
+        // Prompt grants are plain `prompt:{id}` with no folder prefix, so there is no
+        // individual grant to lift a folder into view: only folder `GET` counts.
+        FolderType::Prompts => (OFGA_MODELS.get("prompt_folders").unwrap().key, ""),
     };
 
     let Some(user_id) = user_id else {
@@ -484,6 +477,10 @@ async fn permitted_folders(
     let mut folder_list = list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
         .await
         .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+
+    if child_ofga_model.is_empty() {
+        return Ok(folder_list);
+    }
 
     // In some cases, there might not be direct `GET` permission on the folder.
     // So, we need to check if the user has `GET` permission on any of the dashboards

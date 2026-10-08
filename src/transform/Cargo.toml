@@ -12,7 +12,6 @@ enterprise = ["dep:o2_enterprise"]
 [dependencies]
 async-trait.workspace = true
 config.workspace = true
-hashlink.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 regex.workspace = true

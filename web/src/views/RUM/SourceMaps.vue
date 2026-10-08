@@ -107,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
         :show-global-filter="false"
-        :footer-title="t('rum.sourceMaps')"
         expansion="single"
         expand-on-row-click
         v-model:expanded-ids="expandedIds"

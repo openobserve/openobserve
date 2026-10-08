@@ -350,6 +350,7 @@ import useWorkflowCanvas, {
   clearTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
+import analytics from "@/services/product_analytics";
 
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
 const emit = defineEmits<{ (e: "saved"): void }>();
@@ -736,6 +737,7 @@ const persist = async (): Promise<boolean> => {
         id: workflowObj.currentSelectedWorkflow.id,
         data,
       });
+      analytics.track("workflow_updated", { draft: false });
       toast({ message: t("workflow.updateSuccess"), variant: "success" });
     } else {
       const res = await workflowService.createWorkflow({
@@ -827,6 +829,7 @@ const persistDraft = async (): Promise<boolean> => {
         data,
         draft: true,
       });
+      analytics.track("workflow_updated", { draft: true });
     } else {
       const res = await workflowService.createWorkflow({
         org_identifier: org,

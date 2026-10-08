@@ -56,6 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-blocked-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #toolbar>
           <DbmTableToolbar
             v-model:search="search"
@@ -75,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroup
               v-model="perspective"
               class="shrink-0"
+              mobile-dropdown
               data-test="dbm-blocked-perspective"
             >
               <OToggleGroupItem
@@ -349,16 +358,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #bottom>
-          <!-- The conclusion the table cannot state: everything leads back to
-               one session, and here is the way to it. Rendered inside the
-               pagination bar's actions area, so it sits level with the page
-               controls instead of adding a second bordered row. -->
-          <div
-            v-if="samples.length && footerLine"
-            class="text-text-secondary flex w-full min-w-0 shrink-0 items-center gap-2"
-            data-test="dbm-blocked-footer"
-          >
+        <!-- The conclusion the table cannot state: everything leads back to one session, and here is the way to it. -->
+        <template v-if="samples.length && footerLine" #footer-note>
+          <div class="flex w-full min-w-0 items-center gap-2" data-test="dbm-blocked-footer">
             <OIcon
               :name="perspective === 'blocking' ? 'check-circle' : 'info-outline'"
               class="size-3.5 shrink-0"
@@ -438,6 +440,7 @@ import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -707,6 +710,8 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           id: "query",
           accessorKey: "query",
           header: t("dbm.blocked.columns.sessionQuery"),
+          // Unsized, it took an even share and cut the statement after a few words.
+          size: 420,
           enableSorting: false,
         },
         {
@@ -755,6 +760,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           id: "query",
           accessorKey: "query",
           header: t("dbm.blocked.columns.stuckQuery"),
+          size: 420,
           enableSorting: false,
         },
         {
@@ -899,14 +905,18 @@ const footerLine = computed<I18nText | null>(() => {
   // "All N waits lead back to one session" cannot be said over a capped read —
   // the waits we could not read may well lead somewhere else.
   if (rootPids.value.length !== 1 || truncated.value) return null;
-  return t("dbm.blocked.footer.allLeadBack", {
-    waits: t(
-      isLiveWindow.value ? "dbm.blocked.waitingCount" : "dbm.blocked.waitingCountPast",
-      { count: waitingCount.value },
-      waitingCount.value,
-    ),
-    pid: rootPids.value[0],
-  });
+  return t(
+    "dbm.blocked.footer.allLeadBack",
+    {
+      waits: t(
+        isLiveWindow.value ? "dbm.blocked.waitingCount" : "dbm.blocked.waitingCountPast",
+        { count: waitingCount.value },
+        waitingCount.value,
+      ),
+      pid: rootPids.value[0],
+    },
+    waitingCount.value,
+  );
 });
 
 const footerDetail = computed<I18nText>(() => {

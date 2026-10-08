@@ -60,6 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-activity-table"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-activity-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #toolbar>
           <DbmTableToolbar
             v-model:search="search"
@@ -253,13 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
 
-        <template #bottom>
-          <div
-            class="text-text-secondary flex w-full items-center gap-2.5"
-            data-test="dbm-activity-status-bar"
-          >
-            <span class="max-md:hidden">{{ countLine }}</span>
-          </div>
+        <template v-if="countLine" #footer-note>
+          <span class="max-md:hidden" data-test="dbm-activity-status-bar">{{ countLine }}</span>
         </template>
 
         <template #empty>
@@ -698,12 +701,13 @@ const summaryStats = computed<StatItem[]>(() => {
  * unfiltered row count. Saying "these are the 3 we have" after the search box
  * narrowed 100 rows to 3 would blame the server for the reader's own filter.
  */
-const countLine = computed<I18nText>(() => {
+const countLine = computed<I18nText | null>(() => {
   const claim = activityCountClaim(allRows.value.length, truncated.value);
   if (!claim.complete) return t("dbm.activity.counts.capped", { count: claim.count });
+  // A complete, unfiltered read is exactly the pager's own total, so the footer has nothing to add.
   return search.value.trim()
     ? t("dbm.activity.counts.filtered", { count: rows.value.length, total: claim.count })
-    : t("dbm.activity.counts.complete", { count: claim.count });
+    : null;
 });
 
 const emptyCause = computed(() =>

@@ -309,21 +309,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Bottom -->
-            <template #bottom>
-              <div class="flex h-9 w-full items-center justify-between">
-                <div class="w-[15.625rem] text-xs font-normal max-md:hidden">
-                  {{
-                    t("settings.correlation.serviceCountSingular", {
-                      count: filteredGroupCount,
-                    })
-                  }}
-                  {{
-                    t("settings.correlation.instancesCount", {
-                      count: totalInstances,
-                    })
-                  }}
-                </div>
-              </div>
+            <template v-if="filteredGroupCount > 0" #footer-note>
+              <span class="max-md:hidden">
+                {{
+                  t("settings.correlation.serviceCountSingular", {
+                    count: filteredGroupCount,
+                  })
+                }}
+                {{
+                  t("settings.correlation.instancesCount", {
+                    count: totalInstances,
+                  })
+                }}
+              </span>
             </template>
           </OTable>
         </div>

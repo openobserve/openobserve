@@ -62,6 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="defaultColumnVisibility"
         data-test="dbm-table-health-table"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-table-health-error"
+            @action="onRefresh()"
+          />
+        </template>
         <!-- Magnitude bars. The bar ACCOMPANIES the formatted number, never
              replaces it: `tableSizeLabel` and the two-decimal percentage are
              the honest measurements, and the bar only makes their relative size
@@ -214,15 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </li>
             </ul>
           </section>
-        </template>
-
-        <template #bottom>
-          <div
-            class="text-text-secondary flex w-full items-center gap-2.5"
-            data-test="dbm-table-health-status-bar"
-          >
-            <span class="max-md:hidden">{{ countLine }}</span>
-          </div>
         </template>
 
         <template #empty>
@@ -410,8 +409,6 @@ const disclosures = computed(() =>
     tupleCountDisclosure({ tuples_are_estimated: tuplesAreEstimated.value }, t),
   ].filter((line): line is NonNullable<typeof line> => line != null),
 );
-
-const countLine = computed(() => t("dbm.tableHealth.countLine", { count: rows.value.length }));
 
 /**
  * The "to start collecting" steps, in the checklist shape DbmLockEmptyState

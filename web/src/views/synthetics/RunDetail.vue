@@ -41,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
+        :title="raw(displayMonitorName)"
+        title-data-test="synthetics-run-detail-title"
         :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
@@ -48,14 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
-        <template #title>
-          <span class="inline-flex min-w-0 items-center gap-2">
-            <span data-test="synthetics-run-detail-title" class="truncate">{{
-              displayMonitorName
-            }}</span>
-            <BetaBadge />
-          </span>
-        </template>
         <template #title-trail>
           <OBadge
             :variant="statusBadgeVariant"
@@ -627,7 +621,6 @@ import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";

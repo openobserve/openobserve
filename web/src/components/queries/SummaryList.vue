@@ -87,12 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ durationFormatter(row.queryRange) }}
     </template>
 
-    <template #bottom>
+    <template #selection-actions>
       <OButton
-        v-if="selectedRow.length"
         data-test="qm-multiple-cancel-query-btn"
         variant="outline-destructive"
-        size="sm-action"
+        size="sm"
         @click="handleMultiQueryCancel"
       >
         {{ t("queries.cancelQuery") }}

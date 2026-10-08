@@ -20,7 +20,7 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{metrics, utils::json};
 use http::StatusCode;
 use prost::Message;
-use tonic::{Code, Status};
+use tonic::{Code, Status, metadata::MetadataMap};
 
 /// Converts an OTLP handler's HTTP reply to the gRPC reply, keeping its partial success and
 /// never acknowledging a rejected export.
@@ -38,6 +38,21 @@ pub(crate) async fn export_reply<T: Message + Default>(resp: Response) -> Result
 pub(crate) fn error_status(e: &infra::errors::Error) -> Status {
     let status = StatusCode::from_u16(e.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     Status::new(grpc_code(status), e.to_string())
+}
+
+/// Reads an optional metadata value, rejecting one that is not visible ASCII.
+pub(crate) fn metadata_str<'a>(
+    metadata: &'a MetadataMap,
+    key: &str,
+) -> Result<Option<&'a str>, Status> {
+    metadata
+        .get(key)
+        .map(|v| {
+            v.to_str().map_err(|_| {
+                Status::invalid_argument(format!("Metadata '{key}' must be visible ASCII"))
+            })
+        })
+        .transpose()
 }
 
 pub(crate) fn observe_ok(endpoint: &str, start: Instant) {

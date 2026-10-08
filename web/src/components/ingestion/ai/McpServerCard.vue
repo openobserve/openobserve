@@ -361,6 +361,7 @@ const isTerminalClient = computed(
 
 const content = computed<RichCardContent>(() => ({
   provider: {
+    id: "mcp",
     name: t("ingestion.mcp.shortName"),
     tagline: t("ingestion.mcp.tagline", {
       product: raw("Model Context Protocol"),

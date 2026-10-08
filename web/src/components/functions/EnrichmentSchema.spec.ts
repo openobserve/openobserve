@@ -14,7 +14,7 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {},
 }));
 
