@@ -103,22 +103,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-if="!eventsHeld || chartSeries.length" class="h-64 w-full px-2 pb-2">
+      <!-- While events are loading, the schema would query an unresolved
+           event series, so the renderer must not mount at all here (v-if,
+           not v-show). Once events are ready, the renderer has to stay
+           mounted to run its query and report back, so its own first-load
+           wait is a v-show overlay instead. -->
       <OSkeleton
         v-if="eventsGate === 'loading'"
         class="h-full w-full"
         data-test="rum-analytics-trends-loading"
       />
-      <PanelSchemaRenderer
-        v-else
-        :key="rendererKey"
-        class="h-full w-full"
-        :panelSchema="panelSchema"
-        :selectedTimeObj="selectedTimeObj"
-        :variablesData="{}"
-        :forceLoad="true"
-        searchType="RUM"
-        :allowAnnotationsAPI="false"
-      />
+      <template v-else>
+        <OSkeleton
+          v-if="chartLoading"
+          class="h-full w-full"
+          data-test="rum-analytics-trends-loading"
+        />
+        <PanelSchemaRenderer
+          v-show="!chartLoading"
+          :key="rendererKey"
+          class="h-full w-full"
+          :panelSchema="panelSchema"
+          :selectedTimeObj="selectedTimeObj"
+          :variablesData="{}"
+          :forceLoad="true"
+          searchType="RUM"
+          :allowAnnotationsAPI="false"
+          @loading-state-change="chartLoading = $event"
+        />
+      </template>
     </div>
     <AddToDashboard
       v-if="dashboardOpen"
@@ -248,6 +261,16 @@ const rendererKey = computed(() =>
     metric.value,
   ]),
 );
+
+// `forceLoad` (passed below) skips PanelSchemaRenderer's cache-restore
+// shortcut, so its `loading` always flips true before a fetch and false
+// after — safe to drive a skeleton off it. A key change destroys and
+// recreates the renderer (new range/query/metric), so the skeleton must
+// come back until that fresh instance reports its own first load done.
+const chartLoading = ref(true);
+watch(rendererKey, () => {
+  chartLoading.value = true;
+});
 
 // With no list to name it, an event's id is opaque, so it gets a neutral name until the list is ready.
 const labelOf = (s: StepRef): I18nText =>
