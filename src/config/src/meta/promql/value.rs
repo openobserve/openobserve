@@ -883,10 +883,6 @@ fn extrapolate_from_delta(
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
     let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
-    // If the first/last samples are close to the boundaries of the range,
-    // extrapolate the result. This is as we expect that another sample
-    // will exist given the spacing between samples we've seen thus far,
-    // with an allowance for noise.
     let extrapolation_threshold = avg_duration_between_samples * 1.1;
     if duration_to_start >= extrapolation_threshold {
         duration_to_start = avg_duration_between_samples / 2.0;

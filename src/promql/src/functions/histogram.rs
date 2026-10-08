@@ -27,7 +27,6 @@ use hashbrown::HashMap;
 
 use crate::scalar_param::ScalarParam;
 
-// https://github.com/prometheus/prometheus/blob/v3.5.0/promql/quantile.go#L28-L45
 const SMALL_DELTA_TOLERANCE: f64 = 1e-12;
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
@@ -458,8 +457,6 @@ fn coalesce_buckets(mut buckets: Vec<Bucket>) -> Vec<Bucket> {
     merged
 }
 
-// For the rationale behind this function, see
-// https://github.com/prometheus/prometheus/blob/v3.5.0/promql/quantile.go#L602-L655
 fn ensure_monotonic(buckets: &mut [Bucket]) {
     let mut prev = buckets[0].count;
     for bucket in &mut buckets[1..] {
@@ -476,7 +473,6 @@ fn ensure_monotonic(buckets: &mut [Bucket]) {
     }
 }
 
-// cf. https://github.com/prometheus/prometheus/blob/v3.5.0/util/almost/almost.go
 fn almost_equal(a: f64, b: f64, epsilon: f64) -> bool {
     if (a.is_nan() && b.is_nan()) || a == b {
         return true;
