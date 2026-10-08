@@ -228,6 +228,9 @@ export interface PanelEditorProps {
    */
   showAddToDashboardButton?: boolean;
 
+  /** When set, Add to dashboard is disabled and this explains why (Logs G1). */
+  addToDashboardDisabledReason?: I18nText | null;
+
   // ---- Chart Configuration ----
   /**
    * Array of allowed chart types. If not specified, all chart types are allowed.

@@ -97,6 +97,7 @@
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
+        @user-edit="emit('user-edit')"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -203,6 +204,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   "update:query": [query: string];
+  "user-edit": [];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];

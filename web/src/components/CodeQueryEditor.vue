@@ -220,6 +220,7 @@ export default defineComponent({
   },
   emits: [
     "update-query",
+    "user-edit",
     "run-query",
     "update:query",
     "focus",
@@ -237,6 +238,17 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
+    // Set around every edit the editor makes itself, so only keystrokes emit `user-edit`.
+    let programmatic = false;
+    const asProgrammatic = (edit: () => void) => {
+      const previous = programmatic;
+      programmatic = true;
+      try {
+        edit();
+      } finally {
+        programmatic = previous;
+      }
+    };
     // Emits the editor's content immediately instead of waiting out the change
     // debounce. Assigned when the editor is created; see `commitModelChange`.
     let commitPendingChange: (() => void) | null = null;
@@ -488,7 +500,7 @@ export default defineComponent({
           // Update editor value if different from current
           const currentValue = editorObj?.getValue();
           if (currentValue !== props.query?.trim()) {
-            editorObj.setValue(props.query?.trim() || "");
+            asProgrammatic(() => editorObj.setValue(props.query?.trim() || ""));
           }
 
           // Update readonly option if different
@@ -594,7 +606,11 @@ export default defineComponent({
       // the query.
       commitPendingChange = () => commitModelChange.flush();
 
-      editorObj.onDidChangeModelContent(commitModelChange);
+      editorObj.onDidChangeModelContent((e: any) => {
+        // Non-debounced: the auto-run scheduler must see a keystroke before any pending run fires (AC4.4).
+        if (!e?.isFlush && !programmatic) emit("user-edit");
+        commitModelChange(e);
+      });
 
       // Fires on the text area's own blur. onDidBlurEditorWidget waits a timer tick, so a fast click on Run reads the previous query.
       editorObj.onDidBlurEditorText(() => commitModelChange.flush());
@@ -637,15 +653,17 @@ export default defineComponent({
           // Create an edit operation that replaces the entire content
           // This preserves undo history becuase it treats this as a single edit operation
           //and it will be in the undo stack as one operation
-          model.pushEditOperations(
-            [],
-            [
-              {
-                range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
-                text: trimmedValue,
-              },
-            ],
-            () => null,
+          asProgrammatic(() =>
+            model.pushEditOperations(
+              [],
+              [
+                {
+                  range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
+                  text: trimmedValue,
+                },
+              ],
+              () => null,
+            ),
           );
         }
 
@@ -812,7 +830,7 @@ export default defineComponent({
           (props.readOnly || !hasFocus) && currentValue?.trim() !== newValue?.trim();
 
         if (shouldUpdate) {
-          editorObj.getModel()?.setValue(newValue);
+          asProgrammatic(() => editorObj.getModel()?.setValue(newValue));
         }
       },
     );
@@ -821,7 +839,7 @@ export default defineComponent({
       if (editorObj?.setValue) {
         // Monaco's setValue throws "Illegal argument" for null/undefined —
         // coerce to a string so mode switches (e.g. PromQL → SQL) can't crash the editor
-        editorObj.setValue(value ?? "");
+        asProgrammatic(() => editorObj.setValue(value ?? ""));
         editorObj?.layout();
       }
     };

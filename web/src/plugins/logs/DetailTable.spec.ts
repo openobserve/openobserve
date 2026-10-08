@@ -1342,12 +1342,30 @@ describe("DetailTable Component", () => {
       expect(text).toContain("(18)");
     });
 
-    it("says no level field was found for an unknown row", async () => {
+    it("says there is no text field to scan for an unknown row without one", async () => {
       sevWrapper = mountWith({ host: "a" });
       await flushPromises();
       await sevWrapper.find(BADGE).trigger("click");
       await flushPromises();
-      expect(document.body.querySelector(POPOVER)?.textContent).toContain("No level field found");
+      const popover = document.body.querySelector(POPOVER);
+      expect(popover?.textContent).toContain(
+        "No level field on this row, and no text field to scan.",
+      );
+      expect(popover?.querySelector('[data-test="log-detail-severity-no-level-word"]')).toBeNull();
+    });
+
+    it("names the scanned text field for an unknown row with no level word", async () => {
+      sevWrapper = mountWith({ host: "a", body: "heartbeat ok" });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const line = document.body.querySelector(
+        `${POPOVER} [data-test="log-detail-severity-no-level-word"]`,
+      );
+      expect(line?.textContent?.replace(/\s+/g, " ").trim()).toBe(
+        "No level field on this row, and no level word in body.",
+      );
+      expect(line?.querySelector("code")?.textContent).toBe("body");
     });
   });
 });

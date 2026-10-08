@@ -392,6 +392,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-2xs text-muted-foreground">
                       {{ t("search.liveModeTooltip") }}
                     </div>
+                    <div class="text-2xs text-muted-foreground">
+                      {{ t("search.autoRunAppliesTo") }}
+                    </div>
                   </span>
                 </ODropdownItem>
               </ODropdown>

@@ -1315,7 +1315,12 @@ function generateHistogramData() {
   // }
 }
 
+// Auto Run switched off by the user (#14760): selection still restores, execution waits for Run.
+const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
+
 async function loadPageData() {
+  // A stream from the URL is a shared link: it keeps loading its results whatever the toggle says.
+  const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
   searchObj.loadingStream = true;
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
 
@@ -1326,7 +1331,7 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  if (searchObj.data.stream.selectedStream.value) {
+  if (searchObj.data.stream.selectedStream.value && (streamFromUrl || !isAutoRunOff())) {
     searchData();
   }
 }
@@ -1886,7 +1891,7 @@ const getMoreData = () => {
 
 const onChangeStream = async () => {
   await extractFields();
-  runQueryFn();
+  if (!isAutoRunOff()) runQueryFn();
 };
 
 const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {

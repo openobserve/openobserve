@@ -130,9 +130,18 @@ describe("SearchBar — Drill down mode toggle", () => {
     wrapper.vm.searchObj.meta.logsVisualizeToggle = "drilldown";
     await flushPromises();
 
-    await wrapper.vm.onLogsVisualizeToggleUpdate("patterns");
+    const patterns = vi.fn();
+    wrapper.vm.autoRun.setExecutors({ patterns });
+    wrapper.vm.searchObj.data.stream.streamLists = [{ label: "s", value: "s" }];
+    wrapper.vm.searchObj.data.stream.selectedStream = ["s"];
 
-    expect(wrapper.emitted("extractPatterns")).toBeTruthy();
+    await wrapper.vm.onLogsVisualizeToggleUpdate("patterns");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Patterns activation is an entry point routed through the scheduler (J4), after the mode is set.
+    expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("patterns");
+    expect(patterns).toHaveBeenCalledTimes(1);
+    expect(patterns.mock.calls[0][0]).toMatchObject({ reason: "patterns", op: "patterns" });
   });
 
   it("runs the logs search on Run query instead of delegating to the page", async () => {

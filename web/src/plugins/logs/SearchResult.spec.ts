@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -76,6 +77,8 @@ describe("SearchResult Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
+    // The auto-run engine is a page singleton; each test starts from a clean one.
+    resetLogsAutoRunForTests();
     // jsdom does not implement HTMLElement.scrollTo
     HTMLElement.prototype.scrollTo = vi.fn();
 

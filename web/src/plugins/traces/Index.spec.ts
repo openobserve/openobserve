@@ -780,6 +780,76 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Auto Run off (#14760)", () => {
+    const mountTraces = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    // The page re-reads the shared toggle from storage once auto_query_enabled is known.
+    beforeEach(() => localStorage.setItem("oo_toggle_auto_run", "false"));
+
+    afterEach(() => {
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("restores the last stream on page load without running a search", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      mockRestoreTracesStream.mockReturnValue("default");
+      wrapper = mountTraces();
+      await vi.waitFor(() =>
+        expect(mockSearchObj.data.stream.selectedStream.value).toBe("default"),
+      );
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("does not run when the stream changes, and runs once Auto Run is on", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+
+      mockSearchObj.meta.liveMode = true;
+      localStorage.setItem("oo_toggle_auto_run", "true");
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
+    it("still loads a shared link's stream with Auto Run off", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { stream: "default" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
+        timeout: 3000,
+      });
+    });
+  });
+
   describe("Stream Selection", () => {
     it("should select the default stream automatically", async () => {
       wrapper = mount(Index, {

@@ -89,10 +89,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </i18n-t>
               <span class="text-text-heading">{{ t("logs.severity.notSearchable") }}</span>
             </template>
-            <span v-else class="text-text-heading">{{
-              severity.notFetched
-                ? t("logs.severity.notInSelectedColumns")
-                : t("logs.severity.noLevelField")
+            <span v-else-if="severity.notFetched" class="text-text-heading">{{
+              t("logs.severity.notInSelectedColumns")
+            }}</span>
+            <i18n-t
+              v-else-if="severity.field"
+              keypath="logs.severity.noLevelWordInField"
+              tag="span"
+              scope="global"
+              class="text-text-heading"
+              data-test="log-detail-severity-no-level-word"
+            >
+              <template #field>
+                <code class="font-mono">{{ raw(severity.field) }}</code>
+              </template>
+            </i18n-t>
+            <span v-else class="text-text-heading" data-test="log-detail-severity-no-text-field">{{
+              t("logs.severity.noLevelField")
             }}</span>
           </div>
         </OPopover>

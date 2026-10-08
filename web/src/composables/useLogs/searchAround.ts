@@ -23,6 +23,7 @@ import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import {
   bindSeverityRequest,
   type SeverityRequestSnapshot,
@@ -45,6 +46,7 @@ export const useSearchAround = () => {
   const { generateHistogramData, generateHistogramSkeleton } = useHistogram();
   const { fnParsedSQL, fnUnparsedSQL, addTraceId, removeTraceId, shouldAddFunctionToSearch } =
     logsUtils();
+  const autoRun = useLogsAutoRun();
 
   /**
    * Performs a search around operation to fetch logs data around a specific timestamp or log entry.
@@ -68,6 +70,16 @@ export const useSearchAround = () => {
    * ```
    */
   const searchAroundData = (params: SearchAroundParams): void => {
+    // An explicit run of a different population: its own generation, and no grid record while it shows.
+    const generation = autoRun.engine.newGeneration({
+      lane: "grid",
+      kind: "explicit",
+      reason: "explicit",
+      op: "full",
+      signature: autoRun.readSignature(),
+    });
+    autoRun.invalidateExecuted("search-around");
+    const isCurrent = () => autoRun.engine.isCurrent(generation.id);
     try {
       searchObj.loading = true;
       searchObj.loadingProgressPercentage = 0;
@@ -159,6 +171,11 @@ export const useSearchAround = () => {
 
       const { traceparent, traceId }: TraceContext = generateTraceContext();
       addTraceId(traceId);
+      autoRun.engine.registerTrace(generation.id, traceId, "hits");
+      autoRun.engine.beginHits(traceId);
+      // A plain HTTP call is not in the streaming transport's trace map, so cancel needs its own abort.
+      const controller = new AbortController();
+      autoRun.engine.registerAbort(generation.id, controller);
 
       searchService
         .search_around({
@@ -178,8 +195,10 @@ export const useSearchAround = () => {
             : "",
           is_multistream: isMultiStream && !hitStreamName,
           traceparent,
+          signal: controller.signal,
         })
         .then(async (res: { data: SearchAroundResponse }) => {
+          if (!isCurrent()) return;
           searchObj.loading = false;
           searchObj.data.histogram.chartParams.title = raw("");
           searchObj.data.histogram.chartParams.titleParts = null;
@@ -213,6 +232,7 @@ export const useSearchAround = () => {
           searchObj.data.histogram.chartParams.titleParts = null;
         })
         .catch((error: SearchAroundError) => {
+          if (!isCurrent()) return;
           let traceId = "";
           searchObj.data.errorMsg = t("search.errorWhileProcessingSearchRequest");
 
@@ -251,9 +271,13 @@ export const useSearchAround = () => {
         })
         .finally(() => {
           removeTraceId(traceId);
+          autoRun.engine.settleHits(traceId);
+          if (!isCurrent()) return;
           searchObj.loading = false;
+          autoRun.engine.settleGeneration(generation.id);
         });
     } catch (error: unknown) {
+      autoRun.engine.settleGeneration(generation.id);
       searchObj.loading = false;
       const errorMessage =
         error instanceof Error ? error.message : t("search.unknownErrorOccurred");

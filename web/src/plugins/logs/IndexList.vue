@@ -292,7 +292,9 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
-import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
+import { saveLogsStreamType } from "@/utils/streamPersist";
+import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs/useSearchBar";
+import { compareStreamsByLatest } from "@/utils/logs/estimateScanMb";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -336,7 +338,7 @@ export default defineComponent({
           indexListSelectField.updateInputValue("");
         }
       });
-      this.onStreamChange("");
+      this.onStreamChange("", { origin: "selector" });
       this.resetPagination();
     },
     // One-click stream pick from the empty state — mirrors a dropdown
@@ -443,12 +445,20 @@ export default defineComponent({
     });
 
     const onStreamTypeChange = async (newType: string) => {
+      const token = bumpSelectionToken();
+      const org = store.state.selectedOrganization.identifier;
       searchObj.data.stream.streamType = newType;
       searchObj.data.stream.selectedStream = [];
       searchObj.data.stream.selectedStreamFields = [];
-      saveLogsStreamType(store.state.selectedOrganization.identifier, newType);
-      saveLogsStream(store.state.selectedOrganization.identifier, []);
-      await getStreamList(true);
+      saveLogsStreamType(org, newType);
+      // A later type, stream or org pick owns the selection; this list response is stale.
+      const isCurrent = () =>
+        token === currentSelectionToken() &&
+        searchObj.data.stream.streamType === newType &&
+        store.state.selectedOrganization.identifier === org;
+      await getStreamList(true, { isCurrent });
+      if (!isCurrent()) return;
+      if (searchObj.data.stream.selectedStream.length) onStreamChange("", { origin: "selector" });
     };
 
     const showUserDefinedSchemaToggle = computed(() => {
@@ -472,7 +482,7 @@ export default defineComponent({
       const detailed = searchObj.data.streamResults?.list;
       if (Array.isArray(detailed) && detailed.length) {
         return [...detailed]
-          .sort((a: any, b: any) => (b?.stats?.doc_time_max ?? 0) - (a?.stats?.doc_time_max ?? 0))
+          .sort(compareStreamsByLatest)
           .slice(0, QUICK_PICK_LIMIT)
           .map((item: any) => ({ label: item.name, value: item.name }));
       }

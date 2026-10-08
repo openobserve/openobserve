@@ -216,6 +216,7 @@ vi.mock("@/utils/telemetryCorrelation", async () => {
 
 // Import after all vi.mock() declarations so the mocks are in place
 import { useSearchQuery } from "./useSearchQuery";
+import { buildLogsSignature } from "./useAutoRun";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { gt } from "@/types/i18n";
 
@@ -1085,5 +1086,85 @@ describe("useSearchQuery › getQueryReq records the severity guard of the dispa
     const { getQueryReq } = useSearchQuery(gt);
     expect(getQueryReq(false)).toBeNull();
     expect(recordSeverityRequestMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("useSearchQuery › getQueryReq signature contract (AC5.2)", () => {
+  // Every request field must be covered by the executed signature, or be explicitly ignored.
+  const SIGNATURE_FIELDS_BY_REQUEST_FIELD: Record<string, string[]> = {
+    sql: ["query", "sqlMode", "streams", "quickModeFields", "definedSchemas"],
+    quick_mode: ["quickMode"],
+    sql_mode: ["sqlMode"],
+    query_fn: ["transform"],
+    regions: ["regions"],
+    clusters: ["clusters"],
+  };
+  // Resolved bounds, paging and transport encoding are recorded per execution, not part of the scope.
+  const IGNORED = new Set([
+    "from",
+    "size",
+    "start_time",
+    "end_time",
+    "track_total_hits",
+    "encoding",
+    "query",
+  ]);
+
+  const signatureKeys = Object.keys(
+    buildLogsSignature({
+      query: "",
+      sqlMode: false,
+      streams: [],
+      streamType: "logs",
+      time: { type: "relative", period: "15m" },
+      transformContent: null,
+      showTransformEditor: false,
+      quickMode: false,
+      refreshInterval: 0,
+      sortOrder: "desc",
+      definedSchemas: "",
+    }),
+  );
+
+  const writtenFields = (setup: () => void) => {
+    mockState = createMockState();
+    (mockState.searchObj.data.stream as any).streamLists = [{ name: "my-stream" }];
+    vi.clearAllMocks();
+    setup();
+    const req: any = useSearchQuery(gt).getQueryReq(false);
+    expect(req).not.toBeNull();
+    return [...Object.keys(req), ...Object.keys(req.query)];
+  };
+
+  it.each([
+    ["filter mode", () => {}],
+    [
+      "quick mode with a field list",
+      () => {
+        mockState.searchObj.meta.quickMode = true;
+        mockState.searchObj.data.stream.interestingFieldList = ["_timestamp", "message"];
+        mockState.searchObj.data.stream.selectedStreamFields = [
+          { name: "_timestamp" },
+          { name: "message" },
+        ];
+      },
+    ],
+    [
+      "SQL mode",
+      () => {
+        mockState.searchObj.meta.sqlMode = true;
+        mockState.searchObj.data.query = 'SELECT * FROM "my-stream"';
+      },
+    ],
+  ])("maps every field it writes in %s", (_name, setup) => {
+    for (const field of writtenFields(setup)) {
+      if (IGNORED.has(field)) continue;
+      const covered = SIGNATURE_FIELDS_BY_REQUEST_FIELD[field];
+      expect(
+        covered,
+        `request field "${field}" is neither in the signature nor ignored`,
+      ).toBeTruthy();
+      covered.forEach((key) => expect(signatureKeys).toContain(key));
+    }
   });
 });

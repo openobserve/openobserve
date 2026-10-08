@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
       :regionClusterParams="regionClusterParams"
       :allowedChartTypes="allowedChartTypes"
+      :addToDashboardDisabledReason="addToDashboardReason"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
       @searchRequestTraceIdsUpdated="handleSearchRequestTraceIdsUpdated"
@@ -64,6 +65,7 @@ import useNotifications from "@/composables/useNotifications";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 
@@ -226,7 +228,17 @@ export default defineComponent({
 
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    const autoRun = useLogsAutoRun();
+    // G1: Add to dashboard follows this panel's own completed run (J7, F21).
+    const addToDashboardReason = computed(() =>
+      autoRun.persistReason("visualize", "add-to-dashboard"),
+    );
+
     const addToDashboard = () => {
+      if (addToDashboardReason.value) {
+        showErrorNotification(addToDashboardReason.value);
+        return;
+      }
       // Get result metadata from PanelEditor if available
       const panelResultMetaData = panelEditorRef.value?.metaData?.value;
 
@@ -293,6 +305,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      addToDashboardReason,
       hoveredSeriesState,
       resultMetaData,
       isSimpleSelectAllQuery,

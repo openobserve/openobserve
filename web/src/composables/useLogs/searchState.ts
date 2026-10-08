@@ -18,6 +18,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
+import { resetTransient } from "@/utils/logs/transientSearchKeys";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
@@ -310,6 +311,8 @@ export const searchState = () => {
           refreshInterval: 0,
         }),
       );
+      // Runs before data is restored, so the restored rows keep their own download request.
+      resetTransient(searchObj as unknown as Record<string, unknown>);
 
       // Initialize data with default histogram structure
       searchObj.data = JSON.parse(

@@ -224,15 +224,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="select-pagination min-w-[4.5rem]"
             size="sm"
             :searchable="false"
-            :disable="searchObj.loading"
+            :disable="searchObj.loading || !!gridLockReason"
             @update:model-value="getPageData('recordsPerPage')"
+          />
+          <OTooltip
+            v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
+            :content="gridLockReason"
           />
           <OPagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
             "
-            :disable="searchObj.loading"
+            :disable="searchObj.loading || !!gridLockReason"
+            :data-locked="gridLockReason ? 'true' : undefined"
             v-model="pageNumberInput"
             :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
             :max="
@@ -247,6 +252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="paginator-section"
             @update:model-value="getPageData('pageChange')"
             data-test="logs-search-result-pagination"
+          />
+          <OTooltip
+            v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
+            :content="gridLockReason"
           />
         </div>
       </div>
@@ -827,6 +836,7 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -982,6 +992,8 @@ export default defineComponent({
     },
 
     getPageData(actionType: string) {
+      // The controls are disabled while locked; this also covers keyboard paths.
+      if (this.gridLockReason) return false;
       if (actionType == "prev") {
         if (this.searchObj.data.resultGrid.currentPage > 1) {
           this.searchObj.data.resultGrid.currentPage =
@@ -1219,6 +1231,14 @@ export default defineComponent({
       useLogs(t);
 
     const { searchObj } = searchState();
+    const autoRun = useLogsAutoRun();
+
+    // Paging an out-of-date or search-around grid would fetch a different query than the rows show (AC5.2, D6).
+    const gridLockReason = computed(() => {
+      if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
+      if (autoRun.searchAroundActive()) return t("search.autoRunSearchAroundActive");
+      return null;
+    });
 
     // Use separate patterns state (completely isolated from logs)
     const { patternsState } = usePatterns(t);
@@ -2343,6 +2363,7 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      gridLockReason,
       raw,
       isDark,
       isMobile,

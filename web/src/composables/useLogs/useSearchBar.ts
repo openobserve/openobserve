@@ -36,9 +36,23 @@ import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
-import config from "@/aws-exports";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+
+// Moved on every selection change, so a slower schema response for an earlier pick never wins (P1).
+let selectionToken = 0;
+
+export const bumpSelectionToken = (): number => ++selectionToken;
+
+export const currentSelectionToken = (): number => selectionToken;
+
+export interface StreamChangeOptions {
+  origin?: "editor" | "selector";
+}
+
+export interface QueryDataOptions {
+  generationId?: number;
+}
 
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
@@ -57,6 +71,9 @@ export const useSearchBar = (t: TranslateFn) => {
   const { cancelSearchQueryBasedOnRequestId } = useSearchWebSocket();
 
   const { extractFields } = useStreamFields();
+
+  // Binds the page store and search object to the engine while inside a setup.
+  useLogsAutoRun();
 
   const getFunctions = async () => {
     try {
@@ -261,7 +278,7 @@ export const useSearchBar = (t: TranslateFn) => {
         )
       ) {
         searchObj.data.stream.selectedStream = newSelectedStreams;
-        onStreamChange(value);
+        onStreamChange(value, { origin: "editor" });
       }
     } catch (error) {
       console.error("Error in setSelectedStreams:", {
@@ -273,21 +290,23 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
-  const onStreamChange = async (queryStr: string) => {
+  const onStreamChange = async (queryStr: string, options: StreamChangeOptions = {}) => {
+    const token = bumpSelectionToken();
+    const autoRun = useLogsAutoRun();
+    const editorOrigin = options.origin === "editor";
+    const legacyAutoRun = !store.state.zoConfig.query_on_stream_selection;
+    const stale = () => token !== selectionToken;
     try {
-      // Only flag the results grid as loading when a search will actually run;
-      // otherwise this call just refreshes the stream schema.
-      const willRunQuery =
-        !store.state.zoConfig.query_on_stream_selection ||
-        (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode);
-
       searchObj.loadingStream = true;
-      searchObj.loading = willRunQuery;
+      searchObj.loading = false;
       searchObj.loadingProgressPercentage = 0;
 
-      await cancelQuery();
+      // A stream switch replaces the scope, so the in-flight run and anything pending stop here.
+      autoRun.engine.cancelGeneration(null, { cause: "reset" });
+      if (!editorOrigin) autoRun.engine.clearEditorDirty();
 
-      // Reset query results
+      // Reset query results; the executed record goes with them, so nothing reads as current.
+      autoRun.invalidateExecuted("stream");
       searchObj.data.queryResults = { hits: [] };
       // Cleared with the results, else the previous stream's "no events found"
       // flashes before the new fields land.
@@ -307,6 +326,7 @@ export const useSearchBar = (t: TranslateFn) => {
       );
 
       const streamDataResults = await Promise.all(streamDataPromises);
+      if (stale()) return;
 
       // TODO : We can optimize filter + flatMap using a single reducer function
       // Collect all schema fields
@@ -357,9 +377,9 @@ export const useSearchBar = (t: TranslateFn) => {
         searchObj.meta.showHistogram = false;
       }
 
-      if (!store.state.zoConfig.query_on_stream_selection) {
+      if (legacyAutoRun) {
         searchObj.meta.refreshHistogram = true;
-        await handleQueryData();
+        handleQueryData();
       } else {
         // Reset states when query on selection is disabled
         searchObj.data.sortedQueryResults = [];
@@ -379,35 +399,30 @@ export const useSearchBar = (t: TranslateFn) => {
           errorDetail: "",
         };
         await extractFields();
-        // In live mode, auto-run the query after fields are loaded
-        if (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode) {
-          searchObj.meta.refreshHistogram = true;
-          await handleQueryData();
-        } else {
-          searchObj.loading = false;
-        }
+        if (stale()) return;
+        searchObj.loading = false;
+        if (!editorOrigin) autoRun.request("stream");
       }
     } catch (e: any) {
       console.info("Error while getting stream data:", e);
     } finally {
-      searchObj.loadingStream = false;
+      if (!stale()) searchObj.loadingStream = false;
     }
   };
 
+  // QOSS=false legacy run: unguarded, but still under a generation so Cancel and replacement reach it.
   const handleQueryData = async () => {
     try {
       searchObj.data.tempFunctionLoading = false;
       searchObj.data.tempFunctionName = "";
       searchObj.data.tempFunctionContent = "";
-      searchObj.loading = true;
-      searchObj.loadingProgressPercentage = 0;
-      await getQueryData();
+      useLogsAutoRun().engine.requestRun("explicit");
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
   };
 
-  const getQueryData = async (isPagination = false) => {
+  const getQueryData = async (isPagination = false, options: QueryDataOptions = {}) => {
     try {
       //remove any data that has been cached
       if (Object.keys(searchObj.data.originalDataCache).length > 0) {
@@ -511,7 +526,7 @@ export const useSearchBar = (t: TranslateFn) => {
       }
 
       // Use the appropriate method to fetch data
-      getDataThroughStream(isPagination);
+      getDataThroughStream(isPagination, options.generationId);
 
       // searchObjDebug["buildSearchStartTime"] = performance.now();
       // const queryReq: any = buildSearch();
@@ -852,63 +867,11 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
+  // The single cancel path: browser streams of the current generations, plus the ENT server cancel (P2).
   const cancelQuery = async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      try {
-        // only call cancel query api if it is enterprise
-        // otherwise resolve and return immediately
-        if (config.isEnterprise !== "true") {
-          resolve(true);
-          return;
-        }
-
-        const tracesIds = [...searchObj.data.searchRequestTraceIds];
-
-        if (!searchObj.data.searchRequestTraceIds.length) {
-          searchObj.data.isOperationCancelled = false;
-          resolve(true);
-          return;
-        }
-
-        searchObj.data.isOperationCancelled = true;
-
-        searchService
-          .delete_running_queries(
-            store.state.selectedOrganization.identifier,
-            searchObj.data.searchRequestTraceIds,
-          )
-          .then((res) => {
-            const isCancelled = res.data.some((item: any) => item.is_success);
-            if (isCancelled) {
-              searchObj.data.isOperationCancelled = false;
-              toast({
-                variant: "info",
-                message: t("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
-              });
-            }
-          })
-          .catch((error: any) => {
-            toast({
-              variant: "error",
-              message:
-                error.response?.data?.message ||
-                t("toastMessages.useLogs.failedToCancelRunningQuery"),
-            });
-          })
-          .finally(() => {
-            searchObj.data.searchRequestTraceIds = searchObj.data.searchRequestTraceIds.filter(
-              (id: string) => !tracesIds.includes(id),
-            );
-            resolve(true);
-          });
-      } catch (error) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.useLogs.failedToCancelRunningQuery"),
-        });
-        resolve(true);
-      }
-    });
+    useLogsAutoRun().engine.cancelGeneration(null, { cause: "user" });
+    searchObj.data.isOperationCancelled = false;
+    return true;
   };
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
