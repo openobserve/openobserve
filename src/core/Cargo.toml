@@ -41,6 +41,8 @@ vectorscan = [
     "promql-service/vectorscan",
     "stream/vectorscan",
 ]
+# Lets dependants' tests install a fake stream access checker; never enabled outside dev-dependencies.
+test-utils = []
 profiling = [
     "dep:jemalloc_pprof",
     "dep:pprof",

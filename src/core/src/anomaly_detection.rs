@@ -1207,6 +1207,7 @@ pub async fn clone_config(
     anomaly_id: &str,
     new_name: Option<String>,
     folder_id: Option<String>,
+    owner: Option<String>,
 ) -> Result<serde_json::Value> {
     let db = get_orm_client_rw().await;
 
@@ -1270,7 +1271,7 @@ pub async fn clone_config(
         alert_enabled: src.alert_enabled,
         alert_destinations: src.alert_destinations.clone(),
         folder_id: resolved_folder_id,
-        owner: src.owner.clone(),
+        owner: owner.or_else(|| src.owner.clone()),
         // Feature 2: a clone inherits the original's triage metadata —
         // copying an alert that is P1/tagged and silently dropping both
         // would hand back something that looks configured but is not.

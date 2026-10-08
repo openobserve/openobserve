@@ -26,6 +26,10 @@ pub use openobserve_core::anomaly_detection::{
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_folder_write_permissions;
+#[cfg(feature = "enterprise")]
+use openobserve_core::background_access::{
+    anomaly_sources, anomaly_update_sources, create_owner, guard_loaded, guard_write,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -127,6 +131,12 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
     }
 }
 
+#[cfg(feature = "enterprise")]
+async fn guard_stored(org_id: &str, anomaly_id: &str, user_id: &str) -> Option<Response> {
+    let loaded = anomaly_update_sources(org_id, anomaly_id, None).await;
+    guard_loaded(org_id, user_id, loaded).await.err()
+}
+
 /// Falls back to `fallback` when `owner` is absent or empty.
 fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
     if owner.as_deref().unwrap_or("").is_empty() {
@@ -170,7 +180,20 @@ pub async fn create_config(
     if let Some(resp) = disabled_response() {
         return resp;
     }
-    req.owner = resolve_owner(req.owner, &user_email.user_id);
+    #[cfg(feature = "enterprise")]
+    {
+        let requested = resolve_owner(req.owner, &user_email.user_id);
+        req.owner = Some(create_owner(&org_id, &user_email.user_id, requested.as_deref()).await);
+        let sources = anomaly_sources(
+            &org_id,
+            &req.stream_type,
+            &req.stream_name,
+            req.custom_sql.as_deref(),
+        );
+        if let Err(resp) = guard_write(&org_id, &user_email.user_id, &sources).await {
+            return resp;
+        }
+    }
     // The route gate resolves `?folder=`; this body folder is what actually gets written.
     #[cfg(feature = "enterprise")]
     if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
@@ -229,14 +252,15 @@ pub async fn update_config(
     if let Some(resp) = disabled_response() {
         return resp;
     }
-    // Sanitize empty owner string: treat "" same as omitted on create — fall back to requester.
-    req.owner = req.owner.map(|o| {
-        if o.is_empty() {
-            user_email.user_id.clone()
-        } else {
-            o
+    #[cfg(feature = "enterprise")]
+    {
+        // an update never changes the stored owner
+        req.owner = None;
+        let loaded = anomaly_update_sources(&org_id, &anomaly_id, req.custom_sql.as_deref()).await;
+        if let Err(resp) = guard_loaded(&org_id, &user_email.user_id, loaded).await {
+            return resp;
         }
-    });
+    }
     // An update carrying a folder_id is also a move, so the destination needs its own check.
     #[cfg(feature = "enterprise")]
     if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
@@ -325,8 +349,15 @@ pub async fn delete_config(Path((org_id, anomaly_id)): Path<(String, String)>) -
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
-pub async fn train_model(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+pub async fn train_model(
+    Path((org_id, anomaly_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     if let Some(resp) = disabled_response() {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(resp) = guard_stored(&org_id, &anomaly_id, &user_email.user_id).await {
         return resp;
     }
     match anomaly_service::train_model(&org_id, &anomaly_id).await {
@@ -400,8 +431,15 @@ pub async fn cancel_training(Path((org_id, anomaly_id)): Path<(String, String)>)
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, anomaly_id = %anomaly_id))]
-pub async fn detect_anomalies(Path((org_id, anomaly_id)): Path<(String, String)>) -> Response {
+pub async fn detect_anomalies(
+    Path((org_id, anomaly_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
     if let Some(resp) = disabled_response() {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(resp) = guard_stored(&org_id, &anomaly_id, &user_email.user_id).await {
         return resp;
     }
     match anomaly_service::detect_anomalies(&org_id, &anomaly_id).await {

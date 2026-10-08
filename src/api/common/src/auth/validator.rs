@@ -906,20 +906,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     {
         return Ok(());
     }
-    // Hack for v2 apis
-    let org_id = if path_columns.len() > 2
-        && path_columns[0].eq("v2")
-        && (path_columns[2].eq("alerts")
-            || path_columns[2].eq("folders")
-            || path_columns[2].eq("reports")
-            || path_columns[2].eq("synthetics")
-            || path_columns[2].eq("incidents")
-            || path_columns[2].eq("workflows"))
-    {
-        path_columns[1]
-    } else {
-        path_columns[0]
-    };
+    let org_id = path_org_id(&path_columns);
 
     if openobserve_core::organization::get_org(org_id)
         .await
@@ -939,6 +926,25 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         }
     } else {
         Ok(())
+    }
+}
+
+/// The org segment of a nest-stripped path: second under these v2 prefixes, first elsewhere.
+fn path_org_id<'a>(path_columns: &[&'a str]) -> &'a str {
+    const V2_ORG_SECOND: &[&str] = &[
+        "alerts",
+        "folders",
+        "reports",
+        "synthetics",
+        "incidents",
+        "workflows",
+        "background_objects",
+    ];
+    if path_columns.len() > 2 && path_columns[0] == "v2" && V2_ORG_SECOND.contains(&path_columns[2])
+    {
+        path_columns[1]
+    } else {
+        path_columns[0]
     }
 }
 
@@ -2585,6 +2591,16 @@ mod tests {
             "default"
         };
         assert_eq!(org_id_normal, "default");
+    }
+
+    #[test]
+    fn v2_routes_with_the_org_second_name_that_org() {
+        assert_eq!(
+            path_org_id(&["v2", "acme", "background_objects", "stream_access_audit"]),
+            "acme"
+        );
+        assert_eq!(path_org_id(&["v2", "acme", "alerts"]), "acme");
+        assert_eq!(path_org_id(&["acme", "streams"]), "acme");
     }
 
     #[test]

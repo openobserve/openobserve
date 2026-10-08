@@ -168,6 +168,7 @@ use crate::{
         openobserve_api_management::request::alerts::clone_alert,
         openobserve_api_management::request::alerts::generate_sql,
         openobserve_api_management::request::alerts::move_alerts,
+        openobserve_api_management::request::authz::stream_access_audit::stream_access_audit,
         openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
         openobserve_api_management::request::alerts::incidents::list_incidents,

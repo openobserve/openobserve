@@ -269,6 +269,7 @@ impl From<EvalJobError> for Response {
                 MetaHttpResponse::internal_error("Internal server error")
             }
             EvalJobError::NotFound => MetaHttpResponse::not_found(value),
+            EvalJobError::Changed => MetaHttpResponse::conflict(value),
             EvalJobError::ReconcilerError(err) => {
                 log::error!("[EvalJob] reconciler error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")

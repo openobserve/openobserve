@@ -145,6 +145,12 @@ pub async fn update_dashboard(
     let mut dashboard: Dashboard = req_body.into();
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        guard_whole_edit(&org_id, &user_email.user_id, &dashboard_id, &dashboard).await
+    {
+        return resp;
+    }
 
     let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
         .await
@@ -512,10 +518,17 @@ pub async fn move_dashboards(
 pub async fn add_panel(
     Path((org_id, dashboard_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<PanelRequestBody>,
 ) -> Response {
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        guard_panel_edit(&org_id, &user_email.user_id, &dashboard_id, &req_body.panel).await
+    {
+        return resp;
     }
     let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
@@ -578,10 +591,17 @@ pub async fn add_panel(
 pub async fn update_panel(
     Path((org_id, dashboard_id, panel_id)): Path<(String, String, String)>,
     Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(req_body): axum::Json<PanelRequestBody>,
 ) -> Response {
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        guard_panel_edit(&org_id, &user_email.user_id, &dashboard_id, &req_body.panel).await
+    {
+        return resp;
     }
     let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
@@ -691,6 +711,48 @@ pub fn is_overwrite(query_str: &str) -> bool {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_whole_edit(
+    org_id: &str,
+    user_id: &str,
+    dashboard_id: &str,
+    dashboard: &Dashboard,
+) -> Result<(), Response> {
+    let Some(edited) = openobserve_core::background_access::dashboard_json(dashboard) else {
+        return Err(MetaHttpResponse::bad_request(format!(
+            "dashboard body has no v{} content",
+            dashboard.version
+        )));
+    };
+    openobserve_core::background_access::guard_dashboard_edit(
+        org_id,
+        user_id,
+        dashboard_id,
+        &edited,
+        true,
+    )
+    .await
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_panel_edit(
+    org_id: &str,
+    user_id: &str,
+    dashboard_id: &str,
+    panel: &config::meta::dashboards::v8::Panel,
+) -> Result<(), Response> {
+    let edited =
+        serde_json::to_value(panel).map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
+    openobserve_core::background_access::guard_dashboard_edit(
+        org_id,
+        user_id,
+        dashboard_id,
+        &edited,
+        false,
+    )
+    .await
 }
 
 /// Tries to get the user ID from the request headers.

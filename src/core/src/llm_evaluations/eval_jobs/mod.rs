@@ -58,6 +58,9 @@ pub enum EvalJobError {
 
     #[error("TaskPublishError# {0}")]
     TaskPublish(String),
+
+    #[error("Job changed while the request was in progress; retry")]
+    Changed,
 }
 
 /// Request body for manually evaluating an explicit target with a job's scorers.
@@ -298,6 +301,17 @@ pub async fn get_job(
     Ok(job)
 }
 
+/// [`get_job`] on the primary, for a check that must see the row the write acts on.
+#[tracing::instrument()]
+pub async fn get_job_rw(
+    org_id: &str,
+    job_id: &str,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    table::online_eval_jobs::get_by_org_rw(job_id, org_id)
+        .await?
+        .ok_or(EvalJobError::NotFound)
+}
+
 #[tracing::instrument()]
 pub async fn delete_job(org_id: &str, job_id: &str) -> Result<(), EvalJobError> {
     let job = get_job(org_id, job_id).await?;
@@ -322,41 +336,35 @@ pub async fn transition_status(
     new_status: &str,
 ) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
-
-    if !table::online_eval_jobs::is_valid_transition(&job.status, new_status) {
-        return Err(EvalJobError::InvalidStatusTransition {
-            from: job.status,
-            to: new_status.to_string(),
-        });
-    }
-
-    // Build the target job snapshot (status updated) and let the reconciler
-    // produce/update/delete the eval pipeline before we persist the new
-    // status. This way: if reconciliation fails, we don't end up with a job
-    // claiming `active` while its pipeline isn't enabled.
-    let mut target = job.clone();
-    target.status = new_status.to_string();
-    if new_status == "active" {
-        target
-            .validate_for_activation()
-            .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
-        validate_source_stream(org_id, &target).await?;
-        validate_online_scorers(org_id, &target.scorers).await?;
-    }
-    let pipeline_id = reconciler::reconcile(&target)
-        .await
-        .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
+    let pipeline_id = reconcile_transition(org_id, &job, new_status).await?;
 
     // Persist the new status (and any pipeline_id allocated by reconcile).
     let now = Utc::now().timestamp_millis();
     table::online_eval_jobs::update_status(job_id, new_status, pipeline_id.as_deref(), now).await?;
+    Ok(publish_transition(job, new_status, pipeline_id, now).await)
+}
 
-    let mut updated = job;
-    updated.status = new_status.to_string();
-    updated.updated_at = now;
-    updated.pipeline_id = pipeline_id;
-    publish_eval_job_put(&updated).await;
-    Ok(updated)
+/// Transitions `checked` itself, refusing with `Changed` once the stored row no longer matches it.
+#[tracing::instrument(skip(checked), fields(job_id = %checked.id))]
+pub async fn transition_checked(
+    org_id: &str,
+    checked: table::online_eval_jobs::OnlineEvalJob,
+    new_status: &str,
+) -> Result<table::online_eval_jobs::OnlineEvalJob, EvalJobError> {
+    let pipeline_id = reconcile_transition(org_id, &checked, new_status).await?;
+    let now = Utc::now().timestamp_millis();
+    let persisted = table::online_eval_jobs::update_status_if_unchanged(
+        &checked,
+        new_status,
+        pipeline_id.as_deref(),
+        now,
+    )
+    .await?;
+    if !persisted {
+        realign_refused_transition(&checked, pipeline_id).await;
+        return Err(EvalJobError::Changed);
+    }
+    Ok(publish_transition(checked, new_status, pipeline_id, now).await)
 }
 
 #[cfg(feature = "enterprise")]
@@ -368,6 +376,18 @@ pub async fn manual_evaluate(
     author: Option<String>,
 ) -> Result<ManualEvalJobResponseBody, EvalJobError> {
     let job = get_job(org_id, job_id).await?;
+    manual_evaluate_job(org_id, job, body, author).await
+}
+
+/// Evaluates with `job` as given, so a caller that checked one snapshot runs that same snapshot.
+#[cfg(feature = "enterprise")]
+#[tracing::instrument(skip(job, body), fields(job_id = %job.id))]
+pub async fn manual_evaluate_job(
+    org_id: &str,
+    job: table::online_eval_jobs::OnlineEvalJob,
+    body: ManualEvalJobRequestBody,
+    author: Option<String>,
+) -> Result<ManualEvalJobResponseBody, EvalJobError> {
     if job.status == "archived" {
         return Err(EvalJobError::InvalidJob(
             "Archived eval jobs cannot be manually evaluated".to_string(),
@@ -487,6 +507,79 @@ async fn publish_eval_job_delete(org_id: &str, job_id: &str) {
 #[cfg(not(feature = "enterprise"))]
 async fn publish_eval_job_delete(_org_id: &str, _job_id: &str) {}
 
+/// Validates the move and reconciles the pipeline to it before any status is persisted.
+async fn reconcile_transition(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+    new_status: &str,
+) -> Result<Option<String>, EvalJobError> {
+    if !table::online_eval_jobs::is_valid_transition(&job.status, new_status) {
+        return Err(EvalJobError::InvalidStatusTransition {
+            from: job.status.clone(),
+            to: new_status.to_string(),
+        });
+    }
+
+    // Build the target job snapshot (status updated) and let the reconciler
+    // produce/update/delete the eval pipeline before we persist the new
+    // status. This way: if reconciliation fails, we don't end up with a job
+    // claiming `active` while its pipeline isn't enabled.
+    let mut target = job.clone();
+    target.status = new_status.to_string();
+    if new_status == "active" {
+        target
+            .validate_for_activation()
+            .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+        validate_source_stream(org_id, &target).await?;
+        validate_online_scorers(org_id, &target.scorers).await?;
+    }
+    reconciler::reconcile(&target)
+        .await
+        .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))
+}
+
+async fn publish_transition(
+    mut job: table::online_eval_jobs::OnlineEvalJob,
+    new_status: &str,
+    pipeline_id: Option<String>,
+    now: i64,
+) -> table::online_eval_jobs::OnlineEvalJob {
+    job.status = new_status.to_string();
+    job.updated_at = now;
+    job.pipeline_id = pipeline_id;
+    publish_eval_job_put(&job).await;
+    job
+}
+
+/// Brings the pipeline back in line with the stored row after a refused transition reconciled it.
+async fn realign_refused_transition(
+    checked: &table::online_eval_jobs::OnlineEvalJob,
+    allocated: Option<String>,
+) {
+    let stored = match table::online_eval_jobs::get_by_org_rw(&checked.id, &checked.org_id).await {
+        Ok(stored) => stored,
+        Err(e) => {
+            log::error!("[EvalJob] reload after a refused transition failed: {e}");
+            return;
+        }
+    };
+    let stored_pipeline = stored.as_ref().and_then(|job| job.pipeline_id.as_deref());
+    if allocated.is_some() && allocated.as_deref() != stored_pipeline {
+        let orphan = table::online_eval_jobs::OnlineEvalJob {
+            pipeline_id: allocated,
+            ..checked.clone()
+        };
+        if let Err(e) = reconciler::tear_down(&orphan).await {
+            log::error!("[EvalJob] tear down after a refused transition failed: {e}");
+        }
+    }
+    if let Some(stored) = stored
+        && let Err(e) = reconciler::reconcile(&stored).await
+    {
+        log::error!("[EvalJob] reconcile after a refused transition failed: {e}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,5 +698,64 @@ mod tests {
                 .to_string()
                 .contains("use an Experiment target instead")
         );
+    }
+
+    #[tokio::test]
+    async fn a_transition_refuses_a_checked_snapshot_the_primary_row_has_left() {
+        use table::online_eval_jobs::{self as jobs, OnlineEvalJob};
+
+        jobs::create_table().await.unwrap();
+        let checked = OnlineEvalJob::from(infra::table::entity::online_eval_jobs::Model {
+            id: "transition-cas-job".to_string(),
+            org_id: "transition_cas_org".to_string(),
+            name: "cas".to_string(),
+            description: None,
+            stream: "readable_spans".to_string(),
+            stream_type: "traces".to_string(),
+            target_scope: "trace".to_string(),
+            filter_condition: serde_json::json!({}),
+            scorers: serde_json::json!([]),
+            input_mapping: None,
+            span_selectors: None,
+            span_selector_bindings: None,
+            trace_config: None,
+            session_config: None,
+            sampling_mode: "all".to_string(),
+            sampling_value: serde_json::json!(1),
+            status: "paused".to_string(),
+            version: 1,
+            pipeline_id: None,
+            created_at: 1,
+            updated_at: 1,
+        });
+        jobs::delete(&checked.id).await.unwrap();
+        jobs::add(&checked).await.unwrap();
+        let primary = OnlineEvalJob {
+            stream: "denied_spans".to_string(),
+            ..checked.clone()
+        };
+        jobs::update(&primary).await.unwrap();
+
+        let refused = transition_checked(&checked.org_id, checked.clone(), "archived").await;
+        assert!(matches!(refused, Err(EvalJobError::Changed)), "{refused:?}");
+        let stored = get_job_rw(&checked.org_id, &checked.id).await.unwrap();
+        assert_eq!(stored.status, "paused");
+        assert_eq!(stored.stream, "denied_spans");
+
+        let moved = transition_checked(&checked.org_id, stored, "archived")
+            .await
+            .unwrap();
+        assert_eq!(
+            (moved.status.as_str(), moved.stream.as_str()),
+            ("archived", "denied_spans")
+        );
+        assert_eq!(
+            get_job_rw(&checked.org_id, &checked.id)
+                .await
+                .unwrap()
+                .status,
+            "archived"
+        );
+        jobs::delete(&checked.id).await.unwrap();
     }
 }

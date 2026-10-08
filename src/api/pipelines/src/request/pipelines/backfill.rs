@@ -21,8 +21,12 @@ use axum::{
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
 use openobserve_core::alerts::backfill;
 pub use openobserve_core::alerts::backfill::BackfillRequest;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -75,9 +79,12 @@ pub struct BackfillResponse {
 )]
 pub async fn create_backfill(
     Path((org_id, pipeline_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
-    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+    if let Err(response) =
+        ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
+    {
         return response;
     }
 
@@ -330,6 +337,7 @@ pub async fn get_backfill(
 pub async fn enable_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
     Query(query): Query<std::collections::HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
         return response;
@@ -339,6 +347,12 @@ pub async fn enable_backfill(
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
+    if enable
+        && let Err(response) =
+            ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
+    {
+        return response;
+    }
 
     // Verify the job belongs to the specified pipeline
     match backfill::get_backfill_job(&org_id, &job_id).await {
@@ -561,9 +575,12 @@ pub async fn delete_backfill(
 )]
 pub async fn update_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
-    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+    if let Err(response) =
+        ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
+    {
         return response;
     }
 
@@ -654,6 +671,22 @@ pub async fn update_backfill(
     Json(_body): Json<BackfillRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
+}
+
+/// A backfill reruns its pipeline over past data, so it needs what the pipeline reads.
+#[cfg(feature = "enterprise")]
+async fn ensure_readable_pipeline(
+    org_id: &str,
+    pipeline_id: &str,
+    user_id: &str,
+) -> Result<(), Response> {
+    let pipeline = openobserve_core::pipeline::get_user_pipeline(org_id, pipeline_id)
+        .await
+        .map_err(Response::from)?;
+    let sources = openobserve_core::background_access::pipeline_sources(&pipeline)
+        .await
+        .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
+    openobserve_core::background_access::guard_write(org_id, user_id, &sources).await
 }
 
 #[cfg(test)]

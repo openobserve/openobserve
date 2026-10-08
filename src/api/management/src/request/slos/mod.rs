@@ -30,6 +30,8 @@ use config::meta::slo::{Slo, SloStatusView};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
+#[cfg(feature = "enterprise")]
+use openobserve_core::background_access::{create_owner, guard_write, slo_sources, stored_slo};
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -162,8 +164,16 @@ pub async fn create_slo(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    #[cfg(not(feature = "enterprise"))]
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        slo.owner = Some(create_owner(&slo.org, &user_email.user_id, slo.owner.as_deref()).await);
+        if let Err(resp) = guard_write(&slo.org, &user_email.user_id, &slo_sources(&slo)).await {
+            return resp;
+        }
     }
     if slo.name.is_empty() || slo.name.len() > 256 {
         return MetaHttpResponse::bad_request(
@@ -232,8 +242,23 @@ pub async fn update_slo(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
+    #[cfg(not(feature = "enterprise"))]
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        // an update never changes the stored owner
+        match stored_slo(&slo.org, &slo.id).await {
+            Ok(Some(stored)) => {
+                slo.owner = stored.owner.or_else(|| Some(user_email.user_id.clone()));
+            }
+            Ok(None) => {}
+            Err(e) => return internal(e),
+        }
+        if let Err(resp) = guard_write(&slo.org, &user_email.user_id, &slo_sources(&slo)).await {
+            return resp;
+        }
     }
 
     match slo_service::update(&mut slo).await {
@@ -413,7 +438,19 @@ pub struct EnableQuery {
 pub async fn enable_slo(
     Path((org_id, slo_id)): Path<(String, String)>,
     Query(q): Query<EnableQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if q.value {
+        // a missing SLO checks nothing: set_enabled reads the same primary and answers 404
+        let sources = match stored_slo(&org_id, &slo_id).await {
+            Ok(stored) => stored.as_ref().map(slo_sources).unwrap_or_default(),
+            Err(e) => return internal(e),
+        };
+        if let Err(resp) = guard_write(&org_id, &user_email.user_id, &sources).await {
+            return resp;
+        }
+    }
     match slo_service::set_enabled(&org_id, &slo_id, q.value).await {
         Ok(true) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,

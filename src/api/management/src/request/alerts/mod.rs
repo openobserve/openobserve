@@ -43,6 +43,9 @@ use svix_ksuid::Ksuid;
 use {
     openobserve_core::auth::{check_folder_write_permissions, check_permissions},
     openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
+    openobserve_core::background_access::{
+        alert_sources, anomaly_config_sources, create_owner, guard_write,
+    },
 };
 
 #[cfg(feature = "enterprise")]
@@ -252,8 +255,23 @@ pub async fn create_alert(
     if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
         return resp;
     }
+    #[cfg(not(feature = "enterprise"))]
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        alert.owner =
+            Some(create_owner(&org_id, &user_email.user_id, alert.owner.as_deref()).await);
+        if let Err(resp) = guard_write(
+            &org_id,
+            &user_email.user_id,
+            &alert_sources(&org_id, &alert),
+        )
+        .await
+        {
+            return resp;
+        }
     }
     alert.last_edited_by = Some(user_email.user_id);
 
@@ -276,7 +294,7 @@ async fn create_composite_alert(
     org_id: &str,
     folder_id: &str,
     user_id: String,
-    req: CreateAlertRequestBody,
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))] mut req: CreateAlertRequestBody,
 ) -> Response {
     if let Some(field) = req.composite_unsupported_field() {
         return composite_field_error(
@@ -298,6 +316,10 @@ async fn create_composite_alert(
         composite_unauthorized_children(org_id, &user_id, &condition.expression).await
     {
         return composite_access_error(children);
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        req.alert.owner = Some(create_owner(org_id, &user_id, req.alert.owner.as_deref()).await);
     }
     let input = composite_input(None, org_id, folder_id, user_id, req.alert, condition);
     match openobserve_core::alerts::composite::create_composite(input).await {
@@ -347,10 +369,15 @@ async fn update_composite_alert(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    #[cfg(feature = "enterprise")]
+    let stored_owner = current
+        .as_ref()
+        .map(|current| current.definition.owner.clone());
     let folder_id = current
         .map(|current| current.definition.folder_id)
         .unwrap_or_else(|| "default".to_string());
-    let input = composite_input(
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut input = composite_input(
         Some(id.to_string()),
         org_id,
         &folder_id,
@@ -358,6 +385,10 @@ async fn update_composite_alert(
         req.alert,
         condition,
     );
+    #[cfg(feature = "enterprise")]
+    if let Some(owner) = stored_owner {
+        input.owner = owner;
+    }
     match openobserve_core::alerts::composite::update_composite(id, input).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
         Err(error) => composite_error_response(error),
@@ -1272,11 +1303,7 @@ async fn create_anomaly_alert(
         );
     };
 
-    let owner = if req_body.alert.owner.as_deref().unwrap_or("").is_empty() {
-        Some(user_id)
-    } else {
-        req_body.alert.owner
-    };
+    let owner = Some(create_owner(org_id, &user_id, req_body.alert.owner.as_deref()).await);
 
     let req = CreateAnomalyConfigRequest {
         name: req_body.alert.name,
@@ -1317,6 +1344,15 @@ async fn create_anomaly_alert(
         priority: req_body.alert.priority,
         tags: req_body.alert.tags,
     };
+    let sources = openobserve_core::background_access::anomaly_sources(
+        org_id,
+        &req.stream_type,
+        &req.stream_name,
+        req.custom_sql.as_deref(),
+    );
+    if let Err(resp) = guard_write(org_id, &user_id, &sources).await {
+        return resp;
+    }
 
     match openobserve_core::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
@@ -1785,6 +1821,21 @@ pub async fn clone_alert(
             src_alert.name = new_name;
             // Clear the ID so a new one is assigned on insert
             src_alert.id = None;
+            #[cfg(feature = "enterprise")]
+            {
+                src_alert.owner = Some(
+                    create_owner(&org_id, &user_email.user_id, src_alert.owner.as_deref()).await,
+                );
+                if let Err(resp) = guard_write(
+                    &org_id,
+                    &user_email.user_id,
+                    &alert_sources(&org_id, &src_alert),
+                )
+                .await
+                {
+                    return resp;
+                }
+            }
             match alert::create(client, &org_id, &dst_folder, src_alert, false).await {
                 Ok(saved) => MetaHttpResponse::json(saved),
                 Err(e) => e.into(),
@@ -1841,12 +1892,24 @@ pub async fn clone_alert(
                         return MetaHttpResponse::forbidden("Unauthorized Access");
                     }
                 }
+                #[cfg(feature = "enterprise")]
+                let clone_owner = Some(
+                    create_owner(
+                        &org_id,
+                        &user_email.user_id,
+                        _composite.definition.owner.as_deref(),
+                    )
+                    .await,
+                );
+                #[cfg(not(feature = "enterprise"))]
+                let clone_owner = None;
                 return match openobserve_core::alerts::composite::clone_composite(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
                     Some(dst_folder),
                     "api".to_string(),
+                    clone_owner,
                 )
                 .await
                 {
@@ -1914,12 +1977,24 @@ pub async fn clone_alert(
                 {
                     return MetaHttpResponse::forbidden("Unauthorized Access");
                 }
+                if let Err(resp) = guard_write(
+                    &org_id,
+                    &user_email.user_id,
+                    &anomaly_config_sources(&org_id, &src_cfg),
+                )
+                .await
+                {
+                    return resp;
+                }
+                let src_owner = src_cfg.get("owner").and_then(|o| o.as_str());
+                let clone_owner = create_owner(&org_id, &user_email.user_id, src_owner).await;
                 // Fall back to anomaly detection config clone
                 match openobserve_core::anomaly_detection::clone_config(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
                     Some(dst_folder),
+                    Some(clone_owner),
                 )
                 .await
                 {
@@ -2013,6 +2088,23 @@ pub async fn update_alert(
     }
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
+    #[cfg(feature = "enterprise")]
+    match alert::get_by_id(get_orm_client_rw().await, &org_id, alert_id).await {
+        Ok(_) => {
+            if let Err(resp) = guard_write(
+                &org_id,
+                &user_email.user_id,
+                &alert_sources(&org_id, &alert),
+            )
+            .await
+            {
+                return resp;
+            }
+        }
+        // not an alert: the anomaly fallback below guards its own stored config
+        Err(AlertError::AlertNotFound) => {}
+        Err(e) => return e.into(),
+    }
 
     let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
@@ -2059,10 +2151,17 @@ async fn build_and_run_anomaly_update(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    let owner = fields
-        .owner
-        .or_else(|| alert.owner.clone())
-        .or(Some(user_id));
+    let loaded = openobserve_core::background_access::anomaly_update_sources(
+        org_id,
+        anomaly_id,
+        fields.custom_sql.as_deref(),
+    )
+    .await;
+    if let Err(resp) =
+        openobserve_core::background_access::guard_loaded(org_id, &user_id, loaded).await
+    {
+        return resp;
+    }
     let name = fields
         .name
         .or_else(|| Some(alert.name).filter(|n| !n.is_empty()));
@@ -2096,7 +2195,8 @@ async fn build_and_run_anomaly_update(
         alert_destinations: Some(alert.destinations),
         enabled: fields.enabled,
         folder_id: fields.folder_id,
-        owner,
+        // an update never changes the stored owner
+        owner: None,
         // The v2 PUT carries the FULL alert body, so this is replace
         // semantics: wrapping in `Some` means an omitted priority clears it,
         // matching how tags behave one line down.
@@ -3243,6 +3343,21 @@ pub async fn enable_alert(
         }
     };
     let should_enable = query.value;
+    #[cfg(feature = "enterprise")]
+    if should_enable
+        && let Err(resp) = openobserve_core::background_access::guard_loaded(
+            &org_id,
+            &user_email.user_id,
+            openobserve_core::background_access::stored_alert_sources(
+                &org_id,
+                &alert_id.to_string(),
+            )
+            .await,
+        )
+        .await
+    {
+        return resp;
+    }
     let client = get_orm_client_rw().await;
     match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
         Ok(_) => {
@@ -3383,6 +3498,20 @@ pub async fn enable_alert_bulk(
 
     let client = get_orm_client_rw().await;
     for id in req.ids {
+        #[cfg(feature = "enterprise")]
+        if should_enable
+            && let Some(message) = openobserve_core::background_access::loaded_denial_message(
+                &org_id,
+                &user_email.user_id,
+                openobserve_core::background_access::stored_alert_sources(&org_id, &id.to_string())
+                    .await,
+            )
+            .await
+        {
+            unsuccessful.push(id);
+            err = Some(message);
+            continue;
+        }
         match alert::enable_by_id(client, &org_id, id, should_enable).await {
             Ok(_) => {
                 successful.push(id);
@@ -3499,6 +3628,21 @@ pub async fn trigger_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_loaded(
+        &org_id,
+        &user_email.user_id,
+        openobserve_core::background_access::stored_alert_sources(&org_id, &alert_id.to_string())
+            .await,
+    )
+    .await
+    {
+        return resp;
+    }
+    // the run must read the primary snapshot the guard above authorized
+    #[cfg(feature = "enterprise")]
+    let client = get_orm_client_rw().await;
+    #[cfg(not(feature = "enterprise"))]
     let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
@@ -3585,7 +3729,10 @@ pub async fn trigger_alert(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
     )
 )]
-pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Response {
+pub async fn retrain_alert(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
@@ -3610,6 +3757,17 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     #[cfg(not(feature = "enterprise"))]
     {
         MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_loaded(
+        &org_id,
+        &user_email.user_id,
+        openobserve_core::background_access::anomaly_update_sources(&org_id, &alert_id_str, None)
+            .await,
+    )
+    .await
+    {
+        return resp;
     }
     #[cfg(feature = "enterprise")]
     match openobserve_core::anomaly_detection::train_model(&org_id, &alert_id_str).await {
@@ -4453,6 +4611,194 @@ mod tests {
             assert_eq!(
                 name_resolved_expression("{a1} && {b2}", &map).unwrap(),
                 "weird{b2}name AND second"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod stream_access {
+        use axum::{
+            Json,
+            body::to_bytes,
+            extract::{OriginalUri, Path},
+            http::{StatusCode, Uri},
+        };
+        use config::meta::stream::StreamType;
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::{
+            auth::UserEmail,
+            authz::{QuerySource, TypedStream, fake_checker},
+            background_access::{anomaly_sources, create_owner, guard_write},
+        };
+        use serde_json::json;
+
+        use super::super::*;
+
+        fn user() -> String {
+            format!("{}@example.com", config::ider::uuid())
+        }
+
+        fn logs(org: &str, name: &str) -> TypedStream {
+            TypedStream {
+                org_id: org.to_string(),
+                stream_type: StreamType::Logs,
+                name: name.to_string(),
+            }
+        }
+
+        async fn create(
+            org: &str,
+            user: &str,
+            body: serde_json::Value,
+        ) -> (StatusCode, serde_json::Value) {
+            let resp = create_alert(
+                Path(org.to_string()),
+                OriginalUri(Uri::from_static("/api/v2/org/alerts")),
+                Headers(UserEmail {
+                    user_id: user.to_string(),
+                }),
+                Json(serde_json::from_value(body).unwrap()),
+            )
+            .await;
+            let status = resp.status();
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            (status, serde_json::from_slice(&bytes).unwrap_or_default())
+        }
+
+        #[tokio::test]
+        async fn alert_denied_stream_is_refused() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "allowed"));
+            let (status, body) = create(
+                "sa_org1",
+                &caller,
+                json!({
+                    "name": "a1",
+                    "stream_type": "logs",
+                    "stream_name": "secret",
+                    "query_condition": {
+                        "type": "sql",
+                        "sql": "SELECT * FROM secret JOIN allowed ON true JOIN other ON true"
+                    }
+                }),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: no read permission on logs/secret, logs/other"
+            );
+            assert!(body["hint"].as_str().is_some_and(|h| !h.is_empty()));
+        }
+
+        #[tokio::test]
+        async fn custom_and_promql_alerts_are_refused_on_their_streams() {
+            let caller = user();
+            let (status, body) = create(
+                "sa_org1",
+                &caller,
+                json!({"name": "a2", "stream_type": "logs", "stream_name": "secret",
+                       "query_condition": {"type": "custom"}}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: no read permission on logs/secret"
+            );
+
+            let (status, body) = create(
+                "sa_org1",
+                &caller,
+                json!({"name": "a3", "stream_type": "metrics", "stream_name": "cpu",
+                       "query_condition": {"type": "promql", "promql": "cpu / mem"}}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: no read permission on metrics/cpu, metrics/mem"
+            );
+        }
+
+        #[tokio::test]
+        async fn decrypt_key_without_permission_is_refused() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let sources = [QuerySource::Sql {
+                org_id: "sa_org1".to_string(),
+                sql: "SELECT decrypt(body, 'vault_key') FROM app".to_string(),
+                default_type: StreamType::Logs,
+            }];
+            let resp = guard_write("sa_org1", &caller, &sources).await.unwrap_err();
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(
+                body["message"],
+                "Unauthorized Access: cipher keys: vault_key"
+            );
+
+            fake_checker().grant_cipher_key("sa_org1", &caller, "vault_key");
+            assert!(guard_write("sa_org1", &caller, &sources).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn readable_alert_body_passes_the_guard() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let mut alert = MetaAlert::default();
+            alert.stream_name = "app".to_string();
+            alert.query_condition.query_type = config::meta::alerts::QueryType::SQL;
+            alert.query_condition.sql = Some("SELECT count(*) FROM app".to_string());
+            let sources = openobserve_core::background_access::alert_sources("sa_org1", &alert);
+            assert!(guard_write("sa_org1", &caller, &sources).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn org_admin_and_root_pass_and_admin_shortcut_stays_in_its_org() {
+            let admin = user();
+            fake_checker().grant_admin("sa_org1", &admin);
+            let own = anomaly_sources("sa_org1", "logs", "secret", Some("SELECT * FROM other"));
+            assert!(guard_write("sa_org1", &admin, &own).await.is_ok());
+            let foreign = [QuerySource::Stream {
+                org_id: "sa_org2".to_string(),
+                stream_type: StreamType::Logs,
+                name: "secret".to_string(),
+            }];
+            assert!(guard_write("sa_org1", &admin, &foreign).await.is_err());
+
+            let root = user();
+            fake_checker().grant_root(&root);
+            assert!(guard_write("sa_org1", &root, &foreign).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn anomaly_denied_custom_sql_is_refused() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let sources = anomaly_sources("sa_org1", "logs", "app", Some("SELECT * FROM secret"));
+            let resp = guard_write("sa_org1", &caller, &sources).await.unwrap_err();
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        }
+
+        #[tokio::test]
+        async fn alert_clone_owner_is_caller() {
+            let caller = user();
+            assert_eq!(
+                create_owner("sa_org1", &caller, Some("someone@example.com")).await,
+                caller
+            );
+            assert_eq!(create_owner("sa_org1", &caller, None).await, caller);
+
+            let admin = user();
+            fake_checker().grant_admin("sa_org1", &admin);
+            assert_eq!(
+                create_owner("sa_org1", &admin, Some("someone@example.com")).await,
+                "someone@example.com"
+            );
+            assert_eq!(
+                create_owner("sa_org2", &admin, Some("someone@example.com")).await,
+                admin
             );
         }
     }

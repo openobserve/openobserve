@@ -109,12 +109,17 @@ pub async fn list_eval_jobs(
 )]
 pub async fn create_eval_job(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<EvalJobRequestBody>,
 ) -> Response {
     let job = match infra::table::online_eval_jobs::OnlineEvalJob::try_from(body) {
         Ok(job) => job,
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
+        return resp;
+    }
     match eval_jobs::create_job(&org_id, job).await {
         Ok(j) => {
             let resp: EvalJobResponseBody = j.into();
@@ -182,12 +187,17 @@ pub async fn get_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Res
 )]
 pub async fn update_eval_job(
     Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<EvalJobRequestBody>,
 ) -> Response {
     let job = match infra::table::online_eval_jobs::OnlineEvalJob::try_from(body) {
         Ok(job) => job,
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
+        return resp;
+    }
     match eval_jobs::update_job(&org_id, &job_id, job).await {
         Ok(j) => {
             let resp: EvalJobResponseBody = j.into();
@@ -244,13 +254,24 @@ pub async fn delete_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> 
         (status = 200, body = inline(EvalJobStatusActionResponseBody)),
         (status = 400, description = "Invalid state transition", body = ()),
         (status = 404, description = "Not Found", body = ()),
+        (status = 409, description = "Job changed during the request", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "activate"})),
     ),
 )]
-pub async fn activate_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Response {
-    match eval_jobs::transition_status(&org_id, &job_id, "active").await {
+pub async fn activate_eval_job(
+    Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let transitioned = match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
+        Ok(job) => eval_jobs::transition_checked(&org_id, job, "active").await,
+        Err(resp) => return resp,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let transitioned = eval_jobs::transition_status(&org_id, &job_id, "active").await;
+    match transitioned {
         Ok(j) => {
             let resp: EvalJobStatusActionResponseBody = j.into();
             MetaHttpResponse::json(resp)
@@ -310,13 +331,24 @@ pub async fn pause_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> R
         (status = 200, body = inline(EvalJobStatusActionResponseBody)),
         (status = 400, description = "Invalid state transition", body = ()),
         (status = 404, description = "Not Found", body = ()),
+        (status = 409, description = "Job changed during the request", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "resume"})),
     ),
 )]
-pub async fn resume_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Response {
-    match eval_jobs::transition_status(&org_id, &job_id, "active").await {
+pub async fn resume_eval_job(
+    Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let transitioned = match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
+        Ok(job) => eval_jobs::transition_checked(&org_id, job, "active").await,
+        Err(resp) => return resp,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let transitioned = eval_jobs::transition_status(&org_id, &job_id, "active").await;
+    match transitioned {
         Ok(j) => {
             let resp: EvalJobStatusActionResponseBody = j.into();
             MetaHttpResponse::json(resp)
@@ -387,14 +419,47 @@ pub async fn manual_eval_job(
     axum::Json(body): axum::Json<ManualEvalJobRequestBody>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
-    let author = Some(user_email.user_id);
+    let evaluated = match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
+        Ok(job) => {
+            eval_jobs::manual_evaluate_job(&org_id, job, body, Some(user_email.user_id)).await
+        }
+        Err(resp) => return resp,
+    };
     #[cfg(not(feature = "enterprise"))]
-    let author = None;
+    let evaluated = eval_jobs::manual_evaluate(&org_id, &job_id, body, None).await;
 
-    match eval_jobs::manual_evaluate(&org_id, &job_id, body, author).await {
+    match evaluated {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(err) => err.into(),
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_job(
+    org_id: &str,
+    user_id: &str,
+    job: &infra::table::online_eval_jobs::OnlineEvalJob,
+) -> Result<(), Response> {
+    let sources = openobserve_core::background_access::eval_job_sources(
+        org_id,
+        &job.stream_type,
+        &job.stream,
+    );
+    openobserve_core::background_access::guard_write(org_id, user_id, &sources).await
+}
+
+/// The returned primary snapshot is the one the caller transitions or runs; a failed read refuses.
+#[cfg(feature = "enterprise")]
+async fn checked_stored_job(
+    org_id: &str,
+    user_id: &str,
+    job_id: &str,
+) -> Result<infra::table::online_eval_jobs::OnlineEvalJob, Response> {
+    let job = eval_jobs::get_job_rw(org_id, job_id)
+        .await
+        .map_err(Response::from)?;
+    guard_job(org_id, user_id, &job).await?;
+    Ok(job)
 }
 
 #[cfg(test)]
@@ -442,5 +507,11 @@ mod tests {
         let err = EvalJobError::TaskPublish("queue publish timed out".to_string());
         let resp: Response = err.into();
         assert_eq!(resp.status().as_u16(), 500);
+    }
+
+    #[test]
+    fn test_eval_job_error_changed_is_409() {
+        let resp: Response = EvalJobError::Changed.into();
+        assert_eq!(resp.status().as_u16(), 409);
     }
 }
