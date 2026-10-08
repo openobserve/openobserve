@@ -73,12 +73,7 @@ pub struct ChartPayload {
     pub trigger_ts: u64,
 }
 
-/// Derive the chart-signing key from per-instance secret material (IKM) and
-/// the deployment salt. HKDF-extract (one HMAC application, salt as key) with
-/// a versioned domain-separation label — sufficient without a new dependency.
-///
-/// Callers must fail closed on empty IKM: older installs hash with the public
-/// legacy salt "openobserve", so the salt alone MUST NOT produce a key.
+/// Callers must fail closed on empty IKM: the public legacy salt alone must not produce a key.
 pub fn derive_signing_key(ikm: &str, salt: &str) -> Vec<u8> {
     let mut mac =
         Hmac::<Sha256>::new_from_slice(salt.as_bytes()).expect("HMAC accepts any key length");

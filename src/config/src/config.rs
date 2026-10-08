@@ -412,8 +412,7 @@ pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(i
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
 static STORED_EXT_AUTH_SALT: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
-/// Installs predating the stored salt keep hashing with this public value: rotating it breaks
-/// logins.
+/// Installs older than the stored salt hash with this value: rotating it breaks their logins.
 pub const LEGACY_EXT_AUTH_SALT: &str = "openobserve";
 
 pub fn get_config() -> Arc<Config> {
@@ -1515,8 +1514,7 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
-    /// Secret for presigned and ext-token logins; empty means a new install generates and stores
-    /// one.
+    /// Empty: a new install generates one and stores it in the meta db.
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "")]
     pub ext_auth_salt: String,
     #[env_config(

@@ -74,7 +74,6 @@ pub mod grpc_token {
         super::secret::get(KEY).await
     }
 
-    /// Stores `candidate` unless a token is already stored, and returns the stored token.
     pub async fn get_or_create(candidate: &str) -> Result<String> {
         super::secret::get_or_create(KEY, candidate).await
     }
@@ -89,7 +88,6 @@ pub mod ext_auth_salt {
         super::secret::get(KEY).await
     }
 
-    /// Stores `candidate` unless a salt is already stored, and returns the stored salt.
     pub async fn get_or_create(candidate: &str) -> Result<String> {
         super::secret::get_or_create(KEY, candidate).await
     }
@@ -109,6 +107,7 @@ mod secret {
             .filter(|v| !v.is_empty()))
     }
 
+    /// Returns the stored value, which is `candidate` only when nothing was stored yet.
     pub(super) async fn get_or_create(key: &str, candidate: &str) -> Result<String> {
         let value = Bytes::from(candidate.to_string());
         let owned_key = key.to_string();
