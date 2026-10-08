@@ -77,8 +77,8 @@ pub struct ChartPayload {
 /// the deployment salt. HKDF-extract (one HMAC application, salt as key) with
 /// a versioned domain-separation label — sufficient without a new dependency.
 ///
-/// Callers must fail closed on empty IKM: `ZO_EXT_AUTH_SALT` defaults to the
-/// public constant "openobserve", so the salt alone MUST NOT produce a key.
+/// Callers must fail closed on empty IKM: older installs hash with the public
+/// legacy salt "openobserve", so the salt alone MUST NOT produce a key.
 pub fn derive_signing_key(ikm: &str, salt: &str) -> Vec<u8> {
     let mut mac =
         Hmac::<Sha256>::new_from_slice(salt.as_bytes()).expect("HMAC accepts any key length");
