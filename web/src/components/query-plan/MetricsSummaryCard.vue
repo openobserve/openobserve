@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="metrics-summary-card-value"
-              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
+              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars,1)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
               :style="{ '--chars': String(metrics.totalTime).length }"
             >
               {{ metrics.totalTime }}
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="metrics-summary-card-value"
-              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
+              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars,1)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
               :style="{ '--chars': String(metrics.totalRows).length }"
             >
               {{ metrics.totalRows }}
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="metrics-summary-card-value"
-              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
+              class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars,1)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"
               :style="{ '--chars': String(metrics.peakMemory).length }"
             >
               {{ metrics.peakMemory }}
