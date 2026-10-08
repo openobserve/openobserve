@@ -471,7 +471,7 @@ describe("Logs Index", async () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="logs-no-fts-panel"]').text()).toContain(
-        '"nofts_b" has no full-text fields',
+        "Word search is not configured for nofts_b",
       );
       wrapper.vm.searchObj.data.freeTextBlocked = null;
     });

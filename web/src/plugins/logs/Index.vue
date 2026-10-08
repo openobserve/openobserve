@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-else-if="searchObj.data.freeTextBlocked && searchObj.loading == false"
-                      class="h-full"
+                      class="flex h-full min-h-0 flex-col"
                     >
                       <LogsPermalinkBanner
                         @retry="onPermalinkRetry"
@@ -218,6 +218,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <LogsNoFtsPanel
                         :streams="noFtsPanelStreams"
+                        :term="noFtsRecoveryTerm"
+                        :recovery-streams="noFtsRecoverySchemas"
+                        :selected-streams="searchObj.data.stream.selectedStream"
+                        @clear-run="onNoFtsClearRun"
+                        @field-search="onNoFtsFieldSearch"
                         @configure="onConfigureFreeTextStream"
                       />
                     </div>
@@ -306,6 +311,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="searchObj.data.missingStreamMessage"
                         :message="searchObj.data.missingStreamMessage"
                         :no-fts-streams="searchObj.data.freeTextExcluded ?? []"
+                        :term="noFtsRecoveryTerm"
+                        :recovery-streams="noFtsRecoverySchemas"
+                        :selected-streams="searchObj.data.stream.selectedStream"
+                        @clear-run="onNoFtsClearRun"
+                        @field-search="onNoFtsFieldSearch"
                       />
                       <LogsNoEventsState
                         class="min-h-0 flex-1"
@@ -409,6 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div class="min-h-0 flex-1">
                         <SearchResult
+                          @no-fts-clear-run="onNoFtsClearRun"
+                          @no-fts-field-search="onNoFtsFieldSearch"
                           ref="searchResultRef"
                           :expandedLogs="expandedLogs"
                           :stream-doc-time-range="streamDocTimeRange"
@@ -450,6 +462,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.data.freeTextBlocked && searchObj.meta.logsVisualizeToggle == 'visualize'
               "
               :streams="noFtsPanelStreams"
+              :term="noFtsRecoveryTerm"
+              :recovery-streams="noFtsRecoverySchemas"
+              :selected-streams="searchObj.data.stream.selectedStream"
+              @clear-run="onNoFtsClearRun"
+              @field-search="onNoFtsFieldSearch"
               @configure="onConfigureFreeTextStream"
             />
             <VisualizeLogsQuery
@@ -741,11 +758,13 @@ import {
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { fieldSearchPredicate, type NoFtsFieldSubmission } from "./LogsNoFtsFieldSearch.schema";
 import { isAuthoredStatement, renderPlan } from "@/utils/query/freeTextFilter";
 import {
   buildFilterContext,
   markFreeTextBlocked,
   noFtsStreams,
+  noFtsRecoveryStreams,
   planStreamsFilter,
   recoveryCardsFor,
   searchTextReplacement,
@@ -2098,6 +2117,31 @@ export default defineComponent({
     const noFtsPanelStreams = computed(() =>
       searchObj.data.freeTextBlocked ? noFtsStreams(searchObj, store.state.zoConfig) : [],
     );
+
+    const noFtsRecoverySchemas = computed(() =>
+      noFtsRecoveryStreams(
+        searchObj,
+        searchObj.data.freeTextBlocked?.streams ?? searchObj.data.freeTextExcluded ?? [],
+      ),
+    );
+    const noFtsRecoveryTerm = computed(() => {
+      const plan = planStreamsFilter(
+        searchObj.data.query.trim(),
+        searchObj.data.stream.selectedStream,
+        buildFilterContext(searchObj, store.state.zoConfig),
+      );
+      return plan.kind === "freeText" ? plan.units.join(" ") : searchObj.data.query;
+    });
+    const onNoFtsClearRun = () => runRecoveryFilter("");
+    const onNoFtsFieldSearch = async (values: NoFtsFieldSubmission) => {
+      const predicate = fieldSearchPredicate(values, noFtsRecoverySchemas.value);
+      if (!predicate || predicate !== values.predicate) return;
+      searchObj.data.stream.selectedStream = [values.stream];
+      searchObj.data.query = predicate;
+      searchObj.data.editorValue = predicate;
+      await extractFields();
+      runRecoveryFilter(predicate);
+    };
 
     const recoveryCards = computed(() =>
       searchObj.data.errorMsg !== ""
@@ -3965,6 +4009,10 @@ export default defineComponent({
       onGuardSearchJob,
       onConfigureFreeTextStream,
       noFtsPanelStreams,
+      noFtsRecoverySchemas,
+      noFtsRecoveryTerm,
+      onNoFtsClearRun,
+      onNoFtsFieldSearch,
       recoveryCards,
       onSearchText,
       onRunSuggestion,

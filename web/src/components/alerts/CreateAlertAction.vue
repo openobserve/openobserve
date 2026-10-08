@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdownItem
     v-if="variant === 'menu-item'"
     :disabled="!!disabledReason"
+    focusable-unavailable
+    :description="disabledReason"
     :data-test="dataTest"
     @select="onActivate"
   >
@@ -44,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </slot>
     </template>
     <span>{{ label }}</span>
-    <OTooltip v-if="disabledReason" :content="disabledReason" side="left" />
   </ODropdownItem>
 
   <OButton

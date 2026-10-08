@@ -26,6 +26,7 @@ import {
   type FreeTextContext,
   type FreeTextScanEntry,
   type RecoveryCards,
+  type SchemaField,
   type StreamWithSchema,
   type TextRange,
   type TextSearchTarget,
@@ -240,6 +241,13 @@ export function noFtsStreams(
     const target = ctx.targets[name];
     return { name, hasTextFields: target?.mode !== "blocked" || target.candidates.length > 0 };
   });
+}
+
+export function noFtsRecoveryStreams(
+  searchObj: FreeTextSearchObj,
+  names: string[] = searchObj.data.freeTextBlocked?.streams ?? [],
+): { name: string; schema: SchemaField[] }[] {
+  return names.map((name) => ({ name, schema: streamEntry(searchObj, name)?.schema ?? [] }));
 }
 
 /** Post-error cards for a filter-mode run: Run as, else Search text. */

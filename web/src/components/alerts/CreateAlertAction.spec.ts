@@ -32,9 +32,14 @@ vi.mock("@/composables/alerts/useAlertCreation", async (importOriginal) => {
 
 const DropdownItemStub = {
   name: "ODropdownItem",
-  props: ["disabled", "iconLeft"],
+  props: {
+    disabled: Boolean,
+    iconLeft: String,
+    description: String,
+    focusableUnavailable: Boolean,
+  },
   emits: ["select"],
-  template: `<div class="menu-item-stub" @click="$emit('select')"><slot /></div>`,
+  template: `<div class="menu-item-stub" @click="$emit('select')"><slot /><span v-if="description">{{ description }}</span></div>`,
 };
 
 const ButtonStub = {
@@ -200,6 +205,32 @@ describe("CreateAlertAction", () => {
     expect(build).not.toHaveBeenCalled();
     expect(alertCreationDialog.value).toBeNull();
   });
+
+  it.each(["logs", "patterns", "library", "panel", "dbm"])(
+    "keeps the supplied reason on the %s menu surface",
+    async (source) => {
+      const build = vi.fn(prefill);
+      wrapper = mountAction({ source, disabledReason: "Select a stream first" }, build);
+      expect(wrapper.text()).toContain("Select a stream first");
+      expect(wrapper.findComponent(DropdownItemStub).props("focusableUnavailable")).toBe(true);
+      await wrapper.find(".menu-item-stub").trigger("click");
+      expect(build).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["button", "icon"])(
+    "keeps the reason and disabled behavior on the %s surface",
+    async (variant) => {
+      const build = vi.fn(prefill);
+      wrapper = mountAction({ variant, disabledReason: "Select a stream first" }, build);
+      expect(wrapper.findComponent(ButtonStub).props("disabled")).toBe(true);
+      expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "Select a stream first",
+      );
+      await wrapper.findComponent(ButtonStub).trigger("click");
+      expect(build).not.toHaveBeenCalled();
+    },
+  );
 
   it("marks the control disabled when a reason is set", () => {
     wrapper = mountAction({ disabledReason: "Select a stream first" });
