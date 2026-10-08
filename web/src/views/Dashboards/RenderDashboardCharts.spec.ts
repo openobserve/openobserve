@@ -489,6 +489,93 @@ describe("RenderDashboardCharts", () => {
     });
   });
 
+  describe("variable commits", () => {
+    const chainDashboard = () => ({
+      ...defaultProps.dashboardData,
+      variables: {
+        showDynamicFilters: false,
+        list: [
+          { name: "env", type: "custom", scope: "global", value: "prod", options: [] },
+          {
+            name: "service",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "service", filter: [{ filter: "env=$env" }] },
+          },
+          {
+            name: "pod",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "pod", filter: [{ filter: "service=$service" }] },
+          },
+        ],
+      },
+    });
+
+    const mountWith = (provide: Record<string, any> = {}) =>
+      shallowMount(RenderDashboardCharts, {
+        props: { ...defaultProps, dashboardData: chainDashboard() },
+        global: {
+          plugins: [i18n, store, router],
+          provide,
+          mocks: {
+            $t: (key) => key,
+            $route: { params: {}, query: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: { ODialog: ODialogStub },
+        },
+      });
+
+    const loaded = (v: any, value: any) => {
+      v.value = value;
+      v.isLoading = false;
+      v.isVariableLoadingPending = false;
+      v.isVariablePartialLoaded = true;
+    };
+
+    it("first load commits once, after the whole variable chain has loaded", async () => {
+      wrapper = mountWith();
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const commits = vi.fn();
+      manager.onAutoCommit(commits);
+      const [env, service, pod] = manager.variablesData.global;
+
+      loaded(env, "prod");
+      loaded(service, "api");
+      pod.isVariableLoadingPending = true;
+      await flushPromises();
+      expect(commits).not.toHaveBeenCalled();
+      expect(manager.committedVariablesData.global[1].value).not.toBe("api");
+
+      loaded(pod, "api-1");
+      await flushPromises();
+      expect(commits).toHaveBeenCalledTimes(1);
+      expect(manager.committedVariablesData.global.map((v: any) => v.value)).toEqual([
+        "prod",
+        "api",
+        "api-1",
+      ]);
+    });
+
+    it("follows the dashboard's Auto Run state", async () => {
+      const autoRun = ref(true);
+      wrapper = mountWith({ dashboardAutoRun: autoRun });
+      const manager = wrapper.vm.getVariablesManager();
+      expect(manager.isLiveMode.value).toBe(true);
+
+      autoRun.value = false;
+      await flushPromises();
+      expect(manager.isLiveMode.value).toBe(false);
+    });
+
+    it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {
+      wrapper = mountWith();
+      expect(wrapper.vm.getVariablesManager().isLiveMode.value).toBe(false);
+    });
+  });
+
   describe("Tab Management", () => {
     it("should render TabList when showTabs is true", () => {
       wrapper = createWrapper({ showTabs: true });
