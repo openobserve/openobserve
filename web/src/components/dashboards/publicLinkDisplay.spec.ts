@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { publicLinkUrl } from "@/components/dashboards/publicLinkDisplay";
+import { publicLinkSearchTerm, publicLinkUrl } from "@/components/dashboards/publicLinkDisplay";
 import type { PublicLink } from "@/services/public_dashboards_admin";
 
 const link = { slug: "abc" } as PublicLink;
@@ -30,5 +30,17 @@ describe("publicLinkUrl", () => {
   it("keeps a base URI the server is mounted under", () => {
     window.history.replaceState(null, "", "/o2/web/dashboards");
     expect(publicLinkUrl(link)).toBe(`${window.location.origin}/o2/web/public/dashboards/abc`);
+  });
+});
+
+describe("publicLinkSearchTerm", () => {
+  it("reduces a pasted public URL to its slug", () => {
+    expect(
+      publicLinkSearchTerm(" https://o2.example.com/o2/web/public/dashboards/AbC12?tab=x "),
+    ).toBe("abc12");
+  });
+
+  it("lowercases and trims anything else", () => {
+    expect(publicLinkSearchTerm("  NOC Wall ")).toBe("noc wall");
   });
 });

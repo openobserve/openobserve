@@ -383,7 +383,7 @@
           />
         </template>
         <template #cell-updated="{ row }">
-          <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" />
+          <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" :now="now" />
         </template>
         <template #cell-published_by="{ row }">
           <OUserCell :value="row.published_by" />
@@ -395,6 +395,7 @@
               size="icon-sm"
               icon-left="content-copy"
               class="max-md:hidden"
+              :aria-label="t('dashboard.publicDashboard.copyLink')"
               :data-test="`dashboards-public-links-panel-${row.id}-copy-btn`"
               @click="copyLink(row)"
             >
@@ -405,6 +406,7 @@
               size="icon-sm"
               icon-left="open-in-new"
               class="max-md:hidden"
+              :aria-label="t('dashboard.publicLinks.openPublicPage')"
               :data-test="`dashboards-public-links-panel-${row.id}-open-btn`"
               @click="openPublicPage(row)"
             >
@@ -415,6 +417,7 @@
               size="icon-sm"
               icon-left="edit"
               class="max-md:hidden"
+              :aria-label="t('dashboard.publicLinks.editSettings')"
               :data-test="`dashboards-public-links-panel-${row.id}-edit-btn`"
               @click="openForm(row)"
             >
@@ -426,6 +429,9 @@
               size="icon-sm"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               class="max-md:hidden"
+              :aria-label="
+                row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
+              "
               :loading="busyRows.get(row.id) === 'inline'"
               :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
@@ -445,6 +451,7 @@
                   variant="ghost"
                   size="icon-sm"
                   :title="t('dashboard.moreActions')"
+                  :aria-label="t('dashboard.moreActions')"
                   :loading="busyRows.get(row.id) === 'menu'"
                   :data-test="`dashboards-public-links-panel-${row.id}-menu-btn`"
                 />
@@ -519,6 +526,7 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query";
+import { useNow } from "@/composables/useNow";
 import { copyToClipboard } from "@/utils/clipboard";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -581,6 +589,7 @@ import {
   hasRelativeRange,
   longRange,
   publicLinkColumns,
+  publicLinkSearchTerm,
   publicLinkUrl as publicUrl,
   refreshLabel,
 } from "./publicLinkDisplay";
@@ -635,6 +644,7 @@ const { t } = useI18nTyped();
 const { showErrorNotification, showPositiveNotification } = useNotifications();
 const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
+const now = useNow();
 
 const open = computed({
   get: () => props.modelValue,
@@ -672,10 +682,10 @@ const fetching = linksQuery.isFetching;
 const lastUpdatedAt = linksQuery.dataUpdatedAt;
 const searchQuery = ref("");
 const filteredLinks = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase();
+  const q = publicLinkSearchTerm(searchQuery.value);
   if (!q) return links.value;
   return links.value.filter((link) =>
-    [link.name, link.published_by].some((v) => v.toLowerCase().includes(q)),
+    [link.name, link.slug, link.published_by].some((v) => v.toLowerCase().includes(q)),
   );
 });
 
@@ -740,11 +750,11 @@ const form = useOForm<PublicLinkForm>({
   onSubmit: (value) => submit(value),
 });
 const ranges = form.useStore((s) => s.values.ranges);
+// A duplicate row is still in the list until it's fixed, but is one choice.
 const defaultOptions = computed<RangeOption[]>(() =>
-  ranges.value.map((range) => ({
-    value: rangeKey(range),
-    label: longRange(range, t, timezone.value),
-  })),
+  [...new Map(ranges.value.map((range) => [rangeKey(range), range])).entries()].map(
+    ([value, range]) => ({ value, label: longRange(range, t, timezone.value) }),
+  ),
 );
 // The form holds the ranges; rows give each a stable id, so a picker isn't remounted mid-pick.
 let nextRowId = 0;
@@ -904,6 +914,25 @@ function variableSeedParams(): Record<string, unknown> {
   );
 }
 
+// A seeded value counts as loaded, so an empty one would freeze a query variable at null without ever fetching.
+function withoutEmptyQuerySeeds(
+  params: Record<string, unknown>,
+  list: VariableConfig[],
+): Record<string, unknown> {
+  const queryNames = new Set(list.filter((v) => v.type === "query_values").map((v) => v.name));
+  const isEmpty = (value: unknown) =>
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0);
+  return Object.fromEntries(
+    Object.entries(params).filter(([key, value]) => {
+      const name = key.match(/^var-(.+)\.[tp]\..+$/)?.[1] ?? key.replace(/^var-/, "");
+      return !(queryNames.has(name) && isEmpty(value));
+    }),
+  );
+}
+
 async function seedFormVariables() {
   formVarsReady.value = false;
   const list = (props.variablesConfig?.list ?? []) as VariableConfig[];
@@ -913,7 +942,7 @@ async function seedFormVariables() {
     ...props.dashboardData,
     variables: { ...props.dashboardData?.variables, showDynamicFilters: false },
   });
-  formVars.loadFromUrl({ query: variableSeedParams() });
+  formVars.loadFromUrl({ query: withoutEmptyQuerySeeds(variableSeedParams(), list) });
   Object.keys(formVars.variablesData.tabs).forEach((id) => formVars.setTabVisibility(id, true));
   Object.keys(formVars.variablesData.panels).forEach((id) => formVars.setPanelVisibility(id, true));
   formVarsReady.value = true;

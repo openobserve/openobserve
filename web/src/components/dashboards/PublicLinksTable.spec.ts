@@ -250,6 +250,20 @@ describe("PublicLinksTable", () => {
     open.mockRestore();
   });
 
+  it("names every icon-only row action for screen readers", async () => {
+    const w = build();
+    await flushPromises();
+    const label = (id: string) =>
+      find(w, `dashboards-public-links-l1-${id}-btn`).attributes("aria-label");
+    expect(["copy", "open", "edit", "pause", "menu"].map(label)).toEqual([
+      i18n.global.t("dashboard.publicDashboard.copyLink"),
+      i18n.global.t("dashboard.publicLinks.openPublicPage"),
+      i18n.global.t("dashboard.publicLinks.editSettings"),
+      i18n.global.t("dashboard.publicLinks.pause"),
+      i18n.global.t("dashboard.moreActions"),
+    ]);
+  });
+
   it("opens the dashboard and its edit panel from the row", async () => {
     const w = build();
     await flushPromises();

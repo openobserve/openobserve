@@ -135,4 +135,22 @@ describe("Dashboards.vue public links view", () => {
       expect.anything(),
     );
   });
+
+  it("warns that deleting a dashboard deletes its public links while the feature is on", async () => {
+    const message = (w: VueWrapper, id: string) =>
+      w.findAll(`[data-test="${id}"]`)[0]?.attributes("message");
+    wrapper = await mountAt(router, true);
+    expect(message(wrapper, "dashboard-confirm-dialog")).toBe(
+      "Are you sure you want to delete the dashboard? Its public links will stop working and be deleted.",
+    );
+    expect(message(wrapper, "dashboard-confirm-bulk-delete-dialog")).toContain(
+      "Their public links will stop working and be deleted.",
+    );
+    wrapper.unmount();
+
+    wrapper = await mountAt(router, false);
+    expect(message(wrapper, "dashboard-confirm-dialog")).toBe(
+      "Are you sure you want to delete the dashboard?",
+    );
+  });
 });

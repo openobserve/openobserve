@@ -130,7 +130,7 @@
         />
       </template>
       <template #cell-updated="{ row }">
-        <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" />
+        <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" :now="now" />
       </template>
       <template #cell-published_by="{ row }">
         <OUserCell :value="row.published_by" />
@@ -143,6 +143,7 @@
             size="icon-sm"
             icon-left="content-copy"
             class="max-md:hidden"
+            :aria-label="t('dashboard.publicDashboard.copyLink')"
             :data-test="`dashboards-public-links-${row.id}-copy-btn`"
             @click="copyLink(row)"
           >
@@ -153,6 +154,7 @@
             size="icon-sm"
             icon-left="open-in-new"
             class="max-md:hidden"
+            :aria-label="t('dashboard.publicLinks.openPublicPage')"
             :data-test="`dashboards-public-links-${row.id}-open-btn`"
             @click="openPublicPage(row)"
           >
@@ -164,6 +166,7 @@
             size="icon-sm"
             icon-left="edit"
             class="max-md:hidden"
+            :aria-label="t('dashboard.publicLinks.editSettings')"
             :data-test="`dashboards-public-links-${row.id}-edit-btn`"
             @click="editLink(row)"
           >
@@ -175,6 +178,9 @@
             size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             class="max-md:hidden"
+            :aria-label="
+              row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
+            "
             :loading="busyRows.get(row.id) === 'inline'"
             :disabled="busyRows.has(row.id)"
             :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
@@ -194,6 +200,7 @@
                 variant="ghost"
                 size="icon-sm"
                 :title="t('dashboard.moreActions')"
+                :aria-label="t('dashboard.moreActions')"
                 :loading="busyRows.get(row.id) === 'menu'"
                 :data-test="`dashboards-public-links-${row.id}-menu-btn`"
               />
@@ -303,6 +310,7 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOrgId } from "@/composables/query";
+import { useNow } from "@/composables/useNow";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -330,6 +338,7 @@ import {
   canRebuild,
   hasRelativeRange,
   publicLinkColumns,
+  publicLinkSearchTerm,
   publicLinkUrl,
   refreshLabel,
 } from "./publicLinkDisplay";
@@ -353,6 +362,7 @@ const { t } = useI18nTyped();
 const { showErrorNotification, showPositiveNotification } = useNotifications();
 const { confirm } = useConfirmDialog();
 const orgId = useOrgId();
+const now = useNow();
 
 const timezone = computed<string>(
   () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -432,14 +442,8 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
-// A pasted public URL is matched by its slug, the only part of it that identifies the link.
-const searchTerm = (input: string): string => {
-  const q = input.trim();
-  return (q.match(/\/public\/dashboards\/([^/?#\s]+)/)?.[1] ?? q).toLowerCase();
-};
-
 const visibleLinks = computed(() => {
-  const q = searchTerm(searchQuery.value);
+  const q = publicLinkSearchTerm(searchQuery.value);
   const filter = statusFilter.value;
   return links.value.filter((link) => {
     if (filter !== "all" && !FILTER_STATUSES[filter].includes(link.status)) return false;

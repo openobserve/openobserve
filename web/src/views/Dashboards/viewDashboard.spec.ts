@@ -1513,4 +1513,16 @@ describe("ViewDashboard", () => {
       expect(analytics.track).not.toHaveBeenCalled();
     });
   });
+
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
+  });
 });

@@ -41,6 +41,15 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+type StreamHandlers = { data: (payload: unknown, response: unknown) => void };
+const stream = vi.hoisted(() => ({ fetch: vi.fn() }));
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: stream.fetch,
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+  }),
+}));
+
 import admin, { type PublicLink } from "@/services/public_dashboards_admin";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
 
@@ -71,7 +80,7 @@ const OTableStub = {
   name: "OTable",
   props: ["data", "columns"],
   template:
-    '<div><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.id"><div v-for="col in columns" :key="col.id"><slot :name="\'cell-\' + col.id" :row="row" /></div></div></div>',
+    '<div><slot name="toolbar" /><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.id"><div v-for="col in columns" :key="col.id"><slot :name="\'cell-\' + col.id" :row="row" /></div></div></div>',
 };
 const DateTimeStub = {
   name: "DateTime",
@@ -122,7 +131,7 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
   ...over,
 });
 
-const build = (props: Record<string, unknown> = {}) =>
+const build = (props: Record<string, unknown> = {}, stubs: Record<string, unknown> = {}) =>
   mount(PublicLinksPanel, {
     props: {
       modelValue: true,
@@ -141,6 +150,7 @@ const build = (props: Record<string, unknown> = {}) =>
         OTable: OTableStub,
         VariablesValueSelector: VVSStub,
         DateTime: DateTimeStub,
+        ...stubs,
       },
     },
   });
@@ -621,5 +631,118 @@ describe("PublicLinksPanel", () => {
     await flushPromises();
     expect(has(w, "dashboards-public-links-panel-no-permission")).toBe(true);
     expect(w.find(".drawer-primary-label").text()).toBe("");
+  });
+
+  describe("query-based variables", () => {
+    const qns = {
+      name: "qns",
+      type: "query_values",
+      value: null,
+      options: [],
+      multiSelect: false,
+      query_data: { stream: "s", field: "f", stream_type: "logs" },
+    };
+    const realPickers = (props: Record<string, unknown>) =>
+      build(
+        {
+          variablesConfig: { list: [qns] },
+          timeObj: { start_time: new Date(1e15), end_time: new Date(1e15 + 1e9) },
+          ...props,
+        },
+        { VariablesValueSelector: false },
+      );
+    const create = async (w: ReturnType<typeof build>) => {
+      (
+        w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+      ).form.setFieldValue("name", "NOC wall");
+      await submit(w);
+      return vi.mocked(admin.create).mock.calls[0]?.[2].frozen_variables;
+    };
+
+    beforeEach(() => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+    });
+
+    it("freezes the dashboard's value without its dropdown being opened", async () => {
+      const w = realPickers({
+        dashboardVariables: { getUrlParams: () => ({ "var-qns": "ingress-nginx" }) },
+      });
+      await flushPromises();
+      expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(false);
+      expect(await create(w)).toEqual({ qns: "ingress-nginx" });
+    });
+
+    it("loads a variable the dashboard hadn't loaded yet instead of freezing null", async () => {
+      const w = realPickers({ currentValues: { values: [{ name: "qns", value: null }] } });
+      await flushPromises();
+      expect(stream.fetch).toHaveBeenCalledTimes(1);
+      expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(true);
+
+      const [payload, handlers] = stream.fetch.mock.calls[0] as [unknown, StreamHandlers];
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ field: "f", values: [{ zo_sql_key: "ingress-nginx" }] }] } },
+      });
+      handlers.data(payload, { type: "end" });
+      await flushPromises();
+      expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(false);
+      expect(await create(w)).toEqual({ qns: "ingress-nginx" });
+    });
+  });
+
+  it("finds a link by its slug or a pasted public URL", async () => {
+    window.history.replaceState(null, "", "/web/dashboards");
+    vi.mocked(admin.list).mockResolvedValue({
+      data: { list: [link(), link({ id: "l2", name: "Other", slug: "xyz789" })] },
+    } as never);
+    const w = build();
+    await flushPromises();
+    const search = w.find('[data-test="dashboards-public-links-panel-search"] input');
+    const shown = () =>
+      ["l1", "l2"].filter((id) => has(w, `dashboards-public-links-panel-${id}-copy-btn`));
+
+    await search.setValue(`${window.location.origin}/web/public/dashboards/xyz789?tab=main`);
+    expect(shown()).toEqual(["l2"]);
+    await search.setValue("ABC");
+    expect(shown()).toEqual(["l1"]);
+  });
+
+  it("names every icon-only row action for screen readers", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    const label = (id: string) =>
+      w.find(`[data-test="dashboards-public-links-panel-l1-${id}-btn"]`).attributes("aria-label");
+    expect(["copy", "open", "edit", "pause", "menu"].map(label)).toEqual([
+      i18n.global.t("dashboard.publicDashboard.copyLink"),
+      i18n.global.t("dashboard.publicLinks.openPublicPage"),
+      i18n.global.t("dashboard.publicLinks.editSettings"),
+      i18n.global.t("dashboard.publicLinks.pause"),
+      i18n.global.t("dashboard.moreActions"),
+    ]);
+  });
+
+  it("offers a duplicated range once as the default", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    const w = build();
+    await flushPromises();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: unknown) => void } }
+    ).form.setFieldValue("ranges", [
+      { type: "relative", secs: 3600 },
+      { type: "relative", secs: 3600 },
+      { type: "relative", secs: 86400 },
+    ]);
+    await flushPromises();
+    const options = (w.vm as unknown as { defaultOptions: { value: string }[] }).defaultOptions;
+    expect(options.map((o) => o.value)).toEqual(["r3600", "r86400"]);
+  });
+
+  it("gives the Updated time a ticking clock", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    const w = build();
+    await flushPromises();
+    expect(typeof w.findComponent({ name: "OTimeCell" }).props("now")).toBe("number");
   });
 });

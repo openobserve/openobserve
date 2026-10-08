@@ -1923,6 +1923,7 @@ export default defineComponent({
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,
+      variablesManager,
       showPublicLinksPanel,
       variablesDataUpdated,
       showDashboardSettingsDialog,

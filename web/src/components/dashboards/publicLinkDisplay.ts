@@ -91,6 +91,12 @@ export function publicLinkExpiry(
   return { text: t("dashboard.publicLinks.expiresInDays", { n: days }, days), soon: false };
 }
 
+// A pasted public URL is matched by its slug, the only part of it that identifies the link.
+export function publicLinkSearchTerm(input: string): string {
+  const q = input.trim();
+  return (q.match(/\/public\/dashboards\/([^/?#\s]+)/)?.[1] ?? q).toLowerCase();
+}
+
 export function hasRelativeRange(link: PublicLink): boolean {
   return link.time_range.ranges.some((r) => r.type === "relative");
 }
