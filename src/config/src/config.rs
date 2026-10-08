@@ -115,7 +115,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 115: create rca_steering and add the input columns to rca_runs.
 // 116: add favicon_img to status_pages.
 // 117: create the fleet tables.
-pub const DB_SCHEMA_VERSION: u64 = 118;
+// 118: add lease to org_cleanup_tasks.
+// 119: add alerts.incident_title_template.
+pub const DB_SCHEMA_VERSION: u64 = 119;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

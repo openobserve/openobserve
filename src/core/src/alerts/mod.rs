@@ -57,6 +57,8 @@ pub mod external_alerts;
 #[cfg(feature = "enterprise")]
 pub mod grouping;
 #[cfg(feature = "enterprise")]
+pub mod incident_title;
+#[cfg(feature = "enterprise")]
 pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]

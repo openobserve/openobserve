@@ -95,6 +95,8 @@ export const makePendingPeriodSchema = (t: Translator) =>
 /** creates_incident: optional boolean. */
 export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
+export const alertSettingsIncidentTitleTemplateSchema = z.string().max(1024).optional();
+
 export const alertSettingsNotifyOnRecoverySchema = z.boolean().optional();
 
 /** recovery_destinations: optional. Empty = the recovery follows the firing's destinations. */
@@ -124,6 +126,7 @@ export const makeAlertSettingsShape = (t: Translator) =>
     _ui: z.object({ pendingPeriod: makePendingPeriodSchema(t) }).optional(),
     destinations: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
+    incident_title_template: alertSettingsIncidentTitleTemplateSchema,
     notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
     recovery_destinations: alertSettingsRecoveryDestinationsSchema,
     keep_firing_for: makeKeepFiringForSchema(t),
@@ -148,6 +151,7 @@ export const createAlertSettingsSchema = (t: Translator, isRealTime: boolean) =>
     destinations: z.array(z.string()).optional(),
     workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
+    incident_title_template: alertSettingsIncidentTitleTemplateSchema,
     notify_on_recovery: alertSettingsNotifyOnRecoverySchema,
     recovery_destinations: alertSettingsRecoveryDestinationsSchema,
     keep_firing_for: makeKeepFiringForSchema(t),
