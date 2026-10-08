@@ -43,7 +43,11 @@ const readStore = (): Record<string, FavoriteSavedView> => {
 };
 
 const writeStore = (value: Record<string, FavoriteSavedView>) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // A full or blocked localStorage must not fail the caller; the in-memory favourites still update.
+  }
 };
 
 /** Favourite saved views of one view type in the current org, persisted in localStorage. */
@@ -52,12 +56,10 @@ export function useFavoriteSavedViews(viewType: FavoriteViewType) {
   const { t } = useI18nTyped();
   const stored = ref<Record<string, FavoriteSavedView>>(readStore());
 
-  const favoriteViews = computed(() => {
-    const orgId = store.state.selectedOrganization?.identifier;
-    return Object.values(stored.value).filter(
-      (view) => view?.org_id === orgId && viewTypeOf(view) === viewType,
-    );
-  });
+  const isOwnFavorite = (view: FavoriteSavedView) =>
+    view?.org_id === store.state.selectedOrganization?.identifier && viewTypeOf(view) === viewType;
+
+  const favoriteViews = computed(() => Object.values(stored.value).filter(isOwnFavorite));
   const favoriteIds = computed(() => favoriteViews.value.map((view) => view.view_id));
 
   const removeFavorite = (viewId: string) => {
@@ -85,5 +87,18 @@ export function useFavoriteSavedViews(viewType: FavoriteViewType) {
     toast({ message: t("logs.searchBar.viewAddedFavorites"), variant: "success" });
   };
 
-  return { favoriteIds, favoriteViews, toggleFavorite, removeFavorite };
+  /** Drops this org's and view type's favourites missing from a complete, successfully fetched list. */
+  const pruneFavorites = (liveIds: string[]) => {
+    const live = new Set(liveIds);
+    const next = readStore();
+    const stale = Object.keys(next).filter(
+      (key) => isOwnFavorite(next[key]) && !live.has(next[key].view_id),
+    );
+    if (!stale.length) return;
+    stale.forEach((key) => delete next[key]);
+    writeStore(next);
+    stored.value = next;
+  };
+
+  return { favoriteIds, favoriteViews, toggleFavorite, removeFavorite, pruneFavorites };
 }

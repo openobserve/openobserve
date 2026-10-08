@@ -1056,8 +1056,18 @@ export default defineComponent({
       (savedViewsList.data.value ?? []).filter((view) => view.view_type === "traces"),
     );
     const savedViewsLoading = computed(() => savedViewsList.isLoading.value);
-    const { favoriteIds, favoriteViews, toggleFavorite, removeFavorite } =
+    const { favoriteIds, favoriteViews, toggleFavorite, removeFavorite, pruneFavorites } =
       useFavoriteSavedViews("traces");
+    // Only a successful fetch is the complete list; pruning on error would drop every favourite.
+    watch(
+      () => savedViewsList.data.value,
+      (views) => {
+        if (savedViewsList.isSuccess.value && views) {
+          pruneFavorites(views.map((view) => view.view_id));
+        }
+      },
+      { immediate: true },
+    );
     const sortedTracesSavedViews = computed(() =>
       sortSavedViews(tracesSavedViews.value, favoriteIds.value),
     );
@@ -1097,6 +1107,7 @@ export default defineComponent({
 
     const savedViewsDialogOpen = ref(false);
     const openSavedViewsDialog = () => {
+      savedViewsList.refetch();
       savedViewsDialogOpen.value = true;
     };
 

@@ -17,7 +17,6 @@
 
 import { computed, ref, type Ref } from "vue";
 
-// Canonical keys for every pinnable item across all scopes.
 export type ToolbarPinKey =
   "histogram" | "sqlMode" | "quickMode" | "functionEditor" | "savedViews" | "syntaxGuide";
 

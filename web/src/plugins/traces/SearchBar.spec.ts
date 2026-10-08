@@ -1843,6 +1843,94 @@ describe("SearchBar", () => {
         });
       });
 
+      it("refetches the saved views each time the dialog opens", async () => {
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const callsBefore = mockSavedViewsGet.mock.calls.length;
+        mockSavedViewsGet.mockResolvedValue({
+          data: { views: [tracesView, tracesView2, logsView] },
+        });
+
+        await wrapper
+          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
+          .trigger("click");
+        await flushPromises();
+
+        expect(mockSavedViewsGet.mock.calls.length).toBe(callsBefore + 1);
+        expect(dialog().props("open")).toBe(true);
+        expect(dialog().props("views")).toEqual([tracesView, tracesView2]);
+
+        dialog().vm.$emit("update:open", false);
+        await flushPromises();
+        expect(dialog().props("open")).toBe(false);
+        await wrapper
+          .find('[data-test="traces-search-bar-menu-list-saved-views-btn"]')
+          .trigger("click");
+        await flushPromises();
+
+        expect(mockSavedViewsGet.mock.calls.length).toBe(callsBefore + 2);
+        expect(dialog().props("open")).toBe(true);
+      });
+
+      it("prunes favourites deleted elsewhere once the list loads, freeing the cap", async () => {
+        const favourites: Record<string, unknown> = {
+          l1: { ...logsView, org_id: "default" },
+        };
+        for (let i = 0; i < 9; i++) {
+          favourites[`gone${i}`] = { ...tracesView, view_id: `gone${i}` };
+        }
+        favourites.t1 = tracesView;
+        localStorage.setItem("savedViews", JSON.stringify(favourites));
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(dialog().props("favoriteIds")).toEqual(["t1"]);
+        expect(Object.keys(JSON.parse(localStorage.getItem("savedViews") || "{}"))).toEqual([
+          "l1",
+          "t1",
+        ]);
+
+        dialog().vm.$emit("toggle-favorite", tracesView2, false);
+        await flushPromises();
+        expect(dialog().props("favoriteIds")).toEqual(["t1", "t2"]);
+      });
+
+      it("keeps every favourite when the list fails to load", async () => {
+        mockSavedViewsGet.mockRejectedValue(new Error("boom"));
+        const gone = { ...tracesView, view_id: "gone" };
+        localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView, gone }));
+        wrapper = mountSearchBar();
+        await flushPromises();
+
+        expect(dialog().props("loading")).toBe(false);
+        expect(dialog().props("views")).toEqual([]);
+        expect(dialog().props("favoriteIds")).toEqual(["t1", "gone"]);
+        expect(JSON.parse(localStorage.getItem("savedViews") || "{}")).toEqual({
+          t1: tracesView,
+          gone,
+        });
+      });
+
+      it("reports a successful delete even when localStorage rejects the write", async () => {
+        localStorage.setItem("savedViews", JSON.stringify({ t1: tracesView }));
+        wrapper = mountSearchBar();
+        await flushPromises();
+        const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+          throw new DOMException("quota", "QuotaExceededError");
+        });
+
+        dialog().vm.$emit("delete", tracesView);
+        await flushPromises();
+        setItem.mockRestore();
+
+        expect(mockSavedViewsDelete).toHaveBeenCalledWith(expect.any(String), "t1");
+        expect(dialog().props("favoriteIds")).toEqual([]);
+        expect(toastMock).toHaveBeenCalledWith({
+          message: "search.viewDeletedSuccessfully",
+          variant: "success",
+        });
+      });
+
       it("passes the traces data-test prefix, views and favourites to the dialog", async () => {
         localStorage.setItem(
           "savedViews",

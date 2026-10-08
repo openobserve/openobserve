@@ -28,7 +28,6 @@ const props = withDefaults(
     loading?: boolean;
     /** Rows currently selected; read only when `#selection-actions` is provided. */
     selectedCount?: number;
-    /** Hairline above the bar. */
     bordered?: boolean;
   }>(),
   {

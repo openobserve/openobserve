@@ -96,6 +96,30 @@ describe("SavedViewsListDialog", () => {
     expect(wrapper.emitted("update:search")?.[0]).toEqual(["SLOW"]);
   });
 
+  it("clears the search each time the dialog opens", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    await wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", "SLOW");
+    await flushPromises();
+    expect(find("traces-saved-views-dialog-apply-t1").exists()).toBe(false);
+
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "OSearchInput" }).props("modelValue")).toBe("");
+    expect(find("traces-saved-views-dialog-apply-t1").exists()).toBe(true);
+    expect(wrapper.emitted("update:search")?.at(-1)).toEqual([""]);
+  });
+
+  it("clears a bound search model when the dialog opens", async () => {
+    wrapper = mountDialog({ open: false, search: "SLOW" });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(wrapper.emitted("update:search")).toEqual([[""]]);
+  });
+
   it("emits apply and closes when a view is chosen", async () => {
     wrapper = mountDialog();
     await flushPromises();

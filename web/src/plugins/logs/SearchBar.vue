@@ -2240,6 +2240,7 @@ export default defineComponent({
       favoriteViews: localSavedViews,
       toggleFavorite: handleFavoriteSavedView,
       removeFavorite,
+      pruneFavorites,
     } = useFavoriteSavedViews("logs");
 
     const {
@@ -3840,7 +3841,7 @@ export default defineComponent({
                 message: t("search.viewDeletedSuccessfully"),
                 variant: "success",
               });
-              getSavedViews();
+              refreshSavedViews();
             } else {
               toast({
                 message: t("search.errorDeletingSavedViewDetail", {
@@ -3955,7 +3956,7 @@ export default defineComponent({
                 message: t("search.viewCreatedSuccessfully"),
                 variant: "success",
               });
-              getSavedViews();
+              refreshSavedViews();
               isSavedViewAction.value = "create";
             } else {
               toast({
@@ -4178,9 +4179,15 @@ export default defineComponent({
       { label: "JSON", value: "json" },
     ]);
 
+    // Only a successful fetch is the complete list; pruning on error would drop every favourite.
+    const refreshSavedViews = async () => {
+      const views = await getSavedViews();
+      if (views) pruneFavorites(views.map((view) => view.view_id));
+    };
+
     const loadSavedView = () => {
       if (searchObj.data.savedViews.length == 0) {
-        getSavedViews();
+        refreshSavedViews();
       }
     };
 

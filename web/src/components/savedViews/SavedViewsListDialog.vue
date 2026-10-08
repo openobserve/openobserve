@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -72,6 +72,13 @@ const emit = defineEmits<{
 const search = defineModel<string>("search", { default: "" });
 
 const { t } = useI18nTyped();
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) search.value = "";
+  },
+);
 
 const paneTestId = (pane: Pane) =>
   pane === "all" ? props.dataTestPrefix : `${props.dataTestPrefix}-favorites`;

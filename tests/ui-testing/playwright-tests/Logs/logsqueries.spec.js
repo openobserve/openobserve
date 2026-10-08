@@ -84,6 +84,7 @@ test.describe("Logs Queries testcases", () => {
     await pm.logsPage.clickSavedViewByTitle('e2etimestamp');
     await pm.logsPage.clickSavedViewsExpand();
     await pm.logsPage.clickSavedViewSearchInput();
+    await pm.logsPage.fillSavedViewSearchInput('e2e');
     await pm.logsPage.clickSavedViewByTitle('e2etimestamp');
     await pm.logsPage.clickDeleteButton();
     await pm.logsPage.clickConfirmButton();

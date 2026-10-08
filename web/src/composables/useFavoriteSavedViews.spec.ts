@@ -158,4 +158,64 @@ describe("useFavoriteSavedViews", () => {
 
     expect(favoriteIds.value).toEqual(["l2"]);
   });
+
+  it("prunes only this org's and view type's favourites missing from the live list", () => {
+    localStorage.setItem(
+      "savedViews",
+      JSON.stringify({
+        t1: view("t1", "org-a", "traces"),
+        t2: view("t2", "org-a", "traces"),
+        tb: view("tb", "org-b", "traces"),
+        l1: view("l1"),
+      }),
+    );
+    const { favoriteIds, pruneFavorites } = useFavoriteSavedViews("traces");
+
+    pruneFavorites(["t1"]);
+
+    expect(favoriteIds.value).toEqual(["t1"]);
+    expect(Object.keys(stored())).toEqual(["t1", "tb", "l1"]);
+  });
+
+  it("re-reads storage before pruning and skips the write when nothing is stale", () => {
+    const { favoriteIds, pruneFavorites } = useFavoriteSavedViews("logs");
+    localStorage.setItem("savedViews", JSON.stringify({ l1: view("l1"), l2: view("l2") }));
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+
+    pruneFavorites(["l1", "l2"]);
+    expect(setItem).not.toHaveBeenCalled();
+
+    pruneFavorites(["l2"]);
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(favoriteIds.value).toEqual(["l2"]);
+    setItem.mockRestore();
+  });
+
+  it("frees the cap once deleted favourites are pruned", () => {
+    const entries: Record<string, unknown> = {};
+    for (let i = 0; i < 10; i++) entries[`l${i}`] = view(`l${i}`);
+    localStorage.setItem("savedViews", JSON.stringify(entries));
+    const logs = useFavoriteSavedViews("logs");
+
+    logs.pruneFavorites(["l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"]);
+    logs.toggleFavorite(view("l10"), false);
+
+    expect(stored().l9).toBeUndefined();
+    expect(stored().l10).toEqual(view("l10"));
+    expect(logs.favoriteIds.value).toHaveLength(10);
+  });
+
+  it("keeps working in memory when localStorage rejects the write", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    const { favoriteIds, toggleFavorite, removeFavorite, pruneFavorites } =
+      useFavoriteSavedViews("logs");
+
+    expect(() => toggleFavorite(view("l1"), false)).not.toThrow();
+    expect(favoriteIds.value).toEqual(["l1"]);
+    expect(() => removeFavorite("l1")).not.toThrow();
+    expect(() => pruneFavorites([])).not.toThrow();
+    setItem.mockRestore();
+  });
 });
