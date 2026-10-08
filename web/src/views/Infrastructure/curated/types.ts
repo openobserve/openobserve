@@ -112,6 +112,8 @@ export interface CuratedPanelDef {
    * every omitted scope token to appear here, so silence is never a decision.
    */
   fleetWide?: string[];
+  /** The section-level `emptyMeansHealthy`, for a triage panel in a section where empty otherwise means missing data. */
+  emptyMeansHealthy?: boolean;
 }
 
 export interface CuratedSection {

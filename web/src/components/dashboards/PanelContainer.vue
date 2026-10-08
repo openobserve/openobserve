@@ -47,22 +47,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              running into it. The margin is outside the overflow box, so the
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
+        <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
         <div
           :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap max-lg:line-clamp-2 max-lg:whitespace-normal"
+          :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
         </div>
+        <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
           size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
           data-test="dashboard-panel-curated-badge"
-          :title="t('infra.curated.staleBadgeTooltip')"
+          :aria-label="curatedBadgeText"
         >
-          {{ t(curatedBadge.key, curatedBadgeParams) }}
-          <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
+          <!-- One wrapper, because a child-mode tooltip binds to its previous sibling element. -->
+          <span class="inline-flex items-center" data-test="dashboard-panel-curated-badge-label">
+            <span class="hidden @min-[32rem]/panelbar:inline">{{ curatedBadgeText }}</span>
+            <OIcon name="schedule" size="xs" class="@min-[32rem]/panelbar:hidden" />
+          </span>
+          <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
         <OTag
           v-if="
@@ -503,7 +511,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -621,6 +629,13 @@ export default defineComponent({
         : "";
       return { duration, date: badge.date };
     });
+    const curatedBadgeText = computed(() =>
+      curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
+    );
+    // Both halves are already translated; joining them widens to string without untranslating either.
+    const curatedBadgeTooltip = computed(() =>
+      raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
+    );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
 
@@ -675,6 +690,10 @@ export default defineComponent({
      * from PromQLTableChart's own #empty slot. Claiming tables here too printed the
      * words twice, once from each layer.
      */
+    const curatedTile = computed(
+      () =>
+        props.data?.type === "metric" && props.data?.config?.curated_no_data_eligible !== undefined,
+    );
     const curatedAllClear = computed(
       () =>
         props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
@@ -1136,8 +1155,11 @@ export default defineComponent({
       exemplarErrorMessage,
       curatedBadge,
       curatedBadgeParams,
+      curatedBadgeText,
+      curatedBadgeTooltip,
       curatedNoData,
       curatedAllClear,
+      curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       alertDisabledReason,
