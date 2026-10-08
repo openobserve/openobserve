@@ -52,6 +52,7 @@
           class="hover:bg-interactive-hover-bg h-8 min-h-8 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
+          calendar-presets
           @hide="setTimeForVariables()"
         />
         <AutoRefreshInterval

@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   parseDuration,
   generateDurationLabel,
   getQueryParamsForDuration,
   getDurationObjectFromParams,
   getConsumableRelativeTime,
+  getEffectiveTimeRange,
   getRelativePeriod,
   isInvalidDate,
   convertUnixToDateFormat,
@@ -359,6 +360,65 @@ describe("Date Utilities", () => {
     it("should return undefined for empty period", () => {
       const result = getConsumableRelativeTime("");
       expect(result).toBeUndefined();
+    });
+
+    describe("calendar tokens", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("resolves a calendar token in the given timezone", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+        expect(getConsumableRelativeTime("calendar:month:0", "Asia/Calcutta")).toEqual({
+          startTime: Date.parse("2026-09-30T18:30:00Z") * 1000,
+          endTime: Date.parse("2026-10-08T03:00:00Z") * 1000,
+        });
+        expect(getConsumableRelativeTime("calendar:day:-1", "America/New_York")).toEqual({
+          startTime: Date.parse("2026-10-06T04:00:00Z") * 1000,
+          endTime: Date.parse("2026-10-07T03:59:59.999Z") * 1000,
+        });
+      });
+
+      it("uses the browser timezone when none is given", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+        expect(getConsumableRelativeTime("calendar:day:0")).toEqual({
+          startTime: Date.parse("2026-10-08T00:00:00Z") * 1000,
+          endTime: Date.parse("2026-10-08T03:00:00Z") * 1000,
+        });
+      });
+
+      it("treats a malformed calendar token like any invalid period", () => {
+        expect(getConsumableRelativeTime("calendar:day:1", "UTC")).toBeUndefined();
+        expect(getConsumableRelativeTime("calendar:fortnight:0", "UTC")).toBeUndefined();
+        expect(getConsumableRelativeTime("calendar:year:-999999", "UTC")).toBeUndefined();
+      });
+
+      it("leaves rolling periods unchanged when a timezone is passed", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+        expect(getConsumableRelativeTime("15m", "Asia/Calcutta")).toEqual({
+          startTime: Date.parse("2026-10-08T02:45:00Z") * 1000,
+          endTime: Date.parse("2026-10-08T03:00:00Z") * 1000,
+        });
+      });
+
+      it("getEffectiveTimeRange resolves calendar tokens too", () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+        expect(
+          getEffectiveTimeRange({
+            type: "relative",
+            relativeTimePeriod: "calendar:year:-1",
+            startTime: 1,
+            endTime: 2,
+          }),
+        ).toEqual({
+          startTime: Date.parse("2025-01-01T00:00:00Z") * 1000,
+          endTime: Date.parse("2025-12-31T23:59:59.999Z") * 1000,
+        });
+      });
     });
   });
 

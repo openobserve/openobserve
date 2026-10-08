@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedDate"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
+            calendar-presets
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
           />
@@ -875,7 +876,10 @@ export default defineComponent({
       if (!pickerValue) return null;
 
       if (pickerValue.valueType === "relative" && pickerValue.relativeTimePeriod) {
-        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
+        const result = getConsumableRelativeTime(
+          pickerValue.relativeTimePeriod,
+          store.state.timezone,
+        );
         if (result) {
           return {
             start_time: new Date(result.startTime),
@@ -968,10 +972,8 @@ export default defineComponent({
       );
     };
 
-    const spanOf = (time: any) =>
-      time?.start_time && time?.end_time
-        ? time.end_time.getTime() - time.start_time.getTime()
-        : null;
+    // The relative period __global was last resolved from; compared instead of the span because a calendar period's span grows with now.
+    let globalRelativePeriod: string | null = null;
 
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
@@ -988,10 +990,14 @@ export default defineComponent({
       // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
       const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const relativePeriod = isRelativeGlobal
+        ? (selectedDate.value?.relativeTimePeriod ?? null)
+        : null;
       const globalTimeChanged = isRelativeGlobal
-        ? spanOf(existingGlobalTime) !== spanOf(globalTime)
+        ? globalRelativePeriod !== relativePeriod
         : !areTimesEqual(existingGlobalTime, globalTime);
       const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
+      if (shouldUpdateGlobal) globalRelativePeriod = relativePeriod;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1886,6 +1892,7 @@ export default defineComponent({
       selectedDate,
       currentTimeObj,
       currentTimeObjPerPanel,
+      computeAllPanelTimes,
       shouldRefreshWithoutCachePerPanel,
       refreshInterval,
       // ----------------

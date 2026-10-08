@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePicker"
           size="sm"
           v-model="selectedDate"
+          calendar-presets
           @hide="setTime"
           data-test="pinned-dashboard-date-time-picker"
         />
@@ -156,7 +157,7 @@ const resolveWindow = (): { startTime: number; endTime: number } | null => {
   if (!d) return null;
   const type = d.valueType ?? d.type;
   if (type === "relative" && d.relativeTimePeriod) {
-    const rel = getConsumableRelativeTime(d.relativeTimePeriod);
+    const rel = getConsumableRelativeTime(d.relativeTimePeriod, store.state.timezone);
     if (rel?.startTime && rel?.endTime) {
       return { startTime: rel.startTime, endTime: rel.endTime };
     }

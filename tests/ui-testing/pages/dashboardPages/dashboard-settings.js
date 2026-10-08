@@ -129,6 +129,27 @@ export default class DashboardSetting {
     await relativeBtn.click();
   }
 
+  // Default duration from a Day/This/Last chip; the settings picker auto-applies, so there is no Apply.
+  async calendarTimeSelection(chip, row) {
+    await this.page
+      .locator(
+        '[data-test="dashboard-general-setting-datetime-picker"] [data-test="date-time-btn"]'
+      )
+      .click();
+
+    const calendarBtn = this.page.locator(
+      `[data-test="date-time-relative-${chip}-${row}-btn"]`
+    );
+    await calendarBtn.waitFor({ state: "visible", timeout: 10000 });
+    await calendarBtn.click();
+  }
+
+  getDefaultDurationLabel() {
+    return this.page.locator(
+      '[data-test="dashboard-general-setting-datetime-picker"] .date-time-label'
+    );
+  }
+
   // Toast message locator scoped to a given text (assert visibility in the spec)
   getToastMessageByText(text) {
     return this.page

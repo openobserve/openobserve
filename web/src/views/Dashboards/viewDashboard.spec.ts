@@ -111,6 +111,13 @@ const routeLeaveGuards: Array<() => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
+// Mutable so a test can open the dashboard with its own time params.
+const mockRouteState = vi.hoisted(() => ({
+  query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" } as Record<
+    string,
+    string
+  >,
+}));
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -138,7 +145,7 @@ vi.mock("vue-router", () => ({
   },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
-    query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
+    query: mockRouteState.query,
     path: "/dashboard/test-dashboard-1",
   }),
 }));
@@ -249,6 +256,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { getDashboard } from "@/utils/commons";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -280,6 +288,7 @@ describe("ViewDashboard", () => {
     global.mockRouterReplace.mockClear();
     global.mockRouterBack.mockClear();
     global.mockHistoryState.back = null;
+    mockRouteState.query = { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" };
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -1462,6 +1471,104 @@ describe("ViewDashboard", () => {
       // Test config and loading state properties exist
       expect(wrapper.vm.config).toBeDefined();
       expect(wrapper.vm.arePanelsLoading).toBeDefined();
+    });
+  });
+
+  describe("calendar time ranges", () => {
+    const baseDashboard = {
+      dashboardId: "test-dashboard-1",
+      title: "Test Dashboard",
+      variables: { list: [] },
+      tabs: [{ tabId: "tab-1", name: "Tab 1", panels: [] }],
+    };
+    const pickerWindow = { startTime: 1_000_000, endTime: 2_000_000 };
+    const PickerStub = {
+      name: "DateTimePickerDashboard",
+      props: { modelValue: Object, calendarPresets: Boolean },
+      template: '<div data-test="dashboard-global-date-time-picker"></div>',
+      methods: {
+        getConsumableDateTime: () => ({ ...pickerWindow }),
+      },
+    };
+
+    const mountWithPicker = () =>
+      createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: {
+            DateTimePickerDashboard: PickerStub,
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+          },
+        },
+      });
+
+    afterEach(() => {
+      vi.mocked(getDashboard).mockResolvedValue(baseDashboard);
+      pickerWindow.startTime = 1_000_000;
+      pickerWindow.endTime = 2_000_000;
+    });
+
+    it("turns the calendar presets on for the header picker", async () => {
+      wrapper = mountWithPicker();
+      await flushPromises();
+      expect(wrapper.findComponent(PickerStub).props("calendarPresets")).toBe(true);
+    });
+
+    it("reads a calendar token from the URL period", async () => {
+      mockRouteState.query = { ...mockRouteState.query, period: "calendar:month:-1" };
+      wrapper = mountWithPicker();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate).toMatchObject({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:month:-1",
+      });
+      expect(wrapper.vm.getQueryParamsForDuration(wrapper.vm.selectedDate)).toEqual({
+        period: "calendar:month:-1",
+      });
+    });
+
+    it("opens on the dashboard's default calendar period when the URL has no time", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...baseDashboard,
+        defaultDatetimeDuration: { type: "relative", relativeTimePeriod: "calendar:week:0" },
+      });
+      wrapper = mountWithPicker();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate).toEqual({
+        valueType: "relative",
+        relativeTimePeriod: "calendar:week:0",
+      });
+    });
+
+    it("keeps __global when an offset-0 period only grows with now", async () => {
+      wrapper = mountWithPicker();
+      await flushPromises();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      await flushPromises();
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+      expect(settled.end_time.getTime()).toBe(2_000_000);
+
+      pickerWindow.endTime = 2_500_000;
+      wrapper.vm.computeAllPanelTimes();
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).toBe(settled);
+
+      wrapper.vm.selectedDate.relativeTimePeriod = "calendar:day:-1";
+      wrapper.vm.computeAllPanelTimes();
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).not.toBe(settled);
+      expect(wrapper.vm.currentTimeObjPerPanel.__global.end_time.getTime()).toBe(2_500_000);
+    });
+
+    it("still refreshes __global on a forced recompute", async () => {
+      wrapper = mountWithPicker();
+      await flushPromises();
+      wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "calendar:day:0" };
+      await flushPromises();
+      const settled = wrapper.vm.currentTimeObjPerPanel.__global;
+
+      wrapper.vm.computeAllPanelTimes(true);
+      expect(wrapper.vm.currentTimeObjPerPanel.__global).not.toBe(settled);
     });
   });
 

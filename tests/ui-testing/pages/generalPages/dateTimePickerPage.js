@@ -87,6 +87,11 @@ export class DateTimePickerPage {
         return this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
     }
 
+    /** Calendar preset chip (dashboards only): chip today/yesterday in row day, week/month/quarter/year in rows this/last. */
+    calendarPeriodBtn(chip, row) {
+        return this.relativePeriodBtn(`${chip}-${row}`);
+    }
+
     /**
      * Unit option in the custom period select; unit is one of s/m/h/d/w/M.
      * The OSelect renders each option (ListboxItem/OSelectItem) with the option
@@ -122,6 +127,16 @@ export class DateTimePickerPage {
         const btn = this.relativePeriodBtn(suffix);
         await expect(btn).toBeVisible();
         await btn.click();
+    }
+
+    async selectCalendarPeriod(chip, row) {
+        await this.selectRelativePeriod(`${chip}-${row}`);
+    }
+
+    async expectNoCalendarPresets() {
+        await expect(this.relativePanelMarker).toBeVisible();
+        await expect(this.calendarPeriodBtn('today', 'day')).toHaveCount(0);
+        await expect(this.calendarPeriodBtn('month', 'this')).toHaveCount(0);
     }
 
     async expectAbsolutePanelActive() {
