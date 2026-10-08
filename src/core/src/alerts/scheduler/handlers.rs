@@ -473,9 +473,10 @@ async fn dispatch_per_group(
     let mut errors: Vec<String> = Vec::new();
     let mut delivered_groups: std::collections::HashSet<String> = Default::default();
     let (mut downtime_suppressed, mut downtime_id) = (0usize, None);
+    let muted_groups = group_downtime_map(alert, folder_id, records).await;
     for item in &plan.items {
         // One group muted, the others notify: no send and no silence window for this group.
-        if let Some(downtime) = group_downtime(alert, &alert_id, folder_id, &item.row).await {
+        if let Some(downtime) = muted_groups.get(&item.group_key).cloned() {
             log::info!(
                 "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: suppressed by downtime {}",
                 item.group_key,
@@ -593,35 +594,23 @@ async fn dispatch_per_group(
     })
 }
 
-/// The downtime of one group of a multi-alert, from that group's own row.
+/// The downtime of each muted group of a multi-alert, from one identity call over every row.
 #[cfg(feature = "enterprise")]
-async fn group_downtime(
+async fn group_downtime_map(
     alert: &config::meta::alerts::alert::Alert,
-    alert_id: &str,
     folder_id: &str,
-    row: &config::utils::json::Map<String, config::utils::json::Value>,
-) -> Option<config::meta::downtimes::ActiveDowntime> {
-    if !alert_downtimes_in(&alert.org_id) {
-        return None;
-    }
-    let identity = alert_identity(alert, std::slice::from_ref(row)).await;
-    crate::alerts::downtimes::active_for_alert(
-        &alert.org_id,
-        alert_id,
-        folder_id,
-        identity.first()?,
-        now_micros(),
-    )
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> HashMap<String, config::meta::downtimes::ActiveDowntime> {
+    group_downtimes(alert, folder_id, rows, now_micros()).await
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn group_downtime(
+async fn group_downtime_map(
     _alert: &config::meta::alerts::alert::Alert,
-    _alert_id: &str,
     _folder_id: &str,
-    _row: &config::utils::json::Map<String, config::utils::json::Value>,
-) -> Option<config::meta::downtimes::ActiveDowntime> {
-    None
+    _rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> HashMap<String, config::meta::downtimes::ActiveDowntime> {
+    HashMap::new()
 }
 
 /// Confirm this evaluation's dedup reservations once a notification landed
@@ -1970,6 +1959,19 @@ pub(crate) async fn alert_identity(
     identity
 }
 
+/// One map per SQL group, PromQL series or row, so one muted row never decides for the others.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn downtime_identities(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> Vec<HashMap<String, String>> {
+    downtime_identities_by_key(alert, rows)
+        .await
+        .into_iter()
+        .map(|(_, dims)| dims)
+        .collect()
+}
+
 /// Shared by the composite and manual-trigger producers so `creates_incident` cannot drift.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn page_for_alert_firing(
@@ -2222,7 +2224,7 @@ async fn downtime_decision(
     // An SLO alert runs no query, so its identity is its SLO's (D9).
     let identity = match alert.query_condition.slo_condition.as_ref() {
         Some(slo_condition) => vec![slo_dimensions(&alert.org_id, &slo_condition.slo_id).await],
-        None => alert_identity(alert, rows).await,
+        None => downtime_identities(alert, rows).await,
     };
     muted_in_every_group(&identity, |dims| {
         crate::alerts::downtimes::active_for_alert(&alert.org_id, &alert_id, folder_id, dims, now)
@@ -2231,7 +2233,7 @@ async fn downtime_decision(
 
 /// The first group's downtime when every group has one; else `dispatch_per_group` decides.
 #[cfg(feature = "enterprise")]
-fn muted_in_every_group(
+pub(crate) fn muted_in_every_group(
     identity: &[HashMap<String, String>],
     mut active: impl FnMut(&HashMap<String, String>) -> Option<config::meta::downtimes::ActiveDowntime>,
 ) -> Option<config::meta::downtimes::ActiveDowntime> {
@@ -2241,6 +2243,135 @@ fn muted_in_every_group(
         decision.get_or_insert(downtime);
     }
     decision
+}
+
+/// [downtime_identities] keyed as `dispatch_per_group` keys its groups; a plain alert by row index.
+#[cfg(feature = "enterprise")]
+async fn downtime_identities_by_key(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> Vec<(String, HashMap<String, String>)> {
+    let semantic_groups =
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+    let mut identities = identities_by_key(alert, rows, &semantic_groups);
+    // Once per run and only when no row has an identity, as in `alert_identity`.
+    if let Some(first_row) = rows.first()
+        && identities.iter().all(|(_, dims)| dims.is_empty())
+        && let Some(service) =
+            crate::alerts::incidents::correlated_service_for_routing(&alert.org_id, first_row).await
+    {
+        for (_, dims) in &mut identities {
+            dims.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service.clone(),
+            );
+        }
+    }
+    identities
+}
+
+/// The pure part of [downtime_identities_by_key], before the correlated-service fallback.
+#[cfg(feature = "enterprise")]
+pub(crate) fn identities_by_key(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    semantic_groups: &[config::meta::correlation::FieldAlias],
+) -> Vec<(String, HashMap<String, String>)> {
+    let dims = |row: &config::utils::json::Map<String, config::utils::json::Value>| {
+        o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+            semantic_groups,
+            &alert.query_condition,
+            row,
+        )
+    };
+    if rows.is_empty() {
+        // No row: the alert's own conditions decide, as in `alert_identity`.
+        return vec![(String::new(), dims(&config::utils::json::Map::new()))];
+    }
+    if !alert.query_condition.multi_alert_enabled() {
+        return rows
+            .iter()
+            .enumerate()
+            .map(|(i, row)| (i.to_string(), dims(row)))
+            .collect();
+    }
+    let mut by_key: Vec<_> = rows_by_downtime_key(alert, rows).into_iter().collect();
+    by_key.sort_by(|a, b| a.0.cmp(&b.0));
+    by_key
+        .into_iter()
+        .map(|(key, row)| {
+            let dims = dims(&row);
+            (key, dims)
+        })
+        .collect()
+}
+
+/// The rows of a multi-alert under the group keys `dispatch_per_group` uses.
+#[cfg(feature = "enterprise")]
+fn rows_by_downtime_key(
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) -> HashMap<String, config::utils::json::Map<String, config::utils::json::Value>> {
+    if alert.query_condition.query_type == config::meta::alerts::QueryType::PromQL {
+        config::meta::alerts::dispatch::rows_by_series_key(rows)
+    } else {
+        config::meta::alerts::dispatch::rows_by_group_key(rows, &alert_group_by(alert))
+    }
+}
+
+/// The group key of one multi-alert row, the same key [rows_by_downtime_key] files it under.
+#[cfg(feature = "enterprise")]
+fn downtime_row_key(
+    alert: &config::meta::alerts::alert::Alert,
+    group_by: &[String],
+    row: &config::utils::json::Map<String, config::utils::json::Value>,
+) -> String {
+    use config::meta::alerts::{dispatch, grouping::group_key};
+    if alert.query_condition.query_type == config::meta::alerts::QueryType::PromQL {
+        group_key(&dispatch::promql_series_labels(row))
+    } else {
+        group_key(&dispatch::row_group_labels(row, group_by))
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn alert_group_by(alert: &config::meta::alerts::alert::Alert) -> Vec<String> {
+    alert
+        .query_condition
+        .aggregation
+        .as_ref()
+        .and_then(|a| a.group_by.clone())
+        .unwrap_or_default()
+}
+
+/// The downtime of each muted group of a multi-alert, by group key.
+#[cfg(feature = "enterprise")]
+async fn group_downtimes(
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    now: i64,
+) -> HashMap<String, config::meta::downtimes::ActiveDowntime> {
+    let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
+        return HashMap::new();
+    };
+    if !alert_downtimes_in(&alert.org_id) {
+        return HashMap::new();
+    }
+    downtime_identities_by_key(alert, rows)
+        .await
+        .into_iter()
+        .filter_map(|(key, dims)| {
+            crate::alerts::downtimes::active_for_alert(
+                &alert.org_id,
+                &alert_id,
+                folder_id,
+                &dims,
+                now,
+            )
+            .map(|downtime| (key, downtime))
+        })
+        .collect()
 }
 
 /// The Stage A maps of the unmuted groups, so a muted group of a multi-alert is not paged.
@@ -2277,31 +2408,21 @@ async fn unmuted_group_rows(
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
     now: i64,
 ) -> Option<Vec<config::utils::json::Map<String, config::utils::json::Value>>> {
-    let alert_id = alert.id.as_ref()?.to_string();
+    alert.id.as_ref()?;
     if !alert.creates_incident
         || !alert.query_condition.multi_alert_enabled()
         || !alert_downtimes_in(&alert.org_id)
     {
         return None;
     }
-    let mut kept = Vec::with_capacity(rows.len());
-    for row in rows {
-        let identity = alert_identity(alert, std::slice::from_ref(row)).await;
-        let muted = identity.first().is_some_and(|dims| {
-            crate::alerts::downtimes::active_for_alert(
-                &alert.org_id,
-                &alert_id,
-                folder_id,
-                dims,
-                now,
-            )
-            .is_some()
-        });
-        if !muted {
-            kept.push(row.clone());
-        }
-    }
-    Some(kept)
+    let muted = group_downtimes(alert, folder_id, rows, now).await;
+    let group_by = alert_group_by(alert);
+    Some(
+        rows.iter()
+            .filter(|row| !muted.contains_key(&downtime_row_key(alert, &group_by, row)))
+            .cloned()
+            .collect(),
+    )
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -6667,6 +6788,10 @@ async fn handle_slo_backfill_triggers(
             return Ok(());
         }
         Ok(crate::slo::backfill::ChunkOutcome::More) => {}
+        // The trigger stays, so the next tick reloads the job that changed under this chunk.
+        Ok(crate::slo::backfill::ChunkOutcome::Superseded) => {
+            log::info!("[slo] backfill job of {slo_id} changed during the chunk; reloading");
+        }
         Err(e) => {
             log::error!(
                 "[slo] backfill chunk failed for {}/{slo_id}: {e}",
@@ -8124,5 +8249,138 @@ mod tests {
             ..run(true, false, false, false)
         };
         assert_eq!(anomaly_run_status(&muted), RunOutcome::Suppressed);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn service_groups() -> Vec<config::meta::correlation::FieldAlias> {
+        vec![config::meta::correlation::FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string()],
+            is_workload_type: false,
+        }]
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn service_row(service: &str, value: i64) -> config::utils::json::Map<String, json::Value> {
+        json::json!({ "service": service, "value": value })
+            .as_object()
+            .cloned()
+            .unwrap()
+    }
+
+    /// The decision `downtime_decision`, `realtime_downtime` and `entry_downtime` take.
+    #[cfg(feature = "enterprise")]
+    fn run_downtime(
+        alert: &config::meta::alerts::alert::Alert,
+        rows: &[config::utils::json::Map<String, json::Value>],
+        muted: &[&str],
+    ) -> Option<String> {
+        let identity: Vec<HashMap<String, String>> =
+            identities_by_key(alert, rows, &service_groups())
+                .into_iter()
+                .map(|(_, dims)| dims)
+                .collect();
+        muted_in_every_group(&identity, |dims| {
+            let service = dims.get("service")?;
+            muted
+                .contains(&service.as_str())
+                .then(|| config::meta::downtimes::ActiveDowntime {
+                    id: format!("dt-{service}"),
+                    name: service.clone(),
+                    ends_at: 1,
+                })
+        })
+        .map(|d| d.id)
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_batch_with_one_unmuted_service_is_not_suppressed_in_either_order() {
+        let alert = config::meta::alerts::alert::Alert::default();
+        let payments_first = [service_row("payments", 1), service_row("checkout", 1)];
+        let checkout_first = [service_row("checkout", 1), service_row("payments", 1)];
+        assert_eq!(run_downtime(&alert, &payments_first, &["payments"]), None);
+        assert_eq!(run_downtime(&alert, &checkout_first, &["payments"]), None);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_batch_whose_every_service_is_muted_is_suppressed() {
+        let alert = config::meta::alerts::alert::Alert::default();
+        let rows = [service_row("payments", 1), service_row("checkout", 1)];
+        assert_eq!(
+            run_downtime(&alert, &rows, &["payments", "checkout"]).as_deref(),
+            Some("dt-payments")
+        );
+        assert_eq!(
+            run_downtime(&alert, &rows[..1], &["payments"]).as_deref(),
+            Some("dt-payments")
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_promql_multi_alert_with_one_unmuted_series_is_not_suppressed() {
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        let rows = [service_row("payments", 1), service_row("checkout", 2)];
+        assert_eq!(identities_by_key(&alert, &rows, &service_groups()).len(), 2);
+        assert_eq!(run_downtime(&alert, &rows, &["payments"]), None);
+        assert_eq!(run_downtime(&alert, &rows, &["checkout"]), None);
+        assert!(run_downtime(&alert, &rows, &["payments", "checkout"]).is_some());
+    }
+
+    /// `entry_downtime` reads every row of a grouped-flush entry, not the first.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_grouped_flush_entry_with_mixed_rows_is_not_dropped() {
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.is_real_time = true;
+        let rows = vec![
+            service_row("payments", 1),
+            service_row("payments", 2),
+            service_row("checkout", 3),
+        ];
+        assert_eq!(run_downtime(&alert, &rows, &["payments"]), None);
+    }
+
+    /// `dispatch_per_group` and `unmuted_group_rows` look a row's group up under this key.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn every_multi_alert_row_finds_its_group_identity() {
+        let mut promql = config::meta::alerts::alert::Alert::default();
+        promql.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        promql.query_condition.promql_multi_alert = true;
+        let mut sql = config::meta::alerts::alert::Alert::default();
+        sql.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: Some(vec!["service".to_string()]),
+            function: config::meta::alerts::AggFunction::Avg,
+            having: config::meta::alerts::Condition {
+                column: "value".to_string(),
+                operator: config::meta::alerts::Operator::GreaterThan,
+                value: json::json!(0),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: true,
+        });
+        let rows = [service_row("payments", 1), service_row("checkout", 2)];
+        for alert in [&promql, &sql] {
+            let identities: HashMap<String, HashMap<String, String>> =
+                identities_by_key(alert, &rows, &service_groups())
+                    .into_iter()
+                    .collect();
+            let group_by = alert_group_by(alert);
+            for row in &rows {
+                let dims = &identities[&downtime_row_key(alert, &group_by, row)];
+                assert_eq!(
+                    dims.get("service"),
+                    row["service"].as_str().map(str::to_string).as_ref()
+                );
+            }
+        }
     }
 }

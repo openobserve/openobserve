@@ -126,7 +126,7 @@ async fn sweep_ended_downtimes() -> Result<(), anyhow::Error> {
     );
     let removed = db::downtimes::delete_ended_before(cutoff).await?;
     if removed > 0 {
-        log::info!("[DOWNTIMES::JOB] Removed {removed} ended or cancelled downtimes");
+        log::info!("[DOWNTIMES::JOB] Removed {removed} ended, cancelled or deleted downtimes");
     }
     Ok(())
 }

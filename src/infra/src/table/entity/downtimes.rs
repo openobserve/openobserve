@@ -24,6 +24,7 @@ pub struct Model {
     pub weekdays: Option<Json>,
     pub cancelled_at: Option<i64>,
     pub cancelled_by: Option<String>,
+    pub deleted_at: Option<i64>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_by: String,

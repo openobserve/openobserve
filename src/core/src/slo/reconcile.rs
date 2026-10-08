@@ -37,6 +37,7 @@ use config::{
     utils::json,
 };
 use infra::{db::get_orm_client_rw, table::slo as slo_table};
+use sea_orm::ConnectionTrait;
 
 /// The per-group figures a rebuild produced.
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +50,13 @@ pub struct Rebuilt {
 
 /// Rebuild every group's aggregate for one SLO and write the results.
 pub async fn reconcile(slo: &Slo) -> Result<Vec<Rebuilt>, anyhow::Error> {
+    let rows = rebuild(slo).await?;
+    write_rebuilt(get_orm_client_rw().await, &slo.id, &rows).await?;
+    Ok(rows)
+}
+
+/// The figures [reconcile] would write, read without writing, so a caller can write them guarded.
+pub async fn rebuild(slo: &Slo) -> Result<Vec<Rebuilt>, anyhow::Error> {
     let db = get_orm_client_rw().await;
 
     let Some(status) = slo_table::load_status(db, &slo.id, "").await? else {
@@ -67,18 +75,24 @@ pub async fn reconcile(slo: &Slo) -> Result<Vec<Rebuilt>, anyhow::Error> {
     }
 
     let (from, to) = read_window(watermark, slo.definition.window_secs);
-    let rows = read_aggregate(slo, from, to).await?;
+    read_aggregate(slo, from, to).await
+}
 
-    for r in &rows {
+pub async fn write_rebuilt<C: ConnectionTrait>(
+    conn: &C,
+    slo_id: &str,
+    rows: &[Rebuilt],
+) -> Result<(), anyhow::Error> {
+    for r in rows {
         slo_table::reconcile_from_slices(
-            db,
-            &slo.id,
+            conn,
+            slo_id,
             &r.group_key,
             (r.good, r.total, r.covered_slices),
         )
         .await?;
     }
-    Ok(rows)
+    Ok(())
 }
 
 /// The SQL that rebuilds one SLO's window.

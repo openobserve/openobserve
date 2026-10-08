@@ -366,7 +366,7 @@ pub async fn delete_folder(
         FolderType::Downtimes => {
             if let Some(folder_pk) =
                 table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
-                && table::downtimes::count_by_folder(org_id, &folder_pk).await? > 0
+                && !table::downtimes::release_folder(org_id, &folder_pk).await?
             {
                 return Err(FolderError::DeleteWithDowntimes);
             }

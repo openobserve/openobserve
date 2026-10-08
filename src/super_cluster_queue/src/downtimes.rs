@@ -22,9 +22,10 @@ use config::meta::{
 use infra::{
     coordinator,
     errors::{Error, Result},
-    table,
+    table::{self, downtimes::RowVersion},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{DowntimeMessage, Message};
+use sea_orm::ConnectionTrait;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let msg: DowntimeMessage = msg
@@ -34,24 +35,10 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         DowntimeMessage::Put { org, mut downtime } => {
             downtime.org = org;
             downtime.folder_id = local_folder_id(&downtime).await?;
-            let before = table::downtimes::get(&downtime.org, &downtime.id).await?;
-            // The queue neither orders nor deduplicates: a redelivered older Put must not revert
-            // a newer edit, such as a cancel, that this region already applied.
-            if before
-                .as_ref()
-                .is_some_and(|before| before.updated_at > downtime.updated_at)
-            {
-                log::info!(
-                    "[DOWNTIMES] skipping a stale put of {}/{} (updated_at {} < {})",
-                    downtime.org,
-                    downtime.id,
-                    downtime.updated_at,
-                    before.as_ref().map_or(0, |b| b.updated_at)
-                );
+            let client = infra::db::get_orm_client_rw().await;
+            let Some(coverage_changed) = apply_put(client, &downtime).await? else {
                 return Ok(());
-            }
-            let coverage_changed = before.is_some_and(|before| !before.same_coverage(&downtime));
-            table::downtimes::put(&downtime).await?;
+            };
             coordinator::downtimes::emit_put_event(&downtime.org, &downtime.id).await?;
             if coverage_changed {
                 forget_recorded_mutes(&downtime.id).await;
@@ -62,6 +49,35 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             table::downtimes::delete(&org, &id).await?;
             coordinator::downtimes::emit_delete_event(&org, &id).await
         }
+    }
+}
+
+/// Writes the put unless the stored row is newer; `Some(coverage changed)` if it wrote.
+async fn apply_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<bool>> {
+    let stored = table::downtimes::version_with(conn, &downtime.org, &downtime.id).await?;
+    // The queue neither orders nor deduplicates, so an older Put must not undo a newer edit.
+    if stored.is_some_and(|stored| is_stale(stored, downtime.updated_at)) {
+        log::info!(
+            "[DOWNTIMES] skipping a stale put of {}/{} (updated_at {} vs stored {:?})",
+            downtime.org,
+            downtime.id,
+            downtime.updated_at,
+            stored
+        );
+        return Ok(None);
+    }
+    let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
+    let coverage_changed = before.is_some_and(|before| !before.same_coverage(downtime));
+    table::downtimes::put_with(conn, downtime).await?;
+    Ok(Some(coverage_changed))
+}
+
+/// A soft-deleted row is the newest version until a strictly newer put arrives.
+fn is_stale(stored: RowVersion, put_updated_at: i64) -> bool {
+    if stored.deleted {
+        stored.updated_at >= put_updated_at
+    } else {
+        stored.updated_at > put_updated_at
     }
 }
 
@@ -94,4 +110,125 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
     };
     table::folders::get_or_create(&downtime.org, default, FolderType::Downtimes).await?;
     Ok(DEFAULT_FOLDER.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::downtimes::{DowntimeSchedule, Repeat};
+    use infra::table::entity::{downtimes as entity, folders};
+    use sea_orm::{Database, DatabaseConnection, EntityTrait, Schema, Set};
+
+    use super::*;
+
+    async fn db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(entity::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        folders::Entity::insert(folders::ActiveModel {
+            id: Set("pk-default".to_string()),
+            org: Set("acme".to_string()),
+            folder_id: Set("default".to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            // The stored value of `FolderType::Downtimes`.
+            r#type: Set(6),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    fn downtime(updated_at: i64) -> Downtime {
+        Downtime {
+            id: "d1".to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: format!("v{updated_at}"),
+            reason: None,
+            condition: None,
+            targets: vec![],
+            schedule: DowntimeSchedule {
+                repeat: Repeat::Weekly,
+                starts_at: 1,
+                ends_at: None,
+                timezone: "UTC".to_string(),
+                start_time_local: Some("02:00".to_string()),
+                duration_secs: 60,
+                weekdays: vec![7],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: true,
+            created_by: "lin".to_string(),
+            created_at: 1,
+            updated_by: "lin".to_string(),
+            updated_at,
+        }
+    }
+
+    async fn deleted_at(db: &DatabaseConnection) -> i64 {
+        let stored = entity::Entity::find_by_id("d1")
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap();
+        stored.deleted_at.expect("soft-deleted")
+    }
+
+    #[tokio::test]
+    async fn a_redelivered_older_put_after_a_delete_writes_nothing() {
+        let db = db().await;
+        apply_put(&db, &downtime(10)).await.unwrap();
+        table::downtimes::delete_with(&db, "acme", "d1")
+            .await
+            .unwrap();
+        let tombstone = deleted_at(&db).await;
+
+        assert_eq!(apply_put(&db, &downtime(10)).await.unwrap(), None);
+        assert_eq!(apply_put(&db, &downtime(tombstone)).await.unwrap(), None);
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+        assert_eq!(deleted_at(&db).await, tombstone);
+    }
+
+    #[tokio::test]
+    async fn a_newer_put_after_a_delete_restores_the_row() {
+        let db = db().await;
+        apply_put(&db, &downtime(10)).await.unwrap();
+        table::downtimes::delete_with(&db, "acme", "d1")
+            .await
+            .unwrap();
+        let newer = downtime(deleted_at(&db).await + 1);
+
+        assert_eq!(apply_put(&db, &newer).await.unwrap(), Some(false));
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            Some(newer)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_older_put_never_reverts_a_newer_live_row() {
+        let db = db().await;
+        assert_eq!(apply_put(&db, &downtime(20)).await.unwrap(), Some(false));
+        assert_eq!(apply_put(&db, &downtime(10)).await.unwrap(), None);
+        assert_eq!(apply_put(&db, &downtime(20)).await.unwrap(), Some(false));
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1")
+                .await
+                .unwrap()
+                .map(|d| d.updated_at),
+            Some(20)
+        );
+    }
 }

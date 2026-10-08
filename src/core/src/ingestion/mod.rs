@@ -918,7 +918,7 @@ pub fn refactor_map(
     new_map
 }
 
-/// The downtime that silences a real-time firing, decided on the ingested row (D2).
+/// The downtime that silences a real-time firing, only when every ingested row is muted.
 #[cfg(feature = "enterprise")]
 async fn realtime_downtime(
     alert: &Alert,
@@ -933,14 +933,16 @@ async fn realtime_downtime(
     }
     let alert_id = alert.id.as_ref()?.to_string();
     let (folder, _) = alert::get_alert_from_cache(&alert.org_id, &alert_id).await?;
-    let identity = crate::alerts::scheduler::handlers::alert_identity(alert, rows).await;
-    crate::alerts::downtimes::active_for_alert(
-        &alert.org_id,
-        &alert_id,
-        &folder.folder_id,
-        identity.first()?,
-        now,
-    )
+    let identity = crate::alerts::scheduler::handlers::downtime_identities(alert, rows).await;
+    crate::alerts::scheduler::handlers::muted_in_every_group(&identity, |dims| {
+        crate::alerts::downtimes::active_for_alert(
+            &alert.org_id,
+            &alert_id,
+            &folder.folder_id,
+            dims,
+            now,
+        )
+    })
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -1680,6 +1682,56 @@ mod tests {
         assert_eq!(
             write_error_status(&Error::IngestionError("disk failure".to_string())),
             http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    /// The identity `realtime_downtime` decides on: one map per ingested row.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_realtime_batch_is_muted_only_when_every_row_is() {
+        use crate::alerts::scheduler::handlers::{identities_by_key, muted_in_every_group};
+
+        let groups = [config::meta::correlation::FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string()],
+            is_workload_type: false,
+        }];
+        let row = |service: &str| {
+            serde_json::json!({ "service": service })
+                .as_object()
+                .cloned()
+                .unwrap()
+        };
+        let mut alert = Alert::default();
+        alert.is_real_time = true;
+        let decide = |rows: &[Map<String, Value>], muted: &[&str]| {
+            let identity: Vec<_> = identities_by_key(&alert, rows, &groups)
+                .into_iter()
+                .map(|(_, dims)| dims)
+                .collect();
+            muted_in_every_group(&identity, |dims| {
+                let service = dims.get("service")?;
+                muted
+                    .contains(&service.as_str())
+                    .then(|| config::meta::downtimes::ActiveDowntime {
+                        id: format!("dt-{service}"),
+                        name: service.clone(),
+                        ends_at: 1,
+                    })
+            })
+            .map(|d| d.id)
+        };
+
+        let (payments, checkout) = (row("payments"), row("checkout"));
+        let mixed = [payments.clone(), checkout.clone()];
+        let reversed = [checkout, payments];
+        assert_eq!(decide(&mixed, &["payments"]), None);
+        assert_eq!(decide(&reversed, &["payments"]), None);
+        assert_eq!(
+            decide(&mixed, &["payments", "checkout"]).as_deref(),
+            Some("dt-payments")
         );
     }
 }

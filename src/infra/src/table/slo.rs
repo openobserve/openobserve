@@ -337,8 +337,8 @@ pub async fn bump_generation(
 /// This is what makes at-least-once publication safe (D64): the running
 /// aggregate is a cache, and this rebuilds it from the slices that are the
 /// source of truth. It is therefore **load-bearing**, not hygiene.
-pub async fn reconcile_from_slices(
-    db: &DatabaseConnection,
+pub async fn reconcile_from_slices<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     group_key: &str,
     recomputed: (f64, f64, i32),

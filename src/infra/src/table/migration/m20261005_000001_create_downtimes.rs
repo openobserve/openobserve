@@ -79,6 +79,7 @@ fn create_downtimes_table() -> TableCreateStatement {
         .col(ColumnDef::new(Downtimes::Weekdays).json())
         .col(ColumnDef::new(Downtimes::CancelledAt).big_integer())
         .col(ColumnDef::new(Downtimes::CancelledBy).string_len(256))
+        .col(ColumnDef::new(Downtimes::DeletedAt).big_integer())
         .col(
             ColumnDef::new(Downtimes::CreatedBy)
                 .string_len(256)
@@ -163,6 +164,7 @@ enum Downtimes {
     Weekdays,
     CancelledAt,
     CancelledBy,
+    DeletedAt,
     CreatedBy,
     CreatedAt,
     UpdatedBy,
@@ -198,6 +200,7 @@ mod tests {
                 "weekdays" json,
                 "cancelled_at" bigint,
                 "cancelled_by" varchar(256),
+                "deleted_at" bigint,
                 "created_by" varchar(256) NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_by" varchar(256) NOT NULL,

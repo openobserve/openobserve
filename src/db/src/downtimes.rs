@@ -38,6 +38,21 @@ pub async fn set(downtime: &Downtime) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// [set] for an edit: writes only if the stored row still has `expected_updated_at`.
+pub async fn set_if_unchanged(
+    downtime: &Downtime,
+    expected_updated_at: i64,
+) -> Result<bool, anyhow::Error> {
+    if !table::put_if_unchanged(downtime, expected_updated_at).await? {
+        return Ok(false);
+    }
+    coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
+    reload_org(&downtime.org).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put(downtime).await;
+    Ok(true)
+}
+
 pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
     table::delete(org, id).await?;
     coordinator::emit_delete_event(org, id).await?;
@@ -63,13 +78,10 @@ pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Retention sweep for this region only; each region sweeps its own table.
-pub async fn delete_ended_before(cutoff: i64) -> Result<usize, anyhow::Error> {
+/// Retention sweep for this region only; soft-deleted rows lost their tuple at delete time.
+pub async fn delete_ended_before(cutoff: i64) -> Result<u64, anyhow::Error> {
     let ended = table::list_ended_before(cutoff).await?;
-    if ended.is_empty() {
-        return Ok(0);
-    }
-    table::delete_ended_before(cutoff).await?;
+    let removed = table::delete_ended_before(cutoff).await?;
     // The listed rows carry the folder the OpenFGA tuple hangs off; the cache of this node
     // need not hold them (a fresh node, or the flag off here), so it is not the source.
     for row in &ended {
@@ -77,7 +89,7 @@ pub async fn delete_ended_before(cutoff: i64) -> Result<usize, anyhow::Error> {
         crate::authz::remove_ownership(&row.org, "downtimes", ownership(row)).await;
         remove_cached(&row.org, &row.id);
     }
-    Ok(ended.len())
+    Ok(removed)
 }
 
 /// Loads every row of every org, replacing the cache.

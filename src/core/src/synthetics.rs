@@ -618,49 +618,70 @@ pub async fn location_staleness_watcher() {
                 // Nothing runs here — stay quiet, re-evaluate next tick.
                 continue;
             }
-            // Claim before dispatch so a location without destinations is still
-            // one-shot (no per-tick log spam / retry storm), AND so that only one
-            // scheduler node speaks. This watcher runs on every scheduler node, so
-            // the suppression flag cannot live in this process's memory — N nodes
-            // would each believe they had not notified yet and send N pages for
-            // one outage. The CAS in `try_claim_down_notification` makes exactly
-            // one node the winner.
-            match infra::table::synthetics_locations::try_claim_down_notification(&loc.id, now)
-                .await
-            {
-                Ok(true) => {}
-                Ok(false) => continue, // another node is sending it
-                Err(e) => {
-                    log::error!(
-                        "[synthetics] staleness watcher: claim down notification for {}: {e}",
-                        loc.id
-                    );
-                    continue;
-                }
-            }
-
             let destinations = unmuted_destinations(&org_id, &checks).await;
-            log::warn!(
-                "[synthetics] private location down: {} ({}) org={} affected_checks={} destinations={}",
-                loc.label,
-                loc.id,
-                org_id,
-                checks.len(),
-                destinations.len()
-            );
             if destinations.is_empty() {
-                continue;
+                log::debug!(
+                    "[synthetics] private location down: {} ({}) org={} affected_checks={}, every check muted",
+                    loc.label,
+                    loc.id,
+                    org_id,
+                    checks.len()
+                );
             }
-            notify_location_down(
-                &org_id,
-                &loc,
-                checks.len(),
-                window_us / 1_000_000,
+            report_location_down(
+                &loc.id,
                 &destinations,
+                async || {
+                    infra::table::synthetics_locations::try_claim_down_notification(&loc.id, now)
+                        .await
+                },
+                async |destinations| {
+                    log::warn!(
+                        "[synthetics] private location down: {} ({}) org={} affected_checks={} destinations={}",
+                        loc.label,
+                        loc.id,
+                        org_id,
+                        checks.len(),
+                        destinations.len()
+                    );
+                    notify_location_down(
+                        &org_id,
+                        &loc,
+                        checks.len(),
+                        window_us / 1_000_000,
+                        destinations,
+                    )
+                    .await
+                },
             )
             .await;
         }
     }
+}
+
+/// One notification per outage, from the node whose table CAS wins; nobody to tell claims nothing.
+#[cfg(feature = "enterprise")]
+async fn report_location_down(
+    loc_id: &str,
+    destinations: &[String],
+    claim: impl AsyncFnOnce() -> Result<bool, infra::errors::Error>,
+    notify: impl AsyncFnOnce(&[String]),
+) -> bool {
+    if destinations.is_empty() {
+        return false;
+    }
+    match claim().await {
+        Ok(true) => {}
+        Ok(false) => return false,
+        Err(e) => {
+            log::error!(
+                "[synthetics] staleness watcher: claim down notification for {loc_id}: {e}"
+            );
+            return false;
+        }
+    }
+    notify(destinations).await;
+    true
 }
 
 #[cfg(all(test, feature = "enterprise"))]
@@ -862,6 +883,93 @@ mod tests {
         let line = locations_line(&firing());
         assert!(line.starts_with("2 of 3: "), "{line}");
         assert!(!line.contains("aws-eu-central-1"), "{line}");
+    }
+
+    async fn locations_db() -> sea_orm::DatabaseConnection {
+        use infra::table::entity::synthetics_locations;
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema, Set};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(synthetics_locations::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        synthetics_locations::Entity::insert(synthetics_locations::ActiveModel {
+            id: Set("loc-1".to_string()),
+            org_id: Set(Some("org1".to_string())),
+            kind: Set("private".to_string()),
+            provider: Set("custom".to_string()),
+            region: Set("corp-hq".to_string()),
+            label: Set("Corp HQ".to_string()),
+            pool: Set("private-org1-corp-hq".to_string()),
+            enabled: Set(true),
+            down_notified_at: Set(0),
+            created_at: Set(1),
+            updated_at: Set(1),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn down_notified_at(db: &sea_orm::DatabaseConnection) -> i64 {
+        use sea_orm::EntityTrait;
+        infra::table::entity::synthetics_locations::Entity::find_by_id("loc-1")
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+            .down_notified_at
+    }
+
+    /// One watcher tick for loc-1, with the destinations its unmuted checks left.
+    async fn tick(
+        db: &sea_orm::DatabaseConnection,
+        destinations: &[String],
+        now: i64,
+        sent: &std::sync::atomic::AtomicUsize,
+    ) -> bool {
+        report_location_down(
+            "loc-1",
+            destinations,
+            async || {
+                infra::table::synthetics_locations::try_claim_down_notification_with(
+                    db, "loc-1", now,
+                )
+                .await
+            },
+            async |_| {
+                sent.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn a_location_whose_every_check_is_muted_keeps_its_down_claim() {
+        let db = locations_db().await;
+        let sent = std::sync::atomic::AtomicUsize::new(0);
+
+        assert!(!tick(&db, &[], 100, &sent).await);
+        assert_eq!(
+            down_notified_at(&db).await,
+            0,
+            "a muted tick must not use up the claim"
+        );
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn the_first_tick_after_the_mute_claims_and_notifies_once() {
+        let db = locations_db().await;
+        let sent = std::sync::atomic::AtomicUsize::new(0);
+        let destinations = ["pager".to_string()];
+
+        assert!(!tick(&db, &[], 100, &sent).await);
+        assert!(tick(&db, &destinations, 200, &sent).await);
+        assert!(!tick(&db, &destinations, 300, &sent).await);
+        assert_eq!(down_notified_at(&db).await, 200);
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }
 

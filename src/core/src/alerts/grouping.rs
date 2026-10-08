@@ -526,20 +526,17 @@ async fn entry_downtime(
     let alert_id = entry.alert.id.as_ref()?.to_string();
     let (folder, _) =
         crate::db::alerts::alert::get_alert_from_cache(&entry.alert.org_id, &alert_id).await?;
-    let first_row = entry
-        .rows
-        .first()
-        .map(std::slice::from_ref)
-        .unwrap_or_default();
     let identity =
-        crate::alerts::scheduler::handlers::alert_identity(&entry.alert, first_row).await;
-    crate::alerts::downtimes::active_for_alert(
-        &entry.alert.org_id,
-        &alert_id,
-        &folder.folder_id,
-        identity.first()?,
-        now,
-    )
+        crate::alerts::scheduler::handlers::downtime_identities(&entry.alert, &entry.rows).await;
+    crate::alerts::scheduler::handlers::muted_in_every_group(&identity, |dims| {
+        crate::alerts::downtimes::active_for_alert(
+            &entry.alert.org_id,
+            &alert_id,
+            &folder.folder_id,
+            dims,
+            now,
+        )
+    })
 }
 
 #[cfg(feature = "enterprise")]

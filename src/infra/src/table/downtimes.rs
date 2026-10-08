@@ -22,8 +22,8 @@ use config::meta::{
     folder::FolderType,
 };
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    Set,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, NotSet, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
     sea_query::{Expr, OnConflict},
 };
 use svix_ksuid::KsuidLike;
@@ -39,6 +39,13 @@ use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, Error},
 };
+
+/// The version of a stored row, soft-deleted or not, for ordering replicated writes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RowVersion {
+    pub updated_at: i64,
+    pub deleted: bool,
+}
 
 /// A fresh downtime id.
 pub fn new_id() -> String {
@@ -66,12 +73,28 @@ pub async fn put(downtime: &Downtime) -> Result<(), errors::Error> {
     put_with(client, downtime).await
 }
 
+/// Writes only if the stored row still has `expected_updated_at`; false if it changed or is gone.
+pub async fn put_if_unchanged(
+    downtime: &Downtime,
+    expected_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    put_if_unchanged_with(client, downtime, expected_updated_at).await
+}
+
+/// Soft delete: the row stays as a tombstone so a late replicated put cannot bring it back.
 pub async fn delete(org: &str, id: &str) -> Result<(), errors::Error> {
     let client = get_orm_client_rw().await;
     delete_with(client, org, id).await
 }
 
-/// Deletes ended one-time and bounded recurring rows, and cancelled rows, older than `cutoff`.
+/// The version of the row, including a soft-deleted one.
+pub async fn version(org: &str, id: &str) -> Result<Option<RowVersion>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    version_with(client, org, id).await
+}
+
+/// Deletes ended, cancelled and soft-deleted rows older than `cutoff`.
 pub async fn delete_ended_before(cutoff: i64) -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
     delete_ended_before_with(client, cutoff).await
@@ -95,11 +118,13 @@ pub async fn move_to_folder(
 /// Rows filed in the folder with this primary key; guards folder deletion.
 pub async fn count_by_folder(org: &str, folder_pk: &str) -> Result<u64, errors::Error> {
     let client = get_orm_client_ro().await;
-    Ok(Entity::find()
-        .filter(Column::Org.eq(org))
-        .filter(Column::FolderId.eq(folder_pk))
-        .count(client)
-        .await?)
+    count_by_folder_with(client, org, folder_pk).await
+}
+
+/// Readies a folder for deletion: false if a live row is filed there, else its tombstones go.
+pub async fn release_folder(org: &str, folder_pk: &str) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    release_folder_with(client, org, folder_pk).await
 }
 
 /// Removes every row of an org and returns the removed ids.
@@ -108,12 +133,27 @@ pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
     delete_by_org_with(client, org).await
 }
 
+pub async fn count_by_folder_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    folder_pk: &str,
+) -> Result<u64, errors::Error> {
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::FolderId.eq(folder_pk))
+        .filter(Column::DeletedAt.is_null())
+        .count(conn)
+        .await?)
+}
+
 pub async fn list_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
     folder_id: Option<&str>,
 ) -> Result<Vec<Downtime>, errors::Error> {
-    let mut query = Entity::find().filter(Column::Org.eq(org));
+    let mut query = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::DeletedAt.is_null());
     if let Some(folder_id) = folder_id {
         let Some(folder) = get_folder_model(conn, org, folder_id, FolderType::Downtimes).await?
         else {
@@ -126,7 +166,10 @@ pub async fn list_with<C: ConnectionTrait>(
 }
 
 pub async fn list_all_with<C: ConnectionTrait>(conn: &C) -> Result<Vec<Downtime>, errors::Error> {
-    let models = Entity::find().all(conn).await?;
+    let models = Entity::find()
+        .filter(Column::DeletedAt.is_null())
+        .all(conn)
+        .await?;
     into_downtimes(conn, models).await
 }
 
@@ -137,6 +180,7 @@ pub async fn get_with<C: ConnectionTrait>(
 ) -> Result<Option<Downtime>, errors::Error> {
     let Some(model) = Entity::find_by_id(id)
         .filter(Column::Org.eq(org))
+        .filter(Column::DeletedAt.is_null())
         .one(conn)
         .await?
     else {
@@ -145,24 +189,46 @@ pub async fn get_with<C: ConnectionTrait>(
     Ok(into_downtimes(conn, vec![model]).await?.pop())
 }
 
+/// Tombstones still reference the folder through `downtimes_folder_fk`, so they go before it.
+pub async fn release_folder_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    folder_pk: &str,
+) -> Result<bool, errors::Error> {
+    if count_by_folder_with(conn, org, folder_pk).await? > 0 {
+        return Ok(false);
+    }
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::FolderId.eq(folder_pk))
+        .filter(Column::DeletedAt.is_not_null())
+        .exec(conn)
+        .await?;
+    Ok(true)
+}
+
+pub async fn version_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<RowVersion>, errors::Error> {
+    Ok(Entity::find_by_id(id)
+        .filter(Column::Org.eq(org))
+        .one(conn)
+        .await?
+        .map(|m| RowVersion {
+            updated_at: m.updated_at,
+            deleted: m.deleted_at.is_some(),
+        }))
+}
+
+/// Upsert that also clears `deleted_at`, so a newer replicated put restores a soft-deleted row.
 pub async fn put_with<C: ConnectionTrait>(
     conn: &C,
     downtime: &Downtime,
 ) -> Result<(), errors::Error> {
-    let folder = get_folder_model(
-        conn,
-        &downtime.org,
-        &downtime.folder_id,
-        FolderType::Downtimes,
-    )
-    .await?
-    .ok_or_else(|| {
-        Error::Message(format!(
-            "downtime folder {} not found in org {}",
-            downtime.folder_id, downtime.org
-        ))
-    })?;
-    Entity::insert(to_active_model(downtime, folder.id)?)
+    let folder_pk = folder_pk(conn, downtime).await?;
+    Entity::insert(to_active_model(downtime, folder_pk)?)
         .on_conflict(
             OnConflict::column(Column::Id)
                 .update_columns([
@@ -182,6 +248,7 @@ pub async fn put_with<C: ConnectionTrait>(
                     Column::Weekdays,
                     Column::CancelledAt,
                     Column::CancelledBy,
+                    Column::DeletedAt,
                     Column::CreatedBy,
                     Column::CreatedAt,
                     Column::UpdatedBy,
@@ -194,14 +261,39 @@ pub async fn put_with<C: ConnectionTrait>(
     Ok(())
 }
 
+pub async fn put_if_unchanged_with<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+    expected_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let folder_pk = folder_pk(conn, downtime).await?;
+    let mut model = to_active_model(downtime, folder_pk)?;
+    model.id = NotSet;
+    model.org = NotSet;
+    let res = Entity::update_many()
+        .set(model)
+        .filter(Column::Org.eq(&downtime.org))
+        .filter(Column::Id.eq(&downtime.id))
+        .filter(Column::UpdatedAt.eq(expected_updated_at))
+        .filter(Column::DeletedAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
+}
+
+/// Marks the row deleted; a second delete keeps the first tombstone time.
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
     id: &str,
 ) -> Result<(), errors::Error> {
-    Entity::delete_many()
+    let now = config::utils::time::now_micros();
+    Entity::update_many()
+        .col_expr(Column::DeletedAt, Expr::value(now))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(id))
+        .filter(Column::DeletedAt.is_null())
         .exec(conn)
         .await?;
     Ok(())
@@ -212,7 +304,11 @@ pub async fn delete_ended_before_with<C: ConnectionTrait>(
     cutoff: i64,
 ) -> Result<u64, errors::Error> {
     let res = Entity::delete_many()
-        .filter(ended_before(cutoff))
+        .filter(
+            Condition::any()
+                .add(ended_before(cutoff))
+                .add(Column::DeletedAt.lt(cutoff)),
+        )
         .exec(conn)
         .await?;
     Ok(res.rows_affected)
@@ -224,6 +320,7 @@ pub async fn list_ended_before_with<C: ConnectionTrait>(
 ) -> Result<Vec<Downtime>, errors::Error> {
     let models = Entity::find()
         .filter(ended_before(cutoff))
+        .filter(Column::DeletedAt.is_null())
         .all(conn)
         .await?;
     into_downtimes(conn, models).await
@@ -249,6 +346,7 @@ pub async fn move_to_folder_with<C: ConnectionTrait>(
         )
         .filter(Column::Org.eq(org))
         .filter(Column::Id.is_in(ids.to_vec()))
+        .filter(Column::DeletedAt.is_null())
         .exec(conn)
         .await?;
     Ok(res.rows_affected)
@@ -270,6 +368,26 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(ids)
+}
+
+async fn folder_pk<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+) -> Result<String, errors::Error> {
+    get_folder_model(
+        conn,
+        &downtime.org,
+        &downtime.folder_id,
+        FolderType::Downtimes,
+    )
+    .await?
+    .map(|folder| folder.id)
+    .ok_or_else(|| {
+        Error::Message(format!(
+            "downtime folder {} not found in org {}",
+            downtime.folder_id, downtime.org
+        ))
+    })
 }
 
 /// Open-ended recurring rows have no `ends_at`, so they never match.
@@ -298,6 +416,7 @@ fn to_active_model(d: &Downtime, folder_pk: String) -> Result<ActiveModel, error
         weekdays: Set(Some(serde_json::to_value(&d.schedule.weekdays)?)),
         cancelled_at: Set(d.cancelled_at),
         cancelled_by: Set(d.cancelled_by.clone()),
+        deleted_at: Set(None),
         created_by: Set(d.created_by.clone()),
         created_at: Set(d.created_at),
         updated_by: Set(d.updated_by.clone()),
@@ -537,7 +656,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_removes_only_the_named_row() {
+    async fn delete_hides_only_the_named_row_and_keeps_it_as_a_tombstone() {
         let db = db().await;
         put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
             .await
@@ -546,7 +665,93 @@ mod tests {
             .await
             .unwrap();
         delete_with(&db, "acme", "d1").await.unwrap();
+
         assert_eq!(ids(&list_with(&db, "acme", None).await.unwrap()), ["d2"]);
+        assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), None);
+        assert_eq!(
+            count_by_folder_with(&db, "acme", "pk-default")
+                .await
+                .unwrap(),
+            1
+        );
+        let stored = Entity::find_by_id("d1").one(&db).await.unwrap().unwrap();
+        let deleted_at = stored
+            .deleted_at
+            .expect("the row stays with deleted_at set");
+        assert_eq!(stored.updated_at, deleted_at);
+        assert_eq!(
+            version_with(&db, "acme", "d1").await.unwrap(),
+            Some(RowVersion {
+                updated_at: deleted_at,
+                deleted: true
+            })
+        );
+        assert_eq!(
+            version_with(&db, "acme", "d2").await.unwrap(),
+            Some(RowVersion {
+                updated_at: 1,
+                deleted: false
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn put_restores_a_soft_deleted_row() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+        d.updated_at = i64::MAX;
+        put_with(&db, &d).await.unwrap();
+
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d));
+    }
+
+    #[tokio::test]
+    async fn put_if_unchanged_writes_only_on_a_matching_version() {
+        let db = db().await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+
+        let mut stale = d.clone();
+        stale.name = "stale".to_string();
+        stale.updated_at = 3;
+        assert!(!put_if_unchanged_with(&db, &stale, 2).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d.clone()));
+
+        let mut fresh = d.clone();
+        fresh.name = "fresh".to_string();
+        fresh.folder_id = "planned".to_string();
+        fresh.updated_at = 3;
+        assert!(put_if_unchanged_with(&db, &fresh, 1).await.unwrap());
+        assert_eq!(
+            get_with(&db, "acme", "d1").await.unwrap(),
+            Some(fresh.clone())
+        );
+
+        assert!(!put_if_unchanged_with(&db, &fresh, 1).await.unwrap());
+        let mut foreign = fresh.clone();
+        foreign.org = "other".to_string();
+        foreign.folder_id = "default".to_string();
+        assert!(!put_if_unchanged_with(&db, &foreign, 3).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn put_if_unchanged_never_writes_a_soft_deleted_row() {
+        let db = db().await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+        let updated_at = Entity::find_by_id("d1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap()
+            .updated_at;
+
+        assert!(!put_if_unchanged_with(&db, &d, updated_at).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), None);
     }
 
     #[tokio::test]
@@ -601,11 +806,40 @@ mod tests {
             put_with(&db, &d).await.unwrap();
         }
 
+        for (id, deleted_at) in [
+            ("deleted_long_ago", 12 * DAY),
+            ("deleted_recently", 25 * DAY),
+        ] {
+            put_with(&db, &downtime(id, Repeat::Weekly, None))
+                .await
+                .unwrap();
+            Entity::update_many()
+                .col_expr(Column::DeletedAt, Expr::value(deleted_at))
+                .filter(Column::Id.eq(id))
+                .exec(&db)
+                .await
+                .unwrap();
+        }
+
         let ended = list_ended_before_with(&db, cutoff).await.unwrap();
         let mut listed = ids(&ended);
         listed.sort_unstable();
         assert_eq!(listed, ["cancelled", "ended_once", "ended_weekly"]);
-        assert_eq!(delete_ended_before_with(&db, cutoff).await.unwrap(), 3);
+        assert_eq!(delete_ended_before_with(&db, cutoff).await.unwrap(), 4);
+        assert!(
+            Entity::find_by_id("deleted_long_ago")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            Entity::find_by_id("deleted_recently")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_some()
+        );
         assert_eq!(
             ids(&list_with(&db, "acme", None).await.unwrap()),
             [
@@ -629,5 +863,90 @@ mod tests {
 
         assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), ["d1"]);
         assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
+    }
+
+    /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.
+    async fn db_with_folder_fk() -> DatabaseConnection {
+        use sea_orm::{ConnectOptions, sea_query::ForeignKey};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys = ON")
+            .await
+            .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        let mut downtimes = schema.create_table_from_entity(Entity);
+        downtimes.foreign_key(
+            ForeignKey::create()
+                .from(Entity, Column::FolderId)
+                .to(folders::Entity, folders::Column::Id),
+        );
+        for stmt in [schema.create_table_from_entity(folders::Entity), downtimes] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        folders::Entity::insert(folders::ActiveModel {
+            id: Set("pk-default".to_string()),
+            org: Set("acme".to_string()),
+            folder_id: Set("default".to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(folder_type_into_i16(FolderType::Downtimes)),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn a_folder_whose_only_row_is_deleted_can_be_deleted() {
+        let db = db_with_folder_fk().await;
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+
+        assert!(
+            folders::Entity::delete_by_id("pk-default")
+                .exec(&db)
+                .await
+                .is_err(),
+            "the tombstone still holds the folder"
+        );
+        assert!(
+            release_folder_with(&db, "acme", "pk-default")
+                .await
+                .unwrap()
+        );
+        assert!(Entity::find_by_id("d1").one(&db).await.unwrap().is_none());
+        folders::Entity::delete_by_id("pk-default")
+            .exec(&db)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_folder_with_a_live_row_is_not_released() {
+        let db = db_with_folder_fk().await;
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        put_with(&db, &downtime("d2", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        delete_with(&db, "acme", "d2").await.unwrap();
+
+        assert!(
+            !release_folder_with(&db, "acme", "pk-default")
+                .await
+                .unwrap()
+        );
+        assert!(
+            Entity::find_by_id("d2").one(&db).await.unwrap().is_some(),
+            "nothing is removed while the folder stays"
+        );
     }
 }

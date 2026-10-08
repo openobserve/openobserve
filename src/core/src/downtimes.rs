@@ -240,7 +240,7 @@ pub async fn update(
         updated_at: now,
         ..before.clone()
     };
-    db::downtimes::set(&after).await?;
+    set_if_unchanged(&after, before.updated_at).await?;
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.id).await;
     }
@@ -264,7 +264,7 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
         updated_at: now,
         ..before.clone()
     };
-    db::downtimes::set(&after).await?;
+    set_if_unchanged(&after, before.updated_at).await?;
     remeasure_slos(Some(before), &after);
     Ok(after)
 }
@@ -296,13 +296,14 @@ pub async fn move_to_folder(
     let now = now_micros();
     for row in rows {
         let from = row.folder_id.clone();
+        let expected = row.updated_at;
         let moved = Downtime {
             folder_id: folder_id.clone(),
             updated_by: user_id.to_string(),
             updated_at: now,
             ..row
         };
-        db::downtimes::set(&moved).await?;
+        set_if_unchanged(&moved, expected).await?;
         access::reparent(&moved.id, &from, &folder_id).await;
     }
     Ok(())
@@ -380,6 +381,20 @@ pub async fn listable_folders(org: &str, user_id: &str, folders: Vec<Folder>) ->
         .into_iter()
         .filter(|f| allowed.contains(&f.folder_id))
         .collect()
+}
+
+/// A concurrent edit, cancel or delete since `expected_updated_at` makes this write a 409.
+async fn set_if_unchanged(
+    downtime: &Downtime,
+    expected_updated_at: i64,
+) -> Result<(), DowntimeError> {
+    if db::downtimes::set_if_unchanged(downtime, expected_updated_at).await? {
+        Ok(())
+    } else {
+        Err(DowntimeError::Conflict(
+            "The downtime changed while you were editing it. Reload and try again.".to_string(),
+        ))
+    }
 }
 
 async fn load(org: &str, id: &str) -> Result<Downtime, DowntimeError> {

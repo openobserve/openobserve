@@ -34,14 +34,17 @@ use config::{
 };
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
-    table::{slo as slo_table, slo_backfill_jobs as jobs},
+    table::{entity::slo_backfill_jobs, slo as slo_table, slo_backfill_jobs as jobs},
 };
+use sea_orm::{DatabaseConnection, TransactionTrait};
 
 /// Whether the job has more work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChunkOutcome {
     More,
     Done,
+    /// The job changed after this chunk loaded it, so nothing was recorded; the next tick reloads.
+    Superseded,
 }
 
 /// The next chunk to fill, walking **backwards** from the present.
@@ -92,8 +95,7 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
         cfg.slo.backfill_chunk_secs,
         slo.definition.slice_interval_secs,
     ) else {
-        finish(slo, remeasure).await?;
-        return Ok(ChunkOutcome::Done);
+        return finish(db, slo, remeasure, job.updated_at, now_secs()).await;
     };
 
     let written = if remeasure {
@@ -102,36 +104,14 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
         super::job::run_range(slo, start, end, config::meta::slo::slice::Writer::Backfill).await?
     };
 
-    // `done_through` moves to the chunk's START, because the walk is
-    // backwards: everything from here to the end of the range is filled.
-    jobs::record_progress(
-        db,
-        &slo.id,
-        slo.definition_generation,
-        start,
-        written as i64,
-    )
-    .await?;
-
+    let now = now_secs();
+    let Some(version) = record_chunk(db, &job, start, written as i64, now).await? else {
+        return Ok(ChunkOutcome::Superseded);
+    };
     if start <= job.range_start {
-        finish(slo, remeasure).await?;
-        return Ok(ChunkOutcome::Done);
+        return finish(db, slo, remeasure, version, now).await;
     }
     Ok(ChunkOutcome::More)
-}
-
-/// A re-measure applied no deltas, so `reconcile` rebuilds the aggregate before done.
-async fn finish(slo: &Slo, remeasure: bool) -> Result<(), anyhow::Error> {
-    if remeasure {
-        super::reconcile::reconcile(slo).await?;
-    }
-    jobs::mark_done(
-        get_orm_client_rw().await,
-        &slo.id,
-        slo.definition_generation,
-    )
-    .await?;
-    Ok(())
 }
 
 /// The range a new backfill should cover: the SLO's window, ending where the
@@ -190,6 +170,73 @@ pub async fn is_needed(slo: &Slo) -> Result<bool, anyhow::Error> {
     let db = get_orm_client_ro().await;
     let status = slo_table::load_status(db, &slo.id, "").await?;
     Ok(status.is_some_and(|s| s.definition_generation == slo.definition_generation))
+}
+
+/// Moves `done_through` to the chunk's start; the job's new version, or `None` if it changed.
+async fn record_chunk(
+    db: &DatabaseConnection,
+    job: &slo_backfill_jobs::Model,
+    start: i64,
+    written: i64,
+    now: i64,
+) -> Result<Option<i64>, anyhow::Error> {
+    let recorded = jobs::record_progress(
+        db,
+        &job.slo_id,
+        job.definition_generation,
+        start,
+        written,
+        job.updated_at,
+        now,
+    )
+    .await?;
+    Ok(recorded.then(|| jobs::next_updated_at(job.updated_at, now)))
+}
+
+/// A re-measure applied no deltas, so the rebuilt aggregate is written as the job finishes.
+async fn finish(
+    db: &DatabaseConnection,
+    slo: &Slo,
+    remeasure: bool,
+    version: i64,
+    now: i64,
+) -> Result<ChunkOutcome, anyhow::Error> {
+    let rebuilt = if remeasure {
+        super::reconcile::rebuild(slo).await?
+    } else {
+        Vec::new()
+    };
+    let generation = slo.definition_generation;
+    let done = finish_job(db, &slo.id, generation, version, now, &rebuilt).await?;
+    Ok(if done {
+        ChunkOutcome::Done
+    } else {
+        ChunkOutcome::Superseded
+    })
+}
+
+/// Marks the job done and writes the aggregate in one transaction, or neither if the job changed.
+async fn finish_job(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    generation: i32,
+    version: i64,
+    now: i64,
+    rebuilt: &[super::reconcile::Rebuilt],
+) -> Result<bool, anyhow::Error> {
+    let txn = db.begin().await?;
+    // The CAS update locks the job row, so a concurrent re-measure waits for this commit.
+    if !jobs::mark_done(&txn, slo_id, generation, version, now).await? {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+    super::reconcile::write_rebuilt(&txn, slo_id, rebuilt).await?;
+    txn.commit().await?;
+    Ok(true)
+}
+
+fn now_secs() -> i64 {
+    config::utils::time::now_micros() / 1_000_000
 }
 
 #[cfg(test)]
@@ -383,5 +430,110 @@ mod tests {
         for w in covered.windows(2) {
             assert_eq!(w[0].0, w[1].1, "chunks {:?} and {:?} disagree", w[0], w[1]);
         }
+    }
+
+    async fn jobs_db() -> DatabaseConnection {
+        use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(slo_backfill_jobs::Entity),
+            schema.create_table_from_entity(infra::table::entity::slo_status::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        slo_table::init_generation(&db, "slo1", 1).await.unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn a_chunk_whose_job_was_requeued_meanwhile_is_superseded() {
+        let db = jobs_db().await;
+        jobs::queue(&db, "slo1", 1, 0, 900, 100).await.unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        jobs::queue_remeasure(&db, "slo1", 1, 300, 600, 100)
+            .await
+            .unwrap();
+        let requeued = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+
+        assert_eq!(record_chunk(&db, &loaded, 600, 5, 100).await.unwrap(), None);
+        assert_eq!(jobs::get(&db, "slo1", 1).await.unwrap().unwrap(), requeued);
+    }
+
+    #[tokio::test]
+    async fn a_recorded_chunk_returns_the_version_the_next_write_must_match() {
+        let db = jobs_db().await;
+        jobs::queue(&db, "slo1", 1, 0, 900, 100).await.unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+
+        let version = record_chunk(&db, &loaded, 600, 5, 100).await.unwrap();
+        let stored = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        assert_eq!(version, Some(stored.updated_at));
+        assert_eq!(stored.done_through, Some(600));
+        assert!(
+            jobs::mark_done(&db, "slo1", 1, stored.updated_at, 100)
+                .await
+                .unwrap()
+        );
+    }
+
+    fn rebuilt(good: f64) -> Vec<super::super::reconcile::Rebuilt> {
+        vec![super::super::reconcile::Rebuilt {
+            group_key: String::new(),
+            good,
+            total: 20.0,
+            covered_slices: 4,
+        }]
+    }
+
+    async fn rollup_good(db: &DatabaseConnection) -> Option<f64> {
+        slo_table::load_status(db, "slo1", "")
+            .await
+            .unwrap()
+            .unwrap()
+            .good
+    }
+
+    #[tokio::test]
+    async fn a_superseded_remeasure_writes_no_aggregate() {
+        let db = jobs_db().await;
+        jobs::queue_remeasure(&db, "slo1", 1, 300, 600, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        jobs::queue_remeasure(&db, "slo1", 1, 0, 900, 100)
+            .await
+            .unwrap();
+        let requeued = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+
+        let done = finish_job(&db, "slo1", 1, loaded.updated_at, 100, &rebuilt(15.0)).await;
+        assert!(!done.unwrap());
+        assert_eq!(
+            rollup_good(&db).await,
+            None,
+            "the stale worker wrote the aggregate"
+        );
+        assert_eq!(jobs::get(&db, "slo1", 1).await.unwrap().unwrap(), requeued);
+    }
+
+    #[tokio::test]
+    async fn a_current_remeasure_writes_the_aggregate_and_finishes_together() {
+        let db = jobs_db().await;
+        jobs::queue_remeasure(&db, "slo1", 1, 300, 600, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+
+        let done = finish_job(&db, "slo1", 1, loaded.updated_at, 100, &rebuilt(15.0)).await;
+        assert!(done.unwrap());
+        assert_eq!(rollup_good(&db).await, Some(15.0));
+        assert_eq!(
+            jobs::get(&db, "slo1", 1).await.unwrap().unwrap().state,
+            jobs::STATE_DONE
+        );
     }
 }
