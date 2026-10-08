@@ -188,6 +188,9 @@ export function useFunnelSaveBlockers(opts: {
   const saveBlocked = computed<I18nText | null>(() => {
     const opened = pa.openedFunnel.value;
     if (!opened) return copyBlocked.value;
+    if (hasDeletedStep(pa.funnel.value, opts.events, opts.eventsReady)) {
+      return t("rum.analytics.saved.deletedStepFirst");
+    }
     if (signature(pa.funnel.value) === signature(opened.def))
       return t("rum.analytics.saved.noChanges");
     return uncompiled.value;
