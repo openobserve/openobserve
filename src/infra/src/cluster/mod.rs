@@ -723,13 +723,9 @@ fn latch_staleness_markers(nodes: &[Node]) {
     }
 }
 
-// every role counts, since any node may read or merge metrics; a starting node counts too
+// every role and status counts: any node may read or merge metrics, and a stopping one still drains
 fn all_support_staleness_markers(nodes: &[Node]) -> bool {
-    let mut live = nodes
-        .iter()
-        .filter(|node| node.status != NodeStatus::Offline)
-        .peekable();
-    live.peek().is_some() && live.all(|node| node.staleness_markers)
+    !nodes.is_empty() && nodes.iter().all(|node| node.staleness_markers)
 }
 
 #[cfg(test)]
@@ -755,12 +751,7 @@ mod tests {
             new.clone(),
             old_node("Online")
         ]));
-        assert!(!all_support_staleness_markers(&[
-            new.clone(),
-            old_node("Prepare")
-        ]));
-        assert!(all_support_staleness_markers(&[new, old_node("Offline")]));
-        assert!(!all_support_staleness_markers(&[old_node("Offline")]));
+        assert!(!all_support_staleness_markers(&[new, old_node("Offline")]));
         assert!(!all_support_staleness_markers(&[]));
     }
 
