@@ -10497,6 +10497,67 @@
     "searchTypeOthers": "Others"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Duration",
+      "tooltipSpans": "{count} span | {count} spans",
+      "tooltipErrors": "{count} error ({share}) | {count} errors ({share})",
+      "colorBy": {
+        "label": "Color by",
+        "spans": "Spans",
+        "errors": "Errors"
+      },
+      "noData": "No data",
+      "unavailable": "The latency heatmap is not available for this search",
+      "loadFailed": "Failed to load the latency heatmap"
+    },
+    "comparison": {
+      "title": "Compare selection",
+      "baselineOutside": "Outside the selection",
+      "baselineBefore": "Just before",
+      "sampleNote": "Selection: {selection} · Baseline: {baseline}",
+      "sampleNoteAll": "all {count} span | all {count} spans",
+      "sampleCapped": "{sampled} sampled of {total} spans",
+      "noiseNote": "Differences under {pts} pts are within sampling noise",
+      "loading": "Sampling spans…",
+      "loadFailed": "Could not compare the selection",
+      "sampleOverflow": "The sample does not match the span count, for example because late data arrived. Retry to count again.",
+      "baselineCapped": "Baseline limited to {range}, up to 3 h either side of the selection",
+      "baselineLimited": "Baseline limited to {range} by this stream's {hours}-hour query limit",
+      "rangeClamped": "The server shortened the time range, so the comparison would be incomplete",
+      "rangeTooLong": "The selection is longer than this stream's {hours}-hour query limit",
+      "retry": "Retry",
+      "noSelectionTitle": "Select spans to compare",
+      "noSelectionBody": "Draw a box on the Duration heatmap, or brush the Errors or Rate chart, then open Drill down.",
+      "emptySelection": "No spans in the selection",
+      "emptyBaseline": "No baseline spans",
+      "emptyBaselineHint": "Nothing matched this baseline. Try {mode} instead.",
+      "scorePts": "Δ {pts} pts",
+      "presentIn": "present in {pct} of selection",
+      "filterTo": "Filter to this value",
+      "exclude": "Exclude this value",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Selection {pct}",
+      "baselineShare": "Baseline {pct}",
+      "noValue": "(no value)",
+      "emptyValue": "(empty)",
+      "otherValues": "Other ({count} value) | Other ({count} values)",
+      "showMore": "Show {count} more field | Show {count} more fields",
+      "mostlyEmpty": "Mostly empty in the selection ({count})",
+      "highCardinality": "High-cardinality fields ({count})",
+      "distinctInSample": "{count} distinct value in the sample | {count} distinct values in the sample",
+      "constantFields": "{count} field has a single value everywhere | {count} fields have a single value everywhere",
+      "excludedFields": "Not compared: {fields}",
+      "summaryErrors": "Errors · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "results",
+    "metrics": {
+      "perSecond": {
+        "traces": "traces/s",
+        "spans": "spans/s"
+      }
+    },
     "errLabel": "ERR",
     "agentDefaultVariant": "default",
     "agentNoEnv": "(No env)",
@@ -11066,7 +11127,11 @@
       "unknownOperation": "Unknown Operation",
       "unknownService": "Unknown Service",
       "traceIdCopied": "Trace ID copied to clipboard",
-      "sessionIdCopied": "Session ID copied to clipboard"
+      "sessionIdCopied": "Session ID copied to clipboard",
+      "partial": "Some spans of this trace could not be read. The waterfall may be incomplete.",
+      "truncated": "Showing the first span of this trace, in start-time order. Later spans are not loaded yet. | Showing the first {count} spans of this trace, in start-time order. Later spans are not loaded yet.",
+      "loadMore": "Load the next span | Load next {size} spans",
+      "loadMoreFailed": "Could not load more spans of this trace"
     },
     "traceTree": {
       "clickToExpand": "Click to expand",

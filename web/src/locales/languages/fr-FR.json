@@ -10497,6 +10497,67 @@
     "searchTypeOthers": "Autres"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Durée",
+      "tooltipSpans": "{count} span | {count} spans",
+      "tooltipErrors": "{count} erreur ({share}) | {count} erreurs ({share})",
+      "colorBy": {
+        "label": "Colorer par",
+        "spans": "Spans",
+        "errors": "Erreurs"
+      },
+      "noData": "Aucune donnée",
+      "unavailable": "La carte thermique de latence n'est pas disponible pour cette recherche",
+      "loadFailed": "Échec du chargement de la carte thermique de latence"
+    },
+    "comparison": {
+      "title": "Comparer la sélection",
+      "baselineOutside": "En dehors de la sélection",
+      "baselineBefore": "Juste avant",
+      "sampleNote": "Sélection : {selection} · Référence : {baseline}",
+      "sampleNoteAll": "{count} span au total | {count} spans au total",
+      "sampleCapped": "{sampled} échantillonnés sur {total} spans",
+      "noiseNote": "Les différences inférieures à {pts} pts sont dans le bruit d'échantillonnage",
+      "loading": "Échantillonnage des spans…",
+      "loadFailed": "Impossible de comparer la sélection",
+      "sampleOverflow": "L'échantillon ne correspond pas au nombre de spans, par exemple parce que des données sont arrivées en retard. Réessayez pour refaire le comptage.",
+      "baselineCapped": "Référence limitée à {range}, jusqu'à 3 h de part et d'autre de la sélection",
+      "baselineLimited": "Référence limitée à {range} par la limite de requête de {hours} heures de ce flux",
+      "rangeClamped": "Le serveur a raccourci la plage temporelle, la comparaison serait donc incomplète",
+      "rangeTooLong": "La sélection dépasse la limite de requête de {hours} heures de ce flux",
+      "retry": "Réessayer",
+      "noSelectionTitle": "Sélectionnez des spans à comparer",
+      "noSelectionBody": "Dessinez un cadre sur la carte thermique Durée, ou sélectionnez une zone sur le graphique Erreurs ou Taux, puis ouvrez l'exploration.",
+      "emptySelection": "Aucun span dans la sélection",
+      "emptyBaseline": "Aucun span de référence",
+      "emptyBaselineHint": "Rien ne correspond à cette référence. Essayez plutôt {mode}.",
+      "scorePts": "Δ {pts} pts",
+      "presentIn": "présent dans {pct} de la sélection",
+      "filterTo": "Filtrer sur cette valeur",
+      "exclude": "Exclure cette valeur",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Sélection {pct}",
+      "baselineShare": "Référence {pct}",
+      "noValue": "(aucune valeur)",
+      "emptyValue": "(vide)",
+      "otherValues": "Autre ({count} valeur) | Autres ({count} valeurs)",
+      "showMore": "Afficher {count} champ supplémentaire | Afficher {count} champs supplémentaires",
+      "mostlyEmpty": "Principalement vides dans la sélection ({count})",
+      "highCardinality": "Champs à cardinalité élevée ({count})",
+      "distinctInSample": "{count} valeur distincte dans l'échantillon | {count} valeurs distinctes dans l'échantillon",
+      "constantFields": "{count} champ a une valeur unique partout | {count} champs ont une valeur unique partout",
+      "excludedFields": "Non comparés : {fields}",
+      "summaryErrors": "Erreurs · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "résultats",
+    "metrics": {
+      "perSecond": {
+        "traces": "traces/s",
+        "spans": "spans/s"
+      }
+    },
     "errLabel": "ERR",
     "agentDefaultVariant": "défaut",
     "agentNoEnv": "(Aucun env)",
@@ -11066,7 +11127,11 @@
       "unknownOperation": "Opération inconnue",
       "unknownService": "Service inconnu",
       "traceIdCopied": "ID de trace copié dans le presse-papiers.",
-      "sessionIdCopied": "ID de session copié dans le presse-papiers"
+      "sessionIdCopied": "ID de session copié dans le presse-papiers",
+      "partial": "Certains spans de cette trace n'ont pas pu être lus. La cascade peut être incomplète.",
+      "truncated": "Affichage du premier span de cette trace, dans l'ordre de l'heure de début. Les spans suivants ne sont pas encore chargés. | Affichage des {count} premiers spans de cette trace, dans l'ordre de l'heure de début. Les spans suivants ne sont pas encore chargés.",
+      "loadMore": "Charger le span suivant | Charger les {size} spans suivants",
+      "loadMoreFailed": "Impossible de charger plus de spans pour cette trace"
     },
     "traceTree": {
       "clickToExpand": "Cliquer pour développer",

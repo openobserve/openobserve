@@ -10497,6 +10497,67 @@
     "searchTypeOthers": "其他"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "持续时间",
+      "tooltipSpans": "{count} 个 Span | {count} 个 Span",
+      "tooltipErrors": "{count} 个错误（{share}） | {count} 个错误（{share}）",
+      "colorBy": {
+        "label": "着色依据",
+        "spans": "Span",
+        "errors": "错误"
+      },
+      "noData": "无数据",
+      "unavailable": "此搜索无法使用延迟热力图",
+      "loadFailed": "加载延迟热力图失败"
+    },
+    "comparison": {
+      "title": "比较所选内容",
+      "baselineOutside": "所选范围之外",
+      "baselineBefore": "紧邻之前",
+      "sampleNote": "所选：{selection} · 基线：{baseline}",
+      "sampleNoteAll": "全部 {count} 个 Span | 全部 {count} 个 Span",
+      "sampleCapped": "已采样 {sampled} 个，共 {total} 个 Span",
+      "noiseNote": "低于 {pts} 个百分点的差异属于采样噪声",
+      "loading": "正在采样 Span…",
+      "loadFailed": "无法比较所选内容",
+      "sampleOverflow": "采样结果与 Span 数量不一致，例如有延迟数据到达。请重试以重新计数。",
+      "baselineCapped": "基线限制为 {range}，即所选范围前后各最多 3 小时",
+      "baselineLimited": "受此数据流的 {hours} 小时查询限制，基线被限制为 {range}",
+      "rangeClamped": "服务器缩短了时间范围，因此比较结果可能不完整",
+      "rangeTooLong": "所选范围超过此数据流的 {hours} 小时查询限制",
+      "retry": "重试",
+      "noSelectionTitle": "选择要比较的 Span",
+      "noSelectionBody": "在持续时间热力图上框选，或在错误或速率图表上刷选，然后打开下钻。",
+      "emptySelection": "所选范围内没有 Span",
+      "emptyBaseline": "没有基线 Span",
+      "emptyBaselineHint": "此基线没有匹配项。请改为尝试{mode}。",
+      "scorePts": "Δ {pts} 个百分点",
+      "presentIn": "出现在 {pct} 的所选内容中",
+      "filterTo": "过滤为此值",
+      "exclude": "排除此值",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "所选 {pct}",
+      "baselineShare": "基线 {pct}",
+      "noValue": "（无值）",
+      "emptyValue": "（空）",
+      "otherValues": "其他（{count} 个值） | 其他（{count} 个值）",
+      "showMore": "再显示 {count} 个字段 | 再显示 {count} 个字段",
+      "mostlyEmpty": "所选内容中大多为空（{count}）",
+      "highCardinality": "高基数字段（{count}）",
+      "distinctInSample": "样本中有 {count} 个不同的值 | 样本中有 {count} 个不同的值",
+      "constantFields": "{count} 个字段在所有位置都只有一个值 | {count} 个字段在所有位置都只有一个值",
+      "excludedFields": "未比较：{fields}",
+      "summaryErrors": "错误 · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "结果",
+    "metrics": {
+      "perSecond": {
+        "traces": "追踪/秒",
+        "spans": "Span/s"
+      }
+    },
     "errLabel": "错误",
     "agentDefaultVariant": "默认",
     "agentNoEnv": "（无环境）",
@@ -11066,7 +11127,11 @@
       "unknownOperation": "未知操作",
       "unknownService": "未知服务",
       "traceIdCopied": "追踪 ID 已复制到剪贴板",
-      "sessionIdCopied": "会话ID已复制到剪贴板"
+      "sessionIdCopied": "会话ID已复制到剪贴板",
+      "partial": "此追踪的部分 Span 无法读取。瀑布图可能不完整。",
+      "truncated": "正在按开始时间顺序显示此追踪的第一个 Span。后续 Span 尚未加载。 | 正在按开始时间顺序显示此追踪的前 {count} 个 Span。后续 Span 尚未加载。",
+      "loadMore": "加载下一个 Span | 加载接下来的 {size} 个 Span",
+      "loadMoreFailed": "无法加载此追踪的更多 Span"
     },
     "traceTree": {
       "clickToExpand": "点击展开",

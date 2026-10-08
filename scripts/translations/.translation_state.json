@@ -20093,6 +20093,47 @@
     "clearErrorFilter": "b634835f3e3a5324",
     "collapseFields": "166bd3007d204cc4",
     "comingSoon": "0c47ae112d18c257",
+    "comparison": {
+      "atLeast": "e4acb4ebacae154a",
+      "baselineBefore": "e22168a9f1142b44",
+      "baselineCapped": "2a35b2657e586e14",
+      "baselineLimited": "fc04692876e6e264",
+      "baselineOutside": "0d4ba36ae3c9f536",
+      "baselineShare": "526bab9d7263e71e",
+      "below": "d4ff5bc0b7d6a2bf",
+      "constantFields": "f7b6a29aa581efb3",
+      "distinctInSample": "4633e2533386e770",
+      "emptyBaseline": "1e01d97cfe4ff9f9",
+      "emptyBaselineHint": "3bfe4dfe25e46be6",
+      "emptySelection": "b9bfb4d44c005a56",
+      "emptyValue": "d29a0939bcb51176",
+      "exclude": "fe98541ea9f4b8b1",
+      "excludedFields": "cc4445c0970567a0",
+      "filterTo": "91b758676659c166",
+      "highCardinality": "7b0b942811311958",
+      "loadFailed": "80412999dc291fa1",
+      "loading": "4ec91d26bb950e67",
+      "mostlyEmpty": "870587bfeb0c564a",
+      "noSelectionBody": "a1953a2aafd5116f",
+      "noSelectionTitle": "cbcf6c2cb06db290",
+      "noValue": "c4d8151192263973",
+      "noiseNote": "de3b873e13228bc5",
+      "otherValues": "1ff77bc517a812fe",
+      "presentIn": "2674f4772762aca9",
+      "rangeClamped": "63e37aa8d7d63a08",
+      "rangeTooLong": "179837435ca279ae",
+      "retry": "942087cc2d41e013",
+      "sampleCapped": "94752e5390a0d6ab",
+      "sampleNote": "3963db5e4c80c6e5",
+      "sampleNoteAll": "acfceca42e461144",
+      "sampleOverflow": "4de16f5c04bd68e6",
+      "scorePts": "e34b973219b43538",
+      "selectionShare": "f7d9962b6a594d09",
+      "showMore": "034680a266d075fc",
+      "summaryBand": "5a52d0990da526b3",
+      "summaryErrors": "0c2bb5b9a2fe7e6a",
+      "title": "9087fcde7c5af00c"
+    },
     "copyStacktrace": "ffe4845db8d7fc77",
     "copyTraceId": "f8619a86627d2a9c",
     "correlation": {
@@ -20135,6 +20176,7 @@
       "viewQueryTrend": "df5dc6da572cfc5a"
     },
     "drillDown": "682c25289fd57604",
+    "drillDownBackTarget": "c099142bc3186ded",
     "errLabel": "af440ad05977eb32",
     "error": "d98ee0e5f9399db9",
     "errorCount": "6b8c59fe228558f0",
@@ -20251,6 +20293,19 @@
       "totalTraces": "9de25747b79f02a6",
       "viewByStream": "a0d0cca9513a3a25"
     },
+    "latencyHeatmap": {
+      "colorBy": {
+        "errors": "cb702378f31507ef",
+        "label": "26e43ef8709fee68",
+        "spans": "b3393bfb2a55adff"
+      },
+      "loadFailed": "6ca3f7cd177dee77",
+      "noData": "3b41ba9c7cb8c5d6",
+      "title": "4fc52a3c4c558b51",
+      "tooltipErrors": "e8495a4105eacd41",
+      "tooltipSpans": "7c048203171e0876",
+      "unavailable": "89a2fbf65d5db050"
+    },
     "latencyPercentile": "f338082c29a968ed",
     "layoutForce": "a708bb3fbe01d68c",
     "layoutHorizontal": "0abba441f16eff90",
@@ -20260,6 +20315,12 @@
     "loadingTraceDag": "0a46f9f7189493b9",
     "max": "a1a5936d3b0f8a69",
     "messageLabel": "f5394f7279eef0f3",
+    "metrics": {
+      "perSecond": {
+        "spans": "111b3567f8b41fe5",
+        "traces": "193e2a906f4d0881"
+      }
+    },
     "nextMatch": "825e5abd0762be6e",
     "noCorrelatedLogsFound": "643231c56fd2784d",
     "noData": {
@@ -20665,6 +20726,9 @@
     "traceDetails": {
       "copySessionId": "59cbf182087e3665",
       "filterAdded": "dc54e5b8268d5412",
+      "loadMore": "e05a37bbbf469ccf",
+      "loadMoreFailed": "2ed38582e9961e72",
+      "partial": "18c05b286d0d0a6d",
       "serviceMap": "d20cdb31d1fbd506",
       "sessionId": "cb9ac5c561daa670",
       "sessionIdCopied": "0e11de60b6c2f5dd",
@@ -20672,6 +20736,7 @@
       "timeline": "9dcff98e275f0cb9",
       "traceIdCopied": "0ccb198be88d79c8",
       "traceNotFound": "a975517058ef6c9c",
+      "truncated": "bbd1154b6fc37b6a",
       "unknownOperation": "5a4ac8326c4f4d8b",
       "unknownService": "30dbef66f0d96ed5"
     },

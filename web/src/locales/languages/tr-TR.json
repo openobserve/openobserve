@@ -10497,6 +10497,67 @@
     "searchTypeOthers": "Diğerleri"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Süre",
+      "tooltipSpans": "{count} Span | {count} Span",
+      "tooltipErrors": "{count} hata ({share}) | {count} hata ({share})",
+      "colorBy": {
+        "label": "Renklendirme ölçütü",
+        "spans": "Span'lar",
+        "errors": "Hatalar"
+      },
+      "noData": "Veri yok",
+      "unavailable": "Gecikme ısı haritası bu arama için kullanılamıyor",
+      "loadFailed": "Gecikme ısı haritası yüklenemedi"
+    },
+    "comparison": {
+      "title": "Seçimi karşılaştır",
+      "baselineOutside": "Seçimin dışında",
+      "baselineBefore": "Hemen öncesi",
+      "sampleNote": "Seçim: {selection} · Referans: {baseline}",
+      "sampleNoteAll": "tüm {count} Span | tüm {count} Span",
+      "sampleCapped": "{total} Span'ın {sampled} tanesi örneklendi",
+      "noiseNote": "{pts} puanın altındaki farklar örnekleme gürültüsü sınırları içindedir",
+      "loading": "Span'lar örnekleniyor…",
+      "loadFailed": "Seçim karşılaştırılamadı",
+      "sampleOverflow": "Örnek, Span sayısıyla eşleşmiyor; örneğin geç gelen veriler nedeniyle. Yeniden saymak için tekrar deneyin.",
+      "baselineCapped": "Referans {range} ile sınırlandırıldı, seçimin her iki yanında en fazla 3 sa",
+      "baselineLimited": "Referans, bu akışın {hours} saatlik sorgu sınırı nedeniyle {range} ile sınırlandırıldı",
+      "rangeClamped": "Sunucu zaman aralığını kısalttı, bu nedenle karşılaştırma eksik kalır",
+      "rangeTooLong": "Seçim, bu akışın {hours} saatlik sorgu sınırından daha uzun",
+      "retry": "Tekrar dene",
+      "noSelectionTitle": "Karşılaştırmak için Span seçin",
+      "noSelectionBody": "Süre ısı haritasında bir kutu çizin veya Hatalar ya da Oran grafiğinde alan seçin, ardından Drill down'ı açın.",
+      "emptySelection": "Seçimde Span yok",
+      "emptyBaseline": "Referans Span yok",
+      "emptyBaselineHint": "Bu referansla eşleşen bir şey yok. Bunun yerine {mode} deneyin.",
+      "scorePts": "Δ {pts} puan",
+      "presentIn": "seçimin {pct} kısmında mevcut",
+      "filterTo": "Bu değere göre filtrele",
+      "exclude": "Bu değeri hariç tut",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Seçim {pct}",
+      "baselineShare": "Referans {pct}",
+      "noValue": "(değer yok)",
+      "emptyValue": "(boş)",
+      "otherValues": "Diğer ({count} değer) | Diğer ({count} değer)",
+      "showMore": "{count} alan daha göster | {count} alan daha göster",
+      "mostlyEmpty": "Seçimde büyük ölçüde boş ({count})",
+      "highCardinality": "Yüksek kardinaliteli alanlar ({count})",
+      "distinctInSample": "Örnekte {count} farklı değer | Örnekte {count} farklı değer",
+      "constantFields": "Her yerde tek bir değere sahip {count} alan | Her yerde tek bir değere sahip {count} alan",
+      "excludedFields": "Karşılaştırılmadı: {fields}",
+      "summaryErrors": "Hatalar · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "sonuçlar",
+    "metrics": {
+      "perSecond": {
+        "traces": "iz/s",
+        "spans": "span/sn"
+      }
+    },
     "errLabel": "HATA",
     "agentDefaultVariant": "varsayılan",
     "agentNoEnv": "(Ortam yok)",
@@ -11066,7 +11127,11 @@
       "unknownOperation": "Bilinmeyen İşlem",
       "unknownService": "Bilinmeyen Hizmet",
       "traceIdCopied": "İz kimliği panoya kopyalandı",
-      "sessionIdCopied": "Oturum ID panoya kopyalandı"
+      "sessionIdCopied": "Oturum ID panoya kopyalandı",
+      "partial": "Bu izin bazı span'ları okunamadı. Şelale eksik olabilir.",
+      "truncated": "Bu izin ilk span'ı başlangıç zamanına göre sıralanmış olarak gösteriliyor. Sonraki span'lar henüz yüklenmedi. | Bu izin ilk {count} span'ı başlangıç zamanına göre sıralanmış olarak gösteriliyor. Sonraki span'lar henüz yüklenmedi.",
+      "loadMore": "Sonraki span'ı yükle | Sonraki {size} span'ı yükle",
+      "loadMoreFailed": "Bu izin daha fazla span'ı yüklenemedi"
     },
     "traceTree": {
       "clickToExpand": "Genişletmek için tıklayın",

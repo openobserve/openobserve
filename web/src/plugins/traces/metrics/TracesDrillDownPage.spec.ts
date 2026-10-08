@@ -15,20 +15,19 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
+import i18n from "@/locales";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import TracesDrillDownPage from "./TracesDrillDownPage.vue";
-
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (k: string) => k }),
-}));
 
 function mountPage(props: Record<string, unknown> = {}): VueWrapper<any> {
   return mount(TracesDrillDownPage, {
     attachTo: document.body,
     props: { open: true, title: "Volume Insights", ...props },
     slots: {
-      "header-left": '<span data-test="header-left-content" />',
+      actions: '<span data-test="header-actions-content" />',
       default: '<div data-test="body-content"><input data-test="inner-input" /></div>',
     },
+    global: { plugins: [i18n] },
   });
 }
 
@@ -39,15 +38,22 @@ describe("TracesDrillDownPage", () => {
     wrapper?.unmount();
   });
 
-  it("should render the back button, title, header and body slots", () => {
+  it("should render the standard page header with the title, the actions and the body", () => {
     wrapper = mountPage();
 
-    expect(wrapper.find('[data-test="traces-drill-down-back-btn"]').text()).toContain(
-      "traces.backToResults",
-    );
-    expect(wrapper.text()).toContain("Volume Insights");
-    expect(wrapper.find('[data-test="header-left-content"]').exists()).toBe(true);
+    const header = wrapper.findComponent(OPageHeader);
+    expect(header.exists()).toBe(true);
+    expect(header.props("title")).toBe("Volume Insights");
+    expect(wrapper.find('[data-test="header-actions-content"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="body-content"]').exists()).toBe(true);
+  });
+
+  it("should label the back button Back to results", () => {
+    wrapper = mountPage();
+
+    expect(wrapper.find('[data-test="traces-drill-down-back-btn"]').attributes("aria-label")).toBe(
+      "Back to results",
+    );
   });
 
   it("should focus the Back button on mount", () => {
