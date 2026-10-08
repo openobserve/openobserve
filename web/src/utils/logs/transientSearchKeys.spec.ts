@@ -174,6 +174,18 @@ describe("registry", () => {
 });
 
 describe("save hook (getSearchObj)", () => {
+  it("cancellation is stripped on save and cleared on view apply and snapshot restore", () => {
+    const live = liveSearchObj(true);
+    setPath(live, "meta.runCancelled", { logs: true });
+    const saved = prepareSearchForSave(JSON.parse(JSON.stringify(live)), live);
+    expect(hasPath(saved, "meta.runCancelled")).toBe(false);
+    applyView(live, { meta: { runCancelled: { logs: true } } });
+    expect(getPath(live, "meta.runCancelled")).toEqual({});
+    setPath(live, "meta.runCancelled", { logs: true });
+    resetTransient(live);
+    expect(getPath(live, "meta.runCancelled")).toEqual({});
+  });
+
   it("strips every reset and strip-only key and keeps replace keys and other state", () => {
     registerTransientSearchKeys([REPLACE_KEY]);
     const live = liveSearchObj(true);

@@ -174,6 +174,7 @@ export interface AutoRunMeta {
   consentedScope?: ConsentScope | null;
   runPending?: boolean;
   runOutcome?: Partial<Record<PersistSurface, RunOutcome>>;
+  runCancelled?: Partial<Record<PersistSurface, boolean>>;
 }
 
 export interface AutoRunStore {
@@ -563,6 +564,7 @@ export function createAutoRun(deps: AutoRunDeps) {
 
   function setOutcome(surface: PersistSurface, outcome: RunOutcome | undefined): void {
     meta.runOutcome = { ...(meta.runOutcome ?? {}), [surface]: outcome };
+    meta.runCancelled = { ...(meta.runCancelled ?? {}), [surface]: false };
   }
 
   function emitExecuted(event: ExecutedRecordedEvent): void {
@@ -653,6 +655,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     teardown(gen, keep);
     if (meta.runOutcome?.[gen.surface] === "running") {
       setOutcome(gen.surface, meta.executed?.generation === gen.id ? "partial" : "cancelled");
+      meta.runCancelled = { ...(meta.runCancelled ?? {}), [gen.surface]: true };
     }
   }
 
@@ -1320,6 +1323,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     meta.consentedScope = null;
     meta.runPending = false;
     meta.runOutcome = {};
+    meta.runCancelled = {};
     missedTick = false;
     invalidation = null;
     if (cause === "saved-view" || cause === "url" || cause === "reapply") meta.editorDirty = false;

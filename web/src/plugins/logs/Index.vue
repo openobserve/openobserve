@@ -244,6 +244,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @select-stream="onSelectStream"
                       />
                     </div>
+
+                    <div
+                      v-else-if="showSearchCancelledState"
+                      class="flex h-full flex-col"
+                      data-test="logs-search-cancelled-state"
+                    >
+                      <LogsPermalinkBanner
+                        @retry="onPermalinkRetry"
+                        @show-lines="onPermalinkShowLines"
+                        @show-in-context="onPermalinkShowInContext"
+                        @go-to-page="onSharedPageGo"
+                      />
+                      <OEmptyState
+                        preset="search-cancelled"
+                        size="hero"
+                        class="min-h-0 flex-1"
+                        @action="() => searchBarRef?.handleRunQueryFn?.()"
+                      />
+                    </div>
                     <div
                       v-else-if="
                         searchObj.meta.logsVisualizeToggle === 'logs' &&
@@ -350,6 +369,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ t("search.autoRunStaleChip") }}
                         </OBadge>
                         <OTooltip :content="t('search.autoRunStaleTooltip')" />
+                      </div>
+                      <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
+                        <OBadge
+                          variant="default-soft"
+                          size="sm"
+                          icon="cancel"
+                          data-test="logs-search-cancelled-notice"
+                        >
+                          {{ t("search.searchCancelledNotice") }}
+                        </OBadge>
                       </div>
                       <LogsPermalinkBanner
                         @retry="onPermalinkRetry"
@@ -3662,6 +3691,18 @@ export default defineComponent({
 
     const isAutoRunOn = computed(() => isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta));
     const isResultsStale = computed(() => autoRun.engine.isResultsStale());
+    const gridRunCancelled = computed(
+      () =>
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.meta.runCancelled?.logs === true &&
+        !searchObj.loading,
+    );
+    const showSearchCancelledState = computed(
+      () => gridRunCancelled.value && !searchObj.data.queryResults?.hits?.length,
+    );
+    const showSearchCancelledNotice = computed(
+      () => gridRunCancelled.value && !!searchObj.data.queryResults?.hits?.length,
+    );
     const guardBlocksGrid = computed(
       () => !!searchObj.meta.autoRunBlocked && searchObj.meta.autoRunBlocked.op !== "visualize",
     );
@@ -3880,6 +3921,8 @@ export default defineComponent({
       rowNavAnnouncement: logsRowNavAnnouncement,
       isAutoRunOn,
       isResultsStale,
+      showSearchCancelledState,
+      showSearchCancelledNotice,
       showGuardEmptyState,
       showGuardBanner,
       showGuardSearchJob,

@@ -731,9 +731,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ODropdownItem
               data-test="logs-search-bar-download-custom-range-btn"
-              :disabled="isDownloadDisabled"
+              :disabled="isDownloadDisabled || !!customRangeReason"
               @select="toggleCustomDownloadDialog"
             >
+              <OTooltip v-if="customRangeReason" :content="customRangeReason" side="left" />
               <template #icon-left>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
@@ -4287,6 +4288,12 @@ export default defineComponent({
         !searchObj.data.queryResults?.hits?.length ||
         autoRun.engine.isResultsStale(),
     );
+
+    const customRangeReason = computed<I18nText | null>(() => {
+      if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
+      if (!searchObj.meta.executed) return t("search.runQueryToDownload");
+      return null;
+    });
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
       { label: "JSON", value: "json" },
@@ -4440,9 +4447,6 @@ export default defineComponent({
 
         if (!hasLogs) {
           tabRunPending = "tab";
-        } else {
-          // Logs exist - just switch the view
-          // console.log("[SearchBar] Reusing existing logs data");
         }
       } else if (
         value == "patterns" &&
@@ -4890,6 +4894,7 @@ export default defineComponent({
       onDownloadRowClick,
       isMobile,
       isDownloadDisabled,
+      customRangeReason,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
