@@ -451,6 +451,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!searchObj.loading && searchObj.data.missingStreamMessage"
             :message="searchObj.data.missingStreamMessage"
             :no-fts-streams="searchObj.data.freeTextExcluded ?? []"
+            :term="noFtsRecoveryTerm"
+            :recovery-streams="noFtsRecoverySchemas"
+            :selected-streams="searchObj.data.stream.selectedStream"
+            @clear-run="$emit('no-fts-clear-run')"
+            @field-search="(values) => $emit('no-fts-field-search', values)"
           />
           <!-- VRL function-error banner (collapsible) -->
           <div
@@ -915,6 +920,11 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import {
+  buildFilterContext,
+  noFtsRecoveryStreams,
+  planStreamsFilter,
+} from "@/composables/useLogs/freeTextSearch";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
@@ -979,6 +989,8 @@ export default defineComponent({
     "run-query",
     "jump-to-stream-data",
     "open-mobile-fields",
+    "no-fts-clear-run",
+    "no-fts-field-search",
   ],
   props: {
     expandedLogs: {
@@ -1269,6 +1281,17 @@ export default defineComponent({
 
     const { searchObj } = searchState();
     const autoRun = useLogsAutoRun();
+    const noFtsRecoverySchemas = computed(() =>
+      noFtsRecoveryStreams(searchObj, searchObj.data.freeTextExcluded ?? []),
+    );
+    const noFtsRecoveryTerm = computed(() => {
+      const plan = planStreamsFilter(
+        searchObj.data.query.trim(),
+        searchObj.data.stream.selectedStream,
+        buildFilterContext(searchObj, store.state.zoConfig),
+      );
+      return plan.kind === "freeText" ? plan.units.join(" ") : searchObj.data.query;
+    });
 
     // Paging an out-of-date or search-around grid would fetch a different query than the rows show (AC5.2, D6).
     const gridLockReason = computed(() => {
@@ -2812,6 +2835,8 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      noFtsRecoverySchemas,
+      noFtsRecoveryTerm,
       gridLockReason,
       activeRowIndex,
       pageCount,

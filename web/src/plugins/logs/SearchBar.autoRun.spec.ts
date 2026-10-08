@@ -29,6 +29,17 @@ const { scheduleSearch, toastMock, getViewDetail } = vi.hoisted(() => ({
   getViewDetail: vi.fn(),
 }));
 
+vi.mock("@/composables/useToolbarResponsive", async () => {
+  const { ref } = await import("vue");
+  return {
+    useToolbarResponsive: () => ({
+      toolbarLeftRef: ref(null),
+      toolbarRightRef: ref(null),
+      availableLeftWidth: ref(2000),
+    }),
+  };
+});
+
 vi.mock("@/services/saved_views", async () => {
   const actual = await vi.importActual<any>("@/services/saved_views");
   return { default: { ...actual.default, getViewDetail } };
@@ -77,6 +88,7 @@ const PERSIST_REASON = "Run the query first: this action saves or shares what yo
 describe("SearchBar — auto-run wiring (item 2)", () => {
   let wrapper: VueWrapper<any> | undefined;
   const originalIsEnterprise = config.isEnterprise;
+  const originalIsCloud = config.isCloud;
   const originalZoConfig = { ...store.state.zoConfig };
 
   const mountSearchBar = () =>
@@ -140,6 +152,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
     wrapper?.unmount();
     wrapper = undefined;
     (config as any).isEnterprise = originalIsEnterprise;
+    config.isCloud = originalIsCloud;
     store.state.zoConfig = originalZoConfig;
     vi.restoreAllMocks();
   });
@@ -150,10 +163,180 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       await setup();
       const vm = wrapper!.vm;
       expect(vm.shareReason).toBe(PERSIST_REASON);
-      expect(vm.saveViewReason).toBe(PERSIST_REASON);
-      expect(vm.scheduleJobReason).toBe(PERSIST_REASON);
-      expect(vm.visualizeReason).toBe(PERSIST_REASON);
-      expect(vm.createAlertDisabledReason).toBe(PERSIST_REASON);
+      expect(vm.saveViewReason).toBe("Run your query first");
+      expect(vm.scheduleJobReason).toBe("Run your query first");
+      expect(vm.visualizeReason).toBe("Run your query first");
+      expect(vm.createAlertDisabledReason).toBe("Run your query first");
+    });
+
+    it("keeps shown-row export allowed in search-around while blocking whole-query export", async () => {
+      await setup({ liveMode: false });
+      markExecuted();
+      wrapper!.vm.autoRun.invalidateExecuted("search-around");
+      await flushPromises();
+      expect(wrapper!.vm.isDownloadDisabled).toBe(false);
+      expect(wrapper!.vm.downloadReason).toBeNull();
+      expect(wrapper!.vm.customRangeReason).toBe(i18n.global.t("search.autoRunSearchAroundActive"));
+    });
+
+    it("ArrowDown on unavailable Download stays in the parent menu without opening CSV or JSON", async () => {
+      await setup({ liveMode: false });
+      await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
+      await flushPromises();
+      const download = document.querySelector<HTMLElement>(
+        '[data-test="search-download-submenu-trigger"]',
+      )!;
+      download.focus();
+      download.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }),
+      );
+      await vi.waitFor(() =>
+        expect(document.activeElement).toBe(
+          document.querySelector('[data-test="logs-search-bar-download-custom-range-btn"]'),
+        ),
+      );
+      expect(wrapper!.vm.showDownloadSubmenu).toBe(false);
+      expect(document.querySelector('[data-test="search-download-csv-btn"]')).toBeNull();
+      expect(document.querySelector('[data-test="search-download-json-btn"]')).toBeNull();
+      expect(download.hasAttribute("aria-haspopup")).toBe(false);
+      expect(download.hasAttribute("disabled")).toBe(false);
+    });
+
+    it("renders the enabled Download trigger as a native button and closes its submenu when G1 blocks it", async () => {
+      const { searchObj } = await setup({ liveMode: false });
+      markExecuted();
+      await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
+      await flushPromises();
+      const download = document.querySelector<HTMLElement>(
+        '[data-test="search-download-submenu-trigger"]',
+      )!;
+      expect(download.tagName).toBe("BUTTON");
+      expect(download.getAttribute("role")).toBe("menuitem");
+      download.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }),
+      );
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-test="search-download-csv-btn"]')).not.toBeNull(),
+      );
+      searchObj.meta.editorDirty = true;
+      searchObj.data.query = "level = 'error'";
+      await flushPromises();
+      expect(wrapper!.vm.showDownloadSubmenu).toBe(false);
+      expect(document.querySelector('[data-test="search-download-csv-btn"]')).toBeNull();
+      expect(document.querySelector('[data-test="search-download-json-btn"]')).toBeNull();
+    });
+
+    it("ArrowDown from enabled Download reaches every later parent action and submenu keys return focus", async () => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      await setup({ liveMode: false });
+      store.state.zoConfig.search_inspector_enabled = true;
+      markExecuted();
+      await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
+      await flushPromises();
+      const item = (id: string) => document.querySelector<HTMLElement>(`[data-test="${id}"]`)!;
+      const key = (key: string) =>
+        document.activeElement!.dispatchEvent(
+          new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+        );
+      const download = item("search-download-submenu-trigger");
+      download.focus();
+      for (const id of [
+        "logs-search-bar-download-custom-range-btn",
+        "search-scheduler-create-new-btn",
+        "search-scheduler-list-btn",
+        "logs-create-alert-btn",
+        "search-inspect-btn",
+      ]) {
+        key("ArrowDown");
+        await vi.waitFor(() => expect(document.activeElement).toBe(item(id)));
+        expect(document.querySelector('[data-test="search-download-csv-btn"]')).toBeNull();
+        expect(document.querySelector('[data-test="search-download-json-btn"]')).toBeNull();
+      }
+      for (const [open, close] of [
+        ["ArrowRight", "ArrowLeft"],
+        ["Enter", "Escape"],
+      ]) {
+        download.focus();
+        key(open);
+        await vi.waitFor(() =>
+          expect(document.activeElement).toBe(item("search-download-csv-btn")),
+        );
+        key("ArrowDown");
+        await vi.waitFor(() =>
+          expect(document.activeElement).toBe(item("search-download-json-btn")),
+        );
+        key(close);
+        await vi.waitFor(() => expect(document.activeElement).toBe(download));
+        await vi.waitFor(() =>
+          expect(document.querySelector('[data-test="search-download-csv-btn"]')).toBeNull(),
+        );
+        expect(wrapper!.vm.showDownloadSubmenu).toBe(false);
+        key("ArrowDown");
+        await vi.waitFor(() =>
+          expect(document.activeElement).toBe(item("logs-search-bar-download-custom-range-btn")),
+        );
+      }
+    });
+
+    it("shows current G1 reasons on every menu entry and prevents activation", async () => {
+      (config as any).isEnterprise = "true";
+      const { searchObj } = await setup({ liveMode: false });
+      markExecuted();
+      searchObj.data.query = "level = 'error'";
+      searchObj.data.editorValue = searchObj.data.query;
+      searchObj.meta.editorDirty = true;
+      await flushPromises();
+      if (!wrapper!.vm.isPinned("savedViews")) wrapper!.vm.togglePin("savedViews");
+      await flushPromises();
+      for (const [trigger, ids] of [
+        ["logs-search-bar-utilities-menu-btn", ["logs-search-bar-menu-create-saved-view-btn"]],
+        [
+          "logs-search-bar-saved-views-pinned-list-btn",
+          ["logs-search-bar-saved-views-menu-create"],
+        ],
+        [
+          "logs-search-bar-more-options-btn",
+          [
+            "logs-create-alert-btn",
+            "search-scheduler-create-new-btn",
+            "search-download-submenu-trigger",
+            "logs-search-bar-download-custom-range-btn",
+          ],
+        ],
+      ] as [string, string[]][]) {
+        await wrapper!.get(`[data-test="${trigger}"]`).trigger("click");
+        await flushPromises();
+        for (const testId of ids) {
+          const element = document.querySelector<HTMLElement>(`[data-test="${testId}"]`)!;
+          expect(element).not.toBeNull();
+          expect(element.getAttribute("aria-disabled")).toBe("true");
+          const id = element.getAttribute("aria-describedby")!;
+          expect(id).toBeTruthy();
+          expect(document.getElementById(id)?.textContent).toContain("Run your edited query first");
+          expect(element.hasAttribute("data-disabled")).toBe(false);
+          element.click();
+          element.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+          );
+          element.dispatchEvent(
+            new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true }),
+          );
+        }
+        document
+          .querySelector<HTMLElement>('[role="menu"]')
+          ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await flushPromises();
+      }
+      expect(wrapper!.vm.customDownloadDialog).toBe(false);
+      expect(wrapper!.vm.showDownloadSubmenu).toBe(false);
+      expect(scheduleSearch).not.toHaveBeenCalled();
+      markExecuted();
+      searchObj.meta.editorDirty = false;
+      await flushPromises();
+      expect(wrapper!.vm.saveViewReason).toBeNull();
+      expect(wrapper!.vm.scheduleJobReason).toBeNull();
+      expect(wrapper!.vm.createAlertDisabledReason).toBeNull();
     });
 
     it("enables them once the current query has run, and disables them again when it goes stale", async () => {
@@ -186,7 +369,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       wrapper!.vm.fnSavedView();
       expect(dispatch).not.toHaveBeenCalledWith("setSavedViewDialog", true);
       expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning", message: PERSIST_REASON }),
+        expect.objectContaining({ variant: "warning", message: "Run your query first" }),
       );
       markExecuted();
       await flushPromises();
@@ -400,7 +583,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       await applyView(viewOf());
 
       expect(searchObj.meta.executed).toBeNull();
-      expect(wrapper!.vm.customRangeReason).toBe("Run the query to download");
+      expect(wrapper!.vm.customRangeReason).toBe("Run your query first");
       const search = vi.spyOn(searchService, "search");
       wrapper!.vm.downloadCustomInitialNumber = 1;
       wrapper!.vm.downloadRangeData();

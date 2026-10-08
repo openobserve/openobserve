@@ -298,10 +298,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="save"
                 data-test="logs-search-bar-saved-views-menu-create"
                 :disabled="!!saveViewReason"
+                focusable-unavailable
+                :description="saveViewReason"
                 @select="fnSavedView"
               >
                 {{ t("search.createSavedView") }}
-                <OTooltip v-if="saveViewReason" :content="saveViewReason" side="left" />
               </ODropdownItem>
               <ODropdownItem
                 icon-left="settings"
@@ -557,9 +558,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-menu-create-saved-view-btn"
               shortcut-id="logsSaveView"
               :disabled="!!saveViewReason"
+              focusable-unavailable
+              :description="saveViewReason"
               @select="fnSavedView"
             >
-              <OTooltip v-if="saveViewReason" :content="saveViewReason" side="left" />
               <template #icon-left>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
@@ -673,68 +675,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- DOWNLOADS -->
           <ODropdownGroup :label="t('search.menuGroupDownloads')">
             <!-- Download results — nested sub-dropdown (hover to open) -->
-            <div
+            <ODropdownSub
+              v-if="!isDownloadDisabled"
+              v-model:open="showDownloadSubmenu"
               data-test="search-download-submenu-trigger"
-              :aria-disabled="isDownloadDisabled || undefined"
-              @mouseenter="!isMobile && !isDownloadDisabled && (showDownloadSubmenu = true)"
-              @mouseleave="!isMobile && (showDownloadSubmenu = false)"
-              @click="onDownloadRowClick"
-              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-[''] max-md:flex-wrap"
-              :class="{
-                'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
-              }"
+              :text-value="t('search.downloadTable')"
             >
-              <span
-                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              <template #icon-left>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon size="sm" name="download" />
+                </span>
+              </template>
+              <template #trigger>{{ t("search.downloadTable") }}</template>
+              <template #icon-right><OIcon size="sm" name="chevron-right" /></template>
+              <ODropdownItem
+                data-test="search-download-csv-btn"
+                icon-left="grid-on"
+                :disabled="isDownloadDisabled"
+                @select="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+                >{{ t("search.downloadCSV") }}</ODropdownItem
               >
-                <OIcon size="sm" name="download" />
-              </span>
-              <span class="flex-1 whitespace-nowrap">{{ t("search.downloadTable") }}</span>
-              <OTooltip
-                v-if="isDownloadDisabled && autoRun.engine.isResultsStale()"
-                :content="t('search.autoRunStaleTooltip')"
-                side="left"
-              />
-              <OIcon size="sm" name="chevron-right" />
+              <ODropdownItem
+                data-test="search-download-json-btn"
+                icon-left="data-object"
+                :disabled="isDownloadDisabled"
+                @select="downloadLogs(searchObj.data.queryResults.hits, 'json')"
+                >{{ t("search.downloadJSON") }}</ODropdownItem
+              >
+            </ODropdownSub>
 
-              <div
-                v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 me-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
-                data-test="search-download-submenu"
-              >
-                <button
-                  type="button"
-                  data-test="search-download-csv-btn"
-                  class="text-text-body hover:bg-interactive-hover-bg flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left [line-height:1.2] text-[var(--text-sm)]"
-                  @click="
-                    downloadLogs(searchObj.data.queryResults.hits, 'csv');
-                    showDownloadSubmenu = false;
-                  "
+            <ODropdownItem
+              v-else
+              data-test="search-download-submenu-trigger"
+              disabled
+              focusable-unavailable
+              :description="downloadReason"
+              :text-value="t('search.downloadTable')"
+            >
+              <template #icon-left>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
-                  <OIcon name="grid-on" size="sm" />
-                  <span class="flex-1">{{ t("search.downloadCSV") }}</span>
-                </button>
-                <button
-                  type="button"
-                  data-test="search-download-json-btn"
-                  class="text-text-body hover:bg-interactive-hover-bg flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left [line-height:1.2] text-[var(--text-sm)]"
-                  @click="
-                    downloadLogs(searchObj.data.queryResults.hits, 'json');
-                    showDownloadSubmenu = false;
-                  "
-                >
-                  <OIcon name="data-object" size="sm" />
-                  <span class="flex-1">{{ t("search.downloadJSON") }}</span>
-                </button>
-              </div>
-            </div>
+                  <OIcon size="sm" name="download" />
+                </span>
+              </template>
+              {{ t("search.downloadTable") }}
+              <template #icon-right
+                ><OIcon size="sm" name="chevron-right" class="text-text-secondary"
+              /></template>
+            </ODropdownItem>
 
             <ODropdownItem
               data-test="logs-search-bar-download-custom-range-btn"
               :disabled="isDownloadDisabled || !!customRangeReason"
+              focusable-unavailable
+              :description="customRangeReason || downloadReason"
               @select="toggleCustomDownloadDialog"
             >
-              <OTooltip v-if="customRangeReason" :content="customRangeReason" side="left" />
               <template #icon-left>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
@@ -760,9 +759,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="config.isEnterprise == 'true'"
               data-test="search-scheduler-create-new-btn"
               :disabled="!!scheduleJobReason"
+              focusable-unavailable
+              :description="scheduleJobReason"
               @select="createScheduleJob"
             >
-              <OTooltip v-if="scheduleJobReason" :content="scheduleJobReason" side="left" />
               <template #icon-left>
                 <span
                   class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
@@ -1875,6 +1875,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -1964,6 +1965,7 @@ export default defineComponent({
     OButtonGroup,
     ODialog,
     ODropdown,
+    ODropdownSub,
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
@@ -2044,6 +2046,7 @@ export default defineComponent({
       this.deleteSavedViews();
     },
     toggleCustomDownloadDialog() {
+      if (this.blockWithReason(this.customRangeReason || this.downloadReason)) return;
       this.customDownloadDialog = true;
     },
     confirmUpdateSavedViews() {
@@ -2153,8 +2156,19 @@ export default defineComponent({
       if (mode === "patterns" || mode === "visualize" || mode === "build") return mode;
       return "logs";
     });
-    const persistReason = (surface: PersistSurface, action?: PersistAction) =>
-      autoRun.persistReason(surface, action);
+    const persistReason = (surface: PersistSurface, action?: PersistAction) => {
+      const reason = autoRun.persistReason(surface, action);
+      if (reason !== t("search.autoRunPersistNeedsRun") || action === "share-link") return reason;
+      return queryRunReason.value;
+    };
+    const queryRunReason = computed(() =>
+      (searchObj.meta.executed ||
+        searchObj.meta.executedPatterns ||
+        searchObj.meta.executedPanel) &&
+      (autoRun.engine.isResultsStale() || searchObj.meta.editorDirty)
+        ? t("search.queryActions.runEditedFirst")
+        : t("search.queryActions.runFirst"),
+    );
     const saveViewReason = computed(() => persistReason(activeSurface.value, "save-view"));
     const shareReason = computed(() => persistReason(activeSurface.value, "share-link"));
     const scheduleJobReason = computed(() => persistReason("logs", "search-job"));
@@ -3108,6 +3122,7 @@ export default defineComponent({
     };
 
     const downloadLogs = async (data, format) => {
+      if (isDownloadDisabled.value) return;
       //here we are using a package json2csv which converts json to csv data
       //why package because we faced one issue where user has , in some of the fields so
       //it is treating it as seperate fields
@@ -4275,23 +4290,34 @@ export default defineComponent({
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
     const showDownloadSubmenu = ref(false);
     const { isMobile } = useBreakpoint();
-    // A tap also fires mouseenter, so < md only the click toggles; taps on the submenu's own buttons are ignored.
-    const onDownloadRowClick = (e: MouseEvent) => {
-      if (!isMobile.value || isDownloadDisabled.value) return;
-      if ((e.target as HTMLElement | null)?.closest(".search-download-submenu")) return;
-      showDownloadSubmenu.value = !showDownloadSubmenu.value;
-    };
     // An out-of-date grid would export rows that no longer match the query (AC5.2).
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length ||
         !searchObj.data.queryResults?.hits?.length ||
-        autoRun.engine.isResultsStale(),
+        (!autoRun.searchAroundActive() &&
+          (!searchObj.meta.executed?.complete || autoRun.engine.isResultsStale())),
     );
 
+    watch(isDownloadDisabled, (disabled) => {
+      if (disabled) showDownloadSubmenu.value = false;
+    });
+
+    const downloadReason = computed<I18nText | null>(() => {
+      if (
+        !autoRun.searchAroundActive() &&
+        (autoRun.engine.isResultsStale() || !searchObj.meta.executed?.complete)
+      )
+        return queryRunReason.value;
+      if (!searchObj.data.stream.selectedStream?.length)
+        return t("logs.searchBar.selectStreamBeforeSchedule");
+      if (!searchObj.data.queryResults?.hits?.length) return t("logs.searchBar.noDataToDownload");
+      return null;
+    });
     const customRangeReason = computed<I18nText | null>(() => {
-      if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
-      if (!searchObj.meta.executed) return t("search.runQueryToDownload");
+      if (autoRun.searchAroundActive()) return t("search.autoRunSearchAroundActive");
+      if (autoRun.engine.isResultsStale() || !searchObj.meta.executed?.complete)
+        return queryRunReason.value;
       return null;
     });
     const downloadCustomFileTypeOptions = ref([
@@ -4891,7 +4917,7 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
-      onDownloadRowClick,
+      downloadReason,
       isMobile,
       isDownloadDisabled,
       customRangeReason,

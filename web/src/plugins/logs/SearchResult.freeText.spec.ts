@@ -37,6 +37,7 @@ describe("SearchResult missing-stream banner (item 1 AC4.1)", () => {
 
   beforeEach(async () => {
     resetLogsAutoRunForTests();
+    store.state.userInfo.role = "admin";
     HTMLElement.prototype.scrollTo = vi.fn();
     wrapper = mount(SearchResult, {
       global: {
@@ -55,17 +56,21 @@ describe("SearchResult missing-stream banner (item 1 AC4.1)", () => {
     wrapper.vm.searchObj.data.missingStreamMessage = "";
     wrapper.vm.searchObj.data.freeTextExcluded = [];
     wrapper?.unmount();
+    delete store.state.userInfo.role;
     vi.clearAllMocks();
   });
 
   it("names the excluded stream and routes to its settings without writing anything", async () => {
     wrapper.vm.searchObj.data.missingStreamMessage = "Not searched: nofts_b (no full-text fields).";
     wrapper.vm.searchObj.data.freeTextExcluded = ["nofts_b"];
+    wrapper.vm.searchObj.data.stream.selectedStream = ["fts_a", "nofts_b"];
     await flushPromises();
 
     const banner = wrapper.find('[data-test="logs-missing-stream-banner"]');
     expect(banner.text()).toContain("nofts_b");
-    expect(banner.text()).toContain("no full-text fields");
+    expect(banner.text()).toContain("nofts_b was skipped because word search is not configured.");
+    expect(banner.text()).toContain("These results are from fts_a only.");
+    expect(banner.text()).not.toContain("Not searched:");
 
     await banner.find('[data-test="logs-no-fts-configure-btn"]').trigger("click");
     expect(pushMock).toHaveBeenCalledWith("/streams?dialog=nofts_b");
