@@ -28,8 +28,9 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
     rum_pa::{
-        CreateFunnel, CreateNamedEvent, FunnelRefList, NamedEvent, NamedEventList, NamedEventRefList,
-        RumPaError, RumPaErrorBody, SavedFunnel, SavedFunnelList, UpdateFunnel, UpdateNamedEvent,
+        CreateFunnel, CreateNamedEvent, FunnelRefList, NamedEvent, NamedEventList,
+        NamedEventRefList, RumPaError, RumPaErrorBody, SavedFunnel, SavedFunnelList, UpdateFunnel,
+        UpdateNamedEvent,
         service::{self, Scope},
         validate_app, validate_id,
     },
