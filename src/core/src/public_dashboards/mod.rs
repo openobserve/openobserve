@@ -589,7 +589,7 @@ async fn authorize_query(
     user_id: &str,
     query_type: &str,
     text: &str,
-    (default_type, stream): (StreamType, &str),
+    target: (StreamType, &str),
     authorized: &mut BTreeSet<String>,
     unauthorized: &mut BTreeSet<String>,
 ) -> Result<(), String> {
@@ -599,8 +599,8 @@ async fn authorize_query(
             StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
         };
         // An unreadable query can't be proven safe, so it is withheld rather than run.
-        let streams = query_streams(query_type, text, default_type)
-            .map_err(|_| "unauthorized".to_string())?;
+        let streams =
+            query_streams(query_type, text, target.0).map_err(|_| "unauthorized".to_string())?;
         for (stream, stream_type) in &streams {
             let denied = check_stream_permissions(
                 stream,
@@ -626,8 +626,8 @@ async fn authorize_query(
         authorized.extend(streams.into_iter().map(|(stream, _)| stream));
     }
     #[cfg(not(feature = "enterprise"))]
-    if !stream.is_empty() {
-        authorized.insert(stream.to_string());
+    if !target.1.is_empty() {
+        authorized.insert(target.1.to_string());
     }
     Ok(())
 }
