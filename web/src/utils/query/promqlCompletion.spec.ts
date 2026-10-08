@@ -83,6 +83,20 @@ describe("PROMQL_FUNCTIONS — aggregations and function identifiers", () => {
     }
   });
 
+  it("keeps both smoothing names and documents their shared behavior", () => {
+    const canonical = find("double_exponential_smoothing");
+    const legacy = find("holt_winters");
+    for (const name of ["double_exponential_smoothing", "holt_winters"]) {
+      expect(labels(PROMQL_FUNCTIONS)).toContain(name);
+      expect(find(name)?.insertText).toBe(name);
+      expect(find(name)?.detail).toBe("function");
+    }
+    expect(canonical?.documentation).toBe("Calculate smoothed value of input series");
+    expect(legacy?.documentation).toBe(
+      `${canonical?.documentation} (alias of double_exponential_smoothing)`,
+    );
+  });
+
   it("carries the whole *_over_time family, not a sample of it", () => {
     // The family is the most common source of "I know this function exists".
     const overTime = labels(PROMQL_FUNCTIONS).filter((l) => l.endsWith("_over_time"));

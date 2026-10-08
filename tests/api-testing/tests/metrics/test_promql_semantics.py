@@ -1,26 +1,4 @@
-"""PromQL result shapes the spec fixes, verified end to end.
-
-Three regressions found by A/B testing against Thanos (openobserve#14607,
-#14609, #14610, consolidated in o2-enterprise#2661):
-
-* ``absent_over_time(missing[5m])`` returned NO series. The spec says one series
-  with value 1 — which is exactly the idiom missing-data alerts are built on, so
-  such an alert could never fire.
-* ``scalar(v)`` returned its argument unchanged instead of reducing it, so a
-  query that should yield a scalar yielded a vector.
-* An instant query on a range selector or subquery returned a vector (one value
-  per series) instead of a matrix (every raw sample).
-
-A fourth group came from the same sweep: ``sort``, ``sort_desc``,
-``present_over_time`` and the ``@`` modifier were reported as unimplemented and
-now evaluate. They are pinned here because nothing else covers them — an
-"unsupported function" error is a silent regression for a dashboard that uses
-one. ``double_exponential_smoothing`` is still unimplemented and is
-deliberately NOT asserted.
-
-Each assertion is on ``resultType``/series count, not on the numbers, so the
-tests stay stable whatever else the instance holds.
-"""
+"""PromQL result shapes and smoothing aliases, verified end to end."""
 from __future__ import annotations
 
 import logging
@@ -150,3 +128,55 @@ def test_previously_unsupported_functions_now_evaluate(client, seeded_metric, qu
         f"{query.format(metric=seeded_metric)} returned an error: "
         f"{body.get('error') or body.get('message')}"
     )
+
+
+@pytest.mark.parametrize(("endpoint", "result_type"), [("query", "vector"), ("query_range", "matrix")])
+def test_smoothing_aliases_return_identical_results(client, seeded_metric, endpoint, result_type):
+    end = int(time.time())
+    params = {"time": end} if endpoint == "query" else {"start": end - 180, "end": end, "step": "60s"}
+    results = []
+    for name in ("holt_winters", "double_exponential_smoothing"):
+        resp = client.get(
+            f"prometheus/api/v1/{endpoint}",
+            params={**params, "query": f"{name}({seeded_metric}[10m], 0.5, 0.3)"},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body.get("status") == "success", body
+        data = body.get("data", {})
+        assert data.get("resultType") == result_type, data
+        result = data.get("result", [])
+        assert result, f"{name} returned no series"
+        if endpoint == "query_range":
+            assert all(series.get("values") for series in result), result
+        else:
+            assert all(series.get("value") for series in result), result
+        results.append(data)
+    assert results[0] == results[1]
+
+
+@pytest.mark.parametrize("name", ["holt_winters", "double_exponential_smoothing"])
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_format_query_preserves_smoothing_name(client, name, method):
+    query = f"{name}(m[5m], 0.5, 0.3)"
+    request_args = {"params": {"query": query}} if method == "get" else {"data": {"query": query}}
+    resp = getattr(client, method)("prometheus/api/v1/format_query", **request_args)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body.get("status") == "success", body
+    assert body.get("data") == query
+
+
+@pytest.mark.parametrize("name", ["holt_winters", "double_exponential_smoothing"])
+@pytest.mark.parametrize("endpoint", ["query", "query_range", "format_query"])
+@pytest.mark.parametrize("args", ["m[5m], 0.5", "m[5m], 0.5, 0.3, 0.1"])
+def test_smoothing_arity_error_names_called_function(client, name, endpoint, args):
+    end = int(time.time())
+    params = {"query": f"{name}({args})", "time": end}
+    if endpoint == "query_range":
+        params.update({"start": end - 180, "end": end, "step": "60s"})
+    resp = client.get(f"prometheus/api/v1/{endpoint}", params=params)
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert body.get("status") == "error", body
+    assert f"call to '{name}'" in body.get("error", ""), body

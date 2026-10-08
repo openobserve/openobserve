@@ -141,7 +141,7 @@ export function useNLQuery(t: TranslateFn) {
 
       // Check for PromQL functions
       const promqlFunctions =
-        /\b(rate|increase|delta|idelta|irate|avg_over_time|min_over_time|max_over_time|sum_over_time|count_over_time|quantile_over_time|stddev_over_time|stdvar_over_time|histogram_quantile|label_join|label_replace|abs|ceil|floor|round|sqrt|exp|ln|log2|log10|clamp|clamp_max|clamp_min|sort|sort_desc|time|timestamp|vector|scalar|changes|deriv|predict_linear|holt_winters|resets)\s*\(/i;
+        /\b(rate|increase|delta|idelta|irate|avg_over_time|min_over_time|max_over_time|sum_over_time|count_over_time|quantile_over_time|stddev_over_time|stdvar_over_time|histogram_quantile|label_join|label_replace|abs|ceil|floor|round|sqrt|exp|ln|log2|log10|clamp|clamp_max|clamp_min|sort|sort_desc|time|timestamp|vector|scalar|changes|deriv|predict_linear|holt_winters|double_exponential_smoothing|resets)\s*\(/i;
       if (promqlFunctions.test(trimmed)) {
         return false;
       }
