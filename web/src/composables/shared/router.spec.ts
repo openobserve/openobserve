@@ -1807,6 +1807,7 @@ describe("useRoutes (router.ts)", () => {
     it.each([
       ["infraHosts", "infra/hosts"],
       ["infraKubernetes", "infra/kubernetes"],
+      ["infraKubernetes2", "infra/kubernetes-2"],
     ])("registers %s at path %s", (name, path) => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, name as string);
@@ -1814,17 +1815,20 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe(path);
     });
 
-    it.each(["infraHosts", "infraKubernetes"])("%s beforeEnter calls routeGuard", async (name) => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      vi.mocked(routeGuard as any).mockClear();
-      const { homeChildRoutes } = useRoutes();
-      const route = findRoute(homeChildRoutes, name);
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-      route.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
+      "%s beforeEnter calls routeGuard",
+      async (name) => {
+        const { routeGuard } = await import("@/utils/zincutils");
+        vi.mocked(routeGuard as any).mockClear();
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        const mockTo = {};
+        const mockFrom = {};
+        const mockNext = vi.fn();
+        route.beforeEnter(mockTo, mockFrom, mockNext);
+        expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      },
+    );
 
     it("passes the workload prop to the kubernetes page", () => {
       const { homeChildRoutes } = useRoutes();
@@ -1841,13 +1845,23 @@ describe("useRoutes (router.ts)", () => {
       expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
     });
 
-    it("keeps exactly the infra workload routes that have a curated pack", () => {
+    it("keeps exactly the curated infra workload routes plus Kubernetes 2", () => {
       const { homeChildRoutes } = useRoutes();
       const infraWorkloads = homeChildRoutes
         .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
         .map((r: any) => r.path)
         .sort();
-      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes"]);
+      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes", "infra/kubernetes-2"]);
+    });
+
+    it("registers Kubernetes 2 right after Kubernetes, lazily loading its own page", () => {
+      const { homeChildRoutes } = useRoutes();
+      const index = homeChildRoutes.findIndex((r: any) => r.name === "infraKubernetes");
+      const route = homeChildRoutes[index + 1] as any;
+      expect(route.name).toBe("infraKubernetes2");
+      expect(route.meta?.titleKey).toBe("menu.kubernetes2");
+      expect(route.props).toBeUndefined();
+      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
