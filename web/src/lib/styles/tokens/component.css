@@ -527,6 +527,7 @@
   --color-progress-bar-success: var(--color-success-600);
   --color-progress-bar-warning: var(--color-warning-500);
   --color-progress-bar-danger: var(--color-error-600);
+  --color-progress-bar-neutral: var(--color-grey-400);
   --color-progress-bar-track: var(--color-grey-200);
   --color-progress-bar-label: var(--color-white);
 
@@ -1912,6 +1913,7 @@
   --color-progress-bar-success: var(--color-progress-bar-success);
   --color-progress-bar-warning: var(--color-progress-bar-warning);
   --color-progress-bar-danger: var(--color-progress-bar-danger);
+  --color-progress-bar-neutral: var(--color-progress-bar-neutral);
   --color-progress-bar-track: var(--color-progress-bar-track);
   --color-progress-bar-label: var(--color-progress-bar-label);
 
@@ -2116,6 +2118,12 @@
   --color-service-health-degraded: var(--color-service-health-degraded);
   --color-service-health-healthy: var(--color-service-health-healthy);
   --color-service-health-warning: var(--color-service-health-warning);
+  --color-map-seq-1: var(--color-map-seq-1);
+  --color-map-seq-2: var(--color-map-seq-2);
+  --color-map-seq-3: var(--color-map-seq-3);
+  --color-map-seq-4: var(--color-map-seq-4);
+  --color-map-seq-5: var(--color-map-seq-5);
+  --color-map-card-header: var(--color-map-card-header);
   --color-severity-error-color: var(--color-severity-error-color);
   --color-severity-warning-color: var(--color-severity-warning-color);
   --color-status-error-bg: var(--color-status-error-bg);

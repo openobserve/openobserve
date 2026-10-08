@@ -169,7 +169,7 @@ pub async fn get_org_setting_usage_stream_enabled(org_id: &str) -> Result<bool, 
     Ok(usage_stream_enabled)
 }
 
-/// Whether automatic RED anomaly insights are on for an org; absent settings mean off.
+/// Whether automatic RED anomaly insights are on for an org; absent settings mean on.
 pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, Error> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
     if let Some(v) = ORGANIZATION_SETTING.read().await.get(&key) {

@@ -18,6 +18,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+import { convertToUtcTimestamp } from "@/utils/timezone";
 
 // ---------------------------------------------------------------------------
 // Heavy async component stubs — must be declared before the component import
@@ -27,15 +28,21 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: { template: '<div data-test="render-dashboard-charts"></div>' },
 }));
 
-vi.mock("./TracesMetricsContextMenu.vue", () => ({
-  default: { template: '<div data-test="traces-metrics-context-menu"></div>' },
+vi.mock("./TracesLatencyHeatmap.vue", () => ({
+  default: {
+    name: "TracesLatencyHeatmap",
+    template: '<div data-test="traces-latency-heatmap"></div>',
+    props: ["request"],
+    emits: ["select"],
+  },
 }));
 
-vi.mock("./TracesAnalysisDashboard.vue", () => ({
+vi.mock("./TracesComparison.vue", () => ({
   default: {
-    template: '<div data-test="traces-analysis-dashboard"></div>',
-    props: ["streamName", "streamType", "timeRange", "analysisType"],
-    emits: ["close"],
+    name: "TracesComparison",
+    template: '<div data-test="traces-comparison-stub"></div>',
+    props: ["selection", "streamName"],
+    emits: ["close", "apply-filter"],
   },
 }));
 
@@ -111,6 +118,7 @@ vi.mock("@/utils/zincutils", () => ({
 import useParser from "@/composables/useParser";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
+import { instantToPickerMs } from "./latencyHeatmap";
 
 // ---------------------------------------------------------------------------
 // Test store — minimal shape the component queries via useStore()
@@ -118,6 +126,7 @@ import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
 const mockStore = createStore({
   state: {
     theme: "light",
+    timezone: "UTC",
     selectedOrganization: { identifier: "test-org" },
   },
 });
@@ -143,19 +152,11 @@ function mountComponent(props: Record<string, unknown> = {}): VueWrapper<any> {
         RenderDashboardCharts: {
           template: '<div data-test="render-dashboard-charts"></div>',
         },
-        TracesMetricsContextMenu: {
-          template: '<div data-test="traces-metrics-context-menu"></div>',
-        },
-        TracesAnalysisDashboard: {
-          template: '<div data-test="traces-analysis-dashboard"></div>',
-          props: {
-            streamName: null,
-            streamType: null,
-            timeRange: null,
-            analysisType: null,
-            fullPage: Boolean,
-          },
-          emits: ["close"],
+        TracesComparison: {
+          name: "TracesComparison",
+          template: '<div data-test="traces-comparison-stub"></div>',
+          props: ["selection", "streamName"],
+          emits: ["close", "apply-filter"],
         },
       },
     },
@@ -172,6 +173,18 @@ function getPanelQuery(wrapper: VueWrapper<any>, title: string): string {
   return panel?.queries?.[0]?.query ?? "";
 }
 
+function getPanel(wrapper: VueWrapper<any>, title: string): any {
+  const panels: any[] = wrapper.vm.dashboardData?.tabs?.[0]?.panels ?? [];
+  return panels.find((p: any) => p.title === title);
+}
+
+const THIRTY_MIN_START = Date.UTC(2026, 9, 6, 10, 0, 0) * 1000;
+const THIRTY_MIN_END = THIRTY_MIN_START + 30 * 60 * 1_000_000;
+
+function getHeatmapSql(wrapper: VueWrapper<any>): string {
+  return wrapper.vm.heatmapRequest?.sql ?? "";
+}
+
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -185,6 +198,8 @@ describe("TracesMetricsDashboard", () => {
     mockMetricsRangeFilters.clear();
     mockSearchObj.loading = false;
     mockSearchObj.data.editorValue = "";
+    mockSearchObj.data.datetime = { startTime: 1_000_000, endTime: 2_000_000 };
+    mockStore.state.timezone = "UTC";
     mockSearchObj.meta.showHistogram = true;
     mockSearchObj.meta.searchMode = "traces";
     mockSearchObj.data.stream.selectedStream.value = "default";
@@ -225,9 +240,8 @@ describe("TracesMetricsDashboard", () => {
       expect(charts.exists()).toBe(false);
     });
 
-    it("should not render TracesAnalysisDashboard on initial mount", () => {
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
-      expect(analysisDashboard.exists()).toBe(false);
+    it("should not render the comparison page on initial mount", () => {
+      expect(wrapper.find('[data-test="traces-comparison-stub"]').exists()).toBe(false);
     });
   });
 
@@ -242,14 +256,33 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("approx_distinct(trace_id)");
     });
 
-    it("should use approx_distinct(trace_id) FILTER for error counting in the Rate panel query", async () => {
+    it("plots Rate as traces per second on an explicit interval shared with Errors and the heatmap", async () => {
+      mockSearchObj.data.datetime = { startTime: THIRTY_MIN_START, endTime: THIRTY_MIN_END };
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Rate");
-      // The Rate panel template contains: approx_distinct(trace_id) filter (where span_status = 'ERROR')
-      expect(query).toMatch(
-        /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/i,
+      const rate = getPanelQuery(wrapper, "Rate");
+      expect(rate).toContain("histogram(_timestamp, '15 second')");
+      expect(rate).toContain("approx_distinct(trace_id) / 15.0");
+      expect(rate).not.toContain("[INTERVAL");
+      expect(getPanelQuery(wrapper, "Errors")).toContain("histogram(_timestamp, '15 second')");
+      expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp, '15 second')");
+    });
+
+    it("asks the heatmap for each cell's error count, so both colour modes share one query", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      expect(getHeatmapSql(wrapper)).toContain(
+        "sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count",
       );
+    });
+
+    it("labels Rate in traces/s with two decimals", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const config = getPanel(wrapper, "Rate").config;
+      expect(config.unit).toBe("custom");
+      expect(config.unit_custom).toBe("traces/s");
+      expect(config.decimals).toBe(2);
     });
 
     it("should keep approx_distinct(trace_id) in the Errors panel query in traces mode", async () => {
@@ -285,11 +318,12 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toMatch(/approx_distinct\(trace_id\)/i);
     });
 
-    it("should use count(*) FILTER for error counting in the Rate panel query in spans mode", async () => {
+    it("plots Rate as spans per second", async () => {
+      mockSearchObj.data.datetime = { startTime: THIRTY_MIN_START, endTime: THIRTY_MIN_END };
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Rate");
-      expect(query).toContain("count(*) FILTER (WHERE span_status = 'ERROR')");
+      expect(getPanelQuery(wrapper, "Rate")).toContain("count(*) / 15.0");
+      expect(getPanel(wrapper, "Rate").config.unit_custom).toBe("spans/s");
     });
 
     it("should replace approx_distinct(trace_id) with count(*) in the Errors panel query", async () => {
@@ -307,11 +341,10 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("count(*) FILTER (WHERE span_status = 'ERROR')");
     });
 
-    it("should NOT add the root-span filter to the Duration panel in spans mode", async () => {
+    it("should NOT add the root-span filter to the heatmap query in spans mode", async () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).not.toContain("reference_parent_span_id");
+      expect(getHeatmapSql(wrapper)).not.toContain("reference_parent_span_id");
     });
   });
 
@@ -330,15 +363,25 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("service_name = 'api'");
     });
 
-    it("should include the filter prop in the Duration panel WHERE clause", async () => {
+    it("should include the filter prop in the heatmap WHERE clause", async () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "service_name = 'api'";
       wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain("service_name = 'api'");
+      expect(getHeatmapSql(wrapper)).toContain("WHERE service_name = 'api' GROUP BY");
+    });
+
+    it("should decode span_kind labels in the heatmap WHERE clause", async () => {
+      wrapper.unmount();
+      mockSearchObj.data.editorValue = "span_kind='Server'";
+      wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      expect(getHeatmapSql(wrapper)).toContain("span_kind='2'");
+      expect(getHeatmapSql(wrapper)).not.toContain("span_kind='Server'");
     });
 
     it("should include the filter prop in the Errors panel WHERE clause", async () => {
@@ -412,15 +455,14 @@ describe("TracesMetricsDashboard", () => {
       expect(query).toContain("service_name = 'api'");
     });
 
-    it("should leave non-span_kind filter unchanged in the Duration panel WHERE clause", async () => {
+    it("should leave non-span_kind filter unchanged in the heatmap WHERE clause", async () => {
       wrapper.unmount();
       mockSearchObj.data.editorValue = "service_name = 'api'";
       wrapper = mountComponent();
       await flushPromises();
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain("service_name = 'api'");
+      expect(getHeatmapSql(wrapper)).toContain("service_name = 'api'");
     });
 
     it("should convert span_kind label case-insensitively in the Errors panel", async () => {
@@ -450,8 +492,41 @@ describe("TracesMetricsDashboard", () => {
       await wrapper.vm.loadDashboard();
       await flushPromises();
       const query = getPanelQuery(wrapper, "Rate");
-      expect(query).toContain("duration >= 1000 and duration <= 5000");
+      expect(query).toContain("duration >= 1000 and duration < 5000");
       expect(query).toContain("env = 'prod'");
+    });
+  });
+
+  describe("latency heatmap", () => {
+    it("drops the Duration panel and gives Rate and Errors half the strip each", async () => {
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const panels: any[] = wrapper.vm.dashboardData.tabs[0].panels;
+      expect(panels.map((p) => p.title)).toEqual(["Rate", "Errors"]);
+      expect(panels.map((p) => [p.layout.x, p.layout.w])).toEqual([
+        [0, 24],
+        [24, 24],
+      ]);
+    });
+
+    it("passes the heatmap a request over the search range", async () => {
+      mockSearchObj.data.datetime = { startTime: 3_000_000, endTime: 4_000_000 };
+      await wrapper.vm.loadDashboard();
+      await flushPromises();
+      const heatmap = wrapper.findComponent({ name: "TracesLatencyHeatmap" });
+      expect(heatmap.props("request")).toEqual({
+        sql: getHeatmapSql(wrapper),
+        startTime: 3_000_000,
+        endTime: 4_000_000,
+      });
+    });
+
+    it("builds a fresh request object on every loadDashboard", async () => {
+      await wrapper.vm.loadDashboard();
+      const first = wrapper.vm.heatmapRequest;
+      await wrapper.vm.loadDashboard();
+      expect(wrapper.vm.heatmapRequest).not.toBe(first);
+      expect(wrapper.vm.heatmapRequest).toEqual(first);
     });
   });
 
@@ -468,13 +543,11 @@ describe("TracesMetricsDashboard", () => {
       expect(query).not.toContain("[STREAM_NAME]");
     });
 
-    it("should replace [STREAM_NAME] placeholder in Duration panel", async () => {
+    it("should query the selected stream in the heatmap", async () => {
       mockSearchObj.data.stream.selectedStream.value = "prod_traces";
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).toContain('"prod_traces"');
-      expect(query).not.toContain("[STREAM_NAME]");
+      expect(getHeatmapSql(wrapper)).toContain('FROM "prod_traces"');
     });
 
     it("should replace [STREAM_NAME] placeholder in Errors panel", async () => {
@@ -537,38 +610,6 @@ describe("TracesMetricsDashboard", () => {
       expect(emitted![0][0]).toEqual({ start: 1_000, end: 2_000 });
     });
 
-    it("should emit filters-updated when emitFiltersToQueryEditor is called with a duration range filter", async () => {
-      mockMetricsRangeFilters.set("panel-dur", {
-        panelTitle: "Duration",
-        start: 200,
-        end: 800,
-        timeStart: null,
-        timeEnd: null,
-      });
-      wrapper.vm.emitFiltersToQueryEditor();
-      await flushPromises();
-      const emitted = wrapper.emitted("filters-updated");
-      expect(emitted).toBeTruthy();
-      const filters: string[] = emitted![0][0] as string[];
-      expect(filters.some((f) => f.includes("duration"))).toBe(true);
-    });
-
-    it("should emit filters-updated with an error filter entry when an Errors range is present", async () => {
-      mockMetricsRangeFilters.set("panel-err", {
-        panelTitle: "Errors",
-        start: -1,
-        end: -1,
-        timeStart: 1000,
-        timeEnd: 2000,
-      });
-      wrapper.vm.emitFiltersToQueryEditor();
-      await flushPromises();
-      const emitted = wrapper.emitted("filters-updated");
-      expect(emitted).toBeTruthy();
-      const filters: string[] = emitted![0][0] as string[];
-      expect(filters).toContain("span_status = 'ERROR'");
-    });
-
     it("should NOT emit time-range-selected when onDataZoom is called without start/end", async () => {
       wrapper.vm.onDataZoom({
         start: 0,
@@ -582,85 +623,451 @@ describe("TracesMetricsDashboard", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Insights button — driven via the exposed openUnifiedAnalysisDashboard API
-  // (the insights button DOM element was removed from the template; the
-  //  function is invoked by the parent via defineExpose)
-  // -------------------------------------------------------------------------
-  describe("insights button", () => {
-    it("should open the analysis dashboard when openUnifiedAnalysisDashboard is called", async () => {
-      wrapper.vm.openUnifiedAnalysisDashboard();
-      await flushPromises();
-      expect(wrapper.vm.showAnalysisDashboard).toBe(true);
+  describe("heatmap selection", () => {
+    const S = 1_000_000;
+    const T = Date.UTC(2026, 9, 6, 10, 2, 0) * 1000;
+    const band = "duration >= '100ms' and duration < '500ms'";
+    const selection = (overrides: Record<string, unknown> = {}) => ({
+      timeStartUs: T,
+      timeEndUs: T + 40 * S,
+      durationLoUs: 100_000,
+      durationHiUs: 500_000,
+      ...overrides,
+    });
+    const durationEntry = () =>
+      [...mockMetricsRangeFilters.values()].find((f: any) => f.panelTitle === "Duration");
+
+    // Stands in for the picker, which applies the emitted range a tick after the emit.
+    const mountApplying = (applied: { startTime: number; endTime: number }) => {
+      wrapper.unmount();
+      wrapper = mountComponent({
+        onTimeRangeSelected: () =>
+          queueMicrotask(() => {
+            mockSearchObj.data.datetime = applied;
+          }),
+      });
+    };
+
+    it("emits instants the picker lands exactly on, whatever the browser zone", async () => {
+      const pinnedTz = process.env.TZ;
+      process.env.TZ = "America/New_York";
+      try {
+        mockStore.state.timezone = "Asia/Kolkata";
+        await wrapper.vm.onHeatmapSelect(selection());
+        const { start, end } = wrapper.emitted("time-range-selected")![0][0] as any;
+        // The picker formats with browser-local getters and parses that wall clock in the app zone.
+        const picked = (ms: number) => {
+          const d = new Date(ms);
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const text = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          return convertToUtcTimestamp(text, "Asia/Kolkata");
+        };
+        expect(new Date(T / 1000).getTimezoneOffset()).not.toBe(0);
+        expect(picked(start)).toBe(T);
+        expect(picked(end)).toBe(T + 40 * S);
+      } finally {
+        process.env.TZ = pinnedTz;
+      }
     });
 
-    it("should render TracesAnalysisDashboard after openUnifiedAnalysisDashboard is called", async () => {
-      wrapper.vm.openUnifiedAnalysisDashboard();
-      await flushPromises();
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
-      expect(analysisDashboard.exists()).toBe(true);
+    it("never hands the picker an empty range for a final column clamped mid-second", async () => {
+      // Final column 10:02:00–10:02:10 with the search ending at 10:02:00.437.
+      await wrapper.vm.onHeatmapSelect(selection({ timeEndUs: T + 437_000 }));
+      const { start, end } = wrapper.emitted("time-range-selected")![0][0] as any;
+      // The picker keeps whole seconds only.
+      const appliedStart = Math.floor(start / 1000);
+      const appliedEnd = Math.floor(end / 1000);
+      expect(appliedEnd).toBeGreaterThan(appliedStart);
+      expect(end).toBe(T / 1000 + 1000);
     });
 
-    it("should render it full page, teleported into the traces drill-down target", async () => {
-      wrapper.vm.openUnifiedAnalysisDashboard();
-      await flushPromises();
-      const teleport = wrapper.find("teleport-stub");
-      expect(teleport.attributes("to")).toBe("#traces-drill-down-page");
-      const analysisDashboard = wrapper.findComponent('[data-test="traces-analysis-dashboard"]');
-      expect(analysisDashboard.props("fullPage")).toBe(true);
+    it("rounds a mid-second clamped start down to the whole second", async () => {
+      await wrapper.vm.onHeatmapSelect(selection({ timeStartUs: T + 437_000 }));
+      expect((wrapper.emitted("time-range-selected")![0][0] as any).start).toBe(T / 1000);
     });
 
-    it("should unmount the analysis dashboard when it emits close", async () => {
-      wrapper.vm.openUnifiedAnalysisDashboard();
-      await flushPromises();
-      wrapper.findComponent('[data-test="traces-analysis-dashboard"]').vm.$emit("close");
-      await flushPromises();
-      expect(wrapper.find("teleport-stub").exists()).toBe(false);
-      expect(wrapper.vm.showAnalysisDashboard).toBe(false);
+    it("stores the Duration entry with the range the picker applied", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      mockSearchObj.meta.searchMode = "spans";
+      await wrapper.vm.onHeatmapSelect(selection());
+      expect(durationEntry()).toEqual({
+        panelTitle: "Duration",
+        start: 100_000,
+        end: 500_000,
+        timeStart: T,
+        timeEnd: T + 40 * S,
+        appliedStart: T,
+        appliedEnd: T + 40 * S,
+        baselineFilter: "service_name = 'a'",
+        stream: "default",
+        searchMode: "spans",
+      });
     });
 
-    it("should close the analysis dashboard when a new search starts", async () => {
-      wrapper.vm.openUnifiedAnalysisDashboard();
+    it("emits exactly one editor-filter-set with the composed filter and no filters-updated", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      expect(wrapper.emitted("editor-filter-set")).toEqual([[`(service_name = 'a') and ${band}`]]);
+      expect(wrapper.emitted("filters-updated")).toBeUndefined();
+    });
+
+    it("keeps a user duration condition and intersects the band with it", async () => {
+      mockSearchObj.data.editorValue = "duration >= '1ms'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      expect(wrapper.emitted("editor-filter-set")![0][0]).toBe(`(duration >= '1ms') and ${band}`);
+    });
+
+    it("stores a lo of 0 as a null start", async () => {
+      await wrapper.vm.onHeatmapSelect(selection({ durationLoUs: 0 }));
+      expect(durationEntry()!.start).toBeNull();
+      expect(durationEntry()!.end).toBe(500_000);
+    });
+
+    it("restores the baseline text exactly for a full-height box", async () => {
+      mockSearchObj.data.editorValue = "a = '1'  or b = '2'";
+      await wrapper.vm.onHeatmapSelect(selection({ durationLoUs: 0, durationHiUs: null }));
+      expect(durationEntry()!.start).toBeNull();
+      expect(durationEntry()!.end).toBeNull();
+      expect(wrapper.emitted("editor-filter-set")![0][0]).toBe("a = '1'  or b = '2'");
+    });
+
+    it("gives Drill down the applied end when the picker drops the box's milliseconds", async () => {
+      const appliedEnd = T + 30 * S;
+      mountApplying({ startTime: T, endTime: appliedEnd });
+      await wrapper.vm.onHeatmapSelect(selection({ timeEndUs: appliedEnd + 437_000 }));
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+      wrapper.vm.openComparison();
+      expect(wrapper.vm.comparisonSelection.windowEndUs).toBe(appliedEnd);
+      expect(durationEntry()!.timeEnd).toBe(appliedEnd + 437_000);
+    });
+
+    it("stores the raw editor text, OR and parentheses included, without the band", async () => {
+      const raw = "(service_name = 'a' or duration >= '1ms') and span_kind = 'Server'";
+      mockSearchObj.data.editorValue = raw;
+      await wrapper.vm.onHeatmapSelect(selection());
+      expect(durationEntry()!.baselineFilter).toBe(raw);
+      expect(durationEntry()!.baselineFilter).not.toContain("100ms");
+    });
+
+    it("carries the first box's baseline and original range into a refinement box", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+
+      await wrapper.vm.onHeatmapSelect(
+        selection({ timeStartUs: T + 10 * S, timeEndUs: T + 20 * S, durationLoUs: 200_000 }),
+      );
+
+      expect(durationEntry()!.baselineFilter).toBe("service_name = 'a'");
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+      });
+      expect(wrapper.emitted("editor-filter-set")![1][0]).toBe(
+        "(service_name = 'a') and duration >= '200ms' and duration < '500ms'",
+      );
+    });
+
+    it("re-snapshots the baseline and range when the editor was edited after the first box", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      const edited = `${wrapper.emitted("editor-filter-set")![0][0]} and span_kind = 'Server'`;
+      mockSearchObj.data.editorValue = edited;
+      // The edit was searched, which reloads the charts over the box's range.
+      await wrapper.vm.loadDashboard();
+
+      await wrapper.vm.onHeatmapSelect(
+        selection({ timeStartUs: T + 10 * S, timeEndUs: T + 20 * S, durationLoUs: 200_000 }),
+      );
+
+      expect(durationEntry()!.baselineFilter).toBe(edited);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: T,
+        endTime: T + 40 * S,
+      });
+      expect(wrapper.emitted("editor-filter-set")![1][0]).toBe(
+        `(${edited}) and duration >= '200ms' and duration < '500ms'`,
+      );
+    });
+
+    const brush = (title: "Rate" | "Errors", start = 1_000, end = 2_000) =>
+      wrapper.vm.onDataZoom({ start, end, data: { id: `panel-${title}`, title } });
+    const entryOf = (title: string) =>
+      [...mockMetricsRangeFilters.values()].find((f: any) => f.panelTitle === title);
+
+    it("stores an Errors brush with what it applied and writes the error term over the baseline", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      mockSearchObj.meta.searchMode = "spans";
+      await brush("Errors");
+      expect(entryOf("Errors")).toEqual({
+        panelTitle: "Errors",
+        start: null,
+        end: null,
+        timeStart: T,
+        timeEnd: T + 40 * S,
+        appliedStart: T,
+        appliedEnd: T + 40 * S,
+        baselineFilter: "service_name = 'a'",
+        stream: "default",
+        searchMode: "spans",
+      });
+      expect(wrapper.emitted("editor-filter-set")).toEqual([
+        ["(service_name = 'a') and span_status = 'ERROR'"],
+      ]);
+      expect(wrapper.emitted("filters-updated")).toBeUndefined();
+    });
+
+    it("leaves the editor text unchanged for a Rate brush, which selects time only", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await brush("Rate");
+      expect(wrapper.emitted("editor-filter-set")).toEqual([["service_name = 'a'"]]);
+      expect(entryOf("Rate")!.baselineFilter).toBe("service_name = 'a'");
+    });
+
+    it("hands the picker a brush's own values but converts a box's instants to the app zone", async () => {
+      const pinnedTz = process.env.TZ;
+      process.env.TZ = "UTC";
+      try {
+        mockStore.state.timezone = "Asia/Kolkata";
+        await brush("Rate", T / 1000, T / 1000 + 40_000);
+        expect(wrapper.emitted("time-range-selected")![0][0]).toEqual({
+          start: T / 1000,
+          end: T / 1000 + 40_000,
+        });
+        await wrapper.vm.onHeatmapSelect(selection());
+        const boxRange = wrapper.emitted("time-range-selected")![1][0] as any;
+        expect(boxRange.start).toBe(T / 1000 + 5.5 * 3600 * 1000);
+        expect(boxRange.end).toBe(T / 1000 + 40_000 + 5.5 * 3600 * 1000);
+      } finally {
+        process.env.TZ = pinnedTz;
+      }
+    });
+
+    it("takes the current editor text, error term included, as a box's baseline after an Errors brush", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await brush("Errors");
+      const errorsText = wrapper.emitted("editor-filter-set")![0][0] as string;
+      mockSearchObj.data.editorValue = errorsText;
+      // Live mode: the brush's search reloads the charts over the brushed range.
+      await wrapper.vm.loadDashboard();
+
+      await wrapper.vm.onHeatmapSelect(selection());
+
+      expect(durationEntry()!.baselineFilter).toBe(errorsText);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: T,
+        endTime: T + 40 * S,
+      });
+      const boxText = wrapper.emitted("editor-filter-set")![1][0] as string;
+      expect(boxText).toContain("span_status = 'ERROR'");
+      expect(boxText).toContain(band);
+    });
+
+    it("snapshots the range the charts show, not the picker's, for a brush after an unsearched box", async () => {
+      // Manual mode: the box moves the picker, but the charts still show the range of the last search.
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      await wrapper.vm.onHeatmapSelect(selection());
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+      expect(mockSearchObj.data.datetime).toEqual({ startTime: T, endTime: T + 40 * S });
+
+      await brush("Rate");
+
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toEqual({
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+      });
+    });
+
+    it("keeps the band in the baseline of a brush drawn after a box", async () => {
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = "service_name = 'a'";
+      await wrapper.vm.onHeatmapSelect(selection());
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")![0][0] as string;
+
+      await brush("Rate");
+
+      expect(entryOf("Rate")!.baselineFilter).toContain(band);
+      expect(entryOf("Duration")).toBeUndefined();
+      expect(wrapper.emitted("editor-filter-set")![1][0]).toContain(band);
+    });
+  });
+
+  describe("openComparison", () => {
+    const S = 1_000_000;
+    const T = Date.UTC(2026, 9, 6, 10, 2, 0) * 1000;
+    const R = { startTime: 1_000_000, endTime: 2_000_000 };
+    const raw = "(service_name = 'a' or duration >= '1ms') and span_kind = 'Server'";
+    const stub = () => wrapper.findComponent({ name: "TracesComparison" });
+
+    // Stands in for the picker, which applies the emitted range a tick after the emit.
+    const mountApplying = (applied: { startTime: number; endTime: number }) => {
+      wrapper.unmount();
+      wrapper = mountComponent({
+        onTimeRangeSelected: () =>
+          queueMicrotask(() => {
+            mockSearchObj.data.datetime = applied;
+          }),
+      });
+    };
+    const box = () =>
+      wrapper.vm.onHeatmapSelect({
+        timeStartUs: T,
+        timeEndUs: T + 40 * S,
+        durationLoUs: 100_000,
+        durationHiUs: 500_000,
+      });
+    const brush = (title: "Rate" | "Errors") =>
+      wrapper.vm.onDataZoom({ start: 1_000, end: 2_000, data: { id: `panel-${title}`, title } });
+    const showSelection = () => {
+      mockSearchObj.data.editorValue = wrapper.emitted("editor-filter-set")!.at(-1)![0] as string;
+    };
+
+    beforeEach(() => {
+      vi.mocked(parseDurationWhereClause).mockImplementation((f: string) =>
+        f.replace("'1ms'", "1000"),
+      );
+      mountApplying({ startTime: T, endTime: T + 40 * S });
+      mockSearchObj.data.editorValue = raw;
+    });
+
+    afterEach(() => {
+      vi.mocked(parseDurationWhereClause).mockImplementation((f: string) => f);
+    });
+
+    it("passes a current box as a duration selection with the decoded pre-box filter", async () => {
+      await box();
+      showSelection();
+      wrapper.vm.openComparison();
       await flushPromises();
+      expect(stub().props("selection")).toEqual({
+        kind: "duration",
+        windowStartUs: T,
+        windowEndUs: T + 40 * S,
+        rangeStartUs: R.startTime,
+        rangeEndUs: R.endTime,
+        durationLoUs: 100_000,
+        durationHiUs: 500_000,
+        filter: "(service_name = 'a' or duration >= 1000) and span_kind='2'",
+      });
+      expect(stub().props("streamName")).toBe("my_traces_stream");
+    });
+
+    it.each([
+      ["Errors", "errors"],
+      ["Rate", "rate"],
+    ] as const)("passes a current %s brush as a %s selection", async (title, kind) => {
+      await brush(title);
+      showSelection();
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("selection")).toMatchObject({
+        kind,
+        windowStartUs: T,
+        windowEndUs: T + 40 * S,
+        rangeStartUs: R.startTime,
+        rangeEndUs: R.endTime,
+        durationLoUs: null,
+        durationHiUs: null,
+      });
+    });
+
+    it("passes an empty filter for a box drawn from an empty editor", async () => {
+      mockSearchObj.data.editorValue = "";
+      await box();
+      showSelection();
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("selection").filter).toBe("");
+    });
+
+    it("passes no selection without an entry", async () => {
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().exists()).toBe(true);
+      expect(stub().props("selection")).toBeNull();
+    });
+
+    it("passes no selection when an unsearched edit made the entry stale", async () => {
+      await box();
+      showSelection();
+      mockSearchObj.data.editorValue = `${mockSearchObj.data.editorValue} and http_method = 'GET'`;
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(stub().props("selection")).toBeNull();
+    });
+
+    it("teleports the page into the traces drill-down target", async () => {
+      wrapper.vm.openComparison();
+      await flushPromises();
+      expect(wrapper.find("teleport-stub").attributes("to")).toBe("#traces-drill-down-page");
+    });
+
+    it("unmounts the page on close and when a new search starts, not when one finishes", async () => {
+      wrapper.vm.openComparison();
+      await flushPromises();
+      stub().vm.$emit("close");
+      await flushPromises();
+      expect(stub().exists()).toBe(false);
 
       mockSearchObj.loading = true;
       await flushPromises();
-
-      expect(wrapper.vm.showAnalysisDashboard).toBe(false);
-      expect(wrapper.find("teleport-stub").exists()).toBe(false);
-    });
-
-    it("should keep the analysis dashboard open when a search finishes", async () => {
-      mockSearchObj.loading = true;
+      wrapper.vm.openComparison();
       await flushPromises();
-      wrapper.vm.openUnifiedAnalysisDashboard();
-      await flushPromises();
-
       mockSearchObj.loading = false;
       await flushPromises();
+      expect(stub().exists()).toBe(true);
 
-      expect(wrapper.vm.showAnalysisDashboard).toBe(true);
+      mockSearchObj.loading = true;
+      await flushPromises();
+      expect(stub().exists()).toBe(false);
     });
 
-    it("should set defaultAnalysisTab to volume when no brush selection exists", async () => {
-      wrapper.vm.openUnifiedAnalysisDashboard();
+    it("restores the pre-selection range, clears the selection and runs the composed filter after the picker applies", async () => {
+      const applied = [{ startTime: T, endTime: T + 40 * S }, R];
+      let datetimeAtRun: unknown = null;
+      wrapper.unmount();
+      wrapper = mountComponent({
+        onTimeRangeSelected: () => {
+          const next = applied.shift()!;
+          // The picker applies the range in a watcher before the tick resolves.
+          queueMicrotask(() => {
+            mockSearchObj.data.datetime = next;
+          });
+        },
+        onEditorFilterRun: () => {
+          datetimeAtRun = { ...mockSearchObj.data.datetime };
+        },
+      });
+      await box();
+      showSelection();
+      wrapper.vm.openComparison();
       await flushPromises();
-      expect(wrapper.vm.defaultAnalysisTab).toBe("volume");
+
+      await wrapper.vm.onComparisonApply("http_method = 'GET'");
+
+      expect(wrapper.emitted("time-range-selected")!.at(-1)![0]).toEqual({
+        start: instantToPickerMs(Math.floor(R.startTime / S) * 1000, "UTC"),
+        end: instantToPickerMs(Math.ceil(R.endTime / S) * 1000, "UTC"),
+      });
+      expect(mockMetricsRangeFilters.size).toBe(0);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toBeNull();
+      expect(wrapper.emitted("editor-filter-run")).toEqual([[`(${raw}) and http_method = 'GET'`]]);
+      expect(datetimeAtRun).toEqual(R);
     });
 
-    it("should pass the decoded filter, not the raw display string, as baseFilter", async () => {
-      // Regression test: the query editor shows human-readable duration literals
-      // (e.g. duration <= '1.64s') which must be decoded to raw SQL values before
-      // reaching TracesAnalysisDashboard's generated queries.
-      vi.mocked(parseDurationWhereClause).mockReturnValueOnce("duration <= 1640000");
-      mockSearchObj.data.editorValue = "duration <= '1.64s'";
+    it("applies a filter emitted by the comparison page", async () => {
+      await box();
+      showSelection();
+      wrapper.vm.openComparison();
       await flushPromises();
-
-      wrapper.vm.openUnifiedAnalysisDashboard();
+      stub().vm.$emit("apply-filter", "a = '1'");
       await flushPromises();
-
-      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
-      expect(analysisDashboard.attributes("basefilter")).toBe("duration <= 1640000");
+      expect(wrapper.emitted("editor-filter-run")).toEqual([[`(${raw}) and a = '1'`]]);
     });
   });
 
@@ -685,8 +1092,12 @@ describe("TracesMetricsDashboard", () => {
       expect(typeof wrapper.vm.rangeFiltersVersion).toBe("number");
     });
 
-    it("should expose the openUnifiedAnalysisDashboard method", () => {
-      expect(typeof wrapper.vm.openUnifiedAnalysisDashboard).toBe("function");
+    it("should expose the openComparison method", () => {
+      expect(typeof wrapper.vm.openComparison).toBe("function");
+    });
+
+    it("should expose clearOriginalTimeRange", () => {
+      expect(Object.keys(wrapper.vm.$.exposed)).toContain("clearOriginalTimeRange");
     });
   });
 
@@ -709,7 +1120,40 @@ describe("TracesMetricsDashboard", () => {
       });
       const filters = wrapper.vm.getBaseFilters();
       expect(filters).toHaveLength(1);
-      expect(filters[0]).toBe("duration >= 100 and duration <= 500");
+      expect(filters[0]).toBe("duration >= 100 and duration < 500");
+    });
+
+    it("should write only the upper bound for an end-only Duration range", () => {
+      mockMetricsRangeFilters.set("panel-3", {
+        panelTitle: "Duration",
+        start: null,
+        end: 1000,
+        timeStart: null,
+        timeEnd: null,
+      });
+      expect(wrapper.vm.getBaseFilters()).toEqual(["duration < 1000"]);
+    });
+
+    it("should write only the lower bound for a start-only Duration range", () => {
+      mockMetricsRangeFilters.set("panel-3", {
+        panelTitle: "Duration",
+        start: 1000,
+        end: null,
+        timeStart: null,
+        timeEnd: null,
+      });
+      expect(wrapper.vm.getBaseFilters()).toEqual(["duration >= 1000"]);
+    });
+
+    it("should add nothing for a Duration range with both bounds null", () => {
+      mockMetricsRangeFilters.set("panel-3", {
+        panelTitle: "Duration",
+        start: null,
+        end: null,
+        timeStart: 1,
+        timeEnd: 2,
+      });
+      expect(wrapper.vm.getBaseFilters()).toEqual([]);
     });
 
     it("should include span_status = 'ERROR' when filter prop contains it", () => {
@@ -795,7 +1239,7 @@ describe("TracesMetricsDashboard", () => {
       mockSearchObj.data.editorValue = "span_kind='Internal'";
       wrapper = mountComponent();
       const filters = wrapper.vm.getBaseFilters();
-      expect(filters).toContain("duration >= 100 and duration <= 500");
+      expect(filters).toContain("duration >= 100 and duration < 500");
       expect(filters).toContain("span_kind='1'");
       expect(filters.join(" ")).not.toContain("span_kind='Internal'");
     });
@@ -945,12 +1389,12 @@ describe("TracesMetricsDashboard", () => {
       expect(wrapper.emitted("time-range-selected")).toBeFalsy();
     });
 
-    it("should produce a Duration query with no WHERE clause in spans mode when no filters exist", async () => {
+    it("should produce a heatmap query with no WHERE clause in spans mode when no filters exist", async () => {
       mockSearchObj.meta.searchMode = "spans";
       await wrapper.vm.loadDashboard();
       await flushPromises();
-      const query = getPanelQuery(wrapper, "Duration");
-      expect(query).not.toMatch(/WHERE\b/);
+      expect(getHeatmapSql(wrapper)).toContain("histogram(_timestamp, ");
+      expect(getHeatmapSql(wrapper)).not.toMatch(/WHERE\b/);
     });
   });
 });

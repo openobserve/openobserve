@@ -20,7 +20,9 @@
 //! `o2-enterprise` (which depends on `config`, not on the top-level
 //! `openobserve` crate) can use the same primitives.
 
-pub use config::utils::ssrf_guard::{SsrfDnsResolver, SsrfGuard, build_safe_client};
+pub use config::utils::ssrf_guard::{
+    SsrfDnsResolver, SsrfGuard, build_safe_client, build_safe_destination_client,
+};
 
 #[cfg(test)]
 mod tests {

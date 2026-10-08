@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
-              @drill-down="searchResultRef?.openUnifiedAnalysisDashboard()"
+              @drill-down="searchResultRef?.openComparison()"
             />
           </div>
         </template>
@@ -205,7 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
-                        @metrics:filters-updated="onMetricsFiltersUpdated"
+                        @metrics:editor-filter-set="onMetricsEditorFilterSet"
+                        @metrics:editor-filter-run="onMetricsEditorFilterRun"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
@@ -312,6 +313,7 @@ import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -386,7 +388,6 @@ const correlationFilters = useCorrelationFilters({
 });
 correlationFilters.watchQuery();
 
-let refreshIntervalID = 0;
 const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
@@ -596,10 +597,13 @@ const getDefaultRequest = () => {
 
 function resolveSearchWindow(reuseLastWindow: boolean) {
   const lastQuery = searchObj.data.queryPayload?.query;
-  if (reuseLastWindow && lastQuery?.start_time && lastQuery?.end_time) {
+  const datetime = searchObj.data.datetime;
+  // An unsearched box or brush moves the picker with the editor, so a sort takes that window, never the old one.
+  const pickerMoved =
+    datetime.startTime !== lastQuery?.start_time || datetime.endTime !== lastQuery?.end_time;
+  if (reuseLastWindow && !pickerMoved && lastQuery?.start_time && lastQuery?.end_time) {
     return { startTime: lastQuery.start_time, endTime: lastQuery.end_time };
   }
-  const datetime = searchObj.data.datetime;
   if (datetime.type !== "relative") return cloneDeep(datetime);
 
   const timestamps: any = getConsumableRelativeTime(datetime.relativeTimePeriod);
@@ -782,6 +786,25 @@ function buildEditorFilter() {
   return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
 }
 
+// Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
+const dropStaleSelection = () => {
+  const filters = searchObj.meta.metricsRangeFilters;
+  let dropped = false;
+  for (const [id, entry] of filters) {
+    const current = isRangeSelectionCurrent(entry, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue,
+    });
+    if (current) continue;
+    filters.delete(id);
+    dropped = true;
+  }
+  if (dropped) searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
+};
+
 async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
@@ -830,7 +853,11 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    if (!isPagination) submittedFilter = buildEditorFilter();
+    // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
+    if (!isPagination) {
+      submittedFilter = buildEditorFilter();
+      dropStaleSelection();
+    }
     const combinedFilter = submittedFilter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
@@ -1324,7 +1351,6 @@ onBeforeMount(async () => {
 
 onDeactivated(() => {
   cleanupContextProvider();
-  clearInterval(refreshIntervalID);
 });
 
 onUnmounted(() => {
@@ -1449,25 +1475,18 @@ const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
-// Handler for metrics dashboard brush selection filters
-// Simply replace the query editor content with metrics filters
-// User can manually add their own filters before clicking "Run Query"
-const onMetricsFiltersUpdated = (filters: string[]) => {
-  const allFilters = [...filters];
-  // Add error filter only if span_status='ERROR' is currently active and not already present
-  if (showErrorOnly.value && !allFilters.includes("span_status = 'ERROR'")) {
-    allFilters.push("span_status = 'ERROR'");
-  }
-  // Apply each filter term independently so replace-or-append works per field.
-  // applyFilters owns the single trigger: it emits `searchdata` (one search) only
-  // in live mode. The brush also sets a time range programmatically, which the
-  // DateTime picker stamps userChangedValue=false, so it never adds a competing
-  // search — this filter apply is the sole trigger.
-  if (searchBarRef.value?.applyFilters) {
-    searchBarRef.value.applyFilters(allFilters);
-  } else {
-    console.warn("SearchBar not ready for filter application");
-  }
+// A selection replaces the whole editor text; the programmatic date change never searches, so this is the one search.
+const onMetricsEditorFilterSet = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
+};
+
+// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+const onMetricsEditorFilterRun = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -1526,9 +1545,8 @@ watch(
 // Handler for Reset Filters button
 // Clears all filters including brush selections
 const onFiltersReset = () => {
-  // Brush selections already cleared in SearchBar.vue
-  // metricsRangeFilters.clear() was called
-  // No additional action needed here
+  // SearchBar already cleared the map; a later baseline-only Drill down must use the current range.
+  searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
 const isStreamSelected = computed(() => {
@@ -1839,10 +1857,6 @@ const searchData = () => {
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
 
-  // Clear brush selections when running query
-  // The filters are now part of the query, so brush selections should be cleared
-  searchObj.meta.metricsRangeFilters.clear();
-
   runQueryFn();
 
   analytics.track("Button Click", {
@@ -1859,17 +1873,15 @@ const searchData = () => {
 };
 
 const getMoreData = () => {
-  if (searchObj.meta.refreshInterval == 0) {
-    getQueryData(true);
+  getQueryData(true);
 
-    analytics.track("Button Click", {
-      button: "Get More Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("Button Click", {
+    button: "Get More Data",
+    user_org: store.state.selectedOrganization.identifier,
+    user_id: store.state.userInfo.email,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    page: "Search Logs",
+  });
 };
 
 const onChangeStream = async () => {
