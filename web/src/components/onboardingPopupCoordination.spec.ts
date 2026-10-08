@@ -37,7 +37,7 @@ vi.mock("@/aws-exports", () => ({
   default: mockConfig,
 }));
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import ConnectDataSourcePopup from "./ConnectDataSourcePopup.vue";
 import CommunitySlackInvite from "./CommunitySlackInvite.vue";

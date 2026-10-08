@@ -5,18 +5,17 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestTraces } = require('../utils/trace-ingestion.js');
 
-// TracesMetricsDashboard.emitFiltersToQueryEditor writes duration filters as human-readable strings.
-const DURATION_FILTER_PATTERN = /duration\s*(>=|<=)\s*'[\d.]+(us|ms|s|m)'/;
-// The Insights query fails server-side when that string is not decoded back to µs.
+// A heatmap box writes its half-open band with exact 1-2-5 bounds.
+const DURATION_FILTER_PATTERN = /duration\s*(>=|<)\s*'\d+(us|ms|s)'/;
+// The Drill down query fails server-side when that string is not decoded back to µs.
 const CAST_ERROR_PATTERN = /Cannot cast string|simplify_expressions|Arrow error/i;
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
-// Insights tab slugs from TracesAnalysisDashboard.vue.
-const ANALYSIS_TABS = ['volume', 'error', 'duration'];
 
 test.describe("Traces Charts testcases", () => {
   let pm;
 
   // The Errors panel plots an empty series unless the window holds at least one error span.
+  // Seeded spans are stamped "now" in the shared `default` stream, so they age out and need no teardown.
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
     const context = await browser.newContext({
@@ -109,25 +108,13 @@ test.describe("Traces Charts testcases", () => {
     expect(query, 'Duration zoom must write a duration filter into the editor')
       .toMatch(DURATION_FILTER_PATTERN);
 
-    await pm.tracesPage.clickInsightsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-    await page.waitForTimeout(5000);
+    // The comparison decodes the filter too; a cast failure would land it in its error state.
+    const state = await pm.tracesPage.openComparison();
+    const text = await page.locator(state).innerText();
+    expect(text, 'Drill down must not fail casting the duration filter').not.toMatch(CAST_ERROR_PATTERN);
+    expect(state, 'Drill down must compare the box').toBe(pm.tracesPage.comparisonPage);
 
-    // The cast error hit every dimension panel on every tab, so all three are checked.
-    // A zoomed band can match nothing, so this asserts on errors, not on chart counts.
-    for (const tab of ANALYSIS_TABS) {
-      const states = await pm.tracesPage.openAnalysisTab(tab);
-      testLogger.info(`Insights ${tab} tab panels after duration zoom`, states);
-
-      expect(states.errorText, `${tab} tab must not fail casting the duration filter`)
-        .not.toMatch(CAST_ERROR_PATTERN);
-      expect(states.errors, `${tab} tab must render no errored dimension panel`).toBe(0);
-      // A narrow zoom can legitimately leave a dimension empty; an unresolved panel cannot.
-      expect(states.charts + states.noData, `${tab} tab must resolve every panel`)
-        .toBe(states.panels);
-    }
-
-    await pm.tracesPage.closeAnalysisDashboard();
+    await page.locator(pm.tracesPage.drillDownBackButton).click();
   });
 
   // ─── P0 — Critical path ──────────────────────────────────────────────────────
@@ -182,40 +169,10 @@ test.describe("Traces Charts testcases", () => {
     await searchAndShowCharts();
 
     expect(await pm.tracesPage.isInsightsButtonVisible(), 'Insights button must be visible').toBeTruthy();
-    await pm.tracesPage.clickInsightsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
+    // Without a box or brush there is nothing to compare, so the page asks for a selection.
+    expect(await pm.tracesPage.openComparison()).toBe(pm.tracesPage.comparisonNoSelection);
 
-    expect(await pm.tracesPage.isAnalysisDashboardVisible(), 'Insights dashboard must open').toBeTruthy();
-
-    const drawerText = await pm.tracesPage.getAnalysisDashboardText();
-    expect(drawerText, 'Insights must open without a query error').not.toMatch(CAST_ERROR_PATTERN);
-
-    await pm.tracesPage.closeAnalysisDashboard();
-  });
-
-  test("P0: Insights renders a chart for every dimension on every tab", {
-    tag: ['@tracesCharts', '@traces', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-    await pm.tracesPage.clickInsightsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-    let charted = 0;
-    for (const tab of ANALYSIS_TABS) {
-      const states = await pm.tracesPage.openAnalysisTab(tab);
-      testLogger.info(`Insights ${tab} tab panels`, states);
-
-      expect(states.panels, `${tab} tab must render dimension panels`).toBeGreaterThan(0);
-      expect(states.errors, `${tab} tab panel error: ${states.errorText}`).toBe(0);
-      // The Errors tab is empty when the window holds no error spans; that is not a failure.
-      expect(states.charts + states.noData, `${tab} tab must resolve every panel`)
-        .toBe(states.panels);
-      charted += states.charts;
-    }
-    expect(charted, 'At least one dimension must chart across the three tabs').toBeGreaterThan(0);
-
-    await pm.tracesPage.closeAnalysisDashboard();
+    await page.locator(pm.tracesPage.drillDownBackButton).click();
   });
 
   // ─── P1 — Functional ─────────────────────────────────────────────────────────
@@ -262,6 +219,9 @@ test.describe("Traces Charts testcases", () => {
     await searchAndShowCharts();
 
     await pm.tracesPage.setTimeRange('1h');
+    await expect
+      .poll(() => pm.tracesPage.getTimeRangeLabel(), { timeout: 10000 })
+      .toContain('1 Hour');
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.waitForTraceSearchResults();
 
@@ -282,6 +242,8 @@ test.describe("Traces Charts testcases", () => {
     test.skip(!badgeVisible, 'error-count badge absent — no error spans in this window');
 
     await pm.tracesPage.toggleErrorOnlyFilter();
+    expect(await pm.tracesPage.isErrorOnlyFilterActive(), 'Error-only filter must be active')
+      .toBeTruthy();
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.waitForTraceSearchResults();
 
@@ -300,7 +262,7 @@ test.describe("Traces Charts testcases", () => {
 
     await searchAndShowCharts();
 
-    await page.locator('[data-test="traces-search-mode-spans-btn"]').click();
+    await pm.tracesPage.switchToSpansMode();
     await page.waitForTimeout(3000);
 
     const rendered = await pm.tracesPage.waitForMetricsPanels();
@@ -312,26 +274,24 @@ test.describe("Traces Charts testcases", () => {
 
   // ─── P2 — Negative scenarios ─────────────────────────────────────────────────
 
-  test("P2: Charts render no panels before a stream is selected", {
+  test("P2: A full reload auto-selects the default stream instead of the no-stream state", {
     tag: ['@tracesCharts', '@traces', '@negative', '@P2', '@all']
   }, async ({ page }) => {
 
-    // A full reload drops the in-memory stream selection; a sidebar click would keep it.
+    // A full reload drops the in-memory stream selection; loadStreamLists then
+    // falls back to the `default` stream rather than leaving the page empty.
     await pm.tracesPage.navigateToTracesUrl();
     await page.waitForTimeout(3000);
 
-    await expect(
-      page.locator('[data-test="traces-no-stream-select-stream-card"]'),
-      'The no-stream state must be shown before a stream is picked'
-    ).toBeVisible({ timeout: 15000 });
+    await pm.tracesPage.expectNoStreamCardHidden(
+      'The no-stream state must not be shown when a default stream exists'
+    );
 
-    const panelCanvases = await page
-      .locator('[data-test="traces-metrics-dashboard"] [data-test-panel-title] canvas')
-      .count();
-    expect(panelCanvases, 'No RED panel may render without a stream').toBe(0);
+    const selectedStream = await pm.tracesPage.getSelectedStreamName();
+    expect(selectedStream, 'The default stream must be selected after a reload').toBe('default');
 
     const panelError = await pm.tracesPage.getMetricsPanelErrorText();
-    expect(panelError, 'An unselected stream must not surface a panel error').toBe('');
+    expect(panelError, 'The auto-selected stream must not surface a panel error').toBe('');
 
     await pm.tracesPage.expectSearchBarVisible();
   });
@@ -383,9 +343,11 @@ test.describe("Traces Charts testcases", () => {
     expect(scriptErrors, `Uncaught script errors: ${scriptErrors.join(' | ')}`).toHaveLength(0);
   });
 
-  // Skipped until o2-enterprise#2643 lands — a rejected query leaves the charts
-  // unmounted even after the editor is emptied and the search succeeds again.
-  test.skip("P0: Charts return once a rejected query is cleared (o2-enterprise#2643)", {
+  // Regression guard for o2-enterprise#2643: a cancelled search's late error
+  // callback used to overwrite errorMsg after a newer search already
+  // succeeded, leaving the charts unmounted forever. Fixed by guarding the
+  // error handler with the same staleness check the data handler already had.
+  test("P0: Charts return once a rejected query is cleared (o2-enterprise#2643)", {
     tag: ['@tracesCharts', '@traces', '@regression', '@P0', '@all']
   }, async ({ page }) => {
 
@@ -397,6 +359,10 @@ test.describe("Traces Charts testcases", () => {
     expect(await pm.tracesPage.isSearchErrorVisible(), 'The query must be rejected').toBeTruthy();
 
     expect(await pm.tracesPage.clearTraceQueryByKeyboard(), 'Editor must end up empty').toBeTruthy();
+    // CodeQueryEditor commits Monaco's content to the app after a 500ms debounce;
+    // clicking Run before that flushes re-submits the query it just replaced.
+    // No real user clears and clicks inside that window.
+    await page.waitForTimeout(600);
     await pm.tracesPage.runQuery();
     await pm.tracesPage.waitForTraceSearchResults();
 

@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
-          :footer-title="t('pipeline_destinations.header')"
           sorting="client"
           :default-columns="false"
           :enable-column-resize="true"
@@ -154,10 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdown>
           </template>
 
-          <template v-if="selectedDestinations.length > 0" #bottom>
-            <span class="text-text-secondary text-xs font-medium">
-              {{ selectedDestinations.length }} {{ t("alert_destinations.selected") }}
-            </span>
+          <template #selection-actions>
             <OButton
               data-test="pipeline-destination-list-delete-destinations-btn"
               variant="outline-destructive"
@@ -297,7 +293,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.url,
-        meta: { align: "left" },
+        // An endpoint URL can carry a key or password, so it never shows on hover.
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "method",
@@ -340,7 +337,6 @@ export default defineComponent({
     const showDestinationEditor = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
-    const resultTotal = ref(0);
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -394,7 +390,6 @@ export default defineComponent({
 
       const options = destinationsQuery(org, "pipeline");
       const applyRows = (list: any[]) => {
-        resultTotal.value = list.length;
         destinations.value = list;
         updateRoute();
       };
@@ -611,14 +606,6 @@ export default defineComponent({
       return filterData(destinations.value || [], filterQuery.value);
     });
 
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     const orgIdForWrites = useOrgId();
     const bulkDeleteWrite = useMutation(() => bulkDeleteDestinationsMutation(orgIdForWrites.value));
 
@@ -745,7 +732,6 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      resultTotal,
       routeTo,
       store,
       getTemplates,

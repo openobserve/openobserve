@@ -15,6 +15,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - [OFormToggleGroup](#oformtogglegroup)
 - [OTable](#otable)
 - [OTable cell renderers](#otable-cell-renderers)
+- [Cut cell text — the shared tooltip](#cut-cell-text--the-shared-tooltip)
 
 ---
 
@@ -150,6 +151,11 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - `lastRunAt` (`number | null`, default `null`) — Unix ms timestamp of the last completed query; drives the dot color and relative label
 - `loading` (boolean, default `false`) — spins the icon, disables the button, forces the idle dot
 - `disabled` (boolean, default `false`) — disables independently of loading
+- `variant` (`"ghost"` | `"outline"`, default `"ghost"`) — `outline` beside a bordered date picker in a page header
+- `layout` (`"split"` | `"inline"`, default `"split"`) — `inline` puts the age inside the button ([⟳ | 2m ago]); the age hides below md
+- `dataTest` / `shortcutId` — keep a page's own selector; show the page's refresh shortcut in the tooltip
+
+  **Every page refreshes with this button.** A page header is `DateTime` + `ORefreshButton layout="inline" variant="outline"`, the same as the dashboards list and Database Monitoring; no hand-rolled refresh button with its own "checked just now" text. When an absolute range fills the header below lg, pass `:last-run-at="null"` there so the button drops to its icon.
   **Slots:** none
   **Emits:** `click` (`MouseEvent`) — suppressed while `loading` or `disabled`
   **Example:**
@@ -313,7 +319,6 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - **Filtering** (`filterMode`: `"client"` | `"server"`, default `"client"`)
   - `globalFilter` (string) `v-model`, `globalFilterPlaceholder` (default `"Search..."`)
   - `showGlobalFilter` (boolean, default `true`) — built-in search bar
-  - `footerTitle` (string) — bold "N footerTitle" count label in the footer
 
 - **Selection** (`selection`: `"none"` | `"single"` | `"multiple"`, default `"none"`)
   - `selectedIds` (string[]) `v-model:selectedIds`
@@ -335,6 +340,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   - `loading` (default false), `streaming` (default false — pulsing incremental indicator), `error` (`string|null`), `emptyMessage`
   - `dense` (default `true`), `bordered` (default `true`), `frame` (default `false` — outer frame border), `striped` (default false)
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
+  - `cellOverflowTooltip` (default `true`) — the shared full-text tooltip on cut body cells; pass `false` for a table whose reveal is Wrap / row expansion (logs, correlated logs). See [Cut cell text](#cut-cell-text--the-shared-tooltip)
   - `fillHeight` (default `true` — set false to shrink to content), `virtualScroll` (default false, `virtualScrollItemSize` default `48`), `maxHeight`, `width`
     - Empty state: fill-height tables let the empty state fill the available
       space; non-fill-height tables reserve a `min-h-75` floor so the empty
@@ -370,6 +376,7 @@ interface OTableColumnDef<TData = any> {
     cellClass?: string;
     isName?: boolean; // primary name column (weight 500)
     format?: (value: any, row: any) => any;
+    cellOverflowTooltip?: boolean; // false = this column never shows the cut-cell tooltip (secret columns)
     [key: string]: any;
   };
 }
@@ -433,7 +440,51 @@ arrow, the rows re-order, and the order is wrong.
 - Columns: `column-order-change`, `column-visibility-change`, `update:columnSizes`
 - Virtual scroll: `scroll`, `scroll-end`
 
-**Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `bottom` (scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
+**Always supply `#error` when `error` can be set.** Without the slot, OTable falls back to a solid red banner carrying the raw server string — a different failure look on every page. Use `<template #error="{ message }"><OEmptyState preset="load-error" :description="raw(message)" @action="onRefresh()" /></template>`, with Retry wired to the page's own refresh handler.
+
+**Main slots:** `cell` (scoped `{ row, column, value, table }`), `top`, `toolbar` (inside the frame, above header), `toolbar-trailing`, `header-actions`, `selection-actions` (bulk-action buttons for the footer), `footer-note` (a footer line the pager cannot say), `pagination-bar` (a caller-drawn pager, scoped with pagination state/actions), `loading`, `loading-banner`, `empty`, `error` (`{ message }`), `expansion` (`{ row }`), `tree-warning` (`{ row }`)
+
+#### Footer
+
+**A footer is never hand-built.** Every paginated `OTable` draws the same bar, the
+same one-row height in every state: the pager ("Showing x – y of z", page size,
+page buttons) on the end edge, and on the start edge the first of these that
+applies — otherwise nothing, not even a wrapper:
+
+1. **Rows selected and `#selection-actions` provided** → "N of M selected", a
+   divider, then the slot. M is `data.length` in client mode and `totalCount` in
+   server mode, with a `+` when `totalCountExact` is false; when N exceeds M the
+   text is "N selected".
+2. **`#footer-note` provided** → the note, in the bar's small secondary text, in
+   the width left of the pager.
+
+Neither renders while the table is loading, and both live in the built-in bar:
+with `pagination="none"` or a `#pagination-bar` there is no bar, so they render
+nothing. There is **no total label** — the `footerTitle` prop and the bare row
+count are gone, and so are `#bottom` and `customPaginationBar`.
+
+- **`#selection-actions`** takes the bulk-action buttons and nothing else: no
+  wrapper, no `v-if` on the selection length, no margin / height / padding
+  classes. Every button is `size="sm"`, a destructive action comes last, and no
+  label carries a count — the bar already prints it, once.
+- **`#footer-note`** is for what the pager cannot say: a cap or truncation,
+  partial data, "filtered x of y", a second figure, a conclusion. A line that only
+  restates the row total is not a note — delete it. Put the `v-if` on the
+  `<template>` so the note exists only in the states where it says more, and give
+  it one root element; a root with `max-md:hidden` leaves no empty row on a phone.
+- **`#pagination-bar`** (scope: `currentPage`, `pageSize`, `totalPages`,
+  `totalRows`, `isFirstPage`, `isLastPage`, `setPageSize`, `firstPage`, `prevPage`,
+  `nextPage`, `lastPage`) replaces the built-in bar with a pager the caller draws,
+  and still renders with `pagination="none"`. Only the dashboard panel table
+  (`TableRenderer.vue`) needs it — a list page never does.
+
+The slot content adds no padding, height or typography: the bar owns all three.
+Below md the count and actions take a full row above the pager and a note takes
+its own row. A leftover `#bottom` fails `npm run type-check:app`; because vue-tsc
+never reads a `// @ts-nocheck` file, `OTable.callSites.spec.ts` also scans every
+SFC for the removed `#bottom`, `footer-title` and `custom-pagination-bar`, and for
+footer slots on a table without the built-in bar (`pagination="none"` or
+`#pagination-bar`).
 
 **Exposed (template ref):** `table` (TanStack instance), `toggleAllRows`, `clearSelection`, `resetColumnSizes`, `resetColumnOrder`, `resetPersistedColumns`, `scrollToTop`, `getRows`
 
@@ -477,7 +528,6 @@ const columns: OTableColumnDef[] = [
     selection="multiple"
     v-model:selected-ids="selectedIds"
     :page-size="50"
-    footer-title="Dashboards"
     @row-click="openRow"
   >
     <template #cell="{ column, row, value }">
@@ -490,9 +540,33 @@ const columns: OTableColumnDef[] = [
         />
       </template>
     </template>
+
+    <!-- The footer shows "N of M selected" and these buttons only while rows are selected. -->
+    <template #selection-actions>
+      <OButton variant="outline" size="sm" icon-left="download" @click="exportSelected">
+        {{ t("common.export") }}
+      </OButton>
+      <OButton variant="outline-destructive" size="sm" icon-left="delete" @click="deleteSelected">
+        {{ t("common.delete") }}
+      </OButton>
+    </template>
   </OTable>
 </template>
 ```
+
+**Column widths and headers that read.**
+
+- **Size the column the reader came for.** Unsized columns share the leftover
+  evenly, so a statement column got ~175px of a 1,180px table and truncated every
+  query while When / Took / Status sat half empty. Give the primary column an
+  explicit `size` (Top queries 520, Deadlocks 560, Slowest calls 480) with a
+  one-line comment saying why.
+- **A header names its column, nothing more.** Qualifiers ("(est.)", "(lifetime)")
+  are what the ellipsis eats first; put the explanation in `meta.headerTooltip`.
+  The tooltip anchors to the whole header cell, so it costs no width and no icon.
+- **Good news drops the count.** An empty table whose `#empty` says "All clear"
+  must not print "0 of 0" beneath it; pass an empty `#pagination-bar` (or the
+  wrapper's `#bottom`) for that case only.
 
 **Family:** cell renderers (below); `OTable.types.ts` exports `OTableColumnDef`, the mode/param types, and `COL`/`TABLE_*` size constants. `sub-components/` is internal.
 
@@ -503,9 +577,9 @@ const columns: OTableColumnDef[] = [
 Prebuilt cell components — pass as a column's `cell`. Import individually or from the barrel `@/lib/core/Table/cells`.
 
 - **OTimeCell** (`@/lib/core/Table/cells/OTimeCell.vue`) — the one timestamp renderer: relative ("2m ago") by default, `mode="absolute"` / `"date"` for full datetime; `unit` interprets numeric values (`auto`/`iso`/`s`/`ms`/`us`/`ns`); muted `empty-label` for zero/empty.
-- **OUserCell** (`@/lib/core/Table/cells/OUserCell.vue`) — person/owner/created-by column; renders email or explicit `name` as truncated plain text, dash when empty.
+- **OUserCell** (`@/lib/core/Table/cells/OUserCell.vue`) — person/owner/created-by column; renders email or explicit `name` as cut plain text (full identity on hover when cut), dash when empty.
 - **ONumberCell** (`@/lib/core/Table/cells/ONumberCell.vue`) — consistent numeric rendering (tabular-nums); `format` = `number`/`compact`/`bytesFromMB`/`durationSec`/`durationMs`/`durationUs`/`durationNs`/`percent`. Pair the column with `meta.align: "right"`.
-- **OCodeCell** (`@/lib/core/Table/cells/OCodeCell.vue`) — monospace identifiers / SQL / tokens, truncated with title tooltip and optional hover copy button (`copy`, default true).
+- **OCodeCell** (`@/lib/core/Table/cells/OCodeCell.vue`) — monospace identifiers / SQL / tokens, cut with "…" (full value on hover only when cut) and optional hover copy button (`copy`, default true). **`:tooltip="false"` for secrets** (tokens, credentials) — it also keeps the table's own tooltip off that cell.
 - **ODataBarCell** (`@/lib/core/Table/cells/ODataBarCell.vue`) — value with a proportional background bar (width = value/`max`, caller supplies the column max and pre-formatted `display`); `variant` `default`/`warning`/`danger` for threshold columns. ⚠️ **Client-paginated tables only:** the caller can only compute `max` over the rows it holds, so on a server-paginated table the bar means "biggest on this page" — the scale shifts as you page and the same row draws a different bar. There, drop the bars and let sortable numbers rank the rows.
 
 Also exported from the barrel: `statusVariant`, `humanizeStatus` helpers (+ `StatusTone`, `StatusVariantResult` types) for status badge styling.
@@ -540,3 +614,44 @@ For renders not covered by prebuilt cells, use a slot template `#cell-{id}`:
 ```
 
 **Important:** Access row data directly (`row.enabled`, `row.status`, `row.id`), not via `row.original`. The `row` object _is_ the data record with all properties accessible.
+
+### Cut cell text — the shared tooltip
+
+`OTable` shows **one shared tooltip per table**: when the mouse rests 0.7 s on a body cell whose text is cut with "…", it shows the full text. Cells that fit show nothing. It is measured only on hover, so cells carry no per-cell cost. **Plain cell text and simple `#cell-*` slots need nothing** — don't add `truncate`, a `title` or an `OTooltip` for this.
+
+**Switch it off where it must not show:**
+
+| Case | Do this |
+|---|---|
+| A column holds secrets (token, API key, webhook / signed URL, credential) | column `meta: { cellOverflowTooltip: false }` |
+| The whole table has its own reveal — a Wrap toggle or row expansion (logs, correlated logs, span events) | `<OTable :cell-overflow-tooltip="false">` |
+| One element inside a slot must stay silent | `<OTruncatedText :tooltip="false">` / `<OCodeCell :tooltip="false">` — they mark the element so the table skips it |
+
+A plain `<span class="truncate">` in a cell is **not** an opt-out — the table still shows its full text on hover.
+
+**It steps aside on its own** when the cut element (or a parent/child in the cell) already has its own tooltip that will show — an `OTruncatedText`, an `OTooltip`, a native `title` — so there are never two bubbles. It opens on the side away from a `#cell-hover-actions` toolbar.
+
+**Cells with several parts** (a row of tags, label pairs, a value plus a delta badge): the shared tooltip reads the cell's raw text, which has no separators — three tags `Trace 0` `Annotation 0` `Manual 1` read as `trace0annotation0manual1`. Give such a cell its own tooltip text:
+
+```vue
+<!-- a list of tags: one tooltip with commas -->
+<template #cell-tags="{ row }">
+  <OTruncatedText
+    as="div"
+    class="flex flex-nowrap items-center gap-1"
+    :tooltip="raw(row.tags.join(', '))"
+  >
+    <OTag v-for="tag in row.tags" :key="tag" class="shrink-0">{{ tag }}</OTag>
+  </OTruncatedText>
+</template>
+
+<!-- one long text + a small badge: cut the text only, keep the badge visible -->
+<template #cell-name="{ row }">
+  <div class="flex min-w-0 items-center">
+    <OTruncatedText>{{ row.name }}</OTruncatedText>
+    <OTag v-if="row.isPng" type="reportTag" value="png" class="ms-1 shrink-0" />
+  </div>
+</template>
+```
+
+Tables that never cut (`wrap`, or `horizontal-scroll` with content-sized columns) never show it, so they need no opt-out.

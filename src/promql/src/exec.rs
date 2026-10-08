@@ -28,8 +28,7 @@ use super::engine::Engine;
 use crate::{
     DEFAULT_LOOKBACK, TableProvider,
     ast::{
-        result_order::top_level_sort_descending, selector_visitor::MetricSelectorVisitor,
-        visitor::walk_expr,
+        result_order::top_level_order, selector_visitor::MetricSelectorVisitor, visitor::walk_expr,
     },
     micros, micros_since_epoch,
 };
@@ -89,7 +88,7 @@ impl PromqlContext {
         }
 
         let ctx = Arc::new(self.clone());
-        let sort_descending = top_level_sort_descending(&stmt.expr);
+        let order = top_level_order(&stmt.expr);
         let expr = Arc::new(stmt.expr);
         let is_instant = self.start == self.end;
 
@@ -120,8 +119,8 @@ impl PromqlContext {
         };
 
         let mut sorted_value = final_value;
-        match sort_descending {
-            Some(descending) if is_instant => sorted_value.sort_by_value(descending),
+        match order {
+            Some(order) if is_instant => order.apply(&mut sorted_value),
             _ => sorted_value.sort(),
         }
         Ok((
@@ -144,6 +143,16 @@ impl PromqlContext {
         let cfg = config::get_config();
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
+        if stmt.lookback_delta > Duration::ZERO {
+            self.lookback_delta = micros(stmt.lookback_delta);
+        }
+        let (window_start, window_end) = (self.start, self.end);
+        // A range needs a positive step; the exemplar loader ignores it and scans contiguously.
+        let step = if window_start == window_end {
+            0
+        } else {
+            self.lookback_delta
+        };
 
         // pick all selectors from stmt
         let mut visitor = MetricSelectorVisitor::default();
@@ -158,11 +167,10 @@ impl PromqlContext {
         let mut tasks = Vec::new();
         let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
         for expr in visitor.exprs {
-            let time = self.start;
             let expr = Arc::new(expr);
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            // Use EvalContext::new for instant query (start == end)
-            let eval_ctx = EvalContext::new(time, time, 0, trace_id.to_string());
+            // Exemplars are wanted over the whole range, not only the lookback at `start`.
+            let eval_ctx = EvalContext::new(window_start, window_end, step, trace_id.to_string());
             let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
@@ -208,7 +216,15 @@ impl PromqlContext {
         }
         let merged_data = merged_data
             .into_values()
-            .map(|(labels, exemplars)| RangeValue::new_with_exemplars(labels, exemplars))
+            .filter_map(|(labels, exemplars)| {
+                // An instant request keeps its lookback answer; a range keeps its own bounds.
+                let exemplars = if window_start == window_end {
+                    exemplars
+                } else {
+                    exemplars_in_window(exemplars, window_start, window_end)
+                };
+                (!exemplars.is_empty()).then(|| RangeValue::new_with_exemplars(labels, exemplars))
+            })
             .collect::<Vec<_>>();
 
         // sort data
@@ -216,6 +232,29 @@ impl PromqlContext {
         value.sort();
         Ok((value, result_type, *self.scan_stats.read().await))
     }
+}
+
+/// Exemplars timestamped in `[start, end]`, sorted, with rolling-array repeats removed.
+fn exemplars_in_window(
+    mut exemplars: Vec<Arc<Exemplar>>,
+    start: i64,
+    end: i64,
+) -> Vec<Arc<Exemplar>> {
+    exemplars.retain(|e| e.timestamp >= start && e.timestamp <= end);
+    exemplars.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then(a.value.total_cmp(&b.value))
+            .then_with(|| {
+                a.labels
+                    .partial_cmp(&b.labels)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+    exemplars.dedup_by(|a, b| {
+        a.timestamp == b.timestamp && a.value.to_bits() == b.value.to_bits() && a.labels == b.labels
+    });
+    exemplars
 }
 
 /// The shape an instant query answers with, given what evaluation produced.
@@ -229,7 +268,7 @@ fn shape_instant_result(
     // in its window, so the matrix evaluation produced is already the answer. Collapsing it
     // would keep an arbitrary one of those samples and drop the rest.
     if expr.value_type() == ValueType::Matrix {
-        return (value, Some("matrix".to_string()));
+        return (without_stale_markers(value), Some("matrix".to_string()));
     }
 
     match value {
@@ -255,11 +294,140 @@ fn shape_instant_result(
     }
 }
 
+/// A range selector's samples as the answer shows them: stale markers are not samples.
+fn without_stale_markers(value: Value) -> Value {
+    let Value::Matrix(mut matrix) = value else {
+        return value;
+    };
+    // a series left with no sample is dropped, one that had none (exemplars only) is kept
+    matrix.retain_mut(|series| {
+        let loaded = series.samples.len();
+        series
+            .samples
+            .retain(|sample| !config::meta::promql::is_stale_marker(sample.value));
+        loaded == 0 || !series.samples.is_empty()
+    });
+    Value::Matrix(matrix)
+}
+
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
     use promql_parser::parser;
 
     use super::*;
+
+    const MINUTE: i64 = 60_000_000;
+    const WINDOW_START: i64 = 1_640_995_200_000_000;
+
+    /// One series whose rows each carry the rolling exemplar array an OTLP exporter sends.
+    struct SpreadExemplarProvider {
+        /// `(row timestamp, exemplars as (timestamp, trace_id))`
+        rows: Vec<(i64, Vec<(i64, &'static str)>)>,
+    }
+
+    #[async_trait::async_trait]
+    impl TableProvider for SpreadExemplarProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: promql_parser::label::Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+            _streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                datatypes::{DataType, Field, Schema},
+            };
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+                Field::new("env", DataType::Utf8, false),
+            ]));
+            let exemplars = |list: &[(i64, &str)]| {
+                let items: Vec<String> = list
+                    .iter()
+                    .map(|(ts, trace)| {
+                        format!(r#"{{"_timestamp":{ts},"value":1.5,"trace_id":"{trace}"}}"#)
+                    })
+                    .collect();
+                format!("[{}]", items.join(","))
+            };
+            let n = self.rows.len();
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(
+                        self.rows.iter().map(|r| r.0).collect::<Vec<_>>(),
+                    )),
+                    Arc::new(Float64Array::from(vec![1.0; n])),
+                    Arc::new(UInt64Array::from(vec![7; n])),
+                    Arc::new(StringArray::from(
+                        self.rows
+                            .iter()
+                            .map(|r| Some(exemplars(&r.1)))
+                            .collect::<Vec<_>>(),
+                    )),
+                    Arc::new(StringArray::from(vec!["prod"; n])),
+                ],
+            )
+            .unwrap();
+            let ctx = datafusion::prelude::SessionContext::new();
+            ctx.register_batch(stream_name, batch).unwrap();
+            Ok(vec![crate::ScanContext::table(
+                ctx,
+                schema,
+                ScanStats::default(),
+                true,
+            )])
+        }
+    }
+
+    async fn exemplar_timestamps(
+        query: &str,
+        rows: Vec<(i64, Vec<(i64, &'static str)>)>,
+    ) -> Vec<i64> {
+        let trace_id = "test_exemplar_window";
+        let query_ctx = Arc::new(QueryContext {
+            trace_id: trace_id.to_string(),
+            org_id: "org".to_string(),
+            query_exemplars: true,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout: 30,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
+            search_event_context: None,
+        });
+        let mut ctx = PromqlContext::new(query_ctx, SpreadExemplarProvider { rows }, vec![]);
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = EvalStmt {
+            expr: parser::parse(query).unwrap(),
+            start: at(WINDOW_START),
+            end: at(WINDOW_START + 60 * MINUTE),
+            interval: Duration::from_secs(15),
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let (value, result_type, _) = ctx.query_exemplars(trace_id, stmt).await.unwrap();
+        assert_eq!(result_type.as_deref(), Some("exemplars"));
+        match value {
+            Value::Matrix(series) => series
+                .iter()
+                .flat_map(|s| s.exemplars.iter().flatten())
+                .map(|e| e.timestamp)
+                .collect(),
+            Value::None => vec![],
+            other => panic!("expected a matrix, got {other:?}"),
+        }
+    }
 
     fn shaped(query: &str, value: Value) -> (Value, Option<String>) {
         let expr = parser::parse(query).unwrap();
@@ -301,6 +469,25 @@ mod tests {
 
         assert_eq!(result_type.as_deref(), Some("matrix"));
         assert_eq!(samples(&value), vec![(1000, 14.0), (3000, 45.0)]);
+    }
+
+    #[test]
+    fn test_instant_range_selector_leaves_out_stale_markers() {
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let value = Value::Matrix(vec![
+            RangeValue::new(
+                Labels::default(),
+                vec![Sample::new(1000, 14.0), Sample::new(3000, stale)],
+            ),
+            RangeValue::new(Labels::default(), vec![Sample::new(2000, stale)]),
+        ]);
+        let (value, _) = shaped("m[5m]", value);
+
+        let Value::Matrix(series) = &value else {
+            panic!("expected a matrix");
+        };
+        assert_eq!(series.len(), 1, "a series of only a marker has no samples");
+        assert_eq!(samples(&value), vec![(1000, 14.0)]);
     }
 
     #[test]
@@ -347,5 +534,104 @@ mod tests {
             Value::Sample(sample) => assert_eq!((sample.timestamp, sample.value), (3000, 2.0)),
             other => panic!("unexpected result: {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_returns_the_whole_window_not_just_the_lookback_at_start() {
+        let (before, t10, t40, t55) = (
+            WINDOW_START - 2 * MINUTE,
+            WINDOW_START + 10 * MINUTE,
+            WINDOW_START + 40 * MINUTE,
+            WINDOW_START + 55 * MINUTE,
+        );
+        let rows = vec![
+            (before, vec![(before, "before")]),
+            (t10, vec![(t10, "t10")]),
+            (t40, vec![(t10, "t10"), (t40, "t40")]),
+            (t55, vec![(t55, "t55")]),
+        ];
+
+        let timestamps = exemplar_timestamps("test_metric", rows).await;
+
+        assert_eq!(timestamps, vec![t10, t40, t55]);
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_scans_the_whole_window_for_a_short_range_selector() {
+        let times = [1, 2, 3, 7].map(|m| WINDOW_START + m * MINUTE);
+        let rows = times.iter().map(|&ts| (ts, vec![(ts, "t")])).collect();
+
+        let timestamps = exemplar_timestamps("rate(test_metric[1m])", rows).await;
+
+        assert_eq!(timestamps, times.to_vec());
+    }
+
+    /// Instance values of an instant (`start == end`) or range query's result, in result order.
+    async fn instances(query: &str, end_offset: i64) -> Vec<String> {
+        let query_ctx = crate::engine::tests::create_test_query_ctx("test", "test_org", 30);
+        let mut ctx =
+            PromqlContext::new(query_ctx, crate::engine::tests::SimpleMockProvider, vec![]);
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = EvalStmt {
+            expr: parser::parse(query).unwrap(),
+            start: at(WINDOW_START),
+            end: at(WINDOW_START + end_offset),
+            interval: Duration::from_secs(60),
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let (value, ..) = ctx.exec("test", stmt).await.unwrap();
+        let labels: Vec<_> = match value {
+            Value::Vector(vector) => vector.into_iter().map(|v| v.labels).collect(),
+            Value::Matrix(matrix) => matrix.into_iter().map(|m| m.labels).collect(),
+            other => panic!("unexpected result: {other:?}"),
+        };
+        labels
+            .iter()
+            .map(|labels| {
+                format!(
+                    "{}{}",
+                    labels.get_value("instance"),
+                    labels.get_value("zone")
+                )
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_sort_by_label_orders_an_instant_query_naturally() {
+        let series = |instance: &str, zone: &str, value: f64| {
+            format!(
+                r#"label_replace(label_replace(vector({value}), "instance", "{instance}", "", ""), "zone", "{zone}", "", "")"#
+            )
+        };
+        let input = [
+            series("host10", "a", 1.0),
+            series("host2", "b", 3.0),
+            series("host1", "a", 2.0),
+            series("host2", "a", 4.0),
+        ]
+        .join(" or ");
+        for (query, expected) in [
+            (
+                format!(r#"sort_by_label({input}, "instance")"#),
+                ["host1a", "host2a", "host2b", "host10a"],
+            ),
+            (
+                format!(r#"(sort_by_label_desc({input}, "instance"))"#),
+                ["host10a", "host2b", "host2a", "host1a"],
+            ),
+            (
+                format!(r#"sort_by_label({input}, "zone", "instance")"#),
+                ["host1a", "host2a", "host10a", "host2b"],
+            ),
+        ] {
+            assert_eq!(instances(&query, 0).await, expected, "{query}");
+        }
+        // a range query keeps the label order every range result has
+        let query = format!(r#"sort_by_label_desc({input}, "instance")"#);
+        assert_eq!(
+            instances(&query, 2 * MINUTE).await,
+            ["host1a", "host10a", "host2a", "host2b"]
+        );
     }
 }

@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[10, 20, 50, 100]"
           :row-class="noDestinationRowClass"
-          :footer-title="t('alert_sources.header')"
           wrap
           horizontal-scroll
           :default-columns="false"
@@ -184,9 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-sources-copy-token-${row.integration.id}`"
                 @click="copyTokenFor(row.integration)"
               />
-              <span class="truncate font-mono text-xs" :title="displayedUrlFor(row.integration)">{{
-                displayedUrlFor(row.integration)
-              }}</span>
+              <span class="truncate font-mono text-xs">{{ displayedUrlFor(row.integration) }}</span>
             </div>
             <span v-else class="text-text-secondary">—</span>
           </template>

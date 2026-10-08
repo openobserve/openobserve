@@ -42,6 +42,8 @@ export interface ShortcutEntry {
   display?: string;
   /** Fire even while a text input has focus (see `Shortcut.allowInInput`). */
   allowInInput?: boolean;
+  /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
+  visible?: (caps: ShortcutCapabilities) => boolean;
 }
 
 export interface ShortcutGroup {
@@ -63,6 +65,7 @@ export interface ShortcutCapabilities {
   incidentsEnabled: boolean;
   modelPricingEnabled: boolean;
   rbacEnabled: boolean;
+  aiEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -86,6 +89,7 @@ const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.inciden
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
+const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
@@ -142,6 +146,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     pages: ["shortcuts.pages.functions", "shortcuts.pages.enrichmentTables"],
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
+  { titleKey: "shortcuts.modules.synthetics", pages: ["shortcuts.pages.syntheticsJourney"] },
   {
     titleKey: "shortcuts.modules.iam",
     title: "IAM",
@@ -207,6 +212,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForWindows: "ctrl+b",
         keyForMac: "meta+b",
         descriptionKey: "shortcuts.actions.aiChatToggle",
+        visible: aiChat,
       },
     ],
   },
@@ -576,9 +582,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "functions",
     shortcuts: [
       { id: "functionsAdd", key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
+      { id: "functionsImport", key: "i", descriptionKey: "shortcuts.actions.functionsImport" },
       { id: "functionsRefresh", key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
       { id: "functionsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
       { id: "functionsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "functionsRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
       {
         id: "functionsRowDelete",
         display: "del / ⌫",
@@ -730,6 +742,19 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       {
         id: "syntheticsTokensFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+    ],
+  },
+
+  // ── Synthetics — Journey editor ─────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.syntheticsJourney",
+    scope: "synthetics-journey",
+    shortcuts: [
+      {
+        id: "syntheticsJourneyFocusSearch",
         key: "/",
         descriptionKey: "shortcuts.actions.focusSearch",
       },

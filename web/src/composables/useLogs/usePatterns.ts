@@ -146,6 +146,10 @@ export default function usePatterns(t: TranslateFn) {
         return;
       }
       console.error("[Patterns] Error extracting patterns:", error);
+      // Drop the previous run's results — otherwise the table keeps showing
+      // stale data (e.g. from an earlier single-stream query) once this run
+      // has failed.
+      patternsState.value.patterns = null;
       patternsState.value.error =
         error?.response?.data?.message || t("search.errorExtractingPatterns");
       throw error;

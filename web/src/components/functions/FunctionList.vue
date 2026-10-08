@@ -31,6 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions>
         <OButton
+          variant="outline"
+          size="sm"
+          icon-left="upload-file"
+          data-test="function-list-import-function-btn"
+          @click="goToImportFunction"
+        >
+          {{ t("dashboard.import") }}
+        </OButton>
+        <OButton
           variant="primary"
           size="sm"
           data-test="function-list-add-function-btn"
@@ -127,6 +136,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="edit"
                 />
                 <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="account-tree"
+                  :title="t('function.associatedPipelines')"
+                  data-row-action="view"
+                  class="max-md:hidden"
+                  @click="getAssociatedPipelines({ row })"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="download"
+                  :title="t('common.export')"
+                  data-test="function-list-export-function-btn"
+                  data-row-action="export"
+                  class="max-md:hidden"
+                  @click="exportFunction(row)"
+                />
+                <OButton
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('function.delete')"
@@ -135,15 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="max-md:hidden"
                   @click="showDeleteDialogFn({ row })"
                   icon-left="delete"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  icon-left="account-tree"
-                  :title="t('function.associatedPipelines')"
-                  data-row-action="view"
-                  class="max-md:hidden"
-                  @click="getAssociatedPipelines({ row })"
                 />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
@@ -165,6 +184,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.updateTitle") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
+                    icon-left="account-tree"
+                    class="md:hidden"
+                    data-test="function-list-associated-pipelines-menu"
+                    @select="getAssociatedPipelines({ row })"
+                  >
+                    <span>{{ t("function.associatedPipelines") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="download"
+                    class="md:hidden"
+                    data-test="function-list-export-function-btn-menu"
+                    @select="exportFunction(row)"
+                  >
+                    <span>{{ t("common.export") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
                     icon-left="delete"
                     variant="destructive"
                     class="md:hidden"
@@ -173,35 +208,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span>{{ t("function.delete") }}</span>
                   </ODropdownItem>
-                  <ODropdownItem
-                    icon-left="account-tree"
-                    class="md:hidden"
-                    data-test="function-list-associated-pipelines-menu"
-                    @select="getAssociatedPipelines({ row })"
-                  >
-                    <span>{{ t("function.associatedPipelines") }}</span>
-                  </ODropdownItem>
                 </ODropdown>
               </div>
             </template>
 
-            <template #bottom>
-              <div class="flex w-full items-center justify-between py-2">
-                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
-                  {{ resultTotal }} {{ t("function.header") }}
-                </div>
-                <OButton
-                  v-if="selectedFunctions.length > 0"
-                  data-test="function-list-delete-functions-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                  icon-left="delete"
-                >
-                  {{ t("common.delete") }}
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="function-list-export-functions-btn"
+                variant="outline"
+                size="sm"
+                :loading="exportLoading"
+                @click="exportSelectedFunctions"
+                icon-left="download"
+              >
+                {{ t("common.export") }}
+              </OButton>
+              <OButton
+                data-test="function-list-delete-functions-btn"
+                variant="outline-destructive"
+                size="sm"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+                icon-left="delete"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -273,7 +304,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
@@ -289,6 +320,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { downloadFile } from "@/utils/dom";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   bulkDeleteFunctionsMutation,
@@ -357,8 +389,7 @@ export default defineComponent({
         id: "actions",
         header: t("function.actions"),
         isAction: true,
-        size: 150,
-        meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+        meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
       },
     ];
 
@@ -386,7 +417,7 @@ export default defineComponent({
     // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
     const restorePageIndex = () => {
       setTimeout(() => {
-        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        oTableRef.value?.restorePage?.(currentPage.value);
       }, 0);
     };
 
@@ -475,7 +506,6 @@ export default defineComponent({
     // Bound to the refresh button: always reaches the server.
     const refreshJSTransforms = () => functions.refetch();
 
-    const resultTotal = ref<number>(0);
     const pageSize = ref(20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
 
@@ -536,7 +566,7 @@ export default defineComponent({
       }
       addTransform();
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -609,7 +639,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Delete Function",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -674,17 +704,100 @@ export default defineComponent({
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
+    };
+
+    // No dialog: the provider has no function resource, so a preview would pick between one format.
+
+    // `streams` names streams the target org lacks; `numArgs` the server derives from `params`.
+    const exportPayload = (name: string) => {
+      const fn: any = (functions.data.value ?? []).find((item: any) => item.name === name);
+      if (!fn) return null;
+      return {
+        name: fn.name,
+        function: fn.function,
+        params: fn.params,
+        transType: fn.transType,
+      };
+    };
+
+    const exportLoading = ref(false);
+
+    // The row came from this list, so a miss means the cache moved on: re-read once before giving up.
+    const collectForExport = async (names: string[]) => {
+      let payloads = names.map(exportPayload);
+      if (payloads.some((payload) => !payload)) {
+        await functions.refetch();
+        payloads = names.map(exportPayload);
+      }
+      return {
+        payloads: payloads.filter(Boolean) as Record<string, unknown>[],
+        missing: names.filter((_, i) => !payloads[i]),
+      };
+    };
+
+    // One function keeps its name; a bundle is dated, as the other lists name theirs.
+    const exportFileName = (payloads: Record<string, unknown>[]) => {
+      if (payloads.length !== 1) {
+        return `functions-${new Date().toISOString().slice(0, 10)}.json`;
+      }
+      const name = String(payloads[0]?.name ?? "").replace(/[^A-Za-z0-9._-]+/g, "-");
+      return `${name || "function"}.json`;
+    };
+
+    const runExport = async (names: string[]) => {
+      if (exportLoading.value) return;
+      exportLoading.value = true;
+      try {
+        const { payloads, missing } = await collectForExport(names);
+        if (!payloads.length) throw new Error("no exportable function");
+        // A selection outlives its rows, and the file would be short by names nobody mentioned.
+        if (missing.length) {
+          toast({
+            variant: "info",
+            message: t(
+              "toastMessages.functions.functionsMissingFromExport",
+              { names: raw(missing.join(", ")) },
+              missing.length,
+            ),
+          });
+        }
+        // Object for one, array for several: both import, and the object form is hand-editable.
+        const written = downloadFile(
+          exportFileName(payloads),
+          JSON.stringify(payloads.length === 1 ? payloads[0] : payloads, null, 2),
+          "application/json",
+        );
+        if (!written) throw new Error("download refused");
+        toast({
+          variant: "success",
+          message: t(
+            "toastMessages.functions.successfullyExportedFunctions",
+            { count: payloads.length },
+            payloads.length,
+          ),
+        });
+        selectedFunctionIds.value = [];
+      } catch (error) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorExportingFunctions"),
+        });
+      } finally {
+        exportLoading.value = false;
+      }
+    };
+
+    const exportFunction = (row: any) => runExport([row.name]);
+
+    const exportSelectedFunctions = () => runExport([...selectedFunctionIds.value]);
+
+    const goToImportFunction = () => {
+      router.push({
+        name: "importFunction",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
     };
 
     const bulkDelete = useMutation(() => bulkDeleteFunctionsMutation(orgId.value));
@@ -789,6 +902,12 @@ export default defineComponent({
         },
       },
       {
+        id: "functionsImport",
+        handler: () => {
+          if (!isInputFocused()) goToImportFunction();
+        },
+      },
+      {
         id: "functionsRefresh",
         handler: () => {
           if (!isInputFocused()) refreshJSTransforms();
@@ -817,7 +936,6 @@ export default defineComponent({
       lastUpdatedAt,
       refreshJSTransforms,
       forbidden,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,
@@ -843,6 +961,10 @@ export default defineComponent({
       visibleRows,
       hasVisibleRows,
       openBulkDeleteDialog,
+      exportLoading,
+      exportFunction,
+      exportSelectedFunctions,
+      goToImportFunction,
       bulkDeleteFunctions,
       bulkDeleteLoading,
       confirmBulkDelete,

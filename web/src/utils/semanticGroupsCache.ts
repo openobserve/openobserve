@@ -43,8 +43,10 @@ export async function loadSemanticGroups(
 ): Promise<FieldAlias[]> {
   // Fresh-hit fast path: `fetchQuery` resolves only after the client's own scheduling, and the traces field pipeline awaits this inline.
   const state = queryClient.getQueryState<FieldAlias[]>(serviceStreamKeys.semanticGroups(org));
+  // An invalidated entry is stale whatever its age, or a group save's invalidation never reaches this path.
   if (
     state?.data !== undefined &&
+    !state.isInvalidated &&
     Date.now() - state.dataUpdatedAt < SEMANTIC_GROUPS_CACHE_TTL_MS
   ) {
     return state.data;
@@ -53,7 +55,12 @@ export async function loadSemanticGroups(
     return await queryClient.fetchQuery(semanticGroupsQuery(org));
   } catch (err: any) {
     onError?.(err);
-    console.error("Error loading semantic groups:", err);
+    // A 403 means this org/user simply isn't entitled to semantic groups —
+    // every caller already falls back to `[]` and keeps going, so this is an
+    // expected permission state, not a failure worth logging as an error.
+    if (err?.response?.status !== 403) {
+      console.error("Error loading semantic groups:", err);
+    }
     return [];
   }
 }

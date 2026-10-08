@@ -163,6 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="px-page-edge">
                   <MonitorStatusTimeline
                     :segments="timelineSegments"
+                    :lanes="timelineLanes"
                     :is-browser="isBrowser"
                     :truncated="timelineTruncated"
                     :fail-count="timelineFailCount"
@@ -339,9 +340,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Breakdown Cards — gated on runs query -->
               <template v-if="runsLoading || !runsHasLoadedOnce">
                 <div class="px-page-edge">
-                  <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+                  <div :class="['grid gap-2', breakdownGridClass]">
                     <div
-                      v-for="n in isBrowser ? 3 : 2"
+                      v-for="n in breakdownCardCount"
                       :key="n"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
@@ -369,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Breakdown Cards — runs query error state -->
               <template v-else-if="runsError">
                 <div class="px-page-edge">
-                  <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+                  <div :class="['grid gap-2', breakdownGridClass]">
                     <div
                       v-for="dim in breakdownDimensions"
                       :key="dim"
@@ -378,13 +379,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                         <span class="text-text-heading text-sm font-bold">
                           {{
-                            dim === "Browser"
-                              ? t("synthetics.runs.passRateByBrowser")
-                              : dim === "DurationByLocation"
-                                ? t("synthetics.runs.durationByLocation")
-                                : dim === "Location"
-                                  ? t("synthetics.runs.passRateByLocation")
-                                  : t("synthetics.runs.passRateByDevice")
+                            dim === "Environment"
+                              ? t("synthetics.runs.passRateByEnvironment")
+                              : dim === "Browser"
+                                ? t("synthetics.runs.passRateByBrowser")
+                                : dim === "DurationByLocation"
+                                  ? t("synthetics.runs.durationByLocation")
+                                  : dim === "Location"
+                                    ? t("synthetics.runs.passRateByLocation")
+                                    : t("synthetics.runs.passRateByDevice")
                           }}
                         </span>
                       </div>
@@ -403,7 +406,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else>
                 <div class="px-page-edge">
-                  <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+                  <div :class="['grid gap-2', breakdownGridClass]">
+                    <div
+                      v-if="envAware"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                      data-test="monitor-runs-env-breakdown"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <OIcon name="layers" size="sm" class="text-accent" />
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.passRateByEnvironment") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="px-2 py-2">
+                        <div
+                          v-for="e in envBreakdown"
+                          :key="e.name"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <OIcon :name="e.icon" size="sm" class="text-text-secondary flex-none" />
+                          <OTruncatedText
+                            class="text-text-body w-20 flex-none font-mono text-xs font-semibold"
+                          >
+                            {{ e.name }}
+                          </OTruncatedText>
+                          <div
+                            class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
+                          >
+                            <div
+                              class="h-full rounded-full"
+                              :style="{ width: e.pct, background: e.barColor }"
+                            />
+                          </div>
+                          <span
+                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            :style="{ color: e.textColor }"
+                          >
+                            {{ e.pct }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                     <div
                       v-if="isBrowser"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
@@ -422,13 +466,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(b.name)">
-                            <span
-                              class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ b.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-20 flex-none text-xs font-semibold"
+                          >
+                            {{ b.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -464,13 +506,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(l.name)">
-                            <span
-                              class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ l.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-40 flex-none text-xs font-semibold"
+                          >
+                            {{ l.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -506,13 +546,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(d.name)">
-                            <span
-                              class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ d.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body text-capitalize w-18 flex-none text-xs font-semibold"
+                          >
+                            {{ d.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -548,13 +586,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(d.name)">
-                            <span
-                              class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ d.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-34 flex-none text-xs font-semibold"
+                          >
+                            {{ d.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -706,6 +742,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ (row as VisibleRun).statusLabel }}
                     </OBadge>
                   </template>
+                  <template #cell-environment="{ row }">
+                    <span
+                      v-if="(row as VisibleRun).environment"
+                      class="text-text-body inline-flex max-w-full items-center gap-1 font-mono text-sm"
+                    >
+                      <OIcon name="layers" size="sm" class="text-text-secondary" />
+                      <OTruncatedText>{{ (row as VisibleRun).environment }}</OTruncatedText>
+                    </span>
+                    <span v-else class="text-text-muted text-sm">—</span>
+                  </template>
                   <template #cell-scheduled_at="{ row }">
                     <OTimeCell
                       :value="(row as VisibleRun).scheduledTs"
@@ -728,21 +774,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                   <template #cell-location="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
-                      {{ locationLabel((row as VisibleRun).location) }}
+                      <OTruncatedText>{{
+                        locationLabel((row as VisibleRun).location)
+                      }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-browser="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="browserIcon((row as VisibleRun).browser)" size="sm" />
-                      {{ (row as VisibleRun).browser }}
+                      <OTruncatedText>{{ (row as VisibleRun).browser }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-device="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                      {{ deviceDisplay((row as VisibleRun).device) }}
+                      <OTruncatedText>{{
+                        deviceDisplay((row as VisibleRun).device)
+                      }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -876,9 +926,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="stepsError">
                 <div class="flex items-center gap-2 px-2" data-test="monitor-runs-steps-error">
                   <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
-                  <span class="text-status-error-text min-w-0 flex-1 truncate text-xs">{{
+                  <OTruncatedText :lines="2" class="text-status-error-text flex-1 text-xs">{{
                     stepsError
-                  }}</span>
+                  }}</OTruncatedText>
                   <OButton
                     variant="ghost"
                     size="xs"
@@ -912,9 +962,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- cell-name: Step name -->
                     <template #cell-name="{ row }">
                       <div class="min-w-0">
-                        <div class="text-text-heading truncate text-xs font-semibold">
+                        <OTruncatedText as="div" class="text-text-heading text-xs font-semibold">
                           {{ row.name }}
-                        </div>
+                        </OTruncatedText>
                       </div>
                     </template>
 
@@ -1070,7 +1120,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -1095,6 +1145,7 @@ import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
+import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   rollUpStatus,
@@ -1177,13 +1228,21 @@ interface Props {
    * `retry_step_ids` is never written. The tiles must read "—", not "0.0%":
    * a zero is a measurement, and this is the absence of one. */
   retries?: number;
+  /** The check's environment NAMES; env UI renders only from two upward. */
+  environments?: string[];
+  /** Environment name every query is scoped to; '' = all. */
+  environmentScope?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
   lastTriggeredAt: 0,
   checkType: "browser",
   retries: 0,
+  environments: () => [],
+  environmentScope: "",
 });
+
+const envAware = computed(() => (props.environments?.length ?? 0) >= 2);
 
 /** Whether flakiness is observable at all for this check. */
 const retriesEnabled = computed(() => props.retries > 0);
@@ -1350,6 +1409,7 @@ async function triggerRun() {
   });
   try {
     await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderId.value);
+    analytics.track("synthetic_test_run_triggered", { count: 1 });
     dismiss();
     // "Queued", not "Done": the API enqueues a job, and a browser run takes tens
     // of seconds to land in the results stream. The refresh below fires
@@ -1433,6 +1493,7 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
     location: r.location,
     browser,
     device: r.device,
+    environment: r.environment,
     failedStep: null,
     locator: null,
     action: null,
@@ -1661,8 +1722,7 @@ interface TimelineSegment {
 }
 
 // ── Status timeline ──────────────────────────────────────────────────────
-const timelineSegments = computed<TimelineSegment[]>(() => {
-  const runs = allRuns.value;
+function segmentsFor(runs: MockRun[]): TimelineSegment[] {
   if (runs.length === 0) return [];
 
   // Group by runId — preserves insertion order (most recent run first)
@@ -1736,7 +1796,27 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       tally,
     };
   });
-});
+}
+
+const timelineSegments = computed<TimelineSegment[]>(() => segmentsFor(allRuns.value));
+
+const timelineLanes = computed<{ label: string; segments: (TimelineSegment | null)[] }[] | null>(
+  () => {
+    if (!envAware.value || props.environmentScope) return null;
+    const runs = allRuns.value;
+    if (!runs.length || runs.some((run) => !run.environment)) return null;
+    const overall = timelineSegments.value;
+    const lanes = props.environments
+      .map((env) => {
+        const perRun = new Map(
+          segmentsFor(runs.filter((run) => run.environment === env)).map((seg) => [seg.runId, seg]),
+        );
+        return { label: env, segments: overall.map((seg) => perRun.get(seg.runId) ?? null) };
+      })
+      .filter((lane) => lane.segments.some(Boolean));
+    return lanes.length >= 2 ? lanes : null;
+  },
+);
 
 /**
  * The runs list hit its query cap, so the timeline shows only the most recent
@@ -1794,8 +1874,19 @@ const timelineEndLabel = computed(() => {
 });
 
 // ── Breakdowns ───────────────────────────────────────────────────────────
-const breakdownDimensions = computed(() =>
-  isBrowser.value ? ["Browser", "Location", "Device"] : ["Location", "DurationByLocation"],
+const breakdownDimensions = computed(() => {
+  const dims = isBrowser.value
+    ? ["Browser", "Location", "Device"]
+    : ["Location", "DurationByLocation"];
+  return envAware.value ? ["Environment", ...dims] : dims;
+});
+const breakdownCardCount = computed(() => breakdownDimensions.value.length);
+const breakdownGridClass = computed(() =>
+  breakdownCardCount.value === 4
+    ? "grid-cols-4"
+    : breakdownCardCount.value === 3
+      ? "grid-cols-3"
+      : "grid-cols-2",
 );
 
 interface BreakdownItem {
@@ -1809,6 +1900,27 @@ interface BreakdownItem {
   barColor: string;
   textColor: string;
 }
+const envBreakdown = computed<BreakdownItem[]>(() => {
+  const groups = new Map<string, { pass: number; total: number }>();
+  for (const run of allRuns.value) {
+    // Unattributed rows (pre-stamp history) belong to no environment's rate.
+    if (!run.environment) continue;
+    const g = groups.get(run.environment) ?? { pass: 0, total: 0 };
+    g.total++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
+    groups.set(run.environment, g);
+  }
+  return Array.from(groups.entries()).map(([name, g]) => {
+    const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
+    return {
+      name,
+      icon: "layers",
+      pct: pct + "%",
+      barColor: "var(--color-status-success-text)",
+      textColor: "var(--color-success-700)",
+    };
+  });
+});
 const browserBreakdown = computed<BreakdownItem[]>(() => {
   const groups = new Map<string, { pass: number; total: number }>();
   for (const run of allRuns.value) {
@@ -2008,6 +2120,8 @@ interface MockRun {
   location: string;
   browser: string;
   device: string;
+  /** '' = unattributed — an unscoped check or a pre-stamp historical row. */
+  environment: string;
   triggerType: string;
   failedStep: string | null;
   locator: string | null;
@@ -2054,6 +2168,7 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
         location: locations[Math.floor(r() * locations.length)],
         browser: browsers[Math.floor(r() * browsers.length)],
         device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
+        environment: "",
         failedStep,
         locator,
         action: failedStep
@@ -2120,6 +2235,7 @@ interface VisibleRun {
   device: string;
   /** Resolved device label, i.e. what the cell actually renders. */
   deviceName: string;
+  environment: string;
 }
 
 const STATUS_RANK: Record<string, number> = { fail: 0, error: 1, warning: 2, pass: 3 };
@@ -2153,6 +2269,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       browser: run.browser,
       device: run.device,
       deviceName: deviceDisplay(run.device),
+      environment: run.environment,
     };
   });
 });
@@ -2168,6 +2285,17 @@ const runColumns = computed<OTableColumnDef[]>(() => {
       size: 60,
       sortable: true,
     },
+  ];
+  if (envAware.value) {
+    cols.push({
+      id: "environment",
+      header: t("synthetics.results.environment"),
+      accessorKey: "environment",
+      size: 90,
+      sortable: true,
+    });
+  }
+  cols.push(
     {
       id: "last_run_at",
       header: t("synthetics.table.lastRunAt"),
@@ -2189,7 +2317,7 @@ const runColumns = computed<OTableColumnDef[]>(() => {
       size: 110,
       sortable: true,
     },
-  ];
+  );
   if (isBrowser.value) {
     cols.push(
       {
@@ -2382,11 +2510,76 @@ function cssVar(name: string, fallback: string): string {
   return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
 }
 
+const ENV_SERIES_TOKENS = [
+  "--color-primary-600",
+  "--color-purple-500",
+  "--color-indigo-500",
+  "--color-cyan-500",
+  "--color-orange-500",
+];
+
 const responseChartOption = computed(() => {
   const lineColor = cssVar("--color-primary-600", "#3b82f6");
   const axisColor = cssVar("--color-text-secondary", "#6c707e");
   const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const p95Color = cssVar("--color-status-warning-text", "#f59e0b");
+
+  const p95MarkLine = p95Ms.value
+    ? {
+        silent: true,
+        symbol: "none" as const,
+        lineStyle: { color: p95Color, type: "dashed" as const },
+        data: [{ yAxis: p95Ms.value }],
+        label: {
+          formatter: t("synthetics.runs.chartP95", { value: p95Label.value }),
+          color: p95Color,
+          fontSize: 10,
+        },
+      }
+    : undefined;
+
+  const byEnv = synthetics.bucketsByEnv.value;
+  if (byEnv.size >= 2) {
+    // Configured order first; envs only history knows (since deleted) after.
+    const envs = props.environments.filter((env) => byEnv.has(env));
+    for (const env of byEnv.keys()) if (!envs.includes(env)) envs.push(env);
+    return {
+      backgroundColor: "transparent",
+      grid: { left: 52, right: 52, top: 28, bottom: 28 },
+      legend: { top: 0, textStyle: { color: axisColor, fontSize: 10 } },
+      tooltip: {
+        trigger: "axis" as const,
+        valueFormatter: (val: number) => fmtDur(val),
+      },
+      xAxis: {
+        type: "time" as const,
+        axisLine: { lineStyle: { color: splitColor } },
+        axisLabel: { color: axisColor, fontSize: 10 },
+      },
+      yAxis: {
+        type: "value" as const,
+        axisLabel: {
+          color: axisColor,
+          fontSize: 10,
+          formatter: (val: number) => fmtDur(val),
+        },
+        splitLine: { lineStyle: { color: splitColor, type: "dashed" as const } },
+      },
+      series: envs.map((env, i) => ({
+        name: env,
+        type: "line" as const,
+        smooth: true,
+        showSymbol: false,
+        data: byEnv.get(env)!.map((b) => [b.tsMs, b.p95Ms] as [number, number]),
+        lineStyle: {
+          color: cssVar(ENV_SERIES_TOKENS[i % ENV_SERIES_TOKENS.length], "#3b82f6"),
+          width: 1.5,
+        },
+        // The blended p95 line stays: it is the number the KPI tile shows.
+        markLine: i === 0 ? p95MarkLine : undefined,
+      })),
+    };
+  }
 
   let seriesData: [number, number][];
   if (synthetics.buckets.value.length > 0) {
@@ -2433,19 +2626,7 @@ const responseChartOption = computed(() => {
         data: seriesData,
         lineStyle: { color: lineColor, width: 1.5 },
         areaStyle: { color: lineColor, opacity: 0.08 },
-        markLine: p95Ms.value
-          ? {
-              silent: true,
-              symbol: "none" as const,
-              lineStyle: { color: p95Color, type: "dashed" as const },
-              data: [{ yAxis: p95Ms.value }],
-              label: {
-                formatter: t("synthetics.runs.chartP95", { value: p95Label.value }),
-                color: p95Color,
-                fontSize: 10,
-              },
-            }
-          : undefined,
+        markLine: p95MarkLine,
       },
     ],
   };
@@ -2580,7 +2761,12 @@ async function loadSteps() {
   const tr = timeRangeMicros.value;
   if (!tr) return;
   stepsMatchWindow.value = true;
-  await synthetics.fetchSteps(props.monitorId, tr.startTime, tr.endTime);
+  await synthetics.fetchSteps(
+    props.monitorId,
+    tr.startTime,
+    tr.endTime,
+    props.environmentScope || undefined,
+  );
 }
 
 watch(activeTab, (tab) => {
@@ -2596,7 +2782,14 @@ async function refresh(startTime?: number, endTime?: number) {
   // retry button takes — otherwise defer to the next time it is opened.
   stepsMatchWindow.value = false;
   await Promise.all([
-    synthetics.fetchAll(props.monitorId, startTime, endTime),
+    synthetics.fetchAll(
+      props.monitorId,
+      startTime,
+      endTime,
+      props.environmentScope || undefined,
+      // Per-env chart series: multi-env check, All mode only.
+      envAware.value && !props.environmentScope,
+    ),
     activeTab.value === "steps" ? loadSteps() : Promise.resolve(),
   ]);
 }

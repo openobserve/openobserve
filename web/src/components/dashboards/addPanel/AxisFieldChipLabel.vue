@@ -20,11 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <span
-    class="inline-flex items-center gap-1 leading-normal font-normal"
+    class="inline-flex max-w-80 min-w-0 items-center gap-1 leading-normal font-normal"
     data-test="dashboard-axis-field-chip-label"
   >
-    <span class="whitespace-nowrap"
-      ><span v-for="(seg, i) in segments" :key="i" :class="seg.cls">{{ seg.text }}</span></span
+    <OTruncatedText
+      ><span v-for="(seg, i) in segments" :key="i" :class="seg.cls">{{
+        seg.text
+      }}</span></OTruncatedText
     >
   </span>
 </template>
@@ -32,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = withDefaults(
   defineProps<{

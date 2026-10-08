@@ -131,11 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-title="{ row }">
-          <div class="flex items-center gap-1">
-            <span>
-              {{ row.title || formatDimensions(row.group_values) }}
-            </span>
-          </div>
+          <span>
+            {{ row.title || formatDimensions(row.group_values) }}
+          </span>
         </template>
         <template #cell-dimensions="{ row }">
           <div
@@ -280,20 +278,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
-
-        <!-- Bottom -->
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-              {{ visibleIncidents.length }}
-              {{
-                visibleIncidents.length === 1
-                  ? t("alerts.incidentSingular")
-                  : t("alerts.incidentPlural")
-              }}
-            </div>
-          </div>
-        </template>
       </OTable>
     </OPageLayout>
   </div>
@@ -386,7 +370,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          qTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          qTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },

@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('serviceAccounts.header')"
           sorting="client"
           selection="multiple"
           :selected-ids="selectedAccountEmails"
@@ -122,6 +121,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-first_name="{ row }">
             <template v-if="row.is_system && row.description">{{ row.description }}</template>
             <template v-else>{{ row.first_name }}</template>
+          </template>
+
+          <template v-if="showRolesColumn" #cell-roles="{ row }">
+            <span
+              :data-test="`service-accounts-roles-${row.email}`"
+              class="text-text-secondary text-xs"
+              >{{ serviceAccountRolesText(row.email) }}</span
+            >
           </template>
 
           <template #cell-token="{ row }">
@@ -234,13 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </template>
 
-          <template #bottom>
-            <span class="text-xs font-normal max-md:hidden"
-              >{{ serviceAccountsState.service_accounts_users.length }}
-              {{ t("serviceAccounts.header") }}</span
-            >
+          <template #selection-actions>
             <OButton
-              v-if="selectedAccounts.length > 0"
               data-test="service-accounts-list-delete-accounts-btn"
               variant="outline-destructive"
               size="sm"
@@ -306,9 +308,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an access summary (creation only — rotate shows the token alone). -->
       <div data-test="service-accounts-token-wizard">
         <div data-test="service-accounts-token-step-1">
-          <p class="text-text-secondary mb-3 text-xs">
+          <OBanner
+            variant="warning"
+            icon="warning"
+            dense
+            data-test="service-accounts-token-copy-hint"
+            class="mb-3"
+          >
             {{ t("serviceAccounts.tokenReveal.copyHint") }}
-          </p>
+          </OBanner>
 
           <OTabs v-model="tokenTab" dense align="left">
             <OTab name="curl" :label="t('serviceAccounts.tokenReveal.curl')" />
@@ -318,27 +326,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenCurlSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-curl-code"
+                :code="tokenCurlSnippet"
+                lang="bash"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
             <OTabPanel name="header">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenHeaderSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-header-code"
+                :code="tokenHeaderSnippet"
+                lang="http"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
             <OTabPanel name="env">
-              <pre
-                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenEnvSnippet }}</pre>
+              <OCodeBlock
+                data-test="service-accounts-token-env-code"
+                :code="tokenEnvSnippet"
+                lang="bash"
+                wrap
+                :copy-message="t('serviceAccounts.toast.tokenCopied')"
+              />
             </OTabPanel>
           </OTabPanels>
 
-          <div class="mt-3 flex items-center gap-2">
+          <div class="mt-3 grid grid-cols-2 gap-2">
             <OButton
               data-test="service-accounts-list-token-copy-btn"
               variant="outline"
-              size="icon-md"
+              size="sm"
+              icon-left="content-copy"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
                 copyToClipboard(serviceToken, t, {
@@ -347,23 +368,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 })
               "
             >
-              <OIcon name="content-copy" size="sm" />
+              {{ t("serviceAccounts.copyToken") }}
             </OButton>
-            <span class="text-text-secondary text-xs">{{ t("serviceAccounts.copyToken") }}</span>
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
-              size="icon-md"
-              class="ms-2"
+              size="sm"
+              icon-left="file-download"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
-              <OIcon name="file-download" size="sm" />
+              {{ t("serviceAccounts.downloadToken") }}
             </OButton>
-            <span class="text-text-secondary text-xs">{{
-              t("serviceAccounts.downloadToken")
-            }}</span>
           </div>
 
           <!-- ── Access grant status ──
@@ -389,13 +406,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-token-access-summary"
             class="mt-4"
           >
-            <div v-if="grantedRolesText" class="mb-1 flex items-start gap-2">
-              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-text-secondary text-xs">{{ grantedRolesText }}</span>
+            <div v-if="tokenAccess?.assigned.roles.length" class="mb-2">
+              <div class="text-text-secondary mb-1 text-xs font-medium">
+                {{ t("serviceAccounts.tokenReveal.rolesAssignedLabel") }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <OBadge
+                  v-for="role in tokenAccess.assigned.roles"
+                  :key="role"
+                  variant="success"
+                  icon="check"
+                  size="sm"
+                  >{{ role }}</OBadge
+                >
+              </div>
             </div>
-            <div v-if="grantedGroupsText" class="mb-1 flex items-start gap-2">
-              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-text-secondary text-xs">{{ grantedGroupsText }}</span>
+            <div v-if="tokenAccess?.assigned.groups.length" class="mb-2">
+              <div class="text-text-secondary mb-1 text-xs font-medium">
+                {{ t("serviceAccounts.tokenReveal.groupsAssignedLabel") }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <OBadge
+                  v-for="group in tokenAccess.assigned.groups"
+                  :key="group"
+                  variant="success"
+                  icon="check"
+                  size="sm"
+                  >{{ group }}</OBadge
+                >
+              </div>
             </div>
 
             <div
@@ -478,6 +517,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
+import { allUserRolesQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -488,6 +529,9 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -539,6 +583,9 @@ export default defineComponent({
     ORefreshButton,
     OTable,
     OTag,
+    OBadge,
+    OBanner,
+    OCodeBlock,
     OCodeCell,
     OUserCell,
     OTimeCell,
@@ -555,7 +602,6 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const { track } = useReo();
-    const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
@@ -593,20 +639,6 @@ export default defineComponent({
       () =>
         !!tokenAccess.value &&
         tokenAccess.value.failed.roles.length + tokenAccess.value.failed.groups.length > 0,
-    );
-    const grantedRolesText = computed(() =>
-      tokenAccess.value?.assigned.roles.length
-        ? t("serviceAccounts.tokenReveal.grantedRoles", {
-            roles: tokenAccess.value.assigned.roles.join(", "),
-          })
-        : "",
-    );
-    const grantedGroupsText = computed(() =>
-      tokenAccess.value?.assigned.groups.length
-        ? t("serviceAccounts.tokenReveal.grantedGroups", {
-            groups: tokenAccess.value.assigned.groups.join(", "),
-          })
-        : "",
     );
     const failedRolesText = computed(() =>
       tokenAccess.value?.failed.roles.length
@@ -703,10 +735,38 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
+    // Email -> role names for the Roles column; one batched org-wide request instead of per-row lookups.
+    const serviceAccountRoles = ref<Record<string, string[]> | null>(null);
+
+    const loadServiceAccountRoles = async (force = false) => {
+      if (!showRolesColumn) return;
+      try {
+        const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        serviceAccountRoles.value = (await queryClient.fetchQuery(options)) ?? {};
+      } catch {
+        // Silent: roles are context for this column, not load-bearing — the
+        // list stays fully usable without them.
+        serviceAccountRoles.value = null;
+      }
+    };
+
+    const serviceAccountRolesText = (email: string): string => {
+      const roles = serviceAccountRoles.value?.[email];
+      return roles?.length ? roles.join(", ") : "—";
+    };
+
     onBeforeMount(async () => {
       // Not forced: a route-change read stays cached. Only the refresh button
       // and the post-write reloads below pass `true`.
       await getServiceAccountsUsers();
+      loadServiceAccountRoles();
 
       // Only `action=update&email=…` auto-opens the edit dialog so a shared
       // edit link still lands directly on the user's form. `action=add` is
@@ -721,6 +781,10 @@ export default defineComponent({
         if (match) addUser({ row: match }, true);
       }
     });
+
+    // Roles/Groups are an enterprise/cloud-only concept (OSS has no RBAC UI),
+    // so the column — and the lookup backing it — is skipped entirely there.
+    const showRolesColumn = config.isEnterprise === "true" || config.isCloud === "true";
 
     const columns: OTableColumnDef[] = [
       {
@@ -744,6 +808,21 @@ export default defineComponent({
         minSize: 160,
         meta: { align: "left", flex: true },
       },
+      ...(showRolesColumn
+        ? [
+            {
+              id: "roles",
+              header: t("serviceAccounts.list.col.roles"),
+              accessorKey: "roles",
+              sortable: false,
+              resizable: true,
+              hideable: true,
+              size: 160,
+              minSize: 120,
+              meta: { align: "left" },
+            } satisfies OTableColumnDef,
+          ]
+        : []),
       {
         id: "token",
         header: t("serviceAccounts.list.col.token"),
@@ -811,10 +890,12 @@ export default defineComponent({
       return e?.status === 403 || e?.response?.status === 403;
     });
     // Bound to refresh / post-write reloads: always hits the server.
-    const refreshServiceAccounts = () => getServiceAccountsUsers(true);
+    const refreshServiceAccounts = () => {
+      loadServiceAccountRoles(true);
+      return getServiceAccountsUsers(true);
+    };
 
     const applyServiceAccounts = (accounts: any[]) => {
-      resultTotal.value = accounts.length;
       currentUserRole.value = "";
       serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
         return {
@@ -997,7 +1078,6 @@ export default defineComponent({
               ...serviceAccountsState.service_accounts_users,
               user,
             ];
-            resultTotal.value = serviceAccountsState.service_accounts_users.length;
           }
         } else {
           setTimeout(() => {
@@ -1200,8 +1280,6 @@ export default defineComponent({
       tokenAccessPending,
       hasAccessGrants,
       hasAccessFailures,
-      grantedRolesText,
-      grantedGroupsText,
       failedRolesText,
       failedGroupsText,
       isSyntheticSA,
@@ -1240,6 +1318,9 @@ export default defineComponent({
       isSystemAccount,
       isRowSelectable,
       deleteUserEmailIdentifier,
+      showRolesColumn,
+      serviceAccountRoles,
+      serviceAccountRolesText,
     };
   },
 });

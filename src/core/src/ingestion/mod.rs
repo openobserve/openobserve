@@ -33,10 +33,11 @@ use config::{
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        triggers::ScheduledTriggerData,
     },
     utils::{
         flatten,
-        json::*,
+        json::{self, *},
         schema::format_partition_key,
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
     },
@@ -60,7 +61,7 @@ use super::{
     pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
-    alerts::alert::AlertExt,
+    alerts::alert::{AlertError, AlertExt, NotificationOutcome},
     common::{
         infra::config::STREAM_ALERTS,
         meta::stream::{SchemaEvolution, SchemaRecords},
@@ -151,6 +152,7 @@ pub async fn get_stream_partition_keys(
 
 #[inline(always)]
 pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
+    pipeline::report_broken_realtime_pipelines(stream).await;
     pipeline::get_executable_pipelines(stream).await
 }
 
@@ -233,25 +235,15 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.org_id,
             alert.name
         );
-        match alert
-            .send_notification(&trace_id, val, now, None, now, None, None, None, &[])
-            .await
-        {
+        let outcome = alert
+            .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
+            .await;
+        record_realtime_delivery(&mut trigger_data_stream, &outcome);
+        match outcome {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
-                trigger_data_stream.status = RunOutcome::NotifyFailed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
             }
-            Ok(outcome) => {
-                let success_msg = outcome.success_message.trim().to_owned();
-                let error_msg = outcome.error_message.trim().to_owned();
-                if !error_msg.is_empty() {
-                    trigger_data_stream.error = Some(error_msg);
-                }
-                if !success_msg.is_empty() {
-                    trigger_data_stream.success_response = Some(success_msg);
-                }
+            Ok(_) => {
                 // enforce a minimum silence floor so a high-volume stream cannot
                 // fire (and write to the db) once per matching request
                 let silence_micros = alert.trigger_condition.effective_silence_micros();
@@ -268,15 +260,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                     // After the notification is sent successfully, we need to update
                     // the silence period of the trigger
                     if let Err(e) = db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
-                            org: alert.org_id.to_string(),
-                            module: db::scheduler::TriggerModule::Alert,
-                            module_key,
-                            is_silenced: true,
-                            is_realtime: true,
-                            next_run_at,
-                            ..Default::default()
-                        },
+                        silenced_realtime_trigger(&alert.org_id, module_key, next_run_at, now),
                         false,
                         "",
                     )
@@ -543,6 +527,110 @@ pub fn schema_records_to_entries(
         .collect()
 }
 
+/// All streams while the pattern manager is down, else those whose pattern failed to build.
+#[cfg(any(feature = "vectorscan", test))]
+fn unscannable_streams<'a>(
+    streams: &[(&'a str, u64)],
+    manager_up: bool,
+    unbuilt: impl Fn(&str) -> bool,
+) -> Vec<(&'a str, u64)> {
+    streams
+        .iter()
+        .copied()
+        .filter(|(stream, _)| !manager_up || unbuilt(stream))
+        .collect()
+}
+
+/// Each stream plus its pipelines' fixed same-type destinations, with the source's record count.
+#[cfg(feature = "vectorscan")]
+pub async fn with_pipeline_destinations(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+) -> Vec<(String, u64)> {
+    let mut all: Vec<(String, u64)> = streams.iter().map(|(s, n)| (s.to_string(), *n)).collect();
+    // Walking pipelines clones each compiled one, so skip it when nothing would be refused.
+    if !config::get_config().common.sdr_fail_closed {
+        return all;
+    }
+    for (stream, records) in streams {
+        let params = StreamParams::new(org_id, stream, stream_type);
+        for pipeline in get_stream_executable_pipelines(&params).await {
+            for dest in pipeline.get_all_destination_streams() {
+                let same_scope = dest.org_id == org_id && dest.stream_type == stream_type;
+                if same_scope && !all.iter().any(|(s, _)| *s == dest.stream_name) {
+                    all.push((dest.stream_name.to_string(), *records));
+                }
+            }
+        }
+    }
+    all
+}
+
+/// `ZO_SDR_FAIL_CLOSED`: why a write must be refused before any pipeline runs.
+#[cfg(feature = "vectorscan")]
+pub async fn sdr_fail_closed_refusal(
+    org_id: &str,
+    stream_type: StreamType,
+    streams: &[(&str, u64)],
+    exempt: impl Fn(&str) -> bool,
+) -> Option<String> {
+    use config::meta::self_reporting::redaction::{
+        DataWindow, EvidenceScope, FailPosture, fail_closed_rejection,
+    };
+    if !config::get_config().common.sdr_fail_closed {
+        return None;
+    }
+    let unscannable = match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(mgr) => unscannable_streams(streams, true, |stream| {
+            mgr.has_unbuilt_patterns(
+                org_id,
+                stream_type,
+                stream,
+                o2_enterprise::enterprise::re_patterns::ApplyTime::Ingestion,
+            )
+        }),
+        Err(e) => {
+            log::error!("[SDR] pattern manager unavailable for org {org_id}: {e}");
+            unscannable_streams(streams, false, |_| true)
+        }
+    };
+    let reason = fail_closed_rejection(
+        true,
+        org_id,
+        stream_type,
+        unscannable.iter().map(|(stream, _)| *stream),
+        &exempt,
+    )?;
+    for (stream, records) in unscannable.iter().filter(|(stream, _)| !exempt(stream)) {
+        crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+            &EvidenceScope::new(org_id, stream, stream_type),
+            FailPosture::Closed,
+            *records,
+            DataWindow::default(),
+        )
+        .await;
+    }
+    log::error!("[SDR] {reason}");
+    Some(reason)
+}
+
+/// The fail-closed redaction refusal, as opposed to an overload or another resource error.
+#[cfg(any(feature = "vectorscan", test))]
+pub fn is_sdr_fail_closed_refusal(e: &Error) -> bool {
+    matches!(e, Error::ResourceError(reason)
+        if config::meta::self_reporting::redaction::is_fail_closed_rejection(reason))
+}
+
+/// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
+pub fn write_error_status(e: &Error) -> http::StatusCode {
+    match e {
+        Error::ResourceError(_) => http::StatusCode::SERVICE_UNAVAILABLE,
+        e if e.is_columns_limit_exceeded() => http::StatusCode::BAD_REQUEST,
+        _ => http::StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
 /// An entry carrying a `batch` counts its rows from the batch, not from `data`.
 pub async fn write_entries(
     writer: &Arc<ingester::Writer>,
@@ -570,7 +658,11 @@ pub async fn write_entries(
             stream_name,
             e
         );
-        return Err(Error::IngestionError(e.to_string()));
+        return Err(if e.is_overload() {
+            Error::ResourceError(e.to_string())
+        } else {
+            Error::IngestionError(e.to_string())
+        });
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
@@ -800,11 +892,60 @@ pub fn refactor_map(
     new_map
 }
 
+fn silenced_realtime_trigger(
+    org: &str,
+    module_key: String,
+    next_run_at: i64,
+    fired_at: i64,
+) -> db::scheduler::Trigger {
+    db::scheduler::Trigger {
+        org: org.to_string(),
+        module: db::scheduler::TriggerModule::Alert,
+        module_key,
+        is_silenced: true,
+        is_realtime: true,
+        next_run_at,
+        // Realtime rows carry no other data, and the wakeup clones it forward.
+        data: json::to_string(&ScheduledTriggerData {
+            last_satisfied_at: Some(fired_at),
+            ..Default::default()
+        })
+        .unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
 /// The span of one write partition, which a record's time bucket is counted in.
 fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
     match time_level {
         PartitionTimeLevel::Daily => DAY_MICRO_SECS,
         PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
+}
+
+fn record_realtime_delivery(
+    trigger_data_stream: &mut TriggerData,
+    outcome: &Result<NotificationOutcome, AlertError>,
+) {
+    match outcome {
+        Err(e) => {
+            trigger_data_stream.status = RunOutcome::NotifyFailed;
+            trigger_data_stream.error = Some(format!("error sending notification for alert: {e}"));
+        }
+        Ok(outcome) => {
+            // Any undelivered destination is a failure, even when others succeeded.
+            if !outcome.failed.is_empty() {
+                trigger_data_stream.status = RunOutcome::NotifyFailed;
+            }
+            let success_msg = outcome.success_message.trim().to_owned();
+            let error_msg = outcome.error_message.trim().to_owned();
+            if !error_msg.is_empty() {
+                trigger_data_stream.error = Some(error_msg);
+            }
+            if !success_msg.is_empty() {
+                trigger_data_stream.success_response = Some(success_msg);
+            }
+        }
     }
 }
 
@@ -816,6 +957,53 @@ mod tests {
     use transform::compile_vrl_function;
 
     use super::*;
+
+    #[test]
+    fn test_only_the_fail_closed_refusal_is_recognised() {
+        let reason = config::meta::self_reporting::redaction::fail_closed_rejection(
+            true,
+            "acme",
+            StreamType::Logs,
+            ["app"].into_iter(),
+            |_| false,
+        )
+        .expect("refused");
+        assert!(is_sdr_fail_closed_refusal(&Error::ResourceError(
+            reason.clone()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::ResourceError(
+            "memtable is full".to_string()
+        )));
+        assert!(!is_sdr_fail_closed_refusal(&Error::IngestionError(reason)));
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_every_stream_while_the_manager_is_down() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, false, |_| false),
+            vec![("app", 3), ("audit", 1)]
+        );
+    }
+
+    #[test]
+    fn test_unscannable_streams_is_only_unbuilt_streams_once_the_manager_is_up() {
+        let streams = [("app", 3), ("audit", 1)];
+        assert_eq!(
+            unscannable_streams(&streams, true, |stream| stream == "audit"),
+            vec![("audit", 1)]
+        );
+        assert!(unscannable_streams(&streams, true, |_| false).is_empty());
+    }
+
+    #[test]
+    fn test_silenced_realtime_trigger_records_when_it_fired() {
+        let trigger = silenced_realtime_trigger("org1", "key1".to_string(), 2_000, 1_000);
+        assert!(trigger.is_silenced && trigger.is_realtime);
+        assert_eq!(trigger.next_run_at, 2_000);
+        let data: ScheduledTriggerData = json::from_str(&trigger.data).unwrap();
+        assert_eq!(data.last_satisfied_at, Some(1_000));
+    }
 
     #[test]
     fn test_format_partition_key() {
@@ -1442,5 +1630,72 @@ mod tests {
                 .err()
                 .expect("over the limit");
         assert!(err.to_string().contains("columns"), "{err}");
+    }
+
+    #[test]
+    fn test_write_error_status() {
+        let columns = schema::get_request_columns_limit_error("o/logs/s", 243);
+        assert_eq!(
+            write_error_status(&Error::OtherError(columns)),
+            http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            write_error_status(&Error::ResourceError("write queue full".to_string())),
+            http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            write_error_status(&Error::IngestionError("disk failure".to_string())),
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    fn realtime_row() -> TriggerData {
+        TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_realtime_send_that_reached_every_destination_stays_firing() {
+        let mut row = realtime_row();
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            success_message: " sent ".to_string(),
+            ..Default::default()
+        });
+        record_realtime_delivery(&mut row, &delivered);
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.success_response.as_deref(), Some("sent"));
+        assert_eq!(row.error, None);
+    }
+
+    #[test]
+    fn test_realtime_send_that_partially_failed_is_notify_failed() {
+        let mut row = realtime_row();
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            success_message: "sent to slack".to_string(),
+            error_message: "pagerduty timed out".to_string(),
+        });
+        record_realtime_delivery(&mut row, &partial);
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
+        assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
+    }
+
+    #[test]
+    fn test_realtime_send_that_failed_is_notify_failed() {
+        let mut row = realtime_row();
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        record_realtime_delivery(&mut row, &failed);
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(
+            row.error.as_deref(),
+            Some("error sending notification for alert: http 500")
+        );
     }
 }

@@ -414,7 +414,7 @@ pub async fn search(
                 start,
                 &org_id,
                 stream_type,
-                "500",
+                &err.http_status().to_string(),
                 "_search",
                 &search_type,
                 "",
@@ -515,6 +515,20 @@ pub async fn around_v1(
     let user_id = Some(user_email.user_id.clone());
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
+    let stream_name = around::resolve_around_stream(&stream_name, None, &url_query);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_stream_permissions(
+        &stream_name,
+        &org_id,
+        &user_email.user_id,
+        &stream_type,
+        StreamPermissionResourceType::Search,
+    )
+    .await
+    {
+        return res;
+    }
 
     let ret = around::around(
         &trace_id,
@@ -523,7 +537,6 @@ pub async fn around_v1(
         &stream_name,
         stream_type,
         Query(url_query),
-        None,
         None,
         user_id,
     )
@@ -637,6 +650,20 @@ pub async fn around_v2(
     let user_id = Some(user_email.user_id.clone());
 
     let stream_type = get_stream_type_from_request(&url_query).unwrap_or_default();
+    let stream_name = around::resolve_around_stream(&stream_name, None, &url_query);
+
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_stream_permissions(
+        &stream_name,
+        &org_id,
+        &user_email.user_id,
+        &stream_type,
+        StreamPermissionResourceType::Search,
+    )
+    .await
+    {
+        return res;
+    }
 
     let ret = around::around(
         &trace_id,
@@ -645,7 +672,6 @@ pub async fn around_v2(
         &stream_name,
         stream_type,
         Query(url_query),
-        None,
         Some(body),
         user_id,
     )
@@ -1247,6 +1273,51 @@ fn values_field_where(sql_where: &str, column: &str, keyword: &str) -> String {
     }
 }
 
+/// Every stream `sql` reads, typed by its schema prefix as the search engine resolves it.
+#[cfg(any(feature = "enterprise", test))]
+fn resolve_typed_stream_names(
+    sql: &str,
+    stream_type: StreamType,
+) -> Result<Vec<(String, StreamType)>, infra::errors::Error> {
+    use config::meta::sql::TableReferenceExt;
+
+    let sql = config::utils::query_select_utils::replace_o2_custom_patterns(sql)
+        .unwrap_or_else(|_| sql.to_string());
+    Ok(config::meta::sql::resolve_stream_names_with_type(&sql)?
+        .iter()
+        .map(|t| (t.stream_name(), t.get_stream_type(stream_type)))
+        .collect())
+}
+
+/// Requires search permission on every stream `sql` reads; `None` means allowed.
+#[cfg(feature = "enterprise")]
+async fn check_sql_stream_permissions(
+    sql: &str,
+    org_id: &str,
+    user_id: &str,
+    stream_type: StreamType,
+    trace_id: &str,
+) -> Option<Response> {
+    let streams = match resolve_typed_stream_names(sql, stream_type) {
+        Ok(streams) => streams,
+        Err(e) => return Some(map_error_to_http_response(&e, Some(trace_id.to_string()))),
+    };
+    for (stream, stream_type) in streams {
+        if let Some(res) = check_stream_permissions(
+            &stream,
+            org_id,
+            user_id,
+            &stream_type,
+            StreamPermissionResourceType::Search,
+        )
+        .await
+        {
+            return Some(res);
+        }
+    }
+    None
+}
+
 /// SearchStreamPartition
 
 #[utoipa::path(
@@ -1359,6 +1430,11 @@ pub async fn search_partition(
                 )
                     .into_response();
             }
+        }
+        if let Some(res) =
+            check_sql_stream_permissions(&req.sql, &org_id, user_id, stream_type, &trace_id).await
+        {
+            return res;
         }
     }
 
@@ -1875,6 +1951,25 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_resolve_typed_stream_names_honours_the_schema_prefix() {
+        assert_eq!(
+            resolve_typed_stream_names("SELECT * FROM metrics.foreign_stream", StreamType::Logs)
+                .unwrap(),
+            vec![("foreign_stream".to_string(), StreamType::Metrics)]
+        );
+        assert_eq!(
+            resolve_typed_stream_names(
+                "SELECT * FROM \"a\" JOIN \"b\" ON a.x = b.x",
+                StreamType::Logs
+            )
+            .unwrap()
+            .len(),
+            2
+        );
+        assert!(resolve_typed_stream_names("not sql", StreamType::Logs).is_err());
+    }
+
     fn schema() -> Schema {
         Schema::new(vec![
             Field::new("level", DataType::Utf8, true),
@@ -1925,5 +2020,73 @@ mod tests {
             values_field_where("WHERE a = 1", "\"level\"", "err"),
             "WHERE a = 1 AND str_match_ignore_case(\"level\", 'err')"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn non_member() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: "outsider@example.com".to_string(),
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn assert_unauthorized(resp: Response) {
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(body.contains("Unauthorized Access"), "{body}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_around_refuses_a_caller_outside_the_org() {
+        let query = || {
+            Query(HashMap::from([
+                (
+                    "sql".to_string(),
+                    base64::encode_url("SELECT * FROM \"victim\""),
+                ),
+                ("key".to_string(), "1790702573362064".to_string()),
+            ]))
+        };
+        let path = || Path(("default".to_string(), "allowed".to_string()));
+        assert_unauthorized(around_v1(path(), HeaderMap::new(), non_member(), query()).await).await;
+        let resp = around_v2(
+            path(),
+            HeaderMap::new(),
+            non_member(),
+            query(),
+            axum::body::Bytes::new(),
+        )
+        .await;
+        assert_unauthorized(resp).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_search_partition_refuses_a_caller_outside_the_org() {
+        let resp = search_partition(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            non_member(),
+            Query(HashMap::new()),
+            Json(SearchPartitionRequest {
+                sql: "SELECT * FROM \"victim\"".to_string(),
+                start_time: 0,
+                end_time: 1,
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                query_fn: None,
+                streaming_output: false,
+                histogram_interval: 0,
+                sampling_ratio: None,
+                search_type: None,
+            }),
+        )
+        .await;
+        assert_unauthorized(resp).await;
     }
 }

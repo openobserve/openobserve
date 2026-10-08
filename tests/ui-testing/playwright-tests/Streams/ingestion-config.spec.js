@@ -1,0 +1,335 @@
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
+
+test.describe("Ingestion Configuration Tests", () => {
+  test.describe.configure({ mode: 'parallel' });
+  let pm;
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+
+    await navigateToBase(page);
+    pm = new PageManager(page);
+
+    await page.waitForLoadState('domcontentloaded');
+    testLogger.info('Ingestion configuration test setup completed');
+  });
+
+  test.describe("Ingestion Navigation", () => {
+    test("should navigate to Recommended, Logs, and Metrics pages", {
+      tag: ['@ingestion', '@navigation', '@P0']
+    }, async () => {
+      const orgId = getOrgIdentifier();
+
+      // Test Recommended page navigation
+      testLogger.info('Testing navigation to Recommended ingestion page');
+      await pm.ingestionConfigPage.navigateToRecommended(orgId);
+      await pm.ingestionConfigPage.expectRecommendedPageLoaded();
+      testLogger.info('✓ Recommended page loaded successfully');
+
+      // Test Custom/Logs page navigation
+      testLogger.info('Testing navigation to Custom/Logs ingestion page');
+      await pm.ingestionConfigPage.navigateToCustom(orgId);
+      await pm.ingestionConfigPage.expectLogsPageLoaded();
+      testLogger.info('✓ Logs page loaded successfully');
+
+      // Test Custom/Metrics page navigation
+      testLogger.info('Testing navigation to Custom/Metrics ingestion page');
+      await pm.ingestionConfigPage.clickMetricsTab();
+      await pm.ingestionConfigPage.expectMetricsPageLoaded();
+      testLogger.info('✓ Metrics page loaded successfully');
+
+      testLogger.info('All ingestion page navigation tests completed');
+    });
+  });
+
+  test.describe("Copy Functionality", () => {
+    test("should copy Logs and Metrics configurations to clipboard", {
+      tag: ['@ingestion', '@copy', '@P1']
+    }, async () => {
+      const orgId = getOrgIdentifier();
+
+      // Test copy functionality for Logs (Fluentd)
+      testLogger.info('Testing copy functionality for Fluentd (Logs) configuration');
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/logs/fluentd', orgId);
+      const fluentdContent = await pm.ingestionConfigPage.getContentText();
+      await pm.ingestionConfigPage.expectContentLength(0);
+      testLogger.info(`✓ Fluentd configuration displayed (${fluentdContent.length} chars)`);
+      await pm.ingestionConfigPage.clickCopyButton();
+      await pm.ingestionConfigPage.verifyNotificationVisible('Copied Successfully');
+      testLogger.info('✓ Fluentd configuration copied successfully');
+
+      // Test copy functionality for Metrics (Prometheus)
+      testLogger.info('Testing copy functionality for Prometheus (Metrics) configuration');
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/custom/metrics/prometheus', orgId);
+      const prometheusContent = await pm.ingestionConfigPage.getContentText();
+      expect(prometheusContent).toBeTruthy();
+      testLogger.info(`✓ Prometheus configuration displayed (${prometheusContent.length} chars)`);
+      await pm.ingestionConfigPage.clickCopyButton();
+      await pm.ingestionConfigPage.verifyNotificationVisible();
+      testLogger.info('✓ Prometheus configuration copied successfully');
+
+      testLogger.info('All copy functionality tests completed');
+    });
+  });
+
+  test.describe("Configuration Content", () => {
+    const integrationSamples = [
+      { category: 'logs', name: 'fluentd', path: '/ingestion/custom/logs/fluentd', label: 'Fluentd' },
+      { category: 'logs', name: 'curl', path: '/ingestion/custom/logs/curl', label: 'Curl' },
+      { category: 'metrics', name: 'prometheus', path: '/ingestion/custom/metrics/prometheus', label: 'Prometheus' },
+      { category: 'metrics', name: 'otelCollector', path: '/ingestion/custom/metrics/otelCollector', label: 'OTEL Collector' },
+      { category: 'recommended', name: 'kubernetes', path: '/ingestion/recommended/kubernetes', label: 'Kubernetes' },
+      { category: 'recommended', name: 'gpu', path: '/ingestion/recommended/gpu', label: 'GPU (DCGM Exporter)' },
+      { category: 'databases', name: 'postgres', path: '/ingestion/databases/postgres', label: 'PostgreSQL' },
+    ];
+
+    for (const integration of integrationSamples) {
+      test(`should display ${integration.label} configuration with org identifier`, {
+        tag: ['@ingestion', `@${integration.category}`, '@content', '@P1']
+      }, async () => {
+        testLogger.info(`Testing configuration display for ${integration.label}`);
+
+        const orgId = getOrgIdentifier();
+        await pm.ingestionConfigPage.navigateToIntegration(integration.path, orgId);
+
+        await pm.ingestionConfigPage.verifyCopyButtonVisible();
+        await pm.ingestionConfigPage.verifyContentVisible();
+        await pm.ingestionConfigPage.expectContentLength(10);
+
+        const containsOrgId = await pm.ingestionConfigPage.expectContentContainsOrgId(orgId);
+        if (containsOrgId) {
+          testLogger.info(`✓ Configuration contains org identifier for ${integration.label}`);
+        }
+
+        testLogger.info(`${integration.label} configuration displayed successfully`);
+      });
+    }
+  });
+
+  test.describe("Recommended Page Features", () => {
+    // Skipped: Search was moved from Recommended page to global ingestion search
+    // in Ingestion.vue with different behavior (navigates to routes instead of filtering tabs).
+    // Needs a dedicated test rewrite once the global search UI is stabilized.
+    test.skip("should search and navigate using global ingestion search", {
+      tag: ['@ingestion', '@search', '@P2']
+    }, async ({ page }) => {
+      testLogger.info('Testing global search functionality in ingestion page');
+
+      const orgId = getOrgIdentifier();
+      await pm.ingestionConfigPage.navigateToRecommended(orgId);
+      await pm.ingestionConfigPage.verifySearchInputVisible();
+
+      // Verify the recommended tabs are loaded
+      const initialCount = await pm.ingestionConfigPage.getRouteTabCount();
+      testLogger.info(`Initial recommended integrations count: ${initialCount}`);
+      expect(initialCount).toBeGreaterThan(0);
+
+      // Search for 'kubernetes' using the global search — this navigates to the matching route
+      await pm.ingestionConfigPage.fillSearchInput('kubernetes');
+      // Wait for navigation to settle on a kubernetes route
+      await page.waitForURL(/kubernetes/i, { timeout: 10000 }).catch(() => {});
+
+      // Verify the page navigated to or stayed on a kubernetes-related route
+      const currentUrl = page.url();
+      testLogger.info(`URL after searching 'kubernetes': ${currentUrl}`);
+      expect(currentUrl).toContain('kubernetes');
+
+      // Clear search and verify we can navigate back
+      await pm.ingestionConfigPage.clearSearchInput();
+      await pm.ingestionConfigPage.navigateToRecommended(orgId);
+      await pm.ingestionConfigPage.expectRecommendedPageLoaded();
+
+      const finalCount = await pm.ingestionConfigPage.getRouteTabCount();
+      expect(finalCount).toBe(initialCount);
+
+      testLogger.info('Global search and navigation functionality working correctly');
+    });
+  });
+
+  test.describe("GPU (DCGM Exporter)", () => {
+    test("should open GPU from Recommended with the DCGM Exporter card and both platforms", {
+      tag: ['@ingestion', '@recommended', '@gpu', '@P1']
+    }, async () => {
+      const orgId = getOrgIdentifier();
+      await pm.ingestionConfigPage.openGpuFromRecommended(orgId);
+      await pm.ingestionConfigPage.expectDcgmExporterSelected();
+
+      // Docker (default): the collector config ships to this org's OTLP endpoint.
+      const dockerShip = await pm.ingestionConfigPage.getStepCode('ship');
+      expect(dockerShip).toContain(`/api/${orgId}`);
+      expect(dockerShip).toContain("regex: 'DCGM_.*'");
+
+      // Kubernetes: the platform choice drives every step in the group.
+      await pm.ingestionConfigPage.selectStepVariant('exporter', 'kubernetes');
+      const k8sExporter = await pm.ingestionConfigPage.getStepCode('exporter');
+      expect(k8sExporter).toContain('gpu-helm-charts/dcgm-exporter');
+      expect(k8sExporter).toContain('prometheus.io/scrape');
+      const k8sShip = await pm.ingestionConfigPage.getStepCode('ship');
+      expect(k8sShip).toContain('kubectl port-forward');
+
+      testLogger.info('GPU DCGM Exporter card renders both platform paths');
+    });
+  });
+
+  test.describe("Content Scrolling and Display", () => {
+    test("should scroll through Kubernetes configuration content", {
+      tag: ['@ingestion', '@scroll', '@P2']
+    }, async ({ page }) => {
+      testLogger.info('Testing scroll behavior for Kubernetes configuration');
+
+      const orgId = getOrgIdentifier();
+      await pm.ingestionConfigPage.navigateToIntegration('/ingestion/recommended/kubernetes', orgId);
+
+      await pm.ingestionConfigPage.verifyContentVisible();
+
+      // Get initial scroll dimensions
+      const scrollHeight = await pm.ingestionConfigPage.getContentScrollHeight();
+      const clientHeight = await pm.ingestionConfigPage.getContentClientHeight();
+      testLogger.info(`Content dimensions - scrollHeight: ${scrollHeight}, clientHeight: ${clientHeight}`);
+
+      // Check if content is scrollable (for long configurations)
+      const isScrollable = await pm.ingestionConfigPage.isContentScrollable();
+      if (isScrollable) {
+        testLogger.info('✓ Configuration content is scrollable');
+
+        // Scroll to bottom
+        await pm.ingestionConfigPage.scrollContentToBottom();
+
+        testLogger.info('✓ Successfully scrolled to bottom of configuration');
+      } else {
+        testLogger.info('✓ Configuration content fits without scrolling');
+      }
+
+      testLogger.info('Scroll test completed successfully');
+    });
+  });
+
+  test.describe("Documentation Links", () => {
+    test("should validate ALL documentation links across all integrations", {
+      tag: ['@ingestion', '@links', '@comprehensive', '@P1'],
+    }, async ({ }, testInfo) => {
+      // 5 minutes — iterates 60 integrations checking HTTP status for doc links
+      test.setTimeout(5 * 60 * 1000);
+      const allIntegrations = require('../../../test-data/ingestion_integrations.json');
+
+      testLogger.info(`=== Starting comprehensive documentation link validation for ${allIntegrations.length} integrations ===`);
+
+      // URL patterns known to work in browsers but fail in automated HEAD/GET checks
+      const skipUrls = [
+        'axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve' // Returns 405 for HEAD requests
+      ];
+
+      // Cloud CI runners get intermittent failures from the short.openobserve.ai
+      // redirector service (timeouts, connection resets). Domain-level skip is
+      // intentional — there are 60+ unique paths under this domain across all
+      // integrations, and they ALL use the same unreliable redirector backend.
+      // Enumerating each path individually would be unmaintainable.
+      if (isCloudEnvironment()) {
+        skipUrls.push('short.openobserve.ai');
+      }
+
+      if (skipUrls.length > 0) {
+        testLogger.info(`Note: Skipping ${skipUrls.length} URL(s) known to work but cause issues in automated testing:`);
+        skipUrls.forEach(url => testLogger.info(`  - ${url}`));
+      }
+
+      const orgId = getOrgIdentifier();
+      const allBrokenLinks = [];
+      let totalLinksChecked = 0;
+      let totalLinksSkipped = 0;
+      let integrationsWithLinks = 0;
+      let integrationsWithoutLinks = 0;
+
+      for (const integration of allIntegrations) {
+        testLogger.info(`\nChecking: ${integration.label} (${integration.category})`);
+
+        try {
+          await pm.ingestionConfigPage.navigateToIntegration(integration.path, orgId);
+
+          const linkCount = await pm.ingestionConfigPage.getDocumentationLinkCount();
+
+          if (linkCount === 0) {
+            testLogger.info(`  ℹ No documentation links found`);
+            integrationsWithoutLinks++;
+            continue;
+          }
+
+          integrationsWithLinks++;
+          totalLinksChecked += linkCount;
+
+          // Check HTTP status for all links (with skip list)
+          const linkResults = await pm.ingestionConfigPage.getAllDocumentationLinksStatus(skipUrls);
+
+          const broken = linkResults.filter(r => !r.ok && !r.skipped);
+          const working = linkResults.filter(r => r.ok && !r.skipped);
+          const skipped = linkResults.filter(r => r.skipped);
+
+          if (skipped.length > 0) {
+            totalLinksSkipped += skipped.length;
+            testLogger.info(`  ⊘ ${skipped.length} link(s) skipped (manually verified)`);
+          }
+
+          if (broken.length > 0) {
+            testLogger.info(`  ✗ ${broken.length} broken link(s) found:`);
+            for (const link of broken) {
+              testLogger.info(`    - ${link.url} (Status: ${link.status || link.error})`);
+            }
+
+            allBrokenLinks.push({
+              integration: integration.label,
+              path: integration.path,
+              category: integration.category,
+              brokenLinks: broken
+            });
+          } else if (working.length > 0) {
+            testLogger.info(`  ✓ All ${working.length} link(s) working`);
+          }
+        } catch (error) {
+          testLogger.info(`  ⚠ Error checking ${integration.label}: ${error.message}`);
+        }
+      }
+
+      // Summary Report
+      testLogger.info('\n' + '='.repeat(80));
+      testLogger.info('DOCUMENTATION LINK VALIDATION SUMMARY');
+      testLogger.info('='.repeat(80));
+      testLogger.info(`Total integrations checked: ${allIntegrations.length}`);
+      testLogger.info(`Integrations with links: ${integrationsWithLinks}`);
+      testLogger.info(`Integrations without links: ${integrationsWithoutLinks}`);
+      testLogger.info(`Total links validated: ${totalLinksChecked}`);
+      if (totalLinksSkipped > 0) {
+        testLogger.info(`Total links skipped: ${totalLinksSkipped} (manually verified working)`);
+      }
+
+      if (allBrokenLinks.length > 0) {
+        testLogger.info(`\n❌ BROKEN LINKS FOUND IN ${allBrokenLinks.length} INTEGRATIONS:`);
+        testLogger.info('='.repeat(80));
+
+        for (const item of allBrokenLinks) {
+          testLogger.info(`\n${item.integration} (${item.category})`);
+          testLogger.info(`  Path: ${item.path}`);
+          for (const link of item.brokenLinks) {
+            testLogger.info(`  ✗ ${link.url}`);
+            testLogger.info(`    Status: ${link.status || link.error}`);
+          }
+        }
+        testLogger.info('\n' + '='.repeat(80));
+      } else {
+        testLogger.info(`\n✅ ALL ${totalLinksChecked} DOCUMENTATION LINKS ARE WORKING!`);
+        testLogger.info('='.repeat(80));
+      }
+
+      // Fail test if any broken links found
+      expect(allBrokenLinks.length).toBe(0);
+
+      testLogger.info('\nComprehensive link validation completed');
+    });
+  });
+
+  test.afterEach(async () => {
+    testLogger.info('Ingestion configuration test completed');
+  });
+});

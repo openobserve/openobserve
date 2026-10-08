@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
     <AiScopeBar
       v-if="availableStreams.length > 0"
-      v-model:filter-mode="filterMode"
+      :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
       v-model:selected-agent-name="selectedAgentName"
@@ -205,11 +205,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex flex-col gap-1 max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5"
               >
                 <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
-                  <div
-                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold max-lg:hidden"
+                  <OTruncatedText
+                    as="div"
+                    class="text-2xs text-text-secondary leading-normal font-semibold max-lg:hidden"
                   >
                     {{ card.label }}
-                  </div>
+                  </OTruncatedText>
                   <span
                     class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                   >
@@ -313,8 +314,10 @@ import { buildAgentTraceFilter } from "./llmAgentFilter";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
@@ -330,6 +333,8 @@ const store = useStore();
 const urlType = typeof route.query.type === "string" ? route.query.type : "";
 const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
 const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
+const urlEnv = typeof route.query.env === "string" ? route.query.env : "";
+const urlVersion = typeof route.query.version === "string" ? route.query.version : "";
 
 interface Props {
   streamName: string;
@@ -361,11 +366,12 @@ const {
 const activeStream = ref<string>(
   urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
-// Persists the RESOLVED agent NAME of the cascade selection (was the old single
-// `activeAgent` key). On reload we re-seed the cascade from it (see
-// `pendingAgentName` + `selectAgentByName`), so the last-picked agent is
-// remembered exactly as before — via the cascade, not the retired `activeAgent`.
+// Persists the RESOLVED agent name/env/version of the cascade selection. On
+// reload we re-seed the cascade from them (see `pendingAgentName` +
+// `selectAgentByScope`), so the last-picked variant is remembered exactly.
 const AGENT_LS_KEY = "llmInsights_agentFilter";
+const ENV_LS_KEY = "llmInsights_envFilter";
+const VERSION_LS_KEY = "llmInsights_versionFilter";
 const agents = ref<GenAiAgentListItem[]>([]);
 // True once the agents API has resolved at least once — lets us tell "agents
 // not loaded yet" apart from "this window genuinely has no agents".
@@ -394,12 +400,28 @@ const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "
 const filterMode = ref<"stream" | "agent">(
   !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
 );
-// Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
+// Env/name/version to seed the cascade with once the list loads: the URL
 // deep-link first, else the persisted last selection. Resolved into
-// selectedEnv/AgentName/Version via `selectAgentByName`, then cleared. (The URL
-// carries the readable name, not the internal stream-scoped key.)
+// selectedEnv/AgentName/Version via `selectAgentByScope` (falls back to
+// `selectAgentByName` when the exact env+version no longer exists), then
+// cleared. (The URL carries readable values, not the internal agent key.)
 const pendingAgentName = ref<string | null>(
   filterMode.value === "agent" ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null : null,
+);
+// Env/version come from the same source as the name, so a name-only link never pairs with a stored variant of another agent.
+const pendingEnv = ref<string | null>(
+  filterMode.value !== "agent"
+    ? null
+    : urlAgentName
+      ? urlEnv || null
+      : localStorage.getItem(ENV_LS_KEY) || null,
+);
+const pendingVersion = ref<string | null>(
+  filterMode.value !== "agent"
+    ? null
+    : urlAgentName
+      ? urlVersion || null
+      : localStorage.getItem(VERSION_LS_KEY) || null,
 );
 
 // Shared derived scope computeds come from useAgentScope. LLM Insights injects
@@ -408,7 +430,7 @@ const pendingAgentName = ref<string | null>(
 // `availableStreams` is LLM's trace-stream list. Agent selection now flows
 // through the Env→Agent→Version cascade (selectedEnv/AgentName/Version →
 // selectedAgent), so the old single `activeAgent` ref is gone. The `?agent=`
-// deep-link and last-selection restore seed the cascade via `selectAgentByName`
+// deep-link and last-selection restore seed the cascade via `selectAgentByScope`
 // (see loadInsights). `agentFilterClause` stays page-local (LLM's trace-filter
 // builder). Injected refs are the SAME instances the page owns.
 const {
@@ -424,6 +446,7 @@ const {
   selectedAgentName,
   selectedVersion,
   selectAgentByName,
+  selectAgentByScope,
 } = useAgentScope({
   filterMode,
   activeStream,
@@ -520,6 +543,9 @@ async function onCompareRun(payload: {
   const sharedWindow =
     payload.align === "sameWallClock" ? { start: props.startTime, end: props.endTime } : undefined;
   await versionCompare.run(effectiveStream.value, payload.manual, sharedWindow);
+  if (versionCompare.result.value && !versionCompare.errorA.value && !versionCompare.errorB.value) {
+    analytics.track("agent_version_compare_completed", { align: payload.align });
+  }
 }
 
 // sameWallClock re-runs the compare whenever the page date-picker changes —
@@ -581,13 +607,18 @@ watch(
 // This SAME id is the canonical "which selection are we looking at" key for the
 // whole page: it's the panel dashboardId, the KPI cache key, AND the error
 // table's cache key (passed down as a prop) — so all three caches agree on one
-// identity instead of each deriving its own. `agentKey` is the agent's name, or
+// identity instead of each deriving its own. `agentKey` is the agent variant, or
 // a placeholder when there's no agent (`_stream` on the Stream tab, `_none` on
 // the Agent tab before one resolves) — handled here, in one place.
 const PANEL_CACHE_FOLDER = "ai-llm-insights";
+// Env/version are part of the key: each variant filters to different data, so sharing a name must not share a cache slot.
+function selectionAgentKey(): string {
+  if (filterMode.value !== "agent") return "_stream";
+  const a = effectiveAgent.value;
+  return a ? `${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "_none";
+}
 const panelCacheDashboardId = computed(() => {
-  const agentKey =
-    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
+  const agentKey = selectionAgentKey();
   return selectionKey(
     store.state.selectedOrganization?.identifier ?? "",
     effectiveStream.value,
@@ -634,17 +665,26 @@ const agentEmpty = computed(
 );
 
 // Reflect the current filter in the URL so the view is shareable / survives a
-// reload: `?type=stream&stream=<name>` or `?type=agent&agent=<name>`. We keep
-// the readable name (not the internal agent key) and preserve other params
+// reload: `?type=stream&stream=<name>` or `?type=agent&agent=<name>&env=<env>&version=<version>`.
+// We keep readable values (not the internal agent key) and preserve other params
 // (e.g. the time range owned by the parent).
 function syncFilterUrl() {
   const query: Record<string, any> = { ...route.query, type: filterMode.value };
   if (filterMode.value === "agent") {
     delete query.stream;
-    if (selectedAgent.value?.name) query.agent = selectedAgent.value.name;
-    else delete query.agent;
+    if (selectedAgent.value?.name) {
+      query.agent = selectedAgent.value.name;
+      query.env = selectedEnv.value;
+      query.version = selectedVersion.value;
+    } else {
+      delete query.agent;
+      delete query.env;
+      delete query.version;
+    }
   } else {
     delete query.agent;
+    delete query.env;
+    delete query.version;
     if (activeStream.value) query.stream = activeStream.value;
     else delete query.stream;
   }
@@ -862,8 +902,7 @@ const kpiCards = computed<KpiCard[]>(() => {
 // llmInsightsCache.ts) is its in-memory equivalent, keyed by the same
 // stream+agent+window scope and restored on a tab toggle / same-window revisit.
 function kpiCacheKey(start: number, end: number): string {
-  const agentKey =
-    filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
+  const agentKey = selectionAgentKey();
   return selectionKey(
     store.state.selectedOrganization?.identifier ?? "",
     effectiveStream.value,
@@ -895,12 +934,18 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
       // agents list must be loaded first — await it here. (Agents API is only
       // ever hit on the Agent tab.)
       await loadAgents(start, end, force);
-      // Seed the cascade from a carried-over agent NAME (URL `?agent=` deep-link,
-      // else the persisted last selection) now that the list exists. On a match
-      // this pins env→name→version so `selectedAgent` resolves; then clear it.
+      // Seed the cascade from the carried-over env/name/version (URL deep-link,
+      // else the persisted last selection) now that the list exists: the exact
+      // triple when env and version are known, else by name; then clear it.
       if (pendingAgentName.value) {
-        selectAgentByName(pendingAgentName.value);
+        if (pendingEnv.value && pendingVersion.value) {
+          selectAgentByScope(pendingEnv.value, pendingAgentName.value, pendingVersion.value);
+        } else {
+          selectAgentByName(pendingAgentName.value);
+        }
         pendingAgentName.value = null;
+        pendingEnv.value = null;
+        pendingVersion.value = null;
       }
       // Default to the first agent when nothing valid is selected (fresh entry
       // to the tab, or the previously-picked agent is gone for this window).
@@ -908,9 +953,11 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
       if (!selectedAgent.value && agents.value.length > 0) {
         selectAgentByName(agents.value[0].name);
       }
-      // Persist the resolved agent NAME so a reload restores the same selection.
+      // Persist the resolved agent variant so a reload restores the same selection.
       if (selectedAgent.value?.name) {
         localStorage.setItem(AGENT_LS_KEY, selectedAgent.value.name);
+        localStorage.setItem(ENV_LS_KEY, selectedEnv.value);
+        localStorage.setItem(VERSION_LS_KEY, selectedVersion.value);
       }
     } else {
       // Agents API is only relevant on the Agent tab — don't touch it in Stream
@@ -1015,6 +1062,7 @@ defineExpose({
   compareMode,
   selectedAgentName,
   selectedEnv,
+  selectedVersion,
   activeStream,
   filterMode,
 });

@@ -17,7 +17,7 @@ import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   ListboxFilter,
   ListboxItem,
@@ -87,6 +87,10 @@ type NormalizedOption = {
    * column; a bare (unstyled) badge stays inline next to the label.
    */
   badgeStyle?: Record<string, string>;
+  /** Non-selectable row that shows or hides the options nested under it. */
+  expandable?: boolean;
+  /** Reka string key of the expandable option this one is nested under. */
+  parentKey?: string;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -106,6 +110,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchDebounce: 0,
   hideSelected: false,
   collapsibleGroups: false,
+  pinSelectedInGroups: false,
   creatable: false,
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
@@ -225,6 +230,10 @@ function normalizeOption(input: unknown): NormalizedOption | null {
         ? (option["badgeStyle"] as Record<string, string>)
         : undefined,
     badgeMuted: option["badgeMuted"] === true,
+    expandable: option["expandable"] === true,
+    parentKey: isPrimitiveSelectValue(option["parentValue"])
+      ? toRekaString(option["parentValue"])
+      : undefined,
   };
 }
 
@@ -281,13 +290,24 @@ const baseFilteredOptions = computed(() => {
   if (!term) {
     // In multi-select mode, float previously-selected items to the top so users
     // can immediately see and manage their current choices on re-open.
-    // Only applies when there is a non-empty pin set and no headers in the list
-    // (headers imply grouped options where reordering would break visual grouping).
-    if (props.multiple && pinnedSelected.value.size > 0 && !options.some((o) => o.header)) {
+    // Grouped lists keep their order unless `pinSelectedInGroups` is set; then
+    // items float within their own group (a header and the items under it; a
+    // flat list is one group), so no item leaves its group. sort() is stable.
+    if (
+      props.multiple &&
+      pinnedSelected.value.size > 0 &&
+      (props.pinSelectedInGroups || !options.some((o) => o.header))
+    ) {
       const pinned = pinnedSelected.value;
-      const top = options.filter((o) => pinned.has(toRekaString(o.value)));
-      const rest = options.filter((o) => !pinned.has(toRekaString(o.value)));
-      return [...top, ...rest];
+      let group = 0;
+      return options
+        .map((o) => ({
+          o,
+          group: o.header ? ++group : group,
+          rank: o.header ? 0 : pinned.has(toRekaString(o.value)) ? 1 : 2,
+        }))
+        .sort((a, b) => a.group - b.group || a.rank - b.rank)
+        .map(({ o }) => o);
     }
     return options;
   }
@@ -327,6 +347,44 @@ const toggleGroup = (label: string) => {
   collapsedGroups.value = next;
 };
 
+// ── Expandable options (`expandable` / `parentValue` on an option) ─────────
+const hasNestedOptions = computed(() =>
+  normalizedOptions.value.some((o) => o.parentKey !== undefined),
+);
+// Toggles made while open; null until the first one, so each open starts from the selection.
+const toggledParents = ref<Set<string> | null>(null);
+const expandedParents = computed(() => {
+  if (toggledParents.value) return toggledParents.value;
+  const selected = new Set(selectedValues.value.map((v) => toRekaString(v)));
+  const parents = new Set<string>();
+  for (const opt of normalizedOptions.value) {
+    if (opt.parentKey !== undefined && selected.has(toRekaString(opt.value))) {
+      parents.add(opt.parentKey);
+    }
+  }
+  return parents;
+});
+const isSearching = computed(() => searchTerm.value.trim() !== "");
+const isExpanded = (value: SelectPrimitiveValue) => expandedParents.value.has(toRekaString(value));
+const isNestedRow = (opt: NormalizedOption) => opt.parentKey !== undefined && !isSearching.value;
+const toggleExpanded = (value: SelectPrimitiveValue) => {
+  const next = new Set(expandedParents.value);
+  const key = toRekaString(value);
+  next.has(key) ? next.delete(key) : next.add(key);
+  toggledParents.value = next;
+};
+watch(popoverOpen, (open) => {
+  if (!open) toggledParents.value = null;
+});
+
+// Hides the options of collapsed rows; a search lists every match flat, without the rows.
+const nestedFilteredOptions = computed(() => {
+  const base = baseFilteredOptions.value;
+  if (!hasNestedOptions.value) return base;
+  if (isSearching.value) return base.filter((o) => !o.expandable);
+  return base.filter((o) => o.parentKey === undefined || expandedParents.value.has(o.parentKey));
+});
+
 // The final option list the dropdown renders — the single source of truth that
 // feeds the virtualizer, keyboard navigation, and the empty-state check. It
 // layers the accordion collapse on top of `baseFilteredOptions` (which has
@@ -349,7 +407,7 @@ const toggleGroup = (label: string) => {
 // current group isn't collapsed. `hidden` carries forward until the next header
 // resets it.
 const filteredOptions = computed(() => {
-  const base = baseFilteredOptions.value;
+  const base = nestedFilteredOptions.value;
   if (!props.collapsibleGroups || collapsedGroups.value.size === 0) return base;
   if (searchTerm.value.trim()) return base; // search spans every group
   const out: NormalizedOption[] = [];
@@ -393,7 +451,9 @@ const hasSelection = computed(() => selectedValues.value.some((v) => v !== undef
 const selectedLabels = computed(() => {
   return selectedValues.value
     .map((selectedValue) => {
-      const option = normalizedOptions.value.find((opt) => opt.value === selectedValue);
+      const option = normalizedOptions.value.find(
+        (opt) => !opt.expandable && opt.value === selectedValue,
+      );
       if (option) return option.label;
       // Don't render "null" for unmatched null values — treat as empty/placeholder
       if (selectedValue === null) return null;
@@ -407,9 +467,6 @@ const triggerDisplayLabel = computed(() => {
   if (props.multiple) return selectedLabels.value.join(", ");
   return selectedLabels.value[0] ?? "";
 });
-
-const triggerLabelRef = ref<HTMLElement | null>(null);
-const { isTruncated: isTriggerLabelTruncated } = useIsTruncated(triggerLabelRef);
 
 watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
@@ -563,7 +620,9 @@ function handleClear() {
 // filtered subset — so the master state stays predictable regardless of the
 // search term.
 const selectableOptions = computed<NormalizedOption[]>(() =>
-  normalizedOptions.value.filter((o: NormalizedOption) => !o.header && !o.disabled),
+  normalizedOptions.value.filter(
+    (o: NormalizedOption) => !o.header && !o.disabled && !o.expandable,
+  ),
 );
 
 const allSelected = computed(() => {
@@ -641,6 +700,17 @@ function handleTriggerKeydown(e: KeyboardEvent) {
   if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
 }
 
+const searchFilterRef = ref<{ $el: HTMLInputElement } | null>(null);
+
+// Reka's open auto-focus selects the search text, so the next keystroke would overwrite the seeded character.
+function handlePopoverOpenAutoFocus(e: Event) {
+  const input = searchFilterRef.value?.$el;
+  if (!inputEnabled.value || !input) return;
+  e.preventDefault();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
 // DOM nodes minimal even for 20 000+ option datasets.
@@ -711,6 +781,33 @@ function scrollHighlightedIntoView() {
   }
 }
 
+function expandKeyTarget(key: string, opt: NormalizedOption): NormalizedOption | undefined {
+  if (opt.expandable) {
+    const expanded = isExpanded(opt.value);
+    const toggles =
+      key === "Enter" || (key === "ArrowRight" && !expanded) || (key === "ArrowLeft" && expanded);
+    return toggles ? opt : undefined;
+  }
+  if (key !== "ArrowLeft" || opt.parentKey === undefined) return undefined;
+  return filteredOptions.value.find((o) => toRekaString(o.value) === opt.parentKey);
+}
+
+// Enter toggles an expandable row, Right expands it, Left collapses it (or its row from a nested option).
+function handleExpandKey(e: KeyboardEvent): boolean {
+  if (isSearching.value) return false;
+  const opt = filteredOptions.value[highlightedIndex.value];
+  const target = opt ? expandKeyTarget(e.key, opt) : undefined;
+  if (!target) return false;
+  e.preventDefault();
+  toggleExpanded(target.value);
+  // Runs after the filteredOptions watcher has reset the highlight.
+  nextTick(() => {
+    highlightedIndex.value = filteredOptions.value.indexOf(target);
+    nextTick(scrollHighlightedIntoView);
+  });
+  return true;
+}
+
 function handleDropdownKeydown(e: KeyboardEvent) {
   const nav = navigableIndices.value;
 
@@ -720,6 +817,7 @@ function handleDropdownKeydown(e: KeyboardEvent) {
     popoverOpen.value = false;
     return;
   }
+  if (handleExpandKey(e)) return;
 
   // Allow Enter to trigger create even when no options are visible.
   // Otherwise creatable=true with an empty filtered list silently swallows
@@ -1035,6 +1133,13 @@ const overflowSelectedCount = computed(() =>
 // squeezes the content area — it does not shift the chevron position when the
 // clear button toggles into view.
 const isInlineAppearance = computed(() => props.appearance === "inline");
+const triggerTextTone = computed(() =>
+  props.disabled
+    ? "text-select-disabled-text"
+    : hasSelection.value
+      ? "text-select-text"
+      : "text-select-placeholder",
+);
 
 /**
  * Inline-appearance trigger chrome. Deliberately contributes NOTHING to the
@@ -1194,13 +1299,12 @@ const fieldWidthClass = computed(() => {
                       :label="String(labelText ?? '')"
                       :value="selectedValues[idx]"
                     >
-                      <span
+                      <OTruncatedText
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex max-w-40 shrink-0 items-center truncate px-2 py-0.5 text-xs leading-none"
+                        class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-block max-w-40 shrink-0 px-2 py-0.5 text-xs leading-none"
                       >
                         {{ labelText }}
-                      </span>
-                      <OTooltip :content="raw(String(labelText ?? ''))" />
+                      </OTruncatedText>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
@@ -1213,7 +1317,6 @@ const fieldWidthClass = computed(() => {
                 </template>
                 <template v-else>
                   <span
-                    ref="triggerLabelRef"
                     :class="[
                       'text-start',
                       // An inline trigger is a word in a sentence: it grows to fit
@@ -1230,11 +1333,7 @@ const fieldWidthClass = computed(() => {
                   >
                     {{ hasSelection ? triggerDisplayLabel : placeholder }}
                   </span>
-                  <OTooltip
-                    v-if="hasSelection"
-                    :content="raw(triggerDisplayLabel)"
-                    :disabled="!isTriggerLabelTruncated"
-                  />
+                  <OTooltip v-if="hasSelection" overflow-only />
                 </template>
               </slot>
             </div>
@@ -1314,6 +1413,7 @@ const fieldWidthClass = computed(() => {
             :disable-outside-pointer-events="false"
             :hide-when-detached="true"
             :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
+            @open-auto-focus="handlePopoverOpenAutoFocus"
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
               'flex flex-col overflow-hidden',
@@ -1342,6 +1442,7 @@ const fieldWidthClass = computed(() => {
               >
                 <ListboxFilter
                   v-if="inputEnabled"
+                  ref="searchFilterRef"
                   v-model="searchTerm"
                   auto-focus
                   :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
@@ -1485,6 +1586,34 @@ const fieldWidthClass = computed(() => {
                         {{ filteredOptions[vRow.index].label }}
                       </div>
 
+                      <!-- Not a ListboxItem, so Reka can never select it; mousedown.prevent keeps focus in the search input. -->
+                      <div
+                        v-else-if="filteredOptions[vRow.index].expandable"
+                        :data-test="parentDataTest ? `${parentDataTest}-expand` : undefined"
+                        :data-test-value="toRekaString(filteredOptions[vRow.index].value)"
+                        :aria-expanded="isExpanded(filteredOptions[vRow.index].value)"
+                        :class="[
+                          'flex h-full w-full items-center justify-between gap-2 ps-3 pe-3 text-sm',
+                          'text-select-item-text cursor-pointer select-none',
+                          'transition-colors duration-100',
+                          vRow.index === highlightedIndex
+                            ? 'bg-select-item-hover-bg'
+                            : 'hover:bg-select-item-hover-bg',
+                        ]"
+                        @mousedown.prevent
+                        @click.stop="toggleExpanded(filteredOptions[vRow.index].value)"
+                      >
+                        <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
+                        <OIcon
+                          name="chevron-right"
+                          size="sm"
+                          :class="[
+                            'shrink-0 transition-transform duration-150',
+                            isExpanded(filteredOptions[vRow.index].value) ? 'rotate-90' : '',
+                          ]"
+                        />
+                      </div>
+
                       <!-- Regular item -->
                       <!-- rowClickSingleSelect wrapper: intercepts clicks at capture phase.
                            Checkbox clicks (marked by @pointerdown on the checkbox span)
@@ -1508,7 +1637,8 @@ const fieldWidthClass = computed(() => {
                           :data-test-label="String(filteredOptions[vRow.index].label ?? '')"
                           :class="[
                             'relative flex h-full w-full gap-2',
-                            'ps-3 pe-3 text-sm',
+                            isNestedRow(filteredOptions[vRow.index]) ? 'ps-7' : 'ps-3',
+                            'pe-3 text-sm',
                             'text-select-item-text',
                             'cursor-pointer outline-none select-none',
                             'transition-colors duration-100',
@@ -1577,9 +1707,9 @@ const fieldWidthClass = computed(() => {
                               filteredOptions[vRow.index].label
                             }}</span>
                             <span class="text-select-placeholder mx-1 shrink-0">–</span>
-                            <span class="text-text-secondary truncate text-xs">{{
+                            <OTruncatedText class="text-text-secondary text-xs">{{
                               filteredOptions[vRow.index].subLabel
-                            }}</span>
+                            }}</OTruncatedText>
                           </template>
 
                           <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
@@ -1598,13 +1728,9 @@ const fieldWidthClass = computed(() => {
                                      sub-label under it. With no sub-label there is
                                      nothing to separate from, and every option in
                                      the list reading bold emphasises nothing. -->
-                                <span
-                                  class="truncate"
+                                <OTruncatedText
                                   :class="filteredOptions[vRow.index].subLabel ? 'font-medium' : ''"
-                                  :title="
-                                    optionTooltip ? filteredOptions[vRow.index].label : undefined
-                                  "
-                                  >{{ filteredOptions[vRow.index].label }}</span
+                                  >{{ filteredOptions[vRow.index].label }}</OTruncatedText
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
@@ -1626,10 +1752,11 @@ const fieldWidthClass = computed(() => {
                                   >{{ filteredOptions[vRow.index].badge }}</span
                                 >
                               </span>
-                              <span
+                              <OTruncatedText
                                 v-if="filteredOptions[vRow.index].subLabel"
-                                class="text-text-secondary line-clamp-2 w-full text-xs leading-snug whitespace-normal"
-                                >{{ filteredOptions[vRow.index].subLabel }}</span
+                                :lines="2"
+                                class="text-text-secondary w-full text-xs leading-snug whitespace-normal"
+                                >{{ filteredOptions[vRow.index].subLabel }}</OTruncatedText
                               >
                               <div
                                 v-if="filteredOptions[vRow.index].colorPalette?.length"
@@ -1661,9 +1788,7 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <span class="truncate" :title="filteredOptions[vRow.index].label">{{
-                              filteredOptions[vRow.index].label
-                            }}</span>
+                            <OTruncatedText>{{ filteredOptions[vRow.index].label }}</OTruncatedText>
                           </template>
                         </ListboxItem>
                       </div>
@@ -1788,20 +1913,26 @@ const fieldWidthClass = computed(() => {
             "
           >
             <SelectValue
+              v-if="isInlineAppearance"
               :placeholder="placeholder"
-              :class="[
-                'text-start',
-                isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
-                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                disabled
-                  ? 'text-select-disabled-text'
-                  : hasSelection
-                    ? 'text-select-text'
-                    : 'text-select-placeholder',
-              ]"
+              :class="['text-start whitespace-nowrap', triggerTextTone]"
             >
               <slot name="trigger" :value="modelValue" />
             </SelectValue>
+            <!-- reka's SelectValue is pointer-events:none, so the wrapper is what cuts and takes the hover. -->
+            <OTruncatedText
+              v-else
+              :class="[
+                'flex-1 text-start text-sm',
+                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
+                triggerTextTone,
+              ]"
+              :tooltip="hasSelection && !$slots.trigger ? undefined : false"
+            >
+              <SelectValue :placeholder="placeholder">
+                <slot name="trigger" :value="modelValue" />
+              </SelectValue>
+            </OTruncatedText>
           </div>
         </SelectTrigger>
 
@@ -1916,7 +2047,7 @@ const fieldWidthClass = computed(() => {
                 :key="String(opt.value)"
                 :value="opt.value"
                 :label="opt.label"
-                :disabled="opt.disabled"
+                :disabled="opt.disabled || opt.expandable"
               />
             </template>
 

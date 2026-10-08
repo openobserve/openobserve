@@ -91,6 +91,19 @@ impl From<AlertError> for Response {
             | AlertError::AlertIdMissing
             | AlertError::PendingPeriodOnRealtimeAlert
             | AlertError::NegativePendingPeriod
+            | AlertError::KeepFiringForOutOfRange
+            | AlertError::FrequencyOutOfRange
+            | AlertError::SilenceOutOfRange
+            | AlertError::ToleranceOutOfRange
+            | AlertError::TzOffsetOutOfRange
+            | AlertError::CronHasNoFutureOccurrence { .. }
+            | AlertError::RecoveryOnRealtimeAlert
+            | AlertError::RecoveryDestinationsWithoutRecovery
+            | AlertError::RecoveryDestinationIsPlatform { .. }
+            | AlertError::RecoveryOnMultiAlert
+            | AlertError::RecoveryWithNotificationGrouping
+            | AlertError::RecoveryNeedsJsonPayload { .. }
+            | AlertError::RecoveryNeedsRoutingKey { .. }
             | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
@@ -132,9 +145,7 @@ impl From<AlertError> for Response {
 
 pub fn destination_error_response(value: DestinationError) -> Response {
     match &value {
-        DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
-            MetaHttpResponse::conflict(value)
-        }
+        DestinationError::InUse(_) => MetaHttpResponse::conflict(value),
         DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
         DestinationError::NotFound => MetaHttpResponse::not_found(value),
         other_err => MetaHttpResponse::bad_request(other_err),
@@ -223,7 +234,10 @@ impl From<ReportError> for Response {
             | ReportError::NoDashboards
             | ReportError::InlineAttachmentTypeNotSupportedForPdf
             | ReportError::NoDashboardTabs
-            | ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
+            | ReportError::NoDestinations
+            | ReportError::TzOffsetOutOfRange
+            | ReportError::CronHasNoFutureOccurrence { .. }
+            | ReportError::NegativeInterval => MetaHttpResponse::bad_request(value),
             ReportError::ReportNotFound
             | ReportError::DashboardTabNotFound
             | ReportError::FolderNotFound => MetaHttpResponse::not_found(value),

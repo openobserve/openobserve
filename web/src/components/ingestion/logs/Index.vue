@@ -78,6 +78,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.vector')"
       />
       <ORouteTab
+        name="kinesisfirehose"
+        data-test="ingestion-logs-tab-kinesisfirehose"
+        :to="{
+          name: 'kinesisfirehose',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/kinesis_firehose.svg')"
+        :label="t('ingestion.kinesisFirehose')"
+      />
+      <ORouteTab
+        name="gcpLogs"
+        data-test="ingestion-logs-tab-gcplogs"
+        :to="{
+          name: 'gcpLogs',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
+        :label="t('ingestion.gcpLogs')"
+      />
+      <ORouteTab
         name="ingestLogsFromOtel"
         :to="{
           name: 'ingestLogsFromOtel',
@@ -139,7 +163,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          :title="ingestiontabs"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"
@@ -160,7 +183,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import config from "../../../aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 
@@ -187,7 +210,9 @@ export default defineComponent({
       "curl",
       "fluentbit",
       "fluentd",
+      "kinesisfirehose",
       "vector",
+      "gcpLogs",
       "syslogNg",
       "splunkHec",
       "loongcollector",
@@ -232,7 +257,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,

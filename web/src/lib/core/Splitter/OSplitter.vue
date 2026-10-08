@@ -60,6 +60,7 @@
         'o-splitter__after',
         'relative z-0 flex-1 shrink-0 overflow-hidden',
         horizontal ? 'w-full' : 'h-full',
+        afterClass,
       ]"
     >
       <slot name="after" />
@@ -81,6 +82,7 @@ const props = withDefaults(defineProps<OSplitterProps>(), {
   separatorClass: "",
   separatorStyle: () => ({}),
   beforeClass: "",
+  afterClass: "",
 });
 
 const emit = defineEmits<OSplitterEmits>();
@@ -95,8 +97,8 @@ const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 :
 const { value: currentValue, onMouseDown } = useResizer({
   direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
-  minValue: minValue.value,
-  maxValue: maxValue.value,
+  minValue: () => minValue.value,
+  maxValue: () => maxValue.value,
   unit: props.unit,
   containerRef,
   throttleMs: 16, // 60fps for smooth movement

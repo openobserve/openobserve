@@ -40,6 +40,7 @@ pub mod grouping;
 pub mod incidents;
 pub mod level;
 pub mod priority;
+pub mod recovery;
 pub mod state;
 pub mod state_level;
 pub mod tags;
@@ -112,7 +113,7 @@ fn get_timezone_from_string(
         return Ok(tz);
     }
     // Fallback to FixedOffset for backward compatibility
-    Err(FixedOffset::east_opt(fallback_offset * 60).unwrap())
+    Err(fixed_offset(fallback_offset).unwrap_or_else(|| Utc.fix()))
 }
 
 /// Get timezone offset in minutes from a Tz timezone at a specific point in time
@@ -136,7 +137,9 @@ impl TriggerCondition {
         let frequency = if freq_in_secs {
             self.frequency
         } else {
-            self.frequency * 60
+            self.frequency
+                .checked_mul(60)
+                .ok_or_else(|| anyhow::anyhow!("frequency is out of range"))?
         };
         let tolerance = match self.tolerance_in_secs {
             Some(tolerance) if tolerance > 0 => {
@@ -169,13 +172,23 @@ impl TriggerCondition {
                 };
 
             // Create FixedOffset with the calculated or provided offset
-            let tz_offset = FixedOffset::east_opt(current_offset_minutes * 60).unwrap();
+            let tz_offset = fixed_offset(current_offset_minutes).ok_or_else(|| {
+                anyhow::anyhow!("timezone offset {current_offset_minutes} minutes is out of range")
+            })?;
 
             if apply_silence {
-                let silence = start_utc + Duration::try_minutes(self.silence).unwrap();
+                let silence = Duration::try_minutes(self.silence)
+                    .and_then(|silence| start_utc.checked_add_signed(silence))
+                    .ok_or_else(|| anyhow::anyhow!("silence is out of range"))?;
                 let silence = silence.with_timezone(&tz_offset);
                 // Check for the cron timestamp after the silence period
-                Ok(schedule.after(&silence).next().unwrap().timestamp_micros() + tolerance)
+                Ok(schedule
+                    .after(&silence)
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
+                    .timestamp_micros()
+                    .checked_add(tolerance)
+                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
             } else {
                 // This is important, if provided start_utc was `Some`, it should use the next run
                 // after the start_utc. If it was `None`, it should use the next run after the
@@ -185,9 +198,10 @@ impl TriggerCondition {
                 Ok(schedule
                     .after(&start_utc)
                     .next()
-                    .unwrap()
+                    .ok_or_else(|| anyhow::anyhow!("cron schedule has no future occurrence"))?
                     .timestamp_micros()
-                    + tolerance)
+                    .checked_add(tolerance)
+                    .ok_or_else(|| anyhow::anyhow!("tolerance is out of range"))?)
             }
         } else if apply_silence {
             // silence is in minutes, frequency is in seconds
@@ -197,20 +211,16 @@ impl TriggerCondition {
             // will run after 10 mins of silence period. To avoid this scenario, we
             // should use the max of (frequency, silence) as the next_run_at.
             // Silence period is in minutes, and the frequency is in seconds.
-            let delta = std::cmp::max(frequency, self.silence * 60);
-            Ok(start_utc.timestamp_micros()
-                + Duration::try_seconds(delta)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
-                + tolerance)
+            let delta = self
+                .silence
+                .checked_mul(60)
+                .map(|silence| std::cmp::max(frequency, silence));
+            delta
+                .and_then(|delta| micros_after(start_utc.timestamp_micros(), delta, tolerance))
+                .ok_or_else(|| anyhow::anyhow!("frequency/silence is out of range"))
         } else {
-            Ok(start_utc.timestamp_micros()
-                + Duration::try_seconds(frequency)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap()
-                + tolerance)
+            micros_after(start_utc.timestamp_micros(), frequency, tolerance)
+                .ok_or_else(|| anyhow::anyhow!("frequency is out of range"))
         }
     }
 
@@ -243,7 +253,9 @@ impl TriggerCondition {
         };
 
         // Convert the timestamp to a DateTime with the calculated timezone offset
-        let timezone = FixedOffset::east_opt(current_offset_minutes * 60).unwrap();
+        let Some(timezone) = fixed_offset(current_offset_minutes) else {
+            return next_run_at;
+        };
         let dt = dt_utc.with_timezone(&timezone);
 
         // Get the minute and second of the next_run_at time
@@ -1129,6 +1141,21 @@ impl Serialize for AlertConditionParams {
             }
         }
     }
+}
+
+/// Returns `None` for an offset of a full day or more, which `FixedOffset` cannot represent.
+pub fn fixed_offset(offset_minutes: i32) -> Option<FixedOffset> {
+    offset_minutes
+        .checked_mul(60)
+        .and_then(FixedOffset::east_opt)
+}
+
+/// `start_micros + secs + tolerance`, or `None` when any step overflows.
+fn micros_after(start_micros: i64, secs: i64, tolerance: i64) -> Option<i64> {
+    Duration::try_seconds(secs)
+        .and_then(|d| d.num_microseconds())
+        .and_then(|d| start_micros.checked_add(d))
+        .and_then(|t| t.checked_add(tolerance))
 }
 
 #[cfg(test)]
@@ -2983,5 +3010,99 @@ mod test {
         let items: Vec<_> = node.into_iter().collect();
         assert_eq!(items.len(), 1);
         assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
+
+    fn cron_trigger(cron: &str) -> TriggerCondition {
+        TriggerCondition {
+            frequency_type: FrequencyType::Cron,
+            cron: cron.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn get_next_trigger_time_draws_tolerance_below_256_secs_so_i64_max_is_harmless() {
+        let tc = TriggerCondition {
+            frequency: 60,
+            tolerance_in_secs: Some(i64::MAX),
+            ..Default::default()
+        };
+        assert!(tc.get_next_trigger_time(true, 0, false, None).is_ok());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_i64_max_frequency() {
+        let tc = TriggerCondition {
+            frequency: i64::MAX,
+            ..Default::default()
+        };
+        assert!(tc.get_next_trigger_time(true, 0, false, None).is_err());
+        assert!(tc.get_next_trigger_time(false, 0, false, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_i64_max_silence() {
+        let tc = TriggerCondition {
+            frequency: 60,
+            silence: i64::MAX,
+            ..Default::default()
+        };
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_i64_max_silence_on_a_cron() {
+        let tc = TriggerCondition {
+            silence: i64::MAX,
+            ..cron_trigger("0 0 * * * *")
+        };
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_a_silence_past_the_last_representable_date() {
+        let tc = TriggerCondition {
+            silence: 300_000 * 365 * 24 * 60,
+            ..cron_trigger("0 0 * * * *")
+        };
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_a_full_day_tz_offset_on_a_cron() {
+        let tc = cron_trigger("0 0 * * * *");
+        assert!(tc.get_next_trigger_time(true, 1440, false, None).is_err());
+        assert!(
+            tc.get_next_trigger_time(true, i32::MAX, false, None)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn get_next_trigger_time_skips_alignment_for_a_full_day_tz_offset() {
+        let tc = TriggerCondition {
+            frequency: 300,
+            align_time: true,
+            ..Default::default()
+        };
+        let start = 1_700_000_123_000_000;
+        assert_eq!(
+            tc.get_next_trigger_time(true, 1440, false, Some(start))
+                .unwrap(),
+            start + 300_000_000
+        );
+    }
+
+    #[test]
+    fn get_next_trigger_time_rejects_a_cron_with_no_future_occurrence() {
+        let tc = cron_trigger("0 0 0 1 1 * 2020");
+        assert!(tc.get_next_trigger_time(true, 0, false, None).is_err());
+        assert!(tc.get_next_trigger_time(true, 0, true, None).is_err());
+    }
+
+    #[test]
+    fn get_timezone_from_string_falls_back_to_utc_for_a_full_day_offset() {
+        assert_eq!(get_timezone_from_string(None, 1440), Err(Utc.fix()));
+        assert_eq!(get_timezone_from_string(None, i32::MAX), Err(Utc.fix()));
     }
 }

@@ -25,11 +25,11 @@
       >
         <template #team>
           <router-link
-            class="text-accent shrink-0 hover:underline"
+            class="text-accent min-w-0 hover:underline"
             :to="teamRoute"
             data-test="oncall-response-team-link"
           >
-            {{ raw(teamName) }}
+            <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
           </router-link>
         </template>
         <template #firing>
@@ -41,7 +41,7 @@
           </span>
         </template>
         <template #opened>
-          <span class="truncate" data-test="oncall-response-opened">{{ openedAtClock }}</span>
+          <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
         </template>
       </i18n-t>
     </template>
@@ -49,7 +49,8 @@
     <!-- The two facts a responder needs before anything else ride the title,
          rather than sitting in a metadata grid below the fold. -->
     <template #title-trail>
-      <template v-if="response">
+      <!-- Below lg the title row has room for the alert's name or its tags, not both; there the tags lead the body instead. -->
+      <template v-if="response && lgUp">
         <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
         <OTag type="oncallResponseState" :value="response.state" size="sm" />
         <!-- How long it has been ringing, beside the word "ringing". The two
@@ -76,6 +77,13 @@
     </template>
 
     <template #actions>
+      <ORefreshButton
+        v-if="response"
+        :last-run-at="lastFetchedAt"
+        :loading="refreshing"
+        data-test="oncall-response-refresh"
+        @click="refreshPage"
+      />
       <template v-if="response && isOpenState">
         <!-- Exactly one primary, and it moves: claiming the page matters most
              until somebody has, and closing it matters most after. -->
@@ -91,7 +99,7 @@
         </OButton>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
-        <ODropdown v-if="canAcknowledge">
+        <ODropdown v-if="canAcknowledge && lgUp">
           <template #trigger>
             <OButton
               variant="outline"
@@ -117,7 +125,7 @@
              them had a button. A disabled button that does not say why is a
              dead end — the ladder's own explanation for why there is nobody
              left to escalate to belongs right where the button went grey. -->
-        <span class="inline-flex">
+        <span v-if="lgUp" class="inline-flex">
           <OButton
             variant="outline"
             size="sm-action"
@@ -132,6 +140,7 @@
         </span>
 
         <OButton
+          v-if="lgUp"
           variant="outline"
           size="sm-action"
           data-test="oncall-response-handoff-btn"
@@ -148,7 +157,7 @@
            something larger routinely arrives after it was closed. Hidden once
            an incident exists, because the rail links to it from then on. -->
       <OButton
-        v-if="response && !response.incident_id"
+        v-if="response && !response.incident_id && lgUp"
         variant="outline"
         size="sm-action"
         data-test="oncall-response-promote-btn"
@@ -183,6 +192,59 @@
           {{ t("oncall.resolve") }}
         </OButton>
       </template>
+
+      <!-- Below lg the row holds claiming and closing; the verbs used less often share one menu so the header stays two rows. -->
+      <ODropdown v-if="response && !lgUp && hasMoreActions" side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="icon-toolbar"
+            icon-left="more-vert"
+            :loading="snoozing || escalatingNow"
+            :aria-label="t('oncall.moreActions')"
+            data-test="oncall-response-more-btn"
+          />
+        </template>
+        <ODropdownGroup v-if="canAcknowledge" :label="t('oncall.snoozeFor')">
+          <ODropdownItem
+            v-for="opt in snoozeOptions"
+            :key="opt.minutes"
+            :data-test="`oncall-response-snooze-${opt.minutes}-menu`"
+            @select="snoozeRecord(opt.minutes)"
+          >
+            {{ raw(opt.label) }}
+          </ODropdownItem>
+        </ODropdownGroup>
+        <ODropdownSeparator v-if="canAcknowledge" />
+        <ODropdownItem
+          v-if="isOpenState"
+          :disabled="escalation?.exhausted"
+          data-test="oncall-response-escalate-btn-menu"
+          @select="escalateNow"
+        >
+          <span class="flex max-w-56 flex-col">
+            <span>{{ t("oncall.escalate") }}</span>
+            <!-- Touch has no tooltip, so the reason the verb is greyed out rides on the item itself. -->
+            <span v-if="escalation?.exhausted" class="text-xs whitespace-normal">
+              {{ t("oncall.ladderExhausted") }}
+            </span>
+          </span>
+        </ODropdownItem>
+        <ODropdownItem
+          v-if="isOpenState"
+          data-test="oncall-response-handoff-btn-menu"
+          @select="showHandoff = true"
+        >
+          {{ t("oncall.handoff") }}
+        </ODropdownItem>
+        <ODropdownItem
+          v-if="!response.incident_id"
+          data-test="oncall-response-promote-btn-menu"
+          @select="promoteOpen = true"
+        >
+          {{ t("oncall.promote") }}
+        </ODropdownItem>
+      </ODropdown>
     </template>
 
     <template v-if="response">
@@ -191,6 +253,29 @@
            the scroller — without it the activity thread was clipped at the
            fold with no way to reach the rest. -->
       <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div
+          v-if="!lgUp"
+          class="mb-3 flex flex-wrap items-center gap-2"
+          data-test="oncall-response-meta"
+        >
+          <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+          <OTag type="oncallResponseState" :value="response.state" size="sm" />
+          <span class="text-text-secondary text-xs" data-test="oncall-response-elapsed">
+            {{ elapsedLabel }}
+          </span>
+          <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
+            {{ t("oncall.snoozed") }}
+          </OTag>
+          <OTag
+            v-if="isImpacted"
+            variant="info-outline"
+            size="sm"
+            data-test="oncall-response-liaison-tag"
+          >
+            {{ t("oncall.liaisonTag") }}
+          </OTag>
+        </div>
+
         <!-- The one sentence this screen exists to say when it is true:
              nobody has seen this page, and here is why. -->
         <OnCallReachAlarm
@@ -281,6 +366,14 @@
                     :label="t('oncall.tabPriorCauses')"
                     data-test="oncall-response-tab-causes"
                   />
+                  <!-- Absent on a deployment with no agent, rather than a tab
+                       that opens on nothing. -->
+                  <OTab
+                    v-if="report"
+                    name="report"
+                    :label="t('oncall.tabReport')"
+                    data-test="oncall-response-tab-report"
+                  />
                 </OTabs>
                 <OButton
                   v-if="activeDetailTab === 'activity'"
@@ -332,6 +425,11 @@
                       :loading="priorCausesLoading"
                       @open="openResponse"
                     />
+                  </OTabPanel>
+
+                  <!-- The working behind the verdict card's one sentence. -->
+                  <OTabPanel name="report" data-test="oncall-response-report">
+                    <OnCallReportCard :report="report" :loading="reportLoading" />
                   </OTabPanel>
                 </OTabPanels>
               </OCardSection>
@@ -566,7 +664,9 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
@@ -587,25 +687,56 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
+import OnCallReportCard from "@/components/oncall/OnCallReportCard.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
-import oncallService from "@/services/oncall";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  acknowledgeResponseMutation,
+  addResponseNoteMutation,
+  confirmRecoveryMutation,
+  escalateNowMutation,
+  handoffResponseMutation,
+  oncallTeamQuery,
+  oncallTeamsQuery,
+  promoteResponseMutation,
+  resolveResponseMutation,
+  resolvedScheduleQuery,
+  responseDeliveriesQuery,
+  responseHistoryQuery,
+  responsePriorCausesQuery,
+  responseProgressQuery,
+  responseQuery,
+  responseReportQuery,
+  snoozeResponseMutation,
+  teamMembersQuery,
+  teamPolicyQuery,
+  teamReachabilityQuery,
+  whoIsOnCallQuery,
+} from "@/services/oncall.queries";
+import { oncallKeys } from "@/services/oncall.querykeys";
 import type {
+  DeliveryLedger,
   DeliveryRecord,
   CauseGroup,
   EscalateResult,
@@ -613,9 +744,14 @@ import type {
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
+  OnCallResponseReport,
   OnCallPosition,
+  OnCallTeam,
+  OnCallTeamMember,
   PromoteSeverity,
   ResolutionCause,
+  ResolvedSegment,
+  TeamReachability,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -633,6 +769,7 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
 const nowMicros = useOnCallClock();
 const store = useStore();
 const route = useRoute();
@@ -663,10 +800,9 @@ const isImpacted = computed(
 async function confirmRecovery() {
   confirmingRecovery.value = true;
   try {
-    await oncallService.confirmRecovery({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-      data: recoveryNote.value.trim() ? { note: recoveryNote.value.trim() } : undefined,
+    await recoveryWrite.mutateAsync({
+      responseId: responseId.value,
+      note: recoveryNote.value.trim() || undefined,
     });
     confirmRecoveryOpen.value = false;
     recoveryNote.value = "";
@@ -715,9 +851,8 @@ watch(
 async function promoteRecord() {
   promoting.value = true;
   try {
-    const res = await oncallService.promoteResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+    const res = await promoteWrite.mutateAsync({
+      responseId: responseId.value,
       data: {
         ...(promoteTitle.value.trim() ? { title: promoteTitle.value.trim() } : {}),
         severity: promoteSeverity.value,
@@ -735,7 +870,8 @@ async function promoteRecord() {
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.promoteFailed"),
     });
-    if (err?.response?.status === 409) await fetchResponse();
+    // A refused write expires nothing, so only a forced read shows whose incident won.
+    if (err?.response?.status === 409) await fetchResponse(true);
   } finally {
     promoting.value = false;
   }
@@ -763,6 +899,8 @@ const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
 const firingHistory = ref<OnCallResponse[]>([]);
 const priorCausesLoading = ref(false);
+const report = ref<OnCallResponseReport | null>(null);
+const reportLoading = ref(false);
 /// Only the fields the page shows — the stream, and the condition that
 /// tripped it; the rest of the payload belongs on the alert's own screen,
 /// which the subject row links to. `query_condition`/`condition` is `any`
@@ -806,6 +944,16 @@ const snoozeOptions = [
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const responseId = computed(() => String(route.params.responseId ?? ""));
 
+// The id rides in the variables: the origin link swaps it under a reused instance.
+const resolveWrite = useMutation(() => resolveResponseMutation(orgId.value));
+const ackWrite = useMutation(() => acknowledgeResponseMutation(orgId.value));
+const snoozeWrite = useMutation(() => snoozeResponseMutation(orgId.value));
+const noteWrite = useMutation(() => addResponseNoteMutation(orgId.value));
+const handoffWrite = useMutation(() => handoffResponseMutation(orgId.value));
+const recoveryWrite = useMutation(() => confirmRecoveryMutation(orgId.value));
+const promoteWrite = useMutation(() => promoteResponseMutation(orgId.value));
+const escalateWrite = useMutation(() => escalateNowMutation(orgId.value));
+
 const title = computed(() =>
   response.value
     ? raw(response.value.title || response.value.subject.source_id)
@@ -819,6 +967,9 @@ const isOpenState = computed(() => !!response.value && isUnresolved(response.val
 /// Only an escalating page can be claimed. Once it is owned, Acknowledge and
 /// Snooze are gone and Resolve becomes the primary action.
 const canAcknowledge = computed(() => !!response.value && isEscalating(response.value.state));
+
+/// Whether the compact header's menu has anything in it: a closed page already tied to an incident has no verb left.
+const hasMoreActions = computed(() => isOpenState.value || !response.value?.incident_id);
 
 /// Where the team-name link in the subtitle goes — same target and tab
 /// OnCallAboutPage's own team row links to, so the two agree on what
@@ -982,45 +1133,91 @@ const timeToResolve = computed(() => {
   return formatMicrosDuration(r.closed_at - r.opened_at);
 });
 
-async function fetchResponse() {
-  loading.value = true;
-  try {
-    const res = await oncallService.getResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+/// Cache-first; a force expires the entry first, so it costs one request, not two.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
     });
-    response.value = res.data.response;
-    events.value = res.data.events ?? [];
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
+// The newest read: a slower record for an id the route has already left must not overwrite the current one.
+let latestResponseRead = 0;
+
+// `force` reaches the record alone — it is the only thing a promote conflict moved.
+async function fetchResponse(force = false) {
+  loading.value = true;
+  const readId = ++latestResponseRead;
+  try {
+    const data = await read<{
+      response: OnCallResponse;
+      events: OnCallResponseEvent[];
+    } | null>(responseQuery(orgId.value, responseId.value), force);
+    if (readId !== latestResponseRead) return;
+    response.value = data?.response ?? null;
+    events.value = data?.events ?? [];
+    lastFetchedAt.value =
+      queryClient.getQueryState(responseQuery(orgId.value, responseId.value).queryKey)
+        ?.dataUpdatedAt ?? null;
     // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
     onCallPositionsLoading.value = true;
-    await fetchTeamName();
-    await fetchSubjectAlert();
-    await fetchHandoffTargets();
-    await fetchPriorCauses();
-    await fetchEscalation();
-    await fetchDeliveries();
-    await fetchTeamContext();
+    for (const step of [
+      fetchTeamName,
+      fetchSubjectAlert,
+      fetchHandoffTargets,
+      fetchPriorCauses,
+      fetchReport,
+      fetchEscalation,
+      fetchDeliveries,
+      fetchTeamContext,
+    ]) {
+      await step();
+      if (readId !== latestResponseRead) return;
+    }
   } catch (err: any) {
+    if (readId !== latestResponseRead) return;
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadResponseFailed"),
     });
   } finally {
-    loading.value = false;
+    if (readId === latestResponseRead) loading.value = false;
+  }
+}
+
+const refreshing = ref(false);
+const lastFetchedAt = ref<number | null>(null);
+
+/// Expires every read first, because `fetchResponse`'s own force reaches the record alone.
+async function refreshPage() {
+  refreshing.value = true;
+  try {
+    await queryClient.invalidateQueries({
+      queryKey: oncallKeys.all(orgId.value),
+      refetchType: "none",
+    });
+    await fetchResponse();
+  } finally {
+    refreshing.value = false;
   }
 }
 
 // The record stores a team id; a deleted team still has records pointing at
 // it, so the id is the fallback rather than an error.
 async function fetchTeamName() {
-  if (!response.value) return;
-  teamName.value = response.value.team_id;
+  const r = response.value;
+  if (!r) return;
+  teamName.value = r.team_id;
   try {
-    const res = await oncallService.getTeam({
-      org_identifier: orgId.value,
-      team_id: response.value.team_id,
-    });
-    if (res.data?.name) teamName.value = res.data.name;
+    const team = await read<OnCallTeam | null>(oncallTeamQuery(orgId.value, r.team_id), false);
+    if (team?.name) teamName.value = team.name;
   } catch {
     // Keep the id.
   }
@@ -1030,12 +1227,12 @@ async function resolveRecord() {
   confirmResolve.value = false;
   resolving.value = true;
   try {
-    await oncallService.resolveResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+    await resolveWrite.mutateAsync({
+      responseId: responseId.value,
       cause: resolveCause.value || undefined,
-      cause_note: resolveNote.value.trim() || undefined,
+      causeNote: resolveNote.value.trim() || undefined,
     });
+    analytics.track("oncall_page_resolved", { cause: resolveCause.value || "none", count: 1 });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
   } catch (err: any) {
@@ -1051,10 +1248,8 @@ async function resolveRecord() {
 async function acknowledgeRecord() {
   acking.value = true;
   try {
-    await oncallService.acknowledgeResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
+    await ackWrite.mutateAsync(responseId.value);
+    analytics.track("oncall_page_acknowledged", { count: 1 });
     toast({ variant: "success", message: t("oncall.acknowledged") });
     await fetchResponse();
   } catch (err: any) {
@@ -1070,11 +1265,7 @@ async function acknowledgeRecord() {
 async function snoozeRecord(minutes: number) {
   snoozing.value = true;
   try {
-    await oncallService.snoozeResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-      minutes,
-    });
+    await snoozeWrite.mutateAsync({ responseId: responseId.value, minutes });
     toast({ variant: "success", message: t("oncall.snoozed") });
     await fetchResponse();
   } catch (err: any) {
@@ -1092,11 +1283,7 @@ async function addNote() {
   if (!body) return;
   addingNote.value = true;
   try {
-    await oncallService.addNote({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-      body,
-    });
+    await noteWrite.mutateAsync({ responseId: responseId.value, body });
     noteBody.value = "";
     toast({ variant: "success", message: t("oncall.noteAdded") });
     await fetchResponse();
@@ -1117,11 +1304,10 @@ async function handoffRecord() {
   }
   handingOff.value = true;
   try {
-    await oncallService.handoffResponse({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
+    await handoffWrite.mutateAsync({
+      responseId: responseId.value,
       to: handoffMode.value === "person" ? handoffPerson.value : undefined,
-      to_team_id: handoffMode.value === "team" ? handoffTeam.value : undefined,
+      toTeamId: handoffMode.value === "team" ? handoffTeam.value : undefined,
       note: handoffNote.value.trim() || undefined,
     });
     showHandoff.value = false;
@@ -1143,13 +1329,11 @@ async function handoffRecord() {
 // Handoff targets. Failing to load them leaves the selects empty rather than
 // breaking the page — every other action still works.
 async function fetchHandoffTargets() {
-  if (!response.value) return;
+  const r = response.value;
+  if (!r) return;
   try {
-    const members = await oncallService.listMembers({
-      org_identifier: orgId.value,
-      team_id: response.value.team_id,
-    });
-    memberOptions.value = (members.data ?? []).map((m: { user_email: string }) => ({
+    const members = await read<OnCallTeamMember[]>(teamMembersQuery(orgId.value, r.team_id), false);
+    memberOptions.value = members.map((m) => ({
       label: raw(m.user_email),
       value: m.user_email,
     }));
@@ -1157,10 +1341,10 @@ async function fetchHandoffTargets() {
     memberOptions.value = [];
   }
   try {
-    const teams = await oncallService.listTeams({ org_identifier: orgId.value });
-    teamOptions.value = (teams.data ?? [])
-      .filter((tm: { id: string }) => tm.id !== response.value?.team_id)
-      .map((tm: { id: string; name: string }) => ({ label: raw(tm.name), value: tm.id }));
+    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), false);
+    teamOptions.value = teams
+      .filter((tm) => tm.id !== r.team_id)
+      .map((tm) => ({ label: raw(tm.name), value: tm.id }));
   } catch {
     teamOptions.value = [];
   }
@@ -1169,6 +1353,7 @@ async function fetchHandoffTargets() {
 /// Only alerts have a rule to fetch, and a page whose alert has since been
 /// deleted must still render — the record is the authority on what happened,
 /// the alert only decorates it.
+// Uncached: the page links to the alert editor, which seeds its form from the cached alert entry.
 async function fetchSubjectAlert() {
   subjectAlert.value = null;
   if (response.value?.subject.subject_type !== "alert") return;
@@ -1187,19 +1372,29 @@ async function fetchPriorCauses() {
   priorCausesLoading.value = true;
   try {
     const [causeRes, historyRes] = await Promise.allSettled([
-      oncallService.priorCauses({
-        org_identifier: orgId.value,
-        response_id: responseId.value,
-      }),
-      oncallService.responseHistory({
-        org_identifier: orgId.value,
-        response_id: responseId.value,
-      }),
+      read<CauseGroup[]>(responsePriorCausesQuery(orgId.value, responseId.value), false),
+      read<OnCallResponse[]>(responseHistoryQuery(orgId.value, responseId.value), false),
     ]);
-    priorCauses.value = causeRes.status === "fulfilled" ? (causeRes.value.data ?? []) : [];
-    firingHistory.value = historyRes.status === "fulfilled" ? (historyRes.value.data ?? []) : [];
+    priorCauses.value = causeRes.status === "fulfilled" ? causeRes.value : [];
+    firingHistory.value = historyRes.status === "fulfilled" ? historyRes.value : [];
   } finally {
     priorCausesLoading.value = false;
+  }
+}
+
+// 404 is the ordinary answer — no agent ran, or it never answered — so a
+// failure here leaves the tab hidden rather than surfacing an error.
+async function fetchReport() {
+  reportLoading.value = true;
+  try {
+    report.value = await read<OnCallResponseReport | null>(
+      responseReportQuery(orgId.value, responseId.value),
+      false,
+    );
+  } catch {
+    report.value = null;
+  } finally {
+    reportLoading.value = false;
   }
 }
 
@@ -1215,12 +1410,12 @@ const deliveriesLoading = ref(false);
 async function fetchDeliveries() {
   deliveriesLoading.value = true;
   try {
-    const res = await oncallService.listDeliveries({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
-    deliveries.value = res.data?.deliveries ?? [];
-    deliveriesTotal.value = res.data?.total ?? 0;
+    const ledger = await read<DeliveryLedger | null>(
+      responseDeliveriesQuery(orgId.value, responseId.value),
+      false,
+    );
+    deliveries.value = ledger?.deliveries ?? [];
+    deliveriesTotal.value = ledger?.total ?? 0;
   } catch {
     deliveries.value = [];
     deliveriesTotal.value = 0;
@@ -1243,22 +1438,18 @@ async function fetchTeamContext() {
   onCallPositionsLoading.value = true;
   try {
     const [slots, policyRes, reach] = await Promise.allSettled([
-      // A closed record is history, and the live rotation is not its history:
-      // hours later the pager has moved on, and the rail named whoever holds it
-      // now as though they had been the one paged. The schedule endpoint answers
-      // as of any instant, so a closed record asks it about its own last moment.
-      oncallService.whoIsOnCall({
-        org_identifier: orgId.value,
-        team_id: r.team_id,
-        at: r.closed_at ?? undefined,
-      }),
-      oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
-      oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
+      // A closed record asks about its own last moment — the live rotation is not its history.
+      read<OnCallPosition[]>(
+        whoIsOnCallQuery(orgId.value, r.team_id, r.closed_at ?? undefined),
+        false,
+      ),
+      read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, r.team_id), false),
+      read<TeamReachability | null>(teamReachabilityQuery(orgId.value, r.team_id), false),
     ]);
-    onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
-    policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
+    onCallPositions.value = slots.status === "fulfilled" ? slots.value : [];
+    policy.value = policyRes.status === "fulfilled" ? policyRes.value : null;
     smtpConfigured.value =
-      reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
+      reach.status === "fulfilled" ? (reach.value?.smtp_configured ?? null) : null;
     await fetchHandover();
   } finally {
     onCallPositionsLoading.value = false;
@@ -1280,13 +1471,11 @@ async function fetchHandover() {
   const from = nowMicros.value;
   const to = from + 7 * 24 * 60 * 60 * 1_000_000;
   try {
-    const res = await oncallService.resolvedSchedule({
-      org_identifier: orgId.value,
-      team_id: r.team_id,
-      from,
-      to,
-    });
-    const segments = [...(res.data ?? [])].sort((a, b) => a.from - b.from);
+    const resolved = await read<ResolvedSegment[]>(
+      resolvedScheduleQuery(orgId.value, r.team_id, from, to),
+      false,
+    );
+    const segments = [...resolved].sort((a, b) => a.from - b.from);
     const currentIndex = segments.findIndex((seg) => seg.from <= from && seg.to > from);
     if (currentIndex < 0) return;
     handoverAt.value = segments[currentIndex].to;
@@ -1339,10 +1528,7 @@ function escalateOutcome(result: EscalateResult | undefined): {
 async function escalateNow() {
   escalatingNow.value = true;
   try {
-    const res = await oncallService.escalateNow({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
+    const res = await escalateWrite.mutateAsync({ responseId: responseId.value });
     toast(escalateOutcome(res.data));
     await fetchResponse();
   } catch (err: any) {
@@ -1366,13 +1552,12 @@ function openReachability() {
   });
 }
 
-async function fetchEscalation() {
+async function fetchEscalation(force = false) {
   try {
-    const res = await oncallService.escalationProgress({
-      org_identifier: orgId.value,
-      response_id: responseId.value,
-    });
-    escalation.value = res.data ?? null;
+    escalation.value = await read<EscalationProgress | null>(
+      responseProgressQuery(orgId.value, responseId.value),
+      force,
+    );
   } catch {
     escalation.value = null;
   }
@@ -1386,8 +1571,20 @@ function openResponse(id: string) {
   });
 }
 
+// The ladder's countdown lapses while the entry is still fresh, so this one forces.
+watch(
+  () => {
+    const at = escalation.value?.next_at;
+    return !!at && nowMicros.value >= at;
+  },
+  (lapsed) => {
+    if (lapsed) fetchEscalation(true);
+  },
+);
+
 // The origin-response link stays on this same route with a new responseId
 // param, so Vue Router reuses this instance instead of remounting it — the
 // fetch has to key off responseId directly rather than firing once on mount.
-watch(responseId, fetchResponse, { immediate: true });
+// Wrapped: a watcher hands the callback the new id, which `force` would read as a yes.
+watch(responseId, () => fetchResponse(), { immediate: true });
 </script>

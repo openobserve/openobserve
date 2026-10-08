@@ -527,6 +527,7 @@
   --color-progress-bar-success: var(--color-success-600);
   --color-progress-bar-warning: var(--color-warning-500);
   --color-progress-bar-danger: var(--color-error-600);
+  --color-progress-bar-neutral: var(--color-grey-400);
   --color-progress-bar-track: var(--color-grey-200);
   --color-progress-bar-label: var(--color-white);
 
@@ -941,6 +942,8 @@
   /* Notification count badge ring on the nav rail — a fixed dark ring that
      separates the badge from whatever it overlaps. */
   --color-menu-badge-ring: var(--color-grey-900);
+  /* Active and hover rail labels need a darker step than --color-accent to clear 4.5:1 on the light tile. */
+  --color-nav-label-accent: var(--color-primary-700);
 
   /* Inline progress/duration bar fill (synthetics run timings). */
   --color-progress-track-fill: var(--color-primary-400);
@@ -1284,6 +1287,7 @@
   --color-thread-avatar-bg: var(--color-thread-avatar-bg);
   --color-thread-accent-strong: var(--color-thread-accent-strong);
   --color-menu-badge-ring: var(--color-menu-badge-ring);
+  --color-nav-label-accent: var(--color-nav-label-accent);
   --color-progress-track-fill: var(--color-progress-track-fill);
 
   /* Ingestion empty-state card icon accents */
@@ -1912,6 +1916,7 @@
   --color-progress-bar-success: var(--color-progress-bar-success);
   --color-progress-bar-warning: var(--color-progress-bar-warning);
   --color-progress-bar-danger: var(--color-progress-bar-danger);
+  --color-progress-bar-neutral: var(--color-progress-bar-neutral);
   --color-progress-bar-track: var(--color-progress-bar-track);
   --color-progress-bar-label: var(--color-progress-bar-label);
 
@@ -2067,6 +2072,10 @@
   --color-brand-teams-hover: var(--color-brand-teams-hover);
   --color-brand-email: var(--color-brand-email);
   --color-brand-email-hover: var(--color-brand-email-hover);
+  --color-brand-slack-foreground: var(--color-brand-slack-foreground);
+  --color-brand-teams-foreground: var(--color-brand-teams-foreground);
+  --color-brand-email-foreground: var(--color-brand-email-foreground);
+  --color-brand-email-ink-foreground: var(--color-brand-email-ink-foreground);
   --color-promo-webinar-link: var(--color-promo-webinar-link);
   --color-promo-webinar-link-hover: var(--color-promo-webinar-link-hover);
   --color-promo-webinar-accent: var(--color-promo-webinar-accent);
@@ -2112,6 +2121,12 @@
   --color-service-health-degraded: var(--color-service-health-degraded);
   --color-service-health-healthy: var(--color-service-health-healthy);
   --color-service-health-warning: var(--color-service-health-warning);
+  --color-map-seq-1: var(--color-map-seq-1);
+  --color-map-seq-2: var(--color-map-seq-2);
+  --color-map-seq-3: var(--color-map-seq-3);
+  --color-map-seq-4: var(--color-map-seq-4);
+  --color-map-seq-5: var(--color-map-seq-5);
+  --color-map-card-header: var(--color-map-card-header);
   --color-severity-error-color: var(--color-severity-error-color);
   --color-severity-warning-color: var(--color-severity-warning-color);
   --color-status-error-bg: var(--color-status-error-bg);

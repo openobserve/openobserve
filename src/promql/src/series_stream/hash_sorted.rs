@@ -39,7 +39,7 @@ use futures::TryStreamExt;
 use super::{SeriesStream, plan::LabelColumns};
 use crate::{
     series_loader::label_interner::{LabelColumn, LabelInterner},
-    utils::batch_run_len,
+    utils::{batch_run_len, extend_samples},
 };
 
 /// One partition's series stream; every chain holds one run per series, so the minimum head hash is
@@ -54,6 +54,7 @@ pub(crate) struct HashSortedSeriesStream {
     current: Option<u64>,
     /// The head row of that series, kept past `consume` so its labels can still be read.
     head: Option<(Arc<RecordBatch>, usize)>,
+    stale_markers: bool,
 }
 
 impl HashSortedSeriesStream {
@@ -83,6 +84,7 @@ impl HashSortedSeriesStream {
             offset,
             current: None,
             head: None,
+            stale_markers: config::get_config().prom.staleness_markers_enabled,
         })
     }
 
@@ -155,7 +157,9 @@ impl SeriesStream for HashSortedSeriesStream {
         samples.clear();
         for cursor in &mut self.cursors {
             if cursor.head_hash() == Some(hash) {
-                cursor.consume_run(hash, self.offset, samples).await?;
+                cursor
+                    .consume_run(hash, self.offset, self.stale_markers, samples)
+                    .await?;
             }
         }
         // classic parity: chains interleave in time, so restore per-series order
@@ -206,6 +210,7 @@ impl ChainCursor {
         &mut self,
         hash: u64,
         offset: i64,
+        stale_markers: bool,
         samples: &mut Vec<Sample>,
     ) -> Result<()> {
         while let Some(batch) = &self.batch {
@@ -217,12 +222,14 @@ impl ChainCursor {
             let times = batch[TIMESTAMP_COL_NAME]
                 .as_primitive::<Int64Type>()
                 .values();
-            let values = batch[VALUE_LABEL].as_primitive::<Float64Type>().values();
-            samples.extend(
-                times[self.row..self.row + run_len]
-                    .iter()
-                    .zip(&values[self.row..self.row + run_len])
-                    .map(|(&timestamp, &value)| Sample::new(timestamp + offset, value)),
+            let values = batch[VALUE_LABEL].as_primitive::<Float64Type>();
+            extend_samples(
+                samples,
+                times,
+                values,
+                self.row..self.row + run_len,
+                offset,
+                stale_markers,
             );
             self.row += run_len;
             if self.row < hashes.len() {
@@ -249,6 +256,7 @@ mod tests {
     use crate::{
         aggregations::AggOp,
         functions::{self, RangeFunc},
+        scalar_param::ScalarParam,
         streaming_eval::{RangeExpr, aggregate, eval_range, tests::*},
     };
 
@@ -260,8 +268,8 @@ mod tests {
 
         let agg_cases = [
             AggOp::Avg,
-            AggOp::Bottomk(1),
-            AggOp::Bottomk(2),
+            AggOp::Bottomk(ScalarParam::Const(1.0)),
+            AggOp::Bottomk(ScalarParam::Const(2.0)),
             AggOp::Count,
             AggOp::Group,
             AggOp::Max,
@@ -269,8 +277,8 @@ mod tests {
             AggOp::Stddev,
             AggOp::Stdvar,
             AggOp::Sum,
-            AggOp::Topk(2),
-            AggOp::Topk(10),
+            AggOp::Topk(ScalarParam::Const(2.0)),
+            AggOp::Topk(ScalarParam::Const(10.0)),
         ];
         let func_cases = ["rate", "increase", "sum_over_time", "last_over_time"];
         let modifiers = [
@@ -294,11 +302,11 @@ mod tests {
                     .unwrap()
                     .unwrap();
                     let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-                    let expected = aggregate(sources, op, eval).await.unwrap().0;
+                    let expected = aggregate(sources, op.clone(), eval).await.unwrap().0;
 
-                    let actual = run_streaming(&ctx, modifier, func_name, op, range)
+                    let actual = run_streaming(&ctx, modifier, func_name, op.clone(), range)
                         .await
-                        .expect("streaming path must not fall back on the sorted table");
+                        .expect("the sorted table streams");
 
                     assert_matrix_close(
                         canonical_matrix(expected),
@@ -306,6 +314,59 @@ mod tests {
                         &format!("streaming {op:?}({func_name}) (modifier: {modifier:?})"),
                     );
                 }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_null_value_is_a_stale_marker_unless_markers_are_off() {
+        use config::{
+            TIMESTAMP_COL_NAME,
+            meta::promql::{HASH_LABEL, VALUE_LABEL, is_stale_marker},
+        };
+        use datafusion::{
+            arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+                datatypes::{DataType, Field, Schema},
+            },
+            physical_plan::memory::MemoryStream,
+        };
+
+        use super::{super::SeriesStream, HashSortedSeriesStream};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1])),
+                Arc::new(Int64Array::from(vec![10, 20])),
+                Arc::new(Float64Array::from(vec![Some(1.0), None])),
+            ],
+        )
+        .unwrap();
+        for stale_markers in [true, false] {
+            let stream = MemoryStream::try_new(vec![batch.clone()], schema.clone(), None).unwrap();
+            let mut series = HashSortedSeriesStream::start(
+                vec![Box::pin(stream)],
+                Arc::new(LabelColumns::grouped(vec![])),
+                0,
+            )
+            .await
+            .unwrap();
+            series.stale_markers = stale_markers;
+            assert!(series.advance().await.unwrap().is_some());
+            let mut samples = vec![];
+            series.consume(&mut samples).await.unwrap();
+            assert_eq!(samples[0].value, 1.0);
+            if stale_markers {
+                assert_eq!(samples.len(), 2);
+                assert!(is_stale_marker(samples[1].value));
+            } else {
+                assert_eq!(samples.len(), 1);
             }
         }
     }
@@ -335,6 +396,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ];
         for func_name in func_cases {
             let func: Arc<dyn RangeFunc> =

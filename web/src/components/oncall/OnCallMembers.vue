@@ -18,11 +18,11 @@
         <div class="flex w-full flex-wrap items-center gap-2">
           <OSearchInput
             v-model="memberFilter"
-            class="w-full max-w-xs"
+            class="w-full max-w-xs max-lg:max-w-none"
             :placeholder="t('oncall.memberSearchPlaceholder')"
             data-test="oncall-members-search"
           />
-          <OSeparator vertical />
+          <OSeparator vertical class="max-lg:hidden" />
           <div class="min-w-0 flex-1">
             <OSelect
               v-if="!userLookupFailed"
@@ -58,7 +58,7 @@
 
           <span
             v-if="orgTotal"
-            class="text-text-secondary ms-auto shrink-0 text-xs"
+            class="text-text-secondary ms-auto shrink-0 text-xs max-md:hidden"
             data-test="oncall-members-coverage"
           >
             {{ t("oncall.membersOfOrg", { onTeam: onTeamCount, total: orgTotal }) }}
@@ -71,9 +71,9 @@
       <template #cell-person="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5 py-1">
           <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <span class="text-text-heading truncate text-sm font-medium">
+            <OTruncatedText class="text-text-heading text-sm font-medium">
               {{ raw(row.name) }}
-            </span>
+            </OTruncatedText>
             <OTag v-if="row.state === 'on_call'" variant="success-soft" size="sm">
               {{ t("oncall.badgeOnCallNow") }}
             </OTag>
@@ -98,7 +98,9 @@
               {{ t("oncall.contactUnreachable") }}
             </OTag>
           </span>
-          <span class="text-text-secondary truncate text-xs">{{ raw(row.user_email) }}</span>
+          <OTruncatedText class="text-text-secondary text-xs">{{
+            raw(row.user_email)
+          }}</OTruncatedText>
         </span>
       </template>
 
@@ -123,15 +125,15 @@
 
       <template #cell-nextShift="{ row }">
         <span class="flex flex-col gap-0.5">
-          <span
+          <OTruncatedText
             :class="row.rotation ? 'text-text-body text-sm' : 'text-text-muted text-sm'"
             :data-test="`oncall-members-shift-${row.id}`"
           >
             {{ shiftLine(row) }}
-          </span>
-          <span v-if="row.rotation" class="text-text-secondary truncate text-xs">
+          </OTruncatedText>
+          <OTruncatedText v-if="row.rotation" class="text-text-secondary text-xs">
             {{ row.away ? t("oncall.shiftSkippedWhileAway") : raw(row.rotation) }}
-          </span>
+          </OTruncatedText>
         </span>
       </template>
 
@@ -141,6 +143,7 @@
           variant="ghost"
           size="icon-sm"
           icon-left="event"
+          class="max-md:hidden"
           :aria-label="t('oncall.awayMark')"
           :data-test="`oncall-members-mark-away-${row.id}`"
           @click.stop="openAway(row.user_email)"
@@ -149,10 +152,42 @@
           variant="ghost"
           size="icon-sm"
           icon-left="close"
+          class="max-md:hidden"
           :aria-label="t('oncall.removeMember')"
           :data-test="`oncall-members-remove-${row.id}`"
           @click.stop="memberToRemove = row"
         />
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              :aria-label="t('oncall.moreActions')"
+              data-test="oncall-members-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            v-if="canConfigure"
+            icon-left="event"
+            class="md:hidden"
+            :data-test="`oncall-members-mark-away-${row.id}-menu`"
+            @select="openAway(row.user_email)"
+          >
+            <span>{{ t("oncall.awayMark") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="close"
+            variant="destructive"
+            class="md:hidden"
+            :data-test="`oncall-members-remove-${row.id}-menu`"
+            @select="memberToRemove = row"
+          >
+            <span>{{ t("oncall.removeMember") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </template>
 
       <template #empty>
@@ -267,12 +302,22 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";
+import { queryClient } from "@/composables/query/queryClient";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
-import oncallService from "@/services/oncall";
-import usersService from "@/services/users";
+import {
+  addTeamMembersMutation,
+  createUnavailabilityMutation,
+  deleteUnavailabilityMutation,
+  removeTeamMemberMutation,
+  resolvedScheduleQuery,
+  unavailabilityQuery,
+} from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { orgUsersQuery } from "@/services/users.queries";
 import type {
   MemberReachability,
   OnCallPosition,
@@ -286,6 +331,8 @@ import type {
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { formatInZone, rotationMembers } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -326,6 +373,12 @@ const { noteConfigurationDenied } = useOnCallPermissions();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
+// Getter form: the tab outlives a team switch, and a bound id would write to the one it opened on.
+const addMembersWrite = useMutation(() => addTeamMembersMutation(orgId.value, props.teamId));
+const removeMemberWrite = useMutation(() => removeTeamMemberMutation(orgId.value, props.teamId));
+const createAbsenceWrite = useMutation(() => createUnavailabilityMutation(orgId.value));
+const deleteAbsenceWrite = useMutation(() => deleteUnavailabilityMutation(orgId.value));
+
 /// Which rotation, if any, actually pages this person. Adding somebody to a
 /// team does not put them in the paging order, and that gap is where "why
 /// wasn't I paged" comes from.
@@ -362,12 +415,9 @@ const awaySaving = ref(false);
 async function fetchAbsences() {
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.listUnavailability({
-      org_identifier: orgId.value,
-      from: now,
-      to: now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY,
-    });
-    absences.value = res.data ?? [];
+    absences.value = await queryClient.fetchQuery(
+      unavailabilityQuery(orgId.value, undefined, now, now + ABSENCE_WINDOW_DAYS * MICROS_PER_DAY),
+    );
   } catch {
     absences.value = [];
   }
@@ -379,13 +429,14 @@ async function fetchAbsences() {
 async function fetchSegments() {
   try {
     const now = Date.now() * 1000;
-    const res = await oncallService.resolvedSchedule({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      from: now,
-      to: now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
-    });
-    segments.value = res.data ?? [];
+    segments.value = await queryClient.fetchQuery(
+      resolvedScheduleQuery(
+        orgId.value,
+        props.teamId,
+        now,
+        now + SHIFT_HORIZON_DAYS * MICROS_PER_DAY,
+      ),
+    );
   } catch {
     segments.value = [];
   }
@@ -422,17 +473,15 @@ function openAway(email: string) {
 async function saveAbsence() {
   awaySaving.value = true;
   try {
-    await oncallService.createUnavailability({
-      org_identifier: orgId.value,
-      data: {
-        user_email: awayEmail.value,
-        start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
-        end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
-        ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
-      },
+    await createAbsenceWrite.mutateAsync({
+      user_email: awayEmail.value,
+      start_at: new Date(`${awayFromDate.value}T${awayFromTime.value}`).getTime() * 1000,
+      end_at: new Date(`${awayToDate.value}T${awayToTime.value}`).getTime() * 1000,
+      ...(awayReason.value.trim() ? { reason: awayReason.value.trim() } : {}),
     });
     awayOpen.value = false;
     toast({ variant: "success", message: t("oncall.awaySaved") });
+    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     // The rota moves the away person's turn, so the schedule tab's answer
     // just changed too.
@@ -453,11 +502,9 @@ async function saveAbsence() {
 
 async function removeAbsence(absence: Unavailability) {
   try {
-    await oncallService.deleteUnavailability({
-      org_identifier: orgId.value,
-      unavailability_id: absence.id,
-    });
+    await deleteAbsenceWrite.mutateAsync(absence.id);
     toast({ variant: "success", message: t("oncall.awayRemoved") });
+    // Unforced: the write expired both scopes, so these repaint the refs from one server read.
     await Promise.all([fetchAbsences(), fetchSegments()]);
     emit("changed");
   } catch (err: any) {
@@ -666,6 +713,8 @@ function focusMemberPicker() {
   memberPickerRef.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" });
   memberPickerRef.value?.focus();
 }
+// Exposed so the attention banner's "Add a member" can land the cursor here even when this tab is already open.
+defineExpose({ focusMemberPicker });
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.
@@ -708,8 +757,7 @@ function nameOf(email: string): string {
 async function fetchOrgUsers() {
   loadingUsers.value = true;
   try {
-    const res = await usersService.orgUsers(orgId.value);
-    orgUsers.value = res.data?.data ?? [];
+    orgUsers.value = await queryClient.fetchQuery(orgUsersQuery(orgId.value));
     userLookupFailed.value = false;
   } catch {
     // Not a toast: the form still works, and an error banner over a
@@ -731,11 +779,7 @@ async function commitMembers(emails: string[]) {
   if (!emails.length) return;
   adding.value = true;
   try {
-    await oncallService.addMembers({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: { user_emails: emails },
-    });
+    await addMembersWrite.mutateAsync(emails);
     selected.value = [];
     fallbackEmails.value = "";
     emit("changed");
@@ -756,11 +800,7 @@ async function confirmRemoveMember() {
   memberToRemove.value = null;
   if (!member) return;
   try {
-    await oncallService.removeMember({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      user_email: member.user_email,
-    });
+    await removeMemberWrite.mutateAsync(member.user_email);
     emit("changed");
   } catch (err: any) {
     toast({

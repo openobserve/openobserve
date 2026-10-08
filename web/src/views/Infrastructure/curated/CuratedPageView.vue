@@ -23,14 +23,17 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import type { I18nKey, I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -41,6 +44,7 @@ import { curatedPacks } from "./packs";
 import { FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./packs/kubernetes.page";
 import { useCuratedPage } from "./useCuratedPage";
 import type { HiddenGroupInfo, StaleGroupInfo } from "./resolve";
+import type { RequirementGroup } from "./types";
 
 const props = defineProps<{ workload: WorkloadId }>();
 
@@ -79,7 +83,7 @@ const timezone = computed(() => store.state.timezone ?? "UTC");
 
 const DEFAULT_WINDOW_US = 3 * 60 * 60 * 1_000_000;
 
-/** The SELECTION, not its bounds: a relative window means "as of now", so it is materialized per refresh. */
+// The SELECTION, not its bounds: a relative window means "as of now", so it is materialized per refresh.
 type CuratedWindow =
   | { kind: "relative"; period: string; widthUs: number }
   | { kind: "absolute"; from: number; to: number };
@@ -91,6 +95,9 @@ const selectedWindow = ref<CuratedWindow>({
 });
 
 const range = ref(materialize(selectedWindow.value));
+
+const compactHeaderOnTablet = computed(() => selectedWindow.value.kind === "absolute");
+const { lgUp } = useBreakpoint();
 const checkedAtUs = ref<number | null>(null);
 
 // RelativeTime reads a ms epoch; handing it the µs value dates the refresh to the year 57000.
@@ -98,9 +105,7 @@ const checkedAtMs = computed(() =>
   checkedAtUs.value === null ? null : Math.floor(checkedAtUs.value / 1000),
 );
 
-// MICROSECOND epoch, undivided: usePanelDataLoader reads these back with
-// `new Date(start_time.toISOString()).getTime()` and hands the result to
-// executePromQL as µs, so a ms-epoch Date lands the x-axis in 1970.
+// MICROSECOND epoch, undivided: usePanelDataLoader hands these to executePromQL as µs, so ms lands the x-axis in 1970.
 const currentTimeObj = computed(() => ({
   __global: {
     start_time: new Date(range.value.from),
@@ -122,13 +127,20 @@ function materialize(window: CuratedWindow): { from: number; to: number } {
   return { from: now - window.widthUs, to: now };
 }
 
+const refreshing = ref(false);
+
 const runRefresh = async (force = false) => {
   // An unregistered workload resolves nothing, so it must also fetch nothing.
   if (!hasPack.value) return;
   // Re-anchored per refresh: a relative window frozen at page load empties every range-plotted panel as the clock advances.
   range.value = materialize(selectedWindow.value);
-  await refresh({ orgId: orgId.value, start: range.value.from, end: range.value.to, force });
-  checkedAtUs.value = Date.now() * 1000;
+  refreshing.value = true;
+  try {
+    await refresh({ orgId: orgId.value, start: range.value.from, end: range.value.to, force });
+    checkedAtUs.value = Date.now() * 1000;
+  } finally {
+    refreshing.value = false;
+  }
 };
 
 // ── Faces ───────────────────────────────────────────────────────────────────
@@ -142,6 +154,12 @@ const partialTelemetryKey = computed(() => {
   if (props.workload === "hosts") return "infra.curated.partialTelemetryHosts" as const;
   return "infra.curated.partialTelemetryKubernetes" as const;
 });
+
+// A range picker over a page with nothing to chart is a control that does nothing.
+const showRangeControls = computed(
+  () =>
+    hasPack.value && face.value !== "undetected" && !(face.value === "unknown" && loadError.value),
+);
 
 const openSetupRoute = () => {
   const door = setupDoor.value;
@@ -180,14 +198,7 @@ watch(
   { immediate: true },
 );
 
-/**
- * The tab is shareable only if it is IN the URL, so the resolved selection is
- * written back — including the seeded default, which is what makes a plain
- * landing URL copyable without the reader first clicking something.
- *
- * `replace`, never `push` (ViewDashboard :1487): a tab is a view of one page,
- * so Back should leave the page rather than walk every tab the reader opened.
- */
+// Written back with `replace` (seeded default included) so the URL is shareable and Back leaves the page, not each tab.
 watch(
   selectedTabId,
   (tabId) => {
@@ -200,16 +211,14 @@ watch(
       .replace({ query: { ...route.query, tab: tabId } })
       .finally(() => (isInternalUrlUpdate.value = false));
   },
-  // The seeding watcher above resolves the default during setup, BEFORE this one exists; without
-  // immediate it would never see that first value and a landing URL would stay unshareable.
+  // The seeding watcher resolves the default before this one exists, so without immediate it never sees it.
   { immediate: true },
 );
 
 // ── Explainer strip ─────────────────────────────────────────────────────────
 
 const stripExpanded = ref(false);
-// SEEDS the expansion once (design pass-4 finding 8b: "first presentation only").
-// Re-syncing on every change discarded a collapse the user had just performed.
+// Seeds the expansion once: re-syncing on every change discarded a collapse the user had just performed.
 let stripSeeded = false;
 watch(
   stripAutoExpand,
@@ -228,12 +237,24 @@ const hasStrip = computed(
 
 const collapsedCapabilities = computed<I18nText>(() => {
   const sentences = hiddenGroups.value.map((hidden) => t(hidden.group.capabilityKey));
-  if (sentences.length === 0) return raw("");
+  // Partial groups hide individual panels, which is the fact worth leading with when no whole group is gone.
+  const partialPanels = partialGroups.value.reduce(
+    (sum, partial) => sum + partial.hiddenPanelIds.length,
+    0,
+  );
+  if (sentences.length === 0 && partialPanels > 0) {
+    return t("infra.curated.hiddenPanelCount", { count: partialPanels }, partialPanels);
+  }
+  // With nothing hidden or partial the strip only carries stale groups, which have no capability sentence.
+  const labels = staleGroups.value.map((entry) => t(entry.group.labelKey));
+  const items = sentences.length > 0 ? sentences : [...new Set(labels)];
+  const separator = sentences.length > 0 ? " " : ", ";
+  if (items.length === 0) return raw("");
   // Already-translated sentences: joining them widens to plain string, it does not untranslate them.
-  if (sentences.length <= 2) return raw(sentences.join(" "));
+  if (items.length <= 2) return raw(items.join(separator));
   return t("infra.curated.hiddenSummaryMore", {
-    first: sentences[0],
-    count: sentences.length - 1,
+    first: items[0],
+    count: items.length - 1,
   });
 });
 
@@ -243,18 +264,28 @@ const staleStreams = (hidden: HiddenGroupInfo) =>
   hidden.missingStreams.filter((entry) => entry.state === "stale");
 
 const formatUs = (value: number | null | undefined) =>
-  value == null ? "" : timestampToTimezoneDate(Math.floor(value / 1000), timezone.value);
+  value == null
+    ? ""
+    : timestampToTimezoneDate(Math.floor(value / 1000), timezone.value, "yyyy-MM-dd HH:mm");
 
 /** Dormant face: every group whose streams exist but stopped reporting. */
 const dormantGroups = computed(() =>
   hiddenGroups.value
     .map((hidden) => ({ hidden, stale: staleStreams(hidden) }))
     .filter((entry) => entry.stale.length > 0)
-    .map(({ hidden, stale }) => ({
-      group: hidden.group,
-      streams: stale.map((entry) => entry.name).join(", "),
-      date: formatUs(Math.max(...stale.map((entry) => entry.lastSeenUs ?? 0))),
-    })),
+    .map(({ hidden, stale }) => {
+      const lastSeenUs = Math.max(...stale.map((entry) => entry.lastSeenUs ?? 0));
+      return {
+        group: hidden.group,
+        streams: stale.map((entry) => entry.name).join(", "),
+        lastSeenUs,
+        stoppedAgo: t("infra.curated.stoppedAgo", { duration: humanDuration(lastSeenUs) }),
+        detail: t("infra.curated.streamsStale", {
+          list: raw(stale.map((entry) => entry.name).join(", ")),
+          date: formatUs(lastSeenUs),
+        }),
+      };
+    }),
 );
 
 const expandedSetupSlug = ref<string | null>(null);
@@ -265,6 +296,8 @@ const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"])
   }
   expandedSetupSlug.value = expandedSetupSlug.value === group.setup.slug ? null : group.setup.slug;
 };
+
+const noteOpen = ref(false);
 
 /** A caveat about the active section's panels as a SET (§6.3) — never per tile. */
 const sectionNoteKey = computed(
@@ -279,15 +312,136 @@ const staleDurations = computed(() =>
   staleGroups.value.map((stale) => {
     // A listed stream whose stats never flushed serializes doc_time_max: 0, which formats as the Unix epoch.
     const noDataYet = stale.noDataYet === true || !stale.lastSeenUs;
+    // The label, not the capability sentence: "... are unavailable stopped 3 hours ago" does not parse.
+    const capability = t(stale.group.labelKey);
     return {
-      id: stale.group.id,
-      key: noDataYet ? "infra.curated.staleNoDataBanner" : "infra.curated.staleBanner",
-      capability: t(stale.group.capabilityKey),
+      group: stale.group,
+      noDataYet,
+      capability,
       duration: noDataYet ? "" : humanDuration(stale.lastSeenUs),
-      date: noDataYet ? "" : formatUs(stale.lastSeenUs),
+      detail: noDataYet
+        ? t("infra.curated.staleNoDataBannerShort", { capability })
+        : t("infra.curated.streamsStale", { list: capability, date: formatUs(stale.lastSeenUs) }),
     };
   }),
 );
+
+// The banner names the outage in one line; exact times and the fix live in the hidden-panels strip below it.
+const staleBannerText = computed(() => {
+  const [first, ...rest] = staleDurations.value;
+  if (!first) return raw("");
+  if (rest.length > 0) {
+    return t(
+      "infra.curated.staleBannerMany",
+      { first: first.capability, count: rest.length },
+      rest.length,
+    );
+  }
+  return first.noDataYet
+    ? t("infra.curated.staleNoDataBannerShort", { capability: first.capability })
+    : t("infra.curated.staleBannerShort", {
+        capability: first.capability,
+        duration: first.duration,
+      });
+});
+
+interface StripLine {
+  text: I18nText;
+  dataTest?: string;
+}
+
+interface StripRow {
+  group: RequirementGroup;
+  status: I18nText[];
+  lines: StripLine[];
+  canSetUp: boolean;
+}
+
+// One row per data source, so a group that is both partial and stale reads as one entry.
+const stripRows = computed(() => {
+  const rows = new Map<string, StripRow>();
+  const rowFor = (group: RequirementGroup) => {
+    const row = rows.get(group.id) ?? { group, status: [], lines: [], canSetUp: false };
+    rows.set(group.id, row);
+    return row;
+  };
+  for (const hidden of hiddenGroups.value) {
+    const row = rowFor(hidden.group);
+    row.status.push(panelCountText(hidden.panelCount));
+    row.lines.push(...hiddenGroupLines(hidden));
+    // A PRESENT group's collector already works; only a field is missing, so no "Set up".
+    row.canSetUp = !presentGroupIds.value.includes(hidden.group.id);
+  }
+  for (const partial of partialGroups.value) {
+    const row = rowFor(partial.group);
+    row.status.push(panelCountText(partial.hiddenPanelIds.length));
+    row.lines.push({
+      text: streamsMissingText(partial.missingStreams.map((entry) => entry.name)),
+      dataTest: "curated-strip-streams-missing",
+    });
+  }
+  for (const stale of staleDurations.value) {
+    const row = rowFor(stale.group);
+    row.status.push(
+      stale.noDataYet
+        ? t("infra.curated.staleNoDataBadge")
+        : t("infra.curated.stoppedAgo", { duration: stale.duration }),
+    );
+    row.lines.push({ text: stale.detail, dataTest: "curated-strip-stale" });
+  }
+  // Each part is already translated; joining them widens to string without untranslating either.
+  return [...rows.values()].map((row) => ({ ...row, statusText: raw(row.status.join(" · ")) }));
+});
+
+function panelCountText(count: number) {
+  return t("infra.curated.hiddenPanelCount", { count }, count);
+}
+
+function streamsMissingText(names: string[]) {
+  return t(
+    "infra.curated.streamsMissing",
+    { count: names.length, list: raw(names.join(", ")) },
+    names.length,
+  );
+}
+
+function hiddenGroupLines(hidden: HiddenGroupInfo): StripLine[] {
+  const lines: StripLine[] = [];
+  const absent = absentStreams(hidden);
+  if (absent.length > 0) {
+    lines.push({
+      text: streamsMissingText(absent.map((entry) => entry.name)),
+      dataTest: "curated-strip-streams-missing",
+    });
+  }
+  const stale = staleStreams(hidden);
+  if (stale.length > 0) {
+    lines.push({
+      text: t("infra.curated.streamsStale", {
+        list: raw(stale.map((entry) => entry.name).join(", ")),
+        date: formatUs(stale[0].lastSeenUs),
+      }),
+      dataTest: "curated-strip-streams-stale",
+    });
+  }
+  for (const concept of hidden.unresolvedConcepts ?? []) {
+    lines.push({
+      text: t("infra.curated.fieldUnresolved", {
+        display: raw(concept.display),
+        stream: raw(hidden.group.anchorStream ?? ""),
+      }),
+    });
+  }
+  if (hidden.missingFields?.length) {
+    lines.push({
+      text: t("infra.curated.probeFieldsMissing", {
+        stream: raw(hidden.probeStream ?? ""),
+        list: raw(hidden.missingFields.join(", ")),
+      }),
+    });
+  }
+  return lines;
+}
 
 function humanDuration(sinceUs: number): string {
   // Measured against the later of window-end and wall clock, so a trailing range never reports a negative age.
@@ -298,6 +452,53 @@ function humanDuration(sinceUs: number): string {
   if (hours < 48) return t("infra.curated.durationHours", { count: hours });
   return t("infra.curated.durationDays", { count: Math.floor(hours / 24) });
 }
+
+// ── Jump to latest data ─────────────────────────────────────────────────────
+
+const JUMP_END_NUDGE_US = 1_000_000;
+const JUMP_TOLERANCE_US = 10 * 60 * 1_000_000;
+
+// The EARLIEST stop: up to then every source was reporting, so the jumped-to page is complete.
+const lastCompleteUs = computed<number | null>(() => {
+  const seen =
+    face.value === "dormant"
+      ? dormantGroups.value.map((entry) => entry.lastSeenUs)
+      : staleGroups.value.filter((stale) => !stale.noDataYet).map((stale) => stale.lastSeenUs);
+  const known = seen.filter((value) => value > 0);
+  return known.length > 0 ? Math.min(...known) : null;
+});
+
+const jumpTarget = computed(() => {
+  const last = lastCompleteUs.value;
+  if (last === null) return null;
+  return {
+    from: last - periodWidthUs(manifest.value.defaultRelativePeriod),
+    to: last + JUMP_END_NUDGE_US,
+  };
+});
+
+const showStaleJump = computed(
+  () => lastCompleteUs.value !== null && range.value.to > lastCompleteUs.value + JUMP_TOLERANCE_US,
+);
+
+const jumpLabel = computed(() =>
+  lastCompleteUs.value === null
+    ? raw("")
+    : t("traces.tracesNoEventsState.lastData", {
+        formatted: formatUs(lastCompleteUs.value),
+        zone: timezone.value,
+      }),
+);
+
+const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
+
+const jumpToLatestData = () => {
+  const target = jumpTarget.value;
+  if (!target) return;
+  selectedWindow.value = { kind: "absolute", from: target.from, to: target.to };
+  (dateTimeRef.value as any)?.setAbsoluteTime?.(target.from, target.to);
+  void runRefresh(true);
+};
 
 // ── Warnings ────────────────────────────────────────────────────────────────
 
@@ -322,26 +523,12 @@ const defaultFieldNamesWarning = computed(() =>
 
 const variableList = computed(() => ((dashboard.value as any)?.variables?.list ?? []) as any[]);
 
-/**
- * Panels query COMMITTED variable state (RenderDashboardCharts
- * getCommittedVariablesForPanel), and a selection only reaches it through
- * commitAll — which every other embedder triggers from its own Refresh
- * (ViewDashboard :1254, AppPerformance :326, TracesAnalysisDashboard :782).
- * A curated page has no such button for pickers: PanelContainer's per-panel
- * "refresh to apply variables" control is `v-if="!viewOnly"` (:204) and this
- * page is viewOnly, so an uncommitted selection would be unappliable. Commit
- * on the selection itself instead — the picker IS the apply gesture here.
- */
+// Panels read COMMITTED variables and this viewOnly page has no apply button, so the picker selection itself commits.
 type VariablesManager = ReturnType<typeof useVariablesManager>;
 const variablesManager = ref<VariablesManager | null>(null);
 let stopCommitWatch: (() => void) | undefined;
 
-/**
- * A cleared picker has to leave the URL too, or a refresh restores the scope the
- * user just dropped. getUrlParams omits an empty value (useVariablesManager
- * :994-1002), so rebuilding every `var-` key from it deletes exactly the cleared
- * ones — including the `.t.`/`.p.` suffixed shapes a prefix match would miss.
- */
+// Rebuilding every `var-` key from getUrlParams (which omits empties) drops cleared pickers, suffixed shapes included.
 const syncPickerUrl = (manager: VariablesManager) => {
   const params = manager.getUrlParams({ useLive: false });
   const query: Record<string, any> = { ...route.query };
@@ -361,8 +548,7 @@ const syncPickerUrl = (manager: VariablesManager) => {
 const onVariablesManagerReady = (manager: VariablesManager) => {
   variablesManager.value = manager;
   stopCommitWatch?.();
-  // Values ONLY: options and loading flags churn on every fetch, and committing
-  // on those would re-run panels for a picker the user never touched.
+  // Values ONLY: options and loading flags churn per fetch and would re-run panels for an untouched picker.
   stopCommitWatch = watch(
     () => manager.variablesData.global.map((variable) => variable.value),
     () => {
@@ -377,11 +563,7 @@ onBeforeUnmount(() => stopCommitWatch?.());
 
 // ── Fleet-quadrant drilldown ────────────────────────────────────────────────
 
-/**
- * The sandboxed chart JS cannot see the router, so it announces the pick as a
- * DOM event and the routing happens here — `location.assign` in the sandbox
- * reloaded the whole SPA, losing every panel's data and in-memory state.
- */
+// The sandboxed chart JS cannot reach the router, so it emits a DOM event; `location.assign` reloaded the whole SPA.
 const onClusterDrilldown = (event: Event) => {
   const cluster = (event as CustomEvent<{ cluster?: string }>).detail?.cluster;
   if (!cluster) return;
@@ -398,19 +580,11 @@ const onClusterDrilldown = (event: Event) => {
 onMounted(() => document.addEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
 onBeforeUnmount(() => document.removeEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
 
-/**
- * The reload used to re-seed the tab and the pickers off the URL; a mounted view
- * is re-entered instead, so the drilldown's own two params are applied here.
- * Covers Back and Forward too, which restore a query and nothing else.
- *
- * Keyed on those two ALONE: reacting to the whole query would snap the tab back
- * on unrelated param churn.
- */
+// Re-applies the drilldown's two params on re-entry and Back/Forward; keyed on them alone so other params don't snap the tab.
 watch(
   () => [route.query.tab, route.query["var-cluster"]] as const,
   () => {
-    // Our own ?tab= write echoes back here, and it never carries var-cluster — re-entering
-    // would hit the reset below and drop a hand-picked cluster on every tab click.
+    // Our own ?tab= echo carries no var-cluster; re-entering would reset a hand-picked cluster on every tab click.
     if (isInternalUrlUpdate.value) return;
     const query = route.query;
     const tabs = visibleTabs.value;
@@ -516,84 +690,53 @@ watch(
 </script>
 
 <template>
-  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon">
+  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed>
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
+          v-if="showRangeControls"
+          ref="dateTimeRef"
           auto-apply
           menu-align="end"
-          :default-type="'relative'"
+          :default-type="selectedWindow.kind"
           :default-relative-time="manifest.defaultRelativePeriod"
           data-test-name="curated-date-time"
           @on:date-change="onDateChange"
         />
-        <!-- The SAME indicator the dashboard panel bar carries — one staleness vocabulary app-wide. -->
-        <span
-          v-if="checkedAtMs !== null"
-          class="text-text-secondary flex items-center gap-1"
-          data-test="curated-last-refreshed"
-        >
-          <OIcon name="schedule" size="xs" />
-          <OText variant="meta" as="span">
-            <RelativeTime
-              :timestamp="checkedAtMs"
-              :full-time-prefix="t('dashboard.panelErrorButtons.lastRefreshedAt')"
-            />
-          </OText>
-          <OTooltip side="bottom" align="end">
-            <template #content>
-              {{ t("dashboard.panelErrorButtons.lastRefreshed")
-              }}<RelativeTime :timestamp="checkedAtMs" />
-            </template>
-          </OTooltip>
-        </span>
-        <OButton
+        <!-- Below lg an absolute range label leaves no room for the age, so the button drops to icon-only. -->
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="sm-action"
-          icon-left="refresh"
+          :loading="refreshing"
+          :last-run-at="compactHeaderOnTablet && !lgUp ? null : checkedAtMs"
           data-test="curated-refresh"
           @click="runRefresh(true)"
-        >
-          {{ t("infra.curated.refresh") }}
-        </OButton>
+        />
       </div>
     </template>
 
-    <div
+    <OEmptyState
       v-if="!hasPack"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      size="hero"
+      illustration="board"
+      class="min-h-0 flex-1"
       data-test="curated-pack-unavailable"
-    >
-      <OText tag="h2" class="text-base font-semibold">{{
-        t("infra.curated.packUnavailable")
-      }}</OText>
-      <OText variant="meta">{{ t("infra.curated.packUnavailableHint") }}</OText>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="curated-pack-unavailable-build"
-        @click="openDashboardsList"
-      >
-        {{ t("infra.curated.buildOwnDashboard") }}
-      </OButton>
-    </div>
+      :title="t('infra.curated.packUnavailable')"
+      :description="t('infra.curated.packUnavailableHint')"
+      :action-label="t('infra.curated.buildOwnDashboard')"
+      @action="openDashboardsList"
+    />
 
     <!-- `unknown` + loadError is the lists-failed state, never an endless spinner. -->
-    <div
+    <OEmptyState
       v-else-if="face === 'unknown' && loadError"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      preset="load-error"
+      size="hero"
+      class="min-h-0 flex-1"
       data-test="curated-error"
-    >
-      <OText variant="meta">{{ t("infra.curated.pageError") }}</OText>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="curated-retry"
-        @click="runRefresh(true)"
-      >
-        {{ t("infra.curated.retry") }}
-      </OButton>
-    </div>
+      :description="t('infra.curated.pageError')"
+      @action="runRefresh(true)"
+    />
 
     <div
       v-else-if="face === 'unknown'"
@@ -606,17 +749,17 @@ watch(
       }}</OText>
     </div>
 
-    <div v-else-if="face === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
+    <div v-else-if="face === 'undetected'" class="px-page-edge min-h-0 flex-1 overflow-y-auto">
       <div
         class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
         data-test="curated-setup-state"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{
-          t("infra.workload.setupHeadline")
-        }}</OText>
-        <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
-          t(partialTelemetryKey)
-        }}</OText>
+        <div class="flex flex-col gap-1 px-3">
+          <OText data-test="curated-setup-lead">{{ t("infra.workload.setupHeadline") }}</OText>
+          <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
+            t(partialTelemetryKey)
+          }}</OText>
+        </div>
         <DataSourceSetupCard
           v-if="setupDoor?.kind === 'card'"
           :slug="setupDoor.slug"
@@ -636,36 +779,78 @@ watch(
       </div>
     </div>
 
-    <!-- The streams exist and merely stopped reporting. Rendering the SETUP face
-         here would tell an org to install a collector it already has, so this
-         face names the outage instead and offers no setup CTA. -->
-    <div v-else-if="face === 'dormant'" class="min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
-        data-test="curated-dormant-state"
+    <!-- Streams exist but stopped reporting, so this names the outage and offers no setup CTA. -->
+    <div
+      v-else-if="face === 'dormant'"
+      class="flex min-h-0 flex-1 flex-col justify-center-safe overflow-y-auto"
+      data-test="curated-dormant-state"
+    >
+      <!-- shrink-0: an overflow-hidden flex child shrinks to the pane and clips its own content. -->
+      <OEmptyState
+        illustration="hourglass"
+        class="shrink-0"
+        :title="t('infra.curated.dormantHeadline', { workload: t(manifest.titleKey) })"
+        :description="t('infra.curated.dormantBody')"
       >
-        <OText tag="h2" class="text-xl font-semibold">{{
-          t("infra.curated.dormantHeadline", { workload: t(manifest.titleKey) })
-        }}</OText>
-        <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
-        <OBanner
-          v-for="hidden in dormantGroups"
-          :key="hidden.group.id"
-          variant="warning"
-          dense
-          data-test="curated-dormant-stream"
-          :content="
-            t('infra.curated.streamsStale', {
-              list: hidden.streams,
-              date: hidden.date,
-            })
-          "
-        />
-      </div>
+        <template #actions>
+          <EmptyStateActionCard
+            v-if="jumpTarget"
+            icon="schedule"
+            :label="t('traces.noEvents.jumpToData')"
+            :sublabel="jumpLabel"
+            data-test="curated-jump-to-data"
+            @click="jumpToLatestData"
+          />
+        </template>
+        <template #extra>
+          <ul
+            class="border-border-default divide-border-default rounded-surface flex w-full max-w-3xl flex-col divide-y border text-start"
+          >
+            <li
+              v-for="hidden in dormantGroups"
+              :key="hidden.group.id"
+              class="px-2 py-1"
+              data-test="curated-dormant-stream"
+            >
+              <!-- One line of streams per source until its row is opened, so the screen's one action stays in view. -->
+              <OCollapsible>
+                <template #trigger="{ open }">
+                  <span class="flex min-w-0 flex-1 flex-col gap-1">
+                    <span class="flex items-baseline gap-x-3 max-md:flex-col">
+                      <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{
+                        t(hidden.group.labelKey)
+                      }}</OText>
+                      <OText variant="meta" as="span" nowrap>{{ hidden.stoppedAgo }}</OText>
+                    </span>
+                    <OText
+                      v-if="!open"
+                      variant="meta"
+                      truncate
+                      data-test="curated-dormant-stream-detail"
+                      >{{ hidden.detail }}</OText
+                    >
+                  </span>
+                  <OIcon
+                    name="expand-more"
+                    size="sm"
+                    class="text-text-secondary shrink-0 transition-transform duration-200"
+                    :class="open ? 'rotate-180' : 'rotate-0'"
+                  />
+                </template>
+                <p class="px-2 pb-2 leading-5 break-words">
+                  <OText variant="meta" data-test="curated-dormant-stream-detail-full">{{
+                    hidden.detail
+                  }}</OText>
+                </p>
+              </OCollapsible>
+            </li>
+          </ul>
+        </template>
+      </OEmptyState>
     </div>
 
     <div v-else-if="dashboard" class="flex min-h-0 flex-1 flex-col">
-      <div v-if="singleClusterName" class="flex flex-wrap items-end gap-3 pb-2">
+      <div v-if="singleClusterName" class="px-page-edge flex flex-wrap items-end gap-3 pb-2">
         <OText variant="meta" data-test="curated-single-cluster">{{
           raw(singleClusterName)
         }}</OText>
@@ -682,21 +867,30 @@ watch(
         @variablesManagerReady="onVariablesManagerReady"
       >
         <template #before_panels>
-          <div class="flex flex-col gap-2 pb-2">
+          <div class="flex flex-col gap-2 pt-2">
+            <!-- One banner per outage: a stack of near-identical warnings buries the panels it qualifies. -->
             <OBanner
-              v-for="stale in staleDurations"
-              :key="stale.id"
+              v-if="staleDurations.length > 0"
               variant="warning"
               dense
+              inline-actions
               data-test="curated-stale-banner"
-              :content="
-                t(stale.key as never, {
-                  capability: stale.capability,
-                  duration: stale.duration,
-                  date: stale.date,
-                })
-              "
-            />
+            >
+              {{ staleBannerText }}
+              <!-- Always passed: OBanner reads its slots once, so a slot that appears later never renders. -->
+              <template #actions>
+                <OButton
+                  v-if="showStaleJump"
+                  variant="outline"
+                  size="sm"
+                  icon-left="schedule"
+                  data-test="curated-stale-jump-to-data"
+                  @click="jumpToLatestData"
+                >
+                  {{ t("traces.noEvents.jumpToData") }}
+                </OButton>
+              </template>
+            </OBanner>
 
             <OBanner
               v-for="warning in probeWarnings"
@@ -721,139 +915,137 @@ watch(
               :content="t('infra.curated.warnBanner.stats')"
             />
 
-            <OCollapsible
-              v-if="hasStrip"
-              v-model="stripExpanded"
-              class="border-border-default rounded-surface border p-3"
-              data-test="curated-strip"
-              :label="collapsedCapabilities"
+            <!-- data-test only with a strip: the note alone is not the hidden-panels strip. -->
+            <div
+              v-if="hasStrip || sectionNoteKey"
+              class="flex flex-col gap-1"
+              :data-test="hasStrip ? 'curated-strip' : undefined"
             >
-              <div class="flex flex-col gap-3 pt-3" data-test="curated-strip-expanded">
-                <div
-                  v-for="hidden in hiddenGroups"
-                  :key="hidden.group.id"
-                  class="flex flex-col gap-1"
-                  :data-test="`curated-strip-group-${hidden.group.id}`"
+              <div class="flex min-w-0 items-center gap-2">
+                <OButton
+                  v-if="hasStrip"
+                  variant="outline"
+                  size="sm"
+                  class="max-w-full min-w-0"
+                  :icon-right="stripExpanded ? 'expand-less' : 'expand-more'"
+                  :aria-expanded="stripExpanded"
+                  aria-controls="curated-strip-list"
+                  data-test="curated-strip-toggle"
+                  @click="stripExpanded = !stripExpanded"
                 >
-                  <div class="flex items-center justify-between gap-2">
-                    <OText>{{ t(hidden.group.capabilityKey) }}</OText>
-                    <!-- A group that is PRESENT (its siblings render) has its
-                         collector installed already; only the field is missing,
-                         so "Set up" would send the user to re-install what works. -->
-                    <OButton
-                      v-if="!presentGroupIds.includes(hidden.group.id)"
-                      variant="outline"
-                      size="sm-action"
-                      data-test="curated-strip-setup"
-                      @click="onStripSetup(hidden.group)"
+                  <span class="truncate">{{ collapsedCapabilities }}</span>
+                </OButton>
+                <!-- The caveats are reference, not news: one line opens them instead of a paragraph above every panel. -->
+                <div v-if="sectionNoteKey" class="shrink-0">
+                  <OPopover
+                    v-model:open="noteOpen"
+                    side="bottom"
+                    align="start"
+                    :aria-label="t('infra.curated.aboutNumbers')"
+                  >
+                    <template #trigger>
+                      <!-- Icon-only on phones so the hidden-panels strip keeps the row; sr-only keeps the button named. -->
+                      <OButton
+                        variant="ghost"
+                        size="xs"
+                        icon-left="info-outline"
+                        data-test="curated-section-note-trigger"
+                      >
+                        <span class="max-md:sr-only">{{ t("infra.curated.aboutNumbers") }}</span>
+                      </OButton>
+                    </template>
+                    <p
+                      class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                      data-test="curated-section-note"
                     >
-                      {{ t("infra.curated.setUp") }}
-                    </OButton>
-                  </div>
-                  <OText variant="meta" data-test="curated-strip-hint">{{
-                    t(hidden.group.setupHintKey)
-                  }}</OText>
-                  <OText
-                    v-if="absentStreams(hidden).length"
-                    variant="meta"
-                    data-test="curated-strip-streams-missing"
-                    >{{
-                      t("infra.curated.streamsMissing", {
-                        count: absentStreams(hidden).length,
-                        list: raw(
-                          absentStreams(hidden)
-                            .map((s) => s.name)
-                            .join(", "),
-                        ),
-                      })
-                    }}</OText
-                  >
-                  <OText
-                    v-if="staleStreams(hidden).length"
-                    variant="meta"
-                    data-test="curated-strip-streams-stale"
-                    >{{
-                      t("infra.curated.streamsStale", {
-                        list: raw(
-                          staleStreams(hidden)
-                            .map((s) => s.name)
-                            .join(", "),
-                        ),
-                        date: formatUs(staleStreams(hidden)[0].lastSeenUs),
-                      })
-                    }}</OText
-                  >
-                  <OText
-                    v-for="concept in hidden.unresolvedConcepts ?? []"
-                    :key="concept.groupId"
-                    variant="meta"
-                    >{{
-                      t("infra.curated.fieldUnresolved", {
-                        display: raw(concept.display),
-                        stream: raw(hidden.group.anchorStream ?? ""),
-                      })
-                    }}</OText
-                  >
-                  <OText v-if="hidden.missingFields?.length" variant="meta">{{
-                    t("infra.curated.probeFieldsMissing", {
-                      stream: raw(hidden.probeStream ?? ""),
-                      list: raw(hidden.missingFields.join(", ")),
-                    })
-                  }}</OText>
-                  <OText variant="meta">{{
-                    t(
-                      "infra.curated.hiddenPanelCount",
-                      { count: hidden.panelCount },
-                      hidden.panelCount,
-                    )
-                  }}</OText>
-                  <DataSourceSetupCard
-                    v-if="
-                      hidden.group.setup.kind === 'card' &&
-                      expandedSetupSlug === hidden.group.setup.slug
-                    "
-                    :slug="hidden.group.setup.slug"
-                    @detected="runRefresh(true)"
-                  />
+                      <OText variant="meta">{{ t(sectionNoteKey) }}</OText>
+                    </p>
+                  </OPopover>
                 </div>
-
-                <div
-                  v-for="partial in partialGroups"
-                  :key="`partial-${partial.group.id}`"
-                  class="flex flex-col gap-1"
-                >
-                  <OText variant="meta">{{
-                    t("infra.curated.streamsMissing", {
-                      count: partial.missingStreams.length,
-                      list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
-                    })
-                  }}</OText>
-                </div>
-
-                <div
-                  v-for="stale in staleGroups"
-                  :key="`stale-${stale.group.id}`"
-                  class="flex flex-col gap-1"
-                >
-                  <OText variant="meta" data-test="curated-strip-hint">{{
-                    t(stale.group.setupHintKey)
-                  }}</OText>
-                </div>
-
+              </div>
+              <div
+                v-if="hasStrip && stripExpanded"
+                id="curated-strip-list"
+                class="border-border-default rounded-surface flex max-w-3xl flex-col gap-1 border px-2 py-1"
+                data-test="curated-strip-expanded"
+              >
+                <ul class="divide-border-default flex flex-col divide-y">
+                  <li
+                    v-for="row in stripRows"
+                    :key="row.group.id"
+                    class="flex flex-col gap-1 py-1"
+                    :data-test="`curated-strip-group-${row.group.id}`"
+                  >
+                    <div class="flex items-start gap-2">
+                      <OCollapsible class="min-w-0 flex-1">
+                        <template #trigger="{ open }">
+                          <span class="flex min-w-0 flex-1 flex-col gap-1">
+                            <span class="flex items-baseline gap-x-3 max-md:flex-col">
+                              <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{
+                                t(row.group.labelKey)
+                              }}</OText>
+                              <OText variant="meta" as="span" nowrap>{{ row.statusText }}</OText>
+                            </span>
+                            <OText
+                              v-if="!open && row.lines[0]"
+                              variant="meta"
+                              truncate
+                              :data-test="row.lines[0].dataTest"
+                              >{{ row.lines[0].text }}</OText
+                            >
+                          </span>
+                          <OIcon
+                            name="expand-more"
+                            size="sm"
+                            class="text-text-secondary shrink-0 transition-transform duration-200"
+                            :class="open ? 'rotate-180' : 'rotate-0'"
+                          />
+                        </template>
+                        <div class="flex flex-col gap-1 px-2 pb-2">
+                          <p
+                            v-for="(line, index) in row.lines"
+                            :key="index"
+                            class="leading-5 break-words"
+                          >
+                            <OText variant="meta" :data-test="line.dataTest">{{ line.text }}</OText>
+                          </p>
+                          <p class="leading-5">
+                            <OText variant="meta" data-test="curated-strip-hint">{{
+                              t(row.group.setupHintKey)
+                            }}</OText>
+                          </p>
+                        </div>
+                      </OCollapsible>
+                      <OButton
+                        v-if="row.canSetUp"
+                        variant="outline"
+                        size="sm-action"
+                        class="mt-1.5 shrink-0"
+                        data-test="curated-strip-setup"
+                        @click="onStripSetup(row.group)"
+                      >
+                        {{ t("infra.curated.setUp") }}
+                      </OButton>
+                    </div>
+                    <DataSourceSetupCard
+                      v-if="
+                        row.group.setup.kind === 'card' &&
+                        expandedSetupSlug === row.group.setup.slug
+                      "
+                      :slug="row.group.setup.slug"
+                      @detected="runRefresh(true)"
+                    />
+                  </li>
+                </ul>
                 <OText
                   variant="meta"
+                  class="px-2"
                   data-test="curated-strip-hedge"
                   data-copy-key="infra.curated.hiddenFootnote"
                   >{{ t("infra.curated.hiddenFootnote") }}</OText
                 >
               </div>
-            </OCollapsible>
-
-            <!-- Last in the region, so it sits directly above the grid it
-                 qualifies rather than being pushed off by banners. -->
-            <OText v-if="sectionNoteKey" variant="meta" data-test="curated-section-note">{{
-              t(sectionNoteKey)
-            }}</OText>
+            </div>
           </div>
         </template>
       </RenderDashboardCharts>

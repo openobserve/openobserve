@@ -190,10 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openServicePanel(svc)"
           >
             <div class="mb-2 flex items-center justify-between">
-              <span
-                class="text-text-heading block min-w-0 flex-1 cursor-default overflow-hidden text-sm font-medium text-ellipsis whitespace-nowrap"
-                :title="svc.label ?? svc.id"
-                >{{ svc.label }}</span
+              <OTruncatedText
+                class="text-text-heading block flex-1 cursor-default text-sm font-medium"
+                >{{ svc.label }}</OTruncatedText
               >
               <span class="ms-1 inline-flex shrink-0 items-center">
                 <OButton
@@ -370,11 +369,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-b-border-default text-compact hover:bg-table-row-hover-bg flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 transition-[background] duration-150 last:border-b-0"
         >
           <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
-          <span
-            class="text-text-heading max-w-[12.5em] min-w-[7.5em] overflow-hidden font-medium text-ellipsis whitespace-nowrap"
-            >{{ ev.service }}</span
-          >
-          <span class="text-text-secondary flex-1 truncate">{{ ev.description }}</span>
+          <OTruncatedText class="text-text-heading max-w-[12.5em] min-w-[7.5em] font-medium">{{
+            ev.service
+          }}</OTruncatedText>
+          <OTruncatedText class="text-text-secondary flex-1">{{ ev.description }}</OTruncatedText>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
@@ -416,9 +414,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionAlerts")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionAlertsDesc")
             }}</span>
@@ -443,9 +441,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="search" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionLogs")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionLogsDesc")
             }}</span>
@@ -470,9 +468,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+            <OTruncatedText class="text-text-heading text-(length:--text-sm) font-semibold">{{
               t("overview.emptyActionTraces")
-            }}</span>
+            }}</OTruncatedText>
             <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
               t("overview.emptyActionTracesDesc")
             }}</span>
@@ -517,12 +515,12 @@ import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import { overviewRange } from "@/services/service_graph";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 const AlertHistoryDrawer = defineAsyncComponent(
@@ -803,12 +801,10 @@ const loadAnomalies = async (force = false) => {
 // Alert trigger history feeds recentEvents only
 const loadHistoryAndSplit = async (force = false) => {
   try {
-    // Quantised range: the raw timestamps move on every mount, so a key built
-    // from them could never hit — which is why switching tabs re-requested this.
-    const q = overviewRange(timeRange.value.startTime, timeRange.value.endTime);
+    // Exact bounds: `alertHistoryQuery` rounds only its key, so the newest minutes still reach the server.
     const historyOptions = alertHistoryQuery(orgId.value, {
-      start_time: q.start,
-      end_time: q.end,
+      start_time: timeRange.value.startTime,
+      end_time: timeRange.value.endTime,
       from: 0,
       size: 500,
       sort_by: "timestamp",

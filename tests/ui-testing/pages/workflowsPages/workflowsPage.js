@@ -13,6 +13,10 @@
 //   K9 — the editor Save button has a tooltip overlay that intercepts pointer events; we click it
 //        via evaluate() to bypass the interception.
 //   K10 — the workflows list GET is slow (~16-20s); readiness/list helpers use generous timeouts.
+//   K11 — node-drawer dropdowns (column/operator selects) can take longer than 15s to open under
+//         CI parallel load, even though their options (e.g. condition columns) are static, synchronous
+//         data — it's render/animation contention from several canvases+drawers opening at once, not
+//         a slow fetch. Seen timing out on COND-02's column pick (meta_alert_name) on retry too.
 
 const { expect } = require('@playwright/test');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
@@ -20,7 +24,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 const LIST_TIMEOUT_MS = 45000;   // K10: list load is slow
-const DRAWER_TIMEOUT_MS = 15000;
+const DRAWER_TIMEOUT_MS = 25000; // K11: bumped from 15s — drawer dropdowns under CI parallel load
 
 // Availability is a property of the build, not of a test — probe it once per worker.
 let workflowsEnabled;
@@ -155,10 +159,13 @@ class WorkflowsPage {
     this.nodeTestPassedFor = (t) =>
       `[data-test="workflow-node-${t}-test-ok"], [data-test="workflow-node-${t}-test-rehearsal"]`;
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
+    this.nodeTestRehearsalFor = (t) => `[data-test="workflow-node-${t}-test-rehearsal"]`;
     // Branch-arm append connectors (WorkflowCanvas appendPointsFor) — the hover-revealed
     // `+` points, each carrying an SVG path whose `d` starts at the arm's own source handle.
     this.appendAdd = '[data-test="workflow-flow-append-add"]';
-    this.appendAddPath = '[data-test="workflow-flow-append-add"] svg path';
+    // Direct-child svg only: FlowAddButton's `+` icon is another svg under the same
+    // wrapper (at `> button > svg`), and counting its path too yields 2 paths per arm.
+    this.appendAddPath = '[data-test="workflow-flow-append-add"] > svg path';
     // Node hover actions (WorkflowNode): the disable/enable toggle and the Disabled badge.
     this.nodeDisableToggle = '[data-test="workflows-node-disable-toggle"]';
     this.nodeDisabledBadgeFor = (t) => `[data-test="workflow-node-${t}-disabled-badge"]`;
@@ -209,11 +216,9 @@ class WorkflowsPage {
     // NDV output pane — on a successful destination send this holds the sink's
     // response body, which is what makes delivery assertable.
     this.ndvOutput = '[data-test="workflow-ndv-output"]';
-    // Test-run drawer. Still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
-    // config panel became an ODialog — so its buttons stay `o-drawer-*`.
-    this.testDrawer = '[data-test="workflow-test-drawer"]';
+    // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
+    // config panel became an ODialog — so its primary button stays `o-drawer-*`.
     this.testDrawerPrimary = '[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]';
-    this.testSuppressSwitch = '[data-test="workflow-test-suppress-destinations-btn"]';
     // Workflow function code editor (QuickJS/JavaScript), shared with the Functions page.
     this.functionEditor = '[data-test="logs-vrl-function-editor"]';
     // Warning toast — how a blocked Publish reports itself, since it never reaches the network.
@@ -748,6 +753,8 @@ class WorkflowsPage {
     const toggle = this.page.locator(this.testSuppressDestinationsBtn).first();
     const state = await toggle.getAttribute('aria-checked');
     if (String(on) !== state) await toggle.click({ timeout: DRAWER_TIMEOUT_MS });
+    // A silently-dropped click would leave a delivery test running a suppressed rehearsal.
+    await expect(toggle).toHaveAttribute('aria-checked', String(on), { timeout: DRAWER_TIMEOUT_MS });
   }
 
   async expectSuppressDestinations(on) {
@@ -755,8 +762,10 @@ class WorkflowsPage {
     await expect(toggle).toHaveAttribute('aria-checked', String(on), { timeout: DRAWER_TIMEOUT_MS });
   }
 
-  async expectDispatchWarning() {
-    await expect(this.page.locator(this.testDispatchWarning)).toBeVisible();
+  async expectDispatchWarning(destName) {
+    const banner = this.page.locator(this.testDispatchWarning);
+    await expect(banner).toBeVisible();
+    if (destName) await expect(banner).toContainText(destName, { timeout: DRAWER_TIMEOUT_MS });
   }
 
   async expectNoDispatchWarning() {
@@ -989,18 +998,34 @@ class WorkflowsPage {
    * payload. Per-node results paint as ✓/✗ badges on the canvas nodes afterwards.
    */
   async testRunFromEditor({ liveSend = false } = {}) {
-    await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.openTestDrawer();
     if (liveSend) {
-      // Destination sends are suppressed by default; send-error tests need the real dispatch.
-      const sw = this.page.locator(this.testSuppressSwitch);
-      if ((await sw.getAttribute('aria-checked')) === 'true') {
-        await sw.click({ timeout: DRAWER_TIMEOUT_MS });
-      }
+      // A silent no-op flip would run a suppressed rehearsal and green a delivery test,
+      // so the toggle landing is guarded inside setSuppressDestinations().
+      await this.setSuppressDestinations(false);
     }
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
     await this.page.locator(this.testDrawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Assert a node passed with the REHEARSAL flask (published workflow), never the green ✓. */
+  async expectNodeTestRehearsal(nodeType, timeout = 60000) {
+    await expect(this.page.locator(this.nodeTestRehearsalFor(nodeType)))
+      .toBeVisible({ timeout });
+    await expect(this.page.locator(this.nodeTestOkFor(nodeType))).toHaveCount(0);
+  }
+
+  /**
+   * The destination node's output for a SUPPRESSED run — the `{"suppressed": true, ...}`
+   * preview, not a delivery receipt. Same two-parse shape as destinationIngestReceipt():
+   * the node output is an array of JSON strings (one per send).
+   */
+  async destinationSuppressionPreview() {
+    const raw = await this.nodeTestOutputText('destination');
+    const outer = JSON.parse(raw);
+    const first = Array.isArray(outer) ? outer[0] : outer;
+    return typeof first === 'string' ? JSON.parse(first) : first;
   }
 
   /** Assert a node painted an error badge after a test run (node_type e.g. 'destination','function').

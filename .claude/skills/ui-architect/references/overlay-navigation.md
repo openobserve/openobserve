@@ -220,6 +220,28 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 **Slots:** `trigger` (as-child), `default` (content)
 **Emits:** `update:open` (boolean)
 
+**Info-popover recipe.** Explanatory copy that would otherwise be a paragraph or a
+truncated sentence (copy-and-values.md § A sentence cut by an ellipsis): a ghost
+info button labelled with what it explains, placed beside the control it qualifies,
+icon-only on phones with the label kept for screen readers; the body is one `meta`
+paragraph capped to the viewport.
+
+```vue
+<OPopover v-model:open="noteOpen" side="bottom" align="start" :aria-label="t('dbm.metrics.load.about')">
+  <template #trigger>
+    <OButton variant="ghost" size="xs" icon-left="info-outline" data-test="dbm-metrics-load-hint-trigger">
+      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
+    </OButton>
+  </template>
+  <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5" data-test="dbm-metrics-load-hint">
+    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
+  </p>
+</OPopover>
+```
+
+Use `align="start"` when the button sits at the start of its row; an `OTooltip` is
+not a substitute — it is hover-only and never opens on touch.
+
 **Filter-popover recipe.** A "Filters" / "Narrow results" popover is not a loose
 stack of selects — build it as **one panel you fill in and dismiss**: a title, a
 column of **labelled** fields, then a **pinned action row**. Three rules:
@@ -279,10 +301,11 @@ unfiltered page spends one button and a filtered one shows its scope as chips).
 ### OTooltip
 
 **Import:** `@/lib/overlay/Tooltip/OTooltip.vue`
-**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot).
+**Use when:** A passive hover/focus hint describing an element — icon-button labels, disabled-state explanations, a hint that adds information. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot).
+**Cut text ("…") is not a hand-wired `OTooltip`:** use **`OTruncatedText`** ([core-display](core-display.md#otruncatedtext)), which shows the full text only while it is cut; in an `OTable` cell the table already does it. Never add an `OTooltip` (or a `title`) that just repeats the visible text.
 **Child mode binds to the nearest previous VISIBLE ELEMENT SIBLING, and only falls back to the parent when there is none** — it is not simply "the parent". So put a child-mode `OTooltip` **first** inside the element you want as the trigger; placed after an `<OIcon>` it silently binds to that icon, and only the icon becomes hoverable. Text nodes do not count as siblings, so `<OIcon/> {{ count }} <OTooltip/>` binds to the icon and leaves the count dead. This shipped in the alert-dependency count chips, where the tooltip fired on a 12px glyph inside a 52px chip.
 **Don't use for:** Anything the user interacts with inside the bubble (use **OPopover**); an action menu (use **ODropdown**).
-**Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`)
+**Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`) · `overflowOnly` (boolean — open only while the trigger's text is actually cut; without `content` it shows that text. `OTruncatedText` is built on this — reach for it first) · `anchor` (`HTMLElement | null` — position against a given element; one tooltip shared by many targets, visibility follows `open` alone)
 **Slots:** `default` (trigger — single focusable element; omit for child mode), `content` (rich content, overrides `content` prop)
 **Emits:** none
 **Example:**

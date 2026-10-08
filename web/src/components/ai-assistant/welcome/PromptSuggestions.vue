@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { PROMPT_SUGGESTIONS } from "./welcomeContent";
 
 const { t } = useI18nTyped();
@@ -18,7 +19,10 @@ function selectPrompt(id: string) {
       {{ t("aiAssistant.welcome.tryOneOfThese") }}
     </div>
 
-    <div class="suggestions-grid grid w-full gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+    <!-- Phones show the first three so the whole welcome fits above the composer. -->
+    <div
+      class="suggestions-grid grid w-full gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-md:[&>button:nth-child(n+4)]:hidden"
+    >
       <button
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"
@@ -31,9 +35,9 @@ function selectPrompt(id: string) {
         >
           <OIcon :name="s.icon" size="sm" />
         </span>
-        <span class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+        <OTruncatedText class="flex-1">
           {{ t(`aiAssistant.suggestions.${s.id}`) }}
-        </span>
+        </OTruncatedText>
         <span
           class="suggestion-chip__arrow text-typography-meta group-hover:text-ai-accent inline-flex shrink-0 -translate-x-1 items-center justify-center opacity-0 [transition:opacity_0.15s_ease,transform_0.15s_ease,color_0.15s_ease] group-hover:translate-x-0 group-hover:opacity-100"
           aria-hidden="true"

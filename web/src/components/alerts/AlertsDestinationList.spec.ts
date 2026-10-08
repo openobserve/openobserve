@@ -97,7 +97,7 @@ const OTableStub = {
       <slot name="toolbar" />
       <slot name="empty" />
       <slot name="actions" />
-      <slot name="bottom" :totalRows="data ? data.length : 0" />
+      <slot name="selection-actions" />
       <template v-for="row in data" :key="row.name">
         <div :data-test="'destination-url-' + row.name">
           <slot name="cell-url" :row="row">{{ urlOf(row) }}</slot>
@@ -243,6 +243,14 @@ describe("AlertsDestinationList", () => {
       wrapper = mountComponent();
       await flushPromises();
       expect(destinationService.list).toHaveBeenCalled();
+    });
+
+    it("asks for include_usage, so its own request shares the dependency graph's cache entry", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(destinationService.list).toHaveBeenCalledWith(
+        expect.objectContaining({ include_usage: true }),
+      );
     });
 
     it("calls templateService.list on mount", async () => {
@@ -552,7 +560,7 @@ describe("AlertsDestinationList", () => {
 
   // ── pagination restoration ──────────────────────────────────────────────────
   // OTable is stubbed in this harness (see OTableStub above), so the actual
-  // TanStack pageIndex restoration (setTimeout(0) + table.setPageIndex) cannot
+  // TanStack pageIndex restoration (setTimeout(0) + OTable restorePage) cannot
   // be exercised end-to-end here. These tests cover what IS reachable: seeding
   // currentPage from the URL, and that navigating to/from the add/edit/import
   // views preserves the `page` query param instead of stripping it.

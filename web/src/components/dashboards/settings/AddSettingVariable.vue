@@ -208,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? raw('')
                           : t('dashboard.addSettingVariable.selectFieldPlaceholder')
                       "
-                      :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
                       data-test="dashboard-query-values-filter-name-selector"
                       class="min-w-0 flex-2"
@@ -541,6 +540,7 @@ import {
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import useNotifications from "@/composables/useNotifications";
+import analytics from "@/services/product_analytics";
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -1154,6 +1154,7 @@ export default defineComponent({
             payload,
             route.query.folder ?? "default",
           );
+          analytics.track("dashboard_variable_saved", { type: payload.type, is_new: false });
           emit("save");
         } catch (error: any) {
           if (error?.response?.status === 409) {
@@ -1175,6 +1176,7 @@ export default defineComponent({
       } else {
         try {
           await addVariable(t, store, dashId, payload, route.query.folder ?? "default");
+          analytics.track("dashboard_variable_saved", { type: payload.type, is_new: true });
           emit("save");
         } catch (error: any) {
           if (error?.response?.status === 409) {

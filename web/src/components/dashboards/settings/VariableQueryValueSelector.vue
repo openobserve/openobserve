@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span
-          class="text-select-text flex-1 truncate text-start text-xs leading-4 font-semibold"
+        <OTruncatedText
+          class="text-select-text flex-1 text-start text-xs leading-4 font-semibold"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
-          >{{ displayValue }}</span
+          >{{ displayValue }}</OTruncatedText
         >
       </template>
       <template #before-options>
@@ -139,10 +139,11 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
+  components: { OTruncatedText, OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
   props: {
     modelValue: { type: null, default: undefined },
     variableItem: { type: Object, default: undefined },
@@ -250,9 +251,22 @@ export default defineComponent({
       );
     });
 
+    // Ticking every loaded option by hand shows as "all", but the selection stays an explicit list rather than SELECT_ALL_VALUE.
+    const everyOptionSelected = computed(() => {
+      if (!Array.isArray(selectedValue.value) || props.variableItem.isLoading) return false;
+      const optionValues = computedOptions.value
+        .map((opt: any) => opt.value)
+        .filter((v: any) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)));
+      const selected = new Set(selectedValue.value);
+      return optionValues.length > 0 && optionValues.every((v: any) => selected.has(v));
+    });
+
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
+        return (
+          (Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE) ||
+          everyOptionSelected.value
+        );
       }
       return selectedValue.value === SELECT_ALL_VALUE;
     });

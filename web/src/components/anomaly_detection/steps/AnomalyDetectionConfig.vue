@@ -36,21 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Filters mode -->
-        <div v-if="queryMode === 'filters'" class="mb-4! flex items-start pb-0!">
-          <div
-            class="flex items-center font-semibold"
-            style="width: 11.125rem; min-height: 2.25rem"
-          >
+        <div v-if="queryMode === 'filters'" class="mb-4! flex flex-wrap items-start gap-2 pb-0!">
+          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.anomaly.filters") }}
           </div>
-          <div style="width: calc(100% - 11.875rem)">
+          <div class="min-w-0 flex-1 basis-60">
             <!-- :key must be the array INDEX — the fields bind by index-based
                  name and do not re-bind, so a stable-id key would leave inputs
                  shifted on a mid-list delete. -->
             <div
               v-for="(filter, idx) in filterRows"
               :key="idx"
-              class="mb-2 flex items-center gap-2"
+              class="mb-2 flex flex-wrap items-center gap-2"
               data-test="anomaly-filter-row"
             >
               <OFormSelect
@@ -58,8 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`anomaly-filter-field-${idx}`"
                 :options="filteredStreamFields"
                 :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
-                class="alert-v3-select filter-field-select"
-                style="width: 12.5rem"
+                class="alert-v3-select filter-field-select max-w-50 min-w-50"
                 :loading="loadingFields"
               >
                 <template #empty>
@@ -76,16 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="`filters[${idx}].operator`"
                 :data-test="`anomaly-filter-operator-${idx}`"
                 :options="filterOperators"
-                class="alert-v3-select"
-                style="width: 6.875rem"
+                class="alert-v3-select max-w-27.5 min-w-27.5"
               />
               <OFormInput
                 v-if="operatorNeedsValue(filter.operator)"
                 :name="`filters[${idx}].value`"
                 :data-test="`anomaly-filter-value-${idx}`"
                 :placeholder="t('alerts.placeholders.value')"
-                class="alert-v3-input"
-                style="max-width: 10rem"
+                class="alert-v3-input max-w-40"
               />
               <OButton
                 variant="ghost"
@@ -108,11 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Custom SQL mode -->
-        <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
+        <div v-if="queryMode === 'custom_sql'" class="mb-4! flex flex-wrap items-start gap-2 pb-0!">
+          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.alertDetails.sql") }} <span class="text-status-error-text ms-1">*</span>
           </div>
-          <div style="width: calc(100% - 11.875rem)">
+          <div class="min-w-0 flex-1 basis-60">
             <div
               class="custom-sql-editor-wrapper rounded-default h-35 overflow-hidden border"
               :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
@@ -202,13 +196,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  validation message inside its own column (OSelect's root is
                  flex-col), so on error that column grows and centering would
                  shove the function select down out of line with it. -->
-            <div class="flex items-start gap-2">
+            <div class="flex min-w-0 flex-1 basis-48 flex-wrap items-start gap-2">
               <OFormSelect
                 name="detection_function"
                 :options="detectionFunctions"
                 data-test="anomaly-detection-function"
-                class="alert-v3-select"
-                style="width: 6.875rem"
+                class="alert-v3-select max-w-27.5 min-w-27.5"
                 @update:model-value="onDetectionFunctionChange"
               />
               <OFormSelect
@@ -220,8 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :loading="loadingFields"
                 data-test="anomaly-detection-function-field"
-                class="alert-v3-select"
-                style="width: 8.75rem"
+                class="alert-v3-select max-w-35 min-w-24 flex-1"
               >
                 <template #empty>
                   <div class="text-muted-foreground px-3 py-2">
@@ -251,14 +243,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <div>
+            <div class="min-w-0 flex-1 basis-48">
               <div class="flex items-center gap-0">
                 <OFormInput
                   name="histogram_interval_value"
                   type="number"
                   min="1"
-                  class="alert-v3-input"
-                  style="width: 5.4375rem"
+                  class="alert-v3-input max-w-21.75 min-w-21.75"
                   data-test="anomaly-histogram-interval-value"
                 >
                   <!-- Message rendered below at pair width — see histogramIntervalError. -->
@@ -269,8 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
-                  class="alert-v3-select"
-                  style="min-width: 6.25rem"
+                  class="alert-v3-select max-w-25 min-w-25"
                   data-test="anomaly-histogram-interval-unit"
                 />
               </div>
@@ -287,8 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
+        <div v-else class="mb-4! flex flex-wrap items-start gap-2 pb-0!">
+          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.anomaly.detectionResolution") }}
             <span class="text-status-error-text ms-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
@@ -300,14 +290,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OIcon>
           </div>
-          <div>
+          <div class="min-w-0 flex-1 basis-48">
             <div class="flex items-center gap-0">
               <OFormInput
                 name="histogram_interval_value"
                 type="number"
                 min="1"
-                class="alert-v3-input"
-                style="width: 5.4375rem"
+                class="alert-v3-input max-w-21.75 min-w-21.75"
                 data-test="anomaly-histogram-interval-value"
               >
                 <!-- Message rendered below at pair width — see histogramIntervalError. -->
@@ -318,8 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="intervalUnits"
                 label-key="label"
                 value-key="value"
-                class="alert-v3-select"
-                style="min-width: 6.25rem"
+                class="alert-v3-select max-w-25 min-w-25"
                 data-test="anomaly-histogram-interval-unit"
               />
             </div>
@@ -352,14 +340,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <div>
+            <div class="min-w-0 flex-1 basis-48">
               <div class="flex items-center gap-0">
                 <OFormInput
                   name="schedule_interval_value"
                   type="number"
                   min="1"
-                  class="alert-v3-input"
-                  style="width: 5.4375rem"
+                  class="alert-v3-input max-w-21.75 min-w-21.75"
                   data-test="anomaly-schedule-interval-value"
                 >
                   <!-- Message rendered below at pair width — see scheduleIntervalError. -->
@@ -370,8 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
-                  class="alert-v3-select"
-                  style="min-width: 6.25rem"
+                  class="alert-v3-select max-w-25 min-w-25"
                   data-test="anomaly-schedule-interval-unit"
                 />
               </div>
@@ -401,14 +387,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <div>
+            <div class="min-w-0 flex-1 basis-48">
               <div class="flex items-center gap-0">
                 <OFormInput
                   name="detection_window_value"
                   type="number"
                   min="1"
-                  class="alert-v3-input"
-                  style="width: 5.4375rem"
+                  class="alert-v3-input max-w-21.75 min-w-21.75"
                   data-test="anomaly-detection-window-value"
                 >
                   <!-- Message rendered below at pair width — see detectionWindowError. -->
@@ -419,8 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
-                  class="alert-v3-select"
-                  style="min-width: 6.25rem"
+                  class="alert-v3-select max-w-25 min-w-25"
                   data-test="anomaly-detection-window-unit"
                 />
               </div>
@@ -433,6 +417,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ detectionWindowError }}
               </div>
+              <span
+                v-if="lookBackWindowHint"
+                class="text-text-secondary pt-1 text-xs"
+                data-test="anomaly-detection-window-hint"
+              >
+                {{ lookBackWindowHint }}
+              </span>
+              <span
+                v-if="legacyWindowWarning"
+                class="text-status-warning-text pt-1 text-xs"
+                data-test="anomaly-detection-window-legacy-warning"
+              >
+                {{ legacyWindowWarning }}
+              </span>
             </div>
           </div>
         </div>
@@ -451,31 +449,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
                   <template #content
-                    ><span style="font-size: var(--text-sm)">{{
+                    ><span class="text-sm">{{
                       t("alerts.anomaly.trainingWindowTooltip")
                     }}</span></template
                   >
                 </OTooltip>
               </OIcon>
             </div>
-            <div class="flex flex-col">
+            <div class="flex min-w-0 flex-1 basis-48 flex-col">
               <OFormInput
                 name="training_window_days"
                 type="number"
                 :min="1"
+                :suffix="t('alerts.anomaly.daysUnit')"
                 data-test="anomaly-training-window"
-                class="alert-v3-input"
-                style="width: 5.4375rem"
+                class="alert-v3-input max-w-30 min-w-30"
               />
-              <span class="static-text text-xs" :class="'text-text-secondary'">
-                {{
-                  t("alerts.anomaly.trainingWindowSeasonality", {
-                    seasonality:
-                      Number(trainingWindowDays) >= 7
-                        ? t("alerts.anomaly.seasonalityWeekly")
-                        : raw("hour-of-day"),
-                  })
-                }}
+              <span
+                class="text-text-secondary pt-1 text-xs"
+                data-test="anomaly-training-window-floor-hint"
+              >
+                {{ t("alerts.anomaly.trainingWindowFloorHint", { days: minTrainingDays }) }}
               </span>
             </div>
           </div>
@@ -494,15 +488,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <OFormSelect
-              name="retrain_interval_days"
-              :options="retrainIntervalOptions"
-              label-key="label"
-              value-key="value"
-              data-test="anomaly-retrain-interval"
-              class="alert-v3-select"
-              style="max-width: 12.5rem"
-            />
+            <div class="min-w-0 flex-1 basis-48">
+              <OFormSelect
+                name="retrain_interval_days"
+                :options="retrainIntervalOptions"
+                label-key="label"
+                value-key="value"
+                data-test="anomaly-retrain-interval"
+                class="alert-v3-select max-w-50"
+              />
+            </div>
           </div>
         </div>
 
@@ -520,12 +515,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OIcon>
           </div>
-          <div class="flex flex-1 flex-col gap-1">
+          <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
             <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
             <div v-if="budgetMode" class="flex flex-wrap items-start gap-3">
               <OToggleGroup
                 :model-value="budgetTier"
                 :aria-label="t('alerts.sensitivity')"
+                mobile-dropdown
                 data-test="anomaly-budget-tiers"
                 @update:model-value="onBudgetTier"
               >
@@ -562,13 +558,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div v-else class="flex flex-wrap items-center gap-3">
-              <OFormToggleGroup
-                name="threshold"
+              <OToggleGroup
+                :model-value="bandTier"
                 :aria-label="t('alerts.sensitivity')"
+                mobile-dropdown
                 data-test="anomaly-sensitivity-tier"
+                @update:model-value="onBandTier"
               >
-                <!-- Both controls share one field, so the message is rendered once below. -->
-                <template #error />
                 <OToggleGroupItem
                   v-for="tier in sensitivityTiers"
                   :key="tier.value"
@@ -578,35 +574,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ tier.label }}
                 </OToggleGroupItem>
-              </OFormToggleGroup>
+              </OToggleGroup>
               <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
                    whole control row a label-height below the Sensitivity heading. -->
               <div class="flex items-center gap-2">
                 <span
                   class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
                 >
-                  {{ t("alerts.anomaly.percentile") }}
-                  <OIcon
-                    name="info-outline"
-                    size="sm"
-                    class="cursor-help"
-                    data-test="anomaly-sensitivity-percentile-info"
-                  >
-                    <OTooltip
-                      side="right"
-                      align="center"
-                      max-width="18.75rem"
-                      :content="t('alerts.anomaly.sensitivityNotDataPercentile')"
-                    />
-                  </OIcon>
+                  {{ t("alerts.anomaly.level") }}
                 </span>
                 <OFormInput
-                  name="threshold"
+                  name="band_width"
                   type="number"
+                  suffix="σ"
                   :model-modifiers="{ number: true }"
-                  :aria-label="t('alerts.anomaly.percentile')"
+                  :aria-label="t('alerts.anomaly.level')"
                   class="max-w-21.75 min-w-21.75"
-                  data-test="anomaly-sensitivity-percentile"
+                  data-test="anomaly-sensitivity-level"
                 >
                   <template #error />
                 </OFormInput>
@@ -638,7 +622,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sqlPreview") }}
           </div>
-          <div class="border-border-default rounded-default h-45 flex-1 overflow-hidden border">
+          <div
+            class="border-border-default rounded-default h-45 min-w-0 flex-1 basis-60 overflow-hidden border"
+          >
             <QueryEditor
               data-test-prefix="anomaly-sql-preview"
               :read-only="true"
@@ -679,12 +665,19 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
+  ANOMALY_BALANCED_BAND_WIDTH,
+  ANOMALY_MIN_TRAINING_DAYS,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
+  anomalyIntervalSeconds,
+  anomalyTrainedK,
+  formatAnomalySeconds,
   hasTimestampAliasInSql,
+  lookBackWindowFloorSeconds,
   makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
+  type AnomalyStoredIntervals,
 } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
@@ -711,6 +704,11 @@ export default defineComponent({
     previewSql: {
       type: String,
       default: "",
+    },
+    // From the edit fetch (useAlertForm.anomalyStoredIntervals), never derived from `config` (D4).
+    storedIntervals: {
+      type: Object as PropType<AnomalyStoredIntervals | null>,
+      default: null,
     },
   },
 
@@ -746,9 +744,12 @@ export default defineComponent({
       }),
     );
     const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
+    // One s/m/h/d grammar shared with the server's parse_interval (§4.5) — "90s" and "1d" must render.
     const intervalUnits = computed(() => [
+      { label: t("common.seconds"), value: "s" },
       { label: t("common.minutes"), value: "m" },
       { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
     ]);
     // Fixed enum labels, not dynamic counts — plain keys, no pluralization.
     const retrainIntervalOptions = computed(() => [
@@ -757,11 +758,19 @@ export default defineComponent({
       { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
       { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
     ]);
-    // Values stay numbers — reka-ui matches the active item with ohash.isEqual.
+    const trainedK = computed(() => anomalyTrainedK(props.config));
+    // Preset values stay numbers — reka-ui matches the active item with ohash.isEqual.
     const sensitivityTiers = computed(() => [
-      { value: 99, label: t("alerts.anomaly.sensitivityConservative") },
-      { value: 97, label: t("alerts.anomaly.sensitivityBalanced") },
-      { value: 95, label: t("alerts.anomaly.sensitivityAggressive") },
+      {
+        value: "auto" as const,
+        label:
+          trainedK.value === null
+            ? t("alerts.anomaly.sensitivityAuto")
+            : t("alerts.anomaly.sensitivityAutoTrained", { k: trainedK.value }),
+      },
+      { value: 4, label: t("alerts.anomaly.sensitivityConservative") },
+      { value: ANOMALY_BALANCED_BAND_WIDTH, label: t("alerts.anomaly.sensitivityBalanced") },
+      { value: 2.5, label: t("alerts.anomaly.sensitivityAggressive") },
     ]);
     // 1/week is the burden gate's median target, 4/day the org-wide on-call ceiling.
     const budgetTiers = computed(() => [
@@ -784,7 +793,11 @@ export default defineComponent({
     // The parent (useAlertForm.saveAnomalyDetection) owns the save + payload;
     // this step's submit exists purely to run the schema (the exposed
     // validate() drives form.handleSubmit()), so onSubmit is a no-op.
-    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(t, getTimestampColumn);
+    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(
+      t,
+      getTimestampColumn,
+      () => props.storedIntervals,
+    );
 
     const form = useOForm<AnomalyDetectionConfigForm>({
       defaultValues: anomalyDetectionConfigDefaults(props.config),
@@ -800,9 +813,12 @@ export default defineComponent({
     const detectionFunctionField = form.useStore((s: any) => s.values.detection_function_field);
     const histogramIntervalValue = form.useStore((s: any) => s.values.histogram_interval_value);
     const histogramIntervalUnit = form.useStore((s: any) => s.values.histogram_interval_unit);
+    const scheduleIntervalValue = form.useStore((s: any) => s.values.schedule_interval_value);
+    const scheduleIntervalUnit = form.useStore((s: any) => s.values.schedule_interval_unit);
     const detectionWindowValue = form.useStore((s: any) => s.values.detection_window_value);
+    const detectionWindowUnit = form.useStore((s: any) => s.values.detection_window_unit);
     const trainingWindowDays = form.useStore((s: any) => s.values.training_window_days);
-    const threshold = form.useStore((s: any) => s.values.threshold);
+    const bandWidth = form.useStore((s: any) => s.values.band_width);
     const sensitivityMode = form.useStore((s: any) => s.values.sensitivity_mode);
     const budgetCount = form.useStore((s: any) => s.values.budget_count);
     const budgetPeriod = form.useStore((s: any) => s.values.budget_period);
@@ -821,13 +837,13 @@ export default defineComponent({
     const histogramIntervalError = fieldError("histogram_interval_value");
     const scheduleIntervalError = fieldError("schedule_interval_value");
     const detectionWindowError = fieldError("detection_window_value");
-    const thresholdError = fieldError("threshold");
     const budgetCountError = fieldError("budget_count");
+    const bandWidthError = fieldError("band_width");
 
     const budgetMode = computed(() => sensitivityMode.value === "budget");
 
     const sensitivityError = computed(() =>
-      budgetMode.value ? budgetCountError.value : thresholdError.value,
+      budgetMode.value ? budgetCountError.value : bandWidthError.value,
     );
 
     const sensitivityTooltip = computed(() =>
@@ -851,7 +867,19 @@ export default defineComponent({
       form.setFieldValue("budget_period", tier.period as "day" | "week");
     };
 
-    // Suppressed on bad input (the error is the feedback); never a rate computed from the percentile.
+    const bandTier = computed(() => {
+      const value = bandWidth.value;
+      if (value === "" || value === null || value === undefined) return "auto";
+      return sensitivityTiers.value.find((tier) => tier.value === Number(value))?.value ?? "";
+    });
+
+    const onBandTier = (value: unknown) => {
+      const tier = sensitivityTiers.value.find((entry) => entry.value === value);
+      if (!tier) return;
+      form.setFieldValue("band_width", tier.value === "auto" ? null : tier.value);
+    };
+
+    // Suppressed on bad input: the error is the feedback.
     const sensitivityHint = computed(() => {
       if (budgetMode.value) {
         const count = Number(budgetCount.value);
@@ -860,9 +888,63 @@ export default defineComponent({
           ? t("alerts.anomaly.budgetHintPerWeek", { count })
           : t("alerts.anomaly.budgetHintPerDay", { count });
       }
-      const pct = Number(threshold.value);
-      if (!Number.isInteger(pct) || pct < 50 || pct > 99) return raw("");
-      return t("alerts.anomaly.sensitivityHintPercentile", { percentile: pct });
+      const k = Number(bandWidth.value);
+      if (bandWidth.value === "" || !Number.isFinite(k) || k < 1 || k > 10) return raw("");
+      return t("alerts.anomaly.bandWidthHint", { k });
+    });
+
+    // §4.6: the floor is computed locally from the form's own values — no server dependency.
+    const currentWindowFloor = computed(() =>
+      lookBackWindowFloorSeconds(
+        Number(scheduleIntervalValue.value),
+        String(scheduleIntervalUnit.value),
+        Number(histogramIntervalValue.value),
+        String(histogramIntervalUnit.value),
+      ),
+    );
+
+    // Suppressed while the field is in error, so the floor is stated once, not twice.
+    const lookBackWindowHint = computed(() => {
+      if (detectionWindowError.value) return raw("");
+      const floor = currentWindowFloor.value;
+      if (floor === null) return raw("");
+      return t("alerts.anomaly.lookBackWindowMinimum", {
+        min: formatAnomalySeconds(floor),
+        // Twice the floor plus the 10-minute absence allowance; absence detection is on by default.
+        recommended: formatAnomalySeconds(2 * floor + 600),
+      });
+    });
+
+    const storedTripleUntouched = computed(() => {
+      const stored = props.storedIntervals;
+      return (
+        stored !== null &&
+        Number(histogramIntervalValue.value) === stored.histogram.value &&
+        String(histogramIntervalUnit.value) === stored.histogram.unit &&
+        Number(scheduleIntervalValue.value) === stored.schedule.value &&
+        String(scheduleIntervalUnit.value) === stored.schedule.unit &&
+        Number(detectionWindowValue.value) === stored.window.value &&
+        String(detectionWindowUnit.value) === stored.window.unit
+      );
+    });
+
+    // §4.5: a grandfathered below-floor row saves verbatim but is warned; unparsable stored values stay warning-free.
+    const legacyWindowWarning = computed(() => {
+      const stored = props.storedIntervals;
+      if (!stored || !stored.schedule.parsed || !stored.histogram.parsed) return raw("");
+      if (!storedTripleUntouched.value) return raw("");
+      const floor = lookBackWindowFloorSeconds(
+        stored.schedule.value,
+        stored.schedule.unit,
+        stored.histogram.value,
+        stored.histogram.unit,
+      );
+      const windowSecs =
+        typeof stored.window.raw === "number"
+          ? stored.window.raw
+          : anomalyIntervalSeconds(stored.window.value, stored.window.unit);
+      if (floor === null || windowSecs === null || windowSecs >= floor) return raw("");
+      return t("alerts.anomaly.lookBackWindowLegacy", { min: formatAnomalySeconds(floor) });
     });
 
     // The save payload, the SQL preview and the chart all read props.config, so the form writes back into it
@@ -896,13 +978,17 @@ export default defineComponent({
         cfg.training_window_days = toModelNumber(v.training_window_days);
         cfg.retrain_interval_days = toModelNumber(v.retrain_interval_days);
         if (v.sensitivity_mode === "budget") {
-          // threshold is controller-derived here; an invalid count writes nothing, or the config would flip back to percentile mode.
+          // threshold is controller-derived here; an invalid count writes nothing, or the config would flip back to band mode.
           const count = Number(v.budget_count);
           if (Number.isFinite(count) && count > 0) {
             cfg.alert_budget_per_day = v.budget_period === "week" ? count / 7 : count;
           }
         } else {
-          cfg.threshold = toModelNumber(v.threshold);
+          // Switching to band mode must clear a previously stored budget, or the
+          // save payload keeps sending the stale value.
+          cfg.alert_budget_per_day = undefined;
+          cfg.band_width =
+            v.band_width === "" || v.band_width == null ? null : toModelNumber(v.band_width);
         }
       },
       { deep: true },
@@ -1153,8 +1239,11 @@ export default defineComponent({
       histogramIntervalError,
       scheduleIntervalError,
       detectionWindowError,
-      thresholdError,
+      lookBackWindowHint,
+      legacyWindowWarning,
       sensitivityTiers,
+      bandTier,
+      onBandTier,
       sensitivityHint,
       budgetMode,
       budgetTiers,
@@ -1163,6 +1252,7 @@ export default defineComponent({
       onBudgetTier,
       sensitivityError,
       sensitivityTooltip,
+      minTrainingDays: ANOMALY_MIN_TRAINING_DAYS,
       onCustomSqlChange,
     };
   },

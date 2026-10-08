@@ -13,17 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
+use axum::{
+    body::Bytes,
+    extract::Path,
+    http::{self, HeaderMap},
+    response::Response,
+};
 use config::{
     TIMESTAMP_COL_NAME,
     axum::middlewares::{get_process_time, insert_process_time_header},
     get_config,
     meta::{
+        otlp::OtlpRequestType,
         search::{
             PaginatedResponse, SearchPartitionRequest, StreamResponses, TimeOffset,
             default_use_cache,
         },
         stream::StreamType,
+        traces::session::{quote_identifier, quote_sql_string},
     },
     metrics,
     utils::{json, time::now_micros},
@@ -45,7 +52,10 @@ use tracing::{Instrument, Span};
 
 use crate::{
     common::{
-        meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+        meta::{
+            http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+            otlp::{otlp_error_response, otlp_rejection_response},
+        },
         utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
     search::error_utils::map_error_to_http_response,
@@ -97,10 +107,14 @@ pub(crate) async fn check_stream_permissions(
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     ),
-    request_body(content = String, description = "ExportTraceServiceRequest", content_type = "application/x-protobuf"),
+    request_body(description = "ExportTraceServiceRequest", content(("application/x-protobuf"), (Object = "application/json"))),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({"code": 200})),
-        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+        (status = 200, description = "ExportTraceServiceResponse", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 206, description = "ExportTraceServiceResponse with a partial success (JSON requests only)", content((Object = "application/json"))),
+        (status = 400, description = "google.rpc.Status: invalid body, unsupported Content-Type, or write rejected (e.g. columns limit)", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 429, description = "google.rpc.Status: trial period expired", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 500, description = "google.rpc.Status: internal write error", content(("application/x-protobuf"), (Object = "application/json"))),
+        (status = 503, description = "google.rpc.Status: ingester overloaded or unavailable, or ingestion not allowed (cloud)", content(("application/x-protobuf"), (Object = "application/json"))),
     )
 )]
 pub async fn traces_write(
@@ -114,19 +128,27 @@ pub async fn traces_write(
 
     let user = ingestion_common::IngestUser::from_user_email(&user_email.user_id);
 
-    #[cfg(feature = "cloud")]
-    match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
-        Ok(_) => {}
-        Err(e) => {
-            return MetaHttpResponse::too_many_requests(e);
-        }
-    }
-
     let cfg = get_config();
     let content_type = headers
         .get("Content-Type")
         .and_then(|h| h.to_str().ok())
         .unwrap_or("application/json");
+    let req_type = if content_type.eq(CONTENT_TYPE_PROTO) {
+        OtlpRequestType::HttpProtobuf
+    } else {
+        OtlpRequestType::HttpJson
+    };
+
+    #[cfg(feature = "cloud")]
+    if let Err(e) = check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
+        let status = if matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            http::StatusCode::TOO_MANY_REQUESTS
+        } else {
+            http::StatusCode::SERVICE_UNAVAILABLE
+        };
+        return otlp_rejection_response(req_type, status, e.to_string());
+    }
+
     let org_id = if let Some(Some(v)) = headers
         .get(&cfg.grpc.org_header_key)
         .map(|header| header.to_str().ok())
@@ -144,7 +166,12 @@ pub async fn traces_write(
     } else if content_type.starts_with(CONTENT_TYPE_JSON) {
         traces::otlp_json(&org_id, body, in_stream_name, user).await
     } else {
-        return MetaHttpResponse::bad_request("Bad Request");
+        return otlp_error_response(
+            OtlpRequestType::HttpJson,
+            http::StatusCode::BAD_REQUEST,
+            3, // INVALID_ARGUMENT
+            "Bad Request: Content-Type must be application/json or application/x-protobuf",
+        );
     };
 
     match result {
@@ -152,7 +179,7 @@ pub async fn traces_write(
             insert_process_time_header(process_time, resp.headers_mut());
             resp
         }
-        Err(e) => MetaHttpResponse::internal_error(e),
+        Err(e) => otlp_rejection_response(req_type, http::StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 
@@ -400,13 +427,7 @@ pub async fn get_latest_traces(
     let query_sql = if let Some(ref validated) = validated_schema {
         build_llm_trace_query(&stream_name, validated, &extra_trace_selects)
     } else {
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            {extra_trace_selects} \
-            FROM \"{stream_name}\""
-        )
+        build_trace_query(&stream_name, &extra_trace_selects)
     };
     let sql_order_expr = match sort_by.as_str() {
         "duration" => format!("zo_sql_duration {sort_order}"),
@@ -420,9 +441,7 @@ pub async fn get_latest_traces(
     // F2: the filter is a raw, user-supplied WHERE fragment. Validate it parses as a
     // single well-formed boolean expression before splicing, so statement smuggling
     // and comment-truncated payloads never reach the planner.
-    if !filter.is_empty()
-        && let Err(e) = config::utils::sql::validate_where_fragment(&filter)
-    {
+    if let Err(e) = config::utils::sql::validate_optional_where_fragment(&filter) {
         return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
     }
     let query_sql = if filter.is_empty() {
@@ -637,7 +656,7 @@ pub async fn get_latest_traces(
     // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
     if !multi_service_tids.is_empty() {
         // Trace IDs come from DB rows and must be validated before interpolating into SQL.
-        let multi_ids_str = multi_service_tids
+        let multi_ids = multi_service_tids
             .iter()
             .map(|tid| {
                 tid.chars()
@@ -645,8 +664,7 @@ pub async fn get_latest_traces(
                     .collect::<String>()
             })
             .filter(|tid| !tid.is_empty())
-            .collect::<Vec<String>>()
-            .join("','");
+            .collect::<Vec<String>>();
         // max(infer_service_type) over a COALESCE group is the group's inferred type
         // ("database"/"queue"/...) for inferred entities and NULL for instrumented
         // services, which the UI uses to render inferred nodes with a dotted style.
@@ -655,11 +673,11 @@ pub async fn get_latest_traces(
         } else {
             ""
         };
-        let svc_sql = format!(
-            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
-             count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, {service_key_expr}"
+        let svc_sql = build_service_breakdown_query(
+            &stream_name,
+            service_key_expr,
+            svc_type_select,
+            &multi_ids,
         );
         req.query.sql = svc_sql;
         req.query.from = 0;
@@ -810,6 +828,7 @@ fn build_llm_trace_query(
     validated: &schema_compat::ValidatedLlmSchema,
     extra_selects: &str,
 ) -> String {
+    let stream_ident = quote_identifier(stream_name);
     let first_msg_clause = if validated.has_gen_ai {
         if validated.has_input_messages {
             format!(
@@ -843,7 +862,7 @@ fn build_llm_trace_query(
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM \"{stream_name}\""
+            FROM {stream_ident}"
         )
     } else {
         let total_tokens_expr = if validated.has_total_tokens {
@@ -862,9 +881,46 @@ fn build_llm_trace_query(
             array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM \"{stream_name}\""
+            FROM {stream_ident}"
         )
     }
+}
+
+/// Q1 trace aggregation for streams without a validated LLM schema.
+fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
+    format!(
+        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+        min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        (max(end_time) - min(start_time)) as zo_sql_duration, \
+        {extra_selects} \
+        FROM {}",
+        quote_identifier(stream_name)
+    )
+}
+
+/// Q2b per-(trace, service) breakdown.
+fn build_service_breakdown_query(
+    stream_name: &str,
+    service_key_expr: &str,
+    svc_type_select: &str,
+    trace_ids: &[String],
+) -> String {
+    let trace_ids_sql = trace_ids
+        .iter()
+        .map(|id| quote_sql_string(id))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
+         count(*) AS svc_count, max(duration) AS svc_duration \
+         FROM {} WHERE trace_id IN ({trace_ids_sql}) \
+         GROUP BY trace_id, {service_key_expr}",
+        quote_identifier(stream_name)
+    )
+}
+
+fn build_partition_query(stream_name: &str) -> String {
+    format!("SELECT * FROM {}", quote_identifier(stream_name))
 }
 
 /// GetLatestTracesStream — HTTP/2 streaming variant of GetLatestTraces
@@ -946,9 +1002,7 @@ pub async fn get_latest_traces_stream(
     // stripping done in process_latest_traces_stream (which silently mangles the
     // fragment instead of rejecting it), and that stripping only ever makes the
     // spliced string a subset of what is validated here.
-    if !filter.is_empty()
-        && let Err(e) = config::utils::sql::validate_where_fragment(&filter)
-    {
+    if let Err(e) = config::utils::sql::validate_optional_where_fragment(&filter) {
         return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
     }
 
@@ -1207,13 +1261,7 @@ async fn process_latest_traces_stream(
     let query_sql_base = if let Some(ref validated) = validated_schema {
         build_llm_trace_query(&stream_name, validated, &extra_trace_selects)
     } else {
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            {extra_trace_selects} \
-            FROM \"{stream_name}\""
-        )
+        build_trace_query(&stream_name, &extra_trace_selects)
     };
     let query_sql = if filter.is_empty() {
         format!("{query_sql_base} GROUP BY trace_id ORDER BY {sql_order_expr}")
@@ -1256,7 +1304,7 @@ async fn process_latest_traces_stream(
 
     // Get time partitions
     let partition_req = SearchPartitionRequest {
-        sql: format!("SELECT * FROM \"{stream_name}\""),
+        sql: build_partition_query(&stream_name),
         start_time,
         end_time,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -1827,7 +1875,7 @@ async fn run_q2_for_traces(
     };
 
     if !multi_service_tids.is_empty() {
-        let multi_ids_str = multi_service_tids
+        let multi_ids = multi_service_tids
             .iter()
             .map(|tid| {
                 tid.chars()
@@ -1835,18 +1883,17 @@ async fn run_q2_for_traces(
                     .collect::<String>()
             })
             .filter(|tid| !tid.is_empty())
-            .collect::<Vec<String>>()
-            .join("','");
+            .collect::<Vec<String>>();
         let svc_type_select = if has_infer {
             ", max(infer_service_type) AS service_type"
         } else {
             ""
         };
-        let svc_sql = format!(
-            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
-             count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, {service_key_expr}"
+        let svc_sql = build_service_breakdown_query(
+            stream_name,
+            service_key_expr,
+            svc_type_select,
+            &multi_ids,
         );
         let mut req3 = base_req.clone();
         req3.query.sql = svc_sql;
@@ -1989,6 +2036,128 @@ mod tests {
         assert_eq!(
             json.get("service_type").and_then(|v| v.as_str()),
             Some("database")
+        );
+    }
+
+    // cloud builds run check_ingestion_allowed first, which needs a live org
+    #[cfg(not(feature = "cloud"))]
+    async fn call_traces_write(
+        content_type: &str,
+        body: &'static [u8],
+    ) -> (http::StatusCode, HeaderMap, json::Value) {
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::CONTENT_TYPE, content_type.parse().unwrap());
+        let resp = traces_write(
+            Path("default".to_string()),
+            Headers(UserEmail {
+                user_id: "a@a.com".to_string(),
+            }),
+            headers,
+            Bytes::from_static(body),
+        )
+        .await;
+        let status = resp.status();
+        let resp_headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, resp_headers, json::from_slice(&body).unwrap())
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_traces_write_invalid_json_is_rpc_status() {
+        let (status, headers, body) = call_traces_write(CONTENT_TYPE_JSON, b"{not json").await;
+        assert_eq!(status, http::StatusCode::BAD_REQUEST);
+        assert_eq!(headers[http::header::CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("Invalid json:")
+        );
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_traces_write_unsupported_content_type_is_rpc_status() {
+        let (status, headers, body) = call_traces_write("text/plain", b"hello").await;
+        assert_eq!(status, http::StatusCode::BAD_REQUEST);
+        assert_eq!(headers[http::header::CONTENT_TYPE], CONTENT_TYPE_JSON);
+        assert_eq!(body["code"], 3);
+        let message = body["message"].as_str().unwrap();
+        assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
+    }
+
+    #[test]
+    fn test_build_llm_trace_query_quotes_stream_name() {
+        for has_gen_ai in [true, false] {
+            let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
+            let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
+            assert!(sql.ends_with("FROM \"default\""), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_build_llm_trace_query_escapes_quote_in_stream_name() {
+        for has_gen_ai in [true, false] {
+            let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
+            let sql = build_llm_trace_query("evil\" x", &validated, "count(*) AS span_count");
+            assert!(sql.ends_with("FROM \"evil\"\" x\""), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_trace_builders_quote_stream_name() {
+        assert!(
+            build_trace_query("default", "count(*) AS span_count")
+                .ends_with("count(*) AS span_count FROM \"default\"")
+        );
+        assert_eq!(
+            build_service_breakdown_query(
+                "default",
+                "service_name",
+                "",
+                &["a".to_string(), "b".to_string()]
+            ),
+            "SELECT trace_id, service_name AS service_name, count(*) AS svc_count, \
+             max(duration) AS svc_duration FROM \"default\" WHERE trace_id IN ('a','b') \
+             GROUP BY trace_id, service_name"
+        );
+        assert_eq!(
+            build_partition_query("default"),
+            "SELECT * FROM \"default\""
+        );
+    }
+
+    #[test]
+    fn test_build_trace_query_escapes_quote_in_stream_name() {
+        let sql = build_trace_query("evil\" x", "count(*) AS span_count");
+        assert!(sql.ends_with("FROM \"evil\"\" x\""), "{sql}");
+    }
+
+    #[test]
+    fn test_build_service_breakdown_query_escapes_quote_in_stream_name() {
+        let sql = build_service_breakdown_query("evil\" x", "service_name", "", &["a".to_string()]);
+        assert!(sql.contains("FROM \"evil\"\" x\" WHERE"), "{sql}");
+    }
+
+    #[test]
+    fn test_build_service_breakdown_query_quotes_trace_ids() {
+        let ids = ["a".to_string(), "x') OR ('1'='1".to_string()];
+        let sql = build_service_breakdown_query("default", "service_name", "", &ids);
+        assert!(
+            sql.contains("WHERE trace_id IN ('a','x'') OR (''1''=''1') GROUP BY"),
+            "{sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_partition_query_escapes_quote_in_stream_name() {
+        assert_eq!(
+            build_partition_query("evil\" x"),
+            "SELECT * FROM \"evil\"\" x\""
         );
     }
 }

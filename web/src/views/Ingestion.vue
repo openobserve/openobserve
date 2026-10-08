@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <div class="w-50 flex-none max-md:w-auto max-md:min-w-36 max-md:flex-1">
+      <!-- A fixed phone width lets the title, search and token button share one row. -->
+      <div class="w-50 flex-none max-md:w-40">
         <OSearchInput
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
@@ -36,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <OSelect
-        v-if="!isMobile && !isRUMPage && tokenOptions.length > 0"
+        v-if="lgUp && !isRUMPage && tokenOptions.length > 0"
         v-model="selectedTokenName"
         :options="tokenOptions"
         label-key="label"
@@ -84,7 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
       <div class="-ms-3 w-full">
-        <div v-if="isMobile && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
+        <!-- Below lg the token picker sits above the tabs so the title, search and token button share one row. -->
+        <div v-if="!lgUp && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
           <OSelect
             v-model="selectedTokenName"
             :options="tokenOptions"
@@ -207,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="min-h-0 flex-1">
       <router-view
-        :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
         :currUserEmail="currentUserEmail"
         @copy-to-clipboard-fn="copyToClipboardFn"
@@ -238,7 +239,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -262,7 +263,7 @@ export default defineComponent({
     OBanner,
   },
   setup() {
-    const { isMobile } = useBreakpoint();
+    const { isMobile, lgUp } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
@@ -273,6 +274,33 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
+
+    // latched from GET /{org}/passcode alone (null = unknown), so the concurrent tokens read cannot clear a 403
+    const passcodeReadForbidden = ref<boolean | null>(null);
+
+    // so a late 403 withdraws only a selector-published passcode, never one a successful read returned
+    const passcodeCameFromTokenSelector = ref(false);
+
+    // refuses once a 403 is latched: the credential was never this role's to see
+    const publishSelectedToken = (token: string) => {
+      if (passcodeReadForbidden.value === true) return false;
+      passcodeCameFromTokenSelector.value = true;
+      store.dispatch("setOrganizationPasscodeForbidden", false);
+      store.dispatch("setOrganizationPasscode", token);
+      return true;
+    };
+
+    const applyPasscodeForbidden = (forbidden: boolean) => {
+      passcodeReadForbidden.value = forbidden;
+      store.dispatch("setOrganizationPasscodeForbidden", forbidden);
+      if (forbidden) {
+        // the tokens request can resolve before this 403, so withdraw what it published
+        if (passcodeCameFromTokenSelector.value) {
+          store.dispatch("setOrganizationPasscode", "");
+        }
+      }
+      passcodeCameFromTokenSelector.value = false;
+    };
 
     // Token selector — pick which ingestion token the curl examples use
     const selectedTokenName = ref("");
@@ -298,7 +326,7 @@ export default defineComponent({
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
           if (token?.token) {
-            store.dispatch("setOrganizationPasscode", token.token);
+            publishSelectedToken(token.token);
           }
         }
       },
@@ -308,7 +336,7 @@ export default defineComponent({
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
       if (token?.token) {
-        store.dispatch("setOrganizationPasscode", token.token);
+        publishSelectedToken(token.token);
       }
     };
 
@@ -345,6 +373,8 @@ export default defineComponent({
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
         fetchOrgTokens();
+        // only this call establishes readability; a tokens 403 is not observable on enterprise
+        getOrganizationPasscode();
         getRUMToken();
       }
     });
@@ -382,6 +412,16 @@ export default defineComponent({
 
     watch(() => route.name, syncTabFromRoute);
 
+    // the latch is per-org, so the new org's passcode read must decide afresh
+    watch(
+      () => store.state.selectedOrganization.identifier,
+      (identifier, previous) => {
+        if (identifier === previous) return;
+        passcodeReadForbidden.value = null;
+        passcodeCameFromTokenSelector.value = false;
+      },
+    );
+
     onUpdated(() => {
       if (router.currentRoute.value.name === "ingestion") {
         router.push({
@@ -407,13 +447,17 @@ export default defineComponent({
               timeout: 5000,
             });
           } else {
+            applyPasscodeForbidden(false);
             store.dispatch("setOrganizationPasscode", res.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
-        .catch(() => {
-          // Silently fail — passcode is not critical for page render
+        .catch((e: any) => {
+          // other errors stay silent: the passcode is not critical for page render
+          if (e?.response?.status === 403) {
+            applyPasscodeForbidden(true);
+          }
         });
     };
 
@@ -443,6 +487,7 @@ export default defineComponent({
               message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
+            applyPasscodeForbidden(false);
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
@@ -458,7 +503,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update Passcode",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -504,7 +549,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,
@@ -522,7 +567,7 @@ export default defineComponent({
     const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
 
     const generateRUMToken = () => {
-      // Held rather than returned inline: the `segment.track` call below must
+      // Held rather than returned inline: the `analytics.track` call below must
       // still run synchronously, exactly as it did before.
       const request = createRumToken
         .mutateAsync()
@@ -547,7 +592,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Generate RUM Token",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -581,7 +626,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Update RUM Token",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -664,6 +709,7 @@ export default defineComponent({
 
     return {
       isMobile,
+      lgUp,
       t,
       store,
       router,

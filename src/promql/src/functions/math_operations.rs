@@ -16,6 +16,8 @@
 use config::meta::promql::value::Value;
 use datafusion::error::Result;
 
+use crate::scalar_param::ScalarParam;
+
 pub(crate) fn abs(data: Value) -> Result<Value> {
     exec(data, f64::abs)
 }
@@ -48,16 +50,82 @@ pub(crate) fn sqrt(data: Value) -> Result<Value> {
     exec(data, f64::sqrt)
 }
 
-pub(crate) fn round(data: Value, to_nearest: f64) -> Result<Value> {
-    exec(data, |input| {
+pub(crate) fn round(data: Value, to_nearest: &ScalarParam) -> Result<Value> {
+    super::map_samples(data, "round", |sample| {
         // Prometheus semantics: ties round up, and the inverse keeps e.g. 0.1 steps exact
-        let inverse = 1.0 / to_nearest;
-        (input * inverse + 0.5).floor() / inverse
+        let inverse = 1.0 / to_nearest.at(sample.timestamp);
+        (sample.value * inverse + 0.5).floor() / inverse
     })
 }
 
+pub(crate) fn sin(data: Value) -> Result<Value> {
+    exec(data, f64::sin)
+}
+
+pub(crate) fn cos(data: Value) -> Result<Value> {
+    exec(data, f64::cos)
+}
+
+pub(crate) fn tan(data: Value) -> Result<Value> {
+    exec(data, f64::tan)
+}
+
+pub(crate) fn asin(data: Value) -> Result<Value> {
+    exec(data, f64::asin)
+}
+
+pub(crate) fn acos(data: Value) -> Result<Value> {
+    exec(data, f64::acos)
+}
+
+pub(crate) fn atan(data: Value) -> Result<Value> {
+    exec(data, f64::atan)
+}
+
+pub(crate) fn sinh(data: Value) -> Result<Value> {
+    exec(data, f64::sinh)
+}
+
+pub(crate) fn cosh(data: Value) -> Result<Value> {
+    exec(data, f64::cosh)
+}
+
+pub(crate) fn tanh(data: Value) -> Result<Value> {
+    exec(data, f64::tanh)
+}
+
+pub(crate) fn asinh(data: Value) -> Result<Value> {
+    exec(data, f64::asinh)
+}
+
+pub(crate) fn acosh(data: Value) -> Result<Value> {
+    exec(data, f64::acosh)
+}
+
+pub(crate) fn atanh(data: Value) -> Result<Value> {
+    exec(data, f64::atanh)
+}
+
+// upstream multiplies before dividing; `to_degrees` rounds differently
+pub(crate) fn deg(data: Value) -> Result<Value> {
+    exec(data, |value| value * 180.0 / std::f64::consts::PI)
+}
+
+pub(crate) fn rad(data: Value) -> Result<Value> {
+    exec(data, |value| value * std::f64::consts::PI / 180.0)
+}
+
 pub(crate) fn sgn(data: Value) -> Result<Value> {
-    exec(data, f64::signum)
+    // f64::signum maps ±0 to ±1; Prometheus returns zeros and NaN unchanged.
+    exec(data, |value| {
+        if value > 0.0 {
+            1.0
+        } else if value < 0.0 {
+            -1.0
+        } else {
+            value
+        }
+    })
 }
 
 /// Apply a given simple match function to a float type
@@ -130,26 +198,28 @@ mod tests {
         assert_eq!(apply(sqrt, 1.0), 1.0);
         assert_eq!(apply(sqrt, 4.0), 2.0);
 
-        let round = |input| apply(|data| super::round(data, 1.0), input);
+        let round = |input| apply(|data| super::round(data, &ScalarParam::Const(1.0)), input);
         assert_eq!(round(3.2), 3.0);
         assert_eq!(round(3.5), 4.0);
         assert_eq!(round(3.7), 4.0);
         assert_eq!(round(-3.2), -3.0);
         assert_eq!(round(-3.5), -3.0);
-        let round = |input| apply(|data| super::round(data, 0.5), input);
+        let round = |input| apply(|data| super::round(data, &ScalarParam::Const(0.5)), input);
         assert_eq!(round(3.2), 3.0);
         assert_eq!(round(3.25), 3.5);
         assert_eq!(round(3.7), 3.5);
         assert_eq!(round(-3.2), -3.0);
-        let round = |input| apply(|data| super::round(data, 0.1), input);
+        let round = |input| apply(|data| super::round(data, &ScalarParam::Const(0.1)), input);
         assert_eq!(round(2.345), 2.3);
         assert_eq!(round(0.3), 0.3);
-        let round = |input| apply(|data| super::round(data, 5.0), input);
+        let round = |input| apply(|data| super::round(data, &ScalarParam::Const(5.0)), input);
         assert_eq!(round(12.5), 15.0);
         assert_eq!(round(12.4), 10.0);
 
         assert_eq!(apply(sgn, 5.0), 1.0);
-        assert_eq!(apply(sgn, 0.0), 1.0);
+        assert_eq!(apply(sgn, 0.0).to_bits(), 0.0f64.to_bits());
+        assert_eq!(apply(sgn, -0.0).to_bits(), (-0.0f64).to_bits());
+        assert!(apply(sgn, f64::NAN).is_nan());
         assert_eq!(apply(sgn, -5.0), -1.0);
     }
 
@@ -280,7 +350,7 @@ mod tests {
     fn test_round() {
         let eval_ts = 1000;
         let value = create_matrix(eval_ts, vec![3.2, 3.5, -3.2]);
-        let result = round(value, 1.0).unwrap();
+        let result = round(value, &ScalarParam::Const(1.0)).unwrap();
 
         if let Value::Matrix(result_matrix) = result {
             assert_eq!(result_matrix.len(), 3);
@@ -302,7 +372,7 @@ mod tests {
             assert_eq!(result_matrix.len(), 3);
             assert_eq!(result_matrix[0].samples[0].value, 1.0);
             assert_eq!(result_matrix[1].samples[0].value, -1.0);
-            assert_eq!(result_matrix[2].samples[0].value, 1.0);
+            assert_eq!(result_matrix[2].samples[0].value, 0.0);
         } else {
             panic!("Expected Matrix result");
         }

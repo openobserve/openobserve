@@ -135,6 +135,10 @@ pub async fn create(
         data.usage_stream_enabled = usage_stream_enabled;
     }
 
+    if merge_red_insights_enabled(&mut data, settings.red_insights_enabled) {
+        field_found = true;
+    }
+
     if let Some(cross_links) = settings.cross_links {
         for link in &cross_links {
             if link.name.is_empty() {
@@ -156,12 +160,10 @@ pub async fn create(
     // ignore this for all non _meta orgs
     #[cfg(feature = "cloud")]
     if org_id == META_ORG_ID
-        && let Some(mappings) = settings.domain_org_mappings
+        && let Some(mut mappings) = settings.domain_org_mappings
     {
         field_found = true;
-        for mapping in &mappings {
-            use o2_openfga::authorizer::groups::get_all_groups;
-
+        for mapping in &mut mappings {
             if openobserve_core::organization::get_org(&mapping.org_id)
                 .await
                 .is_none()
@@ -169,6 +171,13 @@ pub async fn create(
                 return MetaHttpResponse::bad_request(format!(
                     "No org with org id {} found",
                     mapping.org_id
+                ));
+            }
+
+            if mapping.domain.is_empty() || mapping.domain.contains(' ') {
+                return MetaHttpResponse::bad_request(format!(
+                    "domain cannot have space or be empty, bad domain '{}'",
+                    mapping.domain
                 ));
             }
 
@@ -181,27 +190,14 @@ pub async fn create(
                     mapping.base_role, mapping.org_id
                 ));
             }
-            if let Some(group) = mapping.user_group.as_ref() {
-                let all_groups = match get_all_groups(&mapping.org_id, None).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "error getting all groups for {} when updating domain org mappings : {e}",
-                            mapping.org_id
-                        );
-                        return MetaHttpResponse::bad_request(format!(
-                            "error getting groups for org {} : {e}",
-                            mapping.org_id
-                        ));
-                    }
-                };
-                if !all_groups.contains(&group) {
-                    return MetaHttpResponse::bad_request(format!(
-                        "custom group {group} not found in org {}",
-                        mapping.org_id
-                    ));
+            if let Some(mut claim) = mapping.role_claim_name.as_mut() {
+                if claim.trim().is_empty() {
+                    return MetaHttpResponse::bad_request("role claim name must not be empty");
                 }
+                *claim = claim.trim().to_string();
             }
+
+            mapping.domain = mapping.domain.to_lowercase();
         }
         data.domain_org_mappings = mappings;
     }
@@ -356,8 +352,31 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
+fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool>) -> bool {
+    let Some(enabled) = value else {
+        return false;
+    };
+    data.red_insights_enabled = enabled;
+    true
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_red_insights_enabled_sets_and_leaves() {
+        let mut data = OrganizationSetting::default();
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(false)));
+        assert!(!data.red_insights_enabled);
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(!data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(true)));
+        assert!(data.red_insights_enabled);
+    }
+
     #[test]
     fn test_max_series_per_query_validation_valid_values() {
         // Test minimum valid value

@@ -15,7 +15,7 @@
 // It always occupies its space (fixed tile height + skeleton while `loading`) so
 // data arriving never shifts the layout below it.
 
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 import OStatCard from "./OStatCard.vue";
 import type { StatItem } from "./OStatStrip.types";
@@ -54,6 +54,16 @@ const props = withDefaults(
 
 const emit = defineEmits<{ select: [key: string] }>();
 
+// Only the FIRST load blanks the values: a refresh keeps the last numbers rather than flickering every tile.
+const settled = ref(false);
+watch(
+  () => props.loading,
+  (loading, wasLoading) => {
+    if (wasLoading && !loading) settled.value = true;
+  },
+);
+const showSkeleton = computed(() => props.loading && !settled.value);
+
 // Callers spell "no filter" as null, as "all", or as a key they never render;
 // all three mean the default tile.
 const activeKey = computed(() => {
@@ -80,10 +90,13 @@ const onCardClick = (item: StatItem) => {
       :label="item.label"
       :value="item.value"
       :sub="item.sub"
+      :sub-icon="item.subIcon"
+      :sub-tooltip="item.subTooltip"
       :icon="item.icon"
       :tone="item.tone"
       :trend="item.trend"
       :max="item.max"
+      :loading="showSkeleton"
       :clickable="selectable && item.selectable !== false"
       :selected="item.selectable !== false && activeKey === item.key"
       :data-test="item.dataTest"

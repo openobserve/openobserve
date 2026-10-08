@@ -172,7 +172,7 @@ version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5d307320b3181d6d7954e663bd7c774a838b8220fe0593c86d9fb09f498b4b"
 dependencies = [
- "gimli",
+ "gimli 0.32.3",
 ]
 
 [[package]]
@@ -1770,11 +1770,22 @@ dependencies = [
 
 [[package]]
 name = "bincode"
-version = "1.3.3"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
 dependencies = [
+ "bincode_derive",
  "serde",
+ "unty",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
+dependencies = [
+ "virtue",
 ]
 
 [[package]]
@@ -2225,16 +2236,17 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "cfgrammar"
-version = "0.13.10"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fe45e18904af7af10e4312df7c97251e98af98c70f42f1f2587aecfcbee56bf"
+checksum = "b5ef80386dea3cda50570f22e1c6a474f0cc688ae220fc584fef354acaf41f2b"
 dependencies = [
+ "bincode",
  "indexmap 2.14.0",
- "lazy_static",
  "num-traits",
+ "proc-macro2",
+ "quote",
  "regex",
- "serde",
- "vob 4.0.0",
+ "vob",
 ]
 
 [[package]]
@@ -2609,6 +2621,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "opentelemetry",
+ "opentelemetry-proto",
  "parking_lot 0.12.5",
  "prost 0.14.4",
  "reqwest 0.13.4",
@@ -2765,6 +2778,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha256",
+ "snap",
  "sqlparser",
  "sqlx",
  "strum 0.28.0",
@@ -4601,6 +4615,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "transform",
+ "usage_reporting",
  "vrl",
 ]
 
@@ -4775,6 +4790,12 @@ checksum = "a296e5a895621edf9fa8329c83aa1cb69a964643e36cf54d8d7a69b789089537"
 dependencies = [
  "ext-trait",
 ]
+
+[[package]]
+name = "fallible-iterator"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2acce4a10f12dc2fb14a218589d4f1f62ef011b2d0cc4b3cb1bba8e94da14649"
 
 [[package]]
 name = "fancy-regex"
@@ -5001,6 +5022,20 @@ checksum = "e076045bb43dac435333ed5f04caf35c7463631d0dae2deb2638d94dd0a5b872"
 dependencies = [
  "lazy_static",
  "num",
+]
+
+[[package]]
+name = "framehop"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09a5a3f0acb82df800ca3aa50c0d60d286c5d13d4cfc3114b3a9663f13b032fe"
+dependencies = [
+ "arrayvec",
+ "cfg-if",
+ "fallible-iterator",
+ "gimli 0.31.1",
+ "macho-unwind-info",
+ "pe-unwind-info",
 ]
 
 [[package]]
@@ -5232,6 +5267,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "gimli"
+version = "0.31.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
+dependencies = [
+ "fallible-iterator",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -5932,8 +5977,12 @@ dependencies = [
  "config",
  "datafusion",
  "futures",
+ "futures-util",
  "hashbrown 0.17.1",
  "hashlink 0.11.1",
+ "hex",
+ "hmac 0.12.1",
+ "http 1.5.0",
  "itertools 0.14.0",
  "log",
  "object_store",
@@ -5947,6 +5996,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1 0.10.7",
+ "sha2 0.10.9",
+ "sha256",
  "sqlx",
  "svix-ksuid",
  "tempfile",
@@ -5958,6 +6009,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
@@ -6655,56 +6707,62 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "lrlex"
-version = "0.13.10"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c71364e868116ee891b0f93559eb9eca5675bec28b22d33c58481e66c3951d7e"
+checksum = "6faf26145c0571bcecf7887802d7dc2947154cb438801d6c90ef3633e68b2365"
 dependencies = [
+ "bincode",
  "cfgrammar",
  "getopts",
- "lazy_static",
+ "glob",
  "lrpar",
  "num-traits",
+ "prettyplease",
+ "proc-macro2",
  "quote",
  "regex",
  "regex-syntax",
- "serde",
+ "syn 2.0.119",
  "vergen",
 ]
 
 [[package]]
 name = "lrpar"
-version = "0.13.10"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b265a81193d94c92d1c9c715498d6fa505bce3f789ceecb24ab5d6fa2dbc71"
+checksum = "402f799a7cfbaf548546e16191a15b7abaeb16ac25bbff5ab41fd93d7548d7a9"
 dependencies = [
  "bincode",
  "cactus",
  "cfgrammar",
  "filetime",
  "indexmap 2.14.0",
- "lazy_static",
  "lrtable",
  "num-traits",
  "packedvec",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
  "regex",
- "serde",
- "static_assertions",
+ "syn 2.0.119",
+ "unicode-width 0.1.14",
  "vergen",
- "vob 4.0.0",
+ "vob",
+ "web-time",
 ]
 
 [[package]]
 name = "lrtable"
-version = "0.13.10"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc36d15214ca997a5097845be1f932b7ee6125c36f5c5e55f6c49e027ddeb6de"
+checksum = "bcbe6a005a604615ab7aab7d1f74be563e508f5c6e42f85fbf65c38fe1f5f268"
 dependencies = [
+ "bincode",
  "cfgrammar",
  "fnv",
  "num-traits",
- "serde",
  "sparsevec",
- "vob 4.0.0",
+ "vob",
 ]
 
 [[package]]
@@ -6764,6 +6822,17 @@ dependencies = [
  "nix 0.29.0",
  "serde",
  "winapi",
+]
+
+[[package]]
+name = "macho-unwind-info"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb4bdc8b0ce69932332cf76d24af69c3a155242af95c226b2ab6c2e371ed1149"
+dependencies = [
+ "thiserror 2.0.19",
+ "zerocopy",
+ "zerocopy-derive",
 ]
 
 [[package]]
@@ -6866,6 +6935,15 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "memmap2"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "memmap2"
 version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
@@ -6886,6 +6964,7 @@ dependencies = [
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "arrow-schema",
  "bytes",
@@ -6895,10 +6974,15 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
- "promql",
+ "object_store",
+ "parquet",
  "promql-parser",
  "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
+ "zstd",
 ]
 
 [[package]]
@@ -7591,6 +7675,16 @@ dependencies = [
 
 [[package]]
 name = "object"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21158b2c33aa6d4561f1c0a6ea283ca92bc54802a93b263e910746d679a7eb53"
+dependencies = [
+ "flate2",
+ "memchr",
+]
+
+[[package]]
+name = "object"
 version = "0.37.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff76201f031d8863c38aa7f905eca4f53abbfa15f609db4277d44cd8938f33fe"
@@ -7797,7 +7891,6 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "itertools 0.14.0",
- "jemalloc_pprof",
  "jsonwebtoken",
  "lettre",
  "log",
@@ -7824,7 +7917,6 @@ dependencies = [
  "parking_lot 0.12.5",
  "parquet",
  "pin-project-lite",
- "pprof",
  "prettytable-rs",
  "prometheus",
  "promql-parser",
@@ -7862,8 +7954,6 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.19",
  "tiktoken-rs",
- "tikv-jemalloc-ctl",
- "tikv-jemalloc-sys",
  "tikv-jemallocator",
  "time",
  "tokio",
@@ -7976,6 +8066,7 @@ dependencies = [
  "axum-tracing-opentelemetry",
  "base64 0.22.1",
  "bytes",
+ "chrono",
  "common",
  "config",
  "db",
@@ -7983,6 +8074,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.17.1",
  "http 1.5.0",
+ "http-body 1.1.0",
  "http-body-util",
  "infra",
  "ingestion-common",
@@ -8004,6 +8096,7 @@ dependencies = [
  "search",
  "serde",
  "serde_json",
+ "snap",
  "stream",
  "time",
  "tokio",
@@ -8070,7 +8163,6 @@ dependencies = [
  "infra",
  "ingester",
  "itertools 0.14.0",
- "jemalloc_pprof",
  "log",
  "mime",
  "o2_dex",
@@ -8085,7 +8177,6 @@ dependencies = [
  "openobserve-sourcemaps",
  "openobserve-synthetics",
  "opentelemetry",
- "pprof",
  "promql-service",
  "regex",
  "reqwest 0.13.4",
@@ -8096,8 +8187,6 @@ dependencies = [
  "serde_json",
  "stream",
  "svix-ksuid",
- "tikv-jemalloc-ctl",
- "tikv-jemalloc-sys",
  "time",
  "tokio",
  "tracing",
@@ -8175,6 +8264,7 @@ dependencies = [
  "tower",
  "tracing",
  "transform",
+ "urlencoding",
  "usage_reporting",
  "utoipa",
 ]
@@ -8247,6 +8337,7 @@ dependencies = [
  "ingestion-common",
  "itertools 0.14.0",
  "itoa",
+ "jemalloc_pprof",
  "jsonwebtoken",
  "lettre",
  "log",
@@ -8262,6 +8353,7 @@ dependencies = [
  "opentelemetry-proto",
  "parking_lot 0.12.5",
  "plotters",
+ "pprof",
  "prometheus",
  "promql",
  "promql-parser",
@@ -8281,10 +8373,13 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "snap",
+ "sqlparser",
  "stream",
+ "strum 0.28.0",
  "svix-ksuid",
  "thiserror 2.0.19",
  "tiktoken-rs",
+ "tikv-jemalloc-ctl",
  "time",
  "tokio",
  "tonic",
@@ -8317,6 +8412,7 @@ dependencies = [
  "enrichment-data",
  "futures",
  "hashbrown 0.17.1",
+ "http 1.5.0",
  "infra",
  "ingester",
  "ingestion-common",
@@ -8333,10 +8429,12 @@ dependencies = [
  "prometheus",
  "promql-service",
  "proto",
+ "rand 0.10.2",
  "regex",
  "report_server",
  "reqwest 0.13.4",
  "schema",
+ "sea-orm",
  "search",
  "search_service",
  "serde_json",
@@ -8445,6 +8543,7 @@ dependencies = [
  "serde",
  "serde_json",
  "svix-ksuid",
+ "thiserror 2.0.19",
  "tokio",
  "tracing",
  "urlencoding",
@@ -8661,8 +8760,8 @@ version = "1.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a69e0a534dd2e6aefce319af62a0aa0066a76bdfcec0201dfe02df226bc9ec70"
 dependencies = [
+ "bincode",
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -8849,6 +8948,19 @@ dependencies = [
  "dtype_dispatch",
  "half",
  "rand_xoshiro",
+]
+
+[[package]]
+name = "pe-unwind-info"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "500fa4cdeacd98997c5865e3d0d1cb8fe7e9d7d75ecc775e07989a433a9a9a59"
+dependencies = [
+ "arrayvec",
+ "bitflags 2.13.1",
+ "thiserror 2.0.19",
+ "zerocopy",
+ "zerocopy-derive",
 ]
 
 [[package]]
@@ -9178,10 +9290,13 @@ dependencies = [
  "backtrace",
  "cfg-if",
  "findshlibs",
+ "framehop",
  "inferno 0.11.21",
  "libc",
  "log",
+ "memmap2 0.5.10",
  "nix 0.26.4",
+ "object 0.29.0",
  "once_cell",
  "protobuf",
  "protobuf-codegen",
@@ -9330,8 +9445,10 @@ name = "promql"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
+ "anyhow",
  "async-recursion",
  "async-trait",
+ "bytes",
  "chrono",
  "config",
  "datafusion",
@@ -9342,20 +9459,25 @@ dependencies = [
  "infra",
  "itertools 0.14.0",
  "log",
+ "metrics_index",
  "o2_enterprise",
+ "object_store",
  "parking_lot 0.12.5",
+ "prometheus",
  "promql-parser",
  "rayon",
  "regex",
  "strum 0.28.0",
+ "tempfile",
  "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "promql-parser"
-version = "0.6.0"
-source = "git+https://github.com/openobserve/promql-parser?branch=openobserve#621826255a3b5fa083decab7419aa2ca6c6e14dd"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29df78fc279e9c4acc1cfbdf5624dc51f3df9d83cea59a67e4632e7502d15aa7"
 dependencies = [
  "cfgrammar",
  "chrono",
@@ -9363,7 +9485,6 @@ dependencies = [
  "lrlex",
  "lrpar",
  "regex",
- "unescaper",
 ]
 
 [[package]]
@@ -10250,6 +10371,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tower",
 ]
 
 [[package]]
@@ -11863,10 +11985,10 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68b4a8ce3045f0fe173fb5ae3c6b7dcfbec02bfa650bb8618b2301f52af0134d"
 dependencies = [
+ "bincode",
  "num-traits",
  "packedvec",
- "serde",
- "vob 3.0.6",
+ "vob",
 ]
 
 [[package]]
@@ -12344,7 +12466,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "332615d90111d8eeaf86a84dc9bbe9f65d0d8c5cf11b4caccedc37754eb0dcfd"
 dependencies = [
  "debugid",
- "memmap2",
+ "memmap2 0.9.11",
  "stable_deref_trait",
  "uuid",
 ]
@@ -12498,7 +12620,7 @@ dependencies = [
  "lru",
  "lz4_flex 0.13.1",
  "measure_time",
- "memmap2",
+ "memmap2 0.9.11",
  "once_cell",
  "oneshot",
  "rayon",
@@ -13412,15 +13534,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eaea85b334db583fe3274d12b4cd1880032beab409c0d774be044d4480ab9a94"
 
 [[package]]
-name = "unescaper"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7285e83a80ce76f5e7bce79fa41f68d78ba62d1003cf27bf748ab24413808cf4"
-dependencies = [
- "thiserror 2.0.19",
-]
-
-[[package]]
 name = "unicase"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13516,6 +13629,12 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
+name = "unty"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
 
 [[package]]
 name = "url"
@@ -13692,23 +13811,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "virtue"
+version = "0.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
+
+[[package]]
 name = "vob"
 version = "3.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc936b5a7202a703aeaf7ce05e7931db2e0c8126813f97db3e9e06d867b0bb38"
 dependencies = [
+ "bincode",
  "num-traits",
- "serde",
-]
-
-[[package]]
-name = "vob"
-version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e840c5339237ded42621d3e376ed7008bf79b68574e97454c2a46fe6f3bbe7f"
-dependencies = [
- "num-traits",
- "serde",
 ]
 
 [[package]]

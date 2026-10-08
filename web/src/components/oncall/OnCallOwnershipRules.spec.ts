@@ -24,8 +24,16 @@ import store from "@/test/unit/helpers/store";
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns", "loading"],
-    template: `<div><div v-for="row in data" :key="row.rule_id">
+    props: [
+      "data",
+      "columns",
+      "loading",
+      "globalFilter",
+      "enableColumnResize",
+      "persistColumns",
+      "tableId",
+    ],
+    template: `<div><slot name="toolbar" /><slot name="toolbar-trailing" /><slot v-if="!data.length" name="empty" /><div v-for="row in data" :key="row.rule_id">
       <slot name="cell-match" :row="row" />
       <slot name="cell-specificity" :row="row" />
       <slot name="cell-caught" :row="row" />
@@ -33,7 +41,12 @@ const stubs = {
       <slot name="cell-health" :row="row" />
     </div></div>`,
   },
-  OEmptyState: { name: "OEmptyState", template: "<div />" },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["size", "preset", "filtered", "description"],
+    emits: ["action"],
+    template: "<div />",
+  },
   OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
@@ -202,5 +215,119 @@ describe("OnCallOwnershipRules", () => {
     });
     expect(wrapper.find('[data-test="oncall-ownership-header"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-ownership-add-rule"]').exists()).toBe(false);
+  });
+
+  describe("the toolbar every other table has", () => {
+    // The table filters, not the host, so each row keeps its precedence number from the full list.
+    it("hands the search to the table, with resize and a column manager", () => {
+      const wrapper = mount(OnCallOwnershipRules, {
+        props: { rules: [rule()], search: "payments" },
+        global: { plugins: [i18n, store], stubs },
+      });
+      expect(table(wrapper).props("globalFilter")).toBe("payments");
+      expect(table(wrapper).props("enableColumnResize")).toBe(true);
+      expect(table(wrapper).props("persistColumns")).toBe(true);
+      expect(table(wrapper).props("tableId")).toBeTruthy();
+      for (const id of ["specificity", "caught", "last", "health"]) {
+        expect(column(wrapper, id).hideable).toBe(true);
+      }
+      expect(column(wrapper, "match").hideable).toBeFalsy();
+    });
+
+    it("renders the host's toolbar in the table's own", () => {
+      const wrapper = mount(OnCallOwnershipRules, {
+        props: { rules: [rule()] },
+        slots: {
+          toolbar: '<span data-test="host-toolbar" />',
+          "toolbar-trailing": '<span data-test="host-trailing" />',
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      expect(wrapper.find('[data-test="host-toolbar"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="host-trailing"]').exists()).toBe(true);
+    });
+
+    // Search matches what the health cell shows, not the enum behind it.
+    it("searches the health column by its label", () => {
+      const wrapper = render([rule({ health: "never_used" })]);
+      expect(column(wrapper, "health").accessorFn(rows(wrapper)[0])).toBe(
+        String(i18n.global.t("oncall.ruleNeverUsed")),
+      );
+    });
+
+    // A search that matched nothing is not an org without rules: the Teams page's no-results state.
+    it("shows the no-results state under a search, and asks the host to clear it", () => {
+      const wrapper = mount(OnCallOwnershipRules, {
+        props: { rules: [], search: "nothing-matches" },
+        global: { plugins: [i18n, store], stubs },
+      });
+      const empty = wrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBe(true);
+      expect(empty.props("size")).toBe("hero");
+      expect(empty.props("description")).toBeUndefined();
+
+      empty.vm.$emit("action", "clear-filters");
+      expect(wrapper.emitted("clear-search")).toHaveLength(1);
+      expect(wrapper.emitted("add")).toBeUndefined();
+    });
+
+    it("keeps the no-rules state and its add action when nothing is searched", () => {
+      const wrapper = render([]);
+      const empty = wrapper.findComponent({ name: "OEmptyState" });
+      expect(empty.props("filtered")).toBeFalsy();
+      expect(empty.props("description")).toBeTruthy();
+
+      empty.vm.$emit("action", "create");
+      expect(wrapper.emitted("add")).toHaveLength(1);
+      expect(wrapper.emitted("clear-search")).toBeUndefined();
+    });
+  });
+
+  /// A phone's action column holds one control, so edit and remove are mirrored in a menu that must emit the same events.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      OTable: {
+        name: "OTable",
+        props: ["data"],
+        template: `<div><div v-for="row in data" :key="row.rule_id"><slot name="cell-actions" :row="row" /></div></div>`,
+      },
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    function renderWithMenu() {
+      return mount(OnCallOwnershipRules, {
+        props: { rules: [rule()], aliases: [{ id: "service", display: "Service" }] },
+        global: { plugins: [i18n, store], stubs: menuStubs },
+      });
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", () => {
+      const wrapper = renderWithMenu();
+
+      for (const action of ["edit", "delete"]) {
+        expect(wrapper.find(`[data-test="oncall-ownership-${action}-r1"]`).classes()).toContain(
+          "max-md:hidden",
+        );
+      }
+      expect(wrapper.find('[data-test="oncall-ownership-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("edits and removes the rule the row is for", async () => {
+      const wrapper = renderWithMenu();
+
+      await wrapper.find('[data-test="oncall-ownership-edit-r1-menu"]').trigger("click");
+      await wrapper.find('[data-test="oncall-ownership-delete-r1-menu"]').trigger("click");
+
+      expect(wrapper.emitted("edit")?.[0][0]).toMatchObject({ rule_id: "r1" });
+      expect(wrapper.emitted("remove")?.[0][0]).toMatchObject({ rule_id: "r1" });
+    });
   });
 });

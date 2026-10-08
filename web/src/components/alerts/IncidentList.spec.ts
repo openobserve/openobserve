@@ -75,7 +75,6 @@ const OTableStub = {
       <slot name="toolbar" />
       <slot name="toolbar-trailing" />
       <slot name="empty" />
-      <slot name="bottom" />
       <template v-for="row in data" :key="row.id">
         <div :data-test="'row-' + row.id" @click="$emit('row-click', row)">
           <slot name="cell-status" :row="row" />
@@ -660,15 +659,15 @@ describe("IncidentList.vue", () => {
         shouldRefresh: false,
       };
       wrapper = createWrapper();
-      const setPageIndex = vi.fn();
+      const restorePage = vi.fn();
       // OTable is stubbed in this suite, so plant the piece of its exposed surface the fix depends on directly onto the template ref.
-      (wrapper.vm as any).qTableRef.table = { setPageIndex };
+      (wrapper.vm as any).qTableRef.restorePage = restorePage;
 
       await flushPromises();
       // Pending only: the refresh button's age interval would make runAllTimers loop forever.
       vi.runOnlyPendingTimers();
 
-      expect(setPageIndex).toHaveBeenCalledWith(2);
+      expect(restorePage).toHaveBeenCalledWith(3);
       store.state.incidents = { incidents: {}, isInitialized: false };
       vi.useRealTimers();
     });

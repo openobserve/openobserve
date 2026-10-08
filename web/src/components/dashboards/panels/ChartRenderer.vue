@@ -145,6 +145,9 @@ echarts.use([
   SVGRenderer,
 ]);
 
+// Right-click reads a y-axis value, so only cartesian series types can answer it
+const CONTEXT_MENU_SERIES_TYPES = ["bar", "line", "scatter"];
+
 export default defineComponent({
   name: "ChartRenderer",
   emits: [
@@ -157,6 +160,7 @@ export default defineComponent({
     "mouseout",
     "contextmenu",
     "domcontextmenu",
+    "finished",
   ],
   props: {
     data: {
@@ -288,6 +292,13 @@ export default defineComponent({
         });
       }
 
+      // A series left out of the legend has no entry to toggle, so it follows the series it overlays.
+      for (const series of props.data?.options?.series ?? []) {
+        if (series?._legendFollows !== undefined) {
+          params.selected[series.name] = params.selected[series._legendFollows] !== false;
+        }
+      }
+
       // get legend
       const legendOption = chart?.getOption()?.legend[0];
 
@@ -318,8 +329,7 @@ export default defineComponent({
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -371,6 +381,8 @@ export default defineComponent({
           x: event.clientX,
           y: event.clientY,
           value: Number(dataPointValue),
+          seriesIndex: params.seriesIndex,
+          dataIndex: params.dataIndex,
         });
       }
     };
@@ -382,8 +394,7 @@ export default defineComponent({
       await nextTick();
       const chartType = chart?.getOption()?.series?.[0]?.type;
 
-      // Only handle contextmenu for bar and line charts
-      if (!chartType || !["bar", "line"].includes(chartType)) {
+      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
         return;
       }
 
@@ -491,6 +502,10 @@ export default defineComponent({
 
       chart?.on("mouseover", function (params: any) {
         emit("mouseover", params);
+      });
+
+      chart?.on("finished", () => {
+        emit("finished");
       });
 
       window.removeEventListener("resize", windowResizeEventCallback);

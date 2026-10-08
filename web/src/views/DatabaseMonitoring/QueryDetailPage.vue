@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
         :default-relative-time="range.relativeTimePeriod ?? undefined"
         data-test-name="dbm-detail-date-time"
-        class="h-8"
+        class="h-8 max-md:[&_.date-time-label]:hidden"
         @on:date-change="onDateChange"
       />
       <OButton
@@ -69,11 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dbm.detail.copySummary") }}
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
-      <DbmRefreshButton
+      <ORefreshButton
+        layout="inline"
+        variant="outline"
         :loading="loading"
         :last-run-at="lastRunAt"
         data-test="dbm-detail-refresh"
-        @refresh="load"
+        @click="load()"
       />
     </template>
 
@@ -242,13 +244,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="traceVantage ? '' : 'order-2'"
             data-test="dbm-detail-stats"
           >
-            <div
+            <DbmAppSourceLegend
               v-if="traceVantage"
-              class="text-text-secondary text-xs"
+              :label="t('dbm.detail.serverMetrics.clientSubtitle')"
               data-test="dbm-detail-stats-provenance"
-            >
-              {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
-            </div>
+            />
             <KpiCardRow>
               <KpiCard
                 v-for="tile in summaryCards"
@@ -259,6 +259,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #label>
                   {{ tile.label
                   }}<span v-if="tile.sub" class="ms-1 font-normal opacity-70">{{ tile.sub }}</span>
+                  <DbmAppSourceMarker
+                    v-if="tile.fromApp"
+                    class="ms-1"
+                    :data-test="`dbm-detail-stat-${tile.id}-app-source`"
+                  />
                 </template>
                 <template #value>
                   <OSkeleton v-if="loading" type="text" class="h-6 w-16" />
@@ -650,8 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     class="text-text-secondary shrink-0"
                   />
-                  <span
-                    class="min-w-0 truncate"
+                  <OTruncatedText
                     :class="[
                       whereRow.isChild
                         ? 'text-text-secondary text-xs'
@@ -666,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? t("dbm.breakdown.noSchema")
                           : t("dbm.detail.whereItRuns.noInstance")
                     }}
-                  </span>
+                  </OTruncatedText>
                   <!-- Tooltip is a SIBLING of the tag: OTag's default slot overrides the `label` prop, so a tooltip inside would blank the "focused" text. -->
                   <span
                     v-if="isWhereRowActive(whereRow, whereScope)"
@@ -752,13 +756,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex items-center gap-3"
                 :data-test="`dbm-detail-error-code-${entry.status_code}`"
               >
-                <span class="text-text-heading w-28 shrink-0 truncate font-mono text-xs">
+                <OTruncatedText class="text-text-heading w-28 shrink-0 font-mono text-xs">
                   {{
                     entry.status_code === "unknown"
                       ? t("dbm.detail.errorsByCode.noCode")
                       : entry.status_code
                   }}
-                </span>
+                </OTruncatedText>
                 <DbmShareBar
                   :share="errorCodeBarShare(entry)"
                   track-class="h-1.5 w-40 shrink-0"
@@ -1022,12 +1026,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #cell-caller="{ row: endpoint }">
                 <div class="flex min-w-0 flex-col">
-                  <span class="text-text-heading truncate text-sm">{{
+                  <OTruncatedText class="text-text-heading text-sm">{{
                     endpoint.serviceLabel
-                  }}</span>
-                  <span v-if="endpoint.endpoint" class="text-text-secondary truncate text-xs">
+                  }}</OTruncatedText>
+                  <OTruncatedText v-if="endpoint.endpoint" class="text-text-secondary text-xs">
                     {{ endpoint.endpoint }}
-                  </span>
+                  </OTruncatedText>
                 </div>
               </template>
               <template #cell-calls="{ row: endpoint }">
@@ -1175,6 +1179,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
+import DbmAppSourceLegend from "@/components/dbm/DbmAppSourceLegend.vue";
+import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
@@ -1182,7 +1188,6 @@ import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTi
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import DbmServiceList from "@/components/dbm/DbmServiceList.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -1193,7 +1198,9 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DateTime from "@/components/DateTime.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -1540,7 +1547,7 @@ const callersEmptyChecks = computed<DbmLockCheck[]>(() => [
  * routes to — rather than naming an env var here and stopping.
  */
 const callersEmptyActions = computed<DbmLockEmptyAction[]>(() => [
-  { id: "open-setup", label: t("dbm.detail.callersEmpty.setUp"), primary: true },
+  { id: "open-setup", label: t("dbm.detail.callersEmpty.setUp"), primary: true, icon: "settings" },
 ]);
 
 const onCallersEmptyAction = (id: string) => {
@@ -2177,6 +2184,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
                 : raw(""),
             )
           : overlapDetail(databaseTime.value.qualifierKey),
+      fromApp: databaseTime.value.source === "client",
       tone: "",
     },
     {
@@ -2198,10 +2206,12 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
           : overlapDetail(callCount.value.qualifierKey),
       // Only the client delta is signed; the server overlap caption is not.
       detailTone: callCount.value.source === "client" ? deltaTone(callsChange) : undefined,
+      fromApp: callCount.value.source === "client",
       tone: "",
     },
     {
       id: "p50",
+      fromApp: true,
       icon: "access-time",
       label: t("dbm.detail.stats.p50"),
       sub: raw("p50"),
@@ -2214,6 +2224,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     },
     {
       id: "p95",
+      fromApp: true,
       icon: "hourglass-empty",
       label: t("dbm.detail.stats.p95"),
       sub: raw("p95"),
@@ -2226,6 +2237,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     },
     {
       id: "max",
+      fromApp: true,
       icon: "trending-up",
       label: t("dbm.detail.stats.max"),
       sub: raw("max"),
@@ -2236,6 +2248,7 @@ const headlineStats = computed<DbmMetricTile[]>(() => {
     },
     {
       id: "errors",
+      fromApp: true,
       icon: "error-outline",
       label: t("dbm.detail.stats.errors"),
       sub: undefined,

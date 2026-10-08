@@ -33,256 +33,308 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   activity feed, and vice versa.
 -->
 <template>
-  <DbmPageChrome
-    :title="t('dbm.metrics.title')"
-    :subtitle="t('dbm.metrics.subtitle')"
-    title-data-test="dbm-metrics-title"
-    date-time-data-test="dbm-metrics-date-time"
-    :tab-counts="tabCounts"
-    :range="range"
-    @date-change="onDateChange"
-  >
-    <div class="flex min-h-0 flex-1 max-md:flex-col">
-      <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
-           scroll column, so any section is one click away instead of a scroll. -->
-      <aside
-        v-if="railItems.length >= 3"
-        class="border-border-default w-44 shrink-0 overflow-y-auto border-e max-md:w-full max-md:overflow-visible max-md:border-e-0 max-md:border-b"
+  <DbmPageChrome title-data-test="dbm-metrics-title" :tab-counts="tabCounts">
+    <div class="flex min-h-0 flex-1 flex-col">
+      <!-- Above the rail and the charts, so it stays put while they scroll, as on every other tab. -->
+      <div
+        class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-1.5"
+        data-test="dbm-metrics-toolbar"
       >
-        <DbmMetricsRail
-          :items="railItems"
-          :active-key="activeSection"
-          :ariaLabel="t('dbm.metrics.railLabel')"
-          @select="jumpTo"
+        <DbmScopeFilters class="min-w-0 flex-1" :filters="dimensionFilters" @clear="clearScope" />
+        <DateTime
+          auto-apply
+          menu-align="end"
+          :default-type="range.type"
+          :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+          :default-relative-time="range.relativeTimePeriod ?? undefined"
+          data-test-name="dbm-metrics-date-time"
+          class="h-8 max-md:[&_.date-time-label]:hidden"
+          @on:date-change="onDateChange"
         />
-      </aside>
-      <div ref="scrollEl" class="min-w-0 flex-1 overflow-y-auto" data-test="dbm-metrics-body">
-        <OContent class="flex flex-col gap-2.5 py-2.5">
-          <div class="flex flex-wrap items-center gap-2">
-            <DbmScopeFilters
-              class="min-w-0 flex-1"
-              :filters="dimensionFilters"
-              @clear="clearScope"
-            />
-            <DbmRefreshButton
-              :loading="loading"
-              shrink
-              :last-run-at="lastRunAt"
-              data-test="dbm-metrics-refresh"
-              @refresh="onRefresh"
-            />
-          </div>
-
-          <DbmSection
-            :ref="(el: unknown) => setSectionRef('load', el)"
-            :title="t('dbm.metrics.load.title')"
-            header-align="center"
-          >
-            <template #hint>
-              <!-- Reads as part of the heading — "Database load · By user ▾" —
-                 the way the folder picker reads inside a page description. -->
-              <OSelect
-                v-model="loadBreakdown"
-                :options="breakdownOptions"
-                size="sm"
-                appearance="inline"
-                :searchable="false"
-                class="shrink-0"
-                data-test="dbm-metrics-load-breakdown"
-              />
-              <span class="text-text-secondary min-w-0 truncate text-xs">{{
-                t("dbm.metrics.load.hint")
-              }}</span>
-            </template>
-            <template #actions>
-              <OButton
-                variant="outline"
-                size="sm"
-                icon-right="arrow-forward"
-                data-test="dbm-metrics-view-activity"
-                @click="openActivity"
-              >
-                {{ t("dbm.metrics.load.viewActivity") }}
-              </OButton>
-            </template>
-            <div class="relative h-64 w-full px-3 pb-3" data-test="dbm-metrics-load-chart">
-              <PanelSchemaRenderer
-                class="h-full w-full"
-                :panel-schema="loadPanelSchema"
-                :selected-time-obj="selectedTimeObj"
-                :variables-data="{}"
-                search-type="ui"
-                :allow-alert-creation="true"
-                :allow-annotations-add="false"
-                :allow-annotations-a-p-i="false"
-                :key="`load::${chartEpoch}::${loadBreakdown}`"
-                @updated:data-zoom="onChartZoom"
-                @error="onLoadError"
-              />
-              <div
-                v-if="loadNoAccess"
-                class="bg-surface-base absolute inset-0 flex flex-col items-center justify-center gap-2"
-                data-test="dbm-metrics-load-no-access"
-              >
-                <OIcon name="lock" class="text-text-muted size-5" />
-                <span class="text-text-secondary text-xs">
-                  {{ t("dbm.metrics.noAccess", { stream: raw("_o2_dbm_server") }) }}
-                </span>
-              </div>
-            </div>
-          </DbmSection>
-
-          <!-- The themed catalog. Rendered OUTSIDE the metric-stream branch:
-             Activity's rollup and Blocks' server counters read DBM streams,
-             so they answer even on an org whose receivers ship no metrics. -->
-          <DbmSection
-            v-for="section in catalogSections"
-            :key="`catalog-${section.key}`"
-            :ref="(el: unknown) => setSectionRef(section.key, el)"
-            :title="t(`dbm.metrics.catalog.${section.key}.title`)"
-            header-align="baseline"
-          >
-            <template #hint>
-              <span class="text-text-secondary text-xs">{{
-                t(`dbm.metrics.catalog.${section.key}.desc`)
-              }}</span>
-              <!-- The host charts join by hostname, not by DB instance — say so,
-                 and say when a loopback instance made the scope a no-op. -->
-              <span
-                v-if="section.key === 'host' && hostHintKey"
-                class="text-text-label text-2xs"
-                data-test="dbm-metrics-host-hint"
-                >{{ t(`dbm.metrics.catalog.host.${hostHintKey}`) }}</span
-              >
-            </template>
-            <!-- An RDS/managed endpoint has no host to scrape — doomed empty
-                 charts would read as a broken pipeline; the fact reads better. -->
-            <div
-              v-if="section.key === 'host' && hostScopeState === 'managed'"
-              class="text-text-secondary p-3 pt-1 text-xs"
-              data-test="dbm-metrics-host-managed"
-            >
-              {{ t("dbm.metrics.catalog.host.managedNote") }}
-            </div>
-            <div
-              v-else
-              class="grid grid-cols-1 gap-2.5 p-3 pt-1"
-              :class="sectionGridClass((catalogPanelsBySection[section.key] ?? []).length)"
-            >
-              <DbmMetricPanel
-                v-for="p in catalogPanelsBySection[section.key] ?? []"
-                :key="`${section.key}:${p.entry.key}::${chartEpoch}::${p.by}`"
-                :panel-key="`${section.key}-${p.entry.key}`"
-                :title="p.entry.title"
-                :help="p.entry.help"
-                :schema="p.entry.schema"
-                :identifier="false"
-                :start-time="current.startTime"
-                :end-time="current.endTime"
-                :by-options="p.byOptions"
-                :by="p.by"
-                :explore-url="p.exploreUrl"
-                @update:by="catalogBy[p.entry.key] = $event"
-                @zoom="onChartZoom"
-              />
-            </div>
-          </DbmSection>
-
-          <template v-if="loading && !hasMetricStreams">
-            <div
-              class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
-              data-test="dbm-metrics-skeleton"
-            >
-              <OSkeleton v-for="n in 6" :key="n" type="rect" class="rounded-surface h-55 w-full" />
-            </div>
-          </template>
-
-          <!-- A failed stream LIST is not an empty org: without this branch the
-             error fell through to the not-collecting state below, blaming the
-             receivers for a fetch that never landed. -->
-          <OEmptyState
-            v-else-if="error"
-            preset="load-error"
-            data-test="dbm-metrics-load-error"
-            @action="onRefresh"
+        <ORefreshButton
+          layout="inline"
+          variant="outline"
+          :loading="loading"
+          :last-run-at="lastRunAt"
+          data-test="dbm-metrics-refresh"
+          @click="onRefresh()"
+        />
+      </div>
+      <div class="flex min-h-0 flex-1 max-md:flex-col">
+        <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
+           scroll column, so any section is one click away instead of a scroll. -->
+        <aside
+          v-if="railItems.length >= 3"
+          class="border-border-default w-44 shrink-0 overflow-y-auto border-e max-md:w-full max-md:overflow-visible max-md:border-e-0 max-md:border-b"
+        >
+          <DbmMetricsRail
+            :items="railItems"
+            :active-key="activeSection"
+            :ariaLabel="t('dbm.metrics.railLabel')"
+            @select="jumpTo"
           />
-
-          <!-- The grid's emptiness indicts the METRIC receivers specifically:
-             the load chart above still answers from the activity feed, so this
-             state must not claim the whole pipeline is down. -->
-          <DbmLockEmptyState
-            v-else-if="!hasMetricStreams"
-            :healthy="false"
-            :title="t('dbm.metrics.notCollecting.title')"
-            :description="t('dbm.metrics.notCollecting.description')"
-            :checklist-title="t('dbm.metrics.notCollecting.checklistTitle')"
-            :checks="notCollectingChecks"
-            size="block"
-            data-test="dbm-metrics-not-collecting"
-          />
-
-          <template v-else>
+        </aside>
+        <div ref="scrollEl" class="min-w-0 flex-1 overflow-y-auto" data-test="dbm-metrics-body">
+          <OContent class="flex flex-col gap-2.5 py-2.5">
             <DbmSection
-              v-if="sections.featured.length"
-              :ref="(el: unknown) => setSectionRef('featured', el)"
-              :title="t('dbm.metrics.sections.featured')"
-              header-align="baseline"
+              :ref="(el: unknown) => setSectionRef('load', el)"
+              :title="t('dbm.metrics.load.title')"
+              header-align="center"
             >
-              <!-- auto-fit: one panel owns the whole line, several wrap into
-                 columns — a fixed column count strands a lone card beside a
-                 row of empty space. -->
-              <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-2.5 p-3 pt-1">
-                <DbmMetricPanel
-                  v-for="entry in sections.featured"
-                  :key="`${entry.key}::${chartEpoch}`"
-                  :panel-key="entry.key"
-                  :title="entry.title"
-                  :help="entry.help"
-                  :schema="entry.schema"
-                  :start-time="current.startTime"
-                  :end-time="current.endTime"
-                  @zoom="onChartZoom"
+              <template #hint>
+                <!-- Reads as part of the heading — "Database load · By user ▾" —
+                 the way the folder picker reads inside a page description. -->
+                <OSelect
+                  v-model="loadBreakdown"
+                  :options="breakdownOptions"
+                  size="sm"
+                  appearance="inline"
+                  :searchable="false"
+                  class="shrink-0"
+                  data-test="dbm-metrics-load-breakdown"
                 />
+                <!-- How to read the chart is reference, so it opens on demand instead of truncating beside the title. -->
+                <OPopover
+                  v-model:open="loadHintOpen"
+                  side="bottom"
+                  align="start"
+                  :aria-label="t('dbm.metrics.load.about')"
+                >
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="xs"
+                      icon-left="info-outline"
+                      data-test="dbm-metrics-load-hint-trigger"
+                    >
+                      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
+                    </OButton>
+                  </template>
+                  <p
+                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                    data-test="dbm-metrics-load-hint"
+                  >
+                    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
+                  </p>
+                </OPopover>
+              </template>
+              <template #actions>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  icon-right="arrow-forward"
+                  data-test="dbm-metrics-view-activity"
+                  @click="openActivity"
+                >
+                  {{ t("dbm.metrics.load.viewActivity") }}
+                </OButton>
+              </template>
+              <div class="relative h-64 w-full px-3 pb-3" data-test="dbm-metrics-load-chart">
+                <PanelSchemaRenderer
+                  class="h-full w-full"
+                  :panel-schema="loadPanelSchema"
+                  :selected-time-obj="selectedTimeObj"
+                  :variables-data="{}"
+                  search-type="ui"
+                  :allow-alert-creation="true"
+                  :allow-annotations-add="false"
+                  :allow-annotations-a-p-i="false"
+                  :key="`load::${chartEpoch}::${loadBreakdown}`"
+                  @updated:data-zoom="onChartZoom"
+                  @error="onLoadError"
+                />
+                <div
+                  v-if="loadNoAccess"
+                  class="bg-surface-base absolute inset-0 flex flex-col items-center justify-center gap-2"
+                  data-test="dbm-metrics-load-no-access"
+                >
+                  <OIcon name="lock" class="text-text-muted size-5" />
+                  <span class="text-text-secondary text-xs">
+                    {{ t("dbm.metrics.noAccess", { stream: raw("_o2_dbm_server") }) }}
+                  </span>
+                </div>
+                <div
+                  v-else-if="loadNotCollecting"
+                  class="bg-surface-base absolute inset-0 flex items-center justify-center"
+                  data-test="dbm-metrics-load-not-collecting"
+                >
+                  <OEmptyState
+                    size="inline"
+                    icon="database"
+                    :title="t('dbm.metrics.serverStreamMissing.title')"
+                    :description="
+                      t('dbm.metrics.serverStreamMissing.description', {
+                        stream: raw('_o2_dbm_server'),
+                      })
+                    "
+                    :action-label="t('dbm.metrics.serverStreamMissing.action')"
+                    data-test="dbm-metrics-load-setup"
+                    @action="openSetup"
+                  />
+                </div>
               </div>
             </DbmSection>
 
-            <div v-if="sections.groups.length" class="flex items-center justify-end">
-              <OInput
-                v-model="panelSearch"
-                size="sm"
-                icon-left="search"
-                :placeholder="t('dbm.metrics.searchPlaceholder')"
-                class="w-60"
-                data-test="dbm-metrics-panel-search"
-              />
-            </div>
-
+            <!-- The themed catalog. Rendered OUTSIDE the metric-stream branch:
+             Activity's rollup and Blocks' server counters read DBM streams,
+             so they answer even on an org whose receivers ship no metrics. -->
             <DbmSection
-              v-for="group in filteredGroups"
-              :key="group.system"
-              :ref="(el: unknown) => setSectionRef(`group-${group.system}`, el)"
-              :title="groupTitle(group.system)"
+              v-for="section in catalogSections"
+              :key="`catalog-${section.key}`"
+              :ref="(el: unknown) => setSectionRef(section.key, el)"
+              :title="t(`dbm.metrics.catalog.${section.key}.title`)"
               header-align="baseline"
             >
               <template #hint>
-                <span class="text-text-label text-2xs">{{ t("dbm.metrics.triageOrder") }}</span>
+                <span class="text-text-secondary text-xs">{{
+                  t(`dbm.metrics.catalog.${section.key}.desc`)
+                }}</span>
+                <!-- The host charts join by hostname, not by DB instance — say so,
+                 and say when a loopback instance made the scope a no-op. -->
+                <span
+                  v-if="section.key === 'host' && hostHintKey"
+                  class="text-text-label text-2xs"
+                  data-test="dbm-metrics-host-hint"
+                  >{{ t(`dbm.metrics.catalog.host.${hostHintKey}`) }}</span
+                >
               </template>
-              <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-2.5 p-3 pt-1">
+              <!-- An RDS/managed endpoint has no host to scrape — doomed empty
+                 charts would read as a broken pipeline; the fact reads better. -->
+              <div
+                v-if="section.key === 'host' && hostScopeState === 'managed'"
+                class="text-text-secondary p-3 pt-1 text-xs"
+                data-test="dbm-metrics-host-managed"
+              >
+                {{ t("dbm.metrics.catalog.host.managedNote") }}
+              </div>
+              <div
+                v-else
+                class="grid grid-cols-1 gap-2.5 p-3 pt-1"
+                :class="sectionGridClass((catalogPanelsBySection[section.key] ?? []).length)"
+              >
                 <DbmMetricPanel
-                  v-for="entry in group.panels"
-                  :key="`${entry.key}::${chartEpoch}`"
-                  :panel-key="entry.key"
-                  :title="entry.title"
-                  :help="entry.help"
-                  :schema="entry.schema"
+                  v-for="p in catalogPanelsBySection[section.key] ?? []"
+                  :key="`${section.key}:${p.entry.key}::${chartEpoch}::${p.by}`"
+                  :panel-key="`${section.key}-${p.entry.key}`"
+                  :title="p.entry.title"
+                  :help="p.entry.help"
+                  :schema="p.entry.schema"
+                  :identifier="false"
                   :start-time="current.startTime"
                   :end-time="current.endTime"
+                  :by-options="p.byOptions"
+                  :by="p.by"
+                  :explore-url="p.exploreUrl"
+                  @update:by="catalogBy[p.entry.key] = $event"
                   @zoom="onChartZoom"
+                  @setup="openSetup"
                 />
               </div>
             </DbmSection>
-          </template>
-        </OContent>
+
+            <template v-if="loading && !hasMetricStreams">
+              <div
+                class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
+                data-test="dbm-metrics-skeleton"
+              >
+                <OSkeleton
+                  v-for="n in 6"
+                  :key="n"
+                  type="rect"
+                  class="rounded-surface h-55 w-full"
+                />
+              </div>
+            </template>
+
+            <!-- A failed stream LIST is not an empty org: without this branch the
+             error fell through to the not-collecting state below, blaming the
+             receivers for a fetch that never landed. -->
+            <OEmptyState
+              v-else-if="error"
+              preset="load-error"
+              data-test="dbm-metrics-load-error"
+              @action="onRefresh"
+            />
+
+            <!-- The grid's emptiness indicts the METRIC receivers specifically:
+             the load chart above still answers from the activity feed, so this
+             state must not claim the whole pipeline is down. -->
+            <DbmLockEmptyState
+              v-else-if="!hasMetricStreams"
+              :healthy="false"
+              :title="t('dbm.metrics.notCollecting.title')"
+              :description="t('dbm.metrics.notCollecting.description')"
+              :checklist-title="t('dbm.metrics.notCollecting.checklistTitle')"
+              :checks="notCollectingChecks"
+              size="block"
+              data-test="dbm-metrics-not-collecting"
+            />
+
+            <template v-else>
+              <DbmSection
+                v-if="sections.featured.length"
+                :ref="(el: unknown) => setSectionRef('featured', el)"
+                :title="t('dbm.metrics.sections.featured')"
+                header-align="baseline"
+              >
+                <!-- auto-fit: one panel owns the whole line, several wrap into
+                 columns — a fixed column count strands a lone card beside a
+                 row of empty space. -->
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-2.5 p-3 pt-1">
+                  <DbmMetricPanel
+                    v-for="entry in sections.featured"
+                    :key="`${entry.key}::${chartEpoch}`"
+                    :panel-key="entry.key"
+                    :title="entry.title"
+                    :help="entry.help"
+                    :schema="entry.schema"
+                    :start-time="current.startTime"
+                    :end-time="current.endTime"
+                    @zoom="onChartZoom"
+                    @setup="openSetup"
+                  />
+                </div>
+              </DbmSection>
+
+              <div v-if="sections.groups.length" class="flex items-center justify-end">
+                <OInput
+                  v-model="panelSearch"
+                  size="sm"
+                  icon-left="search"
+                  :placeholder="t('dbm.metrics.searchPlaceholder')"
+                  class="w-60"
+                  data-test="dbm-metrics-panel-search"
+                />
+              </div>
+
+              <DbmSection
+                v-for="group in filteredGroups"
+                :key="group.system"
+                :ref="(el: unknown) => setSectionRef(`group-${group.system}`, el)"
+                :title="groupTitle(group.system)"
+                header-align="baseline"
+              >
+                <template #hint>
+                  <span class="text-text-label text-2xs">{{ t("dbm.metrics.triageOrder") }}</span>
+                </template>
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(22rem,1fr))] gap-2.5 p-3 pt-1">
+                  <DbmMetricPanel
+                    v-for="entry in group.panels"
+                    :key="`${entry.key}::${chartEpoch}`"
+                    :panel-key="entry.key"
+                    :title="entry.title"
+                    :help="entry.help"
+                    :schema="entry.schema"
+                    :start-time="current.startTime"
+                    :end-time="current.endTime"
+                    @zoom="onChartZoom"
+                    @setup="openSetup"
+                  />
+                </div>
+              </DbmSection>
+            </template>
+          </OContent>
+        </div>
       </div>
     </div>
   </DbmPageChrome>
@@ -296,16 +348,17 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef } from
 import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
+import DateTime from "@/components/DateTime.vue";
 import DbmMetricPanel from "@/components/dbm/DbmMetricPanel.vue";
 import DbmMetricsRail, { type DbmMetricsRailItem } from "@/components/dbm/DbmMetricsRail.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DbmRefreshButton from "@/components/dbm/DbmRefreshButton.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmSection from "@/components/dbm/DbmSection.vue";
 import { tabCountProps } from "@/composables/dbm/useDbmTabCounts";
 import { useDbmListPage } from "@/composables/dbm/useDbmListPage";
 import { useDbmScopeFilters } from "@/composables/dbm/useDbmScopeFilters";
 import useStreams from "@/composables/useStreams";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -313,6 +366,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -330,9 +385,11 @@ import {
   filterDbmMetricPanels,
   filterDbmMetricStreams,
   panelErrorIsForbidden,
+  panelErrorIsStreamMissing,
   type DbmLoadBreakdown,
   type DbmMetricsScope,
 } from "@/utils/dbm/metricsPanels";
+import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import type { MetricStream } from "@/utils/metrics/metricFamily";
 
@@ -414,8 +471,14 @@ const catalogSections = computed<DbmSectionDef[]>(() =>
 /** The honesty hint about the hostname join the host section rides on. */
 /** The load chart's stream-permission state — see panelErrorIsForbidden. */
 const loadNoAccess = ref(false);
+const loadNotCollecting = ref(false);
 const onLoadError = (event: { message?: string; code?: unknown }) => {
   loadNoAccess.value = panelErrorIsForbidden(event);
+  loadNotCollecting.value = panelErrorIsStreamMissing(event);
+};
+
+const openSetup = () => {
+  router.push({ name: DBM_SETUP_ROUTE, query: { org_identifier: org.value } }).catch(() => {});
 };
 
 const hostScopeState = computed(() => dbmHostScopeState(scope.value));
@@ -476,6 +539,7 @@ const hasMetricStreams = computed(
 
 /** Which dimension the load chart stacks by — the Datadog-style slicer. */
 const loadBreakdown = ref<DbmLoadBreakdown>("waitEvent");
+const loadHintOpen = ref(false);
 
 const breakdownOptions = computed<SelectOption[]>(() =>
   DBM_LOAD_BREAKDOWNS.map((dim) => ({

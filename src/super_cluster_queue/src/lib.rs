@@ -45,6 +45,7 @@ mod pipelines;
 mod ratelimit;
 mod re_pattern;
 mod reports;
+mod rum_analytics;
 mod scheduler;
 mod schemas;
 mod search_job;
@@ -55,6 +56,7 @@ mod status_pages;
 mod synthetics;
 mod synthetics_locations;
 mod synthetics_probe_tokens;
+mod synthetics_variables;
 mod templates;
 mod user;
 
@@ -111,6 +113,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_enrichment_file_list_delete_msg: enrichment_table::process_file_list_delete,
         on_kv_msg: kv::process,
         on_service_streams_msg: service_streams::process,
+        on_rum_analytics_msg: rum_analytics::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
@@ -180,6 +183,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_synthetics_msg: synthetics::process,
         on_locations_msg: synthetics_locations::process,
         on_probe_tokens_msg: synthetics_probe_tokens::process,
+        on_variables_msg: synthetics_variables::process,
     };
     let org_users_queue = OrgUsersQueue {
         on_org_users_msg: org_user::process,

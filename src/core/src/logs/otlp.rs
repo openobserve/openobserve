@@ -15,15 +15,12 @@
 
 use std::collections::{HashMap, HashSet};
 
-use axum::{
-    http::{StatusCode, header},
-    response::{IntoResponse, Response},
-};
-use bytes::BytesMut;
+use axum::{http::StatusCode, response::Response};
 use chrono::{Duration, Utc};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
+        db_monitoring::is_dbm_server_stream,
         otlp::OtlpRequestType,
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamType},
@@ -42,17 +39,16 @@ use opentelemetry_proto::tonic::{
     common::v1::InstrumentationScope,
     logs::v1::LogRecord,
 };
-use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
+    common::meta::otlp::{otlp_export_response, otlp_rejection_response},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
-        grpc::{get_val, get_val_with_type_retained},
+        grpc::{get_severity_value, get_val, get_val_with_type_retained},
     },
 };
 
@@ -109,11 +105,17 @@ fn build_otlp_log_record(
         }
     }
 
-    rec["severity"] = if !log_record.severity_text.is_empty() {
-        log_record.severity_text.to_owned().into()
+    let severity = if log_record.severity_text.is_empty() {
+        get_severity_value(log_record.severity_number)
     } else {
-        log_record.severity_number.into()
+        Some(log_record.severity_text.as_str())
     };
+    if let Some(severity) = severity {
+        rec["severity"] = severity.into();
+    }
+    if log_record.severity_number != 0 {
+        rec["severity_number"] = log_record.severity_number.into();
+    }
 
     rec["body"] = get_val(&log_record.body.as_ref());
     rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
@@ -134,51 +136,6 @@ fn build_otlp_log_record(
     Some(rec)
 }
 
-/// ProtoJSON rules: int64 as a decimal string, and `partial_success` omitted on a clean success.
-fn export_response_to_proto_json(res: &ExportLogsServiceResponse) -> json::Value {
-    match &res.partial_success {
-        Some(ps) if ps.rejected_log_records != 0 || !ps.error_message.is_empty() => {
-            let mut partial = json::Map::new();
-            if ps.rejected_log_records != 0 {
-                partial.insert(
-                    "rejectedLogRecords".to_string(),
-                    json::Value::String(ps.rejected_log_records.to_string()),
-                );
-            }
-            if !ps.error_message.is_empty() {
-                partial.insert(
-                    "errorMessage".to_string(),
-                    json::Value::String(ps.error_message.clone()),
-                );
-            }
-            json::json!({ "partialSuccess": partial })
-        }
-        _ => json::json!({}),
-    }
-}
-
-/// OTLP/HTTP requires the response body to use the encoding the request arrived in.
-fn format_http_response(res: ExportLogsServiceResponse, req_type: OtlpRequestType) -> Response {
-    match req_type {
-        OtlpRequestType::HttpJson => (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
-            json::to_vec(&export_response_to_proto_json(&res)).expect("serialize response"),
-        )
-            .into_response(),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
-                out.freeze(),
-            )
-                .into_response()
-        }
-    }
-}
-
 pub async fn handle_request(
     thread_id: usize,
     org_id: &str,
@@ -195,6 +152,22 @@ pub async fn handle_request(
         .map(|name| format_stream_name(name.to_string()))
         .unwrap_or_else(|| "default".to_string());
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
+    // Refused before the pipelines run: a remote-stream destination writes inside them.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        org_id,
+        StreamType::Logs,
+        &[(&stream_name, 0)],
+        |_| false,
+    )
+    .await
+    {
+        return Ok(otlp_rejection_response(
+            req_type,
+            StatusCode::SERVICE_UNAVAILABLE,
+            reason,
+        ));
+    }
 
     let cfg = get_config();
     let log_ingestion_errors = ingestion_log_enabled().await;
@@ -252,6 +225,9 @@ pub async fn handle_request(
     let normalize_keys = executable_pipelines.is_empty() && !need_original;
     let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
     let dbm_enabled = cfg.db_monitoring.enabled;
+    let dbm_gate = dbm_enabled && is_dbm_server_stream(&stream_name);
+    // A pipeline may route to a DBM stream, and its restore reads the name off the input record.
+    let event_name_gate = dbm_gate || (dbm_enabled && !executable_pipelines.is_empty());
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
@@ -370,13 +346,11 @@ pub async fn handle_request(
                 //   * BEFORE the flatten/branch below, so ONE write serves both the pipeline and
                 //     non-pipeline branches.
                 //
-                // Gated on `db_monitoring.enabled` to match `apply_to_record`, which
-                // early-returns when it is off: without the gate an operator who disabled
-                // DBM would still get a DBM column written onto every receiver record.
+                // Gated like canonicalization, or every OTLP stream gains a DBM column.
                 //
                 // Only when non-empty, so records without an event name — every ordinary
                 // log line in the product — are byte-identical to before.
-                if !log_record.event_name.is_empty() && cfg.db_monitoring.enabled {
+                if !log_record.event_name.is_empty() && event_name_gate {
                     rec[O2_EVENT_NAME] = log_record.event_name.as_str().into();
                 }
 
@@ -396,7 +370,7 @@ pub async fn handle_request(
 
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
-                    if dbm_enabled {
+                    if dbm_gate {
                         crate::db_monitoring::server_vantage::canonicalize_dbm_record(
                             &mut local_val,
                         );
@@ -411,7 +385,7 @@ pub async fn handle_request(
                     // any attempt to keep "the trusted one" could only guess from the record
                     // shape — which is precisely what a spoofer controls. Restoring it here,
                     // where `log_record` is still in scope, is what makes the value trusted.
-                    if !log_record.event_name.is_empty() && cfg.db_monitoring.enabled {
+                    if !log_record.event_name.is_empty() && event_name_gate {
                         local_val.insert(
                             O2_EVENT_NAME.to_string(),
                             log_record.event_name.as_str().into(),
@@ -499,6 +473,8 @@ pub async fn handle_request(
                         }
 
                         let destination_stream = stream_params.stream_name.to_string();
+                        let dest_dbm_gate =
+                            dbm_enabled && is_dbm_server_stream(&destination_stream);
                         if !derived_streams.contains(&destination_stream) {
                             derived_streams.insert(destination_stream.clone());
                         }
@@ -560,7 +536,7 @@ pub async fn handle_request(
 
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
-                            if dbm_enabled {
+                            if dest_dbm_gate {
                                 crate::db_monitoring::server_vantage::canonicalize_dbm_record(
                                     &mut local_val,
                                 );
@@ -684,7 +660,7 @@ pub async fn handle_request(
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
 
                 // DBM server-vantage canonicalization (see the note at the first call site).
-                if dbm_enabled {
+                if dbm_gate {
                     crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
                 }
 
@@ -767,7 +743,69 @@ pub async fn handle_request(
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
-        return Ok(format_http_response(res, req_type)); // just return
+        return Ok(otlp_export_response(&res, req_type)); // just return
+    }
+
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Logs, &streams, |_| false)
+                .await
+        {
+            return Ok(otlp_rejection_response(
+                req_type,
+                StatusCode::SERVICE_UNAVAILABLE,
+                reason,
+            ));
+        }
+    }
+
+    // A pattern-manager failure must not fail the request; the evidence row says it failed open.
+    #[cfg(feature = "vectorscan")]
+    {
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                for (stream, data) in json_data_by_stream.iter_mut() {
+                    if config::meta::self_reporting::redaction::is_self_reporting_stream(
+                        org_id,
+                        stream,
+                        StreamType::Logs,
+                    ) {
+                        continue;
+                    }
+                    let before = super::snapshot_derived_sources(&data.0);
+                    if let Err(e) = pattern_manager.process_at_ingestion(
+                        org_id,
+                        StreamType::Logs,
+                        stream,
+                        &mut data.0,
+                    ) {
+                        log::error!(
+                            "[LOGS:OTLP] error applying SDR patterns for stream {org_id}/{stream}: {e}"
+                        );
+                    }
+                    super::refresh_derived_columns(&before, &mut data.0);
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[LOGS:OTLP] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+                );
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Logs,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
+            }
+        }
     }
 
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
@@ -785,11 +823,16 @@ pub async fn handle_request(
     )
     .await;
 
+    let status = match &write_result {
+        Ok(_) => StatusCode::OK,
+        Err(e) => crate::ingestion::write_error_status(e),
+    };
+
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        if write_result.is_ok() { "200" } else { "500" },
+        status.as_str(),
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -803,14 +846,15 @@ pub async fn handle_request(
         .inc();
 
     if let Err(e) = write_result {
-        log::error!("Error while writing logs: {e}");
-        return Ok(MetaHttpResponse::error_with_header(
-            StatusCode::INTERNAL_SERVER_ERROR,
+        log::error!("[LOGS:OTLP] Error while writing logs: org_id: {org_id}, error: {e}");
+        return Ok(otlp_rejection_response(
+            req_type,
+            status,
             format!("error while writing log data: {e}"),
         ));
     }
 
-    Ok(format_http_response(res, req_type))
+    Ok(otlp_export_response(&res, req_type))
 }
 
 #[cfg(test)]
@@ -831,9 +875,10 @@ mod tests {
     };
     use prost::Message;
 
-    use super::{
-        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, export_response_to_proto_json, format_http_response,
-        normalized_resource_map, otlp_log_record,
+    use super::{normalized_resource_map, otlp_export_response, otlp_log_record};
+    use crate::common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::export_response_to_proto_json,
     };
 
     fn partial_response(rejected: i64, error: &str) -> ExportLogsServiceResponse {
@@ -849,7 +894,7 @@ mod tests {
         res: ExportLogsServiceResponse,
         req_type: OtlpRequestType,
     ) -> (axum::http::StatusCode, String, Vec<u8>) {
-        let response = format_http_response(res, req_type);
+        let response = otlp_export_response(&res, req_type);
         let status = response.status();
         let content_type = response
             .headers()
@@ -951,6 +996,34 @@ mod tests {
             })
             .is_none()
         );
+    }
+
+    #[test]
+    fn test_severity_text_derived_from_number_and_number_kept_when_set() {
+        let build = |severity_number: i32, severity_text: &str| {
+            let record = LogRecord {
+                severity_number,
+                severity_text: severity_text.to_string(),
+                ..Default::default()
+            };
+            otlp_log_record(&json::Map::new(), None, None, &record, 1)
+        };
+
+        let rec = build(17, "");
+        assert_eq!(rec["severity"], json::json!("ERROR"));
+        assert_eq!(rec["severity_number"], json::json!(17));
+
+        let rec = build(17, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert_eq!(rec["severity_number"], json::json!(17));
+
+        let rec = build(0, "Error");
+        assert_eq!(rec["severity"], json::json!("Error"));
+        assert!(rec.get("severity_number").is_none());
+
+        let rec = build(0, "");
+        assert!(rec.get("severity").is_none());
+        assert!(rec.get("severity_number").is_none());
     }
 
     use crate::logs::otlp::handle_request;
@@ -1837,5 +1910,61 @@ mod tests {
             .as_ref()
             .unwrap();
         assert_eq!(scope.name, "b");
+    }
+
+    // cloud builds reject the unknown test org at the trial check before the columns check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_handle_request_columns_limit_is_rpc_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        let limit = config::get_config().limit.req_cols_per_record_limit;
+        let log_rec = LogRecord {
+            time_unix_nano: chrono::Utc::now().timestamp_nanos_opt().unwrap() as u64,
+            attributes: (0..=limit)
+                .map(|i| kv(&format!("attr_{i}"), IntValue(i as i64)))
+                .collect(),
+            ..Default::default()
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![log_rec],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let resp = super::handle_request(
+            0,
+            "test_org_id",
+            request,
+            Some("test_columns_limit"),
+            "a@a.com",
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await
+        .unwrap();
+        let status_code = resp.status();
+        let headers = resp.headers().clone();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(status_code, axum::http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            headers[axum::http::header::CONTENT_TYPE],
+            CONTENT_TYPE_PROTO
+        );
+        let status = GoogleRpcStatus::decode(body).unwrap();
+        assert_eq!(status.code, 3);
+        assert!(
+            status
+                .message
+                .starts_with("error while writing log data: Error# Got ")
+        );
+        assert!(status.message.contains(&format!(
+            "columns for stream test_org_id/logs/test_columns_limit, only {limit} columns accept"
+        )));
+        assert!(status.message.contains("ZO_COLS_PER_RECORD_LIMIT"));
     }
 }

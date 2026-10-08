@@ -30,7 +30,10 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
-use promql::utils::{apply_label_selector, apply_matchers};
+use promql::{
+    ScanContext,
+    utils::{apply_label_selector, apply_matchers},
+};
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use search::{
@@ -46,8 +49,6 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::search::grpc::Context;
-
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
@@ -56,7 +57,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<Vec<Context>> {
+) -> Result<Vec<ScanContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
     let schema = Arc::new(
@@ -85,7 +86,7 @@ pub(crate) async fn create_context(
     .await?;
 
     if batches.is_empty() {
-        return Ok(vec![(
+        return Ok(vec![ScanContext::table(
             SessionContext::new(),
             Arc::new(Schema::empty()),
             ScanStats::default(),
@@ -101,13 +102,12 @@ pub(crate) async fn create_context(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
-        .stream_type(StreamType::Metrics)
         .build(0)
         .await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push((ctx, schema, stats, true));
+    resp.push(ScanContext::table(ctx, schema, stats, true));
 
     Ok(resp)
 }
@@ -154,7 +154,6 @@ async fn get_wal_batches(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
-        .stream_type(StreamType::Metrics)
         .build(cfg.limit.cpu_num)
         .await?;
     let table_ref = register_remote_metric_table(&ctx, stream_name, Arc::clone(&schema))?;

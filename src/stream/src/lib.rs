@@ -24,10 +24,11 @@ use common::meta::{
     stream::{FieldUpdate, Stream, StreamCreate},
 };
 use config::{
-    SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    META_ORG_ID, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
+        self_reporting::usage::AUDIT_STREAM,
         stream::{
             DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
             StreamType, TimeRange, UpdateStreamSettings,
@@ -740,6 +741,13 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
+    // The audit trail must not be destroyable through the same API it records.
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Ok(MetaHttpResponse::bad_request(
+            "Cannot delete the audit stream",
+        ));
+    }
+
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();
@@ -910,6 +918,12 @@ pub async fn delete_stream_data_by_time_range(
     stream_name: &str,
     time_range: TimeRange,
 ) -> Result<String, infra::errors::Error> {
+    if org_id == META_ORG_ID && stream_name == AUDIT_STREAM && stream_type == StreamType::Logs {
+        return Err(infra::errors::Error::Message(
+            "Cannot delete the audit stream".to_string(),
+        ));
+    }
+
     if time_range.start > time_range.end {
         return Err(infra::errors::Error::Message(
             "Start time must be less than end time".to_string(),
@@ -988,6 +1002,7 @@ async fn transform_stats(
     stats.storage_size /= SIZE_IN_MB;
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
+    stats.mindex_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
         && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
     {
@@ -1074,6 +1089,7 @@ pub async fn update_fields_type(
         ));
     }
 
+    let stream_schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
     // Build HashMap of field_name -> (DataType, nullable)
     let mut updates = HashMap::with_capacity(field_updates.len());
     for field_update in field_updates {
@@ -1083,6 +1099,18 @@ pub async fn update_fields_type(
                 field_update.data_type, field_update.name
             ))
         })?;
+        // handle_diff_schema would leave a non-widening change unapplied and still return Ok
+        if let Some(current) = stream_schema
+            .field_with_name(&field_update.name)
+            .map(|f| f.data_type())
+            && current != &dt
+            && !infra::schema::is_widening_conversion(current, &dt)
+        {
+            return Err(anyhow::anyhow!(
+                "field [{}] is {current} and cannot be changed to {dt}",
+                field_update.name
+            ));
+        }
         updates.insert(field_update.name.clone(), (dt, field_update.nullable));
     }
 
@@ -1129,8 +1157,12 @@ mod tests {
     use std::collections::HashMap;
 
     use arrow_schema::{DataType, Field};
+    use config::meta::stream::UpdateSettingsWrapper;
 
     use super::*;
+
+    // unique org so the process-wide schema caches can host these tests in parallel
+    const SETTINGS_TEST_ORG: &str = "settings_cache_test_org";
 
     #[test]
     fn test_associated_metadata_streams() {
@@ -1299,6 +1331,7 @@ mod tests {
             storage_size: 10.0 * 1024.0 * 1024.0,   // 10MB in bytes
             compressed_size: 5.0 * 1024.0 * 1024.0, // 5MB in bytes
             index_size: 2.0 * 1024.0 * 1024.0,      // 2MB in bytes
+            mindex_size: 3.0 * 1024.0 * 1024.0,
             ..Default::default()
         };
 
@@ -1308,6 +1341,7 @@ mod tests {
         assert_eq!(stats.storage_size, 10.0);
         assert_eq!(stats.compressed_size, 5.0);
         assert_eq!(stats.index_size, 2.0);
+        assert_eq!(stats.mindex_size, 3.0);
     }
 
     #[tokio::test]
@@ -1397,6 +1431,97 @@ mod tests {
         )
         .await;
         assert!(result.is_err());
+    }
+
+    async fn create_update_fields_test_stream(name: &str) {
+        infra::db::create_table().await.unwrap();
+        let stream = StreamCreate {
+            fields: [("status_code", "Utf8"), ("count", "Int64")]
+                .into_iter()
+                .map(|(name, r#type)| StreamField {
+                    name: name.to_string(),
+                    r#type: r#type.to_string(),
+                })
+                .collect(),
+            settings: StreamSettings::default(),
+        };
+        let resp = create_stream("org1", name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn persisted_field_type(name: &str, field: &str) -> Option<String> {
+        let schema = infra::schema::get_from_db("org1", name, StreamType::Logs)
+            .await
+            .unwrap();
+        schema
+            .field_with_name(field)
+            .ok()
+            .map(|f| f.data_type().to_string())
+    }
+
+    fn field_update(name: &str, data_type: &str) -> FieldUpdate {
+        FieldUpdate {
+            name: name.to_string(),
+            data_type: data_type.to_string(),
+            nullable: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_refuses_a_change_it_cannot_apply() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("refuse_{}", now_micros());
+        create_update_fields_test_stream(name).await;
+        for requested in ["Int64", "UInt64", "Float64", "Boolean"] {
+            let err = update_fields_type(
+                "org1",
+                name,
+                Some(StreamType::Logs),
+                &[
+                    field_update("count", "Float64"),
+                    field_update("status_code", requested),
+                ],
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                format!("field [status_code] is Utf8 and cannot be changed to {requested}")
+            );
+        }
+        // refused as a whole, so the widening change sent with it is not applied either
+        assert_eq!(
+            persisted_field_type(name, "count").await.as_deref(),
+            Some("Int64")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_accepts_the_changes_the_merge_applies() {
+        let name = &format!("accept_{}", now_micros());
+        create_update_fields_test_stream(name).await;
+        update_fields_type(
+            "org1",
+            name,
+            Some(StreamType::Logs),
+            &[
+                field_update("count", "Float64"),
+                field_update("status_code", "Utf8"),
+                field_update("new_field", "Int64"),
+            ],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            persisted_field_type(name, "count").await.as_deref(),
+            Some("Float64")
+        );
+        assert_eq!(
+            persisted_field_type(name, "new_field").await.as_deref(),
+            Some("Int64")
+        );
     }
 
     #[test]
@@ -1635,5 +1760,161 @@ mod tests {
         assert_eq!(parse_data_type("text"), None);
         assert_eq!(parse_data_type(""), None);
         assert_eq!(parse_data_type("int32"), None);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_with_cleanup_refuses_audit_stream() {
+        let res = delete_stream_with_cleanup(
+            META_ORG_ID,
+            AUDIT_STREAM,
+            StreamType::Logs,
+            false,
+            |_, _, _| async { Ok(()) },
+            |_, _, _| async {},
+        )
+        .await
+        .expect("the guard returns a response, not an error");
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_refuses_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("the audit stream must not be time-range deletable");
+        assert!(err.to_string().contains("Cannot delete the audit stream"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_customer_audit_stream() {
+        let err = delete_stream_data_by_time_range(
+            "customer_org",
+            StreamType::Logs,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_data_by_time_range_allows_meta_org_non_logs_audit() {
+        let err = delete_stream_data_by_time_range(
+            META_ORG_ID,
+            StreamType::Traces,
+            AUDIT_STREAM,
+            TimeRange { start: 1, end: 0 },
+        )
+        .await
+        .expect_err("start after end is rejected by the later validation");
+        assert!(err.to_string().contains("Start time must be less than end"));
+    }
+
+    async fn create_settings_test_stream(name: &str, fields: &[&str]) {
+        let _ = infra::db::create_table().await;
+        let stream = StreamCreate {
+            fields: fields
+                .iter()
+                .map(|f| StreamField {
+                    name: f.to_string(),
+                    r#type: "Utf8".to_string(),
+                })
+                .collect(),
+            settings: StreamSettings {
+                enable_distinct_fields: false,
+                ..Default::default()
+            },
+        };
+        let resp = create_stream(SETTINGS_TEST_ORG, name, StreamType::Logs, stream)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn evict_settings_test_stream(name: &str) {
+        let key = format!("{SETTINGS_TEST_ORG}/{}/{name}", StreamType::Logs);
+        STREAM_SCHEMAS_LATEST.write().await.remove(&key);
+        infra::schema::remove_stream_settings(&key).await;
+    }
+
+    async fn update_settings_test_stream(name: &str, update: UpdateStreamSettings) {
+        let resp = update_stream_settings(SETTINGS_TEST_ORG, name, StreamType::Logs, update)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+    }
+
+    async fn settings_test_stream(name: &str) -> StreamSettings {
+        get_stream(SETTINGS_TEST_ORG, name, StreamType::Logs)
+            .await
+            .unwrap()
+            .settings
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_is_read_back_without_waiting_for_the_watcher() {
+        // the test DB outlives the run, so each run needs fresh stream names
+        let name = &format!("read_back_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        // cold caches, as after a restart; no schema watcher runs in unit tests
+        evict_settings_test_stream(name).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                enable_distinct_fields: Some(true),
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        let settings = settings_test_stream(name).await;
+        assert!(settings.enable_distinct_fields);
+        assert_eq!(settings.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_settings_update_right_after_create_finds_the_stream() {
+        let name = &format!("right_after_create_{}", now_micros());
+        create_settings_test_stream(name, &[]).await;
+        update_settings_test_stream(
+            name,
+            UpdateStreamSettings {
+                data_retention: Some(17),
+                ..Default::default()
+            },
+        )
+        .await;
+        assert_eq!(settings_test_stream(name).await.data_retention, 17);
+    }
+
+    #[tokio::test]
+    async fn test_back_to_back_settings_updates_keep_both_changes() {
+        let name = &format!("back_to_back_{}", now_micros());
+        create_settings_test_stream(name, &["fa", "fb"]).await;
+        evict_settings_test_stream(name).await;
+        for field in ["fa", "fb"] {
+            update_settings_test_stream(
+                name,
+                UpdateStreamSettings {
+                    index_fields: UpdateSettingsWrapper {
+                        add: vec![field.to_string()],
+                        remove: vec![],
+                    },
+                    ..Default::default()
+                },
+            )
+            .await;
+        }
+        // read what was persisted, not what this node cached
+        evict_settings_test_stream(name).await;
+        let index_fields = settings_test_stream(name).await.index_fields;
+        assert!(index_fields.contains(&"fa".to_string()), "{index_fields:?}");
+        assert!(index_fields.contains(&"fb".to_string()), "{index_fields:?}");
     }
 }

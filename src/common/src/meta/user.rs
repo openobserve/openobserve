@@ -126,6 +126,11 @@ pub struct UpdateUser {
     pub role: Option<UserRoleRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
+    /// Releases an active failed-login lockout and resets the counters. Nothing else ends one
+    /// early — not even a password change, since the lock records attempts rather than the
+    /// password — and it is gated like a password reset by an administrator.
+    #[serde(default)]
+    pub remove_lockout: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -261,6 +266,14 @@ pub struct SignInUser {
 pub struct SignInResponse {
     pub status: bool,
     pub message: String,
+    /// Days left before the caller's password expires, present only inside the rotation warning
+    /// window. Advisory: a client that ignores it is never broken by one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password_rotation_warning: Option<i64>,
+    /// Seconds until a locked-out account may try again, present only on that refusal. The number
+    /// rather than a sentence, so the console can render it in the viewer's own language.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lockout_retry_after_secs: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -471,7 +484,15 @@ pub struct AuthTokensExt {
 impl AuthTokensExt {
     /// Checks if the token is still valid or not
     pub fn has_expired(&self) -> bool {
-        chrono::Utc::now().timestamp() - self.request_time > self.expires_in
+        Self::is_expired(self.request_time, self.expires_in)
+    }
+
+    /// Both values are caller-supplied, so an age that does not fit in an `i64` counts as expired.
+    pub fn is_expired(request_time: i64, expires_in: i64) -> bool {
+        chrono::Utc::now()
+            .timestamp()
+            .checked_sub(request_time)
+            .is_none_or(|age| age > expires_in)
     }
 }
 
@@ -613,6 +634,7 @@ mod tests {
                 custom: None,
             }),
             token: Some("token123".to_string()),
+            remove_lockout: false,
         };
 
         assert!(update.change_password);
@@ -786,6 +808,21 @@ mod tests {
         assert_eq!(tokens.refresh_token, "refresh123");
         assert_eq!(tokens.request_time, 1234567890);
         assert_eq!(tokens.expires_in, 3600);
+    }
+
+    #[test]
+    fn auth_ext_expiry_survives_extreme_times() {
+        let token = |request_time: i64, expires_in: i64| AuthTokensExt {
+            auth_ext: String::new(),
+            refresh_token: String::new(),
+            request_time,
+            expires_in,
+        };
+        let now = chrono::Utc::now().timestamp();
+        assert!(token(i64::MIN, 300).has_expired());
+        assert!(token(i64::MIN, i64::MAX).has_expired());
+        assert!(token(now - 301, 300).has_expired());
+        assert!(!token(now, 300).has_expired());
     }
 
     #[test]

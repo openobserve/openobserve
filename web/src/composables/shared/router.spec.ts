@@ -13,8 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
+import { createMemoryHistory, createRouter } from "vue-router";
 import useRoutes from "./router";
+import store from "@/stores";
+import { routeGuard } from "@/utils/zincutils";
+import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 
@@ -96,6 +101,29 @@ vi.mock("@/views/RUM/ErrorViewer.vue", () => ({ default: { name: "ErrorViewer" }
 vi.mock("@/views/RUM/AppPerformance.vue", () => ({ default: { name: "AppPerformance" } }));
 vi.mock("@/views/RUM/AppErrors.vue", () => ({ default: { name: "AppErrors" } }));
 vi.mock("@/views/RUM/AppSessions.vue", () => ({ default: { name: "AppSessions" } }));
+vi.mock("@/views/RUM/AppAnalytics.vue", () => ({ default: { name: "AppAnalytics" } }));
+vi.mock("@/views/RUM/NamedEventEditor.vue", () => ({ default: { name: "NamedEventEditor" } }));
+vi.mock("@/components/rum/productAnalytics/AnalyticsOverview.vue", () => ({
+  default: { name: "AnalyticsOverview" },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsFunnels.vue", () => ({
+  default: { name: "AnalyticsFunnels" },
+}));
+vi.mock("@/components/rum/productAnalytics/SavedFunnelsPage.vue", async () => ({
+  default: {
+    name: "SavedFunnelsPage",
+    beforeRouteEnter: (await import("@/utils/rum/funnelLinks")).forwardFunnelLink,
+  },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsPaths.vue", () => ({
+  default: { name: "AnalyticsPaths" },
+}));
+vi.mock("@/components/rum/productAnalytics/AnalyticsRetention.vue", () => ({
+  default: { name: "AnalyticsRetention" },
+}));
+vi.mock("@/components/rum/productAnalytics/NamedEventsListPage.vue", () => ({
+  default: { name: "NamedEventsListPage" },
+}));
 vi.mock("@/components/reports/ReportList.vue", () => ({ default: { name: "ReportList" } }));
 vi.mock("@/components/reports/CreateReport.vue", () => ({ default: { name: "CreateReport" } }));
 vi.mock("@/components/rum/performance/PerformanceSummary.vue", () => ({
@@ -338,6 +366,26 @@ describe("useRoutes (router.ts)", () => {
 
       logoutRoute.beforeEnter({}, {}, vi.fn());
       expect(mockLocation.href).toBe("/login");
+    });
+  });
+
+  describe("parentRoutes — /signup", () => {
+    it("redirects to /login with mode=signup", () => {
+      const { parentRoutes } = useRoutes();
+      const signupRoute = parentRoutes.find((r: any) => r.path === "/signup");
+      expect(signupRoute.redirect({ query: {} })).toEqual({
+        path: "/login",
+        query: { mode: "signup" },
+      });
+    });
+
+    it("keeps the other query params it was opened with", () => {
+      const { parentRoutes } = useRoutes();
+      const signupRoute = parentRoutes.find((r: any) => r.path === "/signup");
+      expect(signupRoute.redirect({ query: { utm_source: "blog", mode: "x" } })).toEqual({
+        path: "/login",
+        query: { utm_source: "blog", mode: "signup" },
+      });
     });
   });
 
@@ -1515,6 +1563,98 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("homeChildRoutes — Product Analytics", () => {
+    const shell = () => findRoute(useRoutes().homeChildRoutes, PA_ROUTES.shell);
+
+    const realRouter = () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("is its own top-level route, not a RUM child", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes.find((r: any) => r.name === PA_ROUTES.shell)?.path).toBe(
+        "product-analytics",
+      );
+      const rum = findRoute(homeChildRoutes, "RUM");
+      expect(rum.children.map((c: any) => c.path)).not.toContain("analytics");
+      expect(findRoute(homeChildRoutes, "RumAnalytics")).toBeUndefined();
+    });
+
+    it("renders the six sub-tab routes inside the shell, each lazy and guarded", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const route = shell();
+      expect(typeof route.component).toBe("function");
+      expect(route.meta.titleKey).toBe("menu.productAnalytics");
+      expect(route.children.map((c: any) => [c.path, c.name])).toEqual([
+        ["overview", PA_ROUTES.overview],
+        ["funnels", PA_ROUTES.funnels],
+        ["funnels/build", PA_ROUTES.funnelBuilder],
+        ["paths", PA_ROUTES.paths],
+        ["retention", PA_ROUTES.retention],
+        ["events", PA_ROUTES.events],
+      ]);
+      for (const child of [route, ...route.children]) {
+        expect(typeof child.component).toBe("function");
+        const next = vi.fn();
+        child.beforeEnter({}, {}, next);
+        expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+      }
+    });
+
+    it("registers the named event editors as siblings of the shell, outside its tab strip", () => {
+      const { homeChildRoutes } = useRoutes();
+      const top = (name: string) => homeChildRoutes.find((r: any) => r.name === name);
+      expect(top(PA_ROUTES.eventNew)?.path).toBe("product-analytics/events/new");
+      expect(top(PA_ROUTES.eventEdit)?.path).toBe("product-analytics/events/:id/edit");
+      expect(top(PA_ROUTES.eventEdit)?.props).toBe(true);
+      const router = realRouter();
+      for (const [path, name] of [
+        ["/product-analytics/events/new", PA_ROUTES.eventNew],
+        ["/product-analytics/events/abc/edit", PA_ROUTES.eventEdit],
+      ]) {
+        const resolved = router.resolve(path);
+        expect(resolved.name).toBe(name);
+        expect(resolved.matched.map((m) => m.name)).not.toContain(PA_ROUTES.shell);
+      }
+      expect(router.resolve("/product-analytics/events").matched.map((m) => m.name)).toEqual([
+        undefined,
+        PA_ROUTES.shell,
+        PA_ROUTES.events,
+      ]);
+      expect(router.resolve("/product-analytics/funnels/build").name).toBe(PA_ROUTES.funnelBuilder);
+    });
+
+    it.each([
+      ["/product-analytics/funnels?app=web&sf=Alpha000000000000000000001", "sf"],
+      ["/product-analytics/funnels?app=web&funnel=abc", "funnel"],
+    ])("forwards %s, a link naming a funnel, to the builder with its query", async (path, key) => {
+      const router = realRouter();
+      await router.push(path);
+      expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);
+      expect(router.currentRoute.value.path).toBe("/product-analytics/funnels/build");
+      expect(router.currentRoute.value.query).toMatchObject({ app: "web" });
+      expect(router.currentRoute.value.query[key]).toBeDefined();
+    });
+
+    it("leaves the remaining RUM tabs where they were", async () => {
+      const router = realRouter();
+      await router.push("/rum/sessions?period=15m");
+      expect(router.currentRoute.value.name).toBe("Sessions");
+    });
+  });
+
   // =========================================================================
   // 16. homeChildRoutes — shortUrl route
   // =========================================================================
@@ -1670,6 +1810,7 @@ describe("useRoutes (router.ts)", () => {
     it.each([
       ["infraHosts", "infra/hosts"],
       ["infraKubernetes", "infra/kubernetes"],
+      ["infraKubernetes2", "infra/kubernetes-2"],
     ])("registers %s at path %s", (name, path) => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, name as string);
@@ -1677,17 +1818,20 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe(path);
     });
 
-    it.each(["infraHosts", "infraKubernetes"])("%s beforeEnter calls routeGuard", async (name) => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      vi.mocked(routeGuard as any).mockClear();
-      const { homeChildRoutes } = useRoutes();
-      const route = findRoute(homeChildRoutes, name);
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-      route.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
+      "%s beforeEnter calls routeGuard",
+      async (name) => {
+        const { routeGuard } = await import("@/utils/zincutils");
+        vi.mocked(routeGuard as any).mockClear();
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        const mockTo = {};
+        const mockFrom = {};
+        const mockNext = vi.fn();
+        route.beforeEnter(mockTo, mockFrom, mockNext);
+        expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      },
+    );
 
     it("passes the workload prop to the kubernetes page", () => {
       const { homeChildRoutes } = useRoutes();
@@ -1704,13 +1848,23 @@ describe("useRoutes (router.ts)", () => {
       expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
     });
 
-    it("keeps exactly the infra workload routes that have a curated pack", () => {
+    it("keeps exactly the curated infra workload routes plus Kubernetes 2", () => {
       const { homeChildRoutes } = useRoutes();
       const infraWorkloads = homeChildRoutes
         .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
         .map((r: any) => r.path)
         .sort();
-      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes"]);
+      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes", "infra/kubernetes-2"]);
+    });
+
+    it("registers Kubernetes 2 right after Kubernetes, lazily loading its own page", () => {
+      const { homeChildRoutes } = useRoutes();
+      const index = homeChildRoutes.findIndex((r: any) => r.name === "infraKubernetes");
+      const route = homeChildRoutes[index + 1] as any;
+      expect(route.name).toBe("infraKubernetes2");
+      expect(route.meta?.titleKey).toBe("menu.kubernetes2");
+      expect(route.props).toBeUndefined();
+      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
@@ -2031,9 +2185,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 4 parentRoutes", () => {
+    it("should have exactly 5 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(4);
+      expect(parentRoutes).toHaveLength(5);
     });
 
     it("should have unique paths in parentRoutes", () => {
@@ -2043,12 +2197,13 @@ describe("useRoutes (router.ts)", () => {
       expect(paths).toHaveLength(uniquePaths.length);
     });
 
-    it("should have component or beforeEnter defined for every parentRoute", () => {
+    it("should have a component, beforeEnter or redirect defined for every parentRoute", () => {
       const { parentRoutes } = useRoutes();
       parentRoutes.forEach((route: any) => {
         const hasComponent = route.component !== undefined;
         const hasBeforeEnter = typeof route.beforeEnter === "function";
-        expect(hasComponent || hasBeforeEnter).toBe(true);
+        const hasRedirect = route.redirect !== undefined;
+        expect(hasComponent || hasBeforeEnter || hasRedirect).toBe(true);
       });
     });
 
@@ -2133,6 +2288,121 @@ describe("useRoutes (router.ts)", () => {
       for (const titleKey of titleKeys) {
         expect(enTitle(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
       }
+    });
+  });
+
+  // custom_hide_menus removes a tile, never a route.
+  describe("hidden menus never block routes (AC-28)", () => {
+    const buildRouter = () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          ...parentRoutes,
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("resolves and enters /streams with custom_hide_menus=streams", async () => {
+      const previous = store.state.zoConfig?.custom_hide_menus;
+      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), custom_hide_menus: "streams" };
+      try {
+        const router = buildRouter();
+        expect(router.resolve("/streams").name).toBe("logstreams");
+        await router.push("/streams");
+        expect(router.currentRoute.value.name).toBe("logstreams");
+      } finally {
+        store.state.zoConfig = { ...store.state.zoConfig, custom_hide_menus: previous };
+      }
+    });
+  });
+
+  // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
+  describe("paywall guard proxy (A-27)", () => {
+    const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
+
+    const flatten = (routes: any[], prefix = ""): any[] =>
+      routes.flatMap((r) => {
+        const path = r.path.startsWith("/") ? r.path : `${prefix}/${r.path}`.replace(/\/+/g, "/");
+        return [{ ...r, fullPath: path }, ...(r.children ? flatten(r.children, path) : [])];
+      });
+
+    // Runs the chain the way vue-router does on entering from outside: every record's beforeEnter, parent first.
+    const chainReachesRouteGuard = (resolved: any): boolean => {
+      vi.mocked(routeGuard).mockClear();
+      let to = resolved;
+      for (let hop = 0; hop < 3; hop++) {
+        let redirect: any = null;
+        for (const record of to.matched) {
+          if (typeof record.beforeEnter !== "function") continue;
+          record.beforeEnter(to, {}, (arg?: any) => {
+            if (arg && typeof arg === "object" && arg.name) redirect = arg;
+          });
+          if (redirect) break;
+        }
+        if (vi.mocked(routeGuard).mock.calls.length) return true;
+        // Only a self-redirect (traces canonicalising its tab query) is followed; a different route is a feature gate.
+        if (!redirect || redirect.name !== to.name) return false;
+        to = { ...to, query: redirect.query ?? to.query };
+      }
+      return false;
+    };
+
+    let previousZoConfig: any;
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      previousZoConfig = store.state.zoConfig;
+      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), database_monitoring_enabled: true };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = previousZoConfig;
+    });
+
+    it("mutes a home child route exactly when its guard chain reaches routeGuard and the paywall applies", () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          ...parentRoutes,
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+      const candidates = flatten(homeChildRoutes).filter(
+        (r) => r.name && r !== catchAll && !r.fullPath.includes(":"),
+      );
+      expect(candidates.length).toBeGreaterThan(30);
+
+      const mismatches = candidates
+        .map((r) => {
+          const resolved = router.resolve({
+            path: r.fullPath,
+            query: { org_identifier: "default" },
+          });
+          const muted = isPaywalledDestination(EXPIRED_MICROS, resolved);
+          const blocked =
+            chainReachesRouteGuard(resolved) && shouldPaywallRoute(EXPIRED_MICROS, resolved.name);
+          return muted === blocked
+            ? null
+            : `${String(resolved.name)}: muted=${muted} blocked=${blocked}`;
+        })
+        .filter((line): line is string => line !== null);
+      expect(mismatches).toEqual([]);
     });
   });
 });

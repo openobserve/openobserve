@@ -17,8 +17,10 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
+import { userKeys } from "@/services/users.querykeys";
 import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 
@@ -485,5 +487,76 @@ describe("OnCallTeams", () => {
     await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
+  });
+
+  // The New team drawer's member picker belongs to this page, so the page's refresh must expire it too.
+  it("expires the users entry on a refresh, and leaves it alone on mount", async () => {
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const usersExpiry = {
+      queryKey: userKeys.users("default"),
+      exact: true,
+      refetchType: "none",
+    };
+    service.listTeams.mockRejectedValueOnce({ response: { data: { message: "boom" } } });
+    const wrapper = render();
+    await flushPromises();
+    expect(spy).not.toHaveBeenCalledWith(usersExpiry);
+
+    // Retry and the toolbar's Refresh are the same `refreshTeams` handler.
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    await wrapper.find('[data-test="oncall-teams-error"] button').trigger("click");
+    await flushPromises();
+    expect(spy).toHaveBeenCalledWith(usersExpiry);
+    spy.mockRestore();
+  });
+
+  /// A phone's action column holds one control, so the row's buttons are mirrored in a menu that must act the same.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    async function rendered() {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      const wrapper = mount(OnCallTeams, { global: { plugins: [i18n, store], stubs: menuStubs } });
+      await flushPromises();
+      return wrapper;
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", async () => {
+      const wrapper = await rendered();
+
+      for (const action of ["edit", "delete"]) {
+        expect(wrapper.find(`[data-test="oncall-team-${action}-team_1"]`).classes()).toContain(
+          "max-md:hidden",
+        );
+      }
+      expect(wrapper.find('[data-test="oncall-teams-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("edits the team the row is for", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-edit-team_1-menu"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OnCallTeamForm" }).props("team")).toEqual(
+        expect.objectContaining({ id: "team_1" }),
+      );
+    });
+
+    it("asks before deleting, as the button does", async () => {
+      const wrapper = await rendered();
+      await wrapper.find('[data-test="oncall-team-delete-team_1-menu"]').trigger("click");
+
+      expect(wrapper.find('[data-test="confirm"]').text()).toContain("Platform");
+    });
   });
 });

@@ -34,9 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-text-body text-sm leading-tight font-semibold">
           {{ t("workflow.history.title") }}
         </div>
-        <div v-if="workflowName" class="text-text-secondary truncate text-xs leading-tight">
+        <OTruncatedText
+          v-if="workflowName"
+          as="div"
+          class="text-text-secondary text-xs leading-tight"
+        >
           {{ workflowName }}
-        </div>
+        </OTruncatedText>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <DateTime
@@ -97,7 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :show-global-filter="false"
           :default-columns="false"
-          :footer-title="t('workflow.history.button')"
           :show-index="true"
           :enable-column-resize="true"
           sort-by="start_time"
@@ -210,6 +213,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import DateTime from "@/components/DateTime.vue";
 import WorkflowExecutionTimeline from "@/components/alerts/AlertHistoryTimeline.vue";
 import NoData from "@/components/shared/grid/NoData.vue";

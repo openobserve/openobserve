@@ -69,6 +69,64 @@ export async function openNavFlyoutChild(page, child) {
 }
 
 /**
+ * Click the Data nav tile to reach the Streams list, falling back to a direct goto when the click does not route.
+ * @param {import('@playwright/test').Page} page
+ */
+export async function gotoStreamsViaNav(page) {
+    const onStreams = (url) => new URL(url).pathname.replace(/\/+$/, '').endsWith('/streams');
+    const tile = page.locator(NAV_GROUP_TILE.data);
+    const tileReady = await tile.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+    // The tile renders while MainLayout is still booting and doubles as a hover-flyout trigger, so a click can be dropped without routing.
+    const navigated = tileReady && await tile.click({ timeout: 10000 })
+        .then(() => page.waitForURL(onStreams, { timeout: 10000 }))
+        .then(() => true)
+        .catch(() => false);
+    if (!navigated) {
+        const orgId = new URL(page.url()).searchParams.get('org_identifier') || getOrgIdentifier();
+        testLogger.warn('Data nav tile click did not reach /streams; navigating directly', { url: page.url() });
+        await page.goto(`${process.env['ZO_BASE_URL']}/web/streams?org_identifier=${orgId}`, { waitUntil: 'domcontentloaded' });
+    }
+    await expect(page).toHaveURL(/\/streams/, { timeout: 15000 });
+    await page.locator('[data-test="log-stream-table"]').waitFor({ state: 'visible', timeout: 30000 });
+}
+
+/**
+ * Click a left-nav link, re-clicking until the SPA route actually lands on `pathSuffix` (e.g. '/logs').
+ * @param {import('@playwright/test').Page} page
+ * @param {string} selector
+ * @param {string} pathSuffix
+ * @param {number} [attempts]
+ */
+export async function clickNavUntilRoute(page, selector, pathSuffix, attempts = 3) {
+    const onRoute = (url) => new URL(url).pathname.replace(/\/+$/, '').endsWith(pathSuffix);
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        await page.locator(selector).click({ force: true });
+        // vue-router ignores a push to the still-current route while an earlier nav is pending, so an early click can be lost.
+        if (await page.waitForURL(onRoute, { timeout: 10000 }).then(() => true).catch(() => false)) return;
+        testLogger.warn(`Nav click on ${selector} did not reach ${pathSuffix} (attempt ${attempt}/${attempts})`, { url: page.url() });
+    }
+    expect(onRoute(page.url()), `left-nav click never routed to ${pathSuffix}; still on ${page.url()}`).toBe(true);
+}
+
+/**
+ * Switch the Logs page view mode ('logs' | 'visualize' | 'build' | 'patterns') via whichever control the toolbar renders.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} mode
+ */
+export async function selectLogsViewMode(page, mode, timeout = 20000) {
+    const toggle = page.locator(`[data-test="logs-${mode}-toggle"]`);
+    const dropdownBtn = page.locator('[data-test="logs-view-mode-dropdown-btn"]');
+    // SearchBar.vue swaps the toggle group for a dropdown while its measured toolbar width is narrow, which can be transient.
+    await toggle.or(dropdownBtn).first().waitFor({ state: 'visible', timeout });
+    if (await toggle.isVisible()) {
+        await toggle.click();
+        return;
+    }
+    await dropdownBtn.click();
+    await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
+}
+
+/**
  * Navigate straight to the metrics PANEL EDITOR.
  *
  * `/metrics` is the zero-query Metrics Explorer (a browse grid of metric cards);

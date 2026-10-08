@@ -16,9 +16,9 @@
 mod aggregate;
 mod at_modifier;
 mod call;
-mod columns;
 mod selector;
 mod streaming;
+mod subquery;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;
@@ -33,7 +33,7 @@ use promql_parser::parser::{
 use crate::{
     ast::{
         at_modifier::{Pin, pin, uses_at},
-        label_usage::labels_dropped_at_root,
+        label_usage::{grouping_labels, labels_dropped_at_root},
     },
     binary,
     exec::PromqlContext,
@@ -47,11 +47,6 @@ pub struct Engine {
     eval_ctx: EvalContext,
     /// Only select columns with certain labels
     label_selector: HashSet<String>,
-    /// If true, skip column pruning and load all label columns. Set when the
-    /// expression contains label-creating functions (`label_replace`,
-    /// `label_join`) whose output labels don't exist in the source schema and
-    /// whose source labels may not be in the aggregation grouping set.
-    disable_label_selector: bool,
     /// If true, the query provably discards all labels (e.g.
     /// `sum(rate(m[5m]))` without a modifier), so series labels are never
     /// loaded at all.
@@ -68,7 +63,6 @@ impl Engine {
             ctx,
             eval_ctx,
             label_selector: HashSet::new(),
-            disable_label_selector: false,
             skip_labels: false,
             result_type: None,
             has_at_modifier: true,
@@ -77,17 +71,17 @@ impl Engine {
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
-        self.extract_columns_from_prom_expr(prom_expr)?;
-        if self.disable_label_selector {
-            self.label_selector.clear();
-        }
+        self.label_selector = grouping_labels(prom_expr);
         self.skip_labels = !self.ctx.query_ctx.query_exemplars
             && !self.ctx.query_ctx.query_data
             && labels_dropped_at_root(prom_expr);
         self.has_at_modifier = uses_at(prom_expr);
         let value = match self.exec_root_range_selector(prom_expr).await? {
             Some(value) => value,
-            None => self.exec_expr(prom_expr).await?,
+            None => match self.exec_root_subquery(prom_expr).await? {
+                Some(value) => value,
+                None => self.exec_expr(prom_expr).await?,
+            },
         };
         Ok((value, self.result_type.clone()))
     }
@@ -122,6 +116,7 @@ impl Engine {
                         Value::Matrix(matrix)
                     }
                     Value::Float(f) => Value::Float(-f),
+                    Value::None => Value::None,
                     _ => {
                         return Err(DataFusionError::NotImplemented(format!(
                             "Unsupported Unary: {expr:?}"
@@ -184,43 +179,12 @@ impl Engine {
                 }
             }
             PromExpr::Paren(ParenExpr { expr }) => self.exec_expr(expr).await?,
-            PromExpr::Subquery(expr) => {
-                let val = self.exec_expr(&expr.expr).await?;
-                let range = expr.range;
-                let matrix = match val {
-                    Value::Matrix(mut vs) => {
-                        // For matrix type, update the time_window range
-                        for rv in &mut vs {
-                            // Update time_window with new range
-                            rv.time_window = Some(TimeWindow::new(range));
-                        }
-                        vs
-                    }
-                    v => {
-                        return Err(DataFusionError::NotImplemented(format!(
-                            "Unsupported subquery, the return value should have been a matrix but got {:?}",
-                            v.get_type()
-                        )));
-                    }
-                };
-
-                Value::Matrix(matrix)
-            }
+            PromExpr::Subquery(sq) => self.exec_subquery(sq).await?,
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                let data = match self.try_streaming_instant_selector(vs).await? {
-                    Some(data) => data,
-                    None => {
-                        let vs = selector::plain_selector(vs, "VectorSelector")?;
-                        self.eval_vector_selector(&vs, None).await?
-                    }
-                };
-                if data.is_empty() {
-                    Value::None
-                } else {
-                    Value::Matrix(data)
-                }
+                self.exec_vector_selector(vs, selector::SelectorOutput::Value)
+                    .await?
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
                 let vs = selector::plain_selector(vs, "MatrixSelector")?;
@@ -273,6 +237,8 @@ pub(crate) mod tests {
     use super::*;
     use crate::exec::PromqlContext;
 
+    const T0: i64 = 1_640_995_200_000_000;
+
     // Test extension struct for testing
     #[derive(Debug)]
     pub(crate) struct TestExtension;
@@ -292,6 +258,14 @@ pub(crate) mod tests {
 
         fn children(&self) -> &[promql_parser::parser::Expr] {
             &[]
+        }
+
+        fn with_new_children(
+            &self,
+            children: Vec<promql_parser::parser::Expr>,
+        ) -> Arc<dyn promql_parser::parser::ast::ExtensionExpr> {
+            assert!(children.is_empty());
+            Arc::new(Self)
         }
     }
 
@@ -354,14 +328,8 @@ pub(crate) mod tests {
             _machers: promql_parser::label::Matchers,
             _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                std::sync::Arc<datafusion::arrow::datatypes::Schema>,
-                config::meta::search::ScanStats,
-                bool,
-            )>,
-        > {
+            _streaming: bool,
+        ) -> datafusion::error::Result<Vec<crate::ScanContext>> {
             Ok(vec![])
         }
     }
@@ -381,17 +349,78 @@ pub(crate) mod tests {
             matchers: promql_parser::label::Matchers,
             _label_selector: HashSet<String>,
             _filters: &mut [(String, Vec<String>)],
-        ) -> datafusion::error::Result<
-            Vec<(
-                datafusion::prelude::SessionContext,
-                std::sync::Arc<datafusion::arrow::datatypes::Schema>,
-                config::meta::search::ScanStats,
-                bool,
-            )>,
-        > {
+            _streaming: bool,
+        ) -> datafusion::error::Result<Vec<crate::ScanContext>> {
             *self.captured.lock().unwrap() = Some(matchers);
             Ok(vec![])
         }
+    }
+
+    /// Serves `m{job="api"}` on instances `a` = 100 and `b` = 200, sampled every minute.
+    struct TwoInstanceProvider(datafusion::prelude::SessionContext);
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for TwoInstanceProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            _stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: Matchers,
+            _label_selector: HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+            _streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
+            Ok(vec![crate::ScanContext::table(
+                self.0.clone(),
+                two_instance_schema(),
+                config::meta::search::ScanStats::default(),
+                true,
+            )])
+        }
+    }
+
+    fn two_instance_schema() -> Arc<datafusion::arrow::datatypes::Schema> {
+        use config::meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL};
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+        Arc::new(Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("job", DataType::Utf8, true),
+            Field::new("instance", DataType::Utf8, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+        ]))
+    }
+
+    fn two_instance_provider() -> TwoInstanceProvider {
+        use datafusion::arrow::array::{
+            Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array,
+        };
+        let rows: Vec<(i64, u64, &str, f64)> = (0..5)
+            .flat_map(|minute| {
+                let ts = T0 - minute * 60_000_000;
+                [(ts, 1, "a", 100.0), (ts, 2, "b", 200.0)]
+            })
+            .collect();
+        let batch = RecordBatch::try_new(
+            two_instance_schema(),
+            vec![
+                Arc::new(Int64Array::from_iter_values(rows.iter().map(|r| r.0))),
+                Arc::new(UInt64Array::from_iter_values(rows.iter().map(|r| r.1))),
+                Arc::new(Float64Array::from_iter_values(rows.iter().map(|r| r.3))),
+                Arc::new(StringArray::from_iter_values(rows.iter().map(|_| "api"))),
+                Arc::new(StringArray::from_iter_values(rows.iter().map(|r| r.2))),
+                Arc::new(StringArray::from_iter_values(rows.iter().map(|_| "m"))),
+            ],
+        )
+        .unwrap();
+        let table =
+            datafusion::datasource::MemTable::try_new(two_instance_schema(), vec![vec![batch]])
+                .unwrap();
+        let ctx = datafusion::prelude::SessionContext::new();
+        ctx.register_table("m", Arc::new(table)).unwrap();
+        TwoInstanceProvider(ctx)
     }
 
     #[test]
@@ -704,6 +733,43 @@ pub(crate) mod tests {
         let series = matrix(eval_on_empty(sparse, 3).await.unwrap());
         assert_eq!(series.len(), 2);
         assert_eq!(series.iter().map(|s| s.samples.len()).sum::<usize>(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_or_fills_gaps_into_one_series() {
+        let series = matrix(
+            eval_on_empty("(vector(time()) < 1640995260) or vector(2)", 3)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+        assert_eq!(values, vec![1640995200.0, 2.0, 2.0]);
+
+        let query = "sum_over_time(((vector(time()) < 1640995260) or vector(2))[2m:1m])";
+        let series = matrix(eval_on_empty(query, 2).await.unwrap());
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].samples.last().unwrap().value, 1640995202.0);
+    }
+
+    #[tokio::test]
+    async fn test_absent_drops_empty_matcher_labels() {
+        let series = matrix(
+            eval_on_empty(r#"absent(missing{job=""}) + vector(1)"#, 1)
+                .await
+                .unwrap(),
+        );
+        assert_eq!(series.len(), 1);
+        assert!(series[0].labels.is_empty());
+        assert_eq!(series[0].samples[0].value, 2.0);
+    }
+
+    #[tokio::test]
+    async fn test_unary_minus_of_nothing_is_nothing() {
+        assert!(matches!(
+            eval_on_empty("-up", 3).await.unwrap(),
+            Value::None
+        ));
     }
 
     fn single_value(value: Value) -> f64 {
@@ -1042,14 +1108,13 @@ pub(crate) mod tests {
         let func = Function {
             name: "time",
             arg_types: vec![],
-            variadic: false,
+            variadic: 0,
+            experimental: false,
             return_type: ValueType::Scalar,
         };
         let expr = PromExpr::Call(Call { func, args });
 
         let result = engine.exec_expr(&expr).await;
-        // This will fail because call_expr is not fully implemented, but we're testing the call
-        // logic
         assert!(result.is_ok());
     }
 
@@ -1183,5 +1248,42 @@ pub(crate) mod tests {
         let (value, result_type) = result.unwrap();
         assert!(matches!(value, Value::Float(42.0)));
         assert!(result_type.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_binary_inside_grouping_keeps_series_apart() {
+        let cases = [
+            ("sum by (job) (m / 2)", 150.0),
+            ("sum by (job) (m * 60)", 18000.0),
+            ("max by (job) (m - 1)", 199.0),
+            ("sum by (job) (m + m)", 600.0),
+            ("sum by (job) (abs(m))", 300.0),
+            ("sum by (job) (ceil(max_over_time(m[5m])))", 300.0),
+            ("count by (job) (timestamp(m))", 2.0),
+        ];
+        for (query, expected) in cases {
+            let trace_id = "test_trace";
+            let mut ctx = PromqlContext::new(
+                create_test_query_ctx(trace_id, "test_org", 30),
+                two_instance_provider(),
+                vec![],
+            );
+            ctx.start = T0;
+            ctx.end = T0;
+            let eval_ctx = EvalContext::new(T0, T0, 0, trace_id.to_string());
+            let mut engine = Engine::new(trace_id, Arc::new(ctx), eval_ctx);
+            let expr = promql_parser::parser::parse(query).unwrap();
+            let (value, _) = engine
+                .exec(&expr)
+                .await
+                .unwrap_or_else(|err| panic!("{query}: {err}"));
+            let Value::Matrix(series) = value else {
+                panic!("{query}: expected a matrix");
+            };
+            assert_eq!(series.len(), 1, "{query}");
+            assert_eq!(series[0].labels.get_value("job"), "api", "{query}");
+            assert_eq!(series[0].samples.len(), 1, "{query}");
+            assert_eq!(series[0].samples[0].value, expected, "{query}");
+        }
     }
 }

@@ -25,15 +25,30 @@ use crate::{
 };
 
 pub const USAGE_STREAM: &str = "usage";
+/// Duplicates the enterprise auditor's private stream name; the two are compared by value.
+pub const AUDIT_STREAM: &str = "audit";
 pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
-/// are rejected.
+/// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
 pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
+}
+
+/// Streams O2 writes itself; a closed list, since user stream names may start with `_` too.
+pub fn is_internal_stream(stream_name: &str) -> bool {
+    is_internal_rollup_stream(stream_name)
+        || matches!(
+            stream_name,
+            super::redaction::REDACTION_EVIDENCE_STREAM
+                | super::evaluator::EVALUATOR_STREAM
+                | super::llm_scores::LLM_SCORES_STREAM
+                | super::llm_experiments::LLM_EXPERIMENT_STREAM
+                | "_anomalies"
+        )
 }
 
 /// Outcome of a single scheduled evaluation — "did it fire?".
@@ -1452,6 +1467,32 @@ mod tests {
     }
 
     #[test]
+    fn test_is_internal_stream() {
+        for name in [
+            "_o2_db_stats",
+            "_o2_dbm_server",
+            "_agent_signals",
+            "_redaction_evidence",
+            "_evaluator",
+            "_llm_scores",
+            "_llm_experiment",
+            "_anomalies",
+        ] {
+            assert!(is_internal_stream(name), "{name}");
+        }
+        // User streams, including `_`-prefixed ones, are kept.
+        for name in [
+            "default",
+            "_orders",
+            "_orders_logs",
+            "_anomalies_v2",
+            "_rumlog",
+        ] {
+            assert!(!is_internal_stream(name), "{name}");
+        }
+    }
+
+    #[test]
     fn test_is_internal_rollup_stream() {
         // The whole _o2_ prefix family — existing rollup streams and any
         // future sibling — plus the pre-prefix-era _agent_signals.
@@ -1808,6 +1849,7 @@ mod tests {
             compressed_size: 1024 * 1024,   // 1MB
             flattened: false,
             index_size: 0,
+            mindex_size: 0,
             bloom_ver: 0,
         };
 
@@ -1895,6 +1937,7 @@ mod tests {
         assert_eq!(stats.max_ts, 0);
         assert!(stats.compressed_size.is_none());
         assert!(stats.index_size.is_none());
+        assert!(stats.mindex_size.is_none());
     }
 
     #[test]
@@ -1910,6 +1953,7 @@ mod tests {
             max_ts: 1234567999,
             compressed_size: Some(1.25),
             index_size: Some(0.75),
+            mindex_size: Some(0.0),
         };
 
         let json = serde_json::to_string(&stats).unwrap();
@@ -2631,4 +2675,6 @@ pub struct Stats {
     pub compressed_size: Option<f64>,
     #[serde(default)]
     pub index_size: Option<f64>,
+    #[serde(default)]
+    pub mindex_size: Option<f64>,
 }

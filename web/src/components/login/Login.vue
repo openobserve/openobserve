@@ -49,31 +49,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="max-width: 9.375rem; max-height: 1.9375rem"
           />
         </span>
-        <img
+        <a
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-          "
-          :src="
-            isDark
-              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-              : getImageURL('images/common/openobserve_latest_light_2.svg')
-          "
-        />
+          href="https://openobserve.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            class="appLogo h-auto"
+            :style="
+              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+            "
+            :src="
+              isDark
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
+            :alt="t('login.openObserveLogoAlt')"
+          />
+        </a>
       </div>
       <div class="mb-4 flex justify-center" v-else>
-        <img
-          class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
-          "
-          :src="
-            isDark
-              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-              : getImageURL('images/common/openobserve_latest_light_2.svg')
-          "
-        />
+        <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
+          <img
+            class="appLogo h-auto"
+            :style="
+              store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+            "
+            :alt="t('login.openObserveLogoAlt')"
+            :src="
+              isDark
+                ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                : getImageURL('images/common/openobserve_latest_light_2.svg')
+            "
+          />
+        </a>
       </div>
 
       <div v-if="autoRedirectDexLogin">
@@ -124,6 +134,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
+          <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
+          <OBanner
+            v-if="lockoutSecondsLeft > 0"
+            variant="error"
+            icon="error"
+            dense
+            class="mb-3"
+            :content="
+              t('login.lockedOut', { duration: raw(durationFormatter(lockoutSecondsLeft)) })
+            "
+            data-test="login-lockout-banner"
+          />
           <OForm
             :schema="loginSchema"
             :default-values="loginDefaults"
@@ -158,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               block
               type="submit"
               :loading="submitting"
+              :disabled="lockoutSecondsLeft > 0"
             >
               {{ t("login.login") }}
             </OButton>
@@ -169,11 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, onBeforeUnmount, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { durationFormatter } from "@/utils/formatters";
+import { usePasswordExpiryWarning } from "@/composables/usePasswordExpiryWarning";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
@@ -188,6 +213,7 @@ import { redirectUser } from "@/utils/common";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { openobserveRum } from "@openobserve/browser-rum";
@@ -197,13 +223,32 @@ import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton, OForm, OFormInput },
+  components: { OButton, OBanner, OForm, OFormInput },
 
   setup() {
     const store = useStore();
     const router = useRouter();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
+    const expiryWarning = usePasswordExpiryWarning();
+
+    // A countdown reaching zero is not "unlocked"; it only lets the server answer again.
+    const lockoutSecondsLeft = ref(0);
+    let lockoutTimer: ReturnType<typeof setInterval> | null = null;
+    const startLockoutCountdown = (secs: number) => {
+      lockoutSecondsLeft.value = Math.ceil(secs);
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(() => {
+        lockoutSecondsLeft.value -= 1;
+        if (lockoutSecondsLeft.value <= 0 && lockoutTimer) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+        }
+      }, 1000);
+    };
+    onBeforeUnmount(() => {
+      if (lockoutTimer) clearInterval(lockoutTimer);
+    });
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
@@ -242,11 +287,27 @@ export default defineComponent({
       return store.state.zoConfig.native_login_enabled;
     });
 
+    // Dex opens on its Create account tab when the request carries screen_hint=signup.
+    const withSignupHint = (url: string): string => {
+      if (router.currentRoute.value.query.mode !== "signup") return url;
+      try {
+        const target = new URL(url, window.location.origin);
+        if (target.searchParams.has("screen_hint")) return url;
+        // Appending to the raw search keeps the existing params byte-for-byte; re-serialising would re-encode them.
+        target.search = target.search
+          ? `${target.search}&screen_hint=signup`
+          : "?screen_hint=signup";
+        return target.toString();
+      } catch {
+        return url;
+      }
+    };
+
     const loginWithSSo = async () => {
       try {
         authService.get_dex_login().then((res) => {
           if (res) {
-            window.location.href = res;
+            window.location.href = withSignupHint(res);
             return;
           }
         });
@@ -279,6 +340,9 @@ export default defineComponent({
             .then(async (res: any) => {
               //if user is authorized, get user info
               if (res.data.status == true) {
+                // Absent when there is nothing to warn about; clearing covers a previous user of this tab.
+                expiryWarning.dismiss();
+                expiryWarning.remember(res.data.password_rotation_warning);
                 //get user info from backend and extract auth token and set it into localstorage
                 getBasicAuth(name.value, password.value);
                 const userInfo = {
@@ -293,7 +357,7 @@ export default defineComponent({
                 const encodedUserInfo: any = b64EncodeStandard(JSON.stringify(userInfo));
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
-                store.dispatch("setUserInfo", encodedUserInfo);
+                store.dispatch("setUserInfo", userInfo);
 
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
@@ -301,6 +365,7 @@ export default defineComponent({
                 if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
+                    id: userInfo.email,
                     name: userInfo.given_name + " " + userInfo.family_name,
                     email: userInfo.email,
                   });
@@ -404,9 +469,14 @@ export default defineComponent({
                 });
               }
             })
-            .catch(() => {
-              //if any error occurs, show error message and reset form.
+            .catch((error: any) => {
               submitting.value = false;
+              const retryAfter = error?.response?.data?.lockout_retry_after_secs;
+              if (retryAfter > 0) {
+                startLockoutCountdown(retryAfter);
+                return;
+              }
+              //if any error occurs, show error message and reset form.
               toast({
                 variant: "error",
                 message: t("toastMessages.login.invalidUsernameOrPassword"),
@@ -424,6 +494,9 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      durationFormatter,
+      lockoutSecondsLeft,
       name,
       password,
       confirmpassword,
@@ -440,6 +513,7 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      withSignupHint,
       config,
       autoRedirectDexLogin,
       isDark,

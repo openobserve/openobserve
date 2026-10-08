@@ -286,10 +286,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ param.key }}
                   </div>
                   <div class="flex flex-1 items-center gap-1 overflow-hidden">
-                    <span
-                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                    <OTruncatedText
+                      :tooltip="param.key === 'OpenObserveAccessKey' ? false : undefined"
+                      class="flex-1"
                       :class="paramValTextClass"
-                      >{{ param.value }}</span
+                      >{{ param.value }}</OTruncatedText
                     >
                     <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
                       <OIcon name="content-copy" size="sm" />
@@ -333,9 +334,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -351,6 +353,7 @@ export default defineComponent({
     OButton,
     OSelect,
     OTooltip,
+    OTruncatedText,
     OCheckbox,
     OIcon,
     OTag,
@@ -511,7 +514,7 @@ export default defineComponent({
       }
 
       window.open(url, "_blank", "noopener,noreferrer");
-      segment.track("AWS Complete Integration Started", {
+      analytics.track("AWS Complete Integration Started", {
         mode: "single",
         region: selectedRegion.value,
         services: enabledServices.value,
@@ -528,7 +531,7 @@ export default defineComponent({
       window.open(consoleUrl, "_blank", "noopener,noreferrer");
       showParamHelper.value = true;
 
-      segment.track("AWS StackSet Integration Started", {
+      analytics.track("AWS StackSet Integration Started", {
         mode: "stackset",
         model: stackSetModel.value,
         admin_region: selectedRegion.value,

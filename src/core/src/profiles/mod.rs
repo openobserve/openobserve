@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod attributes;
+mod otlp_json_compat;
+pub mod query;
+mod validation;
+
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
-use axum::{
-    http,
-    response::{IntoResponse, Response as HttpResponse},
-};
-use bytes::{Bytes, BytesMut};
+use axum::{http, response::Response as HttpResponse};
+use bytes::Bytes;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{otlp::OtlpRequestType, self_reporting::usage::UsageType, stream::StreamType},
@@ -45,10 +47,11 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use schema::check_for_schema;
 
+use self::attributes::resolve_any_value_string;
 use crate::{
     common::meta::{
         authz::Authz,
-        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::{otlp_error_response, otlp_export_response},
         stream::SchemaRecords,
     },
     ingestion::{
@@ -57,13 +60,10 @@ use crate::{
     },
 };
 
-mod otlp_json_compat;
-pub mod query;
-
-/// Transport-neutral failure from profile ingestion. HTTP and gRPC map this
-/// separately so a gate/circuit-breaker reject is not acknowledged as success.
+/// Ingestion failures retain their meaning across HTTP and gRPC.
 #[derive(Debug)]
 pub enum ProfilesExportError {
+    InvalidArgument(String),
     TrialPeriodExpired(String),
     Unavailable(String),
     Internal(anyhow::Error),
@@ -72,7 +72,9 @@ pub enum ProfilesExportError {
 impl std::fmt::Display for ProfilesExportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => write!(f, "{msg}"),
+            Self::InvalidArgument(msg) | Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => {
+                write!(f, "{msg}")
+            }
             Self::Internal(err) => write!(f, "{err}"),
         }
     }
@@ -85,56 +87,6 @@ fn ingestion_gate_error(err: infra::errors::Error) -> ProfilesExportError {
         ProfilesExportError::TrialPeriodExpired(err.to_string())
     } else {
         ProfilesExportError::Unavailable(err.to_string())
-    }
-}
-
-/// Minimal `google.rpc.Status` for OTLP/HTTP failure bodies.
-#[derive(Clone, PartialEq, Message)]
-struct GoogleRpcStatus {
-    #[prost(int32, tag = "1")]
-    code: i32,
-    #[prost(string, tag = "2")]
-    message: String,
-}
-
-/// Format an OTLP/HTTP error response, preserving the request Content-Type.
-///
-/// JSON requests get a ProtoJSON `google.rpc.Status`; protobuf requests get a
-/// binary-encoded Status with `application/x-protobuf`.
-pub fn otlp_error_response(
-    req_type: OtlpRequestType,
-    status: http::StatusCode,
-    rpc_code: i32,
-    message: impl Into<String>,
-) -> HttpResponse {
-    let message = message.into();
-    match req_type {
-        OtlpRequestType::HttpJson => {
-            let body = json::json!({
-                "code": rpc_code,
-                "message": message,
-            });
-            (
-                status,
-                [(http::header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
-                json::to_vec(&body).unwrap_or_default(),
-            )
-                .into_response()
-        }
-        _ => {
-            let rpc = GoogleRpcStatus {
-                code: rpc_code,
-                message,
-            };
-            let mut out = BytesMut::with_capacity(rpc.encoded_len());
-            rpc.encode(&mut out).expect("Out of memory");
-            (
-                status,
-                [(http::header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
-                out.to_vec(),
-            )
-                .into_response()
-        }
     }
 }
 
@@ -175,10 +127,17 @@ fn map_otlp_handler_error(
         OtlpRequestType::HttpProtobuf => "protobuf",
         OtlpRequestType::Grpc => "grpc",
     };
-    log::error!(
+    let level = if matches!(&err, ProfilesExportError::InvalidArgument(_)) {
+        log::Level::Warn
+    } else {
+        log::Level::Error
+    };
+    log::log!(
+        level,
         "[PROFILES:OTLP] Error while handling {kind} request: org_id: {org_id}, error: {err}"
     );
     let (status, rpc_code, msg) = match err {
+        ProfilesExportError::InvalidArgument(msg) => (http::StatusCode::BAD_REQUEST, 3, msg),
         ProfilesExportError::TrialPeriodExpired(msg) => {
             (http::StatusCode::TOO_MANY_REQUESTS, 8, msg) // RESOURCE_EXHAUSTED
         }
@@ -260,7 +219,7 @@ pub async fn otlp_proto(
     )
     .await
     {
-        Ok(v) => Ok(format_http_response(v, OtlpRequestType::HttpProtobuf)),
+        Ok(v) => Ok(otlp_export_response(&v, OtlpRequestType::HttpProtobuf)),
         Err(e) => Ok(map_otlp_handler_error(
             org_id,
             OtlpRequestType::HttpProtobuf,
@@ -289,7 +248,7 @@ pub async fn otlp_json(
         }
     };
     otlp_json_compat::normalize(&mut body_json);
-    let request = match serde_json::from_value::<ExportProfilesServiceRequest>(body_json) {
+    let request = match otlp_json_compat::deserialize(body_json) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[PROFILES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -311,7 +270,7 @@ pub async fn otlp_json(
     )
     .await
     {
-        Ok(v) => Ok(format_http_response(v, OtlpRequestType::HttpJson)),
+        Ok(v) => Ok(otlp_export_response(&v, OtlpRequestType::HttpJson)),
         Err(e) => Ok(map_otlp_handler_error(org_id, OtlpRequestType::HttpJson, e)),
     }
 }
@@ -332,6 +291,8 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+
+    validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
 
     let start = std::time::Instant::now();
     let started_at = now_micros();
@@ -368,6 +329,9 @@ pub async fn handle_otlp_request(
             }
         }
     }
+
+    #[cfg(feature = "vectorscan")]
+    apply_redaction(org_id, &stream_name, &mut all_records).await;
 
     if !all_records.is_empty() {
         buffer_records(
@@ -512,6 +476,57 @@ async fn buffer_records(
     Ok(())
 }
 
+/// Redacts flattened profile records before they are buffered for the WAL.
+#[cfg(feature = "vectorscan")]
+async fn apply_redaction(
+    org_id: &str,
+    stream_name: &str,
+    records: &mut Vec<json::Map<String, json::Value>>,
+) {
+    if records.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            StreamType::Profiles,
+        )
+    {
+        return;
+    }
+    let mut rows: Vec<(i64, json::Map<String, json::Value>)> = std::mem::take(records)
+        .into_iter()
+        .map(|record| {
+            let ts = record
+                .get(TIMESTAMP_COL_NAME)
+                .and_then(json::Value::as_i64)
+                .unwrap_or_default();
+            (ts, record)
+        })
+        .collect();
+    match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(pattern_manager) => {
+            if let Err(e) = pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Profiles,
+                stream_name,
+                &mut rows,
+            ) {
+                log::error!("[PROFILES] error applying SDR patterns for stream {stream_name}: {e}");
+            }
+        }
+        Err(e) => {
+            log::error!("[PROFILES] failed to get pattern manager for SDR redaction: {e}");
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                org_id,
+                StreamType::Profiles,
+                std::iter::once((stream_name, rows.as_slice())),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+            )
+            .await;
+        }
+    }
+    records.extend(rows.into_iter().map(|(_, record)| record));
+}
+
 /// `rejected_profiles` counts whole OTLP Profile messages, not flattened samples.
 ///
 /// Any dropped observation marks the containing Profile as rejected so the
@@ -530,53 +545,6 @@ fn export_service_response(
     partial_success.error_message = "Some profiles were rejected due to out-of-window timestamps, malformed samples, or empty samples".to_string();
     ExportProfilesServiceResponse {
         partial_success: Some(partial_success),
-    }
-}
-
-/// Serialize an export response using ProtoJSON rules (int64 as decimal string).
-fn export_response_to_proto_json(res: &ExportProfilesServiceResponse) -> json::Value {
-    match &res.partial_success {
-        Some(ps) if ps.rejected_profiles != 0 || !ps.error_message.is_empty() => {
-            let mut partial = json::Map::new();
-            if ps.rejected_profiles != 0 {
-                partial.insert(
-                    "rejectedProfiles".to_string(),
-                    json::Value::String(ps.rejected_profiles.to_string()),
-                );
-            }
-            if !ps.error_message.is_empty() {
-                partial.insert(
-                    "errorMessage".to_string(),
-                    json::Value::String(ps.error_message.clone()),
-                );
-            }
-            json::json!({ "partialSuccess": partial })
-        }
-        _ => json::json!({}),
-    }
-}
-
-fn format_http_response(
-    res: ExportProfilesServiceResponse,
-    req_type: OtlpRequestType,
-) -> HttpResponse {
-    match req_type {
-        OtlpRequestType::HttpJson => (
-            http::StatusCode::OK,
-            [(http::header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
-            json::to_vec(&export_response_to_proto_json(&res)).expect("serialize response"),
-        )
-            .into_response(),
-        _ => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            (
-                http::StatusCode::OK,
-                [(http::header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
-                out.to_vec(),
-            )
-                .into_response()
-        }
     }
 }
 
@@ -785,10 +753,11 @@ fn build_sample_records(
                 record.insert(key.clone(), value.clone());
             }
 
+            // `stack` is excluded: redaction runs later, so its digest would outlive the text.
             let event_id = format!(
                 "{:x}",
                 md5::compute(format!(
-                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{stack}/{value}"
+                    "{org_id}/{stream_name}/{timestamp}/{profile_id}/{sample_idx}/{obs_idx}/{value}"
                 ))
             );
             record.insert("event_id".to_string(), json::Value::String(event_id));
@@ -1119,30 +1088,6 @@ fn resolve_key_value_string(
     resolve_any_value_string(attr.value.as_ref(), dictionary)
 }
 
-fn resolve_any_value_string(
-    value: Option<&opentelemetry_proto::tonic::common::v1::AnyValue>,
-    dictionary: Option<&ProfilesDictionary>,
-) -> Option<String> {
-    let value = value?;
-    match value.value.as_ref() {
-        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValueStrindex(
-            index,
-        )) => lookup_string(
-            dictionary.map(|d| d.string_table.as_slice()).unwrap_or(&[]),
-            *index,
-        ),
-        _ => {
-            let normalized = crate::ingestion::grpc::get_val_with_type_retained(&Some(value));
-            let string_value = config::utils::json::get_string_value(&normalized);
-            if string_value.is_empty() {
-                None
-            } else {
-                Some(string_value)
-            }
-        }
-    }
-}
-
 fn resource_attr_tag_key(otel_key: &str) -> String {
     if let Some((_, alias)) = TAG_RESOURCE_ATTR_ALIASES
         .iter()
@@ -1201,6 +1146,10 @@ mod tests {
     };
 
     use super::*;
+    use crate::common::meta::{
+        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+        otlp::export_response_to_proto_json,
+    };
 
     #[test]
     fn lookup_string_skips_zero_and_empty() {
@@ -1931,6 +1880,129 @@ mod tests {
     }
 
     #[test]
+    fn collector_empty_attribute_wire_sentinel_survives_record_extraction() {
+        let mut dictionary = ProfilesDictionary::decode(&[0x32, 0x02, 0x12, 0x00][..]).unwrap();
+        dictionary.string_table = vec!["".into(), "context".into(), "worker-1".into()];
+        dictionary.attribute_table.push(KeyValueAndUnit {
+            key_strindex: 1,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(2)),
+            }),
+            ..Default::default()
+        });
+        let request = ExportProfilesServiceRequest {
+            dictionary: Some(dictionary),
+            resource_profiles: vec![ResourceProfiles {
+                scope_profiles: vec![ScopeProfiles {
+                    profiles: vec![Profile {
+                        samples: vec![Sample {
+                            attribute_indices: vec![1],
+                            values: vec![7],
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let request =
+            ExportProfilesServiceRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["context"], "worker-1");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
+    fn omitted_empty_collection_values_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "empty.array", "empty.kv", "nested"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {}}},
+                    {"keyStrindex": 3, "value": {"arrayValue": {"values": [{"arrayValue": {}}, {"kvlistValue": {}}]}}}
+                ]
+            },
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2, 3], "values": [7]}]}]}]}]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["empty_array"], "[]");
+        assert_eq!(records[0]["empty_kv"], "{}");
+        assert_eq!(records[0]["nested"], "[[],{}]");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
+    fn nested_json_string_references_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "sample.array", "sample.kv", "worker-1", "label"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {"values": [{"keyStrindex": 4, "value": {"stringValueStrindex": 3}}]}}}
+                ]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"key": "context.array", "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}}]},
+                "scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2], "values": [7]}]}]}]
+            }]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["sample_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["sample_kv"], r#"{"label":"worker-1"}"#);
+        assert_eq!(records[0]["context_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
     fn resource_attr_tag_key_uses_aliases_and_dot_replace() {
         assert_eq!(resource_attr_tag_key("k8s.pod.name"), "k8s_pod_name");
         assert_eq!(resource_attr_tag_key("cloud.region"), "cloud_region");
@@ -2329,6 +2401,56 @@ mod tests {
         assert!(matches!(resource, ProfilesExportError::Unavailable(_)));
     }
 
+    #[tokio::test]
+    async fn malformed_dictionary_returns_http_400_with_otlp_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        for index in [-1, 99] {
+            let mut payload = json::json!({
+                "dictionary": {
+                    "stringTable": ["", "thread.name"],
+                    "attributeTable": [{}, {"keyStrindex": 1, "value": {"stringValueStrindex": index}}]
+                },
+                "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1], "values": [1]}]}]}]}]
+            });
+            otlp_json_compat::normalize(&mut payload);
+            let request = otlp_json_compat::deserialize(payload).unwrap();
+            let message = validation::validate(&request).unwrap_err();
+            assert!(message.contains(&format!(
+                "dictionary.attribute_table[1].value.string_value_strindex: index {index}"
+            )));
+            for req_type in [OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf] {
+                let response = map_otlp_handler_error(
+                    "default",
+                    req_type,
+                    ProfilesExportError::InvalidArgument(message.clone()),
+                );
+                assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+                let expected_type = if req_type == OtlpRequestType::HttpJson {
+                    CONTENT_TYPE_JSON
+                } else {
+                    CONTENT_TYPE_PROTO
+                };
+                assert_eq!(
+                    response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+                    expected_type
+                );
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                if req_type == OtlpRequestType::HttpJson {
+                    let status: json::Value = json::from_slice(&body).unwrap();
+                    assert_eq!(status["code"], 3);
+                    assert_eq!(status["message"], message);
+                } else {
+                    let status = GoogleRpcStatus::decode(body).unwrap();
+                    assert_eq!(status.code, 3);
+                    assert_eq!(status.message, message);
+                }
+            }
+        }
+    }
+
     #[test]
     fn map_otlp_handler_error_keeps_http_429_and_503() {
         let trial = map_otlp_handler_error(
@@ -2379,28 +2501,28 @@ mod tests {
     }
 
     #[test]
-    fn format_http_response_uses_200_for_partial_success() {
+    fn otlp_export_response_uses_200_for_partial_success() {
         let res = export_service_response(ExportProfilesPartialSuccess {
             rejected_profiles: 1,
             error_message: String::new(),
         });
         assert_eq!(
-            format_http_response(res.clone(), OtlpRequestType::HttpJson).status(),
+            otlp_export_response(&res, OtlpRequestType::HttpJson).status(),
             http::StatusCode::OK
         );
         assert_eq!(
-            format_http_response(res, OtlpRequestType::HttpProtobuf).status(),
+            otlp_export_response(&res, OtlpRequestType::HttpProtobuf).status(),
             http::StatusCode::OK
         );
     }
 
     #[test]
-    fn format_http_response_emits_proto_json_rejected_profiles_string() {
+    fn otlp_export_response_emits_proto_json_rejected_profiles_string() {
         let res = export_service_response(ExportProfilesPartialSuccess {
             rejected_profiles: 1,
             error_message: String::new(),
         });
-        let response = format_http_response(res.clone(), OtlpRequestType::HttpJson);
+        let response = otlp_export_response(&res, OtlpRequestType::HttpJson);
         assert_eq!(
             response.headers().get(http::header::CONTENT_TYPE).unwrap(),
             CONTENT_TYPE_JSON

@@ -61,28 +61,38 @@ describe("groupNavLinks", () => {
       link("metrics"),
       link("traces"),
       link("rum"),
+      link("productAnalytics"),
       link("dashboards"),
       link("alertList"),
       link("iam"),
       link("settings"),
     ];
-    // Output mirrors the input order exactly (no reordering). Only alertList
-    // changes shape — it collapses into the Reliability tile in its own slot —
-    // and traces, which keeps its slot but gains its NAV_SUBNAV flyout. Infra
-    // is the one INSERTION: it absorbs nothing, so it adds a tile rather than
-    // replacing one, anchored directly after Reliability.
+    // Output mirrors the input order exactly (no reordering). rum and
+    // productAnalytics fold into the Experience tile in rum's slot, alertList
+    // into Reliability in its own, and traces keeps its slot with its NAV_SUBNAV
+    // flyout. Infra is the one INSERTION: it absorbs nothing, so it adds a tile
+    // rather than replacing one, anchored directly after Reliability.
     expect(keysOf(groupNavLinks(input))).toEqual([
       "link:home",
       "link:logs",
       "link:metrics",
       "linkGroup:traces",
-      "link:rum",
+      "linkGroup:experience",
       "link:dashboards",
       "linkGroup:reliability",
       "linkGroup:infra",
       "link:iam",
       "link:settings",
     ]);
+  });
+
+  it("renders nothing for an empty input, even though Infra is standalone", () => {
+    // Regression: MainLayout holds `linksList` at `[]` until `menuReady`
+    // (config load settles), specifically so the rail doesn't pop tiles in.
+    // Infra's children carry no `requires`, so without an explicit empty-input
+    // guard it would still qualify as active and render alone on refresh,
+    // ahead of every other tile, until the real list arrived a beat later.
+    expect(groupNavLinks([])).toEqual([]);
   });
 
   it("routes every Traces flyout item through the canonical query tab", () => {
@@ -396,27 +406,97 @@ describe("groupNavLinks", () => {
     expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:dashboards"]);
   });
 
-  it("groups RUM and Synthetics under the Experience tile", () => {
+  const experienceGroup = (entries: RailEntry[]) =>
+    entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "experience",
+    );
+
+  it("groups RUM, Synthetics and Product Analytics under the Experience tile, in that order", () => {
     const entries = groupNavLinks([
       link("home"),
       link("rum"),
+      link("productAnalytics"),
       link("synthetics"),
       link("alertList"),
     ]);
-    // rum/synthetics are absorbed; the Experience tile takes rum's slot.
+    // All three are absorbed; the Experience tile takes rum's slot.
     expect(keysWithoutInfra(entries)).toEqual([
       "link:home",
       "linkGroup:experience",
       "linkGroup:reliability",
     ]);
-    const experience = entries.find(
-      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
-        e.type === "linkGroup" && e.item.name === "experience",
-    );
+    const experience = experienceGroup(entries);
     // Clicking the tile lands on RUM (always-present route).
     expect(experience?.item.link).toBe("/rum");
-    // Children navigate by route name: RUM + synthetics.
-    expect(experience?.children.map((c) => c.name)).toEqual(["RUM", "synthetics"]);
+    expect(experience?.children.map((c) => c.name)).toEqual([
+      "RUM",
+      "synthetics",
+      "productAnalytics",
+    ]);
+  });
+
+  it("still forms Experience from RUM and Product Analytics when Synthetics is off", () => {
+    const entries = groupNavLinks([
+      link("home"),
+      link("traces"),
+      link("rum"),
+      link("productAnalytics"),
+      link("dashboards"),
+    ]);
+    expect(keysWithoutInfra(entries)).toEqual([
+      "link:home",
+      "linkGroup:traces",
+      "linkGroup:experience",
+      "link:dashboards",
+    ]);
+    expect(experienceGroup(entries)?.children.map((c) => c.name)).toEqual([
+      "RUM",
+      "productAnalytics",
+    ]);
+  });
+
+  it("never renders a standalone Product Analytics tile or flyout", () => {
+    const entries = groupNavLinks([link("rum"), link("productAnalytics"), link("synthetics")]);
+    expect(entries.some((e) => e.type !== "group" && e.item.name === "productAnalytics")).toBe(
+      false,
+    );
+    expect(NAV_SUBNAV.productAnalytics).toBeUndefined();
+  });
+
+  it("declares Product Analytics like its sibling children, lit on every Product Analytics route", () => {
+    const pa = NAV_GROUPS.find((g) => g.key === "experience")?.children.find(
+      (c) => c.name === "productAnalytics",
+    );
+    expect(pa).toMatchObject({
+      titleKey: "menu.productAnalytics",
+      icon: "insights",
+      name: "productAnalytics",
+      requires: "productAnalytics",
+    });
+    expect(pa?.activeOnRoutes).toEqual(
+      expect.arrayContaining([
+        "productAnalyticsOverview",
+        "productAnalyticsFunnels",
+        "productAnalyticsFunnelBuilder",
+        "productAnalyticsPaths",
+        "productAnalyticsRetention",
+        "productAnalyticsEvents",
+        "productAnalyticsEventNew",
+        "productAnalyticsEventEdit",
+      ]),
+    );
+  });
+
+  it("drops only the Product Analytics child when it is hidden by name", () => {
+    // custom_hide_menus=productAnalytics removes it from linksList, so `requires` drops the child.
+    const entries = groupNavLinks([link("home"), link("rum"), link("synthetics")]);
+    expect(experienceGroup(entries)?.children.map((c) => c.name)).toEqual(["RUM", "synthetics"]);
+  });
+
+  it("leaves Synthetics a plain tile when RUM (and with it Product Analytics) is hidden", () => {
+    const entries = groupNavLinks([link("home"), link("synthetics"), link("dashboards")]);
+    expect(keysWithoutInfra(entries)).toEqual(["link:home", "link:synthetics", "link:dashboards"]);
   });
 
   it("keeps RUM a plain link when Synthetics is absent", () => {
@@ -479,10 +559,11 @@ describe("groupNavLinks", () => {
       "infraHosts",
       "dbmDatabases",
       "infraKubernetes",
+      "infraKubernetes2",
     ]);
   });
 
-  it("declares the two workload children ungated, with their titleKey/icon/route", () => {
+  it("declares the workload children ungated, with their titleKey/icon/route", () => {
     // Ungated = always present under Infra; detection changes page state, never existence.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     const byName = (name: string) => infra?.children.find((c) => c.name === name);
@@ -496,7 +577,12 @@ describe("groupNavLinks", () => {
       icon: "hub",
       name: "infraKubernetes",
     });
-    for (const name of ["infraHosts", "infraKubernetes"]) {
+    expect(byName("infraKubernetes2")).toMatchObject({
+      titleKey: "menu.kubernetes2",
+      icon: "hub",
+      name: "infraKubernetes2",
+    });
+    for (const name of ["infraHosts", "infraKubernetes", "infraKubernetes2"]) {
       expect(byName(name)?.gate, name).toBeUndefined();
     }
   });
@@ -563,7 +649,7 @@ describe("groupNavLinks", () => {
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(3);
+    expect(infra?.children).toHaveLength(4);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 
@@ -683,6 +769,51 @@ describe("groupNavLinks", () => {
         if (c.gate) expect(GATE_PREDICATES[c.gate]).toBeTypeOf("function");
       }
     }
+  });
+});
+
+describe("ship guards (AC-15, AC-22, D-27)", () => {
+  it("keeps the Reliability flyout children exactly: no on-call My on-call or Policies rows (AC-15, D-8)", () => {
+    const reliability = NAV_GROUPS.find((g) => g.key === "reliability")!;
+    expect(reliability.children.map((c) => c.name)).toEqual([
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+      "alertLibrary",
+      "sloList",
+      "incidentList",
+      "onCallResponses",
+      "onCallTeams",
+      "onCallRouting",
+      "alertSources",
+    ]);
+  });
+
+  it("still lands the Traces tile on the Spans tab (AC-22, #13852)", () => {
+    const spans = NAV_SUBNAV.traces.find((c) => c.tab === "spans")!;
+    expect(spans.defaultForRoute).toBe(true);
+    expect(NAV_SUBNAV.traces.filter((c) => c.defaultForRoute)).toHaveLength(1);
+  });
+
+  it("emits the children its requires/gate filter removed as `filtered` (D-27)", () => {
+    const entries = groupNavLinks(
+      [
+        { title: "Home", icon: "home", link: "/home", name: "home" },
+        { title: "Alerts", icon: "shield", link: "/alerts", name: "alertList" },
+      ],
+      undefined,
+      () => true,
+    );
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    expect(reliability?.filtered?.map((c) => c.name)).toEqual([
+      "sloList",
+      "incidentList",
+      "alertSources",
+    ]);
+    expect(reliability?.children.some((c) => c.name === "alertSources")).toBe(false);
   });
 });
 

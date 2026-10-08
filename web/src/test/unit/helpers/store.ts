@@ -19,6 +19,8 @@ import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types
 // Mirror of the initial organizationData below; used by resetOrganizationData.
 const organizationObj = {
   organizationPasscode: "",
+  organizationPasscodeForbidden: false,
+  orgTokens: [] as Array<{ name: string; token: string; enabled: boolean }>,
   allDashboardList: {},
   rumToken: {
     rum_token: "",
@@ -95,6 +97,10 @@ const store = createStore({
       // written against. The specs that cover the OSS shape set it to false
       // themselves.
       synthetics_private_locations_enabled: true,
+      // Subtests default on in the fixture; specs for the flag off set it themselves.
+      synthetics_subtests_enabled: true,
+      // The server's configurable step cap; specs covering an override set it themselves.
+      synthetics_browser_max_steps: 50,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",
@@ -161,6 +167,8 @@ const store = createStore({
     },
     organizationData: {
       organizationPasscode: "",
+      organizationPasscodeForbidden: false,
+      orgTokens: [] as Array<{ name: string; token: string; enabled: boolean }>,
       allDashboardList: {},
       rumToken: {
         rum_token: "",
@@ -237,6 +245,12 @@ const store = createStore({
     },
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
+    },
+    setOrganizationPasscodeForbidden(state, payload) {
+      state.organizationData.organizationPasscodeForbidden = payload;
+    },
+    setOrgTokens(state, payload) {
+      state.organizationData.orgTokens = payload;
     },
     resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
@@ -493,6 +507,12 @@ const store = createStore({
     },
     setOrganizationPasscode(context, payload) {
       context.commit("setOrganizationPasscode", payload);
+    },
+    setOrganizationPasscodeForbidden(context, payload) {
+      context.commit("setOrganizationPasscodeForbidden", payload);
+    },
+    setOrgTokens(context, payload) {
+      context.commit("setOrgTokens", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);

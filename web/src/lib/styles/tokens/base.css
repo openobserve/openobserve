@@ -227,6 +227,15 @@
   --color-chart-series-11: #e879f9;
   --color-chart-series-12: #facc15;
 
+  /* Map heat ramp, calm low (1) to hot high (5): every step keeps 3:1 against surface-base. */
+  --color-map-seq-1: #05a92e;
+  --color-map-seq-2: #819307;
+  --color-map-seq-3: #a57c04;
+  --color-map-seq-4: #bd6100;
+  --color-map-seq-5: #d72601;
+  /* Map group card header band: 1.2:1 or more against surface-base, so it reads as a header. */
+  --color-map-card-header: var(--color-grey-200);
+
   --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
 
   /* --- Dashboard table row-highlight palette — light values (dark overrides in
@@ -260,6 +269,9 @@
      1.4.11 exempt (object required to understand content), raised for
      perceptibility rather than to hit 3:1. --- */
   --color-chart-gridline: rgba(0, 0, 0, 0.2);
+
+  /* Expected-range band fill; alpha lives in the token so the legend swatch matches. */
+  --color-chart-band: rgba(115, 115, 115, 0.22);
 
   /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
      dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
@@ -475,6 +487,12 @@
   --color-syntax-addition-bg: #f0fff4;
   --color-syntax-deletion-fg: #b31d28;
   --color-syntax-deletion-bg: #ffeef0;
+  /* Read-only colorized queries (colorizeQuery): the query editor's Monaco hues, nudged to clear 4.5:1 on surface-subtle. */
+  --color-query-syntax-keyword: #0000ff;
+  --color-query-syntax-function: #c700c7;
+  --color-query-syntax-string: #a31515;
+  --color-query-syntax-number: #097f53;
+  --color-query-syntax-comment: #008000;
   /* Brand gradients — theme-independent (same in light/dark) unless noted.
      One AI gradient reused widely; -subtle/-faint are its idle washes
      (dark alpha bumped in dark.css). */
@@ -499,8 +517,16 @@
   --color-brand-slack-hover: #005a42;
   --color-brand-teams: #6264a7;
   --color-brand-teams-hover: #464775;
-  --color-brand-email: #007bff;
+  /* #0069d9, not the stock #007bff: white on #007bff is 3.98:1, under AA. */
+  --color-brand-email: #0069d9;
   --color-brand-email-hover: #0056b3;
+  /* CTA labels on the slack/teams/email fills above and --color-brand-email-ink
+     below. Always white, never --color-text-inverse, which turns near-black in
+     dark mode while these fills stay put. */
+  --color-brand-slack-foreground: var(--color-white);
+  --color-brand-teams-foreground: var(--color-white);
+  --color-brand-email-foreground: var(--color-white);
+  --color-brand-email-ink-foreground: var(--color-white);
   --color-promo-webinar-link: #1e3a8a;
   --color-promo-webinar-link-hover: #1e40af;
   /* Home-banner accent (theme-independent, matches the amber header top-bar).

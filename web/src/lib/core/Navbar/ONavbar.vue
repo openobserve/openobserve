@@ -15,16 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- The edge fades are masks on the rail's own pixels: no element, no width, no height. -->
   <nav
+    ref="navRef"
     v-show="visible"
     v-bind="$attrs"
     role="navigation"
     :aria-label="t('components.navbar.mainNavigation')"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] flex-col overflow-y-auto pb-1 max-md:w-full"
+    :data-overflow-top="overflowTop ? 'true' : undefined"
+    :data-overflow-bottom="overflowBottom ? 'true' : undefined"
+    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] flex-col overflow-y-auto pb-1 data-overflow-bottom:mask-b-from-[calc(100%-3rem)] data-overflow-top:mask-t-from-[calc(100%-3rem)] max-md:w-full"
     :class="overlay ? 'fixed inset-y-0 left-0 z-40 shadow-lg' : 'shrink-0'"
     @keydown="handleKeydown"
+    @scroll.passive="updateOverflow"
+    @click.capture="markRailNavigation"
+    @focusin="onRailFocusin"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
          - link:      plain navigating MenuLink.
@@ -46,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="entry.type === 'link'"
           :link-name="entry.item.name"
           v-bind="{ ...entry.item, mini: miniMode }"
+          :paywalled="isPaywalled(entry.item.link)"
           @mouseenter="emit('menu-hover', entry.item.link)"
         />
         <ONavGroup
@@ -54,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="entry.item.title"
           :icon="entry.item.icon"
           :children="entry.children"
+          :filtered-children="entry.filtered"
           :parent-item="entry.item"
           @mouseenter="emit('menu-hover', entry.item.link)"
         />
@@ -88,11 +97,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { useRouter, type NavigationFailure, type RouteLocationNormalized } from "vue-router";
 import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
-import { RailIndicatorActiveKey } from "./ONavbar.types";
+import { RailIndicatorActiveKey, RailNavigationMarkKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
+import { findContentFocusTarget, findHeaderFocusTarget } from "./railFocus";
+import {
+  RAIL_FADE_REM,
+  hrefPathname,
+  isFocusVisible,
+  railClickPath,
+  revealScrollTop,
+} from "./railReveal";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import MenuLink from "@/components/MenuLink.vue";
 import ONavGroup from "./ONavGroup.vue";
 
@@ -109,6 +128,11 @@ const emit = defineEmits<NavbarEmits>();
 defineSlots<NavbarSlots>();
 
 const { t } = useI18nTyped();
+
+// Fade and reveal are desktop-rail only: the drawer keeps its scroll where the user left it.
+const { isMobile } = useBreakpoint();
+
+const { isPaywalled } = useTrialPaywall();
 
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom
@@ -138,6 +162,7 @@ const bottomEntries = computed(
 // rail is hidden so a bogus 0-position is never stored.
 const router: any = useRouter();
 
+const navRef = ref<HTMLElement | null>(null);
 const indicatorRef = ref<HTMLElement | null>(null);
 const indicatorStyle = ref<Record<string, string>>({});
 const indicatorVisible = ref(false);
@@ -176,6 +201,83 @@ const measure = (animated: boolean) => {
   };
 };
 
+// ── Edge fade and reveal ────────────────────────────────────────────────────
+const overflowTop = ref(false);
+const overflowBottom = ref(false);
+
+function updateOverflow() {
+  const nav = navRef.value;
+  if (!nav || isMobile.value) {
+    overflowTop.value = false;
+    overflowBottom.value = false;
+    return;
+  }
+  const maxScrollTop = nav.scrollHeight - nav.clientHeight;
+  overflowTop.value = nav.scrollTop > 1;
+  overflowBottom.value = nav.scrollTop < maxScrollTop - 1;
+}
+
+function rootFontPx(): number {
+  const size = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  return Number.isFinite(size) && size > 0 ? size : 16;
+}
+
+// Moves the rail's own scrollTop only; scrollIntoView would drag every ancestor scroller.
+function applyReveal(tile: HTMLElement) {
+  const nav = navRef.value;
+  if (!nav || isMobile.value) return;
+  const railRect = nav.getBoundingClientRect();
+  const tileRect = tile.getBoundingClientRect();
+  const next = revealScrollTop({
+    railTop: railRect.top,
+    railBottom: railRect.bottom,
+    tileTop: tileRect.top,
+    tileBottom: tileRect.bottom,
+    scrollTop: nav.scrollTop,
+    maxScrollTop: nav.scrollHeight - nav.clientHeight,
+    fadePx: RAIL_FADE_REM * rootFontPx(),
+  });
+  if (next === null) return;
+  nav.scrollTop = next;
+  updateOverflow();
+}
+
+function revealActiveTile() {
+  const active = navRef.value?.querySelector<HTMLElement>(".nav-menu-item--active");
+  if (active) applyReveal(active);
+}
+
+// The path of the last rail-started click; consumed by the next navigation.
+let pendingMark: string | null = null;
+
+function markRailNavigation(event: MouseEvent) {
+  pendingMark = railClickPath(event);
+}
+
+// A navigation the user started by pointing at a tile never moves the rail under the pointer.
+async function onAfterNavigation(
+  to: RouteLocationNormalized,
+  _from: RouteLocationNormalized,
+  failure?: NavigationFailure | void,
+): Promise<void> {
+  const mark = pendingMark;
+  pendingMark = null;
+  if (failure || isMobile.value) return;
+  const requested = to.redirectedFrom ?? to;
+  if (mark !== null && hrefPathname(router.resolve(requested.fullPath).href) === mark) return;
+  await nextTick();
+  revealActiveTile();
+}
+
+// Keyboard focus lands in the clear band; mouse focus is not :focus-visible, so a click never scrolls.
+function onRailFocusin(event: FocusEvent) {
+  const tile = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+    "a[data-test^='menu-link-'], button[data-test^='menu-link-']",
+  );
+  if (!tile || !isFocusVisible(tile)) return;
+  applyReveal(tile);
+}
+
 // Slide to the newly-active tile when the route changes …
 watch(
   () => router.currentRoute.value.fullPath,
@@ -190,21 +292,39 @@ watch(
 watch(railEntries, async () => {
   await nextTick();
   measure(false);
+  updateOverflow();
+  revealActiveTile();
 });
 
+let removeAfterEach: (() => void) | null = null;
+
 onMounted(async () => {
+  removeAfterEach = router.afterEach(onAfterNavigation);
   await nextTick();
   measure(false);
+  updateOverflow();
+  revealActiveTile();
+  // Web fonts land after first paint and move every tile by a hair, which can leave the revealed one 1 px under the fade.
+  document.fonts?.ready.then(() => {
+    updateOverflow();
+    revealActiveTile();
+  });
   // … but snap (not slide) when tile sizes/visibility change — reflow, the rail
   // being revealed, labels rewrapping — none of which are user selections.
   const list = indicatorRef.value?.parentElement;
   if (list && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => measure(false));
+    resizeObserver = new ResizeObserver(() => {
+      measure(false);
+      updateOverflow();
+    });
     resizeObserver.observe(list);
+    if (navRef.value) resizeObserver.observe(navRef.value);
   }
 });
 
 onBeforeUnmount(() => {
+  removeAfterEach?.();
+  removeAfterEach = null;
   resizeObserver?.disconnect();
   resizeObserver = null;
 });
@@ -226,6 +346,8 @@ provide(
   RailIndicatorActiveKey,
   computed(() => indicatorVisible.value),
 );
+
+provide(RailNavigationMarkKey, markRailNavigation);
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
 
@@ -261,16 +383,9 @@ function handleKeydown(event: KeyboardEvent) {
     }
     case "Tab": {
       event.preventDefault();
-      const target = event.shiftKey
-        ? document.querySelector<HTMLElement>(
-            '.o2-app-header a[href], .o2-app-header button, .o2-app-header [tabindex]:not([tabindex="-1"])',
-          )
-        : document.querySelector<HTMLElement>(
-            '.o2-content-scroll a[href]:not([tabindex="-1"]), .o2-content-scroll button:not([disabled]):not([tabindex="-1"]), .o2-content-scroll input:not([disabled]):not([tabindex="-1"]), .o2-content-scroll select:not([disabled]):not([tabindex="-1"]), .o2-content-scroll [tabindex]:not([tabindex="-1"])',
-          );
-      if (target) {
-        target.focus();
-      }
+      // Region jump: the first VISIBLE control, so the desktop's hidden hamburger cannot swallow focus.
+      const target = event.shiftKey ? findHeaderFocusTarget() : findContentFocusTarget();
+      target?.focus();
       break;
     }
   }

@@ -187,7 +187,7 @@ export function useStreamDetect(opts: UseStreamDetectOptions) {
   return {
     state,
     count,
-    /** Run one check ("Test" / "Test Again" / "I fixed it"). */
+    /** Run one check ("Test" / "Test again" / "I fixed it"). */
     check,
     reset,
     idle: computed(() => state.value === "idle"),

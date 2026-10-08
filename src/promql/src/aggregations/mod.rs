@@ -26,12 +26,15 @@ use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{LabelModifier, token};
 use rayon::prelude::*;
 
+use crate::scalar_param::ScalarParam;
+
 mod avg;
 mod count;
 mod count_values;
 mod dispersion;
 mod extrema;
 mod group;
+mod limit;
 mod max;
 mod min;
 mod quantile;
@@ -44,6 +47,7 @@ pub(crate) use avg::Avg;
 pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
 pub(crate) use group::Group;
+pub(crate) use limit::Limit;
 pub(crate) use max::Max;
 pub(crate) use min::Min;
 pub(crate) use quantile::quantile;
@@ -54,6 +58,9 @@ pub(crate) use sum::{Sum, SumState};
 
 /// Series per parallel partial-aggregation chunk when a single group is large.
 const AGG_PARALLEL_CHUNK: usize = 32768;
+// upstream's bounds for a k converted to int64 (`engine.go`)
+const MAX_K: f64 = 9_223_372_036_854_774_784.0;
+const MIN_K: f64 = -9_223_372_036_854_775_808.0;
 
 /// Trait for PromQL aggregation operators.
 ///
@@ -180,35 +187,36 @@ pub trait Accumulate: Send + Sync + Sized {
 /// through [`AggOp::eval_aggregate`] and the streaming path through `streaming_eval::aggregate`,
 /// each matching once into the monomorphized fold for the chosen [`AggFunc`]. Operators that
 /// are not listed here (`quantile`, `count_values`) are evaluated by their own functions.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum AggOp {
     Avg,
-    Bottomk(usize),
+    Bottomk(ScalarParam),
     Count,
     Group,
+    Limitk(ScalarParam),
+    LimitRatio(ScalarParam),
     Max,
     Min,
     Stddev,
     Stdvar,
     Sum,
-    Topk(usize),
+    Topk(ScalarParam),
 }
 
 impl AggOp {
     /// The operator of a token with its evaluated parameter; the error of an unsupported
     /// operator or of a k that is not a number.
-    pub(crate) fn new(op: &token::TokenType, param: Option<Value>) -> Result<Self> {
-        let k = |name: &str| match param {
-            Some(Value::Float(value)) => Ok(value as usize),
-            _ => Err(DataFusionError::Plan(format!(
-                "[{name}] param must be a number"
-            ))),
+    pub(crate) fn new(op: &token::TokenType, param: Option<ScalarParam>) -> Result<Self> {
+        let k = |name: &str| {
+            param.ok_or_else(|| DataFusionError::Plan(format!("[{name}] param must be a number")))
         };
         Ok(match op.id() {
             token::T_AVG => Self::Avg,
             token::T_BOTTOMK => Self::Bottomk(k("bottomk")?),
             token::T_COUNT => Self::Count,
             token::T_GROUP => Self::Group,
+            token::T_LIMITK => Self::Limitk(limitk_param(k("limitk")?)?),
+            token::T_LIMIT_RATIO => Self::LimitRatio(limit_ratio_param(k("limit_ratio")?)?),
             token::T_MAX => Self::Max,
             token::T_MIN => Self::Min,
             token::T_STDDEV => Self::Stddev,
@@ -226,7 +234,10 @@ impl AggOp {
     /// Whether the output keeps the input series' own labels, so a source must carry every
     /// label of a series rather than its group projection.
     pub(crate) fn needs_series_labels(&self) -> bool {
-        matches!(self, Self::Topk(_) | Self::Bottomk(_))
+        matches!(
+            self,
+            Self::Topk(_) | Self::Bottomk(_) | Self::Limitk(_) | Self::LimitRatio(_)
+        )
     }
 
     /// The generic fold over a materialized matrix.
@@ -241,6 +252,10 @@ impl AggOp {
             Self::Bottomk(k) => eval_aggregate(modifier, data, Rank::new(k, true), eval_ctx),
             Self::Count => eval_aggregate(modifier, data, Count, eval_ctx),
             Self::Group => eval_aggregate(modifier, data, Group, eval_ctx),
+            Self::Limitk(k) => eval_aggregate(modifier, data, Limit::K(k), eval_ctx),
+            Self::LimitRatio(ratio) => {
+                eval_aggregate(modifier, data, Limit::Ratio(ratio), eval_ctx)
+            }
             Self::Max => eval_aggregate(modifier, data, Max, eval_ctx),
             Self::Min => eval_aggregate(modifier, data, Min, eval_ctx),
             Self::Stddev => eval_aggregate(modifier, data, Stddev, eval_ctx),
@@ -470,6 +485,51 @@ where
     Ok(Value::Matrix(results))
 }
 
+/// `limitk`'s k: an error when NaN or beyond int64, as upstream.
+fn limitk_param(k: ScalarParam) -> Result<ScalarParam> {
+    let values = param_values(&k);
+    if values.iter().any(|value| value.is_nan()) {
+        return Err(DataFusionError::Plan("[limitk] param is NaN".to_string()));
+    }
+    let (min, max) = values
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), &v| {
+            (min.min(v), max.max(v))
+        });
+    // a k below 1 at every step selects nothing, so upstream returns before the range checks
+    if max < 1.0 {
+        return Ok(k);
+    }
+    if min <= MIN_K {
+        return Err(DataFusionError::Plan(format!(
+            "[limitk] scalar value {min} underflows int64"
+        )));
+    }
+    if max >= MAX_K {
+        return Err(DataFusionError::Plan(format!(
+            "[limitk] scalar value {max} overflows int64"
+        )));
+    }
+    Ok(k)
+}
+
+/// `limit_ratio`'s ratio: an error when NaN, as upstream.
+fn limit_ratio_param(ratio: ScalarParam) -> Result<ScalarParam> {
+    if param_values(&ratio).iter().any(|value| value.is_nan()) {
+        return Err(DataFusionError::Plan(
+            "[limit_ratio] param is NaN".to_string(),
+        ));
+    }
+    Ok(ratio)
+}
+
+fn param_values(param: &ScalarParam) -> &[f64] {
+    match param {
+        ScalarParam::Const(value) => std::slice::from_ref(value),
+        ScalarParam::PerStep { values, .. } => values,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::promql::value::LabelsExt;
@@ -585,7 +645,7 @@ mod tests {
         // The buffering accumulators merge by appending, so only the chunking may vary.
         assert_chunkings_match(Stddev, 4, &points);
         assert_chunkings_match(Stdvar, 4, &points);
-        assert_chunkings_match(quantile::Quantile::new(0.5), 4, &points);
+        assert_chunkings_match(quantile::Quantile::new(ScalarParam::Const(0.5)), 4, &points);
         assert!(samples_of(Sum.build(0), &[]).is_empty());
     }
 
@@ -617,15 +677,20 @@ mod tests {
         check(Group, &[(10, 1.0), (30, 1.0)]);
         check(Stdvar, &[(10, 1.0), (30, 1.0)]);
         check(Stddev, &[(10, 1.0), (30, 1.0)]);
-        check(quantile::Quantile::new(1.0), &[(10, 3.0), (30, 4.0)]);
+        check(
+            quantile::Quantile::new(ScalarParam::Const(1.0)),
+            &[(10, 3.0), (30, 4.0)],
+        );
     }
 
     #[test]
     fn test_extrema_merge_preserves_nan_and_signed_zero_behavior() {
-        fn check(func: impl AggFunc, initial: f64) {
+        fn check(func: impl AggFunc) {
             for (values, expected) in [
-                (vec![f64::NAN], initial),
+                (vec![f64::NAN], f64::NAN),
+                (vec![f64::NAN, f64::NAN], f64::NAN),
                 (vec![f64::NAN, 7.0, f64::NAN], 7.0),
+                (vec![7.0, f64::NAN], 7.0),
                 (vec![-0.0, 0.0], -0.0),
                 (vec![0.0, -0.0], 0.0),
             ] {
@@ -649,8 +714,8 @@ mod tests {
                 }
             }
         }
-        check(Min, f64::INFINITY);
-        check(Max, f64::NEG_INFINITY);
+        check(Min);
+        check(Max);
     }
 
     #[test]
@@ -701,34 +766,28 @@ mod tests {
             AggOp::new(&op(token::T_AVG), None),
             Ok(AggOp::Avg)
         ));
-        assert!(matches!(
-            AggOp::new(&op(token::T_TOPK), Some(Value::Float(3.7))),
-            Ok(AggOp::Topk(3))
-        ));
-        assert!(matches!(
-            AggOp::new(&op(token::T_BOTTOMK), Some(Value::Float(1.0))),
-            Ok(AggOp::Bottomk(1))
-        ));
-        assert!(matches!(
-            AggOp::new(&op(token::T_TOPK), Some(Value::Float(-1.0))),
-            Ok(AggOp::Topk(0))
-        ));
+        assert_eq!(
+            AggOp::new(&op(token::T_TOPK), Some(ScalarParam::Const(3.7))).unwrap(),
+            AggOp::Topk(ScalarParam::Const(3.7))
+        );
+        assert_eq!(
+            AggOp::new(&op(token::T_BOTTOMK), Some(ScalarParam::Const(1.0))).unwrap(),
+            AggOp::Bottomk(ScalarParam::Const(1.0))
+        );
         for (id, message) in [
             (token::T_TOPK, "[topk] param must be a number"),
             (token::T_BOTTOMK, "[bottomk] param must be a number"),
         ] {
-            for param in [None, Some(Value::None), Some(Value::String("k".into()))] {
-                let result = AggOp::new(&op(id), param);
-                assert!(
-                    matches!(&result, Err(DataFusionError::Plan(m)) if m == message),
-                    "{result:?}"
-                );
-            }
+            let result = AggOp::new(&op(id), None);
+            assert!(
+                matches!(&result, Err(DataFusionError::Plan(m)) if m == message),
+                "{result:?}"
+            );
         }
         for id in [token::T_QUANTILE, token::T_COUNT_VALUES, token::T_ADD] {
             let unsupported = op(id);
             assert!(matches!(
-                AggOp::new(&unsupported, Some(Value::Float(0.5))),
+                AggOp::new(&unsupported, Some(ScalarParam::Const(0.5))),
                 Err(DataFusionError::NotImplemented(m)) if m == format!("Unsupported Aggregate: {unsupported:?}")
             ));
         }
@@ -736,7 +795,12 @@ mod tests {
 
     #[test]
     fn test_agg_op_series_labels() {
-        for op in [AggOp::Topk(1), AggOp::Bottomk(1)] {
+        for op in [
+            AggOp::Topk(ScalarParam::Const(1.0)),
+            AggOp::Bottomk(ScalarParam::Const(1.0)),
+            AggOp::Limitk(ScalarParam::Const(1.0)),
+            AggOp::LimitRatio(ScalarParam::Const(0.5)),
+        ] {
             assert!(op.needs_series_labels());
         }
         for op in [
@@ -763,7 +827,11 @@ mod tests {
             [Sample::new(1000, 1.0)],
         )];
         assert!(matches!(
-            AggOp::Topk(0).eval_aggregate(&None, Value::Matrix(matrix.clone()), &eval_ctx),
+            AggOp::Topk(ScalarParam::Const(0.0)).eval_aggregate(
+                &None,
+                Value::Matrix(matrix.clone()),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
         let off_grid = vec![RangeValue::new(
@@ -771,14 +839,22 @@ mod tests {
             [Sample::new(1500, 1.0)],
         )];
         assert!(matches!(
-            AggOp::Topk(2).eval_aggregate(&None, Value::Matrix(off_grid), &eval_ctx),
+            AggOp::Topk(ScalarParam::Const(2.0)).eval_aggregate(
+                &None,
+                Value::Matrix(off_grid),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
         assert!(matches!(
-            AggOp::Topk(2).eval_aggregate(&None, Value::Matrix(vec![]), &eval_ctx),
+            AggOp::Topk(ScalarParam::Const(2.0)).eval_aggregate(
+                &None,
+                Value::Matrix(vec![]),
+                &eval_ctx
+            ),
             Ok(Value::None)
         ));
-        let Value::Matrix(result) = AggOp::Topk(2)
+        let Value::Matrix(result) = AggOp::Topk(ScalarParam::Const(2.0))
             .eval_aggregate(&None, Value::Matrix(matrix), &eval_ctx)
             .unwrap()
         else {

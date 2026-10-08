@@ -156,6 +156,7 @@ pub struct DeduplicationOutcome {
 /// through — no retry bookkeeping required.
 pub async fn confirm_notification_sent(
     db: &DatabaseConnection,
+    org_id: &str,
     fingerprints: &[String],
 ) -> Result<(), sea_orm::DbErr> {
     if fingerprints.is_empty() {
@@ -166,6 +167,7 @@ pub async fn confirm_notification_sent(
             alert_dedup_state::Column::NotificationSent,
             sea_orm::sea_query::Expr::value(true),
         )
+        .filter(alert_dedup_state::Column::OrgId.eq(org_id))
         .filter(alert_dedup_state::Column::Fingerprint.is_in(fingerprints.to_vec()))
         .exec(db)
         .await?;
@@ -175,9 +177,10 @@ pub async fn confirm_notification_sent(
 /// Get or create deduplication state
 pub async fn get_dedup_state(
     db: &DatabaseConnection,
+    org_id: &str,
     fingerprint: &str,
 ) -> Result<Option<alert_dedup_state::Model>, sea_orm::DbErr> {
-    alert_dedup_state::Entity::find_by_id(fingerprint)
+    alert_dedup_state::Entity::find_by_id((org_id.to_string(), fingerprint.to_string()))
         .one(db)
         .await
 }
@@ -198,7 +201,7 @@ pub async fn save_dedup_state(
     params: DedupStateParams<'_>,
 ) -> Result<alert_dedup_state::Model, sea_orm::DbErr> {
     // Try to find existing record
-    if let Some(existing) = get_dedup_state(db, params.fingerprint).await? {
+    if let Some(existing) = get_dedup_state(db, params.org_id, params.fingerprint).await? {
         // Update existing
         let mut active: alert_dedup_state::ActiveModel = existing.clone().into();
         active.last_seen_at = Set(params.last_seen_at);
@@ -250,6 +253,7 @@ pub async fn cleanup_expired_state(
 /// Used to suppress alerts that share semantic dimensions with recently fired alerts.
 pub async fn find_matching_semantic_fingerprints(
     db: &DatabaseConnection,
+    org_id: &str,
     semantic_dimensions: &std::collections::HashMap<String, String>,
     time_window_minutes: i64,
 ) -> Result<Vec<alert_dedup_state::Model>, sea_orm::DbErr> {
@@ -258,6 +262,7 @@ pub async fn find_matching_semantic_fingerprints(
 
     // Get all recent fingerprints
     let recent_states = alert_dedup_state::Entity::find()
+        .filter(alert_dedup_state::Column::OrgId.eq(org_id))
         .filter(alert_dedup_state::Column::LastSeenAt.gt(cutoff_time))
         .all(db)
         .await?;
@@ -370,7 +375,7 @@ async fn apply_deduplication_impl(
         // error swallows the page for the whole window. `notification_sent`
         // has existed on this table since the feature shipped and was never
         // read; it is the confirm flag.
-        let should_send = match get_dedup_state(db, &fingerprint).await? {
+        let should_send = match get_dedup_state(db, org_id, &fingerprint).await? {
             Some(existing_state)
                 if config::meta::alerts::deduplication::reservation_suppresses(
                     existing_state.notification_sent,
@@ -392,8 +397,9 @@ async fn apply_deduplication_impl(
                 .await
                 {
                     log::warn!(
-                        "Failed to update dedup state for fingerprint {}: {}",
+                        "Failed to update dedup state for fingerprint {}: org_id: {}, error: {}",
                         fingerprint,
+                        org_id,
                         e
                     );
                 }
@@ -441,8 +447,9 @@ async fn apply_deduplication_impl(
             .await
             {
                 log::error!(
-                    "Failed to save dedup state for fingerprint {}: {}",
+                    "Failed to save dedup state for fingerprint {}: org_id: {}, error: {}",
                     fingerprint,
+                    org_id,
                     e
                 );
             }
@@ -477,9 +484,27 @@ mod tests {
     use config::meta::alerts::{
         AggFunction, Aggregation, Condition, Operator, QueryType, alert::Alert,
     };
+    use sea_orm::{ConnectionTrait, Database, Schema};
     use serde_json::{Map, Value, json};
 
-    use super::row_group_key;
+    use super::{
+        DedupStateParams, confirm_notification_sent, get_dedup_state, row_group_key,
+        save_dedup_state,
+    };
+
+    async fn dedup_db() -> sea_orm::DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        for sql in [
+            "CREATE TABLE alerts (id CHAR(27) PRIMARY KEY)",
+            "INSERT INTO alerts (id) VALUES ('alert_a'), ('alert_b')",
+        ] {
+            db.execute_unprepared(sql).await.unwrap();
+        }
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(super::alert_dedup_state::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        db
+    }
 
     fn row(pairs: &[(&str, Value)]) -> Map<String, Value> {
         pairs
@@ -597,5 +622,35 @@ mod tests {
         let mut alert = Alert::default();
         alert.query_condition.query_type = QueryType::Slo;
         assert_eq!(row_group_key(&alert, &row(&[("group", json!("g"))])), None);
+    }
+
+    #[tokio::test]
+    async fn test_dedup_state_is_scoped_by_org() {
+        let db = dedup_db().await;
+        let params = |org_id, alert_id| DedupStateParams {
+            org_id,
+            fingerprint: "fp",
+            alert_id,
+            first_seen_at: 1,
+            last_seen_at: 1,
+            occurrence_count: 1,
+        };
+        save_dedup_state(&db, params("org_a", "alert_a"))
+            .await
+            .unwrap();
+        assert!(get_dedup_state(&db, "org_b", "fp").await.unwrap().is_none());
+
+        save_dedup_state(&db, params("org_b", "alert_b"))
+            .await
+            .unwrap();
+        confirm_notification_sent(&db, "org_a", &["fp".to_string()])
+            .await
+            .unwrap();
+
+        let org_a = get_dedup_state(&db, "org_a", "fp").await.unwrap().unwrap();
+        let org_b = get_dedup_state(&db, "org_b", "fp").await.unwrap().unwrap();
+        assert!(org_a.notification_sent);
+        assert!(!org_b.notification_sent);
+        assert_eq!(org_b.alert_id, "alert_b");
     }
 }

@@ -55,6 +55,7 @@ Rules of thumb:
 
 `role` is derived automatically: `alert` for `error`/`warning`, otherwise `status`.
 **Slots:** `default` (message body, overrides `content`), `icon` (custom leading icon, overrides `icon` prop), `actions` (buttons/links).
+**Slots are detected once, at setup.** `hasActionsSlot` is a `computed` over `useSlots()`, which is not reactive, so `<template v-if="cond" #actions>` that becomes true later never renders. Always pass the slot and put the `v-if` on its contents.
 **Emits:** none.
 **Example:**
 
@@ -233,7 +234,7 @@ function copyLink(url: string) {
 **Key props:**
 
 - `value` (`number`, required) — between 0 and 1; clamped to that range internally.
-- `variant` (`"default" | "warning" | "danger"` — default `"default"`) — semantic fill color.
+- `variant` (`"default" | "success" | "warning" | "danger"` — default `"default"`) — semantic fill color.
 - `size` (`"xs" | "sm" | "md" | "lg"` — default `"sm"`) — track height.
   **Slots:** `default` — content rendered inside the filled bar (e.g. a percentage label).
   **Emits:** none.

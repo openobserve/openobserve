@@ -28,6 +28,8 @@ export class IamPage {
         // open at a time, so we target by the common slug rather than the
         // (different) parent slugs of delete vs. refresh dialogs.
         this.addServiceAccountButton = page.locator('[data-test="service-accounts-add-btn"]');
+        // Service accounts list client-side search (OInput → auto-derived `-field`).
+        this.serviceAccountSearchInput = page.locator('[data-test="iam-service-accounts-search-input-field"]');
         // Service accounts are created from a NAME (lowercase slug); the UI
         // synthesizes the identifier as `<name>.<org>@sa.internal`
         // (see AddServiceAccount.schema.ts).
@@ -75,6 +77,13 @@ export class IamPage {
         this.toastMessages = page.locator('[data-test="o-toast-message"]');
 
         // ============================================================
+        // Selection gutter (OTable select cell / select-all)
+        // ============================================================
+        this.selectAllHeaderCell   = page.locator('th[data-test="o2-table-th-select"]');
+        this.selectAllCheckboxBtn  = page.locator('[data-test="o2-table-select-all"] button[role="checkbox"]');
+        this.deleteSelectedBtn     = page.locator('[data-test="service-accounts-list-delete-accounts-btn"]');
+
+        // ============================================================
         // Per-email runtime factories. Walks from the email-cell up to the
         // ancestor row, then drills back down to the action buttons that
         // share the row scope.
@@ -91,6 +100,10 @@ export class IamPage {
             this.rowByEmail(emailName).locator('[data-test="service-accounts-refresh"]');
         this.updateButtonByEmail = (emailName) =>
             this.rowByEmail(emailName).locator('[data-test="service-accounts-edit"]');
+        this.selectCellByEmail = (emailName) =>
+            this.rowByEmail(emailName).locator('td[data-test="o2-table-select-cell"]');
+        this.checkboxByEmail = (emailName) =>
+            this.selectCellByEmail(emailName).locator('button[role="checkbox"]');
 
         // System account row (resolved via the static system-account label).
         this.systemAccountRow = this.systemAccountLabel.locator(
@@ -98,6 +111,8 @@ export class IamPage {
         );
         this.systemRowDeleteButton = this.systemAccountRow.locator('[data-test="service-accounts-delete"]');
         this.systemRowUpdateButton = this.systemAccountRow.locator('[data-test="service-accounts-edit"]');
+        this.systemRowSelectCell = this.systemAccountRow.locator('td[data-test="o2-table-select-cell"]');
+        this.systemRowCheckbox = this.systemRowSelectCell.locator('button[role="checkbox"]');
     }
 
     async gotoIamPage() {
@@ -210,6 +225,43 @@ export class IamPage {
 
     }
 
+    /**
+     * Assert the post-creation token reveal dialog has closed.
+     */
+    async verifyTokenDialogClosed() {
+        await expect(this.tokenDialog).toBeHidden({ timeout: 10000 });
+    }
+
+    /**
+     * Assert the Add/Update service account drawer has closed (e.g. after Cancel).
+     */
+    async verifyServiceAccountDrawerClosed() {
+        await expect(this.addServiceAccountDialog).toBeHidden({ timeout: 10000 });
+    }
+
+    /**
+     * Filter the service accounts list by the given text (client-side global filter).
+     */
+    async searchServiceAccount(text) {
+        await this.serviceAccountSearchInput.waitFor({ state: 'visible', timeout: 15000 });
+        await this.serviceAccountSearchInput.click();
+        await this.serviceAccountSearchInput.fill(text);
+    }
+
+    /**
+     * Assert a service account row (keyed by its synthesized email) is present.
+     */
+    async verifyServiceAccountInList(emailName) {
+        await expect(this.emailCellByEmail(emailName).first()).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * Assert a service account row (keyed by its synthesized email) is absent.
+     */
+    async verifyServiceAccountNotInList(emailName) {
+        await expect(this.emailCellByEmail(emailName)).toHaveCount(0, { timeout: 15000 });
+    }
+
     async waitResEmailServiceAccount(emailName) {
         const orgName = process.env.ORGNAME || 'default';
         await this.page.waitForResponse(
@@ -227,6 +279,19 @@ export class IamPage {
 
     }
 
+    /**
+     * Copies the raw service-account token from the reveal dialog and returns it,
+     * stripping any "Basic " prefix. Mirrors the clipboard read used in
+     * Streams/ingestionTokens.spec.js (the reveal dialog's copy button writes
+     * the raw `serviceToken`, not the Basic credential).
+     */
+    async captureServiceAccountToken() {
+        await this.page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+        await this.clickCopyToken();
+        const token = await this.page.evaluate(() => navigator.clipboard.readText());
+        return (token || '').replace(/^Basic\s+/i, '');
+    }
+
 
 
     async clickServiceAccountPopUpClosed() {
@@ -242,6 +307,22 @@ export class IamPage {
         // Avoid waitForLoadState('networkidle') — deployed envs continuously poll
         // RUM/analytics so the network never idles. Use a known element instead.
         await this.serviceAccountsTab.waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /**
+     * Full create flow for one service account (no navigation — caller must
+     * already be on the Service Accounts tab). Returns the synthetic email.
+     */
+    async createServiceAccount(name) {
+        const email = this.serviceAccountEmailFor(name);
+        await this.iamPageAddServiceAccount();
+        await this.enterNameServiceAccount(name);
+        await this.clickSaveServiceAccount();
+        await this.verifySuccessMessage('Service account created successfully.');
+        await this.clickServiceAccountPopUpClosed();
+        await this.reloadServiceAccountPage();
+        await this.waitForSelectCell(email);
+        return email;
     }
 
     async deletedServiceAccount(emailName) {
@@ -319,6 +400,89 @@ export class IamPage {
     async enterDescriptionSA() {
         await this.descriptionInput.click();
         await this.descriptionInput.fill('Description Details for Service Account');
+    }
+
+    // ============================================================
+    // Selection gutter (OTable select cell / select-all)
+    // ============================================================
+
+    async waitForSelectCell(emailName) {
+        await expect(this.selectCellByEmail(emailName)).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickCheckboxByEmail(emailName) {
+        await this.checkboxByEmail(emailName).click();
+    }
+
+    // Click near the right edge so the point lands on the empty padding, not the checkbox itself.
+    async clickSelectCellPadding(emailName) {
+        const cell = this.selectCellByEmail(emailName);
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
+    }
+
+    async clickSelectAllCellPadding() {
+        const cell = this.selectAllHeaderCell;
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
+    }
+
+    async expectRowCheckboxChecked(emailName) {
+        await expect(this.checkboxByEmail(emailName)).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    }
+
+    async expectRowCheckboxUnchecked(emailName) {
+        await expect(this.checkboxByEmail(emailName)).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxChecked() {
+        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'checked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxUnchecked() {
+        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+    }
+
+    async expectSelectAllCheckboxIndeterminate() {
+        await expect(this.selectAllCheckboxBtn).toHaveAttribute('data-state', 'indeterminate', { timeout: 10000 });
+    }
+
+    async expectDeleteSelectedBtnVisible() {
+        await expect(this.deleteSelectedBtn).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectDeleteSelectedBtnHidden() {
+        await expect(this.deleteSelectedBtn).toBeHidden({ timeout: 10000 });
+    }
+
+    // Excludes system-managed rows (SRE Agent), which "select all" never selects.
+    async expectAllSelectableRowsSelected() {
+        const selectableRowCount = await this.page
+            .locator('tbody tr[data-test^="o2-table-row-"]')
+            .filter({ hasNot: this.systemAccountLabel })
+            .count();
+        const checkedCount = await this.page
+            .locator('tbody button[role="checkbox"][data-state="checked"]')
+            .count();
+        expect(checkedCount).toBe(selectableRowCount);
+    }
+
+    // isRowSelectable === false, so the select-cell click is a no-op and the checkbox stays disabled.
+    async expectSystemRowCheckboxDisabled() {
+        await expect(this.systemRowCheckbox).toHaveAttribute('data-state', 'unchecked', { timeout: 10000 });
+        await expect(this.systemRowCheckbox).toBeDisabled();
+    }
+
+    async clickSystemRowSelectCellPadding() {
+        const cell = this.systemRowSelectCell;
+        const box = await cell.boundingBox();
+        await cell.click({
+            position: { x: box ? box.width - 4 : 40, y: box ? box.height / 2 : 15 },
+        });
     }
 
     // ============================================================

@@ -244,14 +244,65 @@ impl Sample {
     }
 }
 
+/// A sample value in the text Prometheus' `jsonutil.MarshalFloat` writes.
 struct SampleValueDisplay(f64);
+
+impl fmt::Display for SampleValueDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        if value.is_nan() {
+            return f.write_str("NaN");
+        }
+        if value.is_infinite() {
+            return f.write_str(if value > 0.0 { "+Inf" } else { "-Inf" });
+        }
+        let abs = value.abs();
+        if abs == 0.0 || (1e-6..1e21).contains(&abs) {
+            return write!(f, "{value}");
+        }
+        // Go signs the exponent and pads it to two digits: 1e+21, 1e-07
+        let mut text = FloatText::default();
+        fmt::Write::write_fmt(&mut text, format_args!("{value:e}"))?;
+        let (mantissa, exponent) = text.as_str()?.split_once('e').ok_or(fmt::Error)?;
+        let (sign, digits) = match exponent.strip_prefix('-') {
+            Some(digits) => ('-', digits),
+            None => ('+', exponent),
+        };
+        write!(f, "{mantissa}e{sign}{digits:0>2}")
+    }
+}
 
 impl Serialize for SampleValueDisplay {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.collect_str(&self.0)
+        serializer.collect_str(self)
+    }
+}
+
+/// Stack space for one `{:e}` float; the longest, `-2.2250738585072014e-308`, is 24 bytes.
+#[derive(Default)]
+struct FloatText {
+    bytes: [u8; 32],
+    len: usize,
+}
+
+impl FloatText {
+    fn as_str(&self) -> Result<&str, fmt::Error> {
+        std::str::from_utf8(&self.bytes[..self.len]).map_err(|_| fmt::Error)
+    }
+}
+
+impl fmt::Write for FloatText {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let end = self.len + s.len();
+        self.bytes
+            .get_mut(self.len..end)
+            .ok_or(fmt::Error)?
+            .copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
     }
 }
 
@@ -275,7 +326,7 @@ impl Serialize for Exemplar {
             .map(|l| (l.name.as_str(), l.value.as_str()))
             .collect::<FxIndexMap<_, _>>();
         seq.serialize_field("timestamp", &(self.timestamp / 1_000_000))?;
-        seq.serialize_field("value", &self.value.to_string())?;
+        seq.serialize_field("value", &SampleValueDisplay(self.value))?;
         seq.serialize_field("labels", &labels_map)?;
         seq.end()
     }
@@ -804,7 +855,6 @@ fn extrapolate_from_delta(
             .checked_sub(range_plus_offset)
             .expect("BUG: overflow")
     };
-    assert!(start > 0);
     let end = eval_ts
         .checked_sub(
             offset
@@ -813,7 +863,6 @@ fn extrapolate_from_delta(
                 .expect("BUG: integer conversion failed"),
         )
         .expect("BUG: overflow");
-    assert!(end > 0);
     assert!(start <= end);
 
     let first = &samples[0];
@@ -829,11 +878,15 @@ fn extrapolate_from_delta(
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
-    let duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
+    let mut duration_to_end = (end - last.timestamp) as f64 / 1_000.0;
 
     let sampled_interval = (last.timestamp - first.timestamp) as f64 / 1_000.0;
     let avg_duration_between_samples = sampled_interval / (samples.len() - 1) as f64;
 
+    let extrapolation_threshold = avg_duration_between_samples * 1.1;
+    if duration_to_start >= extrapolation_threshold {
+        duration_to_start = avg_duration_between_samples / 2.0;
+    }
     if is_counter && result > 0.0 && first.value >= 0.0 {
         // Counters cannot be negative. If we have any slope at all
         // (i.e. `result` went up), we can extrapolate the zero point
@@ -847,24 +900,10 @@ fn extrapolate_from_delta(
         }
     }
 
-    // If the first/last samples are close to the boundaries of the range,
-    // extrapolate the result. This is as we expect that another sample
-    // will exist given the spacing between samples we've seen thus far,
-    // with an allowance for noise.
-    let extrapolation_threshold = avg_duration_between_samples * 1.1;
-    let mut extrapolate_to_interval = sampled_interval;
-
-    if duration_to_start < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_start;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
+    if duration_to_end >= extrapolation_threshold {
+        duration_to_end = avg_duration_between_samples / 2.0;
     }
-    if duration_to_end < extrapolation_threshold {
-        extrapolate_to_interval += duration_to_end;
-    } else {
-        extrapolate_to_interval += avg_duration_between_samples / 2.0;
-    }
-    let factor = extrapolate_to_interval / sampled_interval;
+    let factor = (sampled_interval + duration_to_start + duration_to_end) / sampled_interval;
     if matches!(kind, ExtrapolationKind::Rate) {
         result *= factor / range.as_secs_f64();
     } else {
@@ -1019,10 +1058,19 @@ pub fn signature(labels: &Labels) -> u64 {
 /// matching `names`.
 // REFACTORME: make this a method of `Metric`
 pub fn signature_without_labels(labels: &Labels, exclude_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| !exclude_names.contains(&name))
+}
+
+/// [`signature`] of only the labels named in `include_names`.
+pub fn signature_with_labels(labels: &Labels, include_names: &[&str]) -> u64 {
+    hash_labels(labels, |name| include_names.contains(&name))
+}
+
+fn hash_labels(labels: &Labels, include: impl Fn(&str) -> bool) -> u64 {
     let mut hasher = crate::utils::hash::gxhash::new_hasher();
     labels
         .iter()
-        .filter(|item| !exclude_names.contains(&item.name.as_str()))
+        .filter(|item| include(item.name.as_str()))
         .for_each(|item| {
             hasher.write(item.name.as_bytes());
             hasher.write(item.value.as_bytes());
@@ -1038,7 +1086,7 @@ mod tests {
 
     use super::*;
 
-    // Existing serializer text is the compatibility contract.
+    // The serializer before Prometheus formatting; plain decimals must keep its exact text.
     struct LegacySample<'a>(&'a Sample);
 
     impl Serialize for LegacySample<'_> {
@@ -1092,6 +1140,16 @@ mod tests {
         assert_eq!(
             sig_without_ac,
             signature_without_labels(&labels, &["a", "c"])
+        );
+
+        let kept: Labels = labels
+            .iter()
+            .filter(|label| label.name == "a" || label.name == "c")
+            .cloned()
+            .collect();
+        assert_eq!(
+            signature_with_labels(&labels, &["a", "c"]),
+            signature(&kept)
         );
     }
 
@@ -1450,19 +1508,38 @@ mod tests {
         assert_eq!(json, "[1609459200,\"42.5\"]");
     }
 
-    fn assert_sample_display_matches_legacy(sample: Sample) {
-        let expected = serde_json::to_vec(&LegacySample(&sample)).unwrap();
-        assert_eq!(
-            serde_json::to_vec(&sample).unwrap(),
-            expected,
+    /// Plain decimals keep the legacy text; infinities and exponent forms follow Prometheus.
+    fn assert_sample_display(sample: Sample) {
+        let context = format!(
             "timestamp={}, value bits={:016x}",
             sample.timestamp,
             sample.value.to_bits()
         );
-        assert_eq!(
-            serde_json::to_value(sample).unwrap(),
-            serde_json::from_slice::<serde_json::Value>(&expected).unwrap()
-        );
+        let text = serde_json::to_string(&sample).unwrap();
+        let legacy = serde_json::to_string(&LegacySample(&sample)).unwrap();
+        let (timestamp, value): (i64, String) = serde_json::from_str(&text).unwrap();
+        let (legacy_timestamp, legacy_value): (i64, String) =
+            serde_json::from_str(&legacy).unwrap();
+        assert_eq!(timestamp, legacy_timestamp, "{context}");
+        let abs = sample.value.abs();
+        if sample.value.is_nan() || abs == 0.0 || (1e-6..1e21).contains(&abs) {
+            assert_eq!(text, legacy, "{context}");
+        } else if sample.value.is_infinite() {
+            let expected = if sample.value > 0.0 { "+Inf" } else { "-Inf" };
+            assert_eq!(value, expected, "{context}");
+        } else {
+            let (_, exponent) = value.split_once('e').expect(&context);
+            assert!(
+                exponent.starts_with(['+', '-']) && exponent.len() >= 3,
+                "{context}: {value}"
+            );
+            assert_ne!(value, legacy_value, "{context}");
+            assert_eq!(
+                value.parse::<f64>().unwrap().to_bits(),
+                sample.value.to_bits(),
+                "{context}"
+            );
+        }
     }
 
     #[test]
@@ -1505,21 +1582,31 @@ mod tests {
         ];
         for timestamp in timestamps {
             for bits in bits {
-                assert_sample_display_matches_legacy(Sample::new(timestamp, f64::from_bits(bits)));
+                assert_sample_display(Sample::new(timestamp, f64::from_bits(bits)));
             }
         }
         assert_eq!(
             serde_json::to_string(&Sample::new(0, -0.0)).unwrap(),
             "[0,\"-0\"]"
         );
-        assert_eq!(
-            serde_json::to_string(&Sample::new(0, f64::INFINITY)).unwrap(),
-            "[0,\"inf\"]"
-        );
-        assert_eq!(
-            serde_json::to_string(&Sample::new(0, f64::NEG_INFINITY)).unwrap(),
-            "[0,\"-inf\"]"
-        );
+        for (value, expected) in [
+            (f64::INFINITY, "+Inf"),
+            (f64::NEG_INFINITY, "-Inf"),
+            (1e21, "1e+21"),
+            (-1.5e21, "-1.5e+21"),
+            (1e-7, "1e-07"),
+            (1.5e300, "1.5e+300"),
+            (5e-324, "5e-324"),
+            (1e20, "100000000000000000000"),
+            (1e-6, "0.000001"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&Sample::new(0, value)).unwrap(),
+                format!("[0,\"{expected}\"]")
+            );
+            let parsed: Sample = serde_json::from_str(&format!("[0,\"{expected}\"]")).unwrap();
+            assert_eq!(parsed.value.to_bits(), value.to_bits(), "{expected}");
+        }
         assert_eq!(
             serde_json::to_string(&Sample::new(0, f64::NAN)).unwrap(),
             "[0,\"NaN\"]"
@@ -1537,10 +1624,7 @@ mod tests {
             state ^= state << 17;
             let value = f64::from_bits(state);
             if value.is_finite() {
-                assert_sample_display_matches_legacy(Sample::new(
-                    state.rotate_left(19) as i64,
-                    value,
-                ));
+                assert_sample_display(Sample::new(state.rotate_left(19) as i64, value));
                 checked += 1;
             }
         }
@@ -1552,8 +1636,8 @@ mod tests {
             Sample::new(1_000_000, 0.0),
             Sample::new(-1_000_001, -0.0),
             Sample::new(1_000_000, f64::NAN),
-            Sample::new(0, f64::INFINITY),
-            Sample::new(i64::MAX, f64::from_bits(1)),
+            Sample::new(0, 1.5),
+            Sample::new(i64::MAX, 12_345.678),
         ];
         let legacy: Vec<_> = samples.iter().map(LegacySample).collect();
         let mut direct = Vec::new();
@@ -1966,6 +2050,37 @@ mod tests {
             ExtrapolationKind::Rate,
         );
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_extrapolated_rate_caps_start_before_the_counter_zero_point() {
+        let second = 1_000_000;
+        let samples: Vec<_> = [(70, 1.0), (80, 2.0), (90, 3.0), (100, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let increase = extrapolated_rate(
+            &samples,
+            100 * second,
+            Duration::from_secs(60),
+            Duration::ZERO,
+            ExtrapolationKind::Increase,
+        );
+        assert_eq!(increase, Some(3.5));
+
+        // a window reaching back before epoch 0 is still a window
+        let samples: Vec<_> = [(15, 1.0), (30, 2.0), (45, 3.0), (60, 4.0)]
+            .into_iter()
+            .map(|(ts, value)| Sample::new(ts * second, value))
+            .collect();
+        let rate = extrapolated_rate(
+            &samples,
+            60 * second,
+            Duration::from_secs(300),
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        );
+        assert!((rate.unwrap() - 3.5 / 300.0).abs() < 1e-15);
     }
 
     #[test]

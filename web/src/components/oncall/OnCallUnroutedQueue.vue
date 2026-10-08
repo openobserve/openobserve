@@ -57,12 +57,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :frame="false"
       :loading="loading"
+      :error="error || null"
       show-index
+      :global-filter="search"
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-unrouted-queue"
+      :persist-columns="true"
+      :enable-column-resize="true"
       data-test="oncall-unrouted-table"
     >
+      <template v-if="$slots.toolbar" #toolbar><slot name="toolbar" /></template>
+      <template v-if="$slots['toolbar-trailing']" #toolbar-trailing>
+        <slot name="toolbar-trailing" />
+      </template>
+
+      <!-- Inside the table, so the host's toolbar — and the way back to the other tab — stays up. -->
+      <template #error>
+        <OEmptyState
+          size="inline"
+          variant="error"
+          :title="error || undefined"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-unrouted-error"
+          @action="emit('retry')"
+        />
+      </template>
+
       <template #cell-signal="{ row }">
         <span class="flex min-w-0 items-center gap-2">
           <!-- Dismissing stamps the field and keeps the row — the evidence that
@@ -76,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.unroutedDismissedTag") }}
           </OTag>
-          <span class="text-text-heading truncate">{{ titleOf(row) }}</span>
+          <OTruncatedText class="text-text-heading">{{ titleOf(row) }}</OTruncatedText>
         </span>
       </template>
 
@@ -127,30 +148,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="outline"
             size="xs"
+            class="max-md:hidden"
             :data-test="`oncall-unrouted-claim-${row.id}`"
             @click.stop="emit('claim', row)"
           >
-            {{
-              teamName
-                ? t("oncall.unroutedClaimFor", { team: raw(teamName) })
-                : t("oncall.unroutedWriteRule")
-            }}
+            {{ claimLabel }}
           </OButton>
           <OButton
             variant="ghost"
             size="icon-sm"
             icon-left="close"
+            class="max-md:hidden"
             :aria-label="t('oncall.unroutedDismiss')"
             :data-test="`oncall-unrouted-dismiss-${row.id}`"
             @click.stop="emit('dismiss', row)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                :aria-label="t('oncall.moreActions')"
+                data-test="oncall-unrouted-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="alt-route"
+              class="md:hidden"
+              :data-test="`oncall-unrouted-claim-${row.id}-menu`"
+              @select="emit('claim', row)"
+            >
+              <span>{{ claimLabel }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="close"
+              class="md:hidden"
+              :data-test="`oncall-unrouted-dismiss-${row.id}-menu`"
+              @select="emit('dismiss', row)"
+            >
+              <span>{{ t("oncall.unroutedDismiss") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </span>
       </template>
 
       <!-- Silence here is the good outcome, so it gets a sentence rather than
            an empty panel somebody has to interpret. -->
       <template #empty>
+        <!-- An empty search result says nothing about whether alerts reached a team. -->
         <OEmptyState
+          v-if="search"
+          size="hero"
+          preset="no-data"
+          :filtered="!!search"
+          data-test="oncall-unrouted-empty"
+          @action="onEmptyAction"
+        />
+        <OEmptyState
+          v-else
           size="inline"
           preset="no-data"
           :title="t('oncall.unroutedNoneTitle')"
@@ -172,6 +230,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -194,6 +255,9 @@ const props = withDefaults(
     /** Hosts that already name the section — a tab strip, a page header — turn
      *  the title row off rather than repeat themselves. */
     showHeader?: boolean;
+    search?: string;
+    /** The queue's own failure, shown in the table body with a Retry. */
+    error?: I18nText | "";
   }>(),
   {
     signals: () => [],
@@ -202,6 +266,8 @@ const props = withDefaults(
     loading: false,
     claiming: false,
     showHeader: true,
+    search: "",
+    error: "",
   },
 );
 
@@ -209,9 +275,17 @@ const emit = defineEmits<{
   (e: "claim", signal: UnroutedSignal): void;
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
+  (e: "retry"): void;
+  (e: "clear-search"): void;
 }>();
 
 const { t } = useI18nTyped();
+
+const claimLabel = computed<I18nText>(() =>
+  props.teamName
+    ? t("oncall.unroutedClaimFor", { team: raw(props.teamName) })
+    : t("oncall.unroutedWriteRule"),
+);
 
 const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
   {
@@ -224,12 +298,14 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     id: "path",
     header: t("oncall.unroutedPath"),
     sortable: false,
+    hideable: true,
     accessorFn: (row: UnroutedSignal) => routablePathOf(row),
   },
   {
     id: "fires",
     header: t("oncall.unroutedFiresHeader"),
     size: 150,
+    hideable: true,
     accessorFn: (row: UnroutedSignal) => row.occurrences,
   },
   {
@@ -237,7 +313,12 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
     header: t("oncall.unroutedOutcome"),
     size: 170,
     sortable: false,
-    accessorFn: (row: UnroutedSignal) => row.defaulted_team_id ?? "",
+    hideable: true,
+    // The team's name, not its id: search has to match what the cell shows.
+    accessorFn: (row: UnroutedSignal) =>
+      row.defaulted_team_id
+        ? teamNameOf(row.defaulted_team_id)
+        : String(t("oncall.unroutedPagedNobody")),
   },
   {
     id: "actions",
@@ -281,5 +362,9 @@ function teamNameOf(teamId: string): string {
 function routablePathOf(signal: UnroutedSignal): string {
   const kept = identityDimensions(signal.dimensions);
   return Object.keys(kept).length ? dimensionsSentence(kept) : pathOf(signal);
+}
+
+function onEmptyAction(id?: string) {
+  if (id === "clear-filters") emit("clear-search");
 }
 </script>

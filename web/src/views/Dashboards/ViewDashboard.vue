@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
             :url="dashboardShareURL"
+            @copy:success="onDashboardShared"
             variant="outline"
             size="icon-toolbar"
             data-test="dashboard-share-btn"
@@ -350,8 +351,9 @@ import {
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
+import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
@@ -1645,6 +1647,8 @@ export default defineComponent({
       }
     };
 
+    const onDashboardShared = () => analytics.track("dashboard_shared");
+
     /**
      * Computed property for dashboard share URL
      * Converts relative time periods to absolute times for sharing
@@ -1764,6 +1768,11 @@ export default defineComponent({
 
     onMounted(() => {
       isFullscreen.value = false;
+    });
+
+    // printMode hides the app shell globally, so leaving by browser Back (not ✕) must still clear it.
+    onBeforeRouteLeave(() => {
+      if (store.state.printMode) setPrint(false);
     });
 
     const currentTimeObjPerPanel = ref({});
@@ -1896,6 +1905,7 @@ export default defineComponent({
       getQueryParamsForDuration,
       onDataZoom,
       dashboardShareURL,
+      onDashboardShared,
       selectedTabId,
       onMovePanel,
       printDashboard,

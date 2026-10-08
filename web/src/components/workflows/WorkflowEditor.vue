@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="workflow-editor-folder"
             @update:model-value="activeFolderId = $event"
           />
-          <span
+          <OTruncatedText
             v-else
             data-test="workflow-editor-folder-static"
-            class="text-text-body min-w-0 truncate font-medium"
+            class="text-text-body font-medium"
           >
             {{ activeFolderName }}
-          </span>
+          </OTruncatedText>
           <OInlineEdit
             v-if="!workflowObj.isEditWorkflow"
             v-model="workflowObj.currentSelectedWorkflow.description"
@@ -317,6 +317,7 @@ import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
@@ -350,6 +351,7 @@ import useWorkflowCanvas, {
   clearTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
+import analytics from "@/services/product_analytics";
 
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
 const emit = defineEmits<{ (e: "saved"): void }>();
@@ -736,6 +738,7 @@ const persist = async (): Promise<boolean> => {
         id: workflowObj.currentSelectedWorkflow.id,
         data,
       });
+      analytics.track("workflow_updated", { draft: false });
       toast({ message: t("workflow.updateSuccess"), variant: "success" });
     } else {
       const res = await workflowService.createWorkflow({
@@ -827,6 +830,7 @@ const persistDraft = async (): Promise<boolean> => {
         data,
         draft: true,
       });
+      analytics.track("workflow_updated", { draft: true });
     } else {
       const res = await workflowService.createWorkflow({
         org_identifier: org,

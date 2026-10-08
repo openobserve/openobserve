@@ -68,6 +68,7 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
         })
         .collect();
 
+    // Only ever a trigger: `platform::send_resolve` writes the resolve without a template.
     let mut event = json!({
         "event_action": "trigger",
         "payload": {
@@ -78,6 +79,10 @@ pub fn render_pagerduty(c: &RenderedContent, ctx: &NotificationContext) -> Value
         },
         "links": links,
     });
+    // Without it the resolve has nothing to match, and PagerDuty answers 202 to a resolve it drops.
+    if let Some(episode_id) = &ctx.episode_id {
+        event["dedup_key"] = json!(episode_id);
+    }
 
     // Metric-history chart (Events API v2 `images` array). PagerDuty fetches
     // the signed render URL when the incident is displayed; after expiry the

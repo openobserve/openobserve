@@ -23,6 +23,7 @@ import {
   ORDERED_SECTION_IDS,
   DEFAULT_EXPANDED_SECTIONS,
 } from "@/utils/dashboard/searchLabelsConfig";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,6 +89,10 @@ export function useConfigPanel(
       step: {
         label: t("dashboard.stepValue"),
         visible: !!promqlMode.value,
+      },
+      "show-exemplars": {
+        label: t("dashboard.showExemplarsLabel"),
+        visible: !!promqlMode.value && isExemplarEligible(dashboardPanelData.data),
       },
       "panel-default-time": { label: t("dashboard.panelTimeEnabled") },
       "promql-chart-config": {
@@ -248,6 +253,10 @@ export function useConfigPanel(
       "y-axis": {
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
+      "axis-label-mode": {
+        label: t("dashboard.axisLabelMode"),
+        visible: !promqlMode.value && shouldShowCartesianAxisConfig(dashboardPanelData),
       },
       gridlines: {
         label: t("dashboard.showGridlines"),

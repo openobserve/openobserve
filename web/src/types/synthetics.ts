@@ -86,7 +86,9 @@ export type StepAction =
   | "scroll"
   | "wait"
   | "assert"
-  | "screenshot";
+  | "screenshot"
+  // Composition: expanded into the referenced check's steps before any browser sees it.
+  | "subtest";
 
 // ── Locator bundle ──────────────────────────────────────────────────────────
 // A step carries every way to find its element, tried in order, so a cosmetic
@@ -201,6 +203,12 @@ export interface StepAssertion {
   attribute?: string;
 }
 
+/** A resolved subtest reference: the child check's id and its display name. */
+export interface SubtestRef {
+  id: string;
+  name: string;
+}
+
 export interface BrowserStep {
   id: string;
   action: StepAction;
@@ -216,6 +224,8 @@ export interface BrowserStep {
   optional?: boolean;
   /** Runs even after an earlier step failed (logout, cleanup). */
   alwaysRun?: boolean;
+  /** Present only on a `subtest` step. `name` is a display cache and never leaves the editor. */
+  subtest?: { id: string; name?: string };
   value?: string;
   /**
    * Mouse button and click count for a `click` step, promoted from the wire.
@@ -288,6 +298,8 @@ export interface WireStep {
   pageAlias?: string;
   framePath?: string[];
   description?: I18nText;
+  /** Present only on a `subtest` step (§5.1's composition vocabulary). */
+  subtest?: { id: string };
 }
 
 /** Commands the web app sends to the extension via `chrome.runtime.sendMessage`. */
@@ -659,6 +671,7 @@ export interface BrowserCheck {
     password: string;
   };
   variables?: { id?: string; name: string; value: string; secure?: boolean; example?: string }[];
+  environments?: string[];
   secrets?: { id?: string; name: string; value: string }[];
   headers?: { id?: string; key: string; value: string }[];
   cookies?: { id?: string; name: string; value: string; domain: string }[];
@@ -723,4 +736,39 @@ export interface SyntheticLocationDetail extends SyntheticLocation {
   agents: SyntheticLocationAgent[];
   checks: SyntheticLocationCheck[];
   install?: string;
+}
+
+// ── Shared variables and environments ────────────────────────────────────────
+
+export interface SyntheticsVariable {
+  id: string;
+  name: string;
+  kind: "plain" | "secret";
+  description: string;
+  example: string;
+  tags: string[];
+  value?: string;
+  /** Whether a value is stored, sent for both kinds. */
+  has_value?: boolean;
+  /** Checks whose definition references `{{NAME}}`. Drives the deletion guard. */
+  used_by_checks: number;
+  used_by?: string[];
+  owner?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** One environment, with its variables inline - the list renders the whole tab. */
+export interface SyntheticsEnvironment {
+  id: string;
+  name: string;
+  description: string;
+  owner?: string;
+  /** The org's reserved `global` environment, whose variables apply everywhere. */
+  is_global: boolean;
+  created_at: number;
+  updated_at: number;
+  /** Checks pinned to this environment. Not derivable from this response. */
+  checks_count: number;
+  variables: SyntheticsVariable[];
 }

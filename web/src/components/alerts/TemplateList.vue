@@ -65,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
           :current-page="currentPage"
-          :footer-title="t('alert_templates.header')"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -148,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-name="{ row }">
-            <div class="flex items-center gap-2">
-              <span>{{ row.name }}</span>
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
               <OTag
                 v-if="row.isPrebuilt"
                 type="templateOrigin"
@@ -283,10 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @deleted="onDependencyDeleted"
             />
           </template>
-          <template v-if="selectedTemplates.length > 0" #bottom>
-            <span class="text-text-secondary text-xs">
-              {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
-            </span>
+          <template #selection-actions>
             <OButton
               data-test="template-list-delete-templates-btn"
               variant="outline-destructive"
@@ -356,6 +352,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -420,7 +417,6 @@ const editingTemplate: Ref<TemplateData | null> = ref(null);
 // True when the editor was opened via the clone action — the AddTemplate
 // form should treat the prefilled data as a fresh template (not an update).
 const cloningTemplate = ref(false);
-const resultTotal = ref<number>(0);
 
 const confirmDelete: Ref<{
   visible: boolean;
@@ -492,7 +488,7 @@ watch(
   (isLoading) => {
     if (isLoading) return;
     setTimeout(() => {
-      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      oTableRef.value?.restorePage?.(currentPage.value);
     }, 0);
   },
   { once: true },
@@ -750,15 +746,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return byTab;
   return filterData(byTab, filterQuery.value);
 });
-// Watch visibleRows to sync resultTotal with search filter
-watch(
-  visibleRows,
-  (newVisibleRows) => {
-    resultTotal.value = newVisibleRows.length;
-  },
-  { immediate: true },
-);
-
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
 };

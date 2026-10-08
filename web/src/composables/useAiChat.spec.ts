@@ -5,8 +5,10 @@ import store from "@/test/unit/helpers/store";
 vi.mock("@/stores", () => ({
   default: store,
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import useAiChat from "./useAiChat";
+import analytics from "@/services/product_analytics";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -671,6 +673,34 @@ describe("useAiChat", () => {
       const requestBody = JSON.parse(callArgs.body);
 
       expect(requestBody.messages[0].content).toBe("Test");
+    });
+  });
+
+  describe("submitFeedback", () => {
+    it("tracks the feedback type once the server accepts it", async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      expect(await aiChatComposable.submitFeedback("thumbs_up", "org123")).toBe(true);
+
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_feedback_given", {
+        type: "thumbs_up",
+      });
+    });
+
+    it("does not track feedback the server rejected", async () => {
+      mockFetch.mockResolvedValue({ ok: false });
+
+      expect(await aiChatComposable.submitFeedback("thumbs_down", "org123")).toBe(false);
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track feedback that never reached the server", async () => {
+      mockFetch.mockRejectedValue(new Error("offline"));
+
+      expect(await aiChatComposable.submitFeedback("thumbs_down", "org123")).toBe(false);
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

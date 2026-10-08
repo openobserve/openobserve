@@ -3,8 +3,9 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
-import { nextTick } from "vue";
+import { defineComponent, h, KeepAlive, nextTick, ref } from "vue";
 import AppSessions from "./AppSessions.vue";
+import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import ShareButton from "@/components/common/ShareButton.vue";
 import searchService from "@/services/search";
 
@@ -47,6 +48,7 @@ const mockStreamData = {
     { name: "resource_url", type: "UTF8" },
     { name: "application_id", type: "UTF8" },
     { name: "env", type: "UTF8" },
+    { name: "session_has_replay", type: "UTF8" },
   ],
 };
 
@@ -517,6 +519,33 @@ describe("AppSessions.vue", () => {
     it("should keep the base filter out of the sidebar query prop", () => {
       const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
       expect(fieldList.props("query")).not.toContain("session_has_replay");
+    });
+
+    it("falls back to an always-false filter instead of referencing session_has_replay when the org's schema lacks it (o2-enterprise#2799)", async () => {
+      // getStream was destructured at setup, so reconfigure the same mock instance, not a new vi.fn().
+      mockStreams.getStream.mockResolvedValueOnce({
+        schema: mockStreamData.schema.filter((f) => f.name !== "session_has_replay"),
+      });
+      // schemaMapping only adds keys, so a stale true from the first fetch must be cleared first.
+      wrapper.vm.schemaMapping = {};
+      await wrapper.vm.getStreamFields();
+      await nextTick();
+
+      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
+      expect(fieldList.props("baseFilter")).toBe("1 = 0");
+
+      vi.mocked(searchService.search).mockClear();
+      const capturedSqls: string[] = [];
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        capturedSqls.push(params?.query?.query?.sql ?? "");
+        return { data: { hits: [] } };
+      });
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+      const mainQuerySql = capturedSqls.find((sql) => sql.includes('FROM "_rumdata"'));
+      expect(mainQuerySql).toContain("WHERE 1 = 0");
+      expect(mainQuerySql).not.toContain("session_has_replay");
     });
   });
 
@@ -1114,5 +1143,144 @@ describe("AppSessions.vue", () => {
         },
       });
     });
+  });
+});
+
+describe("AppSessions.vue — re-applies a changed URL filter on activation (D-47, AC-35, AC-39)", () => {
+  const show = ref(true);
+
+  const mountKept = async () => {
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { name: "Sessions", path: "/rum/sessions", component: { template: "<div />" } },
+        {
+          name: "rumPerformanceSummary",
+          path: "/rum/performance",
+          component: { template: "<div />" },
+        },
+        {
+          name: PA_ROUTES.shell,
+          path: "/product-analytics",
+          component: { template: "<router-view />" },
+          children: [
+            { name: PA_ROUTES.retention, path: "retention", component: { template: "<div />" } },
+          ],
+        },
+        { path: "/:pathMatch(.*)*", component: { template: "<div />" } },
+      ],
+    });
+    await router.push({ name: "Sessions", query: { org_identifier: "o", period: "15m" } });
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "o" },
+        zoConfig: { timestamp_column: "_timestamp" },
+      },
+    });
+    const Host = defineComponent({
+      setup: () => () =>
+        h(KeepAlive, null, show.value ? [h(AppSessions, { isSessionReplayEnabled: true })] : []),
+    });
+    const wrapper = mount(Host, {
+      global: {
+        plugins: [store, router, i18n],
+        stubs: {
+          OSplitter: { template: "<div><slot name='before' /><slot name='after' /></div>" },
+          OTable: { template: "<div />" },
+          DateTime: { template: "<div />" },
+          SyntaxGuide: { template: "<div />" },
+          QueryEditor: { template: "<div />" },
+          SearchFieldList: { template: "<div />" },
+          NoData: { template: "<div />" },
+        },
+      },
+    });
+    await flushPromises();
+    return { wrapper, router };
+  };
+
+  const cycle = async () => {
+    show.value = false;
+    await flushPromises();
+    show.value = true;
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    show.value = true;
+    mockSessionState.data.editorValue = "";
+  });
+
+  it("re-runs the list with the filter a Product Analytics handoff brings", async () => {
+    const { wrapper, router } = await mountKept();
+    show.value = false;
+    await flushPromises();
+    await router.push({ name: PA_ROUTES.retention, query: { org_identifier: "o" } });
+    await router.push({
+      name: "Sessions",
+      query: { org_identifier: "o", from: "100", to: "200", query: btoa("usr_email='a@x.com'") },
+    });
+    const before = vi.mocked(searchService.search).mock.calls.length;
+    show.value = true;
+    await flushPromises();
+    expect(mockSessionState.data.editorValue).toBe("usr_email='a@x.com'");
+    expect(mockSessionState.data.datetime).toMatchObject({
+      startTime: 100,
+      endTime: 200,
+      valueType: "absolute",
+    });
+    expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(before);
+    wrapper.unmount();
+  });
+
+  it("a plain return with an absolute range issues no new search (F4, AC-39)", async () => {
+    const saved = { ...mockSessionState.data.datetime };
+    try {
+      const { wrapper, router } = await mountKept();
+      Object.assign(mockSessionState.data.datetime, {
+        startTime: 1790000000000000,
+        endTime: 1790000900000000,
+        valueType: "absolute",
+      });
+      const vm = wrapper.findComponent(AppSessions).vm as unknown as {
+        updateUrlQueryParams: () => void;
+      };
+      vm.updateUrlQueryParams();
+      await flushPromises();
+      // The list's own URL write stored numbers; the router hands them back as strings.
+      expect(router.currentRoute.value.query.from).toBe("1790000000000000");
+      const before = vi.mocked(searchService.search).mock.calls.length;
+      await cycle();
+      expect(vi.mocked(searchService.search).mock.calls.length).toBe(before);
+      wrapper.unmount();
+    } finally {
+      Object.assign(mockSessionState.data.datetime, saved);
+    }
+  });
+
+  it("a RUM tab round trip keeps the list's own range and issues no new search", async () => {
+    const { wrapper, router } = await mountKept();
+    show.value = false;
+    await flushPromises();
+    await router.push({
+      name: "rumPerformanceSummary",
+      query: { org_identifier: "o", period: "1h" },
+    });
+    await router.push({ name: "Sessions", query: { org_identifier: "o", period: "1h" } });
+    const before = vi.mocked(searchService.search).mock.calls.length;
+    show.value = true;
+    await flushPromises();
+    expect(mockSessionState.data.datetime.relativeTimePeriod).not.toBe("1h");
+    expect(vi.mocked(searchService.search).mock.calls.length).toBe(before);
+    wrapper.unmount();
+  });
+
+  it("a plain return with the same URL filter issues no new search", async () => {
+    const { wrapper } = await mountKept();
+    const before = vi.mocked(searchService.search).mock.calls.length;
+    await cycle();
+    expect(vi.mocked(searchService.search).mock.calls.length).toBe(before);
+    wrapper.unmount();
   });
 });

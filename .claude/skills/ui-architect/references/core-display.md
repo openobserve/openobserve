@@ -16,8 +16,11 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - [OEmptyState](#oemptystate)
 - [OIcon](#oicon)
 - [OSeparator](#oseparator)
+- [OSettingRow](#osettingrow)
+- [OSettingRowPair](#osettingrowpair)
 - [OShortcut](#oshortcut)
 - [OText](#otext)
+- [OTruncatedText](#otruncatedtext) — cut text ("…") + full-text tooltip only when cut
 - [OVirtualScroll](#ovirtualscroll)
 
 ---
@@ -119,7 +122,8 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - `dimKey` (string, required — drives the colour)
 - `value` (string | number, required — shown in the bold segment)
 - `keyLabel` (string — display override for the key segment)
-- `tooltip` (boolean, default `false` — show a `key=value` hover tooltip)
+- `tooltip` (boolean, default `false` — show an always-on `key=value` hover tooltip instead of the value's own one)
+- `valueTooltip` (boolean, default `true` — a cut value shows its full text on hover; set `false` when an enclosing element already explains the chip, e.g. a row whose `title` holds the full sentence, so only one bubble opens)
 
 **Slots:** none
 **Emits:** none
@@ -217,7 +221,8 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 - `block` (boolean, default `false` — full-width scrollable block vs inline chip)
 - `copyable` (boolean, default `false` — shows a copy-to-clipboard button)
-- `truncate` (boolean, default `false` — ellipsis; inline mode only)
+- `truncate` (boolean, default `false` — ellipsis; inline mode only). A cut value shows its full text on hover, only while it is cut.
+- `tooltip` (I18nText | `false` — with `truncate`: hover text when cut, defaults to the value; **`false` for secrets** such as API keys and tokens, which must never show on hover)
 
 **Slots:** `default` (code content)
 **Emits:** none
@@ -287,6 +292,44 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 </OCollapsible>
 ```
 
+**Rich list row** — one item per row: name + status on line 1, the detail on one
+truncated line, the full detail when opened (copy-and-values.md § One line per item).
+The `#trigger` slot hides the built-in chevron, so draw one and rotate it on `open`;
+hide the truncated line while open so it is not said twice.
+
+```vue
+<OCollapsible>
+  <template #trigger="{ open }">
+    <span class="flex min-w-0 flex-1 flex-col gap-1">
+      <span class="flex items-baseline gap-x-3 max-md:flex-col">
+        <OText variant="body-strong" as="span" class="min-w-0 md:flex-1">{{ row.label }}</OText>
+        <OText variant="meta" as="span" nowrap>{{ row.status }}</OText>
+      </span>
+      <OText v-if="!open" variant="meta" truncate>{{ row.detail }}</OText>
+    </span>
+    <OIcon
+      name="expand-more"
+      size="sm"
+      class="text-text-secondary shrink-0 transition-transform duration-200"
+      :class="open ? 'rotate-180' : 'rotate-0'"
+    />
+  </template>
+  <p class="px-2 pb-2 leading-5 break-words">
+    <OText variant="meta">{{ row.detail }}</OText>
+  </p>
+</OCollapsible>
+```
+
+- **A control beside the trigger:** the body renders inside the root, so a sibling
+  placed after an `OCollapsible` sits beside the whole open body, not the trigger.
+  When a control must stay on the trigger's line (an info button beside "38 panels
+  hidden"), use an `OButton` toggle (`icon-right` `expand-more`/`expand-less`,
+  `:aria-expanded`, `aria-controls`) and render the body below with `v-if`.
+- **Nothing interactive inside `#trigger`** — it is already a button. A Set-up
+  action for a row goes beside the `OCollapsible`, not in its trigger.
+- **In specs**, open an uncontrolled one by clicking its trigger `button`;
+  `setValue(true)` on the component does nothing without a bound `v-model`.
+
 **Family:** Built on reka-ui `Collapsible*` + `OIcon`; accordion coordination via `useCollapsibleGroup`. Standalone.
 
 ---
@@ -326,6 +369,10 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 **Slots:** `illustration`, `title`, `description`, `actions`, `extra`
 **Emits:** `action` (`(id?: string)`), `secondaryAction`
+**In a scroll pane:** the root is `overflow-hidden`, so as a flex child of a
+`flex-col overflow-y-auto` pane it shrinks and clips its own `#extra` list instead of
+letting the pane scroll — pass `class="shrink-0"` and centre with
+`justify-center-safe` on the pane. A list in `#extra` follows "one line per item".
 **Example:**
 
 ```vue
@@ -400,6 +447,61 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 
 ---
 
+### OSettingRow
+**Import:** `@/lib/core/SettingRow/OSettingRow.vue`
+**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own).
+**Don't use for:** Form fields with a label above the control — use `OFormInput` directly.
+**Key props:**
+- `label` (`I18nText`, required — the setting's name)
+- `description` (`I18nText` — one line saying what the setting does or what a special value means)
+- `disabled` (boolean, default `false` — renders the row muted only; the control owns its own disabled state)
+- `dataTest` (string)
+
+**Slots:** `default` — the control on the right
+**Emits:** none
+**Example:**
+```vue
+<OSettingRow
+  :label="t('passwordPolicy.minLength')"
+  :description="t('passwordPolicy.minLengthDesc')"
+  data-test="settings-password-policy-min-length"
+>
+  <OFormInput name="min_length" type="number" width="xs" />
+</OSettingRow>
+```
+**Family:** Pair with `OFormSection`, which supplies the card.
+
+---
+
+### OSettingRowPair
+**Import:** `@/lib/core/SettingRow/OSettingRowPair.vue`
+**Use when:** Two related settings — a min/max, a period and its warning — on one row; the pair owns the hairline and padding so the two cells read as one row.
+**Don't use for:** More than two controls, or unrelated settings that only happen to be adjacent.
+**Key props:**
+- `dataTest` (string)
+
+**Slots:** `default` — exactly two `OSettingRow`; `footer` — a full-width message under both cells (a cross-field validation error)
+**Emits:** none
+**Example:**
+```vue
+<OSettingRowPair data-test="settings-password-policy-pair-length">
+  <OSettingRow :label="t('passwordPolicy.minLength')" data-test="settings-password-policy-min-length">
+    <OFormInput name="min_length" type="number" width="xs" />
+  </OSettingRow>
+  <OSettingRow :label="t('passwordPolicy.maxLength')" data-test="settings-password-policy-max-length">
+    <OFormInput name="max_length" type="number" width="xs">
+      <template #error />
+    </OFormInput>
+  </OSettingRow>
+  <template v-if="maxLengthError" #footer>
+    <p class="text-input-error-text text-xs" role="alert">{{ maxLengthError }}</p>
+  </template>
+</OSettingRowPair>
+```
+**Family:** `OSettingRow`, `OFormSection`.
+
+---
+
 ### OShortcut
 
 **Import:** `@/lib/core/Shortcut/OShortcut.vue`
@@ -440,12 +542,14 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   - `label` — 12px medium, `<span>` default (form/column sub-labels)
   - `meta` — 12px normal secondary, `<span>` default (timestamps, counts, hints)
   - `mono` — 12px IBM Plex Mono, `<span>` default (cron, IDs, field names — non-linked)
-- `as` (string — override the rendered element)
-- `truncate` (boolean, default `false` — ellipsis on overflow)
+- `as` (string — override the rendered element). There is **no `tag` prop**: `<OText tag="h2">` renders the variant's default element (a `<p>` for `body`) and passes `tag` through as a dead attribute, so a "heading" is not one.
+- `truncate` (boolean, default `false` — ellipsis on overflow; the full text shows on hover only while it is cut)
+- `tooltip` (I18nText | `false` — with `truncate`: hover text when cut, defaults to the text; `false` for none. It cuts only as a block or flex item)
 - `nowrap` (boolean, default `false` — prevent wrapping)
 
 **Slots:** `default`
 **Emits:** none
+**No class merging.** OText applies its variant's size, weight, colour and leading as plain classes and does not merge yours, so `class="text-xl"` on a `body` OText fights its `text-sm` by stylesheet order. Change the `variant`; when no variant fits, set the property on a wrapping element the OText inherits from (`<p class="leading-5"><OText variant="mono">…</OText></p>`).
 **Example:**
 
 ```vue
@@ -454,6 +558,53 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 ```
 
 **Family:** Built on reka-ui `Primitive`. Standalone.
+
+---
+
+### OTruncatedText
+
+**Import:** `@/lib/core/Typography/OTruncatedText.vue`
+**Use when:** Any text that may not fit and is cut with "…" — names, IDs, URLs, descriptions, previews. **Write `<OTruncatedText>` wherever you would write `truncate` or `line-clamp-*`.** It cuts the text and shows the full value in a tooltip **only while the text is actually cut**; text that fits shows nothing.
+**Don't use for:** Executable code (use `OCode` with `truncate`). Plain text in an `OTable` cell needs nothing — the table already shows a cut cell's full text (see [core-controls-table](core-controls-table.md)).
+**Key props:**
+
+- `as` (string, default `"span"` — keep the element the call site used, e.g. `h2`, `code`, `div`, so layout doesn't shift. It must be a **block or a flex/grid item**: inline text cannot cut)
+- `lines` (`1`–`6`, default `1` — lines shown before "…"; `1` = `truncate`, more = `line-clamp-N`)
+- `tooltip` (I18nText | `false` — custom tooltip text, e.g. `raw(name)` when the element also holds other markup; **`false` = no tooltip**)
+
+**Slots:** `default` (the text)
+**Emits:** none
+**Example:**
+
+```vue
+<!-- cut text with a full-text tooltip when cut -->
+<OTruncatedText class="text-text-heading font-medium">{{ dashboard.name }}</OTruncatedText>
+
+<!-- two lines, then "…" -->
+<OTruncatedText :lines="2" class="text-text-secondary text-xs">{{ row.description }}</OTruncatedText>
+
+<!-- deliberately no tooltip -->
+<OTruncatedText :tooltip="false" class="font-mono">{{ token }}</OTruncatedText>
+```
+
+**No tooltip (`:tooltip="false"`) when:**
+- the value is a **secret** — token, API/access key, password, webhook or signed URL, connection string, a URL that can carry secret values — a tooltip would print it in full;
+- the full text is **already readable another way** — printed right below, a click/expand reveals it, or a side panel shows it. Huge values (log lines, JSON, prompts) belong here.
+
+Outside a table, `:tooltip="false"` and a plain `truncate` behave the same; use the component anyway so "no tooltip" reads as a decision. **Inside an `OTable` cell a plain `truncate` is NOT enough** — the table's own tooltip would still show the value; `:tooltip="false"` marks the element so the table stays out too.
+
+**Never repeat the visible text** in a `title` or an `OTooltip` next to it (two bubbles, or an always-on bubble for text that fits). Add a tooltip only when it shows *more* than the text on screen.
+
+**Several parts in one cut box** (tags, label pairs, value + delta): the tooltip reads the raw text, which has no separators (`trace0annotation0manual1`). Either
+- **list of tags** → wrap them: `<OTruncatedText as="div" class="flex flex-nowrap items-center gap-1" :tooltip="raw(tags.join(', '))">`, or
+- **one long text + small badges** → put `OTruncatedText` on the text only and give the badges `class="shrink-0"`, so the text cuts and the badges stay visible.
+
+**Gotchas:**
+- The parent row must let it shrink: a flex parent needs `min-w-0` (and so does every flex ancestor up to the box with the fixed width).
+- Directly inside a block container (not a flex row), use `as="div"` — an inline `span` never measures as cut.
+- Inside a non-hoverable bubble (an `OTooltip #content`), a nested `OTruncatedText` can't be hovered; give that content its own wrapping instead.
+
+**Family:** Wraps `OTooltip` (`overflow-only`). Related: `OText` / `OCode` (`truncate` + `tooltip` props), `OTable`'s shared cut-cell tooltip.
 
 ---
 

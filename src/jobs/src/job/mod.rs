@@ -46,13 +46,11 @@ mod incidents;
 mod leader;
 #[cfg(feature = "enterprise")]
 mod llm_experiment_cleanup;
-#[cfg(feature = "enterprise")]
 mod llm_idempotency_purge;
 #[cfg(feature = "enterprise")]
 mod llm_playground_cleanup;
 #[cfg(feature = "enterprise")]
 mod llm_review_reconciliation;
-#[cfg(feature = "enterprise")]
 mod llm_secret_cleanup;
 pub mod metrics;
 mod mmdb_downloader;
@@ -63,8 +61,13 @@ mod org_storage;
 #[cfg(feature = "enterprise")]
 pub(crate) mod pipeline;
 mod pipeline_error_cleanup;
+#[cfg(feature = "enterprise")]
+mod prompt_webhook_delivery;
 mod promql;
 mod promql_self_consume;
+mod query_history_reaper;
+#[cfg(feature = "enterprise")]
+mod red_insights;
 mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
@@ -363,6 +366,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
+        // Deliberately the static rule, not the configured policy: this branch only runs when no
+        // root user exists, so no policy can exist either and the effective one would be the
+        // permissive default. Using it here would weaken the bootstrap credential, not align it.
         if let Err(msg) =
             config::utils::password::validate_password_strength(&cfg.auth.root_user_password)
         {
@@ -424,6 +430,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // watch org users
     tokio::task::spawn(db::user::watch());
+    // Only the policy-tightening sweep publishes to this key, so without the feature the watcher
+    // would hold a coordinator watch open forever for an event that cannot happen.
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(db::user::watch_bulk_refresh());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
@@ -524,6 +534,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    #[cfg(feature = "profiling")]
+    tokio::task::spawn(openobserve_core::self_profiles::run());
+
     // telemetry run
     if cfg.common.telemetry_enabled && LOCAL_NODE.is_querier() {
         spawn_pausable_job!(
@@ -551,8 +564,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
-    tokio::task::spawn(db::system_settings::watch());
     tokio::task::spawn(db::model_pricing::watch());
+    tokio::task::spawn(openobserve_core::prompts::watch_invalidation());
     tokio::task::spawn(db::alerts::templates::watch());
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
@@ -617,9 +630,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
+    // Queue changes during hydration so the snapshot cannot overwrite newer events.
+    let system_settings_watcher = db::system_settings::create_watcher().await?;
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+    tokio::task::spawn(system_settings_watcher);
+
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
         db::model_pricing::cache()
@@ -1088,7 +1107,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .disabled
     {
         tokio::task::spawn(anomaly_claim_supervisor());
+        // Here because create_config does not check the anomaly kill switch itself.
+        tokio::task::spawn(red_insights::run());
     }
+    // Every node that serves writes publishes them, not only the scheduler.
+    openobserve_synthetics::service::start_publish_queue();
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
         // check, stores it, and never runs it — the routes would be registered
@@ -1231,6 +1254,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    query_history_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget
@@ -1244,7 +1268,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     llm_review_reconciliation::run();
     // Replayable SDK requests are retained for 24h; reclaim the lapsed ones.
-    #[cfg(feature = "enterprise")]
     llm_idempotency_purge::run();
     // Early Experiment deletion marks the head and leaves the removal to this
     // sweep, which retries until the Experiment's own storage is gone.
@@ -1254,8 +1277,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     llm_playground_cleanup::run();
     // Signing-key rotation retains the outgoing key only until its bounded
     // grace period ends.
-    #[cfg(feature = "enterprise")]
     llm_secret_cleanup::run();
+    #[cfg(feature = "enterprise")]
+    prompt_webhook_delivery::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

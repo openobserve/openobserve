@@ -39,12 +39,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="depKindColor(focusNode ?? { kind: focus.kind, orphan: false, missing: false })"
         />
         <div class="min-w-0">
-          <div class="text-text-heading truncate text-base font-semibold" :title="entityName">
+          <OTruncatedText as="div" class="text-text-heading text-base font-semibold">
             {{ entityName }}
-          </div>
-          <div class="text-text-secondary truncate text-xs" :title="impactLabel">
+          </OTruncatedText>
+          <OTruncatedText
+            as="div"
+            class="text-text-secondary text-xs"
+            data-test="dependency-impact-subtitle"
+          >
             {{ impactLabel }}
-          </div>
+          </OTruncatedText>
         </div>
       </div>
     </template>
@@ -67,6 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dependency-impact-error"
       />
 
+      <template v-else-if="noConsumers">
+        <div
+          class="text-text-muted flex h-72 items-center justify-center px-2 text-center text-xs"
+          data-test="dependency-impact-no-consumers"
+        >
+          {{ t("alert_dependencies.noConsumers") }}
+        </div>
+      </template>
+
       <template v-else>
         <OSearchInput
           v-model="search"
@@ -75,7 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('alert_dependencies.searchPlaceholder')"
         />
 
-        <div class="flex items-stretch justify-center gap-1" data-test="dependency-impact-flow">
+        <div
+          v-if="isTemplateFocus || hasAlerts"
+          class="flex items-stretch justify-center gap-1"
+          data-test="dependency-impact-flow"
+        >
           <!-- Destinations lane (template focus only). -->
           <template v-if="isTemplateFocus">
             <section
@@ -144,8 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OTag type="countChip" value="neutral">{{ chain.alerts.length }}</OTag>
             </div>
+            <!-- Destination focus grows to its content so the consumer sections below
+                 stay on screen; template focus keeps a fixed lane height, because its
+                 two lanes sit side by side and must line up. -->
             <div
-              class="border-border-default bg-surface-panel rounded-surface h-72 overflow-y-auto border p-1.5"
+              class="border-border-default bg-surface-panel rounded-surface overflow-y-auto border p-1.5"
+              :class="isTemplateFocus ? 'h-72' : 'max-h-72 min-h-16'"
             >
               <div
                 v-if="alertsEmpty"
@@ -188,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="scrollToGroup(g.dest)"
                   >
                     <OIcon name="location-on" size="xs" class="text-info shrink-0" />
-                    <span class="truncate" :title="g.dest.name">{{ g.dest.name }}</span>
+                    <OTruncatedText>{{ g.dest.name }}</OTruncatedText>
                   </div>
                   <!-- Hovering an alert highlights its destination card(s). -->
                   <DependencyEntityRow
@@ -226,6 +247,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </section>
+        </div>
+
+        <!-- Non-alert consumers, one section per kind — the blockers `delete`'s 409 names. -->
+        <div
+          v-if="!isTemplateFocus && consumerSections.length"
+          class="border-border-default mt-3 space-y-3 border-t pt-3"
+          data-test="dependency-impact-other-blockers"
+        >
+          <div
+            v-for="s in consumerSections"
+            :key="s.kind"
+            :data-test="`dependency-impact-blocker-${s.kind}`"
+          >
+            <div class="mb-1.5 flex items-center gap-1.5 px-1">
+              <OIcon :name="depKindIcon(s.kind)" size="sm" class="text-text-secondary" />
+              <span class="text-text-secondary text-2xs font-semibold">{{ s.label }}</span>
+            </div>
+            <div
+              class="border-border-default bg-surface-panel rounded-surface space-y-1 border p-1.5"
+            >
+              <div
+                v-for="row in s.rows"
+                :key="row.id"
+                class="flex items-center gap-2 px-2 py-1.5"
+                :data-test="`dependency-impact-row-${row.name}`"
+              >
+                <OIcon :name="depKindIcon(s.kind)" size="sm" class="text-text-secondary shrink-0" />
+                <OTruncatedText class="text-compact flex-1">{{ row.name }}</OTruncatedText>
+              </div>
+            </div>
+          </div>
         </div>
       </template>
     </div>
@@ -267,6 +319,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -281,8 +334,17 @@ import useDependencyGraph, {
   applyDependencyDeletion,
   depKindIcon,
   depKindColor,
+  consumerBadges,
+  joinWithAnd,
+  DEP_CONSUMER_KINDS,
+  depConsumerLabelKey,
 } from "@/composables/alerts/useDependencyGraph";
-import type { DepFocus, DepNode, DepNodeKind } from "@/composables/alerts/useDependencyGraph";
+import type {
+  DepFocus,
+  DepNode,
+  DepNodeKind,
+  UsageRow,
+} from "@/composables/alerts/useDependencyGraph";
 
 const props = defineProps<{ open: boolean; focus: DepFocus }>();
 const emit = defineEmits<{
@@ -321,21 +383,63 @@ const chain = computed(() => buildFocusChain(graph.value, props.focus));
 const focusNode = computed(() => chain.value.focusNode);
 const entityName = computed(() => focusNode.value?.name ?? props.focus.name ?? "");
 
+// Non-alert consumers of the focused destination — the same blockers `delete` names in its 409.
+const otherBlockers = computed(() =>
+  consumerBadges(focusNode.value).map((b) => ({
+    kind: b.kind,
+    label: t(b.labelKey, { count: b.count }, b.count),
+  })),
+);
+
+// One section per non-alert consumer kind, with its actual rows — what the body lists.
+interface ConsumerSection {
+  kind: (typeof DEP_CONSUMER_KINDS)[number];
+  label: string;
+  rows: UsageRow[];
+}
+const consumerSections = computed<ConsumerSection[]>(() => {
+  const uses = focusNode.value?.consumerUses ?? {};
+  return DEP_CONSUMER_KINDS.filter((k) => uses[k]?.length).map((k) => ({
+    kind: k,
+    label: t(depConsumerLabelKey(k), { count: uses[k]!.length }, uses[k]!.length),
+    rows: uses[k]!,
+  }));
+});
+
+// Destination focus only: whether there is anything downstream at all, of any kind.
+const hasAlerts = computed(() => chain.value.alerts.length > 0);
+const noConsumers = computed(
+  () => !isTemplateFocus.value && !hasAlerts.value && otherBlockers.value.length === 0,
+);
+
 // Header subtitle: what this entity is used by, downstream. A template names its
-// destinations + alerts; a destination names its alerts.
+// destinations + alerts; a destination names EVERY consumer kind, not just alerts.
 const impactLabel = computed(() => {
-  const alerts = t(
-    "alert_dependencies.usedBy",
-    { count: chain.value.alerts.length },
-    chain.value.alerts.length,
-  );
-  if (!isTemplateFocus.value) return t("alert_dependencies.impactDestination", { alerts });
-  const destinations = t(
-    "alert_dependencies.countDestinations",
-    { count: chain.value.destinations.length },
-    chain.value.destinations.length,
-  );
-  return t("alert_dependencies.impactTemplate", { destinations, alerts });
+  if (isTemplateFocus.value) {
+    const alerts = t(
+      "alert_dependencies.usedBy",
+      { count: chain.value.alerts.length },
+      chain.value.alerts.length,
+    );
+    const destinations = t(
+      "alert_dependencies.countDestinations",
+      { count: chain.value.destinations.length },
+      chain.value.destinations.length,
+    );
+    return t("alert_dependencies.impactTemplate", { destinations, alerts });
+  }
+  if (noConsumers.value) return t("alert_dependencies.impactUnused");
+  const parts = otherBlockers.value.map((b) => b.label);
+  if (hasAlerts.value) {
+    parts.unshift(
+      t(
+        "alert_dependencies.usedBy",
+        { count: chain.value.alerts.length },
+        chain.value.alerts.length,
+      ),
+    );
+  }
+  return t("alert_dependencies.impactDestination", { consumers: joinWithAnd(parts) });
 });
 
 const nameMatches = (name: string) => {

@@ -63,23 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dbm-empty-state-diagnostic"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
+      <EmptyStateActionCard
+        :icon="primaryCause === 'not-counted' ? 'refresh' : 'menu-book'"
+        :label="primaryActionLabel"
         data-test="dbm-empty-state-instrument"
         @click="emit('action', primaryCause)"
-      >
-        {{ primaryActionLabel }}
-      </OButton>
-      <OButton
+      />
+      <EmptyStateActionCard
         v-if="traceCount"
-        variant="outline"
-        size="sm"
+        icon="account-tree"
+        :label="t('dbm.empty.checkTrace')"
         data-test="dbm-empty-state-check-trace"
         @click="emit('action', 'check-trace')"
-      >
-        {{ t("dbm.empty.checkTrace") }}
-      </OButton>
+      />
     </template>
 
     <!-- The checklist grammar is shared with DbmLockEmptyState via DbmCheckList,
@@ -96,10 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
+import type { Store } from "vuex";
 
 import DbmCheckList, { type DbmCheckRow, type DbmCheckStatus } from "./DbmCheckList.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount } from "@/utils/dbm/format";
@@ -154,6 +151,12 @@ const props = withDefaults(
     size: "hero",
   },
 );
+const store = inject<Store<any> | null>("store", null);
+// Named the way the org picker names it; the identifier is an opaque id like 3IV3cRABFAqR5I3bdTtHdn041uU.
+const orgLabel = computed(() => {
+  const selected = store?.state?.selectedOrganization;
+  return selected?.identifier === props.org && selected?.label ? selected.label : (props.org ?? "");
+});
 
 const emit = defineEmits<{
   (e: "action", cause: DbmEmptyCauseId): void;
@@ -186,7 +189,7 @@ const checks = computed<DbmCheckRow[]>(() => {
       }),
     );
   }
-  list.push(c("permission", props.permissionOk, "permission", { org: props.org ?? "" }));
+  list.push(c("permission", props.permissionOk, "permission", { org: orgLabel.value }));
 
   // Only meaningful once traces are arriving: "no database spans" on an org
   // with no traces at all is a restatement of the previous line.

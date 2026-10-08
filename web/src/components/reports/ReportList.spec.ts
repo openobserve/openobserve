@@ -115,7 +115,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             <slot name="empty" />
           </div>
         </template>
-        <slot name="bottom" :pagination="{}" :pagesNumber="1" />
+        <slot name="selection-actions" />
       </div>
     `,
   },
@@ -350,16 +350,6 @@ describe("ReportList", () => {
       expect(wrapper.vm.reportsTableRows).toHaveLength(2);
     });
 
-    it("should update resultTotal after filterReports", async () => {
-      wrapper.vm.staticReportsList = [
-        { ...REPORT_SCHEDULED, "#": 1 },
-        { ...REPORT_CACHED, "#": 2 },
-      ];
-      wrapper.vm.activeTab = "shared";
-      await wrapper.vm.filterReports();
-      expect(wrapper.vm.resultTotal).toBe(wrapper.vm.reportsTableRows.length);
-    });
-
     it("refreshes rows after filtering (index is OTable's built-in show-index)", async () => {
       wrapper.vm.staticReportsList = [{ ...REPORT_SCHEDULED }, { ...REPORT_CACHED }];
       wrapper.vm.activeTab = "shared";
@@ -398,7 +388,7 @@ describe("ReportList", () => {
     });
   });
 
-  // ── visibleRows computed & resultTotal watch ─────────────────────────────
+  // ── visibleRows computed ─────────────────────────────────────────────────
 
   describe("visibleRows computed property", () => {
     beforeEach(async () => {
@@ -427,14 +417,6 @@ describe("ReportList", () => {
       await nextTick();
       expect(wrapper.vm.visibleRows).toHaveLength(1);
       expect(wrapper.vm.visibleRows[0].name).toBe("Another Scheduled");
-    });
-
-    it("should update resultTotal when visibleRows change (watch)", async () => {
-      wrapper.vm.filterQuery = "Scheduled Report";
-      await nextTick();
-      // Give the watcher a tick to run
-      await nextTick();
-      expect(wrapper.vm.resultTotal).toBe(wrapper.vm.visibleRows.length);
     });
   });
 

@@ -451,9 +451,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
         alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
         distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
-        kv_store, org_storage_providers, re_pattern, re_pattern_stream_map, reports, search_queue,
-        short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings, templates,
-        timed_annotations,
+        kv_store, llm_prompts, org_storage_providers, query_history, re_pattern,
+        re_pattern_stream_map, reports, rum_pa, search_queue, short_urls, slo, slo_backfill_jobs,
+        slo_budget, slos, system_settings, templates, timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -507,7 +507,12 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     reports::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/reports: {e}"))?;
-    // folders safe to delete after dashboards, timed_annotations, and reports are gone
+    // Prompt heads also reference folders with a restrictive FK. Delete the
+    // complete registry before folders so an org with prompts can be removed.
+    llm_prompts::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_prompts: {e}"))?;
+    // folders are safe to delete after dashboards, annotations, reports, and prompts are gone
     folders::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/folders: {e}"))?;
@@ -523,6 +528,10 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     kv_store::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/kv_store: {e}"))?;
+    rum_pa::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/rum_pa: {e}"))?;
+    crate::rum_pa::service::emit_delete_org(org_id).await;
     // Delete cipher keys through the service layer so the in-memory key REGISTRY
     // evicts cluster-wide (via the coordinator delete + super-cluster propagation);
     // a raw table wipe would leave decrypted keys resident in every node's memory.
@@ -541,6 +550,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     search_queue::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_queue: {e}"))?;
+    query_history::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/query_history: {e}"))?;
     re_pattern::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/re_pattern: {e}"))?;
@@ -1238,6 +1250,20 @@ mod tests {
                 "{call} must run before delete_org_alerts"
             );
         }
+    }
+
+    #[test]
+    fn test_db_resources_deletes_query_history() {
+        position_of("query_history::delete_by_org(org_id)");
+    }
+
+    #[test]
+    fn test_prompt_registry_is_deleted_before_folders() {
+        assert!(
+            position_of("llm_prompts::delete_by_org(org_id)")
+                < position_of("folders::delete_by_org(org_id)"),
+            "prompt rows must be deleted before the folders they reference"
+        );
     }
 
     #[test]

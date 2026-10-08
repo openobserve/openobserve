@@ -10,7 +10,6 @@
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
-        :footer-title="t('onlineEvals.scoreConfig.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"
@@ -114,20 +113,15 @@
           <OTimeCell :value="rowCreated(row)" mode="relative" :empty-label="raw('—')" />
         </template>
 
-        <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal max-md:hidden">
-            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
-          </span>
+        <template #selection-actions>
           <OButton
-            v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="ms-3"
             icon-left="download"
             data-test="score-config-bulk-export-btn"
             @click="handleBulkExport"
           >
-            {{ t("onlineEvals.scoreConfig.export.bulkButton") }} ({{ selectedIds.length }})
+            {{ t("common.export") }}
           </OButton>
         </template>
 
@@ -299,6 +293,8 @@ const columns = computed(() =>
       // shared COL.type (180) is wider than needed — trim it back so the flex
       // `name` column reclaims the width (matching the Scorers table).
       size: 120,
+      // Fits the widest badge ("Categorical") so resizing can't clip it.
+      minSize: 104,
       meta: { align: "left" },
     },
     {

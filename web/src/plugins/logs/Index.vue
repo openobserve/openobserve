@@ -278,6 +278,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </VisualizeLogsQuery>
           </div>
           <div
+            v-if="searchObj.meta.logsVisualizeToggle == 'drilldown'"
+            class="border-border-default h-full overflow-hidden border-t"
+            data-test="logs-drill-down-page"
+          >
+            <!-- Same no-stream / error / no-events states as the results pane. -->
+            <OEmptyState
+              v-if="searchObj.meta.sqlMode"
+              size="hero"
+              :title="t('search.drillDownUnavailableInSqlMode')"
+              data-test="logs-drill-down-sql-mode-text"
+            />
+            <LogsNoDataState
+              v-else-if="
+                !searchObj.loadingStream &&
+                searchObj.data.stream.streamLists.length == 0 &&
+                searchObj.loading == false
+              "
+              :ai-enabled="isAiEnabled"
+              data-test="logs-drill-down-no-streams-in-org-text"
+              @ask-ai="onAskAiFixQuery"
+            />
+            <LogsNoStreamState
+              v-else-if="
+                searchObj.data.stream.streamLists.length > 0 &&
+                searchObj.data.stream.selectedStream.length == 0 &&
+                searchObj.data.filterErrMsg === ''
+              "
+              :org-id="store.state.selectedOrganization.identifier"
+              data-test="logs-drill-down-no-stream-selected-text"
+              @select-stream="onSelectStream"
+              @pick-stream="onPickStream"
+            />
+            <LogsErrorState
+              v-else-if="searchObj.data.filterErrMsg !== '' && searchObj.loading == false"
+              data-test="logs-drill-down-filter-error-message"
+              :error-code="0"
+              :error-msg="searchObj.data.filterErrMsg"
+              :ai-enabled="isAiEnabled"
+              @ask-ai="onAskAiFixQuery"
+              @fix-query="onFixQuery"
+              @configure-stream="onConfigureStream"
+              @widen-range="onWidenRange"
+            />
+            <LogsErrorState
+              v-else-if="searchObj.data.errorMsg !== '' && searchObj.loading == false"
+              data-test="logs-drill-down-error-state"
+              :error-code="parseInt(searchObj.data.errorCode) || 0"
+              :error-msg="searchObj.data.errorMsg"
+              :error-detail="searchObj.data.errorDetail"
+              :ai-enabled="isAiEnabled"
+              :stream-name="searchObj.data.stream.selectedStream[0]"
+              @ask-ai="onAskAiFixQuery"
+              @fix-query="onFixQuery"
+              @configure-stream="onConfigureStream"
+              @widen-range="onWidenRange"
+            />
+            <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
+              <OSpinner size="lg" />
+            </div>
+            <!-- Mounted only once a search settles, so each search rebuilds it from the new results. -->
+            <TracesAnalysisDashboard
+              v-else-if="searchObj.data.queryResults.hits?.length > 0"
+              embedded
+              :streamName="searchObj.data.stream.selectedStream[0]"
+              streamType="logs"
+              :timeRange="drillDownTimeRange"
+              :rateFilter="drillDownRateFilter"
+              :baseFilter="drillDownBaseFilter"
+              :streamFields="
+                searchObj.data.stream.userDefinedSchema?.length > 0
+                  ? searchObj.data.stream.userDefinedSchema
+                  : searchObj.data.stream.selectedStreamFields
+              "
+              :logSamples="searchObj.data.queryResults.hits"
+              analysisType="volume"
+            />
+            <LogsNoEventsState
+              v-else-if="searchObj.meta.searchApplied == true"
+              data-test="logs-drill-down-no-events-found-text"
+              :sql-mode="searchObj.meta.sqlMode"
+              :query="searchObj.data.query"
+              :editor-value="searchObj.data.editorValue"
+              :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
+              :date-type="searchObj.data.datetime.type || 'relative'"
+              :ai-enabled="isAiEnabled"
+              :stream-doc-time-range="streamDocTimeRange"
+              :query-window-us="queryWindowUs"
+              :timezone="store.state.timezone"
+              @jump-to-stream-data="onJumpToStreamData"
+              @open-history="showSearchHistoryfn"
+              @ask-ai="onAskAiFixQuery"
+            />
+            <OEmptyState
+              v-else
+              preset="no-query-applied"
+              size="hero"
+              data-test="logs-drill-down-apply-search-text"
+              @action="() => searchBarRef?.handleRunQueryFn?.()"
+            />
+          </div>
+          <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
             class="h-full overflow-hidden"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
@@ -328,6 +429,7 @@ import {
   defineComponent,
   ref,
   onActivated,
+  onDeactivated,
   computed,
   nextTick,
   onBeforeMount,
@@ -342,7 +444,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
@@ -368,6 +470,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { shouldReloadStreamFieldsForVisualize } from "@/utils/logs/visualizeStreamFields";
 import useAiChat from "@/composables/useAiChat";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { onBeforeAppReload } from "@/utils/beforeAppReload";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -385,6 +488,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
@@ -406,9 +510,13 @@ export default defineComponent({
     SearchResult: defineAsyncComponent(() => import("@/plugins/logs/SearchResult.vue")),
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
+    TracesAnalysisDashboard: defineAsyncComponent(
+      () => import("@/plugins/traces/metrics/TracesAnalysisDashboard.vue"),
+    ),
     OSplitter,
     ODrawer,
     OEmptyState,
+    OSpinner,
     LogsNoEventsState,
     LogsNoDataState,
     LogsNoStreamState,
@@ -426,19 +534,17 @@ export default defineComponent({
         this.searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true") {
-        segment.track("Button Click", {
-          button: "Search Data",
-          user_org: this.store.state.selectedOrganization.identifier,
-          user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.join(","),
-          show_query: this.searchObj.meta.showQuery,
-          show_histogram: this.searchObj.meta.showHistogram,
-          sqlMode: this.searchObj.meta.sqlMode,
-          showFields: this.searchObj.meta.showFields,
-          page: "Search Logs",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Search Data",
+        user_org: this.store.state.selectedOrganization.identifier,
+        user_id: this.store.state.userInfo.email,
+        stream_name: this.searchObj.data.stream.selectedStream.join(","),
+        show_query: this.searchObj.meta.showQuery,
+        show_histogram: this.searchObj.meta.showHistogram,
+        sqlMode: this.searchObj.meta.sqlMode,
+        showFields: this.searchObj.meta.showFields,
+        page: "Search Logs",
+      });
     },
     async getMoreDataRecordsPerPage() {
       if (this.searchObj.meta.refreshInterval == 0) {
@@ -462,15 +568,13 @@ export default defineComponent({
           await this.getJobData(false);
         }
 
-        if (config.isCloud == "true") {
-          segment.track("Button Click", {
-            button: "Get More Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get More Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
     async getMoreData() {
@@ -490,15 +594,13 @@ export default defineComponent({
           await this.getJobData(false);
         }
 
-        if (config.isCloud == "true") {
-          segment.track("Button Click", {
-            button: "Get More Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get More Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
     async getLessData() {
@@ -520,15 +622,13 @@ export default defineComponent({
         await this.getQueryData(true);
         this.refreshHistogramChart();
 
-        if (config.isCloud == "true") {
-          segment.track("Button Click", {
-            button: "Get Less Data",
-            user_org: this.store.state.selectedOrganization.identifier,
-            user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.join(","),
-            page: "Search Logs",
-          });
-        }
+        analytics.track("Button Click", {
+          button: "Get Less Data",
+          user_org: this.store.state.selectedOrganization.identifier,
+          user_id: this.store.state.userInfo.email,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
+          page: "Search Logs",
+        });
       }
     },
   },
@@ -577,16 +677,42 @@ export default defineComponent({
       isWithQuery,
       isLimitQuery,
       updateUrlQueryParams,
+      generateURLQuery,
       addTraceId,
     } = logsUtils();
     const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState, cancelPatterns } = usePatterns(t);
+    const { extractPatterns, patternsState, cancelPatterns, clearPatterns } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
+
+    // Uses SearchResult's histogram brush; SearchResult stays mounted (hidden) in Drill down.
+    const drillDownTimeRange = computed(
+      () =>
+        searchResultRef.value?.originalTimeRangeBeforeSelection ||
+        searchResultRef.value?.volumeAnalysisTimeRange || {
+          startTime: searchObj.data.datetime.startTime,
+          endTime: searchObj.data.datetime.endTime,
+        },
+    );
+    const drillDownRateFilter = computed(() =>
+      searchResultRef.value?.hasHistogramSelection
+        ? searchResultRef.value.histogramSelectionRange
+        : undefined,
+    );
+    // The last run filter: the editor stays editable in Drill down and may hold unrun typing.
+    const drillDownBaseFilter = ref(searchObj.data.editorValue);
+    let runningSearchFilter = searchObj.data.editorValue;
+    watch(
+      () => searchObj.loading,
+      (loading) => {
+        if (loading) runningSearchFilter = searchObj.data.editorValue;
+        else drillDownBaseFilter.value = runningSearchFilter;
+      },
+    );
     const buildQueryPageRef = ref(null);
     const showJobScheduler = ref(false);
 
@@ -609,11 +735,19 @@ export default defineComponent({
       { immediate: true },
     );
     // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+    let preTabletSplitter: number | null = null;
     watch(
       isTablet,
-      (tablet) => {
+      (tablet, wasTablet) => {
         if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+          preTabletSplitter = searchObj.config.splitterModel;
           searchObj.config.splitterModel = 30;
+        } else if (wasTablet && !tablet && !isMobile.value && preTabletSplitter !== null) {
+          // Back on a laptop: undo the floor unless the reader dragged the pane since.
+          if (searchObj.config.splitterModel === 30) {
+            searchObj.config.splitterModel = preTabletSplitter;
+          }
+          preTabletSplitter = null;
         }
       },
       { immediate: true },
@@ -724,9 +858,35 @@ export default defineComponent({
       searchResultRef.value = null;
     });
 
+    // Logs has no beforeunload guard; the URL is what restoreUrlQueryParams reads back after the language reload.
+    const persistQueryForReload = async (): Promise<void> => {
+      const query = generateURLQuery(false);
+      if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
+        delete query.type;
+      }
+      await router.replace({ query });
+    };
+
+    let stopBeforeAppReload: (() => void) | null = null;
+    const unregisterBeforeAppReload = () => {
+      stopBeforeAppReload?.();
+      stopBeforeAppReload = null;
+    };
+    const registerBeforeAppReload = () => {
+      unregisterBeforeAppReload();
+      stopBeforeAppReload = onBeforeAppReload(persistQueryForReload);
+    };
+
+    // Logs is not in MainLayout's keep-alive include list, so onActivated alone would never run.
+    onMounted(registerBeforeAppReload);
+
     onActivated(() => {
+      registerBeforeAppReload();
       if (isLogsMounted.value) handleActivation();
     });
+
+    onDeactivated(unregisterBeforeAppReload);
+    onBeforeUnmount(unregisterBeforeAppReload);
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
@@ -843,6 +1003,17 @@ export default defineComponent({
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
       // Clear any stale error from previous logs search
       resetSearchError();
+
+      // Patterns extraction only supports a single stream (dedicated
+      // single-stream API). Reject client-side instead of letting the
+      // request fail server-side and leaving the previous single-stream
+      // result on screen.
+      if (!searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) {
+        cancelPatterns();
+        clearPatterns();
+        showErrorNotification(t("logs.index.patternsUnavailableForMultiStream"));
+        return;
+      }
 
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;
@@ -1036,7 +1207,8 @@ export default defineComponent({
             await getRegionInfo();
           }
 
-          if (isLogsTab()) {
+          // Drill down is built from the logs results, so it loads them too.
+          if (isLogsTab() || searchObj.meta.logsVisualizeToggle === "drilldown") {
             if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
               await applyReAppliedQuery();
             } else {
@@ -1116,7 +1288,10 @@ export default defineComponent({
         const queryParams: any = router.currentRoute.value.query;
 
         const activationState: ActivationState = {
-          isSearchTab: searchObj.meta.logsVisualizeToggle === PageType.LOGS,
+          // Drill down is built from the logs results, so it reactivates like Search.
+          isSearchTab:
+            searchObj.meta.logsVisualizeToggle === PageType.LOGS ||
+            searchObj.meta.logsVisualizeToggle === "drilldown",
           isStreamExplorer: queryParams.type === PageType.STREAM_EXPLORER,
           isTraceExplorer: queryParams.type === PageType.TRACE_EXPLORER,
           isStreamChanged:
@@ -2971,9 +3146,13 @@ export default defineComponent({
       try {
         const isLogsPage = router.currentRoute.value.name === "logs";
 
+        // Drill down reads the logs search, so it gives the logs context.
+        const isLogsResultsMode =
+          searchObj.meta.logsVisualizeToggle === "logs" ||
+          searchObj.meta.logsVisualizeToggle === "drilldown";
+
         const isStreamSelectedInLogsPage =
-          searchObj.meta.logsVisualizeToggle === "logs" &&
-          searchObj.data.stream.selectedStream.length;
+          isLogsResultsMode && searchObj.data.stream.selectedStream.length;
 
         const isStreamSelectedInDashboardPage =
           searchObj.meta.logsVisualizeToggle === "visualize" &&
@@ -2986,19 +3165,17 @@ export default defineComponent({
 
         const payload = {};
 
-        const streams =
-          searchObj.meta.logsVisualizeToggle === "logs"
-            ? searchObj.data.stream.selectedStream
-            : [
-                dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-                  .stream,
-              ];
+        const streams = isLogsResultsMode
+          ? searchObj.data.stream.selectedStream
+          : [
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                .stream,
+            ];
 
-        const streamType =
-          searchObj.meta.logsVisualizeToggle === "logs"
-            ? searchObj.data.stream.streamType
-            : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-                .stream_type;
+        const streamType = isLogsResultsMode
+          ? searchObj.data.stream.streamType
+          : dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .stream_type;
 
         if (!streamType || !streams?.length) {
           return "";
@@ -3094,8 +3271,9 @@ export default defineComponent({
           // In normal logs mode `handleRunQueryFn` only handles
           // visualize/patterns/build — trigger the logs search the same way the
           // refresh shortcut and the run button do (via the runQuery watcher).
+          // Drill down is built from the logs results, so it runs that search too.
           const mode = searchObj.meta.logsVisualizeToggle;
-          if (!mode || mode === "logs") {
+          if (!mode || mode === "logs" || mode === "drilldown") {
             if (searchObj.loading) return;
             searchObj.loading = true;
             searchObj.runQuery = true;
@@ -3171,6 +3349,10 @@ export default defineComponent({
       getQueryData,
       getJobData,
       searchResultRef,
+      drillDownTimeRange,
+      drillDownRateFilter,
+      drillDownBaseFilter,
+      handleActivation,
       runQueryFn,
       refreshData,
       setQuery,

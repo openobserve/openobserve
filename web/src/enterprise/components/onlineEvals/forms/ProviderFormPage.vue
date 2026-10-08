@@ -149,14 +149,14 @@
                   : t("onlineEvals.provider.testFailed")
               }}
             </OTag>
-            <span
+            <OTruncatedText
               v-if="testMessage"
-              class="truncate text-xs"
+              :lines="2"
+              class="text-xs"
               :class="testState === 'failed' ? 'text-status-error-text' : 'text-text-secondary'"
-              :title="testMessage"
             >
               {{ testMessage }}
-            </span>
+            </OTruncatedText>
           </template>
         </div>
 
@@ -201,6 +201,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -246,7 +247,7 @@ const form = useOForm<ProviderForm>({
 });
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
 const apiKeyRequired = computed(() =>
-  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
+  ["openai", "deepseek", "anthropic", "systemone"].includes(formValues.value.providerType),
 );
 
 const providerTypeOptions = computed(() => [
@@ -256,6 +257,7 @@ const providerTypeOptions = computed(() => [
   { label: raw("Ollama"), value: "ollama" },
   { label: raw("vLLM"), value: "vllm" },
   { label: raw("OpenAI-compatible"), value: "openai_compatible" },
+  { label: raw("System One (TypeSafe Jev)"), value: "systemone" },
 ]);
 
 const endpointPlaceholder = computed(

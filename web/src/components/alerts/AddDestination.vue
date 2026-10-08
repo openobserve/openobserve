@@ -363,6 +363,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alert_destinations.skip_tls_verify')"
               />
             </div>
+
+            <!-- Test Result Display -->
+            <DestinationTestResult
+              v-if="isCustomWebhook && lastTestResult"
+              :result="lastTestResult"
+              :is-loading="isTestInProgress"
+              data-test="custom-test-result"
+              @retry="handleTestDestination"
+            />
           </template>
           <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
             <!-- Recipients are organization users, picked from the list rather
@@ -402,8 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
       >
-        <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-        <div v-if="showPrebuiltFinalActions" class="flex flex-wrap items-center gap-2">
+        <!-- Left side: Test and Preview buttons (prebuilt and custom Web Hook alert destinations) -->
+        <div
+          v-if="showPrebuiltFinalActions || isCustomWebhook"
+          class="flex flex-wrap items-center gap-2"
+        >
           <OButton
             data-test="destination-preview-button"
             variant="outline"
@@ -640,6 +652,12 @@ const typeVal = form.useStore((s: any) => s.values.type as string);
 const apiHeaders = form.useStore(
   (s: any) => (s.values.apiHeaders ?? []) as { key: string; value: string }[],
 );
+const urlVal = form.useStore((state: { values: AddDestinationForm }) => state.values.url);
+const methodVal = form.useStore((state: { values: AddDestinationForm }) => state.values.method);
+const templateVal = form.useStore((state: { values: AddDestinationForm }) => state.values.template);
+const skipTlsVerifyVal = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.skip_tls_verify,
+);
 const slackSetupMethod = form.useStore(
   (state: { values: AddDestinationForm }) => state.values.slack_setup_method,
 );
@@ -672,6 +690,8 @@ const {
   createDestination,
   updateDestination,
   generatePreview,
+  renderTemplateBody,
+  testCustomDestination,
   isTestInProgress,
   lastTestResult,
   clearTestResult,
@@ -687,10 +707,12 @@ const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
 
+// A test result is stale once anything it was sent with changes; an in-flight
+// test is discarded too.
 watch(
-  prebuiltCredentials,
+  [prebuiltCredentials, typeVal, urlVal, methodVal, templateVal, skipTlsVerifyVal, apiHeaders],
   () => {
-    if (lastTestResult.value) clearTestResult();
+    if (lastTestResult.value || isTestInProgress.value) clearTestResult();
   },
   { deep: true },
 );
@@ -727,6 +749,9 @@ const showPrebuiltFinalActions = computed(
     props.isAlerts &&
     (isPrebuiltDestination.value || (isUpdatingDestination.value && dtVal.value !== "custom")) &&
     showPrebuiltAdvancedSettings.value,
+);
+const isCustomWebhook = computed(
+  () => props.isAlerts && dtVal.value === "custom" && typeVal.value === "http",
 );
 const handleSlackFlowChange = (): void => {
   clearTestResult();
@@ -1002,9 +1027,14 @@ const setupDestinationData = () => {
     };
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
-    // When there are none, the default apiHeaders row is kept.
+    // When there are none, the default apiHeaders row is kept. Custom and
+    // pipeline destinations show every header: save rebuilds headers from the
+    // rows alone, so a hidden row would be deleted.
     if (Object.keys(destHeaders).length) {
-      const systemHeaders = ["Content-Type", "Authorization", "X-Routing-Key"];
+      const systemHeaders =
+        props.isAlerts && destType && destType !== "custom"
+          ? ["Content-Type", "Authorization", "X-Routing-Key"]
+          : [];
       const customHeadersOnly = Object.entries(destHeaders).filter(
         ([key]) => !systemHeaders.includes(key),
       );
@@ -1070,11 +1100,11 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   if (typeId === "servicenow" && props.destination.url) {
     credentials.instanceUrl = props.destination.url;
   }
-  // For email destinations, recipients are in the emails field.
+  // For email destinations, recipients are in the emails field. The picker holds
+  // a string[], so pass the array through untouched (a legacy string is split by
+  // the credential defaults).
   if (typeId === "email" && props.destination.emails) {
-    credentials.recipients = Array.isArray(props.destination.emails)
-      ? props.destination.emails.join(", ")
-      : props.destination.emails;
+    credentials.recipients = props.destination.emails;
   }
   // PagerDuty: integrationKey from routing_key metadata above; fall back to the
   // X-Routing-Key header for older destinations.
@@ -1194,8 +1224,19 @@ const selectDestinationType = (type: string) => {
   }
 };
 
-// Handle prebuilt destination test
+// Handle prebuilt and custom Web Hook destination tests
 const handleTestDestination = async () => {
+  if (isCustomWebhook.value) {
+    // testCustomDestination reports every failure through lastTestResult.
+    await testCustomDestination({
+      url: urlVal.value,
+      method: methodVal.value,
+      headers: headersFromRows(apiHeaders.value),
+      skipTlsVerify: skipTlsVerifyVal.value,
+      template: templateVal.value,
+    });
+    return;
+  }
   if (!isPrebuiltDestination.value) return;
 
   try {
@@ -1207,14 +1248,21 @@ const handleTestDestination = async () => {
 
 // Show template preview
 const showPreview = async () => {
-  if (!isPrebuiltDestination.value) return;
+  const customTemplate = isCustomWebhook.value ? templateVal.value : undefined;
+  if (isCustomWebhook.value && !customTemplate) {
+    toast({ variant: "error", message: t("alerts.validation.templateRequired") });
+    return;
+  }
+  if (!isPrebuiltDestination.value && !customTemplate) return;
 
   try {
     // Clear previous content
     previewContent.value = "";
 
     // Fetch and generate preview
-    const preview = await generatePreview(dtVal.value, prebuiltCredentials.value);
+    const preview = customTemplate
+      ? await renderTemplateBody(customTemplate)
+      : await generatePreview(dtVal.value, prebuiltCredentials.value);
     previewContent.value = preview;
 
     // Only show modal after content is ready
@@ -1266,10 +1314,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       (value.credentials ?? {}) as Record<string, unknown>,
     );
     // Build custom headers object from the api-headers array-field
-    const customHeaders: Headers = {};
-    (value.apiHeaders || []).forEach((header) => {
-      if (header.key && header.value) customHeaders[header.key] = header.value;
-    });
+    const customHeaders = headersFromRows(value.apiHeaders || []);
 
     const selectedTemplate = (value.template || "").trim();
     const templateOverride = isUpdatingDestination.value
@@ -1313,6 +1358,15 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
   }
 }
 
+// Header rows → request headers. A row without both a key and a value is skipped.
+function headersFromRows(rows: { key: string; value: string }[]): Headers {
+  const headers: Headers = {};
+  rows.forEach((header) => {
+    if (header.key && header.value) headers[header.key] = header.value;
+  });
+  return headers;
+}
+
 // The custom/pipeline save path (dispatched from saveDestination for non-prebuilt
 // types). OForm calls the submit only once the schema (incl. the type-keyed
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
@@ -1324,10 +1378,7 @@ function saveCustomDestination(value: AddDestinationForm) {
     message: t("common.pleaseWait"),
     timeout: 0,
   });
-  const headers: Headers = {};
-  (value.apiHeaders || []).forEach((header) => {
-    if (header.key && header.value) headers[header.key] = header.value;
-  });
+  const headers = headersFromRows(value.apiHeaders || []);
 
   const payload: Partial<DestinationPayload> = {
     url: value.url,

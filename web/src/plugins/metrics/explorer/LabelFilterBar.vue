@@ -69,11 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-w-62.5 min-w-0"
         :data-test="`metrics-explorer-label-chip-${filter.label}`"
       >
-        <!-- The chip truncates its value; the tooltip is where the whole matcher
-             stays readable. -->
-        <OTooltip :content="raw(`${filter.label} ${filter.operator || '='} ${filter.value}`)" />
-        <span class="truncate font-mono text-xs"
-          >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
+        <OTruncatedText class="font-mono text-xs"
+          >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</OTruncatedText
         >
         <template #trailing>
           <button
@@ -309,6 +306,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 

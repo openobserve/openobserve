@@ -459,9 +459,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.id || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -484,9 +484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="min-w-0 flex-1 truncate">{{
+                              <OTruncatedText class="flex-1">{{
                                 incidentDetails?.title || raw("N/A")
-                              }}</span>
+                              }}</OTruncatedText>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
                                 size="sm"
@@ -607,10 +607,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallTeam") }}
                           </span>
-                          <span class="text-text-body truncate text-xs">
+                          <OTruncatedText class="text-text-body text-xs">
                             {{ raw(oncallTeamName) }}
-                            <OTooltip side="bottom" :content="raw(oncallTeamName)" />
-                          </span>
+                          </OTruncatedText>
                         </div>
                         <div class="flex items-center justify-between gap-2">
                           <span class="text-text-secondary text-xs">
@@ -701,9 +700,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :key="liaison.id"
                             class="flex items-center justify-between gap-2"
                           >
-                            <span class="text-text-body truncate text-xs">
+                            <OTruncatedText class="text-text-body text-xs">
                               {{ raw(oncallTeamNameFor(liaison.team_id)) }}
-                            </span>
+                            </OTruncatedText>
                             <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
                           </span>
                         </div>
@@ -897,17 +896,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip
-                                  v-if="alert.name.length > 30"
-                                  :content="raw(alert.name)"
-                                />
-                                <span class="block truncate font-medium">
-                                  {{
-                                    alert.name.length > 30
-                                      ? alert.name.substring(0, 30) + "..."
-                                      : alert.name
-                                  }}
-                                </span>
+                                <OTruncatedText class="block font-medium">
+                                  {{ alert.name }}
+                                </OTruncatedText>
                               </div>
                               <div class="w-30 flex-shrink-0">
                                 <span :class="'text-text-secondary'">
@@ -1060,9 +1051,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
-                              <span :class="'text-text-body'" class="truncate text-sm font-medium">
+                              <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
-                              </span>
+                              </OTruncatedText>
                             </div>
                           </div>
 
@@ -1487,6 +1478,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
+import { isAxiosError } from "axios";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1495,7 +1487,7 @@ import incidentsService, {
   IncidentCorrelatedStreams,
   ArchivedRcaReport,
 } from "@/services/incidents";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery, responsesForIncidentQuery } from "@/services/oncall.queries";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -1526,10 +1518,15 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import {
+  isPaidOverageConsentError,
+  usePaidOverageConsent,
+} from "@/composables/usePaidOverageConsent";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1552,6 +1549,7 @@ export default defineComponent({
     OUserCell,
     OIcon,
     OTag,
+    OTruncatedText,
     OInlineEdit,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
@@ -1561,6 +1559,8 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
+    const { promptForConsent } = usePaidOverageConsent();
+    const consentLifecycle = new AbortController();
 
     const incidentOrgId = useOrgId();
     const updateIncidentStatus = useMutation(() =>
@@ -1608,11 +1608,7 @@ export default defineComponent({
     /// claiming nobody was paged.
     async function loadOnCallResponse(org: string, incidentId: string) {
       try {
-        const res = await oncallService.listResponsesForIncident({
-          org_identifier: org,
-          incident_id: incidentId,
-        });
-        const records = res.data ?? [];
+        const records = await queryClient.fetchQuery(responsesForIncidentQuery(org, incidentId));
         oncallResponses.value = records;
         // The owner fixes the thing; a liaison contains the blast radius. The
         // owner's record is the one the panel is about.
@@ -1630,10 +1626,8 @@ export default defineComponent({
     async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
       if (!records.some((record) => record.team_id)) return;
       try {
-        const res = await oncallService.listTeams({ org_identifier: org });
-        oncallTeamNames.value = Object.fromEntries(
-          (res.data ?? []).map((team) => [team.id, team.name]),
-        );
+        const teams = await queryClient.fetchQuery(oncallTeamsQuery(org));
+        oncallTeamNames.value = Object.fromEntries(teams.map((team) => [team.id, team.name]));
       } catch {
         // The ids still render; a failed lookup must not blank the panel.
         oncallTeamNames.value = {};
@@ -2643,6 +2637,7 @@ export default defineComponent({
       stopInFlightPolling();
       rcaAbortController?.abort();
       rcaAbortController = null;
+      consentLifecycle.abort();
     });
 
     const close = () => {
@@ -2955,6 +2950,43 @@ export default defineComponent({
       }
     };
 
+    const requestRcaWithConsent = async (
+      org: string,
+      incidentId: string,
+      params: { reanalysis?: boolean; build_on_previous?: boolean },
+      signal?: AbortSignal,
+    ) => {
+      try {
+        return await incidentsService.triggerRca(org, incidentId, params, { signal });
+      } catch (error: unknown) {
+        const status = isAxiosError(error) ? (error.response?.status ?? 0) : 0;
+        const body: unknown = isAxiosError(error) ? error.response?.data : null;
+        if (!isPaidOverageConsentError(status, body)) throw error;
+
+        // A denied request never started on the server. Stop optimistic loading
+        // and polling while the user decides whether to authorize paid usage.
+        rcaLoading.value = false;
+        analysisStartedAt.value = null;
+        if (!analysisInFlight.value) stopInFlightPolling();
+
+        const consentSignal = signal ?? consentLifecycle.signal;
+        const accepted = await promptForConsent(org, "ai_credits", body.consent, consentSignal);
+        const drawerStillActive =
+          !consentSignal.aborted &&
+          store.state.selectedOrganization.identifier === org &&
+          incidentDetails.value?.id === incidentId;
+        if (!accepted || !drawerStillActive) {
+          if (!accepted && drawerStillActive) {
+            toast({ variant: "info", message: t("paidUsage.declinedNotice") });
+          }
+          return null;
+        }
+
+        // Exactly one guarded replacement request. A second denial propagates.
+        return incidentsService.triggerRca(org, incidentId, params, { signal });
+      }
+    };
+
     // Handle severity change from dropdown
     const handleSeverityChange = async (newSeverity: "P1" | "P2" | "P3" | "P4") => {
       if (!incidentDetails.value || updating.value) return;
@@ -2999,18 +3031,25 @@ export default defineComponent({
             });
             if (ok) {
               try {
-                await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
+                const response = await requestRcaWithConsent(org, incidentId, {
+                  reanalysis: true,
+                });
+                if (!response) return;
                 toast({
                   variant: "success",
                   message: t("toastMessages.alerts.aiReanalysisStarted"),
                 });
                 await loadDetails(incidentId);
-              } catch (e: any) {
-                toast({
-                  variant: "error",
-                  message:
-                    e?.response?.data?.message || t("alerts.incidents.reanalysisStartFailed"),
-                });
+              } catch (error: unknown) {
+                const responseData: unknown = isAxiosError(error) ? error.response?.data : null;
+                const message =
+                  responseData &&
+                  typeof responseData === "object" &&
+                  "message" in responseData &&
+                  typeof responseData.message === "string"
+                    ? raw(responseData.message)
+                    : t("alerts.incidents.reanalysisStartFailed");
+                toast({ variant: "error", message });
               }
             }
           }
@@ -3474,13 +3513,14 @@ export default defineComponent({
       rcaAbortController = new AbortController();
 
       try {
-        const response = await incidentsService.triggerRca(
+        const response = await requestRcaWithConsent(
           org,
           incidentId,
           // Fresh analysis unless the user explicitly asked to build on the previous one.
           { build_on_previous: options.buildOnPrevious === true },
-          { signal: rcaAbortController.signal },
+          rcaAbortController.signal,
         );
+        if (!response) return;
 
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;

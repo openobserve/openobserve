@@ -35,6 +35,7 @@ use config::{
         flatten::format_label_name_cow,
         json,
         schema::format_stream_name,
+        sql::{quote_identifier, quote_sql_string},
         time::{now_micros, parse_i64_to_timestamp_micros},
     },
 };
@@ -53,7 +54,7 @@ use search_service;
 
 use super::{
     columnar, ingest,
-    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram},
+    native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, ExpansionLimits, expand_native_histogram},
     prom_decode,
 };
 use crate::{
@@ -130,8 +131,7 @@ pub async fn remote_write(
     let mut stream_alerts_map: HashMap<String, Vec<alert::Alert>> = HashMap::new();
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
-    let decoded = snap::raw::Decoder::new()
-        .decompress_vec(&body)
+    let decoded = config::utils::snappy::decode_raw_snappy(&body, cfg.limit.req_payload_limit)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {e}"))?;
     let request =
         prom_decode::decode(&decoded).map_err(|e| anyhow::anyhow!("Invalid protobuf: {e}"))?;
@@ -169,7 +169,7 @@ pub async fn remote_write(
             db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
                 .await
         {
-            log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
+            log::error!("Error updating metadata for stream: {org_id}/{metric_name}, err: {e}");
         }
     }
 
@@ -393,13 +393,14 @@ pub async fn remote_write(
             let has_writable = event
                 .samples
                 .iter()
-                .any(|s| super::sanitize_metric_value(s.value).is_some());
+                .any(|s| sample_cell(s.value, metric_schema_map.get(&metric_name)).is_some());
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
             }
             for sample in &event.samples {
-                if let Some(value) = super::sanitize_metric_value(sample.value) {
+                if let Some(value) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
+                {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
@@ -424,9 +425,8 @@ pub async fn remote_write(
         let can_move_labels = event.histograms.is_empty();
         for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
-            // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
-            // writer so the two ingestion paths cannot drift apart on this.
-            let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
+            let Some(sample_val) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
+            else {
                 continue;
             };
 
@@ -459,7 +459,7 @@ pub async fn remote_write(
                 &event.histograms,
                 &labels,
                 &metric_name,
-                cfg.prom.native_histogram_max_buckets,
+                ExpansionLimits::from_config(&cfg),
                 &mut gate,
                 &mut sink,
             )
@@ -476,7 +476,9 @@ pub async fn remote_write(
 
     // warn if any records were skipped due to streams being deleted
     if skipped_records > 0 {
-        log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
+        log::warn!(
+            "[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted, org_id: {org_id}"
+        );
     }
 
     let parse_timeseries_ms = step_start.elapsed().as_millis();
@@ -518,6 +520,8 @@ pub async fn remote_write(
 
     let step_start = std::time::Instant::now();
     for (stream_name, mut json_data) in json_data_by_stream {
+        #[cfg(feature = "vectorscan")]
+        apply_redaction(org_id, &stream_name, &mut json_data).await;
         finish_identity_columns(&mut json_data);
         let has_uds = matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)));
         let min_timestamp = json_data.iter().map(|(_, ts, _)| *ts).min().unwrap_or(0);
@@ -727,51 +731,9 @@ pub async fn get_series(
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
 
-    // Comma-separated list of label names
-    let label_names = schema
-        .fields()
-        .iter()
-        .map(|f| f.name().as_str())
-        .filter(|&s| s != TIMESTAMP_COL_NAME && s != VALUE_LABEL && s != HASH_LABEL)
-        .collect::<Vec<_>>()
-        .join("\", \"");
-    if label_names.is_empty() {
+    let Some(sql) = series_sql(&metric_name, &schema, selector.as_ref()) else {
         return Ok(vec![]);
-    }
-
-    let mut sql = format!("SELECT DISTINCT({HASH_LABEL}), \"{label_names}\" FROM {metric_name}");
-    let mut sql_where = Vec::new();
-    if let Some(selector) = selector {
-        for mat in selector.matchers.matchers.iter() {
-            // `__name__` already picked the stream; the stored column may hold the
-            // pre-`format_stream_name` metric name, so filtering on it drops all rows.
-            if mat.name == TIMESTAMP_COL_NAME
-                || mat.name == VALUE_LABEL
-                || mat.name == NAME_LABEL
-                || schema.field_with_name(&mat.name).is_err()
-            {
-                continue;
-            }
-            match &mat.op {
-                MatchOp::Equal => {
-                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
-                }
-                MatchOp::NotEqual => {
-                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
-                }
-                MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
-                }
-                MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
-                }
-            }
-        }
-        if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&sql_where.join(" AND "));
-        }
-    }
+    };
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -795,7 +757,7 @@ pub async fn get_series(
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
-            log::error!("search series error: {err}");
+            log::error!("search series error: org_id: {org_id}, error: {err}");
             return Err(err);
         }
         Ok(resp) => resp
@@ -929,14 +891,7 @@ pub async fn get_label_values(
         return Ok(label_values);
     }
 
-    let metric_name = match opt_metric_name {
-        Some(name) => name,
-        None => {
-            // HACK: in the ideal world we would have queried all the metric streams
-            // and collected label names from them.
-            return Ok(vec![]);
-        }
-    };
+    let metric_name = label_values_metric_name(selector.as_ref())?;
 
     let schema = infra::schema::get(org_id, &metric_name, stream_type)
         .await
@@ -949,40 +904,7 @@ pub async fn get_label_values(
         return Ok(vec![]);
     }
 
-    // Build SQL query with optional WHERE clause based on selector matchers
-    let mut sql = format!("SELECT DISTINCT({label_name}) FROM {metric_name}");
-    let mut sql_where = Vec::new();
-
-    if let Some(selector) = selector {
-        for mat in selector.matchers.matchers.iter() {
-            // Skip special fields and fields that don't exist in the schema
-            if mat.name == TIMESTAMP_COL_NAME
-                || mat.name == VALUE_LABEL
-                || mat.name == NAME_LABEL
-                || schema.field_with_name(&mat.name).is_err()
-            {
-                continue;
-            }
-            match &mat.op {
-                MatchOp::Equal => {
-                    sql_where.push(format!("{} = '{}'", mat.name, mat.value));
-                }
-                MatchOp::NotEqual => {
-                    sql_where.push(format!("{} != '{}'", mat.name, mat.value));
-                }
-                MatchOp::Re(_re) => {
-                    sql_where.push(format!("re_match({}, '{}')", mat.name, mat.value));
-                }
-                MatchOp::NotRe(_re) => {
-                    sql_where.push(format!("re_not_match({}, '{}')", mat.name, mat.value));
-                }
-            }
-        }
-        if !sql_where.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&sql_where.join(" AND "));
-        }
-    }
+    let sql = metadata_sql(&metric_name, &[&label_name], &schema, selector.as_ref());
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -1012,7 +934,7 @@ pub async fn get_label_values(
             .map(|v| v.as_str().unwrap().to_string())
             .collect::<Vec<_>>(),
         Err(err) => {
-            log::error!("search values error: {err:?}");
+            log::error!("search values error: org_id: {org_id}, error: {err:?}");
             return Err(err);
         }
     };
@@ -1021,23 +943,136 @@ pub async fn get_label_values(
     Ok(label_values)
 }
 
+pub fn label_values_metric_name(selector: Option<&parser::VectorSelector>) -> Result<String> {
+    let metric_name = selector.and_then(try_into_metric_name);
+    metric_name.ok_or_else(|| {
+        Error::Message(
+            "match[] must specify a metric for label values, e.g. match[]=up; querying all metrics streams is not supported"
+                .to_owned(),
+        )
+    })
+}
+
 pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String> {
-    match &selector.name {
-        Some(name) => {
-            // `match[]` argument contains a metric name, e.g.
-            // `match[]=zo_response_code{method="GET"}`
-            Some(name.clone())
+    if let Some(name) = &selector.name {
+        return (!name.is_empty()).then(|| name.clone());
+    }
+    selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .into_iter()
+        .find(|matcher| matches!(matcher.op, MatchOp::Equal) && !matcher.value.is_empty())
+        .map(|matcher| matcher.value)
+}
+
+fn series_sql(
+    metric_name: &str,
+    schema: &Schema,
+    selector: Option<&parser::VectorSelector>,
+) -> Option<String> {
+    let mut columns = vec![HASH_LABEL];
+    columns.extend(
+        schema
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .filter(|&name| {
+                name != TIMESTAMP_COL_NAME && name != VALUE_LABEL && name != HASH_LABEL
+            }),
+    );
+    (columns.len() > 1).then(|| metadata_sql(metric_name, &columns, schema, selector))
+}
+
+fn metadata_sql(
+    metric_name: &str,
+    columns: &[&str],
+    schema: &Schema,
+    selector: Option<&parser::VectorSelector>,
+) -> String {
+    let columns = columns
+        .iter()
+        .map(|name| quote_identifier(name))
+        .collect::<Vec<_>>();
+    let mut sql = format!(
+        "SELECT DISTINCT {} FROM {}",
+        columns.join(", "),
+        quote_identifier(metric_name)
+    );
+    let predicates = selector
+        .into_iter()
+        .flat_map(|selector| &selector.matchers.matchers)
+        .filter(|mat| {
+            // The stored metric name can differ from the stream selected by __name__.
+            mat.name != TIMESTAMP_COL_NAME
+                && mat.name != VALUE_LABEL
+                && mat.name != NAME_LABEL
+                && schema.field_with_name(&mat.name).is_ok()
+        })
+        .map(|mat| {
+            let name = quote_identifier(&mat.name);
+            let value = quote_sql_string(&mat.value);
+            match &mat.op {
+                MatchOp::Equal => format!("{name} = {value}"),
+                MatchOp::NotEqual => format!("{name} != {value}"),
+                MatchOp::Re(_) => format!("re_match({name}, {value})"),
+                MatchOp::NotRe(_) => format!("re_not_match({name}, {value})"),
+            }
+        })
+        .collect::<Vec<_>>();
+    if !predicates.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&predicates.join(" AND "));
+    }
+    sql
+}
+
+/// Fills in `__hash__` and `_timestamp`, so the schema below sees the fields that get written.
+/// Redacts a stream's pending records and drops the series hash computed from the raw labels.
+#[cfg(feature = "vectorscan")]
+async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [PendingRecord]) {
+    if json_data.is_empty()
+        || config::meta::self_reporting::redaction::is_self_reporting_stream(
+            org_id,
+            stream_name,
+            config::meta::stream::StreamType::Metrics,
+        )
+    {
+        return;
+    }
+    let mut rows: Vec<(i64, json::Map<String, json::Value>)> = json_data
+        .iter_mut()
+        .map(|(record, timestamp, _)| (*timestamp, std::mem::take(record)))
+        .collect();
+    match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+        Ok(pattern_manager) => {
+            if let Err(e) = pattern_manager.process_at_ingestion(
+                org_id,
+                StreamType::Metrics,
+                stream_name,
+                &mut rows,
+            ) {
+                log::error!(
+                    "[METRICS] error applying SDR patterns for stream {org_id}/{stream_name}: {e}"
+                );
+            }
         }
-        None => {
-            // `match[]` argument does not contain a metric name.
-            // Check if there is `__name__` among the matchers,
-            // e.g. `match[]={__name__="zo_response_code",method="GET"}`
-            selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .map(|m| m.value.clone())
+        Err(e) => {
+            log::error!(
+                "[METRICS] failed to get pattern manager for SDR redaction: org_id: {org_id}, error: {e}"
+            );
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                org_id,
+                StreamType::Metrics,
+                std::iter::once((stream_name, rows.as_slice())),
+                config::meta::self_reporting::redaction::FailPosture::Open,
+            )
+            .await;
         }
+    }
+    for ((record, _, known_hash), (_, redacted)) in json_data.iter_mut().zip(rows) {
+        *record = redacted;
+        // the pre-computed hash identifies the unredacted labels, so it must be recomputed
+        *known_hash = None;
     }
 }
 
@@ -1055,14 +1090,23 @@ fn finish_identity_columns(json_data: &mut [PendingRecord]) {
     }
 }
 
+/// A sample's `value` cell, `None` for no row; a marker needs the `value` column samples create.
+fn sample_cell(value: f64, schema: Option<&SchemaCache>) -> Option<Option<f64>> {
+    let cell = super::sanitize_metric_value(value).row_value()?;
+    (cell.is_some() || ingest::has_value_column(schema)).then_some(cell)
+}
+
+/// `value: None` is a stale marker, written as a NULL `value`.
 fn build_metric_record(
     mut record: json::Map<String, json::Value>,
-    value: f64,
+    value: Option<f64>,
     timestamp: i64,
 ) -> json::Map<String, json::Value> {
     record.insert(
         VALUE_LABEL.to_string(),
-        json::Number::from_f64(value).map_or(json::Value::Null, json::Value::Number),
+        value
+            .and_then(json::Number::from_f64)
+            .map_or(json::Value::Null, json::Value::Number),
     );
     record.insert(
         TIMESTAMP_COL_NAME.to_string(),
@@ -1112,7 +1156,7 @@ async fn buffer_native_histograms(
     histograms: &[prometheus_rpc::Histogram],
     labels: &json::Map<String, json::Value>,
     metric_name: &str,
-    max_buckets: usize,
+    limits: ExpansionLimits,
     gate: &mut HaGate<'_>,
     sink: &mut RecordSink<'_>,
 ) -> Option<usize> {
@@ -1127,7 +1171,7 @@ async fn buffer_native_histograms(
     let mut counted = 0;
     for hp in histograms {
         counted += 1;
-        let records = expand_native_histogram(hp, max_buckets);
+        let records = expand_native_histogram(hp, limits);
         if records.is_empty() {
             // unsupported schema or stale marker: nothing will be written
             continue;
@@ -1137,7 +1181,7 @@ async fn buffer_native_histograms(
         }
         let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
         for (suffix, le, value) in records {
-            let Some(value) = super::sanitize_metric_value(value) else {
+            let Some(value) = super::sanitize_metric_value(value).value() else {
                 continue;
             };
             let idx = CLASSIC_HISTOGRAM_SUFFIXES
@@ -1148,7 +1192,7 @@ async fn buffer_native_histograms(
             if let Some(le) = le {
                 hist_labels.insert(BUCKET_LABEL.to_string(), json::Value::String(le));
             }
-            let record = build_metric_record(hist_labels.clone(), value, timestamp);
+            let record = build_metric_record(hist_labels.clone(), Some(value), timestamp);
             buffer_metric_record(
                 stream_name,
                 json::Value::Object(record),
@@ -1262,6 +1306,194 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn metadata_sql_round_trips_matcher_values() {
+        use datafusion::sql::sqlparser::{
+            ast::{Expr, Value, visit_expressions_mut},
+            dialect::{Dialect, GenericDialect, PostgreSqlDialect},
+            parser::Parser,
+        };
+
+        let schema = Schema::new(vec![datafusion::arrow::datatypes::Field::new(
+            "job",
+            datafusion::arrow::datatypes::DataType::Utf8,
+            true,
+        )]);
+        let values = [
+            "worker's",
+            r"worker\\path",
+            r"worker\d+'s.*",
+            "x' OR '1'='1",
+            "x'; SELECT 'other' --",
+            "x' UNION SELECT 'other",
+        ];
+        for op in ["=", "!=", "=~", "!~"] {
+            for value in values {
+                let promql = format!("up{{job{op}{}}}", serde_json::to_string(value).unwrap());
+                let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
+                    panic!("expected a vector selector");
+                };
+                assert_eq!(selector.matchers.matchers[0].value, value);
+                for (sql, projection) in [
+                    (
+                        metadata_sql("up", &["job"], &schema, Some(&selector)),
+                        "\"job\"",
+                    ),
+                    (
+                        series_sql("up", &schema, Some(&selector)).unwrap(),
+                        "\"__hash__\", \"job\"",
+                    ),
+                ] {
+                    for dialect in [&GenericDialect {} as &dyn Dialect, &PostgreSqlDialect {}] {
+                        let mut statements = Parser::parse_sql(dialect, &sql).unwrap();
+                        assert_eq!(statements.len(), 1);
+                        let mut literals = 0;
+                        let _ = visit_expressions_mut(&mut statements, |expr| {
+                            if let Expr::Value(literal) = expr {
+                                assert_eq!(literal.value, Value::SingleQuotedString(value.into()));
+                                literal.value = Value::SingleQuotedString(String::new());
+                                literals += 1;
+                            }
+                            std::ops::ControlFlow::<()>::Continue(())
+                        });
+                        assert_eq!(literals, 1);
+                        let predicate = match op {
+                            "=" => "\"job\" = ''",
+                            "!=" => "\"job\" <> ''",
+                            "=~" => "re_match(\"job\", '')",
+                            "!~" => "re_not_match(\"job\", '')",
+                            _ => unreachable!(),
+                        };
+                        assert_eq!(
+                            statements[0].to_string(),
+                            format!("SELECT DISTINCT {projection} FROM \"up\" WHERE {predicate}")
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn metadata_sql_executes_matchers_without_changing_selected_rows() {
+        use std::sync::Arc;
+
+        use datafusion::{
+            arrow::{array::StringArray, record_batch::RecordBatch},
+            common::TableReference,
+            prelude::SessionContext,
+        };
+        use search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
+        for (op, pattern, matching) in [
+            ("=", "x' OR '1'='1", "x' OR '1'='1"),
+            ("!=", r"worker's\path", r"worker's\path"),
+            ("=~", r"worker\\path's.*", r"worker\path'suffix"),
+            ("!~", r"worker\\path's.*", r"worker\path'suffix"),
+        ] {
+            let ctx = SessionContext::new();
+            ctx.register_udf(REGEX_MATCH_UDF.clone());
+            ctx.register_udf(REGEX_NOT_MATCH_UDF.clone());
+            let batch = RecordBatch::try_from_iter(vec![
+                (HASH_LABEL, Arc::new(StringArray::from(vec!["a", "b"])) as _),
+                (
+                    "job",
+                    Arc::new(StringArray::from(vec![matching, "other"])) as _,
+                ),
+            ])
+            .unwrap();
+            let schema = batch.schema();
+            ctx.register_batch(TableReference::bare("metric\"name"), batch)
+                .unwrap();
+            let promql = format!(
+                "{{__name__='metric\"name',job{op}{}}}",
+                serde_json::to_string(pattern).unwrap()
+            );
+            let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
+                panic!("expected a vector selector");
+            };
+            let metric = try_into_metric_name(&selector).unwrap();
+            for sql in [
+                metadata_sql(&metric, &["job"], &schema, Some(&selector)),
+                series_sql(&metric, &schema, Some(&selector)).unwrap(),
+            ] {
+                let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+                let values = batches
+                    .iter()
+                    .flat_map(|batch| {
+                        batch
+                            .column_by_name("job")
+                            .unwrap()
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .unwrap()
+                            .iter()
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    values,
+                    vec![Some(if op.starts_with('!') {
+                        "other"
+                    } else {
+                        matching
+                    })],
+                    "{sql}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_sql_quotes_identifiers_and_preserves_field_selection() {
+        use datafusion::{
+            arrow::datatypes::{DataType, Field},
+            sql::sqlparser::{dialect::GenericDialect, parser::Parser},
+        };
+
+        let parser::Expr::VectorSelector(selector) = parser::parse(
+            r#"{__name__='metric"name',job="ok",missing="skip",_timestamp="skip",value="skip"}"#,
+        )
+        .unwrap() else {
+            panic!("expected a vector selector");
+        };
+        let metric = try_into_metric_name(&selector).unwrap();
+        assert_eq!(metric, "metric\"name");
+        let schema = Schema::new(
+            [
+                HASH_LABEL,
+                TIMESTAMP_COL_NAME,
+                VALUE_LABEL,
+                NAME_LABEL,
+                "job",
+                "label\"field",
+                "select",
+            ]
+            .into_iter()
+            .map(|name| Field::new(name, DataType::Utf8, true))
+            .collect::<Vec<_>>(),
+        );
+        for (sql, expected) in [
+            (
+                metadata_sql(&metric, &["label\"field"], &schema, Some(&selector)),
+                r#"SELECT DISTINCT "label""field" FROM "metric""name" WHERE "job" = 'ok'"#,
+            ),
+            (
+                series_sql(&metric, &schema, Some(&selector)).unwrap(),
+                r#"SELECT DISTINCT "__hash__", "__name__", "job", "label""field", "select" FROM "metric""name" WHERE "job" = 'ok'"#,
+            ),
+        ] {
+            let statements = Parser::parse_sql(&GenericDialect {}, &sql).unwrap();
+            assert_eq!(statements.len(), 1);
+            assert_eq!(statements[0].to_string(), expected);
+        }
+        assert!(series_sql(&metric, &Schema::empty(), Some(&selector)).is_none());
+        assert_eq!(
+            metadata_sql(&metric, &["select"], &schema, None),
+            r#"SELECT DISTINCT "select" FROM "metric""name""#
+        );
+    }
 
     fn schema_with_metadata(blob: &str) -> Schema {
         Schema::empty().with_metadata(
@@ -1464,6 +1696,26 @@ mod tests {
     }
 
     #[test]
+    fn test_try_into_metric_name_rejects_non_exact_names() {
+        for query in [
+            r#"{__name__!="up",job="x"}"#,
+            r#"{__name__=~"up.*",job="x"}"#,
+            r#"{__name__=~"up",job="x"}"#,
+            r#"{__name__!~"up.*",job="x"}"#,
+            r#"{__name__="",job="x"}"#,
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(query).unwrap() else {
+                panic!("expected vector selector: {query}");
+            };
+            assert_eq!(try_into_metric_name(&selector), None, "{query}");
+            assert!(
+                label_values_metric_name(Some(&selector)).is_err(),
+                "{query}"
+            );
+        }
+    }
+
+    #[test]
     fn test_try_into_metric_name_none_when_no_name_or_name_label() {
         let sel = VectorSelector {
             name: None,
@@ -1546,10 +1798,53 @@ mod tests {
         for (name, value) in &label_pairs {
             labels.insert(name.clone(), json::Value::String(value.clone()));
         }
-        let record = build_metric_record(labels, 1.5, 1_700_000_000_000_000);
+        let record = build_metric_record(labels, Some(1.5), 1_700_000_000_000_000);
         assert_eq!(
             crate::metrics::signature_of_series_labels(&label_pairs),
             crate::metrics::signature_without_labels(&record, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_sample_cell_keeps_a_stale_marker_only_for_a_stream_with_a_value_column() {
+        use datafusion::arrow::datatypes::{DataType, Field};
+
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let with_value = SchemaCache::new(Schema::new(vec![
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+        ]));
+        let without_value = SchemaCache::new(Schema::new(vec![Field::new(
+            NAME_LABEL,
+            DataType::Utf8,
+            true,
+        )]));
+
+        assert_eq!(sample_cell(stale, Some(&with_value)), Some(None));
+        // a first batch made only of markers: no stream yet, so no row and no schema
+        assert_eq!(sample_cell(stale, None), None);
+        assert_eq!(sample_cell(stale, Some(&without_value)), None);
+        assert_eq!(sample_cell(1.5, None), Some(Some(1.5)));
+        assert_eq!(sample_cell(f64::NAN, Some(&with_value)), None);
+    }
+
+    #[test]
+    fn test_stale_sample_writes_a_null_value_row_in_its_own_series() {
+        let mut labels = json::Map::new();
+        labels.insert(NAME_LABEL.to_string(), json::json!("up"));
+        labels.insert("instance".to_string(), json::json!("a"));
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let value = super::super::sanitize_metric_value(stale)
+            .row_value()
+            .expect("a stale marker writes a row");
+
+        let marker = build_metric_record(labels.clone(), value, 6);
+        let sample = build_metric_record(labels, Some(1.0), 5);
+
+        assert_eq!(marker.get(VALUE_LABEL), Some(&json::Value::Null));
+        assert_eq!(
+            crate::metrics::signature_without_labels(&marker, &[VALUE_LABEL]),
+            crate::metrics::signature_without_labels(&sample, &[VALUE_LABEL])
         );
     }
 
@@ -1558,7 +1853,7 @@ mod tests {
         let mut labels = json::Map::new();
         labels.insert(NAME_LABEL.to_string(), json::json!("http_requests"));
         labels.insert(HASH_LABEL.to_string(), json::json!("sent by the client"));
-        let record = build_metric_record(labels, 1.0, 5);
+        let record = build_metric_record(labels, Some(1.0), 5);
         let recomputed = crate::metrics::signature_without_labels(&record, &[VALUE_LABEL]);
         let mut json_data = vec![(record.clone(), 5_i64, None), (record, 5_i64, Some(7_u64))];
 
@@ -1569,5 +1864,59 @@ mod tests {
             Some(&json::json!(recomputed))
         );
         assert_eq!(json_data[1].0.get(HASH_LABEL), Some(&json::json!(7_u64)));
+    }
+
+    #[test]
+    fn test_label_values_metric_name() {
+        assert!(label_values_metric_name(None).is_err());
+        let parser::Expr::VectorSelector(selector) =
+            parser::parse(r#"{job="prometheus"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        assert!(label_values_metric_name(Some(&selector)).is_err());
+        for (matcher, expected) in [
+            ("up", "up"),
+            (r#"up{job="prometheus"}"#, "up"),
+            (r#"{__name__="up"}"#, "up"),
+            (r#"{__name__=~"up.*",__name__="up"}"#, "up"),
+            (r#"up{job="prometheus" or job="other"}"#, "up"),
+        ] {
+            let parser::Expr::VectorSelector(selector) = parser::parse(matcher).unwrap() else {
+                panic!("expected vector selector");
+            };
+            assert_eq!(
+                label_values_metric_name(Some(&selector)).unwrap(),
+                expected,
+                "{matcher}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_requires_metric() {
+        let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
+        assert!(result.unwrap_err().to_string().contains("match[]"));
+    }
+
+    #[tokio::test]
+    async fn remote_write_rejects_a_snappy_header_declaring_more_than_the_limit() {
+        let mut n = get_config().limit.req_payload_limit as u64 + 1;
+        let mut body = Vec::new();
+        while n >= 0x80 {
+            body.push((n as u8 & 0x7f) | 0x80);
+            n >>= 7;
+        }
+        body.push(n as u8);
+        body.extend_from_slice(b"garbage");
+        let err = remote_write(
+            "default",
+            Bytes::from(body),
+            IngestUser::User("root@example.com".to_string()),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("larger than allowed"), "{err}");
     }
 }

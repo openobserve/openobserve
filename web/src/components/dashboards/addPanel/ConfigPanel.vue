@@ -122,6 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
 
+        <OSwitch
+          v-if="promqlMode && exemplarsSwitchEligible"
+          v-show="isConfigOptionVisible('general', 'show-exemplars')"
+          v-model="dashboardPanelDataModel.data.config.show_exemplars"
+          :label="t('dashboard.showExemplarsLabel')"
+          data-test="dashboard-config-show-exemplars"
+          size="lg"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.showExemplarsHelp')" max-width="15.625rem" />
+          </template>
+        </OSwitch>
+
         <!-- Panel Default Time Configuration -->
         <div v-show="isConfigOptionVisible('general', 'panel-default-time')">
           <div class="flex items-center">
@@ -776,6 +789,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-axis-border"
           size="lg"
         />
+
+        <OToggleGroup
+          v-if="!promqlMode && shouldShowCartesianAxisConfig(dashboardPanelData)"
+          v-show="isConfigOptionVisible('axis', 'axis-label-mode')"
+          type="single"
+          label-position="top"
+          v-model="axisLabelModeModel"
+          data-test="dashboard-config-axis-label-mode"
+          :data-test-selected-value="axisLabelModeModel"
+        >
+          <template #label>
+            <span class="flex items-center gap-1">
+              {{ t("dashboard.axisLabelMode") }}
+              <OIcon
+                name="info-outline"
+                size="sm"
+                class="cursor-help"
+                data-test="dashboard-config-axis-label-mode-info"
+              >
+                <OTooltip :content="t('dashboard.axisLabelModeTooltip')" max-width="15.625rem" />
+              </OIcon>
+            </span>
+          </template>
+          <OToggleGroupItem
+            v-for="opt in axisLabelModeOptions"
+            :key="opt.value"
+            :value="opt.value"
+            size="sm"
+            data-test="dashboard-config-axis-label-mode-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
         <div
           class="flex gap-2"
@@ -1670,7 +1716,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
         >
           <div class="flex items-center">
-            <CustomDateTimePicker v-model="picker.offSet" :picker="picker" :isFirstEntry="false" />
+            <CustomDateTimePicker
+              v-model="picker.offSet"
+              :picker="picker"
+              :isFirstEntry="false"
+              :excludeMonths="!!promqlMode"
+            />
             <OIcon
               class="ms-2 me-1 cursor-pointer"
               size="sm"
@@ -1763,6 +1814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -1785,7 +1837,8 @@ import {
   watchEffect,
   watch,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import type { AxisLabelMode } from "@/utils/dashboard/fieldLabel";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
 import ColorBySeries from "./ColorBySeries.vue";
@@ -1890,6 +1943,17 @@ export default defineComponent({
             v === TOGGLE_AUTO ? null : v;
         },
       });
+    const axisLabelModeModel = computed({
+      get: (): AxisLabelMode => dashboardPanelData.data.config.axis_label_mode ?? "auto",
+      set: (v: AxisLabelMode) => {
+        dashboardPanelData.data.config.axis_label_mode = v;
+      },
+    });
+    const axisLabelModeOptions: { label: I18nText; value: AxisLabelMode }[] = [
+      { label: t("dashboard.auto"), value: "auto" },
+      { label: t("common.show"), value: "show" },
+      { label: t("common.hide"), value: "hide" },
+    ];
     const legendsPositionModel = toggleModel("legends_position");
     const legendsTypeModel = toggleModel("legends_type");
     const chartAlignModel = toggleModel("chart_align");
@@ -2208,7 +2272,12 @@ export default defineComponent({
     ];
     // Single source of truth — shared with the column-formatting dialog. Labels are
     // already translated; raw() only re-brands the `string` the helper widens to.
-    const unitOptions = getUnitOptions(t).map((o) => ({ ...o, label: raw(o.label) }));
+    const unitOptions = computed(() =>
+      getUnitOptions(t, dashboardPanelData.data.config.unit).map((o) => ({
+        ...o,
+        label: raw(o.label),
+      })),
+    );
 
     const labelPositionOptions = [
       {
@@ -2555,6 +2624,8 @@ export default defineComponent({
       };
     };
 
+    const exemplarsSwitchEligible = computed(() => isExemplarEligible(dashboardPanelData.data));
+
     const {
       searchQuery,
       expandedSections,
@@ -2615,6 +2686,8 @@ export default defineComponent({
 
     return {
       raw,
+      axisLabelModeModel,
+      axisLabelModeOptions,
       legendsPositionModel,
       legendsTypeModel,
       chartAlignModel,
@@ -2682,6 +2755,7 @@ export default defineComponent({
       expandedSections,
       isExpanded,
       isSectionVisible,
+      exemplarsSwitchEligible,
       isConfigOptionVisible,
       anySectionVisible,
       allSectionsExpanded,

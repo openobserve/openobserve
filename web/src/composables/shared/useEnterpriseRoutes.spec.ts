@@ -26,11 +26,11 @@ vi.mock("@/aws-exports", () => {
     freePlan: "free",
     paidPlan: "pay-as-you-go",
     enterprisePlan: "enterprise",
-    ooApplicationID: undefined,
-    ooClientToken: undefined,
-    ooSite: undefined,
-    ooService: undefined,
-    ooOrgIdentifier: undefined,
+    o2ApplicationID: undefined,
+    o2ClientToken: undefined,
+    o2Site: undefined,
+    o2Service: undefined,
+    o2OrgIdentifier: undefined,
     environment: undefined,
     ddAPPID: undefined,
     ddClientToken: undefined,
@@ -424,6 +424,25 @@ describe("useEnterpriseRoutes.ts", () => {
       const route = routes.find((r: any) => r.name === name);
       expect(route).toBeDefined();
       expect(route.meta?.allowOnEmptyData).toBe(true);
+    });
+  });
+
+  // My on-call and Policies are URL-only, so their routes must keep resolving.
+  describe("on-call URL-only routes (AC-15)", () => {
+    beforeEach(async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+    });
+
+    it.each([
+      ["oncall/me", "onCallMine"],
+      ["oncall/policies", "onCallPolicies"],
+    ])("keeps %s resolvable by URL as %s", (path, name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.path === path);
+      expect(route?.name).toBe(name);
+      expect(typeof route?.component).not.toBe("undefined");
     });
   });
 

@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                     </div>
-                    <div class="flex w-full items-center justify-between">
+                    <div class="flex w-full items-center justify-between py-2">
                       <div class="flex items-center">
                         <div class="app-tabs-container">
                           <OToggleGroup
@@ -293,7 +293,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disabled="isDialogOpen"
                           variant="outline"
                           size="icon-sm"
-                          class="my-2"
                           @click.stop="openDialog"
                           :title="t('logStream.addFieldsTitle')"
                           icon-left="add"
@@ -407,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="indexTypeOptionsForRow(row)"
                               label-key="label"
                               value-key="value"
-                              class="text-compact h-6! max-h-6! min-h-6!"
+                              class="text-compact"
                               multiple
                               clearable
                               size="sm"
@@ -808,7 +807,7 @@ import {
 } from "@/services/stream.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import {
   formatSizeFromMB,
   getImageURL,
@@ -1674,6 +1673,8 @@ export default defineComponent({
           settings: modifiedSettings,
         })
         .then(async () => {
+          if (modifiedSettings.cross_links)
+            analytics.track("cross_link_saved", { scope: "stream" });
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(indexData.value.name)
           ) {
@@ -1694,7 +1695,7 @@ export default defineComponent({
             },
           );
 
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Update Settings",
             user_org: store.state.selectedOrganization.identifier,
             user_id: store.state.userInfo.email,

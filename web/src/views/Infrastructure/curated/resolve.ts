@@ -814,6 +814,7 @@ export function lintManifest(manifest: CuratedPageManifest): Violation[] {
   const panels = manifestPanels(manifest).map(({ panel, sectionId }) => ({ ...panel, sectionId }));
   const unitValues = new Set(
     getUnitOptions(((key: string) => raw(key)) as never)
+      .filter((option) => !option.expandable)
       .map((option) => option.value)
       .filter((value): value is string => value != null),
   );
@@ -1102,7 +1103,11 @@ function buildPanel(
   if (stale) {
     config.curated_badge = {
       key: stale.noDataYet ? "infra.curated.staleNoDataBadge" : "infra.curated.staleBadge",
-      date: timestampToTimezoneDate(Math.floor(stale.lastSeenUs / 1000), timezone),
+      date: timestampToTimezoneDate(
+        Math.floor(stale.lastSeenUs / 1000),
+        timezone,
+        "yyyy-MM-dd HH:mm",
+      ),
       // lastSeenUs travels so the CONSUMER computes elapsed time at render time.
       // Baking the count here froze it at build time, so the badge counted from
       // one clock while the page banner counted from another and they drifted apart.
@@ -1118,7 +1123,9 @@ function buildPanel(
     // Rides the SAME gate: a green "all clear" on a stale collector would assert
     // something the page cannot know, so it is stamped only where the no-data
     // verdict itself is trustworthy.
-    if (!stale && section?.emptyMeansHealthy) config.curated_empty_means_healthy = true;
+    if (!stale && (panel.def.emptyMeansHealthy ?? section?.emptyMeansHealthy)) {
+      config.curated_empty_means_healthy = true;
+    }
   }
   return {
     id: panel.id,

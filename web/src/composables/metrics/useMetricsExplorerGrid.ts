@@ -46,11 +46,21 @@ import {
   computeStepSeconds,
   computeWidenedRateWindows,
   DEFAULT_SCRAPE_INTERVAL_SECONDS,
+  baseNameOf,
   getMetricDefaults,
+  inferUnit,
   isRateBasedKind,
+  normalizeDeclaredUnit,
   resolveVariant,
+  toO2Unit,
 } from "@/utils/metrics/metricDefaults";
-import { createPreviewQueue, isCancelled, PRIORITY } from "./useMetricsPreviewQueue";
+import {
+  createPreviewQueue,
+  isCancelled,
+  PreviewCancelledError,
+  PRIORITY,
+} from "./useMetricsPreviewQueue";
+import { useMetricsExplorerExemplars } from "./useMetricsExplorerExemplars";
 
 export interface LabelFilter {
   label: I18nText;
@@ -71,6 +81,12 @@ export const labelFilterKey = (filter: LabelFilter): string =>
   // in review, and some editors refuse to open it at all. Same runtime value,
   // plain-text source.
   `${filter.label}\u0000${filter.operator ?? "="}\u0000${filter.value}`;
+
+/** A query window other than the grid's own, in µs. */
+export interface QueryWindow {
+  start: number;
+  end: number;
+}
 
 export type PreviewStatus =
   | "idle"
@@ -482,29 +498,30 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * returning early — callers like `loadLabelValues` read `labelsByStream`
    * immediately after awaiting, so an early return would hand them an empty map.
    */
-  let schemaInFlight: Promise<void> | null = null;
+  let schemaInFlight: Promise<boolean> | null = null;
 
-  const ensureSchemas = (): Promise<void> => {
-    if (schemaLoaded.value) return Promise.resolve();
+  /** Resolves `false` when the load failed; it is then not marked loaded, so the next call tries again. */
+  const ensureSchemas = (): Promise<boolean> => {
+    if (schemaLoaded.value) return Promise.resolve(true);
     if (schemaInFlight) return schemaInFlight;
     // Self-comparing clear: an org switch nulls the slot and a new load may
     // claim it before THIS one settles — its finally must not evict the
     // successor.
-    const self: Promise<void> = doEnsureSchemas().finally(() => {
+    const self: Promise<boolean> = doEnsureSchemas().finally(() => {
       if (schemaInFlight === self) schemaInFlight = null;
     });
     schemaInFlight = self;
     return self;
   };
 
-  const doEnsureSchemas = async () => {
+  const doEnsureSchemas = async (): Promise<boolean> => {
     const generation = orgGeneration;
     schemaLoading.value = true;
     try {
       // Called directly: useStreams cannot request schemas on a bulk fetch.
       const response = await StreamService.nameList(org.value, "metrics", true);
       // The org may have changed while this was in flight; its cards are not ours.
-      if (generation !== orgGeneration) return;
+      if (generation !== orgGeneration) return false;
       const list = (response?.data?.list ?? []) as MetricStream[];
 
       // An empty list is not an answer, it is a failure that did not throw — and
@@ -513,10 +530,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // cannot help here because nothing was thrown. Keep the cards we have; the
       // filter then fails open (see `isLabelEligible`), which is the same
       // outcome as a rejected request.
-      if (!list.length) {
-        schemaLoaded.value = true;
-        return;
-      }
+      if (!list.length) return false;
 
       cards.value = buildMetricCards(list);
       const map: Record<string, string[]> = {};
@@ -525,10 +539,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       labelsByStream.value = map;
       schemaLoaded.value = true;
+      return true;
     } catch {
       // Fail open: without membership data every card stays eligible. The chips
       // still work; we just cannot narrow the grid.
-      if (generation === orgGeneration) schemaLoaded.value = true;
+      return false;
     } finally {
       if (generation === orgGeneration) schemaLoading.value = false;
     }
@@ -558,9 +573,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * card would quietly render unfiltered data. Narrowing the grid — rather than
    * charting a lie — is what makes the chips safe.
    */
-  const isLabelEligible = (card: MetricCard): boolean => {
-    if (labelFilters.value.length === 0) return true;
-    if (!membershipKnown.value) return true;
+  const isLabelEligible = (card: MetricCard): boolean =>
+    inapplicableLabelFilters(card).length === 0;
+
+  /** The active filters this card cannot apply (those `isLabelEligible` fails on). */
+  const inapplicableLabelFilters = (card: MetricCard): LabelFilter[] => {
+    if (labelFilters.value.length === 0) return [];
+    if (!membershipKnown.value) return [];
 
     // The streams the EFFECTIVE variant reads — not the card kind's default ones.
     // A ⚙ override changes the operands: a histogram switched to "Rate of count"
@@ -570,13 +589,13 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the card would chart unfiltered data under an active filter chip. That is
     // the exact lie this whole eligibility rule exists to prevent.
     const operands = operandStreamsOfVariant(card);
-    return labelFilters.value.every((filter) =>
-      operands.every((stream) => {
-        const labels = labelsByStream.value[stream];
-        // A stream we have no schema for (e.g. a `_count` sibling that is not in
-        // the list) cannot be proven to carry the label.
-        return !!labels && labels.includes(filter.label);
-      }),
+    return labelFilters.value.filter(
+      (filter) =>
+        !operands.every((stream) => {
+          const labels = labelsByStream.value[stream];
+          // A stream with no known schema cannot be proven to carry the label.
+          return !!labels && labels.includes(filter.label);
+        }),
     );
   };
 
@@ -950,6 +969,52 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const pointsFor = (card: MetricCard) =>
     card.chartType === "heatmap" ? HEATMAP_POINTS : PREVIEW_POINTS;
 
+  const exemplars = useMetricsExplorerExemplars({
+    queue,
+    org,
+    timeRange,
+    queriesOf: (card) =>
+      ((effectiveVariant(card as MetricCard).resolved?.queries ?? []) as any[]).map((q) => ({
+        expr: q.expr,
+        legend: q.legendTemplate && !q.legendTemplate.includes("{") ? q.legendTemplate : undefined,
+      })),
+    stepOf: (card) => computeStepSeconds(rangeSeconds.value, pointsFor(card as MetricCard)),
+    valueUnitOf: (card) => {
+      const model = card as MetricCard;
+      const bucketUnit = effectiveVariant(model).defaults?.bucketUnit;
+      return toO2Unit(
+        bucketUnit ??
+          normalizeDeclaredUnit(model.declaredUnit) ??
+          inferUnit(baseNameOf(model.name)),
+      );
+    },
+  });
+
+  /** A heatmap card draws its percentiles variant while exemplars are on. */
+  const exemplarSwapsVariant = (card: MetricCard): boolean =>
+    effectiveVariant(card, pointsFor(card), { ignoreExemplars: true }).resolved?.variant?.id ===
+    "heatmap";
+
+  const exemplarEligible = (card: MetricCard): boolean => {
+    if (card.unsupported || previews.value[card.name]?.status === "error") return false;
+    if (exemplarSwapsVariant(card)) return true;
+    return effectiveVariant(card).resolved?.chartType === "line";
+  };
+
+  /** Flips one card's exemplars; a heatmap card re-runs its preview as percentiles. */
+  const toggleExemplars = (card: MetricCard) => {
+    const swaps = exemplarSwapsVariant(card);
+    const ownKeys = new Set(exemplars.exemplarKeysOf(card));
+    // Captured before the flip: afterwards previewKeysOf names the other variant's queries.
+    const supersededKeys = swaps ? previewKeysOf(card).filter((k) => !ownKeys.has(k)) : [];
+    exemplars.toggle(card);
+    if (swaps) {
+      for (const key of supersededKeys) queue.cancel(key, card.name);
+      delete previews.value[card.name];
+      void requestPreview(card);
+    }
+  };
+
   /**
    * Everything a resolved variant depends on. When this changes, every memo is
    * stale; while it holds, a card's variant cannot change.
@@ -998,14 +1063,20 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const effectiveVariant = (
     card: MetricCard,
     points = pointsFor(card),
-    opts?: { applyNanGuard?: boolean; rateWindow?: string; percentileWindow?: string },
+    opts?: {
+      applyNanGuard?: boolean;
+      rateWindow?: string;
+      percentileWindow?: string;
+      ignoreExemplars?: boolean;
+    },
   ) => {
     const epoch = variantEpoch.value;
     if (epoch !== cachedEpoch) {
       variantCache.clear();
       cachedEpoch = epoch;
     }
-    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}`;
+    const exemplarsOn = !opts?.ignoreExemplars && exemplars.enabled(card.name);
+    const cacheKey = `${card.name}|${points}|${opts?.applyNanGuard ? 1 : 0}|${opts?.rateWindow ?? ""}|${opts?.percentileWindow ?? ""}|${exemplarsOn ? 1 : 0}`;
     const hit = variantCache.get(cacheKey);
     if (hit) return hit;
 
@@ -1044,11 +1115,15 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // The card's unit already came from the family-joined rule-set pass; keep it
     // rather than re-deriving from a sub-stream's fallback metadata.
     const override = overrides.value[card.name];
-    const resolved = resolveVariant(
+    let resolved = resolveVariant(
       defaults,
       override?.variantId ?? defaults.variants[0]?.id,
       override?.options,
     );
+    // Exemplars draw on a line chart, so a heatmap card shows its percentiles while they are on; the ⚙ override is never rewritten.
+    if (exemplarsOn && resolved?.variant?.id === "heatmap") {
+      resolved = resolveVariant(defaults, "percentiles", undefined) ?? resolved;
+    }
 
     const result = { defaults, resolved };
     variantCache.set(cacheKey, result);
@@ -1063,8 +1138,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /* ------------------------------------------------------------- previews */
 
-  const previewCacheKey = (query: string, step: number) =>
-    `${org.value}|${query}|${timeRange.value.start_time}|${timeRange.value.end_time}|${step}`;
+  const previewCacheKey = (query: string, step: number, window?: QueryWindow, instant = false) =>
+    `${org.value}|${query}|${window?.start ?? timeRange.value.start_time}|${window?.end ?? timeRange.value.end_time}|${step}${instant ? "|instant" : ""}`;
 
   /**
    * Drops a card's rendered preview and abandons whatever it still has running.
@@ -1096,10 +1171,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * the queue's AbortSignal is what the grid already fires on scroll-away,
    * filter change and refresh, so it is bridged to `cancelStreamQueryBasedOnRequestId`.
    */
-  const streamQuery = (query: string, step: number, signal: AbortSignal) =>
+  const streamQuery = (
+    query: string,
+    step: number,
+    signal: AbortSignal,
+    seriesLimit?: number,
+    window?: QueryWindow,
+    queryType: "range" | "instant" = "range",
+  ) =>
     new Promise<any>((resolve, reject) => {
       const { traceId } = generateTraceContext();
-      const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
+      const maxSeries = seriesLimit ?? store.state?.zoConfig?.max_dashboard_series ?? 100;
       const chunkProcessor = createPromQLChunkProcessor({
         maxSeries,
         enableLogging: false,
@@ -1134,10 +1216,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         {
           queryReq: {
             query,
-            start_time: timeRange.value.start_time,
-            end_time: timeRange.value.end_time,
+            start_time: window?.start ?? timeRange.value.start_time,
+            end_time: window?.end ?? timeRange.value.end_time,
             step: `${step}s`,
-            query_type: "range",
+            query_type: queryType,
           },
           type: "promql",
           traceId,
@@ -1402,6 +1484,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   ) => {
     if (card.unsupported) return;
     if (!timeRange.value.end_time) return;
+    exemplars.ensure(card, opts?.priority ?? PRIORITY.VISIBLE);
 
     // Captured before the first await. Every write into `previews` below happens
     // after one, by which time a bulk clear may have emptied the map and
@@ -1720,7 +1803,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const previewKeysOf = (card: MetricCard): string[] => {
     const points = pointsFor(card);
     const step = computeStepSeconds(rangeSeconds.value, points);
-    const keys = new Set<string>();
+    const keys = new Set<string>(exemplars.exemplarKeysOf(card));
 
     for (const guarded of [false, true]) {
       const { resolved } = effectiveVariant(card, points, {
@@ -1776,6 +1859,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
   const invalidateAll = () => {
     previewsEpoch++;
     queue.cancelAll();
+    exemplars.clearAll();
     previews.value = {};
     previewOrder = [];
     emptyMetrics.value = new Set();
@@ -1835,6 +1919,48 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       queue.cancel(previewCacheKey(expr, step), DIALOG_OWNER);
     }
   };
+
+  /** The metric detail view's queries: dialog-grade priority, their own owner. */
+  const DETAIL_OWNER = "\u0000detail";
+  let detailRequests = 0;
+
+  /** One owner per request, so the queue drops only the aborting chart's waiter from a shared job. */
+  const runDetailQuery = (
+    expr: string,
+    card: MetricCard,
+    signal: AbortSignal,
+    opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
+  ) => {
+    const step = dialogStepFor(card);
+    // The streaming transport reads an instant query's time from end_time, so start and end are both T.
+    const window =
+      opts?.instantAt === undefined ? opts?.window : { start: opts.instantAt, end: opts.instantAt };
+    const instant = opts?.instantAt !== undefined;
+    // The window is in the key, so a shifted request gets its own job instead of joining the current one.
+    const key = previewCacheKey(expr, step, window, instant);
+    if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
+    const owner = `${DETAIL_OWNER}:${++detailRequests}`;
+    const onAbort = () => queue.cancel(key, owner);
+    signal.addEventListener("abort", onAbort, { once: true });
+    return queue
+      .run(
+        key,
+        PRIORITY.DIALOG,
+        (abort) =>
+          streamQuery(expr, step, abort, opts?.maxSeries, window, instant ? "instant" : "range"),
+        owner,
+      )
+      .finally(() => signal.removeEventListener("abort", onAbort));
+  };
+
+  /** The rate window the card charts with, widened if it was, so a breakdown measures alike. */
+  const rateWindowFor = (card: MetricCard): string =>
+    previews.value[card.name]?.widenedRateWindow ??
+    computeRateWindow(rangeSeconds.value, pointsFor(card), scrapeIntervalSeconds.value);
+
+  /** The family map the cards were built from (`buildMetricFamilies`). */
+  const familyByName = computed(() => new Map(cards.value.map((c) => [c.name, c.familyName])));
+  const familyOf = (name: string) => familyByName.value.get(name) ?? name;
 
   /* ------------------------------------------------------ label filtering */
 
@@ -2299,12 +2425,23 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     addLabelFilter,
     removeLabelFilter,
     ensureSchemas,
+    isLabelEligible,
+    inapplicableLabelFilters,
 
     // local state
     overrides,
     favorites,
     setOverride,
     toggleFavorite,
+
+    exemplarsEnabled: exemplars.enabled,
+    exemplarStateOf: exemplars.stateOf,
+    exemplarKeysOf: exemplars.exemplarKeysOf,
+    retryExemplars: exemplars.retry,
+    ensureExemplars: exemplars.ensure,
+    exemplarEligible,
+    exemplarSwapsVariant,
+    toggleExemplars,
 
     // previews
     requestPreview,
@@ -2315,6 +2452,14 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     effectiveVariant,
     runDialogQuery,
     cancelDialogQueries,
+    runDetailQuery,
+    detailStepFor: dialogStepFor,
+    rateWindowFor,
+
+    labelsByStream,
+    prefixAssignment,
+    prefixOf,
+    familyOf,
 
     // lifecycle
     loadStreams,

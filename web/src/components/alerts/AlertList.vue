@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
-                  <span class="truncate">{{ row.name || "--" }}</span>
+                  <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -295,33 +295,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          events originating in a button — but the row click
                          navigates elsewhere, and that is not a default worth
                          depending on another component to keep. -->
-                    <button
+                    <OTruncatedText
                       v-if="row.slo_id"
+                      as="button"
                       type="button"
-                      class="text-text-link truncate hover:underline"
+                      class="text-text-link hover:underline"
                       :aria-label="t('alerts.sloColumn') + ': ' + sloLabel(row)"
                       :data-test="`alert-list-${row.name}-slo-link`"
                       @click.stop="goToSlo(row)"
                     >
                       {{ sloLabel(row) }}
-                    </button>
+                    </OTruncatedText>
                   </template>
                 </div>
                 <!-- Composite rows have no stream/query summary: show the
                      name-resolved expression the backend supplied instead. -->
-                <span
+                <OTruncatedText
                   v-if="row.alert_type === 'Composite' && row.conditions && row.conditions !== '--'"
-                  class="text-text-secondary min-w-0 truncate text-xs"
-                  :title="row.conditions"
+                  class="text-text-secondary block text-xs"
                   :data-test="`alert-list-composite-expression-${row.alert_id}`"
                 >
                   {{ row.conditions }}
-                </span>
-                <OTooltip
-                  v-if="row.name"
-                  :content="row.name"
-                  content-class="max-w-100 whitespace-normal break-words text-xs"
-                />
+                </OTruncatedText>
               </template>
 
               <template #cell-owner="{ row }">
@@ -339,34 +334,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at_raw"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
+                />
+              </template>
+
+              <template #cell-last_satisfied_at="{ row }">
                 <span class="inline-flex min-w-0 items-center gap-1.5">
                   <span
-                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_triggered_at_raw))"
+                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_satisfied_at_raw))"
                     class="h-1.5 w-1.5 shrink-0 rounded-full"
                     :class="
-                      recencyLevel(row.last_triggered_at_raw) === 'hot'
+                      recencyLevel(row.last_satisfied_at_raw) === 'hot'
                         ? 'bg-warning-500 motion-safe:animate-pulse'
                         : 'bg-text-muted'
                     "
                   />
                   <OTimeCell
-                    :value="row.last_triggered_at_raw"
-                    unit="us"
-                    mode="relative"
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
-              </template>
-
-              <template #cell-last_satisfied_at="{ row }">
-                <OTimeCell
-                  :value="row.last_satisfied_at"
-                  unit="iso"
-                  mode="absolute"
-                  :timezone="store.state.timezone"
-                  :empty-label="t('alerts.anomaly.retrainNever')"
-                />
               </template>
 
               <template #cell-status="{ row }">
@@ -734,65 +729,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between gap-1">
-                  <div class="flex min-w-25 items-center text-xs font-normal">
-                    <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
-                      {{ t("alerts.selectedLabel") }}</template
-                    >
-                    <span v-else class="max-md:hidden"
-                      >{{ resultTotal }} {{ t("alerts.header") }}</span
-                    >
-                  </div>
-
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-move-across-folders-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="drive-file-move"
-                    @click="moveMultipleAlerts"
-                    >{{ t("common.move") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-export-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="download"
-                    @click="multipleExportAlert"
-                    >{{ t("common.export") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-pause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="pause"
-                    @click="bulkToggleAlerts('pause')"
-                    >{{ t("alerts.pause") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-unpause-alerts-btn"
-                    variant="outline"
-                    size="sm"
-                    icon-left="play-arrow"
-                    @click="bulkToggleAlerts('resume')"
-                    >{{ t("alerts.resume") }}</OButton
-                  >
-                  <OButton
-                    v-if="selectedAlerts.length > 0"
-                    data-test="alert-list-delete-alerts-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    :loading="bulkDeleteLoading"
-                    @click="openBulkDeleteDialog"
-                    >{{ t("common.delete") }}</OButton
-                  >
-                </div>
+              <template #selection-actions>
+                <OButton
+                  data-test="alert-list-move-across-folders-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="drive-file-move"
+                  @click="moveMultipleAlerts"
+                  >{{ t("common.move") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-export-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="download"
+                  @click="multipleExportAlert"
+                  >{{ t("common.export") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-pause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="pause"
+                  @click="bulkToggleAlerts('pause')"
+                  >{{ t("alerts.pause") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-unpause-alerts-btn"
+                  variant="outline"
+                  size="sm"
+                  icon-left="play-arrow"
+                  @click="bulkToggleAlerts('resume')"
+                  >{{ t("alerts.resume") }}</OButton
+                >
+                <OButton
+                  data-test="alert-list-delete-alerts-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  icon-left="delete"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                  >{{ t("common.delete") }}</OButton
+                >
               </template>
             </OTable>
           </div>
@@ -959,7 +937,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
 import {
   isSloAlert,
   isUnplaceableSloAlert,
@@ -971,7 +949,7 @@ import sloService from "@/services/slos";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
 import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutils";
@@ -1002,6 +980,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1047,6 +1026,7 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     OTag,
+    OTruncatedText,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
@@ -1073,10 +1053,9 @@ export default defineComponent({
     async function fetchOnCallTeams() {
       if (!oncallEnabled.value) return;
       try {
-        const res = await oncallService.listTeams({
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        oncallTeams.value = res.data ?? [];
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
       } catch {
         oncallTeams.value = [];
       }
@@ -1130,7 +1109,7 @@ export default defineComponent({
       (isLoading) => {
         if (isLoading) return;
         setTimeout(() => {
-          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+          oTableRef.value?.restorePage?.(currentPage.value);
         }, 0);
       },
       { once: true },
@@ -1260,9 +1239,7 @@ export default defineComponent({
     const filteredResults: Ref<any[]> = ref([]);
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
-    // Recency of the last trigger, bucketed for the trigger-time dot + the
-    // recently-fired row highlight. Derived from the RAW microsecond timestamp
-    // (last_triggered_at_raw) so it stays correct regardless of display timezone.
+    // Keyed on firing time, not run time; raw µs keeps it timezone-independent.
     const RECENT_TRIGGER_MS = 15 * 60 * 1000; // "hot" — fired in the last 15 min
     const RECENT_TRIGGER_DAY_MS = 24 * 60 * 60 * 1000; // "warm" — within a day
     const triggerAgeMs = (rawMicros: unknown): number | null => {
@@ -1432,7 +1409,7 @@ export default defineComponent({
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
-        if (recencyLevel(r.last_triggered_at_raw) === "hot") recent += 1;
+        if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
       return { active, paused, failed, recent, total: rows.length };
     });
@@ -1511,7 +1488,7 @@ export default defineComponent({
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "recent")
-        return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
+        return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
         return rows.filter(
           (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
@@ -1827,9 +1804,8 @@ export default defineComponent({
       last_triggered_at: anomaly.last_triggered_at
         ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
-      // Raw microsecond epoch — drives the relative-time cell, recency dot and
-      // recently-fired row highlight (timezone-independent).
       last_triggered_at_raw: anomaly.last_triggered_at ?? null,
+      last_satisfied_at_raw: anomaly.last_satisfied_at ?? null,
       last_satisfied_at: anomaly.last_satisfied_at
         ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
@@ -1963,6 +1939,7 @@ export default defineComponent({
               is_real_time: "composite",
               last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
               last_triggered_at_raw: data.last_triggered_at ?? null,
+              last_satisfied_at_raw: data.last_satisfied_at ?? null,
               last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             };
           }
@@ -1990,9 +1967,8 @@ export default defineComponent({
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
             last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
-            // Raw microsecond epoch — drives the relative-time cell, recency dot
-            // and recently-fired row highlight (timezone-independent).
             last_triggered_at_raw: data.last_triggered_at ?? null,
+            last_satisfied_at_raw: data.last_satisfied_at ?? null,
             last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
@@ -2293,6 +2269,8 @@ export default defineComponent({
           loading.value = false;
           return;
         }
+        // A folder switch starts a new list; the page persisted for the previous folder must not be restored onto it.
+        currentPage.value = 1;
         if (searchAcrossFolders.value) {
           searchAcrossFolders.value = false;
           searchQuery.value = "";
@@ -2367,14 +2345,12 @@ export default defineComponent({
           });
         }
         addAlert();
-        if (config.enableAnalytics == "true") {
-          segment.track("Button Click", {
-            button: action,
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Alerts",
-          });
-        }
+        analytics.track("Button Click", {
+          button: action,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Alerts",
+        });
         track("Button Click", {
           button: action,
           page: "Add Alert",
@@ -2478,10 +2454,6 @@ export default defineComponent({
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
-    const resultTotal = computed(function () {
-      return displayedAlerts.value?.length;
-    });
-
     // No timezone suffix in this table, unlike the other lists.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
@@ -2505,9 +2477,32 @@ export default defineComponent({
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
-      toBeClonestreamName.value = "";
-      toBeClonestreamType.value = "";
+      // Pre-fill from the original alert's row — composite rows carry no
+      // single stream, and a row that genuinely has none renders it as the
+      // "--" placeholder (both the list table's own convention and the one
+      // anomaly rows fall back to), which must not get selected as if it
+      // were a real stream type/name.
+      toBeClonestreamType.value =
+        toBeClonedIsComposite.value || !row.stream_type || row.stream_type === "--"
+          ? ""
+          : row.stream_type;
+      toBeClonestreamName.value =
+        toBeClonedIsComposite.value || !row.stream_name || row.stream_name === "--"
+          ? ""
+          : row.stream_name;
       showForm.value = true;
+      // Load the stream-name options for the pre-filled stream type so the
+      // dialog's dropdown reflects it instead of showing an empty list. A
+      // failed load must not abort the clone itself — the dialog still opens,
+      // just with an empty stream-name list the user has to fill by hand —
+      // so the alert-to-clone fetch below always runs regardless.
+      if (toBeClonestreamType.value) {
+        try {
+          await updateStreams(false);
+        } catch {
+          // handled above: dialog stays open with an empty stream-name list
+        }
+      }
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (!toBeClonedIsAnomaly.value && !toBeClonedIsComposite.value) {
         toBeClonedAlert.value = await getAlertById(row.alert_id);
@@ -2718,6 +2713,14 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
+      // An editor save lands here, and the editor opens alerts from their detail
+      // cache (getAlertById): mark those stale, or a reopen within a minute shows
+      // the pre-save copy.
+      void queryClient.invalidateQueries({
+        queryKey: alertKeys.all(store.state.selectedOrganization.identifier),
+        predicate: (q: any) => q.queryKey[3] === "detail",
+        refetchType: "none",
+      });
       // Always fetch the latest alerts for the folder from backend
       await getAlertsFn(store, resolvedFolderId, "", true, "", true);
       // Re-apply active search/filter on the freshly fetched data
@@ -2883,15 +2886,13 @@ export default defineComponent({
             message: err?.data?.message || t("alerts.messages.deleteAlertFailed"),
           });
         });
-      if (config.enableAnalytics == "true") {
-        segment.track("Button Click", {
-          button: "Delete Alert",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          alert_name: selectedDelete.value.name,
-          page: "Alerts",
-        });
-      }
+      analytics.track("Button Click", {
+        button: "Delete Alert",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        alert_name: selectedDelete.value.name,
+        page: "Alerts",
+      });
     };
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
@@ -3083,15 +3084,22 @@ export default defineComponent({
 
     const triggerAlert = async (row: any) => {
       try {
-        await alertsService.trigger_alert(
+        const res = await alertsService.trigger_alert(
           store.state.selectedOrganization.identifier,
           row.alert_id,
           row.folder_name?.id,
         );
-        toast({
-          variant: "success",
-          message: t("alerts.alertTriggeredSuccess"),
-        });
+        // A lost claim or an ineligible row means nothing ran, so success would mislead.
+        toast(
+          res?.data?.claim_lost === true
+            ? { variant: "warning", message: t("alerts.anomaly.detectionAlreadyRunning") }
+            : res?.data?.ineligible === true
+              ? {
+                  variant: "warning",
+                  message: res.data.message || t("alerts.messages.triggerAlertFailed"),
+                }
+              : { variant: "success", message: t("alerts.alertTriggeredSuccess") },
+        );
         if (row.type === "anomaly") {
           await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }
@@ -3723,7 +3731,6 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      resultTotal,
       refreshList,
       pageSize,
       pageSizeOptions,

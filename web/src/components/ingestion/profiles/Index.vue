@@ -19,7 +19,6 @@
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          :title="ingestiontabs"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"
@@ -38,7 +37,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 
@@ -108,7 +107,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: currentRouteName(),
             user_org: store.state.selectedOrganization.identifier,

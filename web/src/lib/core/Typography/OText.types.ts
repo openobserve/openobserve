@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 /**
  * OText — polymorphic typography component.
  *
@@ -59,6 +61,9 @@ export interface TextProps {
    * Adds `overflow: hidden; text-overflow: ellipsis; white-space: nowrap`.
    */
   truncate?: boolean;
+
+  /** With `truncate`: hover text when the text is cut (defaults to the text); `false` for none. It cuts only as a block or flex item. */
+  tooltip?: I18nText | false;
 
   /**
    * Prevent line wrapping (white-space: nowrap).

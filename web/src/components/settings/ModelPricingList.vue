@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
-              <div class="block w-full truncate">{{ row.name }}</div>
+              <OTruncatedText as="div" class="block w-full">{{ row.name }}</OTruncatedText>
             </div>
           </template>
           <template #cell-match_pattern="{ row }">
@@ -439,33 +439,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #bottom>
-            <div class="flex h-12 w-full items-center gap-x-2">
-              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-                {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
-              </div>
-              <OButton
-                v-if="selectedCount > 0"
-                data-test="model-pricing-export-selected-btn"
-                variant="outline"
-                size="sm"
-                @click="exportSelected"
-              >
-                <template #icon-left><OIcon name="download" size="xs" /></template>
-                {{ t("modelPricing.exportSelected", { count: selectedCount }) }}
-              </OButton>
-              <OButton
-                v-if="selectedCount > 0 && selectedIdsOnlyContainsOwn"
-                data-test="model-pricing-delete-selected-btn"
-                variant="outline-destructive"
-                size="sm"
-                :loading="bulkDeleteLoading"
-                @click="confirmDeleteSelected"
-                icon-left="delete"
-              >
-                {{ t("modelPricing.deleteSelected", { count: selectedCount }) }}
-              </OButton>
-            </div>
+          <template #selection-actions>
+            <OButton
+              data-test="model-pricing-export-selected-btn"
+              variant="outline"
+              size="sm"
+              @click="exportSelected"
+            >
+              <template #icon-left><OIcon name="download" size="xs" /></template>
+              {{ t("common.export") }}
+            </OButton>
+            <OButton
+              v-if="selectedIdsOnlyContainsOwn"
+              data-test="model-pricing-delete-selected-btn"
+              variant="outline-destructive"
+              size="sm"
+              :loading="bulkDeleteLoading"
+              @click="confirmDeleteSelected"
+              icon-left="delete"
+            >
+              {{ t("common.delete") }}
+            </OButton>
           </template>
         </OTable>
       </div>
@@ -659,6 +653,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { operatorSymbol, formatUtcWindows, formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -798,8 +793,6 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const resultTotal = computed(() => filteredModels.value.length);
-
 function handleSelectedIdsUpdate(ids: string[]) {
   selectedIds.value = ids;
 }
@@ -811,8 +804,6 @@ const selectedIdsOnlyContainsOwn = computed(() => {
     return model && !isReadOnly(model);
   });
 });
-
-const selectedCount = computed(() => selectedIds.value.length);
 
 /** Get the source of a model: 'built_in', 'meta_org', or 'org'. */
 function getSource(model: any): string {

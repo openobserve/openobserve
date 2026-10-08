@@ -105,6 +105,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
 
             <OToggleGroupItem
+              data-test="logs-drilldown-toggle"
+              :disabled="searchObj.meta.sqlMode"
+              :tooltip="
+                searchObj.meta.sqlMode
+                  ? t('search.drillDownUnavailableInSqlMode')
+                  : toolbarToggleIconOnly
+                    ? t('search.drillDown')
+                    : undefined
+              "
+              value="drilldown"
+              size="sm"
+            >
+              <template #icon-left>
+                <OIcon name="query-stats" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!toolbarToggleIconOnly">{{ t("search.drillDown") }}</span>
+            </OToggleGroupItem>
+
+            <OToggleGroupItem
               v-if="config.isEnterprise == 'true'"
               data-test="logs-patterns-toggle"
               value="patterns"
@@ -220,10 +239,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
-                  size="icon-toolbar"
+                  size="sm-toolbar"
                 >
                   <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
@@ -253,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
                       />
                     </template>
-                    <span class="max-w-56 truncate">{{ view.view_name }}</span>
+                    <OTruncatedText class="max-w-56">{{ view.view_name }}</OTruncatedText>
                     <template #icon-right>
                       <OButton
                         variant="ghost"
@@ -287,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("search.manageSavedViews") }}
               </ODropdownItem>
             </ODropdown>
+            <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
               variant="ghost"
@@ -1743,9 +1763,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
+                  <OTruncatedText
+                    as="div"
+                    class="w-full cursor-pointer text-sm"
                     :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                     @click.stop="
                       applySavedView(row);
@@ -1753,7 +1773,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ value }}
-                  </div>
+                  </OTruncatedText>
                 </template>
                 <template #cell-actions="{ row }">
                   <div class="flex items-center gap-0.5">
@@ -1852,9 +1872,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="border-border my-1 border-t" />
                 </template>
                 <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
+                  <OTruncatedText
+                    as="div"
+                    class="w-full cursor-pointer text-sm"
                     :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
                     @click.stop="
                       applySavedView(row);
@@ -1862,7 +1882,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ value }}
-                  </div>
+                  </OTruncatedText>
                 </template>
                 <template #cell-actions="{ row }">
                   <div class="flex items-center gap-0.5">
@@ -1980,7 +2000,7 @@ import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import searchService from "@/services/search";
 
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
@@ -2045,6 +2065,7 @@ import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -2144,6 +2165,7 @@ export default defineComponent({
     OFormToggleGroup,
     OSpinner,
     OTooltip,
+    OTruncatedText,
     OInput,
     OSearchInput,
     OSelect,
@@ -2556,10 +2578,10 @@ export default defineComponent({
 
     // Approximate rendered widths of left-section content at each collapse state:
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
-    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
-    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 568);
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 248);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 176);
+    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 810);
+    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 658);
+    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
+    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
@@ -2572,7 +2594,7 @@ export default defineComponent({
     // Approximate rendered widths (px) of each pinned control and of the fixed
     // left-section content, used only to decide how many pinned items fit before
     // they would clip. Hidden pinned items stay reachable inside the More menu.
-    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 62 };
+    const PIN_ITEM_WIDTH = { histogram: 46, sqlMode: 46, quickMode: 46, savedViews: 87 };
     const SYNTAX_GUIDE_LABEL_WIDTH = 108;
     const SYNTAX_GUIDE_ICON_WIDTH = 40;
     const PIN_ITEM_GAP = 4;
@@ -2582,8 +2604,8 @@ export default defineComponent({
     const baseReservedWidth = computed(() => {
       let w = 0;
       if (toolbarToggleAsDropdown.value) w += 120;
-      else if (toolbarToggleIconOnly.value) w += 190;
-      else w += 350;
+      else if (toolbarToggleIconOnly.value) w += 230;
+      else w += 440;
       if (!toolbarMoveResetToMenu.value) w += shouldHideToolbarButtonText.value ? 40 : 88;
       w += 92; // More button (always visible)
       w += 24; // inter-item gaps / padding buffer
@@ -2654,6 +2676,12 @@ export default defineComponent({
           ]
         : []),
       { value: "build", icon: "build", label: t("search.buildQuery"), disabled: false },
+      {
+        value: "drilldown",
+        icon: "query-stats",
+        label: t("search.drillDown"),
+        disabled: searchObj.meta.sqlMode,
+      },
       ...(config.isEnterprise === "true"
         ? [
             {
@@ -3078,6 +3106,11 @@ export default defineComponent({
     // DateTime.vue's selectedDate watcher → saveDate → on:date-change, so
     // without this flag updateDateTime would re-enter twice.
     let suppressUpdateDateTime = false;
+    // Drill down is built from the logs results, so a date change re-runs that search too.
+    const isLogsResultsMode = () =>
+      searchObj.meta.logsVisualizeToggle === "logs" ||
+      searchObj.meta.logsVisualizeToggle === "drilldown";
+
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
@@ -3154,15 +3187,15 @@ export default defineComponent({
         value.userChangedValue !== false &&
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
-        searchObj.meta.logsVisualizeToggle === "logs" &&
+        isLogsResultsMode() &&
         searchObj.data.stream.selectedStream.length > 0
       ) {
         searchObj.loading = true;
         searchObj.runQuery = true;
       }
 
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
+      if (value.userChangedValue) {
+        analytics.track("Button Click", {
           button: "Date Change",
           tab: value.tab,
           value: value,
@@ -3176,17 +3209,13 @@ export default defineComponent({
       if (
         value.valueType === "relative" &&
         store.state.zoConfig.query_on_stream_selection == false &&
-        searchObj.meta.logsVisualizeToggle === "logs"
+        isLogsResultsMode()
       ) {
         emit("searchdata");
         return;
       }
 
-      if (
-        searchObj.meta.liveMode &&
-        ignoreAutoTrigger == false &&
-        searchObj.meta.logsVisualizeToggle === "logs"
-      ) {
+      if (searchObj.meta.liveMode && ignoreAutoTrigger == false && isLogsResultsMode()) {
         if (value.valueType === "absolute") {
           debouncedAutoRunAbsolute();
         } else {
@@ -3266,6 +3295,7 @@ export default defineComponent({
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         showDownloadMenu.value = false;
+        analytics.track("logs_downloaded", { format });
       } catch (error) {
         showDownloadMenu.value = false;
         toast({
@@ -3842,7 +3872,10 @@ export default defineComponent({
               // if visualize is there for any saved views we will get right any previous local filter fields
               // they will get applied to the current visualize selected stream
               // so we need to make sure we dont update that local filter fields when it is visualize
-              if (extractedObj.meta.logsVisualizeToggle == "logs") {
+              if (
+                extractedObj.meta.logsVisualizeToggle == "logs" ||
+                extractedObj.meta.logsVisualizeToggle == "drilldown"
+              ) {
                 await updatedLocalLogFilterField();
               }
               await getStreams("logs", true);
@@ -3951,7 +3984,10 @@ export default defineComponent({
               // if visualize is there for any saved views we will get right any previous local filter fields
               // they will get applied to the current visualize selected stream
               // so we need to make sure we dont update that local filter fields when it is visualize
-              if (extractedObj.meta.logsVisualizeToggle == "logs") {
+              if (
+                extractedObj.meta.logsVisualizeToggle == "logs" ||
+                extractedObj.meta.logsVisualizeToggle == "drilldown"
+              ) {
                 await updatedLocalLogFilterField();
               }
             }
@@ -4164,6 +4200,7 @@ export default defineComponent({
         const viewObj: any = {
           data: getSearchObj(),
           view_name: viewName,
+          view_type: "logs",
         };
 
         return createSavedView
@@ -4597,8 +4634,11 @@ export default defineComponent({
         return;
       }
 
-      // confirm with user on toggle from visualize to logs
-      if (value == "logs" && searchObj.meta.logsVisualizeToggle == "visualize") {
+      // confirm with user on toggle from visualize to logs (or drill down, which reads the logs results)
+      if (
+        (value == "logs" || value == "drilldown") &&
+        searchObj.meta.logsVisualizeToggle == "visualize"
+      ) {
         // cancel all the visualize queries
         cancelVisualizeQueries();
 
@@ -4615,7 +4655,10 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else if (value == "logs" && searchObj.meta.logsVisualizeToggle == "patterns") {
+      } else if (
+        (value == "logs" || value == "drilldown") &&
+        searchObj.meta.logsVisualizeToggle == "patterns"
+      ) {
         // Switching from patterns to logs - check if we need to fetch logs
         const hasLogs =
           searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
@@ -4638,7 +4681,8 @@ export default defineComponent({
       } else if (
         value == "patterns" &&
         (searchObj.meta.logsVisualizeToggle == "logs" ||
-          searchObj.meta.logsVisualizeToggle == "visualize")
+          searchObj.meta.logsVisualizeToggle == "visualize" ||
+          searchObj.meta.logsVisualizeToggle == "drilldown")
       ) {
         // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
         emit("extractPatterns");
@@ -5544,12 +5588,6 @@ export default defineComponent({
 /* Remove pagination top separator */
 .saved-view-table :deep(.border-t) {
   border-top: none;
-}
-
-/* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table
-  :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
-  display: none;
 }
 
 /* Query editor placeholder text styling is global (styles/tailwind.css) —

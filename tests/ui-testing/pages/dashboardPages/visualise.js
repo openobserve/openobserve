@@ -2,6 +2,9 @@
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
 import { expect } from "@playwright/test";
 import DateTimeHelper from "./dashboard-time.js";
+import { selectLogsViewMode } from "../commonActions.js";
+import { LogsPage } from "../logsPages/logsPage.js";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
 
 // Long enough for the empty-state overlay to reappear if the panel is genuinely empty.
 const quietPeriodProbeMs = 3000;
@@ -55,11 +58,10 @@ export default class LogsVisualise {
   }
 
   async openVisualiseTab() {
-    // Open Visualise Tab
-    const visualizeToggle = this.page.locator('[data-test="logs-visualize-toggle"]');
-    // Wait for the toggle to be enabled before clicking
-    await visualizeToggle.waitFor({ state: "visible", timeout: 10000 });
-    await visualizeToggle.click();
+    // Started before the toggle so no request is missed; a Run clicked while result_schema is still deciding the chart leaves the panel empty.
+    const pipelineIdle = this.waitForVisualizePipelineIdle();
+    await selectLogsViewMode(this.page, "visualize");
+    await pipelineIdle;
 
     // Wait for the panel editor container to load (async component)
     // It may be hidden if there's a query error, so wait for attached (in DOM)
@@ -69,12 +71,15 @@ export default class LogsVisualise {
     });
   }
 
+  // Visualize tab's root element. Rendered under v-show (Index.vue), so it is
+  // always attached but only *visible* when the Visualize tab is actually active.
+  getPanelEditorContainer() {
+    return this.page.locator('[data-test="panel-editor-container"]');
+  }
+
   // Open visualise tab and ensure table chart is selected when VRL is present
   async openVisualiseTabWithVrl() {
-    // Started before the toggle is clicked so the requests it fires cannot be missed.
-    const pipelineIdle = this.waitForVisualizePipelineIdle();
     await this.openVisualiseTab();
-    await pipelineIdle;
     await this.ensureTableRendered();
   }
 
@@ -111,6 +116,7 @@ export default class LogsVisualise {
         if (idle && (sawRequest || Date.now() >= firstRequestDeadline)) return;
         await this.page.waitForTimeout(250);
       }
+      testLogger.warn(`Visualize pipeline still busy after ${timeout}ms; continuing`, { inFlight });
     } finally {
       this.page.off("request", onRequest);
       this.page.off("requestfinished", onRequestSettled);
@@ -371,12 +377,24 @@ export default class LogsVisualise {
     await this.logsQueryEditor.waitFor({ state: "visible", timeout: 5000 });
     await this.logsQueryEditor.getByRole('code').click();
     await this.logsQueryEditor.locator('.inputarea').fill(sqlQuery);
+    // An edit made while the stream is still loading never reaches searchObj, so Visualize and Add-to-dashboard would use an empty query.
+    await new LogsPage(this.page).waitForSearchQueryCommitted(sqlQuery);
   }
 
   // Open the first VRL Function Editor
   async vrlFunctionEditor(vrl) {
-    await this.functionEditor.first().click();
-    await this.queryEditor.fill(vrl);
+    const editorLines = this.functionEditor.first().locator(".view-lines");
+    const firstLine = vrl.split("\n")[0].trim();
+    // A fill that lands before the lazily-mounted Monaco model binds is discarded, leaving tempFunctionContent empty.
+    await expect(async () => {
+      const shown = ((await editorLines.textContent().catch(() => "")) || "").replace(/\s+/g, "");
+      if (!shown.includes(firstLine.replace(/\s+/g, ""))) {
+        await this.functionEditor.first().click();
+        await this.queryEditor.fill(vrl);
+      }
+      await expect(editorLines).toContainText(firstLine, { timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
+    await new LogsPage(this.page).waitForVrlFunctionCommitted(vrl);
   }
 
   async runQueryAndWaitForCompletion({ expectTable = false } = {}) {

@@ -23,6 +23,7 @@ test.describe.configure({ mode: 'parallel' });
 
 test.describe('Workflows test drawer', { tag: ['@workflows', '@enterprise', '@all'] }, () => {
   let pm;
+  let destName;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -32,7 +33,8 @@ test.describe('Workflows test drawer', { tag: ['@workflows', '@enterprise', '@al
     await pm.workflowsPage.goToAdd();
     await pm.workflowsPage.setName(`wf_auto_tst_${uniq()}`);
     await pm.workflowsPage.addNodeFromPalette('destination');
-    await pm.workflowsPage.createDestinationInline({ name: `wf_auto_dest_${uniq()}`, url: URL_STUB });
+    destName = `wf_auto_dest_${uniq()}`;
+    await pm.workflowsPage.createDestinationInline({ name: destName, url: URL_STUB });
     await pm.workflowsPage.saveNodeDrawer();
   });
 
@@ -69,6 +71,8 @@ test.describe('Workflows test drawer', { tag: ['@workflows', '@enterprise', '@al
   test('TST-05b: un-suppressing destinations warns that the run will dispatch', { tag: ['@workflowsTestDrawer'] }, async () => {
     await pm.workflowsPage.openTestDrawer();
     await pm.workflowsPage.setSuppressDestinations(false);
-    await pm.workflowsPage.expectDispatchWarning();
+    // Naming the destination is what makes the warning actionable — a bare banner
+    // leaves the author guessing which endpoint a Run is about to hit.
+    await pm.workflowsPage.expectDispatchWarning(destName);
   });
 });

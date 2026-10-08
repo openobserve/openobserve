@@ -76,7 +76,7 @@ pub fn invalidate_all_cache() {
 /// A failed emit is logged, not propagated: the database write has already
 /// committed, and the cache TTL is the backstop for a dropped event. Failing
 /// the user's save because a cache hint did not send would be the worse trade.
-async fn invalidate_and_publish(org_id: &str, id: &str) {
+pub async fn invalidate_and_publish(org_id: &str, id: &str) {
     invalidate_cache(org_id, id);
     if let Err(e) = crate::coordinator::synthetics::emit_check_put(org_id, id).await {
         log::error!("[synthetics] emit check cache event failed for {org_id}/{id}: {e}");
@@ -153,6 +153,7 @@ impl TryFrom<synthetics_checks::Model> for Synthetic {
             alert_if_fails: settings.alert_if_fails,
             collect_rum_data: settings.collect_rum_data,
             session_replay: settings.session_replay,
+            environments: settings.environments,
             auth,
             cookies,
             variables,
@@ -326,6 +327,48 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Every synthetic in an org, fully decoded; fails closed on a bad row, unlike `list`.
+pub async fn list_fully_decoded<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<Vec<Synthetic>, errors::Error> {
+    let models = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(conn)
+        .await?;
+    let mut out = Vec::with_capacity(models.len());
+    for m in models {
+        let id = m.id.clone();
+        let s = Synthetic::try_from(m).map_err(|e| {
+            errors::Error::Message(format!("synthetic check {id} is unreadable: {e}"))
+        })?;
+        out.push(s);
+    }
+    Ok(out)
+}
+
+/// How many checks in an org are pinned to each environment, keyed by environment id.
+pub async fn count_by_environment<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashMap<String, u64>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Settings)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    let mut counts = std::collections::HashMap::new();
+    for settings in rows {
+        let parsed: SyntheticSettings = serde_json::from_value(settings).unwrap_or_default();
+        for env in parsed.environments {
+            *counts.entry(env).or_insert(0) += 1;
+        }
+    }
+    Ok(counts)
+}
+
 /// Picks the primary key for a new row. Split out of [`create`] so the
 /// super-cluster branch is testable without a database. An empty id cannot be
 /// honoured, so it falls back rather than inserting `""`.
@@ -351,11 +394,23 @@ pub async fn create<C: TransactionTrait>(
     use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
     let txn = conn.begin().await?;
-    let now = config::utils::time::now_micros();
     let id = new_check_id(&check, use_given_id);
+    let result = insert_row(&txn, org_id, &id, &check).await?;
+    txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
+    Ok(result)
+}
 
-    let mut am = build_active_model(&check)?;
-    am.id = Set(id);
+/// Inserts a check under `id` without touching the cache; the caller announces it.
+pub async fn insert_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    check: &Synthetic,
+) -> Result<Synthetic, errors::Error> {
+    let now = config::utils::time::now_micros();
+    let mut am = build_active_model(check)?;
+    am.id = Set(id.to_owned());
     am.org_id = Set(org_id.to_owned());
     am.folder_id = Set(check.folder_id.clone());
     am.synthetics_type = Set(check_type_to_str(&check.check_type).to_owned());
@@ -364,10 +419,15 @@ pub async fn create<C: TransactionTrait>(
     am.next_run_at = Set(check.start.unwrap_or(0));
     am.owner = Set(check.owner.clone());
 
-    let model = am.insert(&txn).await?.try_into_model()?;
+    let model = am.insert(conn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
-    txn.commit().await?;
-    invalidate_and_publish(&result.org_id, &result.id).await;
+    super::synthetics_refs::replace_for_parent(
+        conn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     Ok(result)
 }
 
@@ -378,19 +438,36 @@ pub async fn update<C: TransactionTrait>(
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
     let txn = conn.begin().await?;
+    let result = update_row(&txn, org_id, id, &check).await?;
+    txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
+    Ok(result)
+}
 
-    let Some(m) = get_model(&txn, org_id, id).await? else {
+/// Updates a check's editable fields without touching the cache; the caller announces it.
+pub async fn update_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    check: &Synthetic,
+) -> Result<Synthetic, errors::Error> {
+    let Some(m) = get_model(conn, org_id, id).await? else {
         return Err(errors::Error::Message(format!("check not found: {id}")));
     };
 
     let mut am: ActiveModel = m.into();
-    update_mutable_fields(&mut am, &check)?;
+    update_mutable_fields(&mut am, check)?;
     am.updated_at = Set(config::utils::time::now_micros());
 
-    let model = am.update(&txn).await?.try_into_model()?;
+    let model = am.update(conn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
-    txn.commit().await?;
-    invalidate_and_publish(&result.org_id, &result.id).await;
+    super::synthetics_refs::replace_for_parent(
+        conn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     Ok(result)
 }
 
@@ -423,6 +500,13 @@ pub async fn put<C: TransactionTrait>(
         }
     };
 
+    super::synthetics_refs::replace_for_parent(
+        &txn,
+        org_id,
+        &result.id,
+        &super::synthetics_refs::refs_of(&result),
+    )
+    .await?;
     txn.commit().await?;
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
@@ -498,6 +582,7 @@ pub struct DueCheck {
     pub org_id: String,
     pub check_type: SyntheticType,
     pub locations: Vec<String>,
+    pub environments: Vec<String>,
     pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
@@ -510,6 +595,8 @@ pub struct DueCheck {
     /// Steps the journey defines right now — 1 for protocol checks. The scheduler
     /// freezes it onto each job so a mid-flight edit cannot move the ack's ceiling.
     pub steps_configured: i32,
+    /// Child ids the journey references, with multiplicity; empty for every non-composed check.
+    pub subtest_refs: Vec<String>,
     pub tags: Vec<String>,
 }
 
@@ -539,20 +626,24 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         // One parse, two answers: `m.config` is moved into `from_value`, so the
         // devices and the frozen step count must come out of the same call.
-        let (browser_devices, steps_configured) = if check_type == SyntheticType::Browser {
-            let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
-            // `unwrap_or_default()` makes an unreadable config ZERO steps, and
-            // `validate_browser_config` rejects an empty journey — so a 0 means
-            // "could not read the row". A 0 ceiling bills real work as nothing,
-            // hence the floor of 1; saturating stops a negative ceiling.
-            let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
-            (cfg.browser_devices, steps)
-        } else {
-            // §1.1: a protocol check is one step per attempt, never zero.
-            (vec![], 1)
-        };
+        let (browser_devices, steps_configured, subtest_refs) =
+            if check_type == SyntheticType::Browser {
+                let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
+                // `unwrap_or_default()` makes an unreadable config ZERO steps, and
+                // `validate_browser_config` rejects an empty journey — so a 0 means
+                // "could not read the row". A 0 ceiling bills real work as nothing,
+                // hence the floor of 1; saturating stops a negative ceiling.
+                let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
+                let subtest_refs = config::meta::synthetics_composition::subtest_refs(&cfg.steps);
+                (cfg.browser_devices, steps, subtest_refs)
+            } else {
+                // §1.1: a protocol check is one step per attempt, never zero.
+                (vec![], 1, Vec::new())
+            };
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
+
+        let settings: SyntheticSettings = serde_json::from_value(m.settings).unwrap_or_default();
 
         Ok(DueCheck {
             id: m.id,
@@ -560,11 +651,13 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
             org_id: m.org_id,
             check_type,
             locations,
+            environments: settings.environments,
             frequency,
             tz_offset: m.tz_offset,
             next_run_at: m.next_run_at,
             browser_devices,
             steps_configured,
+            subtest_refs,
             tags,
         })
     }
@@ -949,6 +1042,7 @@ fn pack_settings(check: &Synthetic) -> Result<serde_json::Value, errors::Error> 
         collect_rum_data: check.collect_rum_data,
         session_replay: check.session_replay,
         start: check.start,
+        environments: check.environments.clone(),
     })?)
 }
 

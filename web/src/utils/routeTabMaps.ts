@@ -78,6 +78,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestFromWindows: "ingestFromWindows",
     ingestFromLinux: "ingestFromLinux",
     ingestFromMacOS: "ingestFromMacOS",
+    ingestFromGpu: "ingestFromGpu",
     AWSConfig: "AWSConfig",
     GCPConfig: "GCPConfig",
     AzureConfig: "AzureConfig",
@@ -119,6 +120,8 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     fluentbit: "fluentbit",
     fluentd: "fluentd",
     vector: "vector",
+    kinesisfirehose: "kinesisfirehose",
+    gcpLogs: "gcpLogs",
     ingestLogsFromOtel: "ingestLogsFromOtel",
     logstash: "logstash",
     syslogNg: "syslogNg",
@@ -137,6 +140,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     plans: "plans",
     invoice_history: "invoice_history",
     billing_group: "billing_group",
+    paidUsage: "paid_usage",
   },
 
   /** views/IdentityAccessManagement.vue */

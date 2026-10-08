@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex min-w-0 flex-1 flex-col px-2">
                     <span class="text-compact font-medium">{{ group.display }}</span>
-                    <span class="text-2xs text-muted-foreground block truncate">
+                    <OTruncatedText class="text-2xs text-muted-foreground block">
                       {{ group.id }} • {{ group.fields.length }}
                       {{ t("correlation.importSemanticGroups.fields") }}
                       <OTag
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         value="true"
                         class="ms-1"
                       />
-                    </span>
+                    </OTruncatedText>
                   </div>
                   <div class="ms-auto flex shrink-0 items-center">
                     <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
@@ -185,12 +185,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex min-w-0 flex-1 flex-col px-2">
                     <span class="text-compact font-medium">{{ mod.proposed.display }}</span>
-                    <span class="text-2xs text-muted-foreground block truncate">
+                    <OTruncatedText class="text-2xs text-muted-foreground block">
                       {{ mod.proposed.id }} • {{ mod.current.fields.length }}
                       {{ t("correlation.importSemanticGroups.fieldsChangeArrow") }}
                       {{ mod.proposed.fields.length }}
                       {{ t("correlation.importSemanticGroups.fields") }}
-                    </span>
+                    </OTruncatedText>
                   </div>
                   <div class="ms-auto flex shrink-0 items-center">
                     <OButton
@@ -345,6 +345,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
@@ -353,6 +354,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -536,6 +539,8 @@ const applyChanges = async () => {
     // Save to backend
     const org = store.state.selectedOrganization.identifier;
     await alertsService.saveSemanticGroups(org, finalGroups);
+    // The groups are cached, and dimension analytics is computed from them.
+    void queryClient.invalidateQueries({ queryKey: serviceStreamKeys.all(org) });
 
     toast({
       message: t("toastMessages.alerts.successfullyAppliedChanges", {

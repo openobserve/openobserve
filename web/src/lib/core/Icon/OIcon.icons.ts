@@ -53,6 +53,7 @@ import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
+import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
@@ -132,6 +133,7 @@ import Dashboard from "~icons/material-symbols/dashboard-outline";
 import AccessTime from "~icons/material-symbols/schedule-outline";
 import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
+import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
@@ -149,10 +151,12 @@ import Description from "~icons/material-symbols/description-outline";
 import Dns from "~icons/material-symbols/dns-outline";
 import ForkRight from "~icons/material-symbols/fork-right";
 import FullscreenExit from "~icons/material-symbols/fullscreen-exit";
+import FitScreen from "~icons/material-symbols/fit-screen";
 import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
+import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
@@ -399,6 +403,7 @@ export const iconRegistry = {
   delete: Delete,
   download: Download,
   edit: Edit,
+  "edit-note": EditNote,
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
@@ -479,6 +484,7 @@ export const iconRegistry = {
   "access-time": AccessTime,
   activity: Activity,
   "align-left": AlignLeft,
+  "align-right": AlignRight,
   "all-inclusive": AllInclusive,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
@@ -527,10 +533,12 @@ export const iconRegistry = {
   "navigate-before": ChevronLeft,
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
+  "fit-screen": FitScreen,
   group: Group,
   "hourglass-empty": HourglassEmpty,
   label: Label,
   layers: Layers,
+  public: Public,
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,

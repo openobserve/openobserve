@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5 max-md:hidden"
+        class="o2-search-input min-w-62.5 max-lg:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         icon-left="search"
         size="icon-sm"
-        class="max-md:hidden"
+        class="max-lg:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div
-      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 md:hidden"
+      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 lg:hidden"
     >
       <OSelect
         v-model="selectedAlert"
@@ -190,14 +190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary text-2xs shrink-0">→</span>
                 <OTag type="alertLevel" :value="row.level" class="shrink-0" />
               </template>
-              <span
+              <OTruncatedText
                 v-if="row.group_label"
-                class="text-2xs text-text-secondary min-w-0 truncate"
+                class="text-2xs text-text-secondary"
                 data-test="alert-history-group-label"
               >
                 {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                <OTooltip :content="row.group_label" :max-width="'18.75rem'" />
-              </span>
+              </OTruncatedText>
             </div>
           </template>
 
@@ -560,6 +559,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

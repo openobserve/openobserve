@@ -13,13 +13,22 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
 import {
+  TOOLTIP_OFF_ATTR,
+  TOOLTIP_TRIGGER_ATTR,
+  TOOLTIP_TRIGGER_OVERFLOW,
+  type TooltipSide,
+} from "@/lib/overlay/Tooltip/OTooltip.types";
+import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
+import {
   TABLE_CHECKBOX_COL_SIZE,
+  TABLE_CELL_CLIP_ATTR,
   OTableCellActionsKey,
+  OTableOverflowTooltipKey,
   ROW_RAIL_TONE_CLASS,
   ROW_TONE_CLASS,
   type OTableProps,
@@ -27,6 +36,7 @@ import {
   type OTableSlots,
   type OTableColumnDef,
   type OTableSection,
+  type OTableOverflowTooltipState,
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
@@ -51,6 +61,7 @@ import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
+import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
@@ -82,6 +93,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   striped: false,
   stickyHeader: true,
   wrap: false,
+  cellOverflowTooltip: true,
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
@@ -89,7 +101,6 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
-  footerTitle: raw(""),
   totalCountExact: true,
   showHeader: true,
   fillHeight: true,
@@ -327,6 +338,77 @@ provide(OTableCellActionsKey, {
   enabled: computed(() => !!slots["cell-hover-actions"]),
 });
 
+// ── Cut-off cell tooltip ────────────────────────────────────────
+// One tooltip for the whole table, measured only on hover, so cells carry no per-cell cost.
+const OVERFLOW_TOOLTIP_DELAY_MS = 700;
+const OWN_TOOLTIP_SELECTOR = `[${TOOLTIP_TRIGGER_ATTR}], [title]:not([title=""])`;
+const TOOLTIP_OFF_SELECTOR = `[${TOOLTIP_OFF_ATTR}]`;
+const overflowAnchor = shallowRef<HTMLElement | null>(null);
+const overflowText = ref("");
+const overflowSide = ref<TooltipSide>("top");
+let overflowTimer: ReturnType<typeof setTimeout> | null = null;
+
+function hideCellOverflow(): void {
+  if (overflowTimer) {
+    clearTimeout(overflowTimer);
+    overflowTimer = null;
+  }
+  overflowAnchor.value = null;
+}
+// An overflow-only tooltip only shows while its own element is cut; any other owner always shows.
+function ownTooltipShows(el: Element): boolean {
+  return (
+    el.getAttribute(TOOLTIP_TRIGGER_ATTR) !== TOOLTIP_TRIGGER_OVERFLOW || isElementTruncated(el)
+  );
+}
+// A cell that already shows its own tooltip keeps it (never two bubbles), and one marked off never gets one.
+function hasOwnTooltip(target: HTMLElement, cell: HTMLElement): boolean {
+  const off = target.closest(TOOLTIP_OFF_SELECTOR);
+  if ((off && cell.contains(off)) || target.querySelector(TOOLTIP_OFF_SELECTOR)) return true;
+  for (let el: Element | null = target; el && cell.contains(el); el = el.parentElement) {
+    if (el.matches(OWN_TOOLTIP_SELECTOR) && ownTooltipShows(el)) return true;
+  }
+  // A text-less owner inside the cell (an icon button's "Copy") describes itself, not the cut text.
+  return [...target.querySelectorAll(OWN_TOOLTIP_SELECTOR)].some(
+    (el) => (el.textContent ?? "").trim() !== "" && ownTooltipShows(el),
+  );
+}
+function showCellOverflow(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): void {
+  overflowTimer = null;
+  if (!cell.isConnected) return;
+  const candidates = [cell, ...cell.querySelectorAll<HTMLElement>(`[${TABLE_CELL_CLIP_ATTR}]`)];
+  const target = candidates.find((el) => isElementTruncated(el));
+  if (!target || hasOwnTooltip(target, cell)) return;
+  const text = readElementText(target);
+  if (!text) return;
+  overflowText.value = text;
+  overflowSide.value = toolbarSide?.() === "top" ? "bottom" : "top";
+  overflowAnchor.value = target;
+}
+function enterCell(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): void {
+  hideCellOverflow();
+  if (!props.cellOverflowTooltip) return;
+  overflowTimer = setTimeout(() => showCellOverflow(cell, toolbarSide), OVERFLOW_TOOLTIP_DELAY_MS);
+}
+function onOverflowTooltipOpenChange(open: boolean): void {
+  if (!open) hideCellOverflow();
+}
+// Handed over as one fixed object: only the tooltip component reads the refs, so opening it never re-renders the table.
+const overflowTooltip: OTableOverflowTooltipState = {
+  anchor: overflowAnchor,
+  text: overflowText,
+  side: overflowSide,
+  onOpenChange: onOverflowTooltipOpenChange,
+};
+watch(
+  () => props.cellOverflowTooltip,
+  (on) => {
+    if (!on) hideCellOverflow();
+  },
+);
+onBeforeUnmount(hideCellOverflow);
+provide(OTableOverflowTooltipKey, { enter: enterCell, leave: hideCellOverflow });
+
 // TanStack memoises the core row model on the DATA ARRAY'S IDENTITY. Callers
 // that stream results mutate their array in place (logs pushes each partition's
 // hits onto `queryResults.hits`), so the identity never changes, the memo never
@@ -398,8 +480,12 @@ const {
       return props.currentPage;
     },
     showIndex: props.showIndex,
-    sortBy: props.sortBy,
-    sortOrder: props.sortOrder,
+    get sortBy() {
+      return props.sortBy;
+    },
+    get sortOrder() {
+      return props.sortOrder;
+    },
     sortFieldMap: props.sortFieldMap,
     get globalFilter() {
       return globalFilterLocal.value;
@@ -1147,6 +1233,8 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
+    // A leading body row is content of its own, so it paints even with no data rows.
+    !slots["body-start"] &&
     (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
@@ -1156,6 +1244,8 @@ const showStreaming = computed(() => props.streaming && displayRows.value.length
 
 // ── Scroll event handler ────────────────────────────────────────
 function handleScroll(event: Event) {
+  // Virtual rows are recycled on scroll, so the hovered cell may now show another row.
+  hideCellOverflow();
   const el = event.target as HTMLElement;
   if (!el) return;
   emit("scroll", { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
@@ -1192,6 +1282,7 @@ watch(
  */
 defineExpose({
   table,
+  restorePage: pagination.restorePage,
   toggleAllRows: selection.toggleAllRows,
   clearSelection: selection.clearSelection,
   // Callers that render their own OTableColumnToggle (outside the built-in
@@ -1204,6 +1295,9 @@ defineExpose({
   resetColumnOrder: () => {
     userReorderedColumns.value = false;
     columnOrder.value = props.columns.map((c) => c.id);
+  },
+  applyColumnVisibility: (visibility: Record<string, boolean>) => {
+    internalColumnVisibility.value = { ...internalColumnVisibility.value, ...visibility };
   },
   resetPersistedColumns: () => {
     persistence.clearPersistedState();
@@ -1388,6 +1482,10 @@ defineExpose({
             // a leading checkbox/expand/drag gutter supplies the left inset on its
             // own (same token — see the CSS).
             'o2-table--edge-inset',
+            // With no body rows the sticky <thead> has nothing to stick within, so the table itself sticks.
+            props.stickyHeader && props.showHeader && (showEmpty || showForbidden || showError)
+              ? 'sticky top-0 z-10'
+              : '',
           ]"
           :style="{
             ...columnSizeVars,
@@ -1471,7 +1569,6 @@ defineExpose({
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
             :selection-multiple="selection.isMultiple.value"
-            :show-select-all="showSelectAll"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1541,6 +1638,10 @@ defineExpose({
             <!-- Expansion slot -->
             <template v-if="slots.expansion" #expansion="expSlotProps">
               <slot name="expansion" :row="expSlotProps.row" />
+            </template>
+
+            <template v-if="slots['body-start']" #body-start>
+              <slot name="body-start" />
             </template>
 
             <!-- Section heading row -->
@@ -1702,55 +1803,10 @@ defineExpose({
         />
       </div>
 
-      <!-- ── Bottom Pagination (with optional bulk actions slot) ──
-           Skipped when `customPaginationBar` is set: the caller's #bottom slot
-           owns the whole pagination bar (rendered standalone below). -->
-      <OTablePagination
-        v-if="pagination.isEnabled.value && !props.customPaginationBar"
-        position="bottom"
-        :current-page="pagination.currentPage.value"
-        :total-pages="pagination.totalPages.value"
-        :total-count="pagination.totalCount.value"
-        :total-count-exact="props.totalCountExact"
-        :page-size="pagination.pageSize.value"
-        :page-size-options="pagination.pageSizeOptions.value"
-        :showing-from="pagination.showingFrom.value"
-        :showing-to="pagination.showingTo.value"
-        :is-first-page="pagination.isFirstPage.value"
-        :is-last-page="pagination.isLastPage.value"
-        :title="props.footerTitle"
-        :loading="heldLoading"
-        @update:page-size="pagination.setPageSize"
-        @first-page="pagination.firstPage"
-        @prev-page="pagination.prevPage"
-        @next-page="pagination.nextPage"
-        @last-page="pagination.lastPage"
-      >
-        <!-- OTablePagination authoritatively swaps the slot for a skeleton when
-           its `loading` prop is true, so we can always pass the slot. -->
-        <template v-if="slots.bottom" #actions>
-          <slot
-            name="bottom"
-            :current-page="pagination.currentPage.value"
-            :page-size="pagination.pageSize.value"
-            :total-pages="pagination.totalPages.value"
-            :total-rows="pagination.totalCount.value"
-            :is-first-page="pagination.isFirstPage.value"
-            :is-last-page="pagination.isLastPage.value"
-            :set-page-size="pagination.setPageSize"
-            :first-page="pagination.firstPage"
-            :prev-page="pagination.prevPage"
-            :next-page="pagination.nextPage"
-            :last-page="pagination.lastPage"
-          />
-        </template>
-      </OTablePagination>
-
-      <!-- Standalone #bottom slot, so a caller's footer is never dropped when
-           pagination is disabled. -->
-      <div v-else-if="slots.bottom" data-test="o2-table-bottom">
+      <!-- A caller-drawn pager replaces the built-in bar and is kept with pagination off, where it may still carry a row count. -->
+      <div v-if="slots['pagination-bar']" data-test="o2-table-pagination-bar">
         <slot
-          name="bottom"
+          name="pagination-bar"
           :current-page="pagination.currentPage.value"
           :page-size="pagination.pageSize.value"
           :total-pages="pagination.totalPages.value"
@@ -1764,8 +1820,38 @@ defineExpose({
           :last-page="pagination.lastPage"
         />
       </div>
+
+      <OTablePagination
+        v-else-if="pagination.isEnabled.value"
+        position="bottom"
+        :current-page="pagination.currentPage.value"
+        :total-pages="pagination.totalPages.value"
+        :total-count="pagination.totalCount.value"
+        :total-count-exact="props.totalCountExact"
+        :page-size="pagination.pageSize.value"
+        :page-size-options="pagination.pageSizeOptions.value"
+        :showing-from="pagination.showingFrom.value"
+        :showing-to="pagination.showingTo.value"
+        :is-first-page="pagination.isFirstPage.value"
+        :is-last-page="pagination.isLastPage.value"
+        :loading="heldLoading"
+        :selected-count="selection.selectedCount.value"
+        @update:page-size="pagination.setPageSize"
+        @first-page="pagination.firstPage"
+        @prev-page="pagination.prevPage"
+        @next-page="pagination.nextPage"
+        @last-page="pagination.lastPage"
+      >
+        <template v-if="slots['selection-actions']" #selection-actions>
+          <slot name="selection-actions" />
+        </template>
+        <template v-if="slots['footer-note']" #footer-note>
+          <slot name="footer-note" />
+        </template>
+      </OTablePagination>
     </div>
     <!-- /bordered wrapper -->
+    <OTableOverflowTooltip v-if="cellOverflowTooltip" :state="overflowTooltip" />
   </div>
 </template>
 

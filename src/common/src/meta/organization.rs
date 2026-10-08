@@ -275,6 +275,8 @@ pub struct StreamSummary {
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
     pub total_index_size: f64,
+    #[serde(default)]
+    pub total_mindex_size: f64,
 }
 
 #[derive(Clone, Serialize, Deserialize, ToSchema)]
@@ -465,6 +467,10 @@ fn default_usage_stream_enabled() -> bool {
     false
 }
 
+fn default_red_insights_enabled() -> bool {
+    true
+}
+
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
@@ -475,7 +481,10 @@ pub struct DomainOrgMapping {
     pub domain: String,
     pub org_id: String,
     pub base_role: String,
-    pub user_group: Option<String>,
+    #[serde(default)]
+    pub role_claim_name: Option<String>,
+    #[serde(default)]
+    pub create_missing_roles: bool,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -504,6 +513,8 @@ pub struct OrganizationSettingPayload {
     pub max_series_per_query: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_stream_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub red_insights_enabled: Option<bool>,
     #[cfg(feature = "enterprise")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub claim_parser_function: Option<String>,
@@ -543,6 +554,8 @@ pub struct OrganizationSetting {
     pub max_series_per_query: Option<usize>,
     #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
+    #[serde(default = "default_red_insights_enabled")]
+    pub red_insights_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
     pub claim_parser_function: String,
@@ -582,6 +595,7 @@ impl Default for OrganizationSetting {
             dark_mode_theme_color,
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
+            red_insights_enabled: default_red_insights_enabled(),
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
@@ -1454,6 +1468,7 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: None,
+            red_insights_enabled: None,
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
@@ -1472,6 +1487,7 @@ mod tests {
         assert!(!obj.contains_key("dark_mode_theme_color"));
         assert!(!obj.contains_key("max_series_per_query"));
         assert!(!obj.contains_key("usage_stream_enabled"));
+        assert!(!obj.contains_key("red_insights_enabled"));
         assert!(!obj.contains_key("cross_links"));
     }
 
@@ -1530,6 +1546,7 @@ mod tests {
             dark_mode_theme_color: None,
             max_series_per_query: None,
             usage_stream_enabled: false,
+            red_insights_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
@@ -1560,6 +1577,7 @@ mod tests {
             dark_mode_theme_color: Some("#000".to_string()),
             max_series_per_query: Some(1000),
             usage_stream_enabled: false,
+            red_insights_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: String::new(),
             cross_links: vec![],
@@ -1635,5 +1653,24 @@ mod tests {
         }"#;
         let parsed: OrganizationSetting = serde_json::from_str(json_false).unwrap();
         assert!(!parsed.usage_stream_enabled);
+    }
+
+    #[test]
+    fn test_red_insights_enabled_defaults_on_and_round_trips() {
+        assert!(OrganizationSetting::default().red_insights_enabled);
+        let legacy: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15}"#).unwrap();
+        assert!(legacy.red_insights_enabled);
+        let off: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": false}"#)
+                .unwrap();
+        assert!(!off.red_insights_enabled);
+        let on: OrganizationSetting =
+            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": true}"#)
+                .unwrap();
+        assert!(on.red_insights_enabled);
+        let payload: OrganizationSettingPayload =
+            serde_json::from_str(r#"{"red_insights_enabled": true}"#).unwrap();
+        assert_eq!(payload.red_insights_enabled, Some(true));
     }
 }

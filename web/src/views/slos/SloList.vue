@@ -71,27 +71,6 @@
     >
       <template #toolbar>
         <div class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents">
-          <OButton
-            v-if="selectedIds.length"
-            variant="outline"
-            size="sm-action"
-            icon-left="drive-file-move"
-            data-test="slos-slolist-move-selected"
-            @click="openMove(selectedRows)"
-          >
-            {{ t("slos.moveSelected", { count: selectedIds.length }) }}
-          </OButton>
-          <OButton
-            v-if="selectedIds.length"
-            variant="outline"
-            size="sm-action"
-            icon-left="download"
-            :loading="exporting"
-            data-test="slos-slolist-export-selected"
-            @click="openExport(selectedRows)"
-          >
-            {{ t("common.export") }}
-          </OButton>
           <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
@@ -158,8 +137,8 @@
       </template>
 
       <template #cell-name="{ row }">
-        <div class="flex items-center gap-2">
-          <span class="font-medium">{{ row.name }}</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
           <OTag
             v-if="isGrouped(row)"
             variant="purple-soft"
@@ -222,12 +201,18 @@
       </template>
 
       <template #cell-window="{ row }">
-        <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
+        <OTruncatedText as="div" :tooltip="windowText(row.window_secs)">
+          <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
+          <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
+        </OTruncatedText>
       </template>
 
       <template #cell-tags="{ row }">
-        <div class="flex flex-wrap gap-1">
+        <OTruncatedText
+          as="div"
+          class="flex flex-wrap gap-1"
+          :tooltip="raw((row.tags || []).join(', '))"
+        >
           <OTag
             v-for="tag in (row.tags || []).slice(0, 2)"
             :key="tag"
@@ -236,7 +221,7 @@
             :label="raw(tag)"
           />
           <span v-if="(row.tags || []).length > 2" class="text-text-secondary">…</span>
-        </div>
+        </OTruncatedText>
       </template>
 
       <template #cell-folder="{ row }">
@@ -356,6 +341,28 @@
             {{ t("slos.new") }}
           </OButton>
         </OEmptyState>
+      </template>
+
+      <template #selection-actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="drive-file-move"
+          data-test="slos-slolist-move-selected"
+          @click="openMove(selectedRows)"
+        >
+          {{ t("common.move") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="download"
+          :loading="exporting"
+          data-test="slos-slolist-export-selected"
+          @click="openExport(selectedRows)"
+        >
+          {{ t("common.export") }}
+        </OButton>
       </template>
     </OTable>
 
@@ -492,6 +499,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -659,6 +667,11 @@ function onExported({ count }: { format: string; count: number }) {
 function folderName(folderId: string): string {
   const folders = store.state.organizationData?.foldersByType?.alerts ?? [];
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
+}
+
+// The two spans hold no space in their text, so the cut-cell tooltip spells it out.
+function windowText(secs: number) {
+  return raw(`${formatWindow(secs)} ${t("slos.rolling")}`);
 }
 
 const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
@@ -876,7 +889,7 @@ watch(
   (isLoading) => {
     if (isLoading) return;
     setTimeout(() => {
-      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      oTableRef.value?.restorePage?.(currentPage.value);
     }, 0);
   },
   { once: true },
@@ -909,9 +922,12 @@ async function load(orgId?: string | null, folderId?: string, force = false) {
 
 function onFolderChange(folderId: string) {
   if (folderId === activeFolderId.value) return;
+  // A folder switch starts a new list: page 1 in table and URL alike.
+  currentPage.value = 1;
+  const { page: _page, ...carriedQuery } = route.query;
   router.push({
     name: "sloList",
-    query: { ...route.query, org_identifier: org.value, folder: folderId },
+    query: { ...carriedQuery, org_identifier: org.value, folder: folderId },
   });
   load(org.value, folderId);
 }

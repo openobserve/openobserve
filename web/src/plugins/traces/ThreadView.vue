@@ -158,12 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="settings" size="xs" class="me-1" />
             {{ t("traces.threadView.system") }}
           </span>
-          <span
+          <OTruncatedText
             v-if="!showSystemFull"
-            class="thread-system__preview text-compact text-text-secondary min-w-0 flex-1 truncate"
+            :tooltip="false"
+            class="thread-system__preview text-compact text-text-secondary flex-1"
           >
             {{ truncate(head.systemPrompt, 160) }}
-          </span>
+          </OTruncatedText>
           <span v-else class="flex-1" />
           <span
             class="thread-system__toggle text-theme-accent inline-flex shrink-0 items-center gap-[0.15rem] text-xs font-medium"
@@ -267,11 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatTime(turn.span.start_time) }}
                 </span>
                 <span
-                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 dark:text-thread-accent-strong inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap"
-                  :title="getModel(turn.span)"
+                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 dark:text-thread-accent-strong inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium"
                 >
                   <OIcon name="bolt" size="xs" />
-                  {{ getModel(turn.span) || t("traces.threadView.unknown") }}
+                  <OTruncatedText>{{
+                    getModel(turn.span) || t("traces.threadView.unknown")
+                  }}</OTruncatedText>
                 </span>
                 <span
                   class="thread-metric rounded-default bg-surface-subtle border-border-default text-text-secondary text-2xs inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none whitespace-nowrap"
@@ -321,6 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface Props {
   spans: any[];
@@ -353,6 +356,7 @@ import {
   getTokens,
   classify,
   buildTraceGroup,
+  spanTimeBounds,
   type Message,
   type Turn,
   type TraceGroup,
@@ -457,10 +461,8 @@ const summary = computed(() => {
   let totalCost = 0;
   for (const t of allTurnSpans) totalCost += getCost(t);
 
-  const starts = all.map((s) => Number(s.start_time)).filter(Number.isFinite);
-  const ends = all.map((s) => Number(s.end_time)).filter(Number.isFinite);
-  const totalDurationNs =
-    starts.length && ends.length ? Math.max(...ends) - Math.min(...starts) : 0;
+  const bounds = spanTimeBounds(all);
+  const totalDurationNs = bounds ? bounds.endNs - bounds.startNs : 0;
 
   const modelCount: Record<string, number> = {};
   for (const t of allTurnSpans) {

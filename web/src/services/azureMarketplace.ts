@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 export interface LinkSubscriptionRequest {
   token: string;
@@ -42,9 +43,14 @@ const azureMarketplace = {
     org_identifier: string,
     token: string,
   ): Promise<{ data: LinkSubscriptionResponse }> => {
-    return http().post(`/api/${org_identifier}/azure-marketplace/link-subscription`, {
-      token,
-    });
+    return http()
+      .post(`/api/${org_identifier}/azure-marketplace/link-subscription`, {
+        token,
+      })
+      .then((res) => {
+        analytics.track("marketplace_subscription_linked", { marketplace: "azure" });
+        return res;
+      });
   },
 };
 

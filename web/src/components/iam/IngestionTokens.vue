@@ -70,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100, 250, 500]"
           sorting="client"
           show-index
-          :footer-title="t('iam.ingestionTokens')"
         >
           <template #toolbar>
             <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
@@ -112,11 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                (OCodeCell copies exactly what it shows), so no manual email +
                base64 step is needed. -->
           <template #cell-token="{ row }">
-            <OCodeCell :value="toBasicAuth(row.name, row.token)" />
+            <OCodeCell :value="toBasicAuth(row.name, row.token)" :tooltip="false" />
           </template>
 
           <template #cell-splunk_token="{ row }">
-            <OCodeCell :value="row.splunk_token" :empty-label="t('ingestion.splunkTokenNone')" />
+            <OCodeCell
+              :value="row.splunk_token"
+              :empty-label="t('ingestion.splunkTokenNone')"
+              :tooltip="false"
+            />
           </template>
 
           <template #cell-status="{ row }">
@@ -410,7 +413,7 @@ export default defineComponent({
         hideable: true,
         // Wide enough for the truncated credential + gap + copy btn.
         size: 340,
-        meta: { align: "left" },
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "splunk_token",
@@ -420,7 +423,7 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 300,
-        meta: { align: "left" },
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "status",

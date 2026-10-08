@@ -19,6 +19,9 @@ import ExportDashboard from "./ExportDashboard.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock getDashboard utility
 vi.mock("@/utils/commons", () => ({
@@ -258,5 +261,38 @@ describe("ExportDashboard", () => {
     const exportButton = wrapper.find('[data-test="export-dashboard"]');
     // OButton renders with Tailwind classes instead of a dashboard-icons class
     expect(exportButton.exists()).toBe(true);
+  });
+
+  it("tracks dashboard_exported once the JSON download is triggered", async () => {
+    const mockAnchor = { setAttribute: vi.fn(), click: vi.fn() };
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) =>
+        tagName === "a" ? (mockAnchor as any) : originalCreateElement(tagName),
+      );
+    const wrapper = mount(ExportDashboard, {
+      props: { dashboardId: "dash123" },
+      global: { plugins: [i18n, store, router] },
+    });
+
+    await wrapper.vm.downloadDashboard();
+
+    expect(analytics.track).toHaveBeenCalledTimes(1);
+    expect(analytics.track).toHaveBeenCalledWith("dashboard_exported", { format: "json" });
+    createElementSpy.mockRestore();
+  });
+
+  it("does not track dashboard_exported when loading the dashboard fails", async () => {
+    const { getDashboard } = await import("@/utils/commons");
+    vi.mocked(getDashboard).mockRejectedValueOnce(new Error("boom"));
+    const wrapper = mount(ExportDashboard, {
+      props: { dashboardId: "dash123" },
+      global: { plugins: [i18n, store, router] },
+    });
+
+    await expect(wrapper.vm.downloadDashboard()).rejects.toThrow("boom");
+
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

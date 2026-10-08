@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             :default-columns="false"
-            :footer-title="t('workflow.header')"
             table-id="workflows-workflow-list"
             width="100%"
             class="h-full w-full"
@@ -167,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-name="{ row }">
               <div class="flex min-w-0 items-center gap-2">
-                <span class="truncate">{{ row.name }}</span>
+                <OTruncatedText>{{ row.name }}</OTruncatedText>
                 <OTag
                   v-if="row.is_draft"
                   :value="t('workflow.draft')"
@@ -292,18 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @action="(id) => (id === 'clear-filters' ? clearFilters() : openCreateEditor())"
               />
             </template>
-
-            <template #bottom>
-              <!-- h-12 / w-50 are exact rem equivalents of the pixel sizes this
-                   footer used to hardcode, so it renders unchanged. The old margin class was
-                   dropped — a legacy CSS-framework class this repo does not
-                   generate, so it never applied. -->
-              <div class="flex h-12 w-full items-center justify-between">
-                <div class="o2-table-footer-title flex w-50 items-center max-md:hidden">
-                  {{ resultTotal }} {{ t("workflow.header") }}
-                </div>
-              </div>
-            </template>
           </OTable>
         </div>
       </div>
@@ -358,6 +345,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -443,6 +431,8 @@ watch(activeFolderId, (folderId) => {
     searchAcrossFolders.value = false;
     filterQuery.value = "";
   }
+  // A folder switch starts a new list, so the page kept for the previous folder must not be restored onto it.
+  currentPage.value = 1;
   getWorkflows(folderId);
 });
 
@@ -485,7 +475,7 @@ const onPageChange = (page: number) => {
 // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
 const restorePageIndex = () => {
   setTimeout(() => {
-    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+    oTableRef.value?.restorePage?.(currentPage.value);
   }, 0);
 };
 
@@ -499,8 +489,6 @@ const filteredWorkflows = computed(() => {
     return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
   });
 });
-
-const resultTotal = computed(() => filteredWorkflows.value.length);
 
 // The list API has no `trigger` field — it returns each workflow's full `nodes`
 // array, so we derive the Trigger label from the trigger node in the graph.

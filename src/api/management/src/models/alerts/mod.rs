@@ -229,6 +229,21 @@ pub struct Alert {
     #[serde(default)]
     #[schema(example = 10)]
     pub pending_period_sec: i64,
+
+    /// Send one notification when this alert recovers.
+    #[serde(default)]
+    pub notify_on_recovery: bool,
+
+    /// Where the recovery message goes. Empty = the firing's own destinations. Ticket closes are
+    /// unaffected: a resolve must reach whatever the firing opened.
+    #[serde(default)]
+    pub recovery_destinations: Vec<String>,
+
+    /// Seconds the condition must stay clear before the alert recovers.
+    /// 0 recovers on the first clear evaluation.
+    #[serde(default)]
+    #[schema(example = 0)]
+    pub keep_firing_for: i64,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -598,6 +613,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             query_condition: alert.query_condition.into(),
             trigger_condition: alert.trigger_condition.into(),
             destinations: alert.destinations,
+            recovery_destinations: alert.recovery_destinations,
             template: alert.template,
             context_attributes: alert.context_attributes,
             row_template: alert.row_template,
@@ -619,6 +635,8 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             runbook_url: alert.runbook_url,
             scheduler_job_present: None,
             pending_period_sec: alert.pending_period_sec,
+            notify_on_recovery: alert.notify_on_recovery,
+            keep_firing_for: alert.keep_firing_for,
         }
     }
 }
@@ -824,6 +842,9 @@ impl From<Alert> for meta_alerts::alert::Alert {
         // sending "", and a stored "" would render as a link to nowhere.
         alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
         alert.pending_period_sec = value.pending_period_sec;
+        alert.notify_on_recovery = value.notify_on_recovery;
+        alert.recovery_destinations = value.recovery_destinations;
+        alert.keep_firing_for = value.keep_firing_for.max(0);
 
         alert
     }
@@ -838,7 +859,8 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             threshold: value.threshold_count,
             warning_threshold: value.warning_threshold_count,
             notify_on_warning: value.notify_on_warning,
-            frequency: value.frequency_minutes * 60,
+            // `From` cannot fail; `prepare_alert` rejects the saturated value
+            frequency: value.frequency_minutes.saturating_mul(60),
             cron: value.cron,
             frequency_type: value.frequency_type.unwrap_or_default().into(),
             silence: value.silence_minutes,
@@ -1752,5 +1774,17 @@ mod tests {
         assert!(!meta.creates_incident);
         assert!(meta.id.is_none());
         assert!(meta.owner.is_none());
+    }
+
+    #[test]
+    fn an_out_of_range_frequency_saturates_instead_of_overflowing() {
+        let trigger = TriggerCondition {
+            frequency_minutes: i64::MAX,
+            ..Default::default()
+        };
+        assert_eq!(
+            meta_alerts::TriggerCondition::from(trigger).frequency,
+            i64::MAX
+        );
     }
 }

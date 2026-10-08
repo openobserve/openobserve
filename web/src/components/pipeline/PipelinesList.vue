@@ -334,51 +334,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #bottom="bottomProps">
-            <div class="flex w-full items-center justify-between py-1">
-              <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
-                {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
-              </div>
-              <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
-                <OButton
-                  data-test="pipeline-list-export-pipelines-btn"
-                  variant="outline"
-                  size="sm"
-                  @click="exportBulkPipelines"
-                  icon-left="download"
-                >
-                  {{ t("pipeline_list.export") }}
-                </OButton>
-                <OButton
-                  data-test="pipeline-list-pause-pipelines-btn"
-                  variant="outline"
-                  size="sm"
-                  @click="bulkTogglePipelines('pause')"
-                  icon-left="pause"
-                >
-                  {{ t("pipeline_list.pause") }}
-                </OButton>
-                <OButton
-                  data-test="pipeline-list-resume-pipelines-btn"
-                  variant="outline"
-                  size="sm"
-                  @click="bulkTogglePipelines('resume')"
-                  icon-left="play-arrow"
-                >
-                  {{ t("pipeline_list.resume") }}
-                </OButton>
-                <OButton
-                  data-test="pipeline-list-delete-pipelines-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                  icon-left="delete"
-                >
-                  {{ t("common.delete") }}
-                </OButton>
-              </div>
-            </div>
+          <template #selection-actions>
+            <OButton
+              data-test="pipeline-list-export-pipelines-btn"
+              variant="outline"
+              size="sm"
+              @click="exportBulkPipelines"
+              icon-left="download"
+            >
+              {{ t("pipeline_list.export") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-pause-pipelines-btn"
+              variant="outline"
+              size="sm"
+              @click="bulkTogglePipelines('pause')"
+              icon-left="pause"
+            >
+              {{ t("pipeline_list.pause") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-resume-pipelines-btn"
+              variant="outline"
+              size="sm"
+              @click="bulkTogglePipelines('resume')"
+              icon-left="play-arrow"
+            >
+              {{ t("pipeline_list.resume") }}
+            </OButton>
+            <OButton
+              data-test="pipeline-list-delete-pipelines-btn"
+              variant="outline-destructive"
+              size="sm"
+              :loading="bulkDeleteLoading"
+              @click="openBulkDeleteDialog"
+              icon-left="delete"
+            >
+              {{ t("common.delete") }}
+            </OButton>
           </template>
         </OTable>
       </div>
@@ -661,7 +654,7 @@ const onPageChange = (page: number) => {
 // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
 const restorePageIndex = () => {
   setTimeout(() => {
-    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+    oTableRef.value?.restorePage?.(currentPage.value);
   }, 0);
 };
 

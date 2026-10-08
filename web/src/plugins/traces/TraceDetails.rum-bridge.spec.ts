@@ -21,6 +21,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 import tracesMockData from "@/test/unit/mockData/traces";
+import analytics from "@/services/product_analytics";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -32,6 +33,8 @@ vi.mock("@/composables/useNotifications", () => ({
     showErrorNotification: vi.fn(),
   }),
 }));
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mocked because the test store's streams module is a stub that never caches a fetched list.
 vi.mock("@/composables/useStreams", () => ({
@@ -114,7 +117,14 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
   let wrapper: any;
   let rumRequests: any[];
 
-  function mountWithDetails(details: any) {
+  function answerRumSearch(sql: string, rumRows: any[]) {
+    if (sql.includes("type = 'view'")) return rumRows.filter((r) => r.type === "view");
+    if (sql.includes("type='action'")) return rumRows.filter((r) => r.type === "action");
+    if (sql.includes("type = 'error'")) return rumRows.filter((r) => r.type !== "view");
+    return rumRows.filter((r) => r._oo_trace_id);
+  }
+
+  function mountWithDetails(details: any, rumRows: any[] = []) {
     rumRequests = [];
     globalThis.server.use(
       http.get(
@@ -131,7 +141,8 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
           const body: any = await request.json();
           if (body.query?.sql?.includes("_rumdata")) {
             rumRequests.push(body.query);
-            return HttpResponse.json({ took: 0, hits: [], total: 0, from: 0, size: 0 });
+            const hits = answerRumSearch(body.query.sql, rumRows);
+            return HttpResponse.json({ took: 0, hits, total: hits.length, from: 0, size: 0 });
           }
           return HttpResponse.json(details);
         },
@@ -139,6 +150,41 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     );
 
     return mountTraceDetails({ traceId: "test-trace-id" });
+  }
+
+  const RUM_SESSION_ID = "bf9f9e4f-34e8-4c4f-b43f-f27c17769d93";
+  const AI_CONVERSATION_ID = "01a0bb13-c247-707a-9b90-26610d52030b";
+  const REPLAY_BUTTON = '[data-test="trace-details-view-session-replay-btn"]';
+
+  function makeRumRows(sessionFlags: Record<string, unknown>) {
+    const base = {
+      session_id: RUM_SESSION_ID,
+      view_id: "view-1",
+      date: 1_755_853_746_000,
+      ...sessionFlags,
+    };
+    return [
+      {
+        ...base,
+        type: "resource",
+        _oo_trace_id: "test-trace-id",
+        _oo_span_id: "d4b07e603e2fa32f",
+        resource_url: "https://app.example/api/ai/chat_stream",
+        resource_method: "POST",
+        resource_type: "fetch",
+        resource_duration: 1_000_000,
+      },
+      { ...base, type: "view", view_url: "/web/ai", view_time_spent: 5_000_000 },
+    ];
+  }
+
+  async function mountBridge(rumRows: any[], details = makeDetailsResponse("d4b07e603e2fa32f")) {
+    wrapper = mountWithDetails(details, rumRows);
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBeGreaterThan(3), {
+      timeout: 5000,
+    });
+    await flushPromises();
   }
 
   function mountTraceDetails(props: Record<string, unknown>) {
@@ -154,6 +200,7 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
   }
 
   beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
     localStorage.removeItem("o2_trace_active_tab");
     localStorage.removeItem("o2_trace_tab_order");
 
@@ -240,5 +287,85 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
     expect(selected.trace_start_time).toBe(TRACE_START_US);
     expect(selected.trace_end_time).toBe(TRACE_END_US + 1);
+  });
+
+  it("hides Play Session Replay when the browser session has no recording", async () => {
+    await mountBridge(makeRumRows({}));
+
+    expect(wrapper.vm.spanList.some((s: any) => s.rum_session_id === RUM_SESSION_ID)).toBe(true);
+    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(false);
+  });
+
+  it("shows Play Session Replay when the browser session has a recording", async () => {
+    await mountBridge(makeRumRows({ session_has_replay: true }));
+
+    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(true);
+  });
+
+  it("opens the RUM session, not the AI conversation, from Play Session Replay", async () => {
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+    const details = makeDetailsResponse("d4b07e603e2fa32f");
+    details.hits[0].session_id = AI_CONVERSATION_ID;
+    details.hits[0].gen_ai_conversation_id = AI_CONVERSATION_ID;
+    await mountBridge(makeRumRows({ session_has_replay: true }), details);
+
+    await wrapper.find(REPLAY_BUTTON).trigger("click");
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push.mock.calls[0][0]).toMatchObject({
+      name: "SessionViewer",
+      params: { id: RUM_SESSION_ID },
+    });
+    expect(push.mock.calls[0][0].params.id).not.toBe(AI_CONVERSATION_ID);
+  });
+
+  it("tracks trace_details_loaded once the trace details request succeeds", async () => {
+    wrapper = mountWithDetails(makeDetailsResponse(""));
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBe(3), { timeout: 5000 });
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("trace_details_loaded", { mode: "standalone" });
+  });
+
+  it("does not track trace_details_loaded when the trace details request fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/settings/v2/key_fields`,
+        () => HttpResponse.json({ setting_value: {} }),
+      ),
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json({ message: "boom" }, { status: 500 }),
+      ),
+    );
+    wrapper = mountTraceDetails({ traceId: "test-trace-id" });
+    await flushPromises();
+    await vi.waitFor(
+      () => expect(wrapper.vm.searchObj.data.traceDetails.isLoadingTraceDetails).toBe(false),
+      { timeout: 5000 },
+    );
+    await flushPromises();
+
+    expect(wrapper.vm.spanList.length).toBe(0);
+    expect(analytics.track).not.toHaveBeenCalledWith("trace_details_loaded", expect.anything());
+  });
+
+  // Regression: a page-long RUM view root must not set the waterfall's axis.
+  it("fits the waterfall axis to the trace, not to a long-lived RUM view", async () => {
+    const rows = makeRumRows({});
+    const view = rows.find((row) => row.type === "view")!;
+    view.date = 1_755_853_746_000 - 10 * 60_000; // opened ten minutes earlier
+    view.view_time_spent = 25 * 60 * 1e9; // and left open for 25 minutes
+    await mountBridge(rows);
+
+    await vi.waitFor(() => expect(wrapper.vm.baseTracePosition.durationUs).toBeGreaterThan(0), {
+      timeout: 5000,
+    });
+    expect(wrapper.vm.baseTracePosition.startTimeUs).toBe(TRACE_START_US);
+    expect(wrapper.vm.baseTracePosition.durationUs).toBe(TRACE_END_US - TRACE_START_US);
+    // The flame graph keeps the full extent.
+    expect(wrapper.vm.traceTree[0].lowestStartTime).toBe(TRACE_START_US - 10 * ONE_MINUTE_US);
   });
 });

@@ -20,12 +20,23 @@ import { gt } from "@/types/i18n";
 
 const mockFetchAiChat = vi.fn();
 const mockGetStructuredContext = vi.fn();
+const mockPromptForConsent = vi.fn();
 
 vi.mock("@/composables/useAiChat", () => ({
   default: vi.fn(() => ({
     fetchAiChat: mockFetchAiChat,
     getStructuredContext: mockGetStructuredContext,
   })),
+}));
+
+vi.mock("@/composables/usePaidOverageConsent", () => ({
+  isPaidOverageConsentError: (status: number, body: unknown) =>
+    status === 412 &&
+    typeof body === "object" &&
+    body !== null &&
+    "error_type" in body &&
+    body.error_type === "paid_overage_consent_required",
+  usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
 }));
 
 // useSuggestions is used inside useNLQuery to extract function names
@@ -48,6 +59,9 @@ vi.mock("@/utils/query/promQLUtils", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
+import analytics from "@/services/product_analytics";
 import { useNLQuery } from "./useNLQuery";
 
 // ---------------------------------------------------------------------------
@@ -90,6 +104,7 @@ describe("useNLQuery", () => {
       sqlMode: false,
       streamType: "logs",
     });
+    mockPromptForConsent.mockResolvedValue(true);
   });
 
   // -------------------------------------------------------------------------
@@ -352,6 +367,66 @@ describe("useNLQuery", () => {
       expect(result).toBeNull();
     });
 
+    it("retries exactly once with the same request after consent", async () => {
+      const denialBody = {
+        error_type: "paid_overage_consent_required",
+        consent: {
+          feature: "ai_credits",
+          organization: { org_id: "default", enabled: false, can_manage: true },
+          payer: null,
+          effective: false,
+          billing_status: "eligible",
+        },
+      };
+      const denial = {
+        ok: false,
+        status: 412,
+        json: vi.fn().mockResolvedValue(denialBody),
+      } as unknown as Response;
+      const success = makeStreamResponse([
+        `data: ${JSON.stringify({ content: "SELECT count(*) FROM errors" })}\n\n`,
+      ]);
+      mockFetchAiChat.mockResolvedValueOnce(denial).mockResolvedValueOnce(success);
+      const nlq = useNLQuery(gt);
+
+      const result = await nlq.generateSQL("count errors", "default", undefined, "session-1");
+
+      expect(result).toBe("SELECT count(*) FROM errors");
+      expect(mockPromptForConsent).toHaveBeenCalledWith(
+        "default",
+        "ai_credits",
+        denialBody.consent,
+        undefined,
+      );
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+      expect(mockFetchAiChat.mock.calls[1]).toEqual(mockFetchAiChat.mock.calls[0]);
+    });
+
+    it("does not retry after consent is declined", async () => {
+      mockPromptForConsent.mockResolvedValue(false);
+      mockFetchAiChat.mockResolvedValue({
+        ok: false,
+        status: 412,
+        json: vi.fn().mockResolvedValue({
+          error_type: "paid_overage_consent_required",
+          consent: {
+            feature: "ai_credits",
+            organization: { org_id: "default", enabled: false, can_manage: true },
+            payer: null,
+            effective: false,
+            billing_status: "eligible",
+          },
+        }),
+      } as unknown as Response);
+      const nlq = useNLQuery(gt);
+
+      const result = await nlq.generateSQL("query", "default");
+
+      expect(result).toBeNull();
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
+      expect(nlq.streamingResponse.value).toBe(gt("paidUsage.declinedNotice"));
+    });
+
     it("returns null when fetchAiChat returns cancelled flag", async () => {
       mockFetchAiChat.mockResolvedValue({ cancelled: true });
 
@@ -451,6 +526,48 @@ describe("useNLQuery", () => {
 
       const result = await useNLQuery(gt).generateSQL("show errors", "default");
       expect(result).toBeNull();
+    });
+  });
+
+  describe("generateSQL – product analytics", () => {
+    it("tracks ai_query_generated once a query is extracted", async () => {
+      const sseChunk = `data: ${JSON.stringify({ content: "```sql\nSELECT * FROM logs\n```" })}\n\n`;
+      mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
+
+      await useNLQuery(gt).generateSQL("show logs", "default");
+
+      expect(analytics.track).toHaveBeenCalledWith("ai_query_generated");
+    });
+
+    it("does not track when the response holds no query", async () => {
+      const sseChunk = `data: ${JSON.stringify({ content: "What is your organization?" })}\n\n`;
+      mockFetchAiChat.mockResolvedValue(makeStreamResponse([sseChunk]));
+
+      await useNLQuery(gt).generateSQL("query", "default");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track when the request fails", async () => {
+      mockFetchAiChat.mockResolvedValue({ ok: false, status: 500 } as unknown as Response);
+
+      await useNLQuery(gt).generateSQL("query", "default");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track a non-query action such as a created dashboard", async () => {
+      const chunks = [
+        `data: ${JSON.stringify({ type: "tool_call", tool: "createDashboard", message: "Creating" })}\n\n`,
+        `data: ${JSON.stringify({ type: "tool_result", tool: "createDashboard", success: true, message: "ok" })}\n\n`,
+        `data: ${JSON.stringify({ type: "message", content: "Dashboard has been created" })}\n\n`,
+      ];
+      mockFetchAiChat.mockResolvedValue(makeStreamResponse(chunks));
+
+      const result = await useNLQuery(gt).generateSQL("create dashboard", "default");
+
+      expect(result).toContain("DASHBOARD_CREATED");
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

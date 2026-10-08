@@ -97,7 +97,10 @@
                  rest with everybody above. Offering an empty picker instead
                  read as a required field nobody knew how to fill. -->
             <template v-if="row.optional && !overridden[row.key]">
-              <OText variant="meta" class="min-w-0 flex-1">
+              <OText
+                variant="meta"
+                class="min-w-0 flex-1 max-md:order-last max-md:basis-full max-md:ps-4"
+              >
                 {{ t("oncall.presetCatchAllDefault") }}
               </OText>
               <OButton
@@ -339,7 +342,9 @@ import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import oncallService from "@/services/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { applySchedulePresetMutation, schedulePresetsQuery } from "@/services/oncall.queries";
+import { useMutation } from "@tanstack/vue-query";
 import type { OnCallTeamMember, PresetDescriptor, PresetInput } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -378,6 +383,8 @@ const store = useStore();
 const MINUTES_PER_DAY = 1440;
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
+const applyPresetWrite = useMutation(() => applySchedulePresetMutation(orgId.value, props.teamId));
+
 const presets = ref<PresetDescriptor[]>([]);
 const loading = ref(false);
 const chosen = ref<PresetDescriptor | null>(null);
@@ -404,7 +411,8 @@ const memberOptions = computed<SelectOption[]>(() =>
 watch(
   open,
   (isOpen) => {
-    if (isOpen && !presets.value.length) fetchPresets();
+    // Entered on every open: the catalogue's cache entry, not a guard, keeps a reopen off the wire.
+    if (isOpen) fetchPresets();
     if (!isOpen) {
       applyError.value = "";
       attempted.value = false;
@@ -417,8 +425,7 @@ watch(
 async function fetchPresets() {
   loading.value = true;
   try {
-    const res = await oncallService.listSchedulePresets({ org_identifier: orgId.value });
-    presets.value = res.data ?? [];
+    presets.value = await queryClient.fetchQuery(schedulePresetsQuery(orgId.value));
     // Landing on a chosen shape: the screen's job is comparison, and an empty
     // right pane makes the first click cost a shape nobody had rejected yet.
     if (!chosen.value && presets.value[0]) choose(presets.value[0]);
@@ -887,11 +894,7 @@ async function apply() {
       if (isUntouchedOptionalGroup(key, value)) continue;
       body[key] = value;
     }
-    await oncallService.applySchedulePreset({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      data: body,
-    });
+    await applyPresetWrite.mutateAsync(body);
     toast({ variant: "success", message: t("oncall.presetsApplied") });
     open.value = false;
     emit("applied");

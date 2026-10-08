@@ -106,6 +106,8 @@ vi.mock("@/constants/config", () => ({
 const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
+// Captures the leave guard ViewDashboard registers so tests can invoke it.
+const routeLeaveGuards: Array<() => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
@@ -131,6 +133,9 @@ vi.mock("vue-router", () => ({
       },
     },
   }),
+  onBeforeRouteLeave: (guard: () => unknown) => {
+    routeLeaveGuards.push(guard);
+  },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
     query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
@@ -242,6 +247,10 @@ vi.mock("moment-timezone", () => ({
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+import ShareButton from "@/components/common/ShareButton.vue";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("ViewDashboard", () => {
   let wrapper: any;
@@ -645,6 +654,31 @@ describe("ViewDashboard", () => {
       // Manually trigger the method to test print mode functionality
       await wrapper.vm.printDashboard();
       expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", true);
+    });
+
+    it("should clear print mode when leaving the page without the close button", async () => {
+      routeLeaveGuards.length = 0;
+      wrapper = createWrapper();
+      await flushPromises();
+      Object.assign(global.mockStoreState, { printMode: true });
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.forEach((guard) => guard());
+
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", false);
+      Object.assign(global.mockStoreState, { printMode: false });
+    });
+
+    it("should not touch print mode on leave when it is already off", async () => {
+      routeLeaveGuards.length = 0;
+      wrapper = createWrapper();
+      await flushPromises();
+      Object.assign(global.mockStoreState, { printMode: false });
+      global.mockStoreDispatch.mockClear();
+
+      routeLeaveGuards.forEach((guard) => guard());
+
+      expect(global.mockStoreDispatch).not.toHaveBeenCalledWith("setPrintMode", expect.anything());
     });
 
     it("should show correct print button icon based on print mode", async () => {
@@ -1428,6 +1462,55 @@ describe("ViewDashboard", () => {
       // Test config and loading state properties exist
       expect(wrapper.vm.config).toBeDefined();
       expect(wrapper.vm.arePanelsLoading).toBeDefined();
+    });
+  });
+
+  describe("product analytics", () => {
+    const mountWithOverflowActions = () =>
+      createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+        },
+      });
+
+    it("tracks dashboard_shared once the share link is copied", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("copy:success", { url: "x", type: "short" });
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_shared");
+    });
+
+    it("does not track dashboard_shared when only the short URL was created", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("shorten:success", { shortUrl: "x" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track dashboard_shared when the copy fails", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper
+        .findComponent(ShareButton)
+        .vm.$emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track dashboard_shared when shortening fails", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("shorten:error", { error: "x" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

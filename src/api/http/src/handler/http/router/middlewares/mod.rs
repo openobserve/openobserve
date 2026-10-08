@@ -14,5 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod org_blocking;
+mod password_policy;
+mod root_only;
 
 pub use org_blocking::blocked_orgs_middleware;
+pub use password_policy::password_policy_middleware;
+pub use root_only::root_only_middleware;

@@ -109,6 +109,12 @@ function getValidTagName(tagName: string): string {
   return processedTagName;
 }
 
+// structuredClone is missing before Safari 15.4, and the emitted tree is plain JSON anyway.
+function cloneTree(node: any): any {
+  if (typeof structuredClone === "function") return structuredClone(node);
+  return JSON.parse(JSON.stringify(node));
+}
+
 // ---------------------------------------------------------------------------
 // Internal decoder state
 // ---------------------------------------------------------------------------
@@ -132,10 +138,13 @@ export interface RecordConverter {
    * Records that are already in the classic format are returned unchanged.
    */
   convert(record: any): any[];
+  /** A segment was skipped: drop Change records until the next Change-format full snapshot. */
+  markStale(): void;
 }
 
 export function createRecordConverter(): RecordConverter {
   let stringTable: string[] = [];
+  let stale = false;
   let nextNodeId = 0;
   let nodes = new Map<number, TrackedNode>();
   let styleSheets = new Map<number, StoredStyleSheet>();
@@ -223,6 +232,12 @@ export function createRecordConverter(): RecordConverter {
     }
   }
 
+  // Text and CDATA nodes carry no childNodes, so every read of them must tolerate its absence.
+  function childrenOf(tracked: TrackedNode | undefined): any[] | undefined {
+    const children = tracked?.node?.childNodes;
+    return Array.isArray(children) ? children : undefined;
+  }
+
   // Resolve where a node with the given id and insertion point sits in the tree.
   // Returns { parentId, index } where index is the position in parent's childNodes,
   // or null for the root node.
@@ -236,28 +251,27 @@ export function createRecordConverter(): RecordConverter {
     if (insertionPoint > 0) {
       // appendChild to (id - insertionPoint)
       const parentId = id - insertionPoint;
-      const parent = nodes.get(parentId);
-      const index = parent ? parent.node.childNodes.length : 0;
-      return { parentId, index };
+      const children = childrenOf(nodes.get(parentId));
+      return { parentId, index: children ? children.length : 0 };
     }
     if (insertionPoint === 0) {
       // insert right after previously-added node (id - 1)
       const prevSiblingId = id - 1;
       const prevSibling = nodes.get(prevSiblingId);
       const parentId = prevSibling ? prevSibling.parentId : -1;
-      const parent = nodes.get(parentId);
-      if (!parent) return { parentId, index: 0 };
-      const idx = parent.node.childNodes.findIndex((c: any) => c.id === prevSiblingId);
-      return { parentId, index: idx === -1 ? parent.node.childNodes.length : idx + 1 };
+      const children = childrenOf(nodes.get(parentId));
+      if (!children) return { parentId, index: 0 };
+      const idx = children.findIndex((c: any) => c.id === prevSiblingId);
+      return { parentId, index: idx === -1 ? children.length : idx + 1 };
     }
     // insertionPoint < 0 : insert before (id + insertionPoint)
     const nextSiblingId = id + insertionPoint;
     const nextSibling = nodes.get(nextSiblingId);
     const parentId = nextSibling ? nextSibling.parentId : -1;
-    const parent = nodes.get(parentId);
-    if (!parent) return { parentId, index: 0 };
-    const idx = parent.node.childNodes.findIndex((c: any) => c.id === nextSiblingId);
-    return { parentId, index: idx === -1 ? parent.node.childNodes.length : idx };
+    const children = childrenOf(nodes.get(parentId));
+    if (!children) return { parentId, index: 0 };
+    const idx = children.findIndex((c: any) => c.id === nextSiblingId);
+    return { parentId, index: idx === -1 ? children.length : idx };
   }
 
   function applyStyleSheetToNode(nodeId: number, sheetIds: number[]) {
@@ -325,9 +339,9 @@ export function createRecordConverter(): RecordConverter {
               documentNode = node;
               nodes.set(id, { node, parentId: -1 });
             } else {
-              const parent = nodes.get(placement.parentId);
-              if (parent) {
-                parent.node.childNodes.splice(placement.index, 0, node);
+              const children = childrenOf(nodes.get(placement.parentId));
+              if (children) {
+                children.splice(placement.index, 0, node);
               }
               nodes.set(id, { node, parentId: placement.parentId });
             }
@@ -394,8 +408,11 @@ export function createRecordConverter(): RecordConverter {
     const out: any = { ...record };
     delete out.format;
     out.type = RecordType.FullSnapshot;
+    // rrweb rebuilds from this event on every seek, so it must not see the live tree later changes keep editing.
     out.data = {
-      node: documentNode ?? { type: NodeType.Document, childNodes: [], id: 0 },
+      node: documentNode
+        ? cloneTree(documentNode)
+        : { type: NodeType.Document, childNodes: [], id: 0 },
       initialOffset,
     };
     return out;
@@ -430,16 +447,18 @@ export function createRecordConverter(): RecordConverter {
             let nextId: number | null = null;
             if (placement !== null) {
               parentId = placement.parentId;
-              const parent = nodes.get(parentId);
-              if (parent) {
-                const sibling = parent.node.childNodes[placement.index];
+              const children = childrenOf(nodes.get(parentId));
+              if (children) {
+                const sibling = children[placement.index];
                 nextId = sibling ? sibling.id : null;
-                parent.node.childNodes.splice(placement.index, 0, node);
+                children.splice(placement.index, 0, node);
               }
             }
             nodes.set(id, { node, parentId });
-            // Emit the node with empty children; descendants arrive as their own adds.
-            const emitted = { ...node, childNodes: [] };
+            // Descendants arrive as their own adds, and attributes are copied because later changes edit the tracked node.
+            const emitted = node.attributes
+              ? { ...node, attributes: { ...node.attributes }, childNodes: [] }
+              : { ...node, childNodes: [] };
             adds.push({ parentId, nextId, node: emitted });
           }
           break;
@@ -451,10 +470,10 @@ export function createRecordConverter(): RecordConverter {
             const parentId = tracked ? tracked.parentId : -1;
             removes.push({ id: nodeId, parentId });
             if (tracked) {
-              const parent = nodes.get(parentId);
-              if (parent) {
-                const idx = parent.node.childNodes.findIndex((c: any) => c.id === nodeId);
-                if (idx !== -1) parent.node.childNodes.splice(idx, 1);
+              const children = childrenOf(nodes.get(parentId));
+              if (children) {
+                const idx = children.findIndex((c: any) => c.id === nodeId);
+                if (idx !== -1) children.splice(idx, 1);
               }
               nodes.delete(nodeId);
             }
@@ -607,13 +626,18 @@ export function createRecordConverter(): RecordConverter {
         record.format === SnapshotFormatChange &&
         Array.isArray(record.data)
       ) {
+        stale = false;
         return [convertFullSnapshot(record)];
       }
       if (record && record.type === RecordType.Change) {
-        return convertChange(record);
+        // String table and node ids are out of step after a skipped segment, so the frame freezes instead of corrupting.
+        return stale ? [] : convertChange(record);
       }
       // Already classic (or a passthrough record like Meta/Focus/type-3/type-8).
       return [record];
+    },
+    markStale() {
+      stale = true;
     },
   };
 }
@@ -643,4 +667,13 @@ export function hasChangeFormatRecords(records: any[]): boolean {
       (r.type === RecordType.Change ||
         (r.type === RecordType.FullSnapshot && r.format === SnapshotFormatChange)),
   );
+}
+
+// A cold converter has no string table, so Change records before the first snapshot decode to empty strings; classic records are kept.
+export function dropChangesBeforeFirstSnapshot(records: any[]): any[] {
+  const snapshotIndex = records.findIndex(
+    (r) => r && r.type === RecordType.FullSnapshot && r.format === SnapshotFormatChange,
+  );
+  if (snapshotIndex <= 0) return records;
+  return records.filter((r, i) => i >= snapshotIndex || !r || r.type !== RecordType.Change);
 }
