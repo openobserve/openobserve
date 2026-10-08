@@ -1085,7 +1085,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </template>
             </button>
           </OTooltip>
-          <div
+          <OTruncatedText
             v-else
             as="div"
             :class="[

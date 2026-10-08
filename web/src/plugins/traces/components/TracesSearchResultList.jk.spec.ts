@@ -310,16 +310,6 @@ describe("TracesSearchResultList J/K (mounted with the real OTable)", () => {
       await vi.waitFor(() => expect(region()).toBe("Couldn't load page 2"));
     });
 
-    it("auto-refresh keeps the list on its page and says why", async () => {
-      state.searchObj.meta.refreshInterval = 10;
-      await mountList();
-      for (let i = 0; i < 6; i++) await step(1);
-      expect(crossings).toEqual([]);
-      await vi.waitFor(() =>
-        expect(region()).toBe("Auto-refresh is on; turn it off to change pages"),
-      );
-    });
-
     it("announces spans in spans mode", async () => {
       await mountList({ searchMode: "spans" });
       await step(1);

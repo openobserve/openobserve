@@ -556,9 +556,7 @@ const navigation = () => searchObj.meta.resultGrid.navigation;
 const totalPages = computed(() =>
   props.total && props.rowsPerPage ? Math.max(1, Math.ceil(props.total / props.rowsPerPage)) : 1,
 );
-// getMoreData drops a page request while auto-refresh is on, so a crossing would never resolve.
-const autoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
-const canChangePage = computed(() => props.showPagination && !autoRefreshOn());
+const canChangePage = computed(() => props.showPagination);
 const activeRowIndex = computed(() =>
   navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null,
 );
@@ -604,11 +602,7 @@ const clearSelection = () => {
   navigation().pendingPageSelection = null;
 };
 
-const edgeMessage = (edge: "first" | "last", direction: 1 | -1) => {
-  const morePages =
-    props.showPagination &&
-    (direction === 1 ? props.currentPage < totalPages.value : props.currentPage > 1);
-  if (morePages && autoRefreshOn()) return t("traces.rowNav.autoRefreshEdge");
+const edgeMessage = (edge: "first" | "last", _direction: 1 | -1) => {
   return edge === "last" ? t("traces.rowNav.lastResult") : t("traces.rowNav.firstResult");
 };
 
