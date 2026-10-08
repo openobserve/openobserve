@@ -48,7 +48,7 @@ function decodedSql(entry) {
 
 async function editorText(page) {
   const text = await page.locator(`${editor} .view-lines`).first().innerText();
-  return text.replace(/ /g, ' ').trim();
+  return text.replace(/\u00a0/g, ' ').trim();
 }
 
 async function open(page, streams, query, extra = '') {
@@ -97,6 +97,7 @@ test.describe('Logs bare-word search (item 1)', () => {
         _timestamp: at(i),
         level: i % 2 ? 'error' : 'info',
         service_name: i % 4 < 2 ? 'api' : 'web',
+        enabled: i % 2 === 0,
         body:
           i % 5 === 0
             ? `upstream request timeout after 30s #${i}`
@@ -104,7 +105,9 @@ test.describe('Logs bare-word search (item 1)', () => {
               ? `connection refused by peer #${i}`
               : i % 5 === 2
                 ? `request refused, timeout pending #${i}`
-                : `all good #${i}`,
+                : i % 5 === 3
+                  ? `all good debug -500 limit 50 #${i}`
+                  : `all good #${i}`,
       })),
     );
     await ingestRows(
@@ -152,6 +155,67 @@ test.describe('Logs bare-word search (item 1)', () => {
       'Full-text search in: body',
       { timeout: 15000 },
     );
+  });
+
+  test('edits clear mixed-filter decorations and restore pure text without a search (AC-BW.8)', {
+    tag: ['@freeText', '@logs'],
+  }, async ({ page }) => {
+    const searches = await open(page, FTS, 'timeout');
+    await run(page, searches);
+    await expect(page.locator(rows).first()).toBeVisible({ timeout: 30000 });
+    const term = page.locator(`${editor} .o2-free-text-term`);
+    await expect(term.first()).toBeVisible();
+    const before = searches.all().length;
+    await page.locator(editor).first().click();
+    await page.keyboard.press('End');
+    await page.keyboard.insertText(" AND level='x'");
+    await expect(term).toHaveCount(0, { timeout: 500 });
+    expect(await editorText(page)).toBe("timeout AND level='x'");
+    expect(searches.all()).toHaveLength(before);
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.insertText('timeout');
+    await expect(term.first()).toBeVisible({ timeout: 500 });
+    expect(await editorText(page)).toBe('timeout');
+    expect(searches.all()).toHaveLength(before);
+    await term.first().hover();
+    await expect(page.locator('.monaco-hover:not(.hidden)').first()).toContainText('all words, any order');
+    await expect(page.locator('.monaco-hover:not(.hidden)').first()).toContainText("Runs as match_all('timeout')");
+  });
+
+  test('minus words exclude while minus numbers remain text (AC-BW.9)', {
+    tag: ['@freeText', '@logs'],
+  }, async ({ page, request }) => {
+    for (const [raw, where, total] of [
+      ['-debug', "NOT match_all('debug')", 32],
+      ['-500', "match_all('-500')", 8],
+    ]) {
+      const searches = await open(page, FTS, raw);
+      const sql = await run(page, searches);
+      expect(sql).toBe(`select * from "${FTS}"  WHERE ${where}`);
+      expect(await editorText(page)).toBe(raw);
+      expect(await apiTotal(request, sql)).toBe(total);
+      const dataRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
+      await expect(dataRows.first()).toBeVisible({ timeout: 30000 });
+      if (raw === '-debug') await expect(dataRows.first()).not.toContainText('debug');
+      else await expect(dataRows.first()).toContainText('-500');
+    }
+  });
+
+  test('LIMIT words run as text and field-like LIMIT filters still show the guard (AC-BW.10)', {
+    tag: ['@freeText', '@logs'],
+  }, async ({ page, request }) => {
+    const searches = await open(page, FTS, 'limit 50');
+    const sql = await run(page, searches);
+    expect(sql).toBe(`select * from "${FTS}"  WHERE match_all('limit') AND match_all('50')`);
+    expect(await editorText(page)).toBe('limit 50');
+    expect(await apiTotal(request, sql)).toBe(8);
+    await expect(page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(8, { timeout: 30000 });
+
+    const guarded = await open(page, FTS, 'enabled limit 5');
+    await page.locator(runBtn).click();
+    await expect(page.getByText('LIMIT is not supported without SQL mode.').first()).toBeVisible();
+    expect(guarded.all()).toHaveLength(0);
+    expect(await editorText(page)).toBe('enabled limit 5');
   });
 
   test('a stream with no full-text field sends nothing and shows the panel (AC3.1, AC3.4, AC6.1)', {

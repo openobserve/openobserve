@@ -15,6 +15,7 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createMemoryHistory } from "vue-router";
@@ -420,6 +421,47 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         expect.objectContaining({ variant: "error", message: "queue full" }),
       );
     });
+  });
+
+  it("wires editor edits to display-only free-text previews without dispatching (AC-BW.8)", async () => {
+    const { searchObj, logs } = await setup({ liveMode: false });
+    vi.useFakeTimers();
+    try {
+      store.state.zoConfig.default_fts_keys = ["body"];
+      searchObj.data.query = "timeout";
+      searchObj.data.streamResults = {
+        list: [
+          {
+            name: "app_logs",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "level", type: "Utf8" },
+            ],
+            settings: {},
+          },
+        ],
+      };
+      await nextTick();
+      vi.advanceTimersByTime(150);
+      expect(searchObj.data.freeTextDecorations?.hover).toContain("match_all('timeout')");
+      let editorText = "timeout AND level='x'";
+      const setValue = vi.fn();
+      wrapper!.vm.queryEditorRef = { getValue: () => editorText, setValue };
+      wrapper!.vm.onEditorUserEdit();
+      expect(searchObj.data.freeTextDecorations).toBeNull();
+      editorText = "-debug";
+      wrapper!.vm.onEditorUserEdit();
+      vi.advanceTimersByTime(150);
+      expect(searchObj.data.freeTextDecorations?.hover).toContain("NOT match_all('debug')");
+      expect(searchObj.data.query).toBe("timeout");
+      expect(editorText).toBe("-debug");
+      expect(setValue).not.toHaveBeenCalled();
+      expect(logs).not.toHaveBeenCalled();
+    } finally {
+      wrapper?.unmount();
+      wrapper = undefined;
+      vi.useRealTimers();
+    }
   });
 
   describe("J4 trigger sites dispatch through requestRun", () => {

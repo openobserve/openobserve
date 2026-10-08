@@ -115,6 +115,15 @@ describe("freeTextFilter", () => {
   describe("J2 rows on an fts stream (AC2.1)", () => {
     it.each([
       ["timeout", "match_all('timeout')"],
+      ["TIMEOUT", "match_all('TIMEOUT')"],
+      ["'connection is closed'", "match_all('connection is closed')"],
+      ["*rro*", "match_all('*rro*')"],
+      ["-debug", "NOT match_all('debug')"],
+      ["error -debug", "match_all('error') AND NOT match_all('debug')"],
+      ["error OR -debug", "match_all('error') OR NOT match_all('debug')"],
+      ["NOT -debug", "NOT NOT match_all('debug')"],
+      ["limit 50", "match_all('limit') AND match_all('50')"],
+      ["-'quoted'", "match_all('-''quoted''')"],
       ['"connection refused"', "match_all('connection refused')"],
       ["'connection refused'", "match_all('connection refused')"],
       ["timeout error", "match_all('timeout') AND match_all('error')"],
@@ -170,6 +179,39 @@ describe("freeTextFilter", () => {
 
     it.each([
       ["level"],
+      ["LEVEL"],
+      ["s.level"],
+      ['"level"'],
+      ["level:error"],
+      ["-level"],
+      ["-LEVEL"],
+      ["-s.level"],
+      ["-level:error"],
+      ["-a"],
+      ["error -a"],
+      ["-" + "a".repeat(64)],
+      ["-flags[1]"],
+      ["-"],
+      ["I/O"],
+      ["%"],
+      ["_"],
+      ["**"],
+      ["a".repeat(64)],
+      ["timeout a"],
+      ["response time"],
+      ["null pointer"],
+      ["selected from cache"],
+      ["enabled limit 5"],
+      ["TRUE"],
+      ["re_match(f,'x')"],
+      ["f LIKE '%x%'"],
+      ["f IN ('a')"],
+      ["f > 5"],
+      ["error AND status=500"],
+      ["status=500 timeout"],
+      ["''"],
+      ['""'],
+      [""],
       ["s.is_error"],
       ["flags[1]"],
       ['"is_error"'],
@@ -180,7 +222,8 @@ describe("freeTextFilter", () => {
       ["connection is closed"],
       ["request in progress"],
     ])("%s is unchanged", (raw) => {
-      const plan = planFilter(raw, FIELDS);
+      const fields = new Set([...FIELDS, "enabled"]);
+      const plan = planFilter(raw, fields);
       expect(plan.kind).toBe("sql");
       expect(renderPlan(plan, FTS, KNOWN)).toBe(legacyWhere(raw, KNOWN));
     });
@@ -243,8 +286,8 @@ describe("freeTextFilter", () => {
       expect(renderPlan(plan, FTS, KNOWN)).toBe(legacyWhere(raw, KNOWN));
     });
 
-    it("reads -timeout as text, not negation", () => {
-      expect(renderFts("-timeout")).toBe("match_all('-timeout')");
+    it("reads -timeout as exclusion", () => {
+      expect(renderFts("-timeout")).toBe("NOT match_all('timeout')");
     });
 
     it("keeps % and _ in a term verbatim, and literal in scan mode", () => {

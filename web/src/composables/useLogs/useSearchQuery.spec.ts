@@ -1238,6 +1238,44 @@ describe("useSearchQuery › free text (item 1)", () => {
     expect(mockState.searchObj.data.query).toBe("timeout");
   });
 
+  it.each([
+    ["-debug", "NOT match_all('debug')"],
+    ["error -debug", "match_all('error') AND NOT match_all('debug')"],
+    ["-500", "match_all('-500')"],
+    ["limit 50", "match_all('limit') AND match_all('50')"],
+  ])("produces the exact request for %s without changing the query", (raw, where) => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = raw;
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getSql(getQueryReq(false))).toBe(`select * from "fts_a"  WHERE ${where}`);
+    expect(mockState.searchObj.data.query).toBe(raw);
+  });
+
+  it("renders LIMIT words for every free-text arm in multi-stream requests", () => {
+    select(ftsStream("fts_a"), ftsStream("fts_b"));
+    mockState.searchObj.data.query = "limit 50";
+    const { getQueryReq } = useSearchQuery(gt);
+    const sql = getSql(getQueryReq(false));
+    expect(sql.match(/WHERE match_all\('limit'\) AND match_all\('50'\)/g)).toHaveLength(2);
+    expect(mockState.searchObj.data.query).toBe("limit 50");
+  });
+
+  it.each([false, true])(
+    "keeps the LIMIT guard for field-like filters (multi-stream: %s)",
+    (multi) => {
+      const stream = ftsStream("fts_a");
+      stream.schema.push({ name: "enabled", type: "Boolean" });
+      select(...(multi ? [stream, { ...stream, name: "fts_b" }] : [stream]));
+      mockState.searchObj.data.query = "enabled limit 5";
+      const { getQueryReq } = useSearchQuery(gt);
+      expect(getQueryReq(false)).toBeNull();
+      expect(mockState.notificationMsg.value).toBe(
+        "LIMIT is not supported without SQL mode. Remove it from the filter.",
+      );
+      expect(mockState.searchObj.data.query).toBe("enabled limit 5");
+    },
+  );
+
   it("joins words with AND, keeps OR/NOT and groups (J2)", () => {
     select(ftsStream("fts_a"));
     mockState.searchObj.data.query = 'timeout AND (error OR "connection refused") NOT x1';

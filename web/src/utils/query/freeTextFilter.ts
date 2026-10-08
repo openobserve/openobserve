@@ -664,7 +664,7 @@ function isPureTextToken(
     case "rparen":
       return true;
     case "word":
-      return !isFieldLikeWord(tok.text, names);
+      return !isFieldLikeWord(/^-[A-Za-z]/.test(tok.text) ? tok.text.slice(1) : tok.text, names);
     case "dquote":
       return !names.has(tok.text) && !gluedToNextOperand(lexed, next);
     case "squote":
@@ -742,6 +742,9 @@ function parsePrimary(tokens: Lexed[], state: { pos: number }): PlanNode | null 
     if (child === null || tokens[state.pos]?.tok.t !== "rparen") return null;
     state.pos++;
     return { k: "group", child };
+  }
+  if (tok.t === "word" && /^-[A-Za-z]/.test(tok.text)) {
+    return { k: "not", child: { k: "text", value: tok.text.slice(1) } };
   }
   if (tok.t === "word" || tok.t === "squote" || tok.t === "dquote")
     return { k: "text", value: tok.text };
