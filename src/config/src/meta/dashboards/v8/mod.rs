@@ -706,6 +706,16 @@ pub struct QueryConfig {
     time_shift: Option<Vec<TimeShift>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     query_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    formula: Option<String>,
+    #[serde(rename = "ref", default, skip_serializing_if = "Option::is_none")]
+    query_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hide: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    query_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    promql_legend_fallback: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1388,6 +1398,11 @@ mod tests {
             max: None,
             time_shift: None,
             query_label: None,
+            formula: None,
+            query_ref: None,
+            hide: None,
+            query_type: None,
+            promql_legend_fallback: None,
         };
         let json = serde_json::to_string(&qc).unwrap();
         assert!(!json.contains("step_value"));

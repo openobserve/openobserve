@@ -1,5 +1,5 @@
-/** Semantic color state derived from the data value */
-export type ProgressBarVariant = "default" | "success" | "warning" | "danger";
+/** Semantic color state derived from the data value; `neutral` is a calm, non-semantic fill (a comparison baseline) */
+export type ProgressBarVariant = "default" | "success" | "warning" | "danger" | "neutral";
 
 /** Height of the progress track */
 export type ProgressBarSize = "xs" | "sm" | "md" | "lg";

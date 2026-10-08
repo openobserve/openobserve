@@ -34,11 +34,17 @@
 use infra::{errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, OncallMessage};
 
+/// Applies a decodable on-call message, drops the rest. [weak: dropped; the next save re-sends it]
 pub(crate) async fn process(msg: Message) -> Result<()> {
-    let msg = msg.try_into().map_err(|e| {
-        infra::errors::Error::Message(format!("[ONCALL] Failed to deserialize: {e}"))
-    })?;
-    process_msg(msg).await
+    let key = msg.key.clone();
+    match OncallMessage::try_from(msg) {
+        Ok(msg) => process_msg(msg).await,
+        // The consumer acks only on Ok, so an error here would block the queue on a newer variant.
+        Err(e) => {
+            log::warn!("[SUPER_CLUSTER:oncall] dropped undecodable message key={key}: {e}");
+            Ok(())
+        }
+    }
 }
 
 pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
@@ -177,4 +183,23 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use o2_enterprise::enterprise::super_cluster::queue::MessageType;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn an_oncall_variant_this_build_cannot_decode_is_acknowledged() {
+        let msg = Message::new(
+            "/oncall/org1/slack/chan-1".to_string(),
+            Some(br#"{"SlackChannelPut":{"token":"xoxb-secret"}}"#.to_vec().into()),
+            None,
+            true,
+            MessageType::OncallTable,
+        );
+        assert!(process(msg).await.is_ok());
+    }
 }

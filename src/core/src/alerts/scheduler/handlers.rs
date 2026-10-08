@@ -15,13 +15,13 @@
 
 use std::{collections::HashMap, str::FromStr, time::Instant};
 
-use chrono::{DateTime, Duration, FixedOffset, Utc};
+use chrono::{DateTime, Duration, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::{TriggerCondition, level::DeliveryDecision},
-        dashboards::reports::ReportFrequencyType,
+        alerts::{TriggerCondition, fixed_offset, level::DeliveryDecision},
+        dashboards::reports::{ReportFrequency, ReportFrequencyType},
         pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
@@ -1392,7 +1392,7 @@ async fn handle_anomaly_detection_triggers(
             {
                 Ok(run) => (
                     anomaly_run_status(&run),
-                    None,
+                    run.notify_error.clone(),
                     Some(serde_json::json!({ "anomalies_found": run.anomaly_count }).to_string()),
                     run.gate_passed,
                 ),
@@ -1581,26 +1581,17 @@ fn get_skipped_timestamps(
     let mut skipped_timestamps = Vec::new();
     let mut next_run_at;
     if !cron.is_empty() {
-        let cron = Schedule::from_str(cron).unwrap();
-        let suppposed_to_run_at_dt = DateTime::from_timestamp_micros(supposed_to_run_at).unwrap();
-        let suppposed_to_run_at_dt =
-            suppposed_to_run_at_dt.with_timezone(&FixedOffset::east_opt(tz_offset * 60).unwrap());
-        next_run_at = cron
-            .after(&suppposed_to_run_at_dt)
-            .next()
-            .unwrap()
-            .timestamp_micros();
-        while next_run_at <= supposed_to_run_at + delay {
-            skipped_timestamps.push(next_run_at);
-            let suppposed_to_run_at_dt = DateTime::from_timestamp_micros(next_run_at).unwrap();
-            let suppposed_to_run_at_dt = suppposed_to_run_at_dt
-                .with_timezone(&FixedOffset::east_opt(tz_offset * 60).unwrap());
-            next_run_at = cron
-                .after(&suppposed_to_run_at_dt)
-                .next()
-                .unwrap()
-                .timestamp_micros();
-        }
+        let Some((skipped, next)) =
+            skipped_cron_timestamps(supposed_to_run_at, cron, tz_offset, delay)
+        else {
+            log::warn!(
+                "[ALERT] cron '{cron}' with tz_offset {tz_offset} cannot be evaluated, skipping none"
+            );
+            let final_timestamp = if align_time { supposed_to_run_at } else { now };
+            return (skipped_timestamps, final_timestamp);
+        };
+        skipped_timestamps = skipped;
+        next_run_at = next;
     } else {
         next_run_at = if align_time {
             TriggerCondition::align_time(
@@ -1632,6 +1623,28 @@ fn get_skipped_timestamps(
         }
     };
     (skipped_timestamps, final_timestamp)
+}
+
+/// Cron runs within `delay` plus the next one, or `None` when the schedule cannot be evaluated.
+fn skipped_cron_timestamps(
+    supposed_to_run_at: i64,
+    cron: &str,
+    tz_offset: i32,
+    delay: i64,
+) -> Option<(Vec<i64>, i64)> {
+    let cron = Schedule::from_str(cron).ok()?;
+    let tz = fixed_offset(tz_offset)?;
+    let next_after = |ts: i64| {
+        let dt = DateTime::from_timestamp_micros(ts)?.with_timezone(&tz);
+        cron.after(&dt).next().map(|next| next.timestamp_micros())
+    };
+    let mut skipped = Vec::new();
+    let mut next_run_at = next_after(supposed_to_run_at)?;
+    while next_run_at <= supposed_to_run_at + delay {
+        skipped.push(next_run_at);
+        next_run_at = next_after(next_run_at)?;
+    }
+    Some((skipped, next_run_at))
 }
 
 /// Returns maximum considerable delay in microseconds - minimum of 1 hour or 20% of the frequency.
@@ -2983,7 +2996,8 @@ async fn handle_alert_triggers(
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                     );
-                    if let Some(batch) = crate::alerts::grouping::get_ready_batch(&fingerprint)
+                    if let Some(batch) =
+                        crate::alerts::grouping::get_ready_batch(&new_trigger.org, &fingerprint)
                         && let Err(e) = crate::alerts::grouping::send_grouped_notification(
                             &scheduler_trace_id,
                             batch,
@@ -3902,58 +3916,10 @@ async fn handle_report_triggers(
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
-    let mut run_once = false;
-
-    let mut frequency_seconds = 60;
-
-    // Update trigger, set `next_run_at` to the
-    // frequency interval of this report
-    match report.frequency.frequency_type {
-        ReportFrequencyType::Hours => {
-            frequency_seconds = report.frequency.interval * 3600;
-            new_trigger.next_run_at += Duration::try_hours(report.frequency.interval)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-        }
-        ReportFrequencyType::Days => {
-            frequency_seconds = report.frequency.interval * 86400;
-            new_trigger.next_run_at += Duration::try_days(report.frequency.interval)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-        }
-        ReportFrequencyType::Weeks => {
-            frequency_seconds = report.frequency.interval * 604800;
-            new_trigger.next_run_at += Duration::try_weeks(report.frequency.interval)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-        }
-        ReportFrequencyType::Months => {
-            // Assumes each month to be of 30 days.
-            frequency_seconds = report.frequency.interval * 2592000;
-            new_trigger.next_run_at += Duration::try_days(report.frequency.interval * 30)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
-        }
-        ReportFrequencyType::Once => {
-            // Check on next week
-            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-            run_once = true;
-        }
-        ReportFrequencyType::Cron => {
-            let schedule = Schedule::from_str(&report.frequency.cron)?;
-            // tz_offset is in minutes
-            let tz_offset = FixedOffset::east_opt(report.tz_offset * 60).unwrap();
-            new_trigger.next_run_at = schedule
-                .upcoming(tz_offset)
-                .next()
-                .unwrap()
-                .timestamp_micros();
-        }
-    }
+    let run_once = report.frequency.frequency_type == ReportFrequencyType::Once;
+    let (next_run_at, frequency_seconds) =
+        report_next_run(&report.frequency, report.tz_offset, new_trigger.next_run_at);
+    new_trigger.next_run_at = next_run_at;
 
     if report.frequency.align_time && report.frequency.frequency_type != ReportFrequencyType::Cron {
         new_trigger.next_run_at = TriggerCondition::align_time(
@@ -4091,6 +4057,35 @@ async fn handle_report_triggers(
     publish_triggers_usage(trigger_data_stream);
 
     Ok(())
+}
+
+/// Next run and frequency in seconds of a report schedule; a week out if it cannot be evaluated.
+fn report_next_run(frequency: &ReportFrequency, tz_offset: i32, now: i64) -> (i64, i64) {
+    let step = |unit_secs: i64| {
+        let secs = frequency.interval.checked_mul(unit_secs)?;
+        let next = now.checked_add(secs.checked_mul(1_000_000)?)?;
+        Some((next, secs))
+    };
+    let next = match frequency.frequency_type {
+        ReportFrequencyType::Hours => step(3600),
+        ReportFrequencyType::Days => step(86400),
+        ReportFrequencyType::Weeks => step(604800),
+        // Assumes each month to be of 30 days.
+        ReportFrequencyType::Months => step(2592000),
+        ReportFrequencyType::Once => None,
+        ReportFrequencyType::Cron => Schedule::from_str(&frequency.cron).ok().and_then(|cron| {
+            let next = cron.upcoming(fixed_offset(tz_offset)?).next()?;
+            Some((next.timestamp_micros(), 60))
+        }),
+    };
+    next.unwrap_or_else(|| {
+        if frequency.frequency_type != ReportFrequencyType::Once {
+            log::warn!(
+                "[REPORT] schedule {frequency:?} with tz_offset {tz_offset} cannot be evaluated, checking again in a week"
+            );
+        }
+        (now + second_micros(7 * 86400), 60)
+    })
 }
 
 async fn handle_derived_stream_triggers(
@@ -4317,9 +4312,8 @@ async fn handle_derived_stream_triggers(
             err_msg
         ));
     };
-    let start_time = new_trigger_data
-        .period_end_time
-        .map(|period_end_time| period_end_time + 1);
+    // Search excludes a window's end, so the next window starts exactly there.
+    let start_time = new_trigger_data.period_end_time;
 
     // in case the range [start_time, end_time] is greater than querying period, it needs to
     // evaluate and ingest 1 period at a time.
@@ -6795,6 +6789,102 @@ mod tests {
     }
 
     #[test]
+    fn get_skipped_timestamps_skips_nothing_for_a_schedule_it_cannot_evaluate() {
+        let supposed_to_run_at = 1640995200000000;
+        let now = 1640995800000000;
+        for (cron, tz_offset) in [
+            ("0 */5 * * * *", 1440),
+            ("0 */5 * * * *", i32::MAX),
+            ("0 0 0 1 1 * 2020", 0),
+            ("not a cron", 0),
+        ] {
+            let got = get_skipped_timestamps(
+                supposed_to_run_at,
+                cron,
+                tz_offset,
+                300,
+                600000000,
+                false,
+                now,
+                None,
+            );
+            assert_eq!(got, (vec![], now), "{cron} @ {tz_offset}");
+            let got = get_skipped_timestamps(
+                supposed_to_run_at,
+                cron,
+                tz_offset,
+                300,
+                600000000,
+                true,
+                now,
+                None,
+            );
+            assert_eq!(got, (vec![], supposed_to_run_at), "{cron} @ {tz_offset}");
+        }
+    }
+
+    #[test]
+    fn report_next_run_falls_back_a_week_for_a_schedule_it_cannot_evaluate() {
+        let now = 1640995200000000;
+        let week = Duration::try_days(7).unwrap().num_microseconds().unwrap();
+        let cron = |cron: &str| ReportFrequency {
+            cron: cron.to_string(),
+            frequency_type: ReportFrequencyType::Cron,
+            ..Default::default()
+        };
+        let every = |frequency_type, interval| ReportFrequency {
+            interval,
+            frequency_type,
+            ..Default::default()
+        };
+        for (frequency, tz_offset) in [
+            (cron("0 */5 * * * *"), 1440),
+            (cron("0 */5 * * * *"), i32::MAX),
+            (cron("0 0 0 1 1 * 2020"), 0),
+            (cron("not a cron"), 0),
+            (every(ReportFrequencyType::Hours, i64::MAX), 0),
+            (every(ReportFrequencyType::Days, i64::MAX), 0),
+            (every(ReportFrequencyType::Weeks, i64::MAX), 0),
+            (every(ReportFrequencyType::Months, i64::MAX), 0),
+        ] {
+            assert_eq!(
+                report_next_run(&frequency, tz_offset, now),
+                (now + week, 60),
+                "{frequency:?} @ {tz_offset}"
+            );
+        }
+    }
+
+    #[test]
+    fn report_next_run_follows_a_valid_schedule() {
+        let now = 1640995200000000;
+        let hour = Duration::try_hours(1).unwrap().num_microseconds().unwrap();
+        let hours = ReportFrequency {
+            interval: 2,
+            frequency_type: ReportFrequencyType::Hours,
+            ..Default::default()
+        };
+        assert_eq!(report_next_run(&hours, 0, now), (now + 2 * hour, 7200));
+        let months = ReportFrequency {
+            interval: 1,
+            frequency_type: ReportFrequencyType::Months,
+            ..Default::default()
+        };
+        assert_eq!(
+            report_next_run(&months, 0, now),
+            (now + 30 * 24 * hour, 2592000)
+        );
+        let cron = ReportFrequency {
+            cron: "0 0 * * * *".to_string(),
+            frequency_type: ReportFrequencyType::Cron,
+            ..Default::default()
+        };
+        let (next, frequency_seconds) = report_next_run(&cron, 1439, now);
+        assert!(next > now_micros() && next <= now_micros() + hour, "{next}");
+        assert_eq!(frequency_seconds, 60);
+    }
+
+    #[test]
     fn test_get_skipped_timestamps_with_frequency() {
         // Test with frequency-based scheduling (no cron)
         let supposed_to_run_at = 1640995200000000; // 2022-01-01 00:00:00 UTC
@@ -6933,34 +7023,6 @@ mod tests {
         // Should have many skipped timestamps (60 minutes worth)
         assert!(skipped_timestamps.len() >= 50);
         assert_eq!(final_timestamp, now);
-    }
-
-    #[test]
-    fn test_get_skipped_timestamps_invalid_cron() {
-        // Test with invalid cron expression - should panic
-        let supposed_to_run_at = 1640995200000000;
-        let cron = "invalid cron";
-        let tz_offset = 0;
-        let frequency = 300;
-        let delay = 600000000;
-        let align_time = false;
-        let now = 1640995800000000;
-
-        // This should panic due to invalid cron expression
-        let result = std::panic::catch_unwind(|| {
-            get_skipped_timestamps(
-                supposed_to_run_at,
-                cron,
-                tz_offset,
-                frequency,
-                delay,
-                align_time,
-                now,
-                None,
-            )
-        });
-
-        assert!(result.is_err());
     }
 
     #[test]
@@ -7466,6 +7528,7 @@ mod tests {
             anomaly_count: 0,
             gate_passed,
             notify_failed,
+            notify_error: None,
             claim_lost,
             ineligible,
         };

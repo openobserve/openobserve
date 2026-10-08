@@ -984,6 +984,9 @@ export default defineComponent({
             cfg.alert_budget_per_day = v.budget_period === "week" ? count / 7 : count;
           }
         } else {
+          // Switching to band mode must clear a previously stored budget, or the
+          // save payload keeps sending the stale value.
+          cfg.alert_budget_per_day = undefined;
           cfg.band_width =
             v.band_width === "" || v.band_width == null ? null : toModelNumber(v.band_width);
         }

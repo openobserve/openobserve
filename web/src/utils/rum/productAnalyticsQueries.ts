@@ -322,12 +322,18 @@ export function facetOptionsSql(scope: AnalyticsScope, field: "env" | "version")
 
 export function summarySql(scope: AnalyticsScope, currentStartUs: number): string {
   const cs = Math.trunc(currentStartUs);
-  const synthetic = has(scope, "session_type")
+  const hasSessionType = has(scope, "session_type");
+  const synthetic = hasSessionType
     ? `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`
     : "0 AS synthetic_sessions";
+  // The caption says synthetics are excluded, so the sessions KPI (and its prior-period base) must
+  // actually drop them here too, not just report their count via `synthetic_sessions`.
+  const notSynthetic = hasSessionType
+    ? " AND (session_type IS NULL OR session_type <> 'synthetics')"
+    : "";
   const cols = [
-    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} THEN session_id END) AS sessions`,
-    `COUNT(DISTINCT CASE WHEN _timestamp < ${cs} THEN session_id END) AS prev_sessions`,
+    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} THEN session_id END) AS sessions`,
+    `COUNT(DISTINCT CASE WHEN _timestamp < ${cs}${notSynthetic} THEN session_id END) AS prev_sessions`,
     `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND type = 'view' THEN view_id END) AS views`,
     `COUNT(CASE WHEN _timestamp >= ${cs} AND type IN ('view', 'action') THEN 1 END) AS va_rows`,
     synthetic,
@@ -1071,9 +1077,19 @@ const pathCtes = (
   if (def.cohort) return cohortPathCtes(scope, id, def, def.cohort, opts, attrs);
   const anchor = def.anchor;
   if (!anchor) throw new Error("Paths need an anchor or a funnel cohort");
-  const types = attrs
+  const include = attrs
     ? `(${pathsIncludeExpr(scope, def.include)} OR type = 'error')`
     : pathsIncludeExpr(scope, def.include);
+  // "all" already covers both kinds, and a "pages"/"clicks" filter already covers a same-kind
+  // anchor. Otherwise (e.g. a page anchor under "Clicks") the anchor's own event must be let
+  // through regardless, or it can never be found as "reached" downstream.
+  const anchorKindCovered =
+    def.include === "all" ||
+    (anchor.kind === "p" && def.include === "pages") ||
+    (anchor.kind === "c" && def.include === "clicks");
+  const types = anchorKindCovered
+    ? include
+    : `(${include} OR ${stepPredicateRaw(anchor, scope, opts.events)})`;
   const cols = [
     "session_id AS sid",
     "type AS ty",

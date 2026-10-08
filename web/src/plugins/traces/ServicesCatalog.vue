@@ -532,6 +532,7 @@ import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
+import config from "@/aws-exports";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 
@@ -661,8 +662,11 @@ interface RedInsight {
 const insights = ref<RedInsight[]>([]);
 let insightsRequest = 0;
 let catalogLoad = 0;
+// The RED insights job is enterprise-only, so OSS never fetches the _anomalies schema for it.
 const redInsightsEnabled = computed(
-  () => store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
+  () =>
+    config.isEnterprise == "true" &&
+    store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
 );
 
 // OTable owns pagination internally; `currentPage` is retained only as the
@@ -706,10 +710,20 @@ const selectedServiceNode = computed(() =>
 
 const emptyGraphData = { nodes: [], edges: [] };
 
-const timeRange = computed(() => ({
-  startTime: searchObj.data.datetime.startTime,
-  endTime: searchObj.data.datetime.endTime,
-}));
+// Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+const timeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+watch(
+  () => [
+    selectedServiceRow.value,
+    searchObj.data.datetime.type,
+    searchObj.data.datetime.relativeTimePeriod,
+    searchObj.data.datetime.startTime,
+    searchObj.data.datetime.endTime,
+  ],
+  () => {
+    if (selectedServiceRow.value) timeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+  },
+);
 
 let currentTraceId: string | null = null;
 
@@ -1068,7 +1082,6 @@ async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSche
   }
 }
 
-// Same request definition as red_insights.rs request_predicate; the service graph counts only internal roots.
 function requestPredicate(hasParentColumn: boolean): string {
   const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
   if (!hasParentColumn) return `(${kinds})`;

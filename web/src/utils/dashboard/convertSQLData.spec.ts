@@ -4129,6 +4129,51 @@ describe("convertSQLData", () => {
         expect(result.options.series).toBeDefined();
       });
 
+      it("tags each query's series with its panel query and role, for right-click alerts", async () => {
+        const searchData = [
+          [{ timestamp: "2023-01-01", value: 10 }],
+          [{ timestamp: "2023-01-02", value: 20 }],
+        ];
+        const resultMetaData = { value: [[mockResultMetaData[0]], [mockResultMetaData[0]]] };
+        const metadata = {
+          queries: [
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } },
+            { panelQueryIndex: 0, timeRangeGap: { seconds: 86_400_000, periodAsStr: "1d" } },
+          ],
+        };
+
+        const schema = {
+          ...mockPanelSchema,
+          queries: [
+            {
+              fields: {
+                x: [{ alias: "timestamp", label: "Timestamp" }],
+                y: [{ alias: "value", label: "Value" }],
+                z: [],
+                breakdown: [],
+              },
+            },
+          ],
+        };
+        const result = await convertMultiSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          resultMetaData,
+          metadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const tagged = result.options.series.filter((s: any) => s._panelQueryIndex !== undefined);
+        expect(tagged.map((s: any) => [s._panelQueryIndex, s._seriesRole])).toEqual([
+          [0, "primary"],
+          [0, "shifted"],
+        ]);
+      });
+
       it("should handle metadata queries without periodAsStr", async () => {
         const schema = mockPanelSchema;
         const searchData = [

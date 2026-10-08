@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -33,6 +33,20 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     useLocalTimezone: vi.fn().mockReturnValue("UTC"),
     b64EncodeUnicode: vi.fn().mockImplementation((str) => btoa(str)),
     b64DecodeUnicode: vi.fn().mockImplementation((str) => atob(str)),
+  };
+});
+
+const mockViewport = vi.hoisted(() => ({ mdUp: true }));
+vi.mock("@/composables/useBreakpoint", async () => {
+  const { computed } = await import("vue");
+  return {
+    default: () => ({
+      isMobile: computed(() => !mockViewport.mdUp),
+      isTablet: computed(() => false),
+      isDesktop: computed(() => mockViewport.mdUp),
+      mdUp: computed(() => mockViewport.mdUp),
+      lgUp: computed(() => mockViewport.mdUp),
+    }),
   };
 });
 
@@ -69,6 +83,7 @@ vi.mock("@/components/CodeQueryEditor.vue", () => ({
 
 import DashboardQueryEditor from "@/components/dashboards/addPanel/DashboardQueryEditor.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -732,5 +747,277 @@ describe("DashboardQueryEditor", () => {
     wrapper.findComponent({ name: "CodeQueryEditor" }).vm.$emit("run-query");
 
     expect(runQuery).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("formula letters and the saved hide flag", () => {
+  let wrapper: any;
+
+  afterEach(() => wrapper?.unmount());
+
+  const mountWith = (queries: any[], currentQueryIndex = 0) => {
+    const mock: any = createMockDashboardPanelData();
+    mock.promqlMode = ref(true);
+    mock.dashboardPanelData.data.queryType = "promql";
+    mock.dashboardPanelData.data.queries.splice(0, 1, ...queries);
+    mock.dashboardPanelData.layout.currentQueryIndex = currentQueryIndex;
+    // The default mock pushes onto the raw array, which never fires the editor's watcher.
+    mock.addQuery = () => mock.dashboardPanelData.data.queries.push(q({}, ""));
+    (useDashboardPanelData as any).mockImplementation(() => mock);
+    wrapper = mount(DashboardQueryEditor, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { dashboardPanelDataPageKey: "dashboard" },
+        stubs: { QueryTypeSelector: true, QueryEditor: true },
+      },
+    });
+    return mock.dashboardPanelData;
+  };
+  const q = (config: any = {}, query = "up") => ({
+    query,
+    customQuery: true,
+    vrlFunctionQuery: "",
+    config,
+  });
+  const refs = (data: any) => data.data.queries.map((it: any) => it.config?.ref);
+
+  it("gives legacy queries their letters by position on load", async () => {
+    const data = mountWith([q(), q()]);
+    await wrapper.vm.$nextTick();
+
+    expect(refs(data)).toEqual(["A", "B"]);
+  });
+
+  it("gives a new query the first unused letter", async () => {
+    const data = mountWith([q({ ref: "B" })]);
+    wrapper.vm.addTab();
+    await wrapper.vm.$nextTick();
+
+    expect(refs(data)).toEqual(["B", "A"]);
+  });
+
+  it("keeps every letter when a preceding query is deleted", async () => {
+    const data = mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "B * 2" }, "")], 2);
+    await wrapper.vm.removeTab(0);
+    await wrapper.vm.$nextTick();
+
+    expect(refs(data)).toEqual(["B", undefined]);
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').exists()).toBe(false);
+  });
+
+  it("labels each non-formula tab with its letter", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A" }, "")]);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-0"]').text()).toBe(
+      "A · Query 1",
+    );
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-1"]').text()).toBe("Formula 1");
+  });
+
+  it("backs the visibility toggle with config.hide", async () => {
+    const data = mountWith([q({ ref: "A", hide: true }), q({ ref: "B" })]);
+    await wrapper.vm.$nextTick();
+    expect(data.layout.hiddenQueries).toEqual([0]);
+
+    wrapper.vm.toggleQueryVisibility(1);
+    await wrapper.vm.$nextTick();
+
+    expect(data.data.queries[1].config.hide).toBe(true);
+    expect(data.layout.hiddenQueries).toEqual([0, 1]);
+  });
+
+  it("adds a formula as a lettered-free code query", async () => {
+    const data = mountWith([q({ ref: "A" })]);
+    await wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]').trigger("click");
+    await wrapper.vm.$nextTick();
+
+    const formula = data.data.queries[1];
+    expect(formula.config.formula).toBe("");
+    expect(formula.customQuery).toBe(true);
+    expect(formula.config.ref).toBeUndefined();
+    expect(data.layout.currentQueryIndex).toBe(1);
+  });
+
+  it("writes the editor text of a formula tab into config.formula", async () => {
+    const data = mountWith([q({ ref: "A" }), q({ formula: "" }, "")], 1);
+    wrapper.vm.handleQueryUpdate("A * 2");
+
+    expect(data.data.queries[1].config.formula).toBe("A * 2");
+    expect(data.data.queries[1].query).toBe("");
+  });
+
+  it("shows an unknown letter under the formula", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A / B" }, "")], 1);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="dashboard-panel-formula-error"]').text()).toBe(
+      "B is not a query in this panel",
+    );
+  });
+
+  it("tells a referenced input that its own settings do not apply in the formula", async () => {
+    mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "A * 2" }, "")]);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(true);
+
+    wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 1;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-formula-input-note"]').exists()).toBe(false);
+  });
+
+  describe("where messages render", () => {
+    const precedesEditor = (selector: string) => {
+      const editor = wrapper.find('[data-test="dashboard-panel-query-editor"]').element;
+      const node = wrapper.find(selector).element;
+      return !!(node.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING);
+    };
+
+    it("shows the formula error above the editor", async () => {
+      mountWith([q({ ref: "A" }), q({ formula: "A / B" }, "")], 1);
+      await wrapper.vm.$nextTick();
+      expect(precedesEditor('[data-test="dashboard-panel-formula-error"]')).toBe(true);
+    });
+
+    it("shows the formula-input note above the editor", async () => {
+      mountWith([q({ ref: "A" }), q({ formula: "A * 2" }, "")]);
+      await wrapper.vm.$nextTick();
+      expect(precedesEditor('[data-test="dashboard-panel-formula-input-note"]')).toBe(true);
+    });
+
+    it("shows query errors, such as the builder refusal, above the editor", async () => {
+      const data = mountWith([q({ ref: "A" })]);
+      data.meta.errors.queryErrors = ["The builder cannot show a subquery"];
+      await wrapper.vm.$nextTick();
+      const errors = wrapper.find('[data-test="dashboard-panel-query-errors"]');
+      expect(errors.text()).toContain("The builder cannot show a subquery");
+      expect(precedesEditor('[data-test="dashboard-panel-query-errors"]')).toBe(true);
+    });
+
+    it("renders no message row when there is nothing to say", async () => {
+      mountWith([q({ ref: "A" })]);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-query-messages"]').exists()).toBe(false);
+    });
+
+    it("drops the builder refusal once the query text changes", async () => {
+      const data = mountWith([q({ ref: "A" })]);
+      data.meta.errors.queryErrors = ["The builder cannot show a subquery"];
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-query-errors"]').exists()).toBe(true);
+
+      data.data.queries[0].query = "rate(up[5m])";
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-query-errors"]').exists()).toBe(false);
+    });
+
+    it("drops the builder refusal when another tab becomes active", async () => {
+      const data = mountWith([q({ ref: "A" }), q({ ref: "B" })]);
+      data.meta.errors.queryErrors = ["The builder cannot show a subquery"];
+      await wrapper.vm.$nextTick();
+
+      data.layout.currentQueryIndex = 1;
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+      expect(data.meta.errors.queryErrors).toEqual([]);
+    });
+  });
+
+  it("numbers formulas among formulas", async () => {
+    mountWith([q({ ref: "A" }), q({ ref: "B" }), q({ formula: "A" }, ""), q({ formula: "B" }, "")]);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-2"]').text()).toBe("Formula 1");
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-3"]').text()).toBe("Formula 2");
+  });
+
+  it("numbers queries among queries", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A" }, ""), q({ ref: "B" })]);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-test="dashboard-panel-query-tab-name-2"]').text()).toBe(
+      "B · Query 2",
+    );
+  });
+
+  describe("the eye", () => {
+    const eye = (i: number) =>
+      wrapper.find(`[data-test="dashboard-panel-query-tab-visibility-${i}"]`);
+    const label = (i: number) => wrapper.find(`[data-test="dashboard-panel-query-tab-name-${i}"]`);
+
+    it("is a labelled button beside the tab, not inside it", async () => {
+      mountWith([q({ ref: "A", hide: true }), q({ ref: "B" })]);
+      await wrapper.vm.$nextTick();
+      expect(eye(0).element.tagName).toBe("BUTTON");
+      expect(eye(0).attributes("aria-label")).toBe("Show query results");
+      expect(eye(1).attributes("aria-label")).toBe("Hide query results");
+      expect(eye(0).element.closest('[role="tab"]')).toBeNull();
+      expect(wrapper.find('[data-test="dashboard-panel-query-tab-0"]').text()).toBe("A · Query 1");
+    });
+
+    it("toggles from the keyboard without switching tabs", async () => {
+      const data = mountWith([q({ ref: "A" }), q({ ref: "B" })]);
+      await wrapper.vm.$nextTick();
+      // A native button turns Enter into a click; jsdom does not, so both events are sent.
+      await eye(1).trigger("keydown", { key: "Enter" });
+      expect(data.layout.currentQueryIndex).toBe(0);
+      await eye(1).trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(data.layout.currentQueryIndex).toBe(0);
+      expect(data.data.queries[1].config.hide).toBe(true);
+      expect(eye(1).element.tagName).toBe("BUTTON");
+    });
+
+    it("mutes a hidden query's label only on inactive tabs", async () => {
+      mountWith([q({ ref: "A", hide: true }), q({ ref: "B", hide: true }), q({ ref: "C" })]);
+      await wrapper.vm.$nextTick();
+      expect(label(0).classes()).not.toContain("text-text-muted");
+      expect(label(1).classes()).toContain("text-text-muted");
+      expect(label(2).classes()).not.toContain("text-text-muted");
+    });
+
+    it("keeps an inactive tab's controls off a phone's strip", async () => {
+      mountWith([q({ ref: "A" }), q({ ref: "B" })]);
+      await wrapper.vm.$nextTick();
+      const phoneHidden = (selector: string) =>
+        !!wrapper.find(selector).element.closest(".max-md\\:hidden");
+      for (const control of ["rename", "visibility", "remove"]) {
+        expect(phoneHidden(`[data-test="dashboard-panel-query-tab-${control}-0"]`)).toBe(false);
+        expect(phoneHidden(`[data-test="dashboard-panel-query-tab-${control}-1"]`)).toBe(true);
+      }
+    });
+  });
+
+  it("seeds a rename with the tab's own default name", async () => {
+    mountWith([q({ ref: "A" }), q({ formula: "A" }, ""), q({ ref: "B" })]);
+    await wrapper.vm.$nextTick();
+    wrapper.vm.startEditQueryName(1, wrapper.vm.dashboardPanelData.data.queries[1]);
+    expect(wrapper.vm.editingQueryName).toBe("Formula 1");
+    wrapper.vm.startEditQueryName(2, wrapper.vm.dashboardPanelData.data.queries[2]);
+    expect(wrapper.vm.editingQueryName).toBe("Query 2");
+  });
+
+  it("shows the Add formula tooltip when the phone icon is hovered", async () => {
+    mockViewport.mdUp = false;
+    try {
+      mountWith([q({ ref: "A" })]);
+      await wrapper.vm.$nextTick();
+      const button = wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]').element;
+      button.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 800));
+      await wrapper.vm.$nextTick();
+      expect(document.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+        "Add formula",
+      );
+    } finally {
+      mockViewport.mdUp = true;
+    }
+  });
+
+  it("keeps Add formula reachable as a labelled icon on a phone", async () => {
+    mountWith([q({ ref: "A" })]);
+    await wrapper.vm.$nextTick();
+    const button = wrapper.find('[data-test="dashboard-panel-query-tab-add-formula"]');
+    expect(button.attributes("aria-label")).toBe("Add formula");
+    expect(button.find(".max-md\\:hidden").text()).toBe("Add formula");
   });
 });

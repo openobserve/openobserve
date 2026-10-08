@@ -59,6 +59,8 @@ export interface ProcessedPromQLData {
     data: Record<number, string>; // timestamp -> value map
   }>;
   queryIndex: number;
+  /** "shifted" for a past period drawn over its panel query. */
+  seriesRole?: "primary" | "shifted";
   queryConfig: any;
 }
 
