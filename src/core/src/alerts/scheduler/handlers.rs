@@ -6309,34 +6309,6 @@ mod tests {
         assert!(should_dispatch_after_incident(false, false));
     }
 
-    #[test]
-    fn test_composite_delivery_error_for_every_send_result() {
-        let delivered = Ok(NotificationOutcome {
-            succeeded: vec!["slack".to_string()],
-            ..Default::default()
-        });
-        assert_eq!(composite_delivery_error(&delivered), None);
-
-        let partial = Ok(NotificationOutcome {
-            succeeded: vec!["slack".to_string()],
-            failed: vec!["pagerduty".to_string()],
-            error_message: " pagerduty timed out ".to_string(),
-            ..Default::default()
-        });
-        assert_eq!(
-            composite_delivery_error(&partial).as_deref(),
-            Some("pagerduty timed out")
-        );
-
-        let failed = Err(AlertError::SendNotificationError {
-            error_message: "http 500".to_string(),
-        });
-        assert!(
-            composite_delivery_error(&failed)
-                .is_some_and(|error| error.starts_with("error sending notification for alert:"))
-        );
-    }
-
     #[cfg(feature = "enterprise")]
     fn oncall_record(
         state: config::meta::oncall::ResponseState,
@@ -7494,6 +7466,34 @@ mod tests {
         let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
+    }
+
+    #[test]
+    fn test_composite_delivery_error_for_every_send_result() {
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            ..Default::default()
+        });
+        assert_eq!(composite_delivery_error(&delivered), None);
+
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            error_message: " pagerduty timed out ".to_string(),
+            ..Default::default()
+        });
+        assert_eq!(
+            composite_delivery_error(&partial).as_deref(),
+            Some("pagerduty timed out")
+        );
+
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(
+            composite_delivery_error(&failed)
+                .is_some_and(|error| error.starts_with("error sending notification for alert:"))
+        );
     }
 
     /// The alert list's only source for an anomaly's outcome, so the recorded
