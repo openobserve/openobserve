@@ -320,8 +320,12 @@ pub(crate) async fn create_slo_tables_for_test(
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
     m20261003_000001_create_rum_pa_tables::Migration
-        .up(&SchemaManager::new(db))
+        .up(&manager)
+        .await?;
+    m20261008_000001_add_name_to_rum_pa_tombstones::Migration
+        .up(&manager)
         .await
 }
 
