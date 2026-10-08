@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import ODialog from "./ODialog.vue";
 import { DialogContent } from "reka-ui";
 
@@ -291,6 +291,46 @@ describe("ODialog", () => {
       const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(dispatchKeydown(btn.element, { key: "s", ctrlKey: true })).toBe(true);
       expect(dispatchKeydown(btn.element, { key: "Escape" })).toBe(true);
+      wrapper.unmount();
+    });
+  });
+  describe("initial focus", () => {
+    const openConfirm = async (props: Record<string, unknown> = {}) => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: {
+          open: true,
+          title: "Discard?",
+          primaryButtonLabel: "Discard",
+          secondaryButtonLabel: "Keep",
+          ...props,
+        },
+        slots: { default: "<p>Body</p>" },
+      });
+      await flushPromises();
+      // jsdom never runs reka's mount auto-focus, so fire the event ODialog handles.
+      const content = wrapper.findAllComponents(DialogContent).at(-1)!;
+      content.vm.$emit("openAutoFocus", new Event("focus.autoFocusOnMount"));
+      await flushPromises();
+      return wrapper;
+    };
+
+    it("focuses the primary button when the body has no field", async () => {
+      const wrapper = await openConfirm();
+      await vi.waitFor(() =>
+        expect(document.activeElement?.getAttribute("data-test")).toBe("o-dialog-primary-btn"),
+      );
+      wrapper.unmount();
+    });
+
+    it("focuses the secondary button when initialFocus is secondary, so Enter does not run a destructive primary", async () => {
+      const wrapper = await openConfirm({
+        initialFocus: "secondary",
+        primaryButtonVariant: "destructive",
+      });
+      await vi.waitFor(() =>
+        expect(document.activeElement?.getAttribute("data-test")).toBe("o-dialog-secondary-btn"),
+      );
       wrapper.unmount();
     });
   });
