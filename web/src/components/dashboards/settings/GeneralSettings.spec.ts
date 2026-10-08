@@ -129,7 +129,12 @@ describe("GeneralSettings", () => {
           },
           DateTimePickerDashboard: {
             template: '<div data-test="datetime-picker"></div>',
-            props: ["modelValue", "initialTimezone", "autoApplyDashboard"],
+            props: {
+              modelValue: Object,
+              initialTimezone: String,
+              autoApplyDashboard: Boolean,
+              calendarPresets: Boolean,
+            },
             emits: ["update:modelValue"],
           },
         },
@@ -409,6 +414,53 @@ describe("GeneralSettings", () => {
 
       expect(wrapper.emitted()).toHaveProperty("close");
       expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+  });
+
+  describe("Calendar default duration", () => {
+    it("offers the calendar presets in the default-duration picker", async () => {
+      wrapper = await createWrapper();
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
+      expect(dateTimePicker.props("calendarPresets")).toBe(true);
+    });
+
+    it("loads a saved calendar token and saves it back unchanged", async () => {
+      vi.mocked(getDashboard).mockResolvedValue({
+        ...mockDashboardData,
+        defaultDatetimeDuration: { relativeTimePeriod: "calendar:month:-1", type: "relative" },
+      });
+      wrapper = await createWrapper();
+      expect(wrapper.vm.dateTimeValue).toMatchObject({
+        relativeTimePeriod: "calendar:month:-1",
+        valueType: "relative",
+      });
+
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
+      await dateTimePicker.vm.$emit("update:modelValue", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "calendar:month:0",
+        valueType: "relative",
+      });
+
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(updateDashboard).toHaveBeenCalledWith(
+        store,
+        store.state.selectedOrganization.identifier,
+        "dashboard-1",
+        expect.objectContaining({
+          defaultDatetimeDuration: {
+            startTime: 1,
+            endTime: 2,
+            relativeTimePeriod: "calendar:month:0",
+            type: "relative",
+          },
+        }),
+        "default",
+      );
     });
   });
 

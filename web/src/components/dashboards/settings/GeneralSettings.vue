@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
             :auto-apply-dashboard="true"
+            calendar-presets
             menu-align="start"
           />
         </div>

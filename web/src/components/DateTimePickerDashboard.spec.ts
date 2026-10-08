@@ -61,6 +61,7 @@ describe("DateTimePickerDashboard", () => {
               "default-relative-time": String,
               initialTimezone: [String, null],
               disable: Boolean,
+              calendarPresets: Boolean,
             },
             methods: {
               refresh: vi.fn(),
@@ -174,6 +175,37 @@ describe("DateTimePickerDashboard", () => {
       const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
       expect(dateTimeComponent.exists()).toBe(true);
       expect(wrapper.vm.initialTimezone).toBeNull();
+    });
+  });
+
+  describe("Calendar presets", () => {
+    it("keeps calendar presets off by default so non-dashboard pickers are unchanged", () => {
+      wrapper = createWrapper();
+      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      expect(dateTimeComponent.props("calendarPresets")).toBe(false);
+    });
+
+    it("passes calendarPresets through to DateTime", () => {
+      wrapper = createWrapper({ calendarPresets: true });
+      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      expect(dateTimeComponent.props("calendarPresets")).toBe(true);
+    });
+
+    it("forwards a calendar token as a relative period", async () => {
+      wrapper = createWrapper({ calendarPresets: true });
+      const dateTimeComponent = wrapper.findComponent('[data-test="datetime-component"]');
+      await dateTimeComponent.vm.$emit("on:date-change", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "calendar:month:0",
+        valueType: "relative",
+      });
+      expect(wrapper.emitted("update:modelValue")[0][0]).toEqual({
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "calendar:month:0",
+        valueType: "relative",
+      });
     });
   });
 

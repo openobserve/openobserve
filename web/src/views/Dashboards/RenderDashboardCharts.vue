@@ -234,6 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <DateTimePickerDashboard
                           :modelValue="panelTimeValues[item.id]"
                           :auto-apply-dashboard="false"
+                          calendar-presets
                           size="sm"
                           class="panel-time-picker-widget"
                           @update:modelValue="(val) => onPanelTimeApply(item.id, val)"

@@ -59,8 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
-          icon-left="schedule"
+          @mouseenter="refreshTooltipNow"
         >
+          <template #icon-left>
+            <OTooltip v-if="triggerTooltip" :content="triggerTooltip" />
+            <OIcon name="schedule" size="sm" />
+          </template>
           <span
             class="date-time-label flex-1 text-left font-semibold max-md:min-w-0 max-md:truncate"
             >{{ triggerLabel }}</span
@@ -133,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div
-                  v-if="filteredRelativePeriods.length === 0"
+                  v-if="filteredRelativePeriods.length === 0 && filteredCalendarRows.length === 0"
                   class="text-text-secondary px-3 py-4 text-center text-sm"
                 >
                   {{ t("common.noMatchingRelativePresets") }}
@@ -156,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="h-8! w-8! font-bold! disabled:opacity-35"
                       :class="
                         selectedType == 'relative' &&
+                        calendarToken === null &&
                         relativePeriod == period.value &&
                         relativeValue == item
                           ? 'bg-button-primary! text-button-primary-foreground!'
@@ -177,6 +182,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         max-width="18.75rem"
                         :content="raw(queryRangeRestrictionMsg)"
                       />
+                    </OButton>
+                  </div>
+                </div>
+
+                <div
+                  v-for="row in filteredCalendarRows"
+                  :key="'calendar_' + row.key"
+                  class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
+                >
+                  <div class="min-w-18.75 text-sm font-semibold">
+                    {{ row.label }}
+                  </div>
+                  <div class="flex w-55.5 gap-1.5">
+                    <OButton
+                      v-for="chip in row.chips"
+                      :key="chip.token"
+                      :data-test="`date-time-relative-${chip.key}-${row.key}-btn`"
+                      class="h-8! min-w-0 flex-1 px-0! font-bold!"
+                      :class="
+                        selectedType === 'relative' && calendarToken === chip.token
+                          ? 'bg-button-primary! text-button-primary-foreground!'
+                          : 'bg-text-heading/7!'
+                      "
+                      variant="ghost"
+                      size="xs"
+                      @mouseenter="refreshTooltipNow"
+                      @click="setCalendarPeriod(chip.token)"
+                    >
+                      {{ chip.label }}
+                      <OTooltip :content="calendarTooltip(chip.token)" />
                     </OButton>
                   </div>
                 </div>
@@ -358,6 +393,16 @@ import {
 } from "../utils/zincutils";
 import { subtractRelativeTime } from "@/utils/date";
 import {
+  buildCalendarToken,
+  formatCalendarLabel,
+  formatCalendarTooltip,
+  parseCalendarToken,
+  resolveCalendarPeriod,
+  shiftCalendarToken,
+  type CalendarUnit,
+} from "@/utils/dashboard/calendarPeriods";
+import { localeFileMap } from "@/locales";
+import {
   parseDateRangeString,
   parseSingleDateTime,
   type ParsedSingleDateTime,
@@ -365,7 +410,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
@@ -379,6 +424,18 @@ const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   w: 520,
   M: 120,
 };
+
+interface CalendarChip {
+  key: string;
+  token: string;
+  label: I18nText;
+}
+
+interface CalendarRow {
+  key: "day" | "this" | "last";
+  label: I18nText;
+  chips: CalendarChip[];
+}
 
 interface ConsumableDateTime {
   startTime: number;
@@ -471,13 +528,17 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
       default: "outline",
     },
+    calendarPresets: {
+      type: Boolean,
+      default: false,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change", "hide", "show"],
 
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18nTyped();
+    const { t, locale } = useI18nTyped();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
@@ -489,6 +550,18 @@ export default defineComponent({
     });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
+    // A selected calendar period overrides relativePeriod/relativeValue while the type is relative.
+    const calendarToken = ref<string | null>(null);
+    const appliedCalendarToken = ref<string | null>(null);
+    // The relative selection last applied; closing the panel without Apply returns to it so the arrows never act on a pending pick.
+    let appliedSelection = {
+      selectedType: "relative",
+      calendarToken: null as string | null,
+      relativePeriod: "m",
+      relativeValue: 15,
+    };
+    // Offset-0 tooltips end at now, so they read a clock refreshed on hover rather than a stale render time.
+    const tooltipNow = ref(Date.now());
     const lastValidCustomValue = ref(15);
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(currentTimezone);
@@ -604,6 +677,57 @@ export default defineComponent({
       relativePeriods.filter((period) => visibleRelativeItems(period).length > 0),
     );
 
+    const calendarChip = (key: string, unit: CalendarUnit, offset: number, label: I18nText) => ({
+      key,
+      token: buildCalendarToken(unit, offset),
+      label,
+    });
+
+    const calendarUnitChips = (offset: number): CalendarChip[] => [
+      calendarChip("week", "week", offset, t("common.calendarWeek")),
+      calendarChip("month", "month", offset, t("common.calendarMonth")),
+      calendarChip("quarter", "quarter", offset, t("common.calendarQuarter")),
+      calendarChip("year", "year", offset, t("common.calendarYear")),
+    ];
+
+    const calendarRows: CalendarRow[] = [
+      {
+        key: "day",
+        label: t("common.calendarDay"),
+        chips: [
+          calendarChip("today", "day", 0, t("common.today")),
+          calendarChip("yesterday", "day", -1, t("common.yesterday")),
+        ],
+      },
+      { key: "this", label: t("common.calendarThis"), chips: calendarUnitChips(0) },
+      { key: "last", label: t("common.calendarLast"), chips: calendarUnitChips(-1) },
+    ];
+
+    const filteredCalendarRows = computed<CalendarRow[]>(() => {
+      if (!props.calendarPresets) return [];
+      const query = relativeSearchTerm.value.trim().toLowerCase();
+      if (!query) return calendarRows;
+      return calendarRows
+        .map((row) =>
+          row.label.toLowerCase().includes(query)
+            ? row
+            : {
+                ...row,
+                chips: row.chips.filter((chip) => chip.label.toLowerCase().includes(query)),
+              },
+        )
+        .filter((row) => row.chips.length > 0);
+    });
+
+    const intlLocale = computed(() => localeFileMap[String(locale.value)] ?? "en-US");
+
+    const refreshTooltipNow = () => {
+      tooltipNow.value = Date.now();
+    };
+
+    const calendarTooltip = (token: string | null) =>
+      formatCalendarTooltip(token, store.state.timezone, tooltipNow.value) ?? undefined;
+
     const relativeItemHours = (periodValue: string, item: number) =>
       relativeDatesInHour[periodValue][relativeDates[periodValue].indexOf(item)];
 
@@ -708,6 +832,7 @@ export default defineComponent({
 
     const setRelativeDate = (period: string, value: number) => {
       selectedType.value = "relative";
+      calendarToken.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
       if (props.autoApply) saveDate("relative");
@@ -734,6 +859,7 @@ export default defineComponent({
         MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
       );
       lastValidCustomValue.value = relativeValue.value;
+      calendarToken.value = null;
 
       if (props.autoApply) saveDate("relative-custom");
     };
@@ -746,10 +872,22 @@ export default defineComponent({
         relativeValue.value = lastValidCustomValue.value;
     };
 
+    const setCalendarPeriod = (token: string) => {
+      selectedType.value = "relative";
+      calendarToken.value = token;
+      if (props.autoApply) saveDate("relative");
+    };
+
     const setRelativeTime = (period: string) => {
+      if (props.calendarPresets && resolveCalendarPeriod(period, store.state.timezone)) {
+        calendarToken.value = period;
+        return;
+      }
+
       const periodString = period?.match(/(\d+)([smhdwM])/);
 
       if (periodString) {
+        calendarToken.value = null;
         const periodValue = periodString[1];
         const periodUnit = periodString[2];
 
@@ -854,6 +992,20 @@ export default defineComponent({
      */
     const markApplied = () => {
       appliedDisplayValue.value = getDisplayValue.value;
+      appliedCalendarToken.value = selectedType.value === "relative" ? calendarToken.value : null;
+      appliedSelection = {
+        selectedType: selectedType.value,
+        calendarToken: calendarToken.value,
+        relativePeriod: relativePeriod.value,
+        relativeValue: relativeValue.value,
+      };
+    };
+
+    const restoreAppliedSelection = () => {
+      selectedType.value = appliedSelection.selectedType;
+      calendarToken.value = appliedSelection.calendarToken;
+      relativePeriod.value = appliedSelection.relativePeriod;
+      relativeValue.value = appliedSelection.relativeValue;
     };
 
     const saveDate = (dateType?: string | null) => {
@@ -956,6 +1108,13 @@ export default defineComponent({
     }
 
     const getConsumableDateTime = (): ConsumableDateTime => {
+      const calendarRange =
+        selectedType.value === "relative"
+          ? resolveCalendarPeriod(calendarToken.value, store.state.timezone)
+          : null;
+      if (calendarRange) {
+        return { ...calendarRange, relativeTimePeriod: calendarToken.value };
+      }
       if (selectedType.value == "relative") {
         let period = PERIOD_ARITHMETIC_UNIT[relativePeriod.value];
         let periodValue = relativeValue.value;
@@ -1093,6 +1252,12 @@ export default defineComponent({
         : `${fromDay} ${fromTime} - ${toDay} ${toTime}`;
     };
 
+    // Mirrors triggerLabel: the live selection while it is in force or being edited, else the applied one.
+    const triggerTooltip = computed(() => {
+      if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
+      return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
+    });
+
     /**
      * What the trigger button renders.
      *
@@ -1112,6 +1277,11 @@ export default defineComponent({
     });
 
     const getDisplayValue = computed(() => {
+      const calendarLabel =
+        !props.disableRelative && selectedType.value === "relative"
+          ? formatCalendarLabel(calendarToken.value, store.state.timezone, t, intlLocale.value)
+          : null;
+      if (calendarLabel) return calendarLabel;
       if (!props.disableRelative && selectedType.value === "relative") {
         const count = isValidCustomValue(relativeValue.value)
           ? relativeValue.value
@@ -1275,6 +1445,14 @@ export default defineComponent({
      * range; otherwise we save and emit directly.
      */
     const shiftTimeRange = (direction: "prev" | "next") => {
+      if (selectedType.value === "relative" && calendarToken.value !== null) {
+        const shifted = shiftCalendarToken(calendarToken.value, direction === "prev" ? -1 : 1);
+        if (shifted === null || !resolveCalendarPeriod(shifted, store.state.timezone)) return;
+        calendarToken.value = shifted;
+        menuOpen.value = false;
+        saveDate("relative");
+        return;
+      }
       const { startTime, endTime } = getConsumableDateTime();
       const duration = endTime - startTime;
       if (!(duration > 0)) return;
@@ -1299,7 +1477,9 @@ export default defineComponent({
     };
 
     const isNextShiftDisabled = () => {
-      if (selectedType.value === "relative") return true;
+      if (selectedType.value === "relative") {
+        return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
+      }
       const { endUTC } = getUTCTimeStamp();
       return !(endUTC + MICROS_PER_SECOND <= Date.now() * 1000);
     };
@@ -1486,9 +1666,11 @@ export default defineComponent({
     const menuOpen = ref(false);
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
+        refreshTooltipNow();
         onBeforeShow();
         onShow();
       } else {
+        if (!props.autoApply) restoreAppliedSelection();
         onBeforeHide();
         onHide();
       }
@@ -1510,6 +1692,12 @@ export default defineComponent({
       relativeSearchTerm,
       visibleRelativeItems,
       filteredRelativePeriods,
+      filteredCalendarRows,
+      calendarToken,
+      setCalendarPeriod,
+      calendarTooltip,
+      triggerTooltip,
+      refreshTooltipNow,
       relativeItemHours,
       saveDate,
       onBeforeShow,

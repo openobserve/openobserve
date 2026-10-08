@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :hide-range-shift="hideRangeShift"
     :menu-align="menuAlign"
     :variant="variant"
+    :calendar-presets="calendarPresets"
     @hide="onHide"
     @show="onShow"
   >
@@ -87,6 +88,11 @@ export default defineComponent({
       required: false,
       default: "outline",
       type: String as PropType<ButtonVariant>,
+    },
+    calendarPresets: {
+      required: false,
+      default: false,
+      type: Boolean,
     },
   },
   emits: ["update:modelValue", "hide", "show"],
