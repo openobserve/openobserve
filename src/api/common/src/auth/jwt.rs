@@ -931,26 +931,35 @@ pub async fn process_domain_org_mapping(
                     )
                     .await;
                 }
-                if let Err(e) = update_tuples(add_tuples, remove_tuples).await {
-                    log::error!(
-                        "error updating claim based role tuples for user {user_email} org {} : {e}",
-                        mapped.org_id
-                    );
+
+                if !add_tuples.is_empty() || !remove_tuples.is_empty() {
+                    if let Err(e) = update_tuples(add_tuples, remove_tuples).await {
+                        log::error!(
+                            "error updating claim based role tuples for user {user_email} org {} : {e}",
+                            mapped.org_id
+                        );
+                    }
                 }
             }
 
             log::info!(
-                "user {user_email} joined org {} successfully via domain org mapping, deleting any invites",
+                "user {user_email} joined org {} successfully via domain org mapping",
                 mapped.org_id
             );
-            if let Err(e) =
-                org_invites::delete_invites_for_user(&mapped.org_id, &user_email.to_lowercase())
-                    .await
-            {
-                log::error!(
-                    "error in deleting invites for user {user_email} for org {} after joining via domain mapping : {e}",
+            if need_to_add_user {
+                log::info!(
+                    "deleting any invites for {user_email} in org {} as added via org mapping",
                     mapped.org_id
                 );
+                if let Err(e) =
+                    org_invites::delete_invites_for_user(&mapped.org_id, &user_email.to_lowercase())
+                        .await
+                {
+                    log::error!(
+                        "error in deleting invites for user {user_email} for org {} after joining via domain mapping : {e}",
+                        mapped.org_id
+                    );
+                }
             }
             log::info!("domain org mapping for user {user_email} successfully processed");
             Ok(true)
