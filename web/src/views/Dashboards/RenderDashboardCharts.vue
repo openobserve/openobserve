@@ -1188,6 +1188,22 @@ export default defineComponent({
       },
     );
 
+    watch(
+      () => ({
+        tabId: selectedTabId.value,
+        ids: panels.value
+          .map((panel: any) => panel.id)
+          .sort()
+          .join(","),
+      }),
+      async (next, previous) => {
+        // A panel joining a built grid never becomes a widget; tab switches and empty grids refresh above.
+        if (!previous?.ids || next.ids === previous.ids || next.tabId !== previous.tabId) return;
+        await nextTick();
+        await refreshGridStack();
+      },
+    );
+
     // Initialize GridStack when component is mounted
     onMounted(async () => {
       await nextTick(); // Wait for DOM to be ready
