@@ -1,109 +1,63 @@
 name: Sister Enterprise Merge Gate
 
-# Independent of Playwright E2E: any internal OSS PR with a same-named enterprise PR must
-# wait while that PR is open. A missing or closed-unmerged enterprise PR does not block.
-# Require the commit status `sister-ent-merge-gate` (NOT the workflow job) on OSS
-# branches only after BOTH this workflow and o2-enterprise's notify-oss-sister-pr.yml
-# are on their target branches. pull_request_target and repository_dispatch use the
-# base/default workflow, not the PR's copy. Re-trigger existing OSS PRs once deployed.
-# Enterprise PR open/reopen/close events dispatch back here to recheck the current
-# OSS head SHA; this also catches a sister PR opened after an earlier green check.
+# An OSS PR with an open, same-named o2-enterprise PR must wait: enterprise merges first.
+# Checks once when "Merge when ready" is clicked (and on later pushes) and again on the
+# merge-queue commit; it never waits. If it fails, merge the enterprise PR, then re-run this job.
+# Make the job `Sister Enterprise PR` a required check on main.
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN: o2-enterprise Pull requests: read.
 
 on:
-  # No checkout or execution of PR code. Forks are exempt because their head is not
-  # a paired branch in the OSS repository.
+  # pull_request_target: the base copy of this file runs, and no PR code is checked out.
   pull_request_target:
-    types: [opened, reopened, synchronize, edited, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
-  repository_dispatch:
-    types: [sister-enterprise-changed]
-  # Required statuses must also appear on merge-queue commits; the PR head was checked first.
+    types: [auto_merge_enabled, synchronize]
   merge_group:
 
 concurrency:
-  group: sister-ent-merge-${{ github.event.client_payload.oss_pr || github.event.pull_request.number || github.ref }}
+  group: sister-ent-merge-gate-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
-  statuses: write
   pull-requests: read
 
 jobs:
-  sister-ent-merge:
-    # Only the commit status on the OSS head is required; the workflow job runs on
-    # the base SHA and must not fail it when a sister PR is still open.
-    name: Publish Sister Merge Status
+  sister-ent:
+    name: Sister Enterprise PR
+    if: ${{ github.event_name == 'merge_group' || github.event.pull_request.auto_merge != null }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check enterprise PR and publish OSS commit status
-        env:
-          GH_TOKEN: ${{ github.token }} # publish a required status on the OSS PR head
-          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }} # read private o2-enterprise PR history
-          EVENT_NAME: ${{ github.event_name }}
-          OSS_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.client_payload.oss_pr || github.event.pull_request.number }}
-          DISPATCH_HEAD_REF: ${{ github.event.client_payload.head_ref }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          OSS: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          # refs/heads/gh-readonly-queue/main/pr-<number>-<sha>
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
         run: |
           set -euo pipefail
-          status() {
-            gh api -X POST "repos/$OSS_REPO/statuses/$HEAD_SHA" \
-              -f context=sister-ent-merge-gate -f state="$1" -f description="$2" \
-              -f target_url="$RUN_URL" --jq '"\(.context): \(.state)"'
-          }
-          if [ "$EVENT_NAME" = "merge_group" ]; then
-            status success "Sister PR checked on the OSS PR head"
-            exit 0
+          if [ -n "$QUEUE_REF" ]; then
+            PR=${QUEUE_REF##*/pr-}; PR=${PR%%-*}
           fi
-          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
-            [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || { echo "::warning::Invalid OSS PR number"; exit 0; }
-            PR=$(gh api "repos/$OSS_REPO/pulls/$PR_NUMBER")
-            # The dispatch can arrive after the OSS PR merged or changed branches. Never
-            # publish a result for a stale cross-repository notification.
-            if [ "$(jq -r '.state' <<< "$PR")" != "open" ] ||
-               [ "$(jq -r '.head.ref' <<< "$PR")" != "$DISPATCH_HEAD_REF" ]; then
-              echo "::notice::OSS PR #$PR_NUMBER closed or changed branches — ignoring stale notification."
-              exit 0
-            fi
-            HEAD_REPO=$(jq -r '.head.repo.full_name // empty' <<< "$PR")
-            HEAD_REF=$(jq -r '.head.ref' <<< "$PR")
-            HEAD_SHA=$(jq -r '.head.sha' <<< "$PR")
-          fi
-          if [ "$HEAD_REPO" != "$OSS_REPO" ]; then
-            status success "Fork PR: no same-repository sister branch"
-            exit 0
-          fi
-          # Dependabot-triggered runs only get Dependabot secrets, so ENT_TOKEN is empty;
-          # these PRs never have a sister enterprise PR anyway.
-          if [[ "$HEAD_REF" == dependabot/* ]]; then
-            status success "Dependabot PR: no sister enterprise PR"
+          read -r HEAD_REPO BRANCH AUTHOR < <(gh api "repos/$OSS/pulls/$PR" \
+            --jq '"\(.head.repo.full_name // "-") \(.head.ref) \(.user.login)"')
+
+          # A fork branch is not a paired branch. Dependabot-triggered runs get no ORG_ADMIN_TOKEN.
+          if [ "$HEAD_REPO" != "$OSS" ] || [ "$AUTHOR" = "dependabot[bot]" ]; then
+            echo "Not a paired branch; nothing to check."
             exit 0
           fi
 
-          REPO=openobserve/o2-enterprise
-          # PR metadata survives head-branch deletion. The newest exact same-repository
-          # head wins, so an old merge cannot override a newer open/closed PR.
-          if SISTER=$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$REPO" --head "$HEAD_REF" --state all -L 100 \
-            --json number,state,headRefName,headRepository,createdAt |
-            jq -c --arg head "$HEAD_REF" --arg repo "$REPO" \
-              '[.[] | select(.headRefName == $head and .headRepository.nameWithOwner == $repo)] | sort_by(.createdAt) | last'); then
-            NUMBER=$(jq -r '.number // empty' <<< "$SISTER")
-            STATE=$(jq -r '.state // empty' <<< "$SISTER")
-            if [ -z "$NUMBER" ]; then
-              status success "No matching enterprise PR"
-            elif [ "$STATE" = "OPEN" ]; then
-              # pending blocks the merge without a red X; only a failed lookup is a failure.
-              status pending "Enterprise PR #$NUMBER is open; merge it first"
-              echo "::notice::Waiting for sister enterprise PR https://github.com/$REPO/pull/$NUMBER."
-            else
-              # MERGED, or CLOSED unmerged (abandoned): nothing left to wait for.
-              status success "Enterprise PR #$NUMBER is $STATE"
-            fi
-          else
-            status failure "Could not verify enterprise PR history"
-            echo "::warning::Enterprise PR lookup failed; required status remains red."
-            exit 0
+          ENT=openobserve/o2-enterprise
+          # PR metadata survives branch deletion and squash merges. The newest same-repo PR wins.
+          STATE=$(GH_TOKEN="$ENT_TOKEN" gh pr list --repo "$ENT" --head "$BRANCH" --state all -L 100 \
+            --json state,headRefName,headRepository,createdAt |
+            jq -r --arg b "$BRANCH" --arg r "$ENT" \
+              '[.[] | select(.headRefName == $b and .headRepository.nameWithOwner == $r)]
+               | sort_by(.createdAt) | last | .state // "NONE"')
+
+          if [ "$STATE" = "OPEN" ]; then
+            echo "::error::The sister o2-enterprise PR for '$BRANCH' is open. Merge it first, then re-run this job."
+            exit 1
           fi
+          echo "Sister o2-enterprise PR: $STATE. Nothing to wait for."
