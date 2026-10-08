@@ -357,14 +357,15 @@ const useLogs = (t: TranslateFn) => {
     }
     searchObj.loading = true;
     searchObj.loadingProgressPercentage = 0;
-    if (mode !== "page") {
+    // Only a new run can change the query's streams; a page or page-size run re-sends the executed query.
+    if (mode === "full") {
       await refreshFreeTextSchemas(searchObj, store.state.zoConfig, (name) =>
         getStream(name, searchObj.data.stream.streamType || "logs", true, true),
       );
       // A run that replaced this one while the schema loaded owns the shared results now.
       if (!useLogsAutoRun().engine.isCurrent(generationId)) return;
     }
-    await getQueryData(mode === "page", { generationId });
+    await getQueryData(mode === "page", { generationId, reuseSchema: mode !== "full" });
   };
 
   // Search-history and AI re-apply load a scope for the user to run, so run-state from before is dropped.

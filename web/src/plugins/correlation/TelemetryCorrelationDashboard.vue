@@ -423,6 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <TraceDetails
               mode="embedded"
+              :shortcuts-active="shortcutsActive"
               :trace-id-prop="extractedTraceId || ''"
               :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
               :span-list-prop="traceSpanList"
@@ -864,6 +865,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <TraceDetails
             mode="embedded"
+            :shortcuts-active="shortcutsActive"
             :trace-id-prop="extractedTraceId || ''"
             :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
             :span-list-prop="traceSpanList"
@@ -1145,11 +1147,14 @@ export interface TelemetryCorrelationDashboardProps {
   panelHeight?: number; // Override default panel height (grid units) for metric panels
   logsPanelWidth?: number; // Override default panel width (grid units) for logs panel
   logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
+  /** Forwarded to the embedded TraceDetails; a kept-alive tab that is not shown must not own J/K. */
+  shortcutsActive?: boolean;
 }
 
 const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
+  shortcutsActive: true,
 });
 
 const emit = defineEmits<{

@@ -59,6 +59,7 @@ import {
   planStreamsFilter,
   type FilterResolveContext,
 } from "@/composables/useLogs/freeTextSearch";
+import { closeDrawerForQuery } from "@/composables/useLogs/logsRowNav";
 
 export { appendConjunct, materializeFreeText, planStreamsFilter, type FilterResolveContext };
 
@@ -344,7 +345,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       searchObj.data.queryResults = {};
     }
 
-    searchObj.meta.showDetailTab = false;
+    closeDrawerForQuery(searchObj, isPagination);
     searchObj.meta.searchApplied = true;
     searchObj.data.functionError = "";
 

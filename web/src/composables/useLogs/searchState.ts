@@ -20,6 +20,7 @@ import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import { resetTransient } from "@/utils/logs/transientSearchKeys";
 import type { FreeTextBlocked, FreeTextDecorations } from "@/composables/useLogs/freeTextSearch";
+import type { PageLoad, PageRequest } from "@/utils/pageCrossing";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
@@ -140,6 +141,9 @@ export interface ResultGrid {
   columns: unknown[];
   colOrder: { [key: string]: string[] };
   colSizes: { [key: string]: unknown };
+  hitsSettled?: boolean;
+  pageRequest?: PageRequest | null;
+  pageLoad?: PageLoad | null;
 }
 
 export interface SearchAroundData {
@@ -347,6 +351,10 @@ export const searchState = () => {
       // Restore cached query results and histogram data
       searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
       searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
+      // No request is in flight after a remount, so no page request can still resolve.
+      searchObj.data.resultGrid.pageRequest = null;
+      searchObj.data.resultGrid.pageLoad = null;
+      searchObj.data.resultGrid.hitsSettled = true;
       // Restore histogram — breakdownSeries was serialized as an entries array
       // (Map is not JSON-serializable), so reconstruct the Map here.
       const savedBreakdown = state.data.histogram.breakdownSeries;

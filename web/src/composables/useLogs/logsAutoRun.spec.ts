@@ -263,6 +263,37 @@ describe("transport binding (AC4.1, P2 records)", () => {
     expect(sentPayloads[1].query.sql).toContain("LIMIT 10 OFFSET 5");
   });
 
+  it("cancelling a bound pagination generation resolves its crossing as `cancelled` (4a §3.2.2)", () => {
+    const obj = fakeSearchObj.value;
+    obj.meta.resultGrid = {
+      navigation: {
+        currentRowIndex: 49,
+        selectionActive: true,
+        pendingPageSelection: { page: 2, position: "first", requestId: null },
+      },
+    };
+    obj.data.resultGrid.pageRequest = null;
+    obj.data.resultGrid.pageLoad = null;
+    const connection = useSearchConnection((key: string) => key as any);
+    const page = openGrid();
+    connection.getDataThroughStream(
+      { query: { sql: 'select * from "app"', from: 50, size: 50 } } as any,
+      true,
+      callbacks,
+      page.id,
+    );
+    const bound = obj.meta.resultGrid.navigation.pendingPageSelection.requestId;
+    expect(bound).toBe(obj.data.resultGrid.pageRequest.requestId);
+
+    run().engine.cancelGeneration(null, { cause: "user" });
+
+    expect(obj.data.resultGrid.pageLoad).toEqual({
+      requestId: bound,
+      ok: false,
+      reason: "cancelled",
+    });
+  });
+
   it("sends nothing for a follow-up of a replaced generation", () => {
     const connection = useSearchConnection((key: string) => key as any);
     const old = openGrid();

@@ -35,6 +35,12 @@ import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 import { raw, type TranslateFn } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import {
+  failPendingPageNavigation,
+  notePageLoad,
+  notePageRetry,
+  notifyHitsComplete,
+} from "@/composables/useLogs/logsRowNav";
 
 export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -78,13 +84,20 @@ export const useSearchStream = (t: TranslateFn) => {
    * Main entry point for search operations
    * Delegates to appropriate split composables
    */
-  const getDataThroughStream = (isPagination: boolean, generationId?: number) => {
+  const getDataThroughStream = (
+    isPagination: boolean,
+    generationId?: number,
+    options: { reuseSchema?: boolean } = {},
+  ) => {
     try {
       if (!isPagination) resetQueryData();
 
       // 1. Build the query using the query composable
       const queryReq = queryBuilder.getQueryReq(isPagination);
-      if (!queryReq) return;
+      if (!queryReq) {
+        if (isPagination) failPendingPageNavigation(searchObj);
+        return;
+      }
 
       // 2. Execute the search through the connection manager
       connectionManager.getDataThroughStream(
@@ -92,10 +105,12 @@ export const useSearchStream = (t: TranslateFn) => {
         isPagination,
         searchCallbacks(),
         generationId,
+        options,
       );
     } catch (error: any) {
       console.error("Search operation failed:", error);
       searchObj.loading = false;
+      if (isPagination) failPendingPageNavigation(searchObj, { quiet: true });
       showErrorNotification(t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
     }
   };
@@ -144,6 +159,8 @@ export const useSearchStream = (t: TranslateFn) => {
     if (payload.type === "search") {
       searchObj.loading = false;
       searchObj.loadingProgressPercentage = 0;
+      if (payload.isPagination) notePageLoad(searchObj, payload.traceId, "done");
+      notifyHitsComplete(payload);
     }
     if (payload.type === "histogram" || payload.type === "pageCount") {
       searchObj.loadingHistogram = false;
@@ -189,6 +206,7 @@ export const useSearchStream = (t: TranslateFn) => {
           };
         }
 
+        if (data.isPagination) notePageRetry(searchObj, data.traceId);
         // Rebuild payload and retry
         const payload = connectionManager.buildWebSocketPayload(
           data.queryReq,
@@ -196,6 +214,7 @@ export const useSearchStream = (t: TranslateFn) => {
           "search",
         );
         (payload as { generationId?: number }).generationId = data.generationId;
+        (payload as { reuseSchema?: boolean }).reuseSchema = data.reuseSchema;
 
         connectionManager.initializeSearchConnection(payload);
         addTraceId(payload.traceId);

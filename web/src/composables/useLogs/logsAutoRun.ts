@@ -47,6 +47,7 @@ import {
 } from "@/utils/logs/estimateScanMb";
 import { sqlSources } from "@/utils/logs/sqlSources";
 import { freeTextGateFlags } from "@/utils/logs/freeTextScan";
+import { notePageCancelled } from "@/composables/useLogs/logsRowNav";
 
 export interface TransportPayload {
   traceId: string;
@@ -235,6 +236,8 @@ function createLogsAutoRun() {
     },
     abortTrace: (traceId) => {
       transport?.abortTrace(traceId, searchObj().organizationIdentifier);
+      // A browser abort fires no error callback, so the crossing bound to this request resolves here.
+      notePageCancelled(searchObj(), traceId);
       const data = searchObj().data;
       data.searchRequestTraceIds = (data.searchRequestTraceIds ?? []).filter(
         (id: string) => id !== traceId,

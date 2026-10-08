@@ -50,9 +50,36 @@ export const ITEM1_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.freeTextScan", mode: "replace", owner: "item1", defaultValue: () => ({}) },
 ];
 
+// The open drawer and its row are page-local; a view or a restore must never reopen them.
+export const ITEM4A_TRANSIENT_KEYS: TransientSearchKey[] = [
+  { path: "meta.showDetailTab", mode: "reset", owner: "item4a", defaultValue: () => false },
+  {
+    path: "meta.resultGrid.navigation.currentRowIndex",
+    mode: "reset",
+    owner: "item4a",
+    defaultValue: () => null,
+  },
+  {
+    path: "meta.resultGrid.navigation.selectionActive",
+    mode: "reset",
+    owner: "item4a",
+    defaultValue: () => false,
+  },
+  {
+    path: "meta.resultGrid.navigation.pendingPageSelection",
+    mode: "reset",
+    owner: "item4a",
+    defaultValue: () => null,
+  },
+  { path: "data.resultGrid.pageRequest", mode: "reset", owner: "item4a", defaultValue: () => null },
+  { path: "data.resultGrid.pageLoad", mode: "reset", owner: "item4a", defaultValue: () => null },
+  { path: "data.resultGrid.hitsSettled", mode: "reset", owner: "item4a", defaultValue: () => true },
+];
+
 export const TRANSIENT_SEARCH_KEYS: TransientSearchKey[] = [
   ...ITEM2_TRANSIENT_KEYS,
   ...ITEM1_TRANSIENT_KEYS,
+  ...ITEM4A_TRANSIENT_KEYS,
 ];
 
 function isPlainObject(value: unknown): value is PlainObject {

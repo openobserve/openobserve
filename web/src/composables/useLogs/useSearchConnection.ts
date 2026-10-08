@@ -31,6 +31,7 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { raw } from "@/types/i18n";
 import { setAutoRunTransport, useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import searchService from "@/services/search";
+import { failPendingPageNavigation, notePageRequest } from "@/composables/useLogs/logsRowNav";
 
 export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -63,6 +64,7 @@ export const useSearchConnection = (t: TranslateFn) => {
 
     if (type === "search") {
       searchObj.data.lastSearchTraceId = traceId;
+      if (isPagination) notePageRequest(searchObj, traceId);
     }
     if (type === "histogram") {
       searchObj.data.lastHistogramTraceId = traceId;
@@ -172,6 +174,7 @@ export const useSearchConnection = (t: TranslateFn) => {
       onReset: (data: any, traceId?: string) => void;
     },
     generationId?: number,
+    options: { reuseSchema?: boolean } = {},
   ) => {
     try {
       if (!queryReq) return;
@@ -218,6 +221,7 @@ export const useSearchConnection = (t: TranslateFn) => {
       );
 
       if (generationId != null) (payload as { generationId?: number }).generationId = generationId;
+      if (options.reuseSchema) (payload as { reuseSchema?: boolean }).reuseSchema = true;
 
       // Add callbacks to payload
       payload.onData = callbacks.onData;
@@ -246,6 +250,7 @@ export const useSearchConnection = (t: TranslateFn) => {
     } catch (e: any) {
       console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
+      if (isPagination) failPendingPageNavigation(searchObj, { quiet: true });
       showErrorNotification(
         raw(
           notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),

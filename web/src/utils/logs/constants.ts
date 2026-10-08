@@ -15,6 +15,7 @@
 
 import { useLocalWrapContent } from "@/utils/zincutils";
 import { TimePeriodUnit } from "@/ts/interfaces";
+import type { PageLoad, PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
 
 /**
  * Maximum number of search retries before giving up
@@ -144,7 +145,9 @@ export const DEFAULT_LOGS_CONFIG = {
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
-        currentRowIndex: 0,
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as PendingPageSelection | null,
       },
       showPagination: true,
     },
@@ -227,6 +230,8 @@ export const DEFAULT_LOGS_CONFIG = {
       colOrder: {} as any,
       colSizes: {} as any,
       hitsSettled: true,
+      pageRequest: null as PageRequest | null,
+      pageLoad: null as PageLoad | null,
     },
     histogramInterval: 0 as any,
     transforms: [] as any[],

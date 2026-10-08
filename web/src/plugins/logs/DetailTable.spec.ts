@@ -889,6 +889,7 @@ describe("DetailTable Component", () => {
       "closeTable",
       "show-correlation",
       "load-correlation",
+      "update:tab",
     ];
     expect(componentOptions.emits).toEqual(expectedEmits);
   });
@@ -1366,6 +1367,120 @@ describe("DetailTable Component", () => {
         "No level field on this row, and no level word in body.",
       );
       expect(line?.querySelector("code")?.textContent).toBe("body");
+    });
+  });
+
+  describe("J/K footer and page crossing (4a §3.3)", () => {
+    const dashboardStub = {
+      name: "TelemetryCorrelationDashboard",
+      props: ["externalActiveTab", "shortcutsActive"],
+      template: "<div />",
+    };
+
+    const mountFooter = async (props: Record<string, unknown> = {}) => {
+      wrapper?.unmount();
+      wrapper = mount(DetailTable, {
+        attachTo: "#app",
+        props: { ...defaultProps, ...props },
+        global: {
+          ...globalMountOptions,
+          stubs: {
+            ...globalMountOptions.stubs,
+            OButton: false,
+            TelemetryCorrelationDashboard: dashboardStub,
+            CorrelatedLogsTable: true,
+          },
+        },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    const button = (name: "next" | "previous") =>
+      wrapper.find(`[data-test="log-detail-${name}-detail-btn"]`);
+
+    it("shows the J and K keycaps from the registry and opts out of drawer autofocus", async () => {
+      await mountFooter();
+      expect(wrapper.find('[data-test="log-detail-next-detail-btn-kbd"]').text()).toContain("J");
+      expect(wrapper.find('[data-test="log-detail-previous-detail-btn-kbd"]').text()).toContain(
+        "K",
+      );
+      expect(
+        wrapper.find('[data-test="dialog-box"]').attributes("data-no-autofocus"),
+      ).toBeDefined();
+    });
+
+    it("keeps Next enabled on the last row when another page exists", async () => {
+      await mountFooter({ currentIndex: 9, totalLength: 10, hasNextPage: true });
+      expect(button("next").attributes("disabled")).toBeUndefined();
+      await wrapper.setProps({ hasNextPage: false });
+      expect(button("next").attributes("disabled")).toBeDefined();
+      await wrapper.setProps({ currentIndex: 0, hasPrevPage: true });
+      expect(button("previous").attributes("disabled")).toBeUndefined();
+    });
+
+    it("covers the record while a page loads, keeps the footer and blocks record actions", async () => {
+      await mountFooter({
+        currentIndex: 9,
+        totalLength: 10,
+        hasNextPage: true,
+        pageLoading: true,
+        pageLoadingDirection: "next",
+        pageLoadingPage: 2,
+      });
+      const overlay = wrapper.find('[data-test="log-detail-page-loading"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("Loading page 2…");
+      expect(overlay.element.parentElement?.getAttribute("aria-busy")).toBe("true");
+      expect(button("next").attributes("disabled")).toBeDefined();
+      expect(button("next").attributes("aria-busy")).toBe("true");
+      expect(button("previous").attributes("disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-busy")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="logs-detail-table-search-around-btn"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    it("disables both buttons with the reason as their tooltip", async () => {
+      await mountFooter({ currentIndex: 3, navDisabledReason: "resultsChanged" });
+      expect(button("next").attributes("disabled")).toBeDefined();
+      expect(button("previous").attributes("disabled")).toBeDefined();
+      expect(wrapper.vm.nextTooltip).toBe("Results changed");
+      await wrapper.setProps({ navDisabledReason: "loading" });
+      expect(wrapper.vm.prevTooltip).toBe("Loading results…");
+      await wrapper.setProps({ navDisabledReason: "notInPage" });
+      expect(wrapper.vm.nextTooltip).toBe("Not in the current page");
+    });
+
+    it("explains a blocked page edge on the edge button only (AC5.7)", async () => {
+      await mountFooter({
+        currentIndex: 9,
+        totalLength: 10,
+        pageEdgeReason: "Run the query to update results",
+      });
+      expect(button("next").attributes("disabled")).toBeDefined();
+      expect(wrapper.vm.nextTooltip).toBe("Run the query to update results");
+      expect(wrapper.vm.prevTooltip).toBe("Previous log");
+    });
+
+    it("emits update:tab on mount, including a correlated initial tab, and on every change", async () => {
+      await mountFooter({ initialTab: "correlated-logs" });
+      expect(wrapper.emitted("update:tab")?.[0]).toEqual(["correlated-logs"]);
+      wrapper.vm.tab = "table";
+      await flushPromises();
+      expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
+    });
+
+    it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
+      await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
+      const traces = () =>
+        wrapper
+          .findAllComponents(dashboardStub)
+          .find((c: any) => c.props("externalActiveTab") === "traces");
+      expect(traces()?.props("shortcutsActive")).toBe(false);
+      wrapper.vm.tab = "correlated-traces";
+      await flushPromises();
+      expect(traces()?.props("shortcutsActive")).toBe(true);
     });
   });
 });

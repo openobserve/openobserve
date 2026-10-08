@@ -198,6 +198,52 @@ describe("useSearchBar Composable", () => {
     });
   });
 
+  describe("getQueryData — drawer-close rule and selection reset (4a §3.2.5, §3.2.7)", () => {
+    const prime = (pending: boolean) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.showDetailTab = true;
+      searchObj.meta.resultGrid.navigation = {
+        currentRowIndex: 49,
+        selectionActive: true,
+        pendingPageSelection: pending ? { page: 2, position: "first", requestId: null } : null,
+      };
+      return searchObj;
+    };
+
+    it("a new query closes the drawer and drops the open row", async () => {
+      const searchObj = prime(true);
+      await (wrapper.vm as any).getQueryData(false);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+      expect(searchObj.meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: false,
+        pendingPageSelection: null,
+      });
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(false, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("a J/K crossing's page query keeps the drawer and the selection", async () => {
+      const searchObj = prime(true);
+      await (wrapper.vm as any).getQueryData(true);
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBe(49);
+      expect(searchObj.meta.resultGrid.navigation.pendingPageSelection?.page).toBe(2);
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(true, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("a mouse page query still closes the drawer", async () => {
+      const searchObj = prime(false);
+      await (wrapper.vm as any).getQueryData(true);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+    });
+  });
+
   describe("onStreamChange", () => {
     it("clears carried-over selectedFields so FTS re-selects for the new stream", async () => {
       // Carried over from a previously selected stream. "field1" even exists

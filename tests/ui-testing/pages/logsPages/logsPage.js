@@ -384,6 +384,12 @@ export class LogsPage {
         this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailPreviousKbd = '[data-test="log-detail-previous-detail-btn-kbd"]';
+        this.logDetailNextKbd = '[data-test="log-detail-next-detail-btn-kbd"]';
+        this.logDetailPageLoading = '[data-test="log-detail-page-loading"]';
+        this.logsDetailNavLive = '[data-test="logs-detail-nav-live"]';
+        this.logsRowNavLive = '[data-test="logs-row-nav-live"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
         // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
@@ -3916,6 +3922,22 @@ export class LogsPage {
         await expect(this.page.locator(this.logDetailPreviousBtn)).toBeVisible();
         await expect(this.page.locator(this.logDetailNextBtn)).toBeVisible();
         testLogger.info('✓ Previous and Next navigation buttons are visible');
+    }
+
+    /** The results-table row at hit index `n`; DetailTable's Table tab reuses the same row ids. */
+    logResultsRow(n) {
+        return this.page.locator(`[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${n}"]`);
+    }
+
+    /** Presses a J/K row key with nothing typed into, the way a keyboard user would. */
+    async pressLogRowKey(key, options = {}) {
+        await this.page.keyboard.press(key, options);
+    }
+
+    /** Asserts that exactly hit `n` carries the open-row highlight (4a AC1.1). */
+    async expectActiveLogRow(n) {
+        await expect(this.logResultsRow(n)).toHaveAttribute('aria-current', 'true');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"] [data-active-row="true"]')).toHaveCount(1);
     }
 
     // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====

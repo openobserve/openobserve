@@ -340,6 +340,52 @@ describe("Logs Index", async () => {
     );
   });
 
+  describe("search-job page crossing (4a §3.2.2, AC2.11)", () => {
+    const prime = () => {
+      const { searchObj } = wrapper.vm;
+      searchObj.meta.jobId = "job-1";
+      searchObj.meta.refreshInterval = 0;
+      searchObj.meta.resultGrid.navigation.pendingPageSelection = {
+        page: 2,
+        position: "first",
+        requestId: null,
+      };
+      searchObj.data.resultGrid.pageRequest = null;
+      searchObj.data.resultGrid.pageLoad = null;
+      return searchObj;
+    };
+
+    afterEach(() => {
+      wrapper.vm.searchObj.meta.jobId = "";
+      wrapper.vm.searchObj.meta.resultGrid.navigation.pendingPageSelection = null;
+    });
+
+    it("binds the crossing before the job page loads and records `done` after it", async () => {
+      const searchObj = prime();
+      let finish!: () => void;
+      wrapper.vm.getJobData = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+      const run = wrapper.vm.getMoreData();
+      const bound = searchObj.meta.resultGrid.navigation.pendingPageSelection.requestId;
+      expect(bound).toMatch(/^job-\d+$/);
+      expect(wrapper.vm.getJobData).toHaveBeenCalledWith(false);
+      expect(searchObj.data.resultGrid.pageLoad).toBeNull();
+      finish();
+      await run;
+      expect(searchObj.data.resultGrid.pageLoad).toEqual({
+        requestId: bound,
+        ok: true,
+        reason: "done",
+      });
+    });
+
+    it("records `error` when the job page throws", async () => {
+      const searchObj = prime();
+      wrapper.vm.getJobData = vi.fn(() => Promise.reject(new Error("job failed")));
+      await wrapper.vm.getMoreData();
+      expect(searchObj.data.resultGrid.pageLoad).toMatchObject({ ok: false, reason: "error" });
+    });
+  });
+
   describe("free text (item 1)", () => {
     const stream = (name: string, fts: boolean) => ({
       name,
