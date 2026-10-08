@@ -65,7 +65,7 @@ async fn eval_range_partition<S: SeriesStream>(
         source.consume(&mut samples).await?;
         let mut values = Vec::with_capacity(eval.timestamps.len());
         values.extend(
-            eval.values(&samples)
+            eval.values(&mut samples)
                 .map(|(slot, value)| Sample::new(eval.timestamps[slot], value)),
         );
         if !values.is_empty() {

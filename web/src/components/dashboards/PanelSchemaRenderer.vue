@@ -252,6 +252,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :x="contextMenuPosition.x"
         :y="contextMenuPosition.y"
         :value="contextMenuValue"
+        :panel-query-index="contextMenuData?.panelQueryIndex"
+        :series-role="contextMenuData?.seriesRole"
+        :unit="panelSchema?.config?.unit"
+        :unit-custom="panelSchema?.config?.unit_custom"
         @select="handleCreateAlert"
         @close="hideContextMenu"
       />
@@ -310,7 +314,11 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { usePanelAlertCreation, usePanelDownload } from "@/composables/dashboard/usePanelActions";
+import {
+  forecastPointOf,
+  usePanelAlertCreation,
+  usePanelDownload,
+} from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
@@ -467,6 +475,12 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    /** The registered alert source a right-click alert names, so its toast says where it came from. */
+    alertSource: {
+      default: "panel",
+      required: false,
+      type: String,
+    },
     runId: {
       type: String,
       default: null,
@@ -603,10 +617,13 @@ export default defineComponent({
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
-    // Returns array of hidden query indices (e.g., [0, 2] means queries 0 and 2 are hidden)
-    // Returns [] if no page key or no hiddenQueries - which means no filtering
-    const hiddenQueries = computed(() => {
-      return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
+    // The editor's live toggles win in the editor; elsewhere the saved hide flags apply.
+    const hiddenQueries = computed((): number[] => {
+      if (dashboardPanelDataForHiding)
+        return dashboardPanelDataForHiding.layout?.hiddenQueries || [];
+      return (panelSchema.value?.queries ?? []).flatMap((query: any, i: number) =>
+        query?.config?.hide ? [i] : [],
+      );
     });
 
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
@@ -733,6 +750,7 @@ export default defineComponent({
       allowAnnotationsAdd,
       allowAnnotationsAPI,
       allowAlertCreation,
+      alertSource,
       runId,
       tabId,
       tabName,
@@ -1126,7 +1144,7 @@ export default defineComponent({
       contextMenuPosition,
       contextMenuValue,
       onChartContextMenu,
-      onChartDomContextMenu,
+      onChartDomContextMenu: openAlertContextMenu,
       hideContextMenu,
       handleCreateAlert,
     } = usePanelAlertCreation({
@@ -1138,7 +1156,25 @@ export default defineComponent({
       store,
       router,
       emit,
+      visibleQueryIndexes,
+      hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
+      alertSource,
     });
+    // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
+    const onChartDomContextMenu = (event: any) => {
+      const series =
+        typeof event?.seriesIndex === "number"
+          ? panelData.value?.options?.series?.[event.seriesIndex]
+          : undefined;
+      openAlertContextMenu({
+        ...event,
+        panelQueryIndex: series?._panelQueryIndex,
+        seriesRole: series?._seriesRole,
+        ...(series?._seriesRole === "forecast"
+          ? { forecastPoint: forecastPointOf(series, event.dataIndex) }
+          : {}),
+      });
+    };
 
     // hovered series state
     // used to show tooltip axis for all charts

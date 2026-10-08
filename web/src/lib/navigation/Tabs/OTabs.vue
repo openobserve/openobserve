@@ -202,6 +202,16 @@ const indicator = reactive({ left: 0, width: 0, visible: false });
 // left edge on initial mount — only later selections animate.
 const indicatorReady = ref(false);
 
+function tabEnd(tab: HTMLElement): HTMLElement {
+  const next = tab.nextElementSibling;
+  return next instanceof HTMLElement && next.hasAttribute("data-otab-trailing") ? next : tab;
+}
+
+function tabRight(tab: HTMLElement): number {
+  const end = tabEnd(tab);
+  return end.offsetLeft + end.offsetWidth;
+}
+
 function updateIndicator(): void {
   if (isVertical.value) return;
   const list = tablistRef.value;
@@ -212,7 +222,7 @@ function updateIndicator(): void {
     return;
   }
   indicator.left = active.offsetLeft;
-  indicator.width = active.offsetWidth;
+  indicator.width = tabRight(active) - active.offsetLeft;
   indicator.visible = true;
 }
 
@@ -235,7 +245,7 @@ function updateScrollState(): void {
   const list = tablistRef.value;
   if (list) {
     for (const tab of list.querySelectorAll<HTMLElement>('[role="tab"]')) {
-      const right = tab.offsetLeft + tab.offsetWidth;
+      const right = tabRight(tab);
       if (right > contentWidth) contentWidth = right;
     }
     if (contentWidth > 0) contentWidth += 3; // tablist px-0.75 (3px) right padding
@@ -308,11 +318,12 @@ function revealActiveTab(behavior: ScrollBehavior): void {
   const activeTab = el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
   if (!activeTab) return;
   const tabRect = activeTab.getBoundingClientRect();
+  const tabRightEdge = tabEnd(activeTab).getBoundingClientRect().right;
   const containerRect = el.getBoundingClientRect();
   if (tabRect.left < containerRect.left) {
     el.scrollBy({ left: tabRect.left - containerRect.left - 8, behavior });
-  } else if (tabRect.right > containerRect.right) {
-    el.scrollBy({ left: tabRect.right - containerRect.right + 8, behavior });
+  } else if (tabRightEdge > containerRect.right) {
+    el.scrollBy({ left: tabRightEdge - containerRect.right + 8, behavior });
   }
 }
 

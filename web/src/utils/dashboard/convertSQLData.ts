@@ -757,6 +757,10 @@ export const convertMultiSQLData = async (
 
   // C2: Series labeling + C4: Stack collision fix — apply to ALL queries when multi-query
   if (options && options.length > 1 && options[0]?.options) {
+    // A right-clicked series alerts on its own panel query, a shifted one on its parent's.
+    const seriesRoleAt = (i: number) =>
+      Number(metadata?.queries?.[i]?.timeRangeGap?.seconds) ? "shifted" : "primary";
+
     // Label Q1 series
     if (options[0].options.series) {
       const pIdx0 = metadata?.queries?.[0]?.panelQueryIndex ?? 0;
@@ -769,6 +773,8 @@ export const convertMultiSQLData = async (
           ...it,
           name: buildLabeledName(it.name, q1Config, pIdx0, q1Period),
           _queryIndex: 0,
+          _panelQueryIndex: pIdx0,
+          _seriesRole: seriesRoleAt(0),
         };
       });
     }
@@ -788,6 +794,8 @@ export const convertMultiSQLData = async (
               ...it,
               name: buildLabeledName(it.name, qConfig, panelQueryIndex, periodAsStr),
               _queryIndex: i,
+              _panelQueryIndex: panelQueryIndex,
+              _seriesRole: seriesRoleAt(i),
               // C4: prefix stack names to prevent cross-query stacking
               stack: it.stack ? `q${i}-${it.stack}` : it.stack,
             };

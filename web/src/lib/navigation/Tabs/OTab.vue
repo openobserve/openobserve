@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<OTabProps>(), {
   disableDrag: false,
 });
 
-defineSlots<OTabSlots>();
+const slots = defineSlots<OTabSlots>();
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY);
 
@@ -82,7 +82,13 @@ const baseClasses = computed<string>(() =>
     // hover-revealed drag grip. The gutter is tied to `reorderable` (not
     // per-press state), so a tab is pixel-identical at rest, on hover, and
     // while its label is being edited — the grip only ever changes opacity.
-    isReorderable.value ? "ps-3 pe-2" : isVertical.value ? "ps-1 pe-2" : "px-2",
+    isReorderable.value
+      ? "ps-3 pe-2"
+      : isVertical.value
+        ? "ps-1 pe-2"
+        : slots.trailing
+          ? "ps-2 pe-1"
+          : "px-2",
     "font-normal text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
@@ -229,6 +235,15 @@ const heightClasses = computed<string>(() => {
       </template>
       <slot v-else />
     </TabsTrigger>
+    <!-- OTabs measures this with the trigger for the underline and the overflow arrows. -->
+    <span
+      v-if="slots.trailing"
+      data-otab-trailing
+      class="inline-flex shrink-0 items-center gap-0.5 border-b-2 border-transparent pe-1.5"
+      :class="heightClasses"
+    >
+      <slot name="trailing" />
+    </span>
     <OTooltip v-if="tooltip" :content="tooltip" />
   </span>
 </template>

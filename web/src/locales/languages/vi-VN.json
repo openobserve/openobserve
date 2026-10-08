@@ -5279,8 +5279,9 @@
     "hundredPlaceholder": "100",
     "last": "Cuối",
     "alertContextMenu": {
-      "thresholdAbove": "Tạo cảnh báo với ngưỡng trên {value}",
-      "thresholdBelow": "Tạo cảnh báo với ngưỡng dưới {value}"
+      "thresholdAbove": "Cảnh báo khi vượt {value}",
+      "thresholdBelow": "Cảnh báo khi dưới {value}",
+      "forecastReaches": "Cảnh báo khi dự báo đạt {value}"
     },
     "dashboardErrors": {
       "errorsCount": "Lỗi ({count})"
@@ -5302,6 +5303,12 @@
     "showQueryResults": "Hiển thị kết quả truy vấn",
     "hideQueryResults": "Ẩn kết quả truy vấn",
     "renameQuery": "Đổi tên truy vấn",
+    "addFormula": "Thêm công thức",
+    "formulaNumber": "Công thức {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} không phải là một truy vấn trong panel này",
+    "formulaReferencesFormula": "{letter} là một công thức, và công thức không được tham chiếu đến công thức khác",
+    "formulaInputNote": "Được dùng trong công thức: ở đó, cài đặt tức thời/khoảng, chú giải, bước và dịch chuyển thời gian của truy vấn này không được áp dụng.",
     "multiSqlQueryLabel": "Nhãn truy vấn",
     "multiSqlQueryLabelHint": "Tên tùy chỉnh cho truy vấn này trong chú thích (ví dụ: 'Production')",
     "multiQueryWarning": "Chỉ Truy vấn 1 được hiển thị cho {chartType}",
@@ -6331,8 +6338,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Thay đổi chế độ truy vấn",
-      "changeQueryModeConfirm": "Bạn có chắc muốn thay đổi chế độ truy vấn? Dữ liệu đã lưu cho trục X, trục Y và bộ lọc sẽ bị xóa.",
-      "switchToBuilderConfirm": "Bạn có chắc muốn chuyển sang chế độ xây dựng? Truy vấn PromQL tùy chỉnh của bạn sẽ bị xóa."
+      "changeQueryModeConfirm": "Bạn có chắc muốn thay đổi chế độ truy vấn? Dữ liệu đã lưu cho trục X, trục Y và bộ lọc sẽ bị xóa."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Cũng thay thế truy vấn bằng truy vấn mẫu",
@@ -6480,6 +6486,7 @@
       "selectRequiredFields": "Vui lòng chọn các trường bắt buộc để hiển thị biểu đồ",
       "noDataFound": "Không tìm thấy dữ liệu",
       "seriesLimitWarning": "Giới hạn chuỗi hiển thị để đảm bảo hiệu suất tối ưu",
+      "fitted": "vừa khớp",
       "mapLayerName": "Lớp 1",
       "mapLayerNameIndexed": "Lớp {index}",
       "secondsAgo": "{count} giây trước | {count} giây trước",
@@ -8666,10 +8673,39 @@
     "noData": "Không có dữ liệu",
     "recentData": "dữ liệu gần đây",
     "theLastDay": "ngày qua | {count} ngày qua",
+    "forecast": {
+      "modeThreshold": "Ngưỡng",
+      "modeForecast": "Dự báo",
+      "expression": "Biểu thức để dự báo",
+      "alertWhen": "Cảnh báo khi nó",
+      "rises": "tăng đến",
+      "falls": "giảm đến",
+      "threshold": "Ngưỡng",
+      "within": "trong vòng",
+      "days": "ngày",
+      "basedOn": "Dựa trên",
+      "window6h": "6 giờ",
+      "window1d": "1 ngày",
+      "window2d": "2 ngày",
+      "window7d": "7 ngày",
+      "help": "Một đường xu hướng thẳng được vẽ qua lượng lịch sử này cho mỗi chuỗi. Mỗi chuỗi có đường đạt ngưỡng kịp thời sẽ tự phát cảnh báo.",
+      "horizonRange": "Nhập số ngày nguyên từ {min} đến {max}",
+      "horizonLabel": "Tầm dự báo theo ngày",
+      "dayCount": "{n} ngày | {n} ngày",
+      "summaryRises": "Cảnh báo khi dự báo tăng đến {threshold} trong vòng {horizon}",
+      "summaryFalls": "Cảnh báo khi dự báo giảm đến {threshold} trong vòng {horizon}",
+      "triggerRises": "dự báo tăng đến {threshold} trong vòng {horizon}",
+      "triggerFalls": "dự báo giảm đến {threshold} trong vòng {horizon}",
+      "previewSeries": "ngày cho đến {threshold}",
+      "previewReason": "{count} chuỗi dự báo đạt {threshold} trong vòng {horizon}",
+      "rowTemplateHint": "Mỗi hàng của chuỗi đọc như “đạt 90 trong 3 ngày”. Các hàng chỉ hiển thị trong mẫu đích có chứa {'{'}rows{'}'}."
+    },
     "prefill": {
       "dialog": {
         "title": "Tạo cảnh báo",
         "continue": "Tiếp tục đến cảnh báo",
+        "queryChoiceLabel": "Cảnh báo theo truy vấn",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Luồng",
         "thresholdLabel": "Cảnh báo trên",
         "thresholdMatchingRows": "Các hàng khớp",
@@ -8705,6 +8741,10 @@
         "library": {
           "label": "Tùy chỉnh trong trình chỉnh sửa",
           "toast": "Từ Thư viện cảnh báo: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Tạo cảnh báo",
+          "toast": "Truy vấn đã được nhập từ Metrics Explorer"
         },
         "dbm": {
           "label": "Báo cho tôi",
@@ -9388,11 +9428,77 @@
         "close": "Quay lại chỉ số",
         "backTo": "chỉ số",
         "openInVisualize": "Mở trong Visualize",
+        "overlay": {
+          "current": "Hiện tại",
+          "noData": "Không có dữ liệu {period}",
+          "forecast": "Dự báo"
+        },
+        "noAlertQuery": "Chỉ số này không có truy vấn để cảnh báo",
+        "drilldown": {
+          "button": "Nhật ký & trace",
+          "help": "Mở nhật ký và trace của dịch vụ thuộc chỉ số này. Việc tương quan cần các nhãn nhận diện dịch vụ, nên các chỉ số hạ tầng không có nhãn dịch vụ thường không tìm thấy gì, trừ khi tổ chức đặt dịch vụ là tùy chọn.",
+          "enterprise": "Drilldown nhật ký và trace là tính năng của gói Enterprise.",
+          "discoveryOff": "Tính năng khám phá dịch vụ đã bị tắt cho tổ chức này.",
+          "forbidden": "Bạn không có quyền sử dụng tương quan dịch vụ.",
+          "checking": "Đang kiểm tra quyền truy cập…",
+          "loading": "Đang tải…",
+          "schemaError": "Không thể tải nhãn của chỉ số này.",
+          "retry": "Thử lại",
+          "pickService": "Chọn một {label} để xem nhật ký và trace của nó",
+          "noServiceValues": "Không có giá trị {label} trong khoảng thời gian này.",
+          "noServiceLabel": "Chỉ số này không có nhãn dịch vụ để đối chiếu.",
+          "needIdentity": "Lọc theo nhãn định danh, chẳng hạn như namespace, để đối chiếu.",
+          "noService": "Không tìm thấy dịch vụ nào với các bộ lọc này.",
+          "noPermission": "Bạn không có quyền xem dịch vụ.",
+          "logs": "Nhật ký",
+          "traces": "Trace",
+          "noLogsStream": "Không có stream nhật ký cho dịch vụ {service}",
+          "noTracesStream": "Không có stream trace cho dịch vụ {service}",
+          "noServiceField": "Không có trường dịch vụ trong stream này",
+          "notApplied": "Chưa áp dụng: {labels} (không có trường khớp trong stream này)"
+        },
+        "forecast": {
+          "label": "Dự báo",
+          "off": "Tắt",
+          "linear": "Tuyến tính",
+          "smoothed": "Xu hướng làm mượt",
+          "smoothedHelp": "Xu hướng làm mượt là phép chiếu tuyến tính của một chuỗi đã làm mượt: mỗi điểm được làm mượt qua mười bước liền trước, sau đó khớp một đường thẳng. Đây không phải là dự báo theo mùa.",
+          "horizon": "Khoảng dự báo",
+          "horizonAuto": "25% khoảng thời gian",
+          "horizonComputed": "{duration} (25% khoảng thời gian)",
+          "linearHelp": "Tuyến tính: một đường thẳng khớp với khoảng thời gian hiển thị.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 giờ",
+          "horizon6h": "6 giờ",
+          "horizon1d": "1 ngày",
+          "horizon1w": "1 tuần",
+          "suffix": "dự báo"
+        },
+        "compare": {
+          "label": "So sánh với",
+          "off": "Tắt",
+          "ago1h": "1 giờ trước",
+          "ago1d": "1 ngày trước",
+          "ago1w": "1 tuần trước"
+        },
         "noPreview": "Không có bản xem trước — hãy mở trong Visualize",
         "exemplars": "Exemplar",
         "filtersNotApplied": "Bộ lọc {filters} không áp dụng cho chỉ số này; đang hiển thị tất cả chuỗi của nó | Bộ lọc {filters} không áp dụng cho chỉ số này; đang hiển thị tất cả chuỗi của nó",
         "tabBreakdown": "Phân tách",
         "tabRelated": "Liên quan",
+        "tabUsedIn": "Được dùng trong",
+        "tabUsedInCount": "Được dùng trong ({count})",
+        "usedIn": {
+          "dashboards": "Bảng điều khiển ({count})",
+          "alerts": "Cảnh báo ({count})",
+          "slos": "SLO ({count})",
+          "pipelines": "Pipeline theo lịch ({count})",
+          "empty": "Không có bảng điều khiển, cảnh báo, SLO hay pipeline theo lịch nào bạn có thể thấy sử dụng chỉ số này",
+          "error": "Không thể tra cứu nơi chỉ số này được sử dụng",
+          "unparsed": "{count} truy vấn không thể phân tích cú pháp và được khớp theo tên | {count} truy vấn không thể phân tích cú pháp và được khớp theo tên",
+          "textMatch": "Khớp theo tên",
+          "textMatchHelp": "Truy vấn này không thể phân tích cú pháp, nên nó được tìm thấy bằng cách tìm tên chỉ số trong văn bản của truy vấn. Truy vấn có thể không đọc chỉ số này."
+        },
         "breakdown": {
           "distinctCount": "{count} giá trị | {count} giá trị",
           "distinctMany": "{count}+ giá trị",
@@ -9644,6 +9750,30 @@
       "regexPattern": "Mẫu regex (ví dụ: prod.*)",
       "regexNotMatching": "Regex không khớp (ví dụ: test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "Trình dựng không thể hiển thị {construct}",
+      "twoMetrics": "Trình dựng không thể hiển thị phép toán giữa hai chỉ số — hãy dùng công thức",
+      "noMetric": "Trình dựng cần một truy vấn trên một chỉ số có tên",
+      "mismatch": "Trình dựng không thể hiển thị chính xác truy vấn này",
+      "constructs": {
+        "without": "nhóm without (…)",
+        "offset": "một bổ ngữ offset",
+        "at": "một bổ ngữ {'@'}",
+        "orMatchers": "một or giữa các bộ so khớp nhãn",
+        "subquery": "một truy vấn con",
+        "vectorMatching": "so khớp vector với on (…) hoặc ignoring (…)",
+        "bool": "một so sánh bool",
+        "unaryMinus": "một biểu thức đảo dấu",
+        "string": "một đối số chuỗi",
+        "nonFinite": "một số không hữu hạn",
+        "rangeVector": "một vector khoảng trần",
+        "setOperator": "toán tử tập hợp {op}",
+        "function": "hàm {name}()",
+        "aggregation": "phép tổng hợp {name}",
+        "numberFirst": "một số ở bên trái của {op}",
+        "operator": "toán tử {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Khoảng thời gian để tính tốc độ",
@@ -9663,6 +9793,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Bội số gần nhất"
       },
+      "rangeOnlyFirst": "Hàm khoảng chỉ có thể là bước đầu tiên",
+      "rangeOnlyFirstNote": "Hàm khoảng đọc các mẫu thô, vì vậy nó chỉ có thể là bước đầu tiên. Hãy xóa các bước khác để thêm một bước.",
       "dragToReorder": "Kéo để sắp xếp lại",
       "noMatchingLabels": "Không có nhãn phù hợp",
       "selectMetricFirst": "Chọn chỉ số trước để tải nhãn",

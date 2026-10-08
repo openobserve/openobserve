@@ -571,12 +571,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="detailLoading"
       :tab="detailTab"
       :breakdown-label="breakdownLabel"
+      :compare="compareOffset"
+      :forecast="forecastMethod"
+      :forecast-horizon="forecastHorizon"
+      :step-seconds="detailCard ? grid.detailStepFor(detailCard) : 0"
       :overview="detailOverview"
       :panel-queries="detailPanelQueries"
       :chart-of="chartOf"
       :is-favorite="!!detailMetric && grid.favorites.value.includes(detailMetric)"
       :all-cards="grid.cards.value"
       :labels-by-stream="grid.labelsByStream.value"
+      :ensure-schemas="grid.ensureSchemas"
       :prefix-of="grid.prefixOf"
       :family-of="grid.familyOf"
       :filters="grid.labelFilters.value"
@@ -601,6 +606,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry-exemplars="detailCard && grid.retryExemplars(detailCard)"
       @update:tab="onDetailTab"
       @update:breakdown-label="onBreakdownLabel"
+      @update:compare="compareOffset = $event"
+      @update:forecast="onForecastMethod"
+      @update:forecast-horizon="forecastHorizon = $event"
       @open-related="onOpenRelated"
       @add-filter="onBreakdownAddFilter"
     />
@@ -685,6 +693,7 @@ import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
   type LabelFilter,
+  type QueryWindow,
 } from "@/composables/metrics/useMetricsExplorerGrid";
 import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
@@ -699,8 +708,10 @@ import {
   EXPLORER_FILTER_PARAM_KEYS,
   explorerFiltersToQuery,
   queryToExplorerFilters,
+  type CompareOffset,
   type DetailTab,
 } from "@/utils/metrics/explorerUrlState";
+import type { ForecastHorizon, ForecastMethod } from "@/utils/metrics/forecast";
 import {
   queryParamsToSelectedDate,
   selectedDateToQueryParams,
@@ -885,6 +896,9 @@ export default defineComponent({
     const detailMetric = ref<string | null>(null);
     const detailTab = ref<DetailTab | null>(null);
     const breakdownLabel = ref<string | null>(null);
+    const compareOffset = ref<CompareOffset | null>(null);
+    const forecastMethod = ref<ForecastMethod | null>(null);
+    const forecastHorizon = ref<ForecastHorizon | null>(null);
     const detailOpen = computed(() => isGridMode.value && !!detailMetric.value);
 
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
@@ -1441,7 +1455,7 @@ export default defineComponent({
       expr: string,
       signal: AbortSignal,
       card = detailCard.value,
-      opts?: { maxSeries?: number },
+      opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
     ) => {
       if (!card) return null;
       // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
@@ -1475,10 +1489,19 @@ export default defineComponent({
       detailMetric.value = null;
       detailTab.value = null;
       breakdownLabel.value = null;
+      compareOffset.value = null;
+      forecastMethod.value = null;
+      forecastHorizon.value = null;
+    };
+
+    // A horizon left behind by a forecast turned off would linger in the URL.
+    const onForecastMethod = (method: ForecastMethod | null) => {
+      forecastMethod.value = method;
+      if (!method) forecastHorizon.value = null;
     };
 
     const onDetailTab = (tab: string | number) => {
-      if (tab === "breakdown" || tab === "related") detailTab.value = tab;
+      if (tab === "breakdown" || tab === "related" || tab === "used_in") detailTab.value = tab;
     };
 
     const onBreakdownLabel = (label: string | null) => {
@@ -1529,6 +1552,9 @@ export default defineComponent({
         detailMetric.value = f.metric;
         detailTab.value = f.tab ?? null;
         breakdownLabel.value = f.breakdownLabel ?? null;
+        compareOffset.value = f.compare ?? null;
+        forecastMethod.value = f.forecast ?? null;
+        forecastHorizon.value = f.forecastHorizon ?? null;
       }
 
       // Rehydrate the built chart on refresh / a shared Visualize link: decode
@@ -1575,6 +1601,9 @@ export default defineComponent({
         metric: mode.value === "visualize" ? null : detailMetric.value,
         tab: detailTab.value,
         breakdownLabel: breakdownLabel.value,
+        compare: compareOffset.value,
+        forecast: forecastMethod.value,
+        forecastHorizon: forecastHorizon.value,
       });
       const time: any = selectedDateToQueryParams(selectedDate.value);
       // The default window is recoverable from its absence, like the filters.
@@ -1698,6 +1727,9 @@ export default defineComponent({
         detailMetric.value,
         detailTab.value,
         breakdownLabel.value,
+        compareOffset.value,
+        forecastMethod.value,
+        forecastHorizon.value,
         selectedDate.value,
         refreshInterval.value,
       ],
@@ -1729,6 +1761,9 @@ export default defineComponent({
       detailMetric.value = detail.metric ?? null;
       detailTab.value = detail.tab ?? null;
       breakdownLabel.value = detail.breakdownLabel ?? null;
+      compareOffset.value = detail.compare ?? null;
+      forecastMethod.value = detail.forecast ?? null;
+      forecastHorizon.value = detail.forecastHorizon ?? null;
     };
 
     // URL -> state, for the navigations the mount-time apply cannot see:
@@ -1756,7 +1791,16 @@ export default defineComponent({
 
       // Mode/detail-only changes skip the filters: new Set/array identities re-query every card.
       const withoutPageKeys = (o: Record<string, string>) => {
-        const { mode: _m, metric: _x, tab: _t, breakdown_label: _b, ...rest } = o;
+        const {
+          mode: _m,
+          metric: _x,
+          tab: _t,
+          breakdown_label: _b,
+          compare: _c,
+          forecast: _f,
+          forecast_h: _h,
+          ...rest
+        } = o;
         return rest;
       };
       const q = route.query as Record<string, any>;
@@ -2202,6 +2246,10 @@ export default defineComponent({
       detailMetric,
       detailTab,
       breakdownLabel,
+      compareOffset,
+      forecastMethod,
+      forecastHorizon,
+      onForecastMethod,
       detailOpen,
       detailCard,
       detailLoading,
