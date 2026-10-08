@@ -35,6 +35,9 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
     if msg == "dashboard not found" {
         return MetaHttpResponse::not_found(msg);
     }
+    if msg == openobserve_core::public_dashboards::OLDER_FORMAT_ERROR {
+        return MetaHttpResponse::bad_request(msg);
+    }
     if msg.contains("permission") {
         return MetaHttpResponse::forbidden(msg);
     }
@@ -310,5 +313,23 @@ pub async fn delete(
     match openobserve_core::public_dashboards::delete(&org_id, &link.id).await {
         Ok(_) => MetaHttpResponse::json(serde_json::json!({ "deleted": true })),
         Err(e) => map_err("delete", e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_link_errors_map_to_their_status() {
+        let older = anyhow::anyhow!(openobserve_core::public_dashboards::OLDER_FORMAT_ERROR);
+        assert_eq!(map_err("create", older).status(), StatusCode::BAD_REQUEST);
+        let missing = anyhow::anyhow!("dashboard not found");
+        assert_eq!(map_err("create", missing).status(), StatusCode::NOT_FOUND);
+        let other = anyhow::anyhow!("connection refused");
+        assert_eq!(
+            map_err("create", other).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

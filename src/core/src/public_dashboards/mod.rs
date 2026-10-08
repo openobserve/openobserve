@@ -54,6 +54,9 @@ const MAX_RANGE_SECS: i64 = 365 * 86_400;
 /// How often a link of only absolute ranges is checked for expiry and a departed publisher.
 const ABSOLUTE_CHECK_SECS: i64 = 86_400;
 const MAX_FROZEN_VARIABLES_BYTES: usize = 64 * 1024;
+/// Refusal for a dashboard the rebuilder can't build; the admin API maps it to 400.
+pub const OLDER_FORMAT_ERROR: &str =
+    "This dashboard uses an older format. Open it and save it once, then publish.";
 
 /// Search-response fields the renderer reads; SQL, VRL errors and trace ids stay private.
 const PUBLIC_META_FIELDS: [&str; 6] = [
@@ -69,8 +72,12 @@ const PUBLIC_META_FIELDS: [&str; 6] = [
 /// dashboard config (edits auto-sync), executes each panel query as the
 /// publisher, and upserts a snapshot per allowed preset.
 pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
-    let conn = infra::db::get_orm_client_rw().await;
     let now = now_micros();
+    // Expired data is never stored again, even for a caller still holding an enabled link.
+    if is_expired(pd.expires_at, now) {
+        return Ok(());
+    }
+    let conn = infra::db::get_orm_client_rw().await;
 
     let Some((_folder, dash)) = dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await? else {
         pd_table::mark_rebuilt(conn, &pd.id, REBUILD_STATE_ERROR, None, None, now).await?;
@@ -687,6 +694,7 @@ pub async fn create(
     let Some((folder, dash)) = dashboards::get_by_id(org, dashboard_id).await? else {
         return Err(anyhow::anyhow!("dashboard not found"));
     };
+    check_format(&dash)?;
 
     let id = ider::uuid();
     let slug = gen_unique_slug().await?;
@@ -839,6 +847,7 @@ pub async fn update_link(
     cfg: PublicDashboardConfig,
     user_id: &str,
 ) -> Result<PublicDashboard, anyhow::Error> {
+    ensure_current_format(&link.org_id, &link.dashboard_id).await?;
     link.updated_by = Some(user_id.to_string());
     link.name = cfg.name.trim().to_string();
     link.time_ranges = Some(serde_json::to_string(&cfg.time_range.ranges)?);
@@ -906,11 +915,12 @@ pub async fn resume_link(
     mut link: PublicDashboard,
     user_id: &str,
 ) -> Result<PublicDashboard, anyhow::Error> {
-    if link.expires_at.is_some_and(|exp| exp <= now_micros()) {
+    if is_expired(link.expires_at, now_micros()) {
         return Err(anyhow::anyhow!(
             "this link has expired; extend its expiry date to bring it back"
         ));
     }
+    ensure_current_format(&link.org_id, &link.dashboard_id).await?;
     link.enabled = true;
     link.updated_by = Some(user_id.to_string());
     link.updated_at = now_micros();
@@ -932,6 +942,7 @@ pub async fn rebuild_now(
     if !link.enabled {
         return Err(anyhow::anyhow!("resume this link before rebuilding it"));
     }
+    ensure_current_format(&link.org_id, &link.dashboard_id).await?;
     link.updated_by = Some(user_id.to_string());
     link.updated_at = now_micros();
     pd_table::update(&link).await?;
@@ -974,6 +985,11 @@ async fn restart_rebuilds(link: &PublicDashboard) -> Result<(), anyhow::Error> {
     )
     .await;
     let now = now_micros();
+    if is_expired(link.expires_at, now) {
+        // With its trigger gone the scheduler never runs the expiry cleanup, so it happens here.
+        pd_table::delete_snapshots(infra::db::get_orm_client_rw().await, &link.id).await?;
+        return Ok(());
+    }
     register_trigger(&link.org_id, &link.id, now).await?;
     if let Err(e) = rebuild_one(link).await {
         log::warn!(
@@ -995,6 +1011,13 @@ async fn register_trigger(org: &str, id: &str, next_run_at: i64) -> Result<(), a
     db::scheduler::push(trigger)
         .await
         .map_err(|e| anyhow::anyhow!("failed to register rebuild trigger: {e}"))
+}
+
+async fn ensure_current_format(org: &str, dashboard_id: &str) -> Result<(), anyhow::Error> {
+    let Some((_folder, dash)) = dashboards::get_by_id(org, dashboard_id).await? else {
+        return Err(anyhow::anyhow!("dashboard not found"));
+    };
+    check_format(&dash)
 }
 
 /// Reject a create request the server would otherwise have to rewrite or store unbounded.
@@ -1056,6 +1079,12 @@ fn check_range(range: &TimeRange, now: i64) -> Result<(), String> {
         TimeRange::Relative { secs } if *secs < MIN_RANGE_SECS => {
             return Err("a relative time range must be at least 1 minute".to_string());
         }
+        TimeRange::Relative { secs } if *secs % 60 != 0 => {
+            return Err("a relative time range must be a whole number of minutes".to_string());
+        }
+        TimeRange::Absolute { start, .. } if *start < 0 => {
+            return Err("an absolute time range can't start before 1970".to_string());
+        }
         TimeRange::Absolute { start, end } if start >= end => {
             return Err("an absolute time range must start before it ends".to_string());
         }
@@ -1079,8 +1108,20 @@ fn check_rebuild_secs(secs: i32) -> Result<(), String> {
 }
 
 fn check_expiry(expires_at: Option<i64>, now: i64) -> Result<(), String> {
-    if expires_at.is_some_and(|exp| exp <= now) {
+    if is_expired(expires_at, now) {
         return Err("expiry must be in the future".to_string());
+    }
+    Ok(())
+}
+
+fn is_expired(expires_at: Option<i64>, now: i64) -> bool {
+    expires_at.is_some_and(|exp| exp <= now)
+}
+
+// The rebuilder only builds v8 panels, so an older dashboard would publish as an empty page.
+fn check_format(dash: &Dashboard) -> Result<(), anyhow::Error> {
+    if dash.v8.is_none() {
+        return Err(anyhow::anyhow!(OLDER_FORMAT_ERROR));
     }
     Ok(())
 }
@@ -1109,6 +1150,32 @@ mod tests {
             check_expiry(Some(100), 100).unwrap_err(),
             "expiry must be in the future"
         );
+    }
+
+    #[test]
+    fn a_link_expires_at_its_expiry_instant() {
+        assert!(!is_expired(None, 100));
+        assert!(!is_expired(Some(101), 100));
+        assert!(is_expired(Some(100), 100));
+        assert!(is_expired(Some(5), 100));
+    }
+
+    #[test]
+    fn only_a_v8_dashboard_can_be_published() {
+        let old = Dashboard {
+            version: 3,
+            ..Default::default()
+        };
+        assert_eq!(
+            check_format(&old).unwrap_err().to_string(),
+            OLDER_FORMAT_ERROR
+        );
+        let current = Dashboard {
+            version: 8,
+            v8: Some(Default::default()),
+            ..Default::default()
+        };
+        assert!(check_format(&current).is_ok());
     }
 
     #[test]
@@ -1304,12 +1371,22 @@ mod tests {
         let abs = |start: i64, end: i64| TimeRange::Absolute { start, end };
         let day = 86_400 * 1_000_000;
         assert!(check_range(&rel(30), now).is_err());
+        assert!(check_range(&rel(120), now).is_ok());
+        assert_eq!(
+            check_range(&rel(61), now).unwrap_err(),
+            "a relative time range must be a whole number of minutes"
+        );
         assert!(check_range(&rel(365 * 86_400), now).is_ok());
         assert!(check_range(&rel(366 * 86_400), now).is_err());
         assert!(check_range(&rel(90 * 86_400), now).is_ok());
         assert!(check_range(&abs(now - 365 * day, now), now).is_ok());
         assert!(check_range(&abs(now - 366 * day, now), now).is_err());
         assert!(check_range(&abs(now, now - day), now).is_err());
+        assert!(check_range(&abs(0, day), now).is_ok());
+        assert_eq!(
+            check_range(&abs(-1, day), now).unwrap_err(),
+            "an absolute time range can't start before 1970"
+        );
         assert_eq!(
             check_range(&abs(now - day, now + 1), now).unwrap_err(),
             "an absolute time range must end in the past"
