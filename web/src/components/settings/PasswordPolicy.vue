@@ -78,6 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="password-policy-label">{{ row.label }}</span>
             <q-toggle
               v-if="row.kind === 'toggle'"
+              class="o2-toggle-button-lg -tw:ml-4"
+              size="lg"
               :model-value="get(row.path)"
               :disable="row.disabled?.()"
               @update:model-value="(v: boolean) => onToggle(row.path, v)"
