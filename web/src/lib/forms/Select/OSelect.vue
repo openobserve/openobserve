@@ -703,6 +703,17 @@ function handleTriggerKeydown(e: KeyboardEvent) {
   if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
 }
 
+const searchFilterRef = ref<{ $el: HTMLInputElement } | null>(null);
+
+// Reka's open auto-focus selects the search text, so the next keystroke would overwrite the seeded character.
+function handlePopoverOpenAutoFocus(e: Event) {
+  const input = searchFilterRef.value?.$el;
+  if (!inputEnabled.value || !input) return;
+  e.preventDefault();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
 // DOM nodes minimal even for 20 000+ option datasets.
@@ -1404,6 +1415,7 @@ const fieldWidthClass = computed(() => {
             :disable-outside-pointer-events="false"
             :hide-when-detached="true"
             :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
+            @open-auto-focus="handlePopoverOpenAutoFocus"
             :class="[
               'z-10001 min-w-(--reka-popover-trigger-width)',
               'flex flex-col overflow-hidden',
@@ -1432,6 +1444,7 @@ const fieldWidthClass = computed(() => {
               >
                 <ListboxFilter
                   v-if="inputEnabled"
+                  ref="searchFilterRef"
                   v-model="searchTerm"
                   auto-focus
                   :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
