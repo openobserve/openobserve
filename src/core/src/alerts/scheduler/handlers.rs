@@ -64,6 +64,10 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// How far a running public-dashboard rebuild keeps its trigger's next run ahead of now.
+const PUBLIC_DASHBOARD_HOLD_SECS: i64 = 180;
+const PUBLIC_DASHBOARD_HOLD_RENEW_SECS: u64 = 60;
+
 /// One anomaly detection run as the trigger history records it, scheduled or manual.
 pub(crate) struct AnomalyRunRecord {
     pub(crate) status: RunOutcome,
@@ -3830,7 +3834,7 @@ async fn handle_public_dashboard_triggers(
         return crate::public_dashboards::pause_for_departed_publisher(pd).await;
     }
 
-    if let Err(e) = crate::public_dashboards::rebuild_one(&pd).await {
+    if let Err(e) = rebuild_holding_trigger(trace_id, &new_trigger, &pd).await {
         log::error!(
             "[SCHEDULER trace_id {trace_id}] public dashboard rebuild failed: {pd_id}: {e}"
         );
@@ -3839,6 +3843,39 @@ async fn handle_public_dashboard_triggers(
     new_trigger.next_run_at = public_dashboard_next_run(&pd, trigger.next_run_at, now_micros());
     db::scheduler::update_trigger(new_trigger, true, trace_id).await?;
     Ok(())
+}
+
+/// The scheduler lease lapses on a long rebuild, so the trigger is kept not-due until it ends.
+async fn rebuild_holding_trigger(
+    trace_id: &str,
+    trigger: &db::scheduler::Trigger,
+    pd: &infra::table::entity::public_dashboards::Model,
+) -> Result<(), anyhow::Error> {
+    let mut rebuild = std::pin::pin!(crate::public_dashboards::rebuild_one(pd));
+    let renew = std::time::Duration::from_secs(PUBLIC_DASHBOARD_HOLD_RENEW_SECS);
+    loop {
+        let hold = public_dashboard_hold(trigger, now_micros());
+        // Not batched, so the final reschedule cannot be overtaken by a queued hold.
+        if let Err(e) = db::scheduler::update_trigger(hold, false, trace_id).await {
+            log::warn!(
+                "[SCHEDULER trace_id {trace_id}] public dashboard hold failed: {}: {e}",
+                pd.id
+            );
+        }
+        tokio::select! {
+            res = &mut rebuild => return res,
+            _ = tokio::time::sleep(renew) => {}
+        }
+    }
+}
+
+/// Waiting, not Processing: a lapsed lease would otherwise count a retry on every renewal.
+fn public_dashboard_hold(trigger: &db::scheduler::Trigger, now: i64) -> db::scheduler::Trigger {
+    db::scheduler::Trigger {
+        next_run_at: now + second_micros(PUBLIC_DASHBOARD_HOLD_SECS),
+        status: db::scheduler::TriggerStatus::Waiting,
+        ..trigger.clone()
+    }
 }
 
 /// A relative range rebuilds every refresh; a link of only absolute ranges is only checked.
@@ -7635,6 +7672,29 @@ mod tests {
         assert_eq!(next_public_dashboard_run(100 * s, 10, 115 * s), 125 * s);
         // A zero cadence still spaces runs by a second.
         assert_eq!(next_public_dashboard_run(100 * s, 0, 100 * s), 101 * s);
+    }
+
+    #[test]
+    fn a_running_public_dashboard_rebuild_keeps_its_trigger_not_due() {
+        let s = 1_000_000;
+        let trigger = db::scheduler::Trigger {
+            org: "o".into(),
+            module: db::scheduler::TriggerModule::PublicDashboard,
+            module_key: "l1".into(),
+            next_run_at: 100 * s,
+            status: db::scheduler::TriggerStatus::Processing,
+            ..Default::default()
+        };
+        let now = 200 * s;
+        let hold = public_dashboard_hold(&trigger, now);
+        let renew = i64::try_from(PUBLIC_DASHBOARD_HOLD_RENEW_SECS).unwrap() * s;
+        // Two renewals may fail before another node is allowed to start the link.
+        assert!(hold.next_run_at > now + 2 * renew);
+        assert_eq!(hold.status, db::scheduler::TriggerStatus::Waiting);
+        assert_eq!(
+            (hold.org, hold.module, hold.module_key),
+            (trigger.org, trigger.module, trigger.module_key)
+        );
     }
 
     /// A lost claim and an ineligible row judged nothing, so neither can read as Normal.
