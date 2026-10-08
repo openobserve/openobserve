@@ -244,8 +244,10 @@ export function resolveStreamFilter(
   ctx: FilterResolveContext,
 ): StreamFilter {
   const filter = raw.trim();
-  if (hasLimitClause(stripCommentLines(filter))) throw new NonSqlLimitError();
   const plan = planStreamsFilter(filter, [stream], ctx);
+  if (plan.kind !== "freeText" && hasLimitClause(stripCommentLines(filter))) {
+    throw new NonSqlLimitError();
+  }
   if (plan.kind !== "freeText") {
     const where = renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "";
     return { where, blocked: false, sqlNodesOnly: where, plan };
@@ -262,8 +264,10 @@ export function resolveFiltersForStreams(
   fields?: MultiStreamFieldContext,
 ): ResolvedStreamFilters {
   const filter = raw.trim();
-  if (hasLimitClause(stripCommentLines(filter))) throw new NonSqlLimitError();
   const plan = planStreamsFilter(filter, streams, ctx);
+  if (plan.kind !== "freeText" && hasLimitClause(stripCommentLines(filter))) {
+    throw new NonSqlLimitError();
+  }
   const result: ResolvedStreamFilters = {
     perStream: new Map(),
     excluded: [],

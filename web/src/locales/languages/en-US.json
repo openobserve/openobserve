@@ -1386,7 +1386,7 @@
     "menuGroupAlerts": "Alerts",
     "freeTextChooseFirst": "Choose how to search text first",
     "freeTextScanLogsOnly": "Scan mode works in the logs view only; set a full-text field to use text search here",
-    "freeTextSearchedFields": "Full-text search in: {fields}",
+    "freeTextSearchedFields": "Full-text search in: {fields} (all words, any order)",
     "freeTextRunsAs": "Runs as {sql}",
     "freeTextNotSearched": "Not searched: {streams} (no full-text fields).",
     "freeTextSetField": "Set a full-text field",

@@ -1845,6 +1845,7 @@ import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext } from "@/composables/useLogs/freeTextSearch";
+import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
@@ -4377,8 +4378,16 @@ export default defineComponent({
       }
     };
 
+    const updateFreeTextPreview = useFreeTextPreview(
+      searchObj,
+      () => store.state.zoConfig,
+      () => queryEditorRef.value?.getValue?.() ?? searchObj.data.query,
+      t,
+    );
+
     const onEditorUserEdit = () => {
       autoRun.engine.markEditorDirty();
+      updateFreeTextPreview();
     };
 
     const cancelRun = () => {
