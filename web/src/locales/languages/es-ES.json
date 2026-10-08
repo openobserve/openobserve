@@ -19214,7 +19214,7 @@
       "waitingOn": "esperando a {pid}",
       "degraded": "Una sesión está bloqueando {count}. Ha tenido una transacción abierta durante {age} y no ha ejecutado una consulta en ese tiempo — muy probablemente una aplicación que olvidó confirmar.",
       "footer": {
-        "allLeadBack": "Todos los {waits} conducen de vuelta al pid {pid}",
+        "allLeadBack": "{waits} conduce de vuelta al pid {pid} | Los {waits} conducen de vuelta al pid {pid}",
         "allLeadBackDetail": "— una sesión, que mantiene un bloqueo sobre {object}.",
         "switchToBlocking": "Cambiar a “Quién bloquea”",
         "releaseAll": "Finalizar la sesión {pid} libera todos los {count}.",

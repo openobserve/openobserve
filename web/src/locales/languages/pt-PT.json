@@ -19214,7 +19214,7 @@
       "waitingOn": "aguardando {pid}",
       "degraded": "Uma sessão está bloqueando {count}. Ela está com uma transação aberta há {age} e não executou uma consulta nesse tempo — provavelmente um aplicativo que esqueceu de fazer commit.",
       "footer": {
-        "allLeadBack": "Todos os {waits} levam de volta ao pid {pid}",
+        "allLeadBack": "{waits} leva de volta ao pid {pid} | Todos os {waits} levam de volta ao pid {pid}",
         "allLeadBackDetail": "— uma sessão, mantendo um bloqueio em {object}.",
         "switchToBlocking": "Mudar para “Quem está bloqueando”",
         "releaseAll": "Encerrar a sessão {pid} libera todos os {count}.",
@@ -19428,7 +19428,7 @@
         "totalBytes": "Tamanho total",
         "heapBytes": "Tamanho do heap",
         "overheadBytes": "Índice + TOAST",
-        "liveTuples": "Linhas vivas",
+        "liveTuples": "Linhas ativas",
         "deadTuples": "Linhas mortas",
         "deadTupPct": "Inchaço",
         "modSinceAnalyze": "Linhas desde a análise",
