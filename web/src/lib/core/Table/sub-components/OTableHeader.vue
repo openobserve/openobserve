@@ -45,6 +45,8 @@ const props = defineProps<{
   sortOrder?: string;
   sortFieldMap?: Record<string, string>;
   getSortIcon?: (columnId: string) => "asc" | "desc" | "none";
+  sortDisabled?: boolean;
+  sortDisabledReason?: I18nText;
   stickyHeader?: boolean;
   bordered?: boolean;
   pivotHeaderLevels?: any[];
@@ -142,7 +144,7 @@ const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill",
 
 function handleSort(columnId: string, toggleHandler?: (event: Event) => void, event?: MouseEvent) {
   const meta = props.table.getColumn(columnId)?.columnDef?.meta as any;
-  if (!meta?.sortable) return;
+  if (!meta?.sortable || props.sortDisabled) return;
   emit("sort", columnId);
   if (event) toggleHandler?.(event);
 }
@@ -244,6 +246,15 @@ function headerAlignClass(header: any): string {
   if (align === "center") return "text-center justify-center";
   if (align === "right") return "text-right justify-end";
   return "";
+}
+
+// On the <th> (columnheader), where ARIA allows aria-sort; a button may not carry it.
+function headerAriaSort(header: any): "ascending" | "descending" | "none" | undefined {
+  if (!props.sortingEnabled || !(header.column.columnDef.meta as any)?.sortable) return undefined;
+  const direction = props.getSortIcon?.(header.id);
+  if (direction === "asc") return "ascending";
+  if (direction === "desc") return "descending";
+  return "none";
 }
 
 function headerPaddingClass(header: any): string {
@@ -547,6 +558,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         @mouseenter="noteCutHeaderName(header, $event)"
+        :aria-sort="headerAriaSort(header)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           'table-head',
@@ -631,75 +643,84 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ]"
         >
           <!-- Sortable header -->
-          <div
+          <OTooltip
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            :class="[
-              'flex min-w-0 cursor-pointer items-center gap-1',
-              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
-              headerAlignClass(header),
-            ]"
-            data-test="o2-table-th-sort-trigger"
-            @click="
-              (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
-            "
+            :content="sortDisabledReason"
+            :disabled="!(sortDisabled && sortDisabledReason)"
+            side="top"
           >
-            <span
-              class="flex min-w-0 shrink flex-col justify-center"
-              :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
+            <button
+              type="button"
+              :class="[
+                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start focus-visible:ring-2 focus-visible:outline-none',
+                sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+                headerAlignClass(header),
+              ]"
+              data-test="o2-table-th-sort-trigger"
+              :aria-disabled="sortDisabled ? 'true' : undefined"
+              @click="
+                (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
+              "
             >
-              <OTruncatedText
-                class="w-full leading-tight"
-                data-o2-th-label
-                :tooltip="labelTooltip(header)"
+              <span
+                class="flex min-w-0 shrink flex-col justify-center"
+                :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
               >
-                <FlexRender
-                  v-if="!header.isPlaceholder"
-                  :render="header.column.columnDef.header"
-                  :props="header.getContext()"
-                />
-              </OTruncatedText>
-              <OTruncatedText
-                v-if="headerSubLabel(header)"
-                class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
-                data-o2-th-sublabel
-                :data-test="`o2-table-th-sublabel-${header.id}`"
-                :tooltip="labelTooltip(header)"
-              >
-                {{ headerSubLabel(header) }}
-              </OTruncatedText>
-            </span>
-            <!-- Sort icons — `shrink-0` so they're never clipped even when the
+                <OTruncatedText
+                  class="w-full leading-tight"
+                  data-o2-th-label
+                  :tooltip="labelTooltip(header)"
+                >
+                  <FlexRender
+                    v-if="!header.isPlaceholder"
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                </OTruncatedText>
+                <OTruncatedText
+                  v-if="headerSubLabel(header)"
+                  class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                  data-o2-th-sublabel
+                  :data-test="`o2-table-th-sublabel-${header.id}`"
+                  :tooltip="labelTooltip(header)"
+                >
+                  {{ headerSubLabel(header) }}
+                </OTruncatedText>
+              </span>
+              <!-- Sort icons — `shrink-0` so they're never clipped even when the
                  header title truncates. -->
-            <span
-              v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
-              class="flex shrink-0 items-center"
-            >
-              <OIcon
-                v-if="getSortIcon?.(header.id) === 'asc'"
-                name="arrow-upward"
-                size="sm"
-                class="text-table-sort-icon-active"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="asc"
-              />
-              <OIcon
-                v-else-if="getSortIcon?.(header.id) === 'desc'"
-                name="arrow-downward"
-                size="sm"
-                class="text-table-sort-icon-active"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="desc"
-              />
-              <OIcon
-                v-else
-                name="unfold-more"
-                size="sm"
-                class="opacity-40"
-                data-test="o2-table-sort-icon-inactive"
-                data-test-sort-direction="none"
-              />
-            </span>
-          </div>
+              <span
+                v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
+                class="flex shrink-0 items-center"
+              >
+                <OIcon
+                  v-if="getSortIcon?.(header.id) === 'asc'"
+                  name="arrow-upward"
+                  size="sm"
+                  class="text-table-sort-icon-active"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="asc"
+                />
+                <OIcon
+                  v-else-if="getSortIcon?.(header.id) === 'desc'"
+                  name="arrow-downward"
+                  size="sm"
+                  class="text-table-sort-icon-active"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="desc"
+                />
+                <OIcon
+                  v-else
+                  name="unfold-more"
+                  size="sm"
+                  class="opacity-40"
+                  data-test="o2-table-sort-icon-inactive"
+                  data-test-sort-direction="none"
+                />
+              </span>
+            </button>
+          </OTooltip>
 
           <!-- Non-sortable header -->
           <div
@@ -912,6 +933,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         @mouseenter="noteCutHeaderName(header, $event)"
+        :aria-sort="headerAriaSort(header)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
@@ -990,71 +1012,80 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             headerAlignClass(header),
           ]"
         >
-          <div
+          <OTooltip
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            :class="[
-              'flex cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap',
-              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
-              headerAlignClass(header),
-            ]"
-            data-test="o2-table-th-sort-trigger"
-            @click="
-              (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
-            "
+            :content="sortDisabledReason"
+            :disabled="!(sortDisabled && sortDisabledReason)"
+            side="top"
           >
-            <span
-              class="flex min-w-0 shrink flex-col justify-center"
-              :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
+            <button
+              type="button"
+              :class="[
+                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none',
+                sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+                headerAlignClass(header),
+              ]"
+              data-test="o2-table-th-sort-trigger"
+              :aria-disabled="sortDisabled ? 'true' : undefined"
+              @click="
+                (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
+              "
             >
-              <OTruncatedText
-                class="w-full leading-tight"
-                data-o2-th-label
-                :tooltip="labelTooltip(header)"
+              <span
+                class="flex min-w-0 shrink flex-col justify-center"
+                :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
               >
-                <FlexRender
-                  v-if="!header.isPlaceholder"
-                  :render="header.column.columnDef.header"
-                  :props="header.getContext()"
+                <OTruncatedText
+                  class="w-full leading-tight"
+                  data-o2-th-label
+                  :tooltip="labelTooltip(header)"
+                >
+                  <FlexRender
+                    v-if="!header.isPlaceholder"
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                </OTruncatedText>
+                <OTruncatedText
+                  v-if="headerSubLabel(header)"
+                  class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                  data-o2-th-sublabel
+                  :data-test="`o2-table-th-sublabel-${header.id}`"
+                  :tooltip="labelTooltip(header)"
+                >
+                  {{ headerSubLabel(header) }}
+                </OTruncatedText>
+              </span>
+              <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
+                <OIcon
+                  v-if="getSortIcon?.(header.id) === 'asc'"
+                  name="arrow-upward"
+                  size="sm"
+                  class="text-table-sort-icon-active shrink-0"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="asc"
                 />
-              </OTruncatedText>
-              <OTruncatedText
-                v-if="headerSubLabel(header)"
-                class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
-                data-o2-th-sublabel
-                :data-test="`o2-table-th-sublabel-${header.id}`"
-                :tooltip="labelTooltip(header)"
-              >
-                {{ headerSubLabel(header) }}
-              </OTruncatedText>
-            </span>
-            <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
-              <OIcon
-                v-if="getSortIcon?.(header.id) === 'asc'"
-                name="arrow-upward"
-                size="sm"
-                class="text-table-sort-icon-active shrink-0"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="asc"
-              />
-              <OIcon
-                v-else-if="getSortIcon?.(header.id) === 'desc'"
-                name="arrow-downward"
-                size="sm"
-                class="text-table-sort-icon-active shrink-0"
-                data-test="o2-table-sort-icon-active"
-                data-test-sort-direction="desc"
-              />
-              <OIcon
-                v-else
-                name="unfold-more"
-                size="sm"
-                class="shrink-0 opacity-40"
-                data-test="o2-table-sort-icon-inactive"
-                data-test-sort-direction="none"
-              />
-            </template>
-          </div>
-          <OTruncatedText
+                <OIcon
+                  v-else-if="getSortIcon?.(header.id) === 'desc'"
+                  name="arrow-downward"
+                  size="sm"
+                  class="text-table-sort-icon-active shrink-0"
+                  data-test="o2-table-sort-icon-active"
+                  data-test-sort-direction="desc"
+                />
+                <OIcon
+                  v-else
+                  name="unfold-more"
+                  size="sm"
+                  class="shrink-0 opacity-40"
+                  data-test="o2-table-sort-icon-inactive"
+                  data-test-sort-direction="none"
+                />
+              </template>
+            </button>
+          </OTooltip>
+          <div
             v-else
             as="div"
             :class="[

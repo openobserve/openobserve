@@ -240,14 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-locked="gridLockReason ? 'true' : undefined"
             v-model="pageNumberInput"
             :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
-            :max="
-              Math.max(
-                1,
-                (searchObj.communicationMethod === 'streaming' || searchObj.meta.jobId != ''
-                  ? searchObj.data.queryResults?.pagination?.length
-                  : searchObj.data.queryResults?.partitionDetail?.paginations?.length) || 0,
-              )
-            "
+            :max="pageCount"
             :max-pages="paginationMaxPages"
             class="paginator-section"
             @update:model-value="getPageData('pageChange')"
@@ -272,7 +265,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
         The histogram is pinned along the X axis only (see histogramPinStyle), so
         scrolling the wide results table sideways can't drag the chart with it. -->
-      <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
+      <!-- tabindex -1: focus lands here when a closed drawer has no row to return to (4a §3.2.2). -->
+      <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef" tabindex="-1">
         <div
           ref="histogramRef"
           :style="histogramPinStyle"
@@ -511,6 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :enable-column-resize="true"
                   :get-row-status-color="getLogRowStatusColor"
                   :row-class="getLogRowClass"
+                  :active-row-index="activeRowIndex"
                   expansion="multiple"
                   :expanded-ids="expandedLogIds"
                   data-test="logs-search-result-logs-table"
@@ -719,41 +714,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:open="searchObj.meta.showDetailTab"
         :width="85"
         :title="t('search.rowDetail')"
+        :sub-title="drawerSubTitle"
+        :return-focus-to="detailReturnFocus"
         @update:open="(v) => !v && reDrawChart()"
+        @after-close="onDetailDrawerAfterClose"
       >
         <DetailTable
-          v-if="searchObj.data.queryResults?.hits?.length"
-          :key="'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex"
-          v-model="
-            searchObj.data.queryResults.hits[searchObj.meta.resultGrid.navigation.currentRowIndex]
-          "
+          v-if="detailRow"
+          :key="'dialog_' + detailOpenSeq"
+          :model-value="detailRow"
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
           class="rounded-default"
-          :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
-          :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
+          :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex ?? -1"
+          :totalLength="searchObj.data.queryResults?.hits?.length || 0"
+          :has-prev-page="hasPrevPage"
+          :has-next-page="hasNextPage"
+          :page-loading="!!searchObj.meta.resultGrid.navigation.pendingPageSelection"
+          :page-loading-direction="pageLoadingDirection"
+          :page-loading-page="searchObj.meta.resultGrid.navigation.pendingPageSelection?.page ?? 0"
+          :nav-disabled-reason="navDisabledReason"
+          :page-edge-reason="pageEdgeReason"
           :highlight-query="searchObj.data.highlightQuery"
-          @showNextDetail="navigateRowDetail"
-          @showPrevDetail="navigateRowDetail"
+          @showNextDetail="stepLogRow(1, false)"
+          @showPrevDetail="stepLogRow(-1, false)"
+          @update:tab="onDetailTabChange"
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
           @close="searchObj.meta.showDetailTab = false"
-          @view-trace="
-            redirectToTraces(
-              searchObj.data.queryResults.hits[
-                searchObj.meta.resultGrid.navigation.currentRowIndex
-              ],
-            )
-          "
+          @view-trace="redirectToTraces(detailRow)"
           @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
+        <!-- Outside the keyed DetailTable so it is one node across steps, inside the dialog so reka does not hide it. -->
+        <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-detail-nav-live">
+          {{ detailNavAnnouncement }}
+        </div>
       </ODrawer>
 
       <!-- Pattern Details Drawer -->
@@ -835,6 +837,16 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import {
+  failPendingPageNavigation,
+  logsRowNavAnnouncement,
+  onHitsComplete,
+  resetRowSelection,
+  setPageNavFailureHandler,
+} from "@/composables/useLogs/logsRowNav";
+import { nextRowTarget } from "@/utils/rowNavigation";
+import { matchDetailRow, trustworthyFields } from "@/utils/logs/detailRowMatch";
+import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -1016,6 +1028,7 @@ export default defineComponent({
           this.scrollTableToTop(0);
         }
       } else if (actionType == "recordsPerPage") {
+        resetRowSelection(this.searchObj);
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
         if (this.searchObj.communicationMethod === "streaming") {
@@ -1034,30 +1047,7 @@ export default defineComponent({
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        //here at first the queryResults is undefined so we are checking if it is undefined then we are setting it to empty array
-        if (
-          this.searchObj.meta.jobId != "" &&
-          this.searchObj.data.queryResults.paginations == undefined
-        ) {
-          this.searchObj.data.queryResults.pagination = [];
-        }
-        const maxPages =
-          this.searchObj.communicationMethod === "streaming" || this.searchObj.meta.jobId != ""
-            ? this.searchObj.data.queryResults.pagination.length
-            : this.searchObj.data.queryResults?.partitionDetail?.paginations.length;
-        if (this.pageNumberInput > Math.ceil(maxPages) && this.searchObj.meta.jobId == "") {
-          toast({
-            variant: "error",
-            message: this.t("logs.searchResult.pageOutOfRange"),
-            timeout: 1000,
-          });
-          this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-          return false;
-        }
-
-        this.searchObj.data.resultGrid.currentPage = this.pageNumberInput;
-        this.$emit("update:scroll");
-        this.scrollTableToTop(0);
+        if (!this.changePage(Number(this.pageNumberInput), { fromCrossing: false })) return false;
       }
       return undefined;
     },
@@ -1121,6 +1111,8 @@ export default defineComponent({
     },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
+      // Search-around never reaches getQueryData, so it drops the old open row itself (AC5.4).
+      resetRowSelection(this.searchObj);
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       // this.$emit("search:timeboxed", obj);
       this.searchAroundData(obj);
@@ -1656,13 +1648,12 @@ export default defineComponent({
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
-    const openLogDetails = (props: any, index: number) => {
-      searchObj.meta.showDetailTab = true;
-      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "json"; // Reset to default tab
+    const openLogDetails = (_row: any, index: number) => {
+      if (!openDetail({ index }, { tab: "json" })) return;
+      searchObj.meta.resultGrid.navigation.selectionActive = true;
 
       // Prepare correlation context (but don't open panel automatically)
-      const logData = searchObj.data.queryResults?.hits?.[index];
+      const logData = detailRow.value;
       if (logData) {
         correlationContext.value = {
           timestamp: logData._timestamp || Date.now() * 1000,
@@ -1680,26 +1671,17 @@ export default defineComponent({
         return;
       }
 
-      // Find the index of this row in the hits array by comparing timestamp
-      const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
-      const index = searchObj.data.queryResults?.hits?.findIndex(
-        (hit: any) => hit[timestampColumn] === row[timestampColumn],
-      );
-
-      if (index === -1 || index === undefined) {
+      // Identity is the hit's position: timestamps repeat within a batch.
+      const index = logsRowIndex(row);
+      if (index < 0) {
         console.error("[SearchResult] Could not find flex index for correlation", {
-          rowTimestamp: row[timestampColumn],
           hitsCount: searchObj.data.queryResults?.hits?.length,
         });
         return;
       }
 
-      // Set the initial tab to correlated-logs before opening the sidebar
-      detailTableInitialTab.value = "correlated-logs";
-
-      // Open the log details sidebar
-      searchObj.meta.showDetailTab = true;
-      searchObj.meta.resultGrid.navigation.currentRowIndex = index;
+      openDetail({ index }, { tab: "correlated-logs" });
+      searchObj.meta.resultGrid.navigation.selectionActive = true;
 
       // Load correlation data
       openCorrelationFromLog(row);
@@ -1855,28 +1837,380 @@ export default defineComponent({
       }
     };
 
-    const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
-      if (next) {
-        return oldIndex + 1;
-      } else {
-        return oldIndex - 1;
-      }
-    };
-
-    const navigateRowDetail = (isNext: boolean, isPrev: boolean) => {
-      const newIndex = getRowIndex(
-        isNext,
-        isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
-      );
-      searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
-
-      // Clear correlation data when navigating to a different log
-      // User will need to click a correlation tab again for the new log
+    const clearCorrelationState = () => {
       correlationDashboardProps.value = null;
       correlationLoading.value = false;
       correlationError.value = null;
     };
+
+    const navigation = () => searchObj.meta.resultGrid.navigation;
+    const hitsList = (): any[] => searchObj.data.queryResults?.hits ?? [];
+    const detailRow = ref<Record<string, any> | null>(null);
+    const detailOpenSeq = ref(0);
+    const detailActiveTab = ref("json");
+    const rowNavAnnouncement = logsRowNavAnnouncement;
+    const detailNavAnnouncement = ref("");
+    let afterCloseAnnouncement: string | null = null;
+    let crossingFromClosedDrawer = false;
+
+    const currentPage = computed(() => Number(searchObj.data.resultGrid.currentPage) || 1);
+    const pageCount = computed(() =>
+      Math.max(
+        1,
+        (searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
+          ? searchObj.data.queryResults?.pagination?.length
+          : searchObj.data.queryResults?.partitionDetail?.paginations?.length) || 0,
+      ),
+    );
+    const searchAroundShown = () => searchObj.data.searchAround?.indexTimestamp > 0;
+    const autoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
+    // Live mode stays page-1-only, and a stale or search-around grid would page a different query (4a §3.2).
+    const canChangePage = computed(
+      () =>
+        !!searchObj.meta.resultGrid.showPagination &&
+        !autoRefreshOn() &&
+        !searchAroundShown() &&
+        !gridLockReason.value,
+    );
+    const hasNextPage = computed(() => canChangePage.value && currentPage.value < pageCount.value);
+    const hasPrevPage = computed(() => canChangePage.value && currentPage.value > 1);
+    // Another request clearing `loading` must not enable J/K while the hits stream still reorders rows.
+    const hitsSettled = () => searchObj.data.resultGrid.hitsSettled !== false && !searchObj.loading;
+
+    const activeRowIndex = computed(() =>
+      navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null,
+    );
+
+    const pageEdgeReason = computed(() => {
+      if (!searchObj.meta.resultGrid.showPagination || searchAroundShown()) return null;
+      if (autoRefreshOn()) return t("logs.rowNav.autoRefreshEdge");
+      if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
+      return null;
+    });
+
+    const navDisabledReason = computed<"resultsChanged" | "loading" | null>(() => {
+      if (navigation().pendingPageSelection) return null;
+      if (!hitsSettled()) return "loading";
+      if (navigation().currentRowIndex == null) return "resultsChanged";
+      return null;
+    });
+
+    const pageLoadingDirection = computed<"next" | "prev" | null>(() => {
+      const pending = navigation().pendingPageSelection;
+      if (!pending) return null;
+      return pending.position === "first" ? "next" : "prev";
+    });
+
+    const drawerSubTitle = computed(() => {
+      const pending = navigation().pendingPageSelection;
+      if (pending) return t("logs.rowNav.loadingPage", { page: pending.page });
+      const index = navigation().currentRowIndex;
+      if (index == null || !hitsList().length) return undefined;
+      return t("logs.rowNav.positionLabel", {
+        row: index + 1,
+        count: hitsList().length,
+        page: currentPage.value,
+      });
+    });
+
+    const resultsRowElement = (index: number): HTMLElement | null =>
+      searchListContainer.value?.querySelector<HTMLElement>(
+        `[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${index}"]`,
+      ) ?? null;
+
+    const detailReturnFocus = (): HTMLElement | null => {
+      const index = navigation().currentRowIndex;
+      return index == null ? null : resultsRowElement(index);
+    };
+
+    // Re-setting the same text is not re-announced, so the region is emptied first.
+    const announceInto = (region: typeof rowNavAnnouncement, message: string) => {
+      region.value = "";
+      nextTick(() => {
+        region.value = message;
+      });
+    };
+
+    const announce = (message: string) =>
+      announceInto(
+        searchObj.meta.showDetailTab ? detailNavAnnouncement : rowNavAnnouncement,
+        message,
+      );
+
+    const announcePosition = (index: number) =>
+      announce(
+        t("logs.rowNav.position", {
+          row: index + 1,
+          count: hitsList().length,
+          page: currentPage.value,
+        }),
+      );
+
+    const scrollRowIntoView = (index: number) => {
+      nextTick(() => resultsRowElement(index)?.scrollIntoView({ block: "nearest" }));
+    };
+
+    const clearRowSelection = () => {
+      navigation().selectionActive = false;
+      navigation().currentRowIndex = null;
+    };
+
+    /** The drawer's only writer (4a §3.2.7): snapshots the record and remounts DetailTable. */
+    const openDetail = (
+      target: { index: number } | { record: Record<string, any> },
+      options: { origin?: "user" | "permalink" | "crossing"; tab?: string } = {},
+    ): boolean => {
+      let record: Record<string, any> | undefined;
+      let index: number | null = null;
+      if ("index" in target) {
+        record = hitsList()[target.index];
+        index = target.index;
+      } else {
+        record = target.record;
+      }
+      if (!record) return false;
+      if ((options.origin ?? "user") !== "crossing") navigation().pendingPageSelection = null;
+      const tab =
+        options.tab ?? (searchObj.meta.showDetailTab ? detailTableInitialTab.value : "json");
+      detailRow.value = { ...record };
+      navigation().currentRowIndex = index;
+      detailOpenSeq.value += 1;
+      detailTableInitialTab.value = tab;
+      detailActiveTab.value = tab;
+      searchObj.meta.showDetailTab = true;
+      return true;
+    };
+
+    const onDetailTabChange = (tab: string) => {
+      detailActiveTab.value = tab;
+      if (tab === "json" || tab === "table") detailTableInitialTab.value = tab;
+    };
+
+    const isOtherDialogOpen = () =>
+      Array.from(document.querySelectorAll('[role="dialog"][data-state="open"]')).some(
+        (el) => !el.matches('[data-test="logs-search-result-detail-dialog"]'),
+      );
+
+    const focusedResultsRow = (): number | null => {
+      const active = document.activeElement as HTMLElement | null;
+      const table = searchListContainer.value?.querySelector(
+        '[data-test="logs-search-result-logs-table"]',
+      );
+      const row = active?.closest?.<HTMLElement>('[data-test^="o2-table-row-"]');
+      if (!table || !row || !table.contains(row)) return null;
+      const match = /^o2-table-row-(\d+)$/.exec(row.dataset.test ?? "");
+      return match ? Number(match[1]) : null;
+    };
+
+    // Hover is never an anchor: it is pointer-incidental (4a §3.2 "Anchor").
+    const resolveAnchor = (): number | null => {
+      if (searchObj.meta.showDetailTab) return navigation().currentRowIndex ?? null;
+      const focused = focusedResultsRow();
+      if (focused !== null) return focused;
+      if (navigation().selectionActive) return navigation().currentRowIndex ?? null;
+      if (searchAroundShown()) {
+        const ts = searchObj.data.searchAround.indexTimestamp;
+        const index = hitsList().findIndex((hit) => hit[logsTimestampCol.value] === ts);
+        return index >= 0 ? index : null;
+      }
+      return null;
+    };
+
+    const edgeMessage = (edge: "first" | "last", direction: 1 | -1): string => {
+      const morePages =
+        searchObj.meta.resultGrid.showPagination &&
+        !searchAroundShown() &&
+        (direction === 1 ? currentPage.value < pageCount.value : currentPage.value > 1);
+      if (morePages && pageEdgeReason.value) return pageEdgeReason.value;
+      return edge === "last" ? t("logs.rowNav.lastResult") : t("logs.rowNav.firstResult");
+    };
+
+    /** Paginator and J/K crossings share this; only a crossing keeps the open row (4a §3.2). */
+    const changePage = (page: number, options: { fromCrossing?: boolean } = {}): boolean => {
+      // The controls are disabled while locked; this also covers keyboard paths.
+      if (gridLockReason.value) return false;
+      const results = searchObj.data.queryResults;
+      if (searchObj.meta.jobId != "" && results.paginations == undefined) results.pagination = [];
+      const maxPages =
+        searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
+          ? results.pagination?.length
+          : results?.partitionDetail?.paginations?.length;
+      if (page > Math.ceil(maxPages) && searchObj.meta.jobId == "") {
+        toast({ variant: "error", message: t("logs.searchResult.pageOutOfRange"), timeout: 1000 });
+        pageNumberInput.value = searchObj.data.resultGrid.currentPage;
+        return false;
+      }
+      if (!options.fromCrossing) resetRowSelection(searchObj);
+      searchObj.data.resultGrid.currentPage = page;
+      pageNumberInput.value = page;
+      emit("update:scroll");
+      scrollTableToTop(0);
+      return true;
+    };
+
+    const startCrossing = (page: number, position: "first" | "last") => {
+      crossingFromClosedDrawer = !searchObj.meta.showDetailTab;
+      navigation().pendingPageSelection = { page, position, requestId: null };
+      announce(t("logs.rowNav.loadingPageAnnouncement", { page }));
+      const sent = changePage(page, { fromCrossing: true });
+      // The dispatch is synchronous, so a still-unbound crossing here was never sent (4a §3.2 "Dispatch check").
+      if (navigation().pendingPageSelection?.requestId === null) {
+        failPendingPageNavigation(searchObj, { quiet: !sent });
+      }
+    };
+
+    /** One J/K step, shared by the keys and the drawer's Prev/Next buttons. */
+    const stepLogRow = (direction: 1 | -1, isRepeat = false) => {
+      if (searchObj.meta.logsVisualizeToggle !== "logs") return;
+      if (!hitsSettled() || navigation().pendingPageSelection) return;
+      if (isOtherDialogOpen()) return;
+      const hits = hitsList();
+      if (!hits.length) return;
+      if (searchObj.meta.showDetailTab && detailActiveTab.value.startsWith("correlated-")) return;
+      const target = nextRowTarget({
+        anchor: resolveAnchor(),
+        count: hits.length,
+        direction,
+        page: currentPage.value,
+        pageCount: pageCount.value,
+        canChangePage: canChangePage.value,
+        isRepeat,
+      });
+      if (target.kind === "select") {
+        if (!openDetail({ index: target.index })) return;
+        navigation().selectionActive = true;
+        clearCorrelationState();
+        scrollRowIntoView(target.index);
+        announcePosition(target.index);
+      } else if (target.kind === "page") {
+        startCrossing(target.page, target.position);
+      } else if (target.kind === "edge") {
+        announce(edgeMessage(target.edge, direction));
+      }
+    };
+
+    // A drawer close that coincides with this message is announced outside, once the dialog content is gone.
+    const closeDrawerAnnouncing = (message: string) => {
+      if (searchObj.meta.showDetailTab) {
+        afterCloseAnnouncement = message;
+        searchObj.meta.showDetailTab = false;
+      } else {
+        announceInto(rowNavAnnouncement, message);
+      }
+    };
+
+    const failCrossing = (page: number, options: { quiet: boolean; cancelled?: boolean }) => {
+      navigation().pendingPageSelection = null;
+      clearRowSelection();
+      if (options.cancelled) {
+        closeDrawerAnnouncing("");
+        return;
+      }
+      const message = t("logs.rowNav.pageFailed", { page });
+      if (!options.quiet) toast({ variant: "error", message });
+      closeDrawerAnnouncing(message);
+    };
+
+    const crossingTargetStillWanted = () => {
+      if (searchObj.meta.logsVisualizeToggle !== "logs" || isOtherDialogOpen()) return false;
+      if (!crossingFromClosedDrawer) return true;
+      const active = document.activeElement;
+      if (!active || active === document.body) return true;
+      const table = searchListContainer.value?.querySelector(
+        '[data-test="logs-search-result-logs-table"]',
+      );
+      return !!table?.contains(active) || active === scrollContainerRef.value;
+    };
+
+    const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
+      if (!load.ok) {
+        failCrossing(pending.page, { quiet: false, cancelled: load.reason === "cancelled" });
+        return;
+      }
+      const hits = hitsList();
+      if (!hits.length) {
+        navigation().pendingPageSelection = null;
+        clearRowSelection();
+        closeDrawerAnnouncing(t("logs.rowNav.pageEmpty", { page: pending.page }));
+        return;
+      }
+      const index = pending.position === "first" ? 0 : hits.length - 1;
+      navigation().pendingPageSelection = null;
+      if (crossingTargetStillWanted()) {
+        openDetail({ index }, { origin: "crossing" });
+        clearCorrelationState();
+      } else {
+        navigation().currentRowIndex = index;
+      }
+      navigation().selectionActive = true;
+      scrollRowIntoView(index);
+      nextTick(() => announcePosition(index));
+    };
+
+    // Sync: the error that fails a page also swaps the results for the error state, which unmounts this component.
+    watch(
+      () => searchObj.data.resultGrid.pageLoad,
+      (load) => {
+        const pending = navigation().pendingPageSelection ?? null;
+        if (pending && acceptsPageLoad(pending, load ?? null)) resolveCrossing(pending, load!);
+      },
+      { flush: "sync" },
+    );
+
+    // Leaving Logs mode abandons a crossing; nothing reopens when its page lands (4a §3.2.2 "Cancel").
+    watch(
+      () => searchObj.meta.logsVisualizeToggle,
+      (mode) => {
+        if (mode !== "logs" && navigation().pendingPageSelection) resetRowSelection(searchObj);
+      },
+    );
+
+    const onDetailDrawerAfterClose = () => {
+      const message = afterCloseAnnouncement;
+      afterCloseAnnouncement = null;
+      if (navigation().currentRowIndex == null)
+        scrollContainerRef.value?.focus({ preventScroll: true });
+      if (message) nextTick(() => announceInto(rowNavAnnouncement, message));
+    };
+
+    /** Keeps the open drawer on its row after a search replaced the hits (4a §3.2.7 "Row match"). */
+    const rematchDetailRow = () => {
+      const snapshot = detailRow.value;
+      if (!snapshot) return;
+      const executed = searchObj.meta.executed as
+        { signature?: { sqlMode?: boolean }; req?: any } | null | undefined;
+      const options = { timestampColumn: logsTimestampCol.value };
+      const fields = executed?.req
+        ? trustworthyFields(
+            {
+              sqlMode: !!executed.signature?.sqlMode,
+              encoding: executed.req.encoding,
+              query: executed.req.query ?? {},
+            },
+            options,
+          )
+        : "all";
+      navigation().currentRowIndex = matchDetailRow(hitsList(), snapshot, fields, options);
+    };
+
+    const stopHitsComplete = onHitsComplete((payload) => {
+      if (payload.type !== "search" || navigation().pendingPageSelection) return;
+      if (!searchObj.meta.showDetailTab || !detailRow.value) return;
+      rematchDetailRow();
+    });
+
+    const stopPageNavFailure = setPageNavFailureHandler(({ quiet }) => {
+      const pending = navigation().pendingPageSelection;
+      if (pending) failCrossing(pending.page, { quiet });
+    });
+
+    onBeforeUnmount(() => {
+      stopHitsComplete();
+      stopPageNavFailure();
+      // A failed page can swap the results for the error state before the drawer reports its close.
+      if (afterCloseAnnouncement) announceInto(rowNavAnnouncement, afterCloseAnnouncement);
+      afterCloseAnnouncement = null;
+    });
 
     const addSearchTerm = (
       field: string | number,
@@ -2134,6 +2468,8 @@ export default defineComponent({
           correlationDashboardProps.value = null;
           correlationLoading.value = false;
           correlationError.value = null;
+          // Esc or × during a crossing cancels it; the page still lands but nothing reopens (AC2.8).
+          if (navigation().pendingPageSelection) resetRowSelection(searchObj);
         }
       },
     );
@@ -2364,6 +2700,26 @@ export default defineComponent({
 
     return {
       gridLockReason,
+      activeRowIndex,
+      pageCount,
+      canChangePage,
+      hasPrevPage,
+      hasNextPage,
+      pageLoadingDirection,
+      navDisabledReason,
+      pageEdgeReason,
+      drawerSubTitle,
+      detailReturnFocus,
+      onDetailDrawerAfterClose,
+      detailRow,
+      detailOpenSeq,
+      detailActiveTab,
+      onDetailTabChange,
+      openDetail,
+      stepLogRow,
+      changePage,
+      rowNavAnnouncement,
+      detailNavAnnouncement,
       raw,
       isDark,
       isMobile,
@@ -2413,7 +2769,6 @@ export default defineComponent({
       formatCount,
       openLogDetails,
       changeMaxRecordToReturn,
-      navigateRowDetail,
       totalHeight,
       reDrawChart,
       toggleFieldList,
@@ -2448,7 +2803,6 @@ export default defineComponent({
       skeletonBarHeights,
       sendToAiChat,
       closeTable,
-      getRowIndex,
       getPartitionPaginations,
       getSocketPaginations,
       resetPlotChart,

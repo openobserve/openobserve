@@ -515,6 +515,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODrawer>
+    <!-- Outside the results, which an error state replaces exactly when a failed page is announced. -->
+    <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-row-nav-live">
+      {{ rowNavAnnouncement }}
+    </div>
   </div>
 </template>
 
@@ -612,6 +616,12 @@ import {
 } from "@/composables/useLogs/freeTextSearch";
 import { isAutoRunActive, type RunContext } from "@/composables/useLogs/useAutoRun";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import {
+  logsRowNavAnnouncement,
+  nextJobRequestId,
+  notePageLoad,
+  notePageRequest,
+} from "@/composables/useLogs/logsRowNav";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
@@ -703,7 +713,15 @@ export default defineComponent({
           this.autoRun.engine.requestRun("pagination");
         } else {
           this.searchObj.loading = true;
-          await this.getJobData(false);
+          // Bound before the await, so a J/K crossing sees its request when the paginator returns (4a §3.2.2).
+          const requestId = nextJobRequestId();
+          notePageRequest(this.searchObj, requestId);
+          try {
+            await this.getJobData(false);
+            notePageLoad(this.searchObj, requestId, "done");
+          } catch {
+            notePageLoad(this.searchObj, requestId, "error");
+          }
         }
 
         analytics.track("Button Click", {
@@ -3653,6 +3671,16 @@ export default defineComponent({
         },
       },
       {
+        id: "logsNextRow",
+        handler: (e?: KeyboardEvent) =>
+          (searchResultRef.value as any)?.stepLogRow?.(1, !!e?.repeat),
+      },
+      {
+        id: "logsPrevRow",
+        handler: (e?: KeyboardEvent) =>
+          (searchResultRef.value as any)?.stepLogRow?.(-1, !!e?.repeat),
+      },
+      {
         id: "logsExport",
         handler: () => {
           if (autoRun.engine.isResultsStale()) return;
@@ -3666,6 +3694,7 @@ export default defineComponent({
 
     return {
       autoRun,
+      rowNavAnnouncement: logsRowNavAnnouncement,
       isAutoRunOn,
       isResultsStale,
       showGuardEmptyState,

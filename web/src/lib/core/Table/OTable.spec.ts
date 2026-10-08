@@ -32,6 +32,8 @@ import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { I18nText } from "@/types/i18n";
 import type { OTableColumnDef } from "./OTable.types";
 import { raw } from "@/types/i18n";
 
@@ -3099,5 +3101,229 @@ describe("OTable body sections", () => {
 
     expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
     expect(wrapper.findAll("tbody tr")).toHaveLength(4);
+  });
+});
+
+describe("OTable activeRowIndex", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const RING = ["bg-table-row-selected-bg", "ring-2", "ring-inset", "ring-focus-ring-accent"];
+
+  it("marks only the matching row with aria-current, data-active-row and the ring", () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(5), columns: makeColumns(), activeRowIndex: 2 },
+    });
+    const active = wrapper.find('[data-test="o2-table-row-2"]');
+    expect(active.attributes("aria-current")).toBe("true");
+    expect(active.attributes("data-active-row")).toBe("true");
+    for (const cls of RING) expect(active.classes()).toContain(cls);
+
+    for (const i of [0, 1, 3, 4]) {
+      const row = wrapper.find(`[data-test="o2-table-row-${i}"]`);
+      expect(row.attributes("aria-current")).toBeUndefined();
+      expect(row.attributes("data-active-row")).toBeUndefined();
+      expect(row.classes()).not.toContain("ring-2");
+      expect(row.classes()).not.toContain("bg-table-row-selected-bg");
+    }
+  });
+
+  it("renders no active state when the prop is absent or null", async () => {
+    wrapper = mount(OTable, { props: { data: makeRows(4), columns: makeColumns() } });
+    expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+    expect(wrapper.findAll("[data-active-row]")).toHaveLength(0);
+    expect(wrapper.findAll("tr.ring-2")).toHaveLength(0);
+
+    await wrapper.setProps({ activeRowIndex: null });
+    expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+  });
+
+  it("moves the highlight when the index changes, and clears it on null", async () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(4), columns: makeColumns(), activeRowIndex: 0 },
+    });
+    await wrapper.setProps({ activeRowIndex: 3 });
+    expect(wrapper.find('[data-test="o2-table-row-0"]').attributes("aria-current")).toBeUndefined();
+    expect(wrapper.find('[data-test="o2-table-row-3"]').attributes("aria-current")).toBe("true");
+
+    await wrapper.setProps({ activeRowIndex: null });
+    expect(wrapper.findAll("[data-active-row]")).toHaveLength(0);
+  });
+
+  it("keeps the row's existing attributes and test ids", () => {
+    wrapper = mount(OTable, {
+      props: {
+        data: makeRows(3),
+        columns: makeColumns(),
+        activeRowIndex: 1,
+        rowClass: "custom-row-class",
+        onRowClick: () => {},
+      },
+    });
+    const row = wrapper.find('[data-test="o2-table-row-1"]');
+    expect(row.classes()).toContain("custom-row-class");
+    expect(row.attributes("tabindex")).toBe("0");
+  });
+
+  it("does not stripe the active row", () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(4), columns: makeColumns(), striped: true, activeRowIndex: 1 },
+    });
+    expect(wrapper.find('[data-test="o2-table-row-1"]').classes()).not.toContain(
+      "bg-table-row-striped-bg",
+    );
+    expect(wrapper.find('[data-test="o2-table-row-3"]').classes()).toContain(
+      "bg-table-row-striped-bg",
+    );
+  });
+
+  it("names the row expand button and reports its state (axe button-name on the J/K highlight)", async () => {
+    const wrapper = mount(OTable, {
+      props: { data: makeRows(2), columns: makeColumns(), expansion: "multiple" },
+    });
+    const button = wrapper.find('[data-test="o2-table-expand-0"]');
+    expect(button.attributes("aria-label")).toBe("Expand");
+    expect(button.attributes("aria-expanded")).toBe("false");
+    await button.trigger("click");
+    await nextTick();
+    expect(wrapper.find('[data-test="o2-table-expand-0"]').attributes("aria-label")).toBe(
+      "Collapse",
+    );
+    expect(wrapper.find('[data-test="o2-table-expand-0"]').attributes("aria-expanded")).toBe(
+      "true",
+    );
+    wrapper.unmount();
+  });
+
+  it("highlights the active row in the virtual-scroll body branch", () => {
+    const host = mount(OTable, { props: { data: makeRows(6), columns: makeColumns() } });
+    const table = (host.vm as any).table;
+    const virtualRows = [2, 3, 4].map((index) => ({
+      index,
+      start: index * 36,
+      size: 36,
+      key: index,
+    }));
+    const body = mount(OTableBody, {
+      props: { rows: table.getRowModel().rows, table, virtualRows, activeRowIndex: 3 },
+      attachTo: document.createElement("table"),
+    });
+    const active = body.findAll("[data-active-row]");
+    expect(active).toHaveLength(1);
+    expect(active[0].attributes("data-test")).toBe("o2-table-row-3");
+    expect(active[0].attributes("aria-current")).toBe("true");
+    body.unmount();
+    host.unmount();
+  });
+});
+
+describe("OTable sort header button", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const tsColumns = (): OTableColumnDef<TestRow>[] => [
+    { id: "id", header: "ID", accessorKey: "id", sortable: true, size: 60 },
+    { id: "name", header: "Name", accessorKey: "name", size: 200 },
+  ];
+
+  const mountServer = (props: Record<string, unknown> = {}) =>
+    mount(OTable, {
+      props: {
+        data: makeRows(5),
+        columns: tsColumns(),
+        sorting: "server",
+        sortBy: "id",
+        sortOrder: "desc",
+        ...props,
+        "onUpdate:sortOrder": (order: "asc" | "desc") => wrapper.setProps({ sortOrder: order }),
+      },
+    });
+
+  const trigger = () => wrapper.find('[data-test="o2-table-th-sort-trigger"]');
+  const direction = () =>
+    wrapper.find('[data-test="o2-table-sort-icon-active"]').attributes("data-test-sort-direction");
+
+  it("T-A4: with sortClearable=false a sorted column goes desc → asc → desc, never cleared", async () => {
+    wrapper = mountServer({ sortClearable: false });
+    expect(direction()).toBe("desc");
+
+    await trigger().trigger("click");
+    await flushPromises();
+    expect(direction()).toBe("asc");
+
+    await trigger().trigger("click");
+    await flushPromises();
+    expect(direction()).toBe("desc");
+
+    const changes = wrapper.emitted("sort-change")!.map((e) => e[0]);
+    expect(changes).toEqual([
+      { column: "id", order: "asc" },
+      { column: "id", order: "desc" },
+    ]);
+    expect(wrapper.emitted("update:sortBy")!.every((e) => e[0] === "id")).toBe(true);
+  });
+
+  it("still clears a desc sort by default (sortClearable defaults to true)", async () => {
+    wrapper = mountServer();
+    await trigger().trigger("click");
+    expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({ column: "", order: "asc" });
+  });
+
+  it("T-A8: the trigger is a keyboard-operable button and the header carries aria-sort", async () => {
+    wrapper = mountServer({ sortClearable: false });
+    const button = trigger();
+    expect(button.element.tagName).toBe("BUTTON");
+    expect(button.attributes("type")).toBe("button");
+    expect(button.attributes("aria-disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="o2-table-th-id"]').attributes("aria-sort")).toBe("descending");
+    expect(wrapper.find('[data-test="o2-table-th-name"]').attributes("aria-sort")).toBeUndefined();
+
+    await button.trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-th-id"]').attributes("aria-sort")).toBe("ascending");
+  });
+
+  it("reports aria-sort none on a sortable column that is not sorted", () => {
+    wrapper = mountServer({ sortBy: "", sortOrder: undefined });
+    expect(wrapper.find('[data-test="o2-table-th-id"]').attributes("aria-sort")).toBe("none");
+  });
+
+  it("T-A8: sortDisabled ignores clicks, sets aria-disabled and shows the reason tooltip", async () => {
+    const reason = "Newest first while auto refresh is on." as I18nText;
+    wrapper = mountServer({ sortClearable: false, sortDisabled: true, sortDisabledReason: reason });
+    const button = trigger();
+    expect(button.attributes("aria-disabled")).toBe("true");
+    expect(button.classes()).toContain("cursor-not-allowed");
+
+    await button.trigger("click");
+    expect(wrapper.emitted("sort-change")).toBeUndefined();
+    expect(wrapper.emitted("update:sortOrder")).toBeUndefined();
+    expect(direction()).toBe("desc");
+
+    const tooltip = wrapper.findAllComponents(OTooltip).find((c) => c.props("content") === reason);
+    expect(tooltip).toBeTruthy();
+    expect(tooltip!.props("disabled")).toBe(false);
+  });
+
+  it("T-A8: the tooltip stays off while sorting is enabled", () => {
+    wrapper = mountServer({ sortDisabledReason: "unused" as I18nText });
+    const tooltip = wrapper
+      .findAllComponents(OTooltip)
+      .find((c) => c.props("content") === "unused");
+    expect(tooltip!.props("disabled")).toBe(true);
+  });
+
+  it("sortDisabled also blocks client-side sorting", async () => {
+    wrapper = mount(OTable, {
+      props: { data: makeRows(5), columns: tsColumns(), sorting: "client", sortDisabled: true },
+    });
+    await trigger().trigger("click");
+    expect((wrapper.vm as any).table.getState().sorting).toEqual([]);
   });
 });

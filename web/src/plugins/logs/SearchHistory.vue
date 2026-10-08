@@ -738,14 +738,15 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load history on mount, then hand the
-    // scope back to the logs page on leave.
+    // Releasing a token, not restoring a captured name, keeps an out-of-order unmount from clobbering a newer owner.
+    let scopeToken: symbol | null = null;
     onMounted(() => {
-      getManager()?.setScope("search-history");
+      scopeToken = getManager()?.acquireScope("search-history") ?? null;
       fetchSearchHistory();
     });
     onUnmounted(() => {
-      getManager()?.setScope("logs");
+      if (scopeToken) getManager()?.releaseScope(scopeToken);
+      scopeToken = null;
     });
     return {
       isMobile,

@@ -27,6 +27,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="info" size="sm" />
       <span>{{ t("search.freeTextBuildNotice") }}</span>
     </div>
+    <div
+      v-if="parserLoadFailed || retryingParser"
+      role="alert"
+      class="bg-status-error-bg text-status-error-text flex items-center gap-2 px-3 py-2 text-xs"
+      data-test="logs-build-parser-error"
+    >
+      <OIcon name="error-outline" size="sm" />
+      <span class="min-w-0 flex-1">{{ t("logs.buildQueryPage.parserLoadFailed") }}</span>
+      <OButton
+        variant="outline"
+        size="xs"
+        data-test="logs-build-parser-retry"
+        :loading="retryingParser"
+        @click="retryParser"
+        >{{ t("logs.buildQueryPage.retryParser") }}</OButton
+      >
+    </div>
     <!-- PanelEditor with BUILD_PRESET -->
     <PanelEditor
       ref="panelEditorRef"
@@ -64,6 +81,7 @@ import {
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
@@ -170,6 +188,9 @@ const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 const freeTextNotice = ref(false);
+// The filter could not be read into the builder, so every run would be unfiltered until a retry loads the parser.
+const parserLoadFailed = ref(false);
+const retryingParser = ref(false);
 const needsFilterInit = () =>
   !props.isSqlMode && (!!props.whereClause?.trim() || props.freeTextFilter);
 // Until the search bar's filter is in the builder, the panel holds the stream with no WHERE.
@@ -190,6 +211,7 @@ const {
 const runBlocked = computed(
   () =>
     filterInitPending.value ||
+    parserLoadFailed.value ||
     (freeTextNotice.value && !dashboardPanelData.data.queries[0]?.customQuery),
 );
 // A newer initialisation owns the panel; an older one resuming after an await must not write to it.
@@ -250,6 +272,7 @@ const restoreConfigFromUrl = (): {
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
   freeTextNotice.value = false;
+  parserLoadFailed.value = false;
   filterInitPending.value = needsFilterInit();
   holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
   // Reset panel data first
@@ -353,7 +376,18 @@ const initializeFromQuery = async () => {
 
     // Parse WHERE clause into builder filter
     if (whereClause?.trim() || freeTextFilter) {
-      const { filter, complete } = await parseWhereClauseToFilterChecked(whereClause);
+      let parsed: Awaited<ReturnType<typeof parseWhereClauseToFilterChecked>>;
+      try {
+        parsed = await parseWhereClauseToFilterChecked(whereClause);
+      } catch (error) {
+        if (seq !== initSeq) return;
+        console.error("Build: query parser failed to load", error);
+        parserLoadFailed.value = true;
+        filterInitPending.value = false;
+        emit("initialized");
+        return;
+      }
+      const { filter, complete } = parsed;
       if (seq !== initSeq) return;
       // A text search the builder cannot hold would otherwise run unfiltered (AC6.6).
       if (freeTextFilter && (!whereClause?.trim() || !complete)) {
@@ -563,8 +597,19 @@ watch(
 // PanelEditor Event Handlers (forward to parent)
 // ============================================================================
 
+const retryParser = async () => {
+  retryingParser.value = true;
+  try {
+    await initializeFromQuery();
+  } finally {
+    retryingParser.value = false;
+  }
+};
+
 const onQueryGenerated = (query: string) => {
-  if (holdGeneratedQuery.value || freeTextNotice.value) return;
+  // Until the filter is in the builder, a generated query lacks it and would erase it from the search bar.
+  if (holdGeneratedQuery.value || filterInitPending.value || freeTextNotice.value) return;
+  if (parserLoadFailed.value) return;
   // Forward the generated query to parent (Index.vue -> SearchBar)
   emit("queryGenerated", query);
 };

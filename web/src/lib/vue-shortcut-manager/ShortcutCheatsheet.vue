@@ -43,6 +43,7 @@
             icon-left="close"
             size="icon"
             class="shrink-0"
+            :aria-label="t('common.close')"
             data-test="shortcut-cheatsheet-close-btn"
             @click="open = false"
           />

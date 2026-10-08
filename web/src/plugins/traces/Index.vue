@@ -260,6 +260,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t("traces.index.changeStreamMessage") }}</p>
     </ODialog>
+    <!-- Outside the results, which an error state replaces exactly when a failed page is announced. -->
+    <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="traces-row-nav-live">
+      {{ tracesRowNavAnnouncement }}
+    </div>
   </div>
 </template>
 
@@ -312,6 +316,7 @@ import {
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
+import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
@@ -329,6 +334,7 @@ import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface TracesSavedView {
@@ -806,10 +812,13 @@ const dropStaleSelection = () => {
 };
 
 async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
+  let boundTraceId: string | null = null;
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
+    // Rows are bound by position, so a new result set must not inherit the old selection (4a §3.4).
+    if (!isPagination) resetTraceRowSelection();
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
     searchObj.data.sqlSyntaxErrorRanges = [];
@@ -877,6 +886,14 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     const searchTraceId = getUUID().replace(/-/g, "");
     currentSearchTraceId = searchTraceId;
     tracesRequestState[searchTraceId] = { hasWritten: false };
+    if (isPagination) {
+      recordPageRequest(
+        searchObj.meta.resultGrid.navigation,
+        searchObj.data.resultGrid,
+        searchTraceId,
+      );
+      boundTraceId = searchTraceId;
+    }
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
@@ -1010,6 +1027,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           if (!tracesRequestState[searchTraceId]) return;
 
           searchObj.loading = false;
+          if (isPagination) noteTracesPageLoad(searchTraceId, "error");
 
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
@@ -1055,6 +1073,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             isLLMSpanPresent.value = false;
           }
           delete tracesRequestState[searchTraceId];
+          if (isPagination) noteTracesPageLoad(searchTraceId, "done");
           if (!isPagination) {
             analytics.track("traces_search_completed");
             fetchTracesCount();
@@ -1072,7 +1091,20 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     searchObj.loading = false;
     searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
+    // This catch never reaches the request's own error callback, so a bound crossing resolves here.
+    if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
   }
+}
+
+function resetTraceRowSelection() {
+  const navigation = searchObj.meta.resultGrid.navigation;
+  navigation.selectionActive = false;
+  navigation.currentRowIndex = null;
+  navigation.pendingPageSelection = null;
+}
+
+function noteTracesPageLoad(requestId: string, reason: PageLoadReason) {
+  recordPageLoad(searchObj.data.resultGrid, { requestId, ok: reason === "done", reason });
 }
 
 const updateFieldVisibility = async (field: any) => {
@@ -1107,6 +1139,9 @@ const cancelSearch = () => {
   });
   // Cancelling tears down the listeners, so no terminal event will release this entry.
   delete tracesRequestState[currentSearchTraceId];
+  if (searchObj.data.resultGrid.pageRequest?.requestId === currentSearchTraceId) {
+    noteTracesPageLoad(currentSearchTraceId, "cancelled");
+  }
   currentSearchTraceId = null;
   searchObj.loading = false;
 };
@@ -2174,6 +2209,18 @@ useShortcuts([
   {
     id: "tracesCopyUrl",
     handler: () => copyTracesUrl(t),
+  },
+  {
+    id: "tracesNextRow",
+    handler: (e?: KeyboardEvent) => {
+      if (activeTab.value === "search") searchResultRef.value?.stepTraceRow?.(1, !!e?.repeat);
+    },
+  },
+  {
+    id: "tracesPrevRow",
+    handler: (e?: KeyboardEvent) => {
+      if (activeTab.value === "search") searchResultRef.value?.stepTraceRow?.(-1, !!e?.repeat);
+    },
   },
 ]);
 </script>

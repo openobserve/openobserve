@@ -160,6 +160,9 @@ export interface DrawerProps {
 
   /** When false, the page behind stays interactive and only the close button or Escape outside a field closes it. Default: true. */
   modal?: boolean;
+
+  /** Element to focus when the drawer closes; a missing or detached element keeps the default. */
+  returnFocusTo?: () => HTMLElement | null;
 }
 
 export interface DrawerEmits {
@@ -171,6 +174,8 @@ export interface DrawerEmits {
   (e: "click:secondary"): void;
   /** Fires when the neutral inbuilt button is clicked. */
   (e: "click:neutral"): void;
+  /** Fires once the content has unmounted and focus has been placed after a close. */
+  (e: "after-close"): void;
 }
 
 export interface DrawerSlots {

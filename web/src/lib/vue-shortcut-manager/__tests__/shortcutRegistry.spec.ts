@@ -228,3 +228,42 @@ describe("synthetics journey search shortcut", () => {
     expect(synthetics?.pages).toContain("shortcuts.pages.syntheticsJourney");
   });
 });
+
+describe("row navigation entries (item 4a)", () => {
+  const entry = (id: string) =>
+    SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).find((e) => e.id === id);
+  const groupOf = (id: string) =>
+    SHORTCUT_REGISTRY.find((g) => g.shortcuts.some((e) => e.id === id));
+
+  it("keeps every id unique across the registry", () => {
+    const ids = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts.map((e) => e.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("binds J/K in the logs and traces scopes", () => {
+    expect(getShortcutDef("logsNextRow")).toMatchObject({ key: "j", scope: "logs" });
+    expect(getShortcutDef("logsPrevRow")).toMatchObject({ key: "k", scope: "logs" });
+    expect(getShortcutDef("tracesNextRow")).toMatchObject({ key: "j", scope: "traces" });
+    expect(getShortcutDef("tracesPrevRow")).toMatchObject({ key: "k", scope: "traces" });
+  });
+
+  it("keeps the display-only rows keyless and unregisterable", () => {
+    for (const id of ["logsRowFocusMove", "logsRowOpen", "logsDetailClose", "tracesRowOpen"]) {
+      const e = entry(id);
+      expect(e?.display).toBeTruthy();
+      expect(e?.key ?? e?.keys ?? e?.keyForMac ?? e?.keyForWindows).toBeUndefined();
+      expect(getShortcutDef(id)).toBeUndefined();
+    }
+    expect(groupOf("logsRowOpen")?.scope).toBe("logs");
+    expect(groupOf("tracesRowOpen")?.scope).toBe("traces");
+  });
+
+  it("describes trace-detail J/K as visible-span steps", () => {
+    expect(getShortcutDef("traceNextSpan")?.descriptionKey).toBe(
+      "shortcuts.actions.traceNextVisibleSpan",
+    );
+    expect(getShortcutDef("tracePrevSpan")?.descriptionKey).toBe(
+      "shortcuts.actions.tracePrevVisibleSpan",
+    );
+  });
+});

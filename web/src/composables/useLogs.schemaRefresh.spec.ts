@@ -168,4 +168,56 @@ describe("runGridSearch after a deferred free-text schema refresh (item 1, spec 
       `select * from "app"  WHERE match_all('timeout')`,
     ]);
   });
+
+  describe("same-query re-dispatches reuse the loaded schema (user report 2026-10-07)", () => {
+    // An earlier test's field extraction may still be in flight; its schema read is not this test's.
+    beforeEach(async () => {
+      await vi.waitFor(() => expect(searchObj.loadingStream).toBe(false));
+      await flushPromises();
+      getStreamMock.mockReset();
+    });
+
+    const deliver = async (payload: any, handlers: any) => {
+      handlers.data(payload, {
+        type: "search_response_metadata",
+        content: { results: { hits: [], total: 1, took: 1, scan_size: 0, from: 0 } },
+      });
+      handlers.data(payload, {
+        type: "search_response_hits",
+        content: {
+          results: {
+            hits: [{ _timestamp: 1, body: "timeout" }],
+            total: 1,
+            took: 1,
+            scan_size: 0,
+            from: 0,
+          },
+        },
+      });
+      handlers.complete(payload, { type: "end" });
+      await flushPromises();
+    };
+
+    it.each(["page", "page-size"] as const)(
+      "a %s run of a bare-word query sends one search and reads no schema",
+      async (mode) => {
+        getStreamMock.mockResolvedValue(ftsStream);
+        searchObj.data.query = "timeout";
+        await wrapper.vm.runGridSearch(openGrid().id, mode);
+        const searches = sent.filter((s) => s.payload.type === "search");
+        expect(searches).toHaveLength(1);
+        await deliver(searches[0].payload, searches[0].handlers);
+        await vi.waitFor(() => expect(searchObj.loadingStream).toBe(false));
+        expect(getStreamMock).not.toHaveBeenCalled();
+      },
+    );
+
+    it("a new bare-word run still refreshes the schema before it is sent", async () => {
+      getStreamMock.mockResolvedValue(ftsStream);
+      searchObj.data.query = "timeout";
+      await wrapper.vm.runGridSearch(openGrid().id);
+      expect(getStreamMock).toHaveBeenCalledWith("app", "logs", true, true);
+      expect(sent.filter((s) => s.payload.type === "search")).toHaveLength(1);
+    });
+  });
 });

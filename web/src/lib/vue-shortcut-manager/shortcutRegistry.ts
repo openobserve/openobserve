@@ -254,6 +254,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+d",
         descriptionKey: "shortcuts.actions.logsExport",
       },
+      { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
+      { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
+      // Display-only: OTable's row keys (useTableRowShortcuts) and the drawer's Escape handle these.
+      {
+        id: "logsRowFocusMove",
+        display: "↑ / ↓",
+        descriptionKey: "shortcuts.actions.logsRowFocusMove",
+      },
+      { id: "logsRowOpen", display: "enter", descriptionKey: "shortcuts.actions.logsRowOpen" },
+      {
+        id: "logsDetailClose",
+        display: "escape",
+        descriptionKey: "shortcuts.actions.logsDetailClose",
+      },
     ],
   },
 
@@ -400,6 +414,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForMac: "meta+shift+c",
         descriptionKey: "shortcuts.actions.tracesCopyUrl",
       },
+      { id: "tracesNextRow", key: "j", descriptionKey: "shortcuts.actions.tracesNextRow" },
+      { id: "tracesPrevRow", key: "k", descriptionKey: "shortcuts.actions.tracesPrevRow" },
+      // Display-only: Enter on a focused OTable row is handled by useTableRowShortcuts.
+      { id: "tracesRowOpen", display: "enter", descriptionKey: "shortcuts.actions.tracesRowOpen" },
     ],
   },
 
@@ -412,13 +430,13 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "traceNextSpan",
         keys: ["j", "down"],
         display: "J / ↓",
-        descriptionKey: "shortcuts.actions.traceNextSpan",
+        descriptionKey: "shortcuts.actions.traceNextVisibleSpan",
       },
       {
         id: "tracePrevSpan",
         keys: ["k", "up"],
         display: "K / ↑",
-        descriptionKey: "shortcuts.actions.tracePrevSpan",
+        descriptionKey: "shortcuts.actions.tracePrevVisibleSpan",
       },
     ],
   },

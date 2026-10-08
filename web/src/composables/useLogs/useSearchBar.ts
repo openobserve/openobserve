@@ -39,6 +39,7 @@ import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { raw } from "@/types/i18n";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { pruneFreeTextScan } from "@/utils/logs/freeTextScan";
+import { closeDrawerForQuery, resetRowSelection } from "@/composables/useLogs/logsRowNav";
 
 // Moved on every selection change, so a slower schema response for an earlier pick never wins (P1).
 let selectionToken = 0;
@@ -53,6 +54,8 @@ export interface StreamChangeOptions {
 
 export interface QueryDataOptions {
   generationId?: number;
+  /** Same query re-sent (page size): its results reuse the stream schemas already loaded. */
+  reuseSchema?: boolean;
 }
 
 export const useSearchBar = (t: TranslateFn) => {
@@ -443,7 +446,9 @@ export const useSearchBar = (t: TranslateFn) => {
 
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
-      searchObj.meta.showDetailTab = false;
+      // Rows are keyed by index, so a new result set must not inherit the old open row (4a §3.2.5).
+      if (!isPagination) resetRowSelection(searchObj);
+      closeDrawerForQuery(searchObj, isPagination);
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";
       if (
@@ -529,7 +534,9 @@ export const useSearchBar = (t: TranslateFn) => {
       }
 
       // Use the appropriate method to fetch data
-      getDataThroughStream(isPagination, options.generationId);
+      getDataThroughStream(isPagination, options.generationId, {
+        reuseSchema: !!options.reuseSchema,
+      });
 
       // searchObjDebug["buildSearchStartTime"] = performance.now();
       // const queryReq: any = buildSearch();

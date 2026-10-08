@@ -110,9 +110,18 @@ onActivated(() => (hostAway.value = false));
 
 function handleCloseAutoFocus(event: Event) {
   if (hostAway.value || awaySinceOpen) event.preventDefault();
-  if (hostAway.value || !awaySinceOpen) return;
-  awaySinceOpen = false;
-  if (openedFrom?.isConnected) openedFrom.focus();
+  const target = hostAway.value ? null : props.returnFocusTo?.();
+  if (target?.isConnected) {
+    // Not gated on defaultPrevented, so the result is the same whichever listener reka runs first.
+    event.preventDefault();
+    awaySinceOpen = false;
+    target.scrollIntoView({ block: "nearest" });
+    target.focus({ preventScroll: true });
+  } else if (!hostAway.value && awaySinceOpen) {
+    awaySinceOpen = false;
+    if (openedFrom?.isConnected) openedFrom.focus();
+  }
+  emit("after-close");
 }
 
 function handleOpenChange(v: boolean) {

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="searchdetaildialog flex h-full flex-col flex-nowrap"
     :class="severityBorderClass"
     data-test="dialog-box"
+    data-no-autofocus
   >
     <!-- Single Tab Row -->
     <div class="flex shrink-0 items-center justify-between">
@@ -134,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             variant="outline"
             icon-left="account-tree"
+            :disabled="pageLoading"
             @click="viewTrace"
             >{{ t("search.viewTrace") }}</OButton
           >
@@ -153,10 +155,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex min-h-0 flex-1 flex-col',
+        'relative flex min-h-0 flex-1 flex-col',
         tab.startsWith('correlated-') ? 'full-height-panels overflow-hidden' : 'overflow-y-auto',
       ]"
+      :aria-busy="pageLoading ? 'true' : undefined"
     >
+      <!-- Covers the old record while a page crossing loads, so its field actions cannot fire. -->
+      <div
+        v-if="pageLoading"
+        class="bg-dialog-bg/80 text-text-secondary absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 text-sm"
+        data-test="log-detail-page-loading"
+      >
+        <OSpinner size="lg" />
+        <span>{{ t("logs.rowNav.loadingPage", { page: pageLoadingPage }) }}</span>
+      </div>
       <OTabPanels
         data-test="log-detail-tab-container"
         v-model="tab"
@@ -450,6 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="traces"
+            :shortcuts-active="tab === 'correlated-traces'"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -500,12 +513,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-detail-previous-detail-btn"
             variant="outline"
             size="sm-action"
-            :disabled="currentIndex <= 0"
+            :disabled="prevDisabled"
+            :loading="pageLoading && pageLoadingDirection === 'prev'"
             @click="$emit('showPrevDetail', false, true)"
-            ><OIcon name="navigate-before" size="sm" class="me-1" />{{
-              t("common.previous")
-            }}</OButton
           >
+            <!-- First child, so the tooltip anchors to the whole button. -->
+            <OTooltip :content="prevTooltip" shortcut-id="logsPrevRow" />
+            <OIcon name="navigate-before" size="sm" class="me-1" />{{ t("common.previous") }}
+            <OShortcut
+              id="logsPrevRow"
+              class="ms-1.5 max-md:hidden"
+              data-test="log-detail-previous-detail-btn-kbd"
+            />
+          </OButton>
         </div>
         <div
           v-show="
@@ -521,11 +541,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="recordSizeOptions"
             size="md"
             class="select-noof-records"
+            :disabled="pageLoading"
           />
           <OButton
             data-test="logs-detail-table-search-around-btn"
             variant="outline"
             size="sm-action"
+            :disabled="pageLoading"
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
             >{{ t("common.searchAround") }}</OButton
           >
@@ -535,10 +557,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-detail-next-detail-btn"
             variant="outline"
             size="sm-action"
-            :disabled="currentIndex >= totalLength - 1"
+            :disabled="nextDisabled"
+            :loading="pageLoading && pageLoadingDirection === 'next'"
             @click="$emit('showNextDetail', true, false)"
-            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ms-1"
-          /></OButton>
+          >
+            <OTooltip :content="nextTooltip" shortcut-id="logsNextRow" />
+            {{ t("common.next") }}
+            <OShortcut
+              id="logsNextRow"
+              class="ms-1.5 max-md:hidden"
+              data-test="log-detail-next-detail-btn-kbd"
+            />
+            <OIcon name="navigate-next" size="sm" class="ms-1" />
+          </OButton>
         </div>
       </div>
     </OCardSection>
@@ -551,7 +582,16 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { defineComponent, ref, reactive, onBeforeMount, computed, watch, type PropType } from "vue";
+import {
+  defineComponent,
+  ref,
+  reactive,
+  onBeforeMount,
+  onMounted,
+  computed,
+  watch,
+  type PropType,
+} from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -583,6 +623,8 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -635,6 +677,8 @@ export default defineComponent({
     ODropdownSeparator,
     OSwitch,
     OSpinner,
+    OShortcut,
+    OTooltip,
     OIcon,
     OTable,
     OSearchInput,
@@ -653,6 +697,7 @@ export default defineComponent({
     "closeTable",
     "show-correlation",
     "load-correlation", // New event for lazy loading correlation data
+    "update:tab",
   ],
   props: {
     modelValue: {
@@ -703,6 +748,35 @@ export default defineComponent({
     embedded: {
       type: Boolean,
       default: false,
+    },
+    hasPrevPage: {
+      type: Boolean,
+      default: false,
+    },
+    hasNextPage: {
+      type: Boolean,
+      default: false,
+    },
+    pageLoading: {
+      type: Boolean,
+      default: false,
+    },
+    pageLoadingDirection: {
+      type: String as PropType<"next" | "prev" | null>,
+      default: null,
+    },
+    pageLoadingPage: {
+      type: Number,
+      default: 0,
+    },
+    navDisabledReason: {
+      type: String as PropType<"resultsChanged" | "notInPage" | "loading" | null>,
+      default: null,
+    },
+    // Why the page edge cannot be crossed (stale results, auto-refresh); shown on the disabled edge button.
+    pageEdgeReason: {
+      type: String as unknown as PropType<I18nText | null>,
+      default: null,
     },
   },
   methods: {
@@ -800,6 +874,7 @@ export default defineComponent({
 
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
+      emit("update:tab", newTab);
       const isCorrelationTab = newTab.startsWith("correlated-");
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
@@ -999,6 +1074,34 @@ export default defineComponent({
       tabOrder.value = order;
       window.localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.name)));
     };
+
+    // The tab watch has no `immediate`, and the drawer can mount straight onto a correlated tab (4a guard 6).
+    onMounted(() => emit("update:tab", tab.value));
+
+    const NAV_DISABLED_KEYS = {
+      resultsChanged: "logs.rowNav.resultsChanged",
+      notInPage: "logs.rowNav.notInPage",
+      loading: "logs.rowNav.loadingResults",
+    } as const;
+
+    const atFirst = computed(() => props.currentIndex <= 0 && !props.hasPrevPage);
+    const atLast = computed(
+      () => props.currentIndex >= props.totalLength - 1 && !props.hasNextPage,
+    );
+    const prevDisabled = computed(
+      () => props.pageLoading || !!props.navDisabledReason || atFirst.value,
+    );
+    const nextDisabled = computed(
+      () => props.pageLoading || !!props.navDisabledReason || atLast.value,
+    );
+
+    const navTooltip = (atEdge: boolean, fallback: I18nText): I18nText => {
+      if (props.navDisabledReason) return t(NAV_DISABLED_KEYS[props.navDisabledReason]);
+      if (atEdge && props.pageEdgeReason) return props.pageEdgeReason;
+      return fallback;
+    };
+    const prevTooltip = computed(() => navTooltip(atFirst.value, t("logs.rowNav.previousLog")));
+    const nextTooltip = computed(() => navTooltip(atLast.value, t("logs.rowNav.nextLog")));
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -1217,6 +1320,10 @@ export default defineComponent({
       router,
       rowData,
       tab,
+      prevDisabled,
+      nextDisabled,
+      prevTooltip,
+      nextTooltip,
       flattenJSONObject,
       selectedRelativeValue,
       recordSizeOptions,

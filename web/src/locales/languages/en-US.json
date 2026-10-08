@@ -11447,7 +11447,22 @@
     "eventClusterAriaLabelPlural": "{count} events, {errors} errors",
     "eventMarkerTooltip": "Event: {name}",
     "exceptionMarkerTooltip": "Exception: {type}",
-    "spanEventFallback": "span event"
+    "spanEventFallback": "span event",
+    "spanNav": {
+      "firstSpan": "First span",
+      "lastSpan": "Last span",
+      "position": "Span {index} of {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Trace {row} of {count}, page {page}",
+      "spanPosition": "Span {row} of {count}, page {page}",
+      "firstResult": "First result",
+      "lastResult": "Last result",
+      "autoRefreshEdge": "Auto-refresh is on; turn it off to change pages",
+      "loadingPage": "Loading page {page}",
+      "pageFailed": "Couldn't load page {page}",
+      "pageEmpty": "Page {page} has no results"
+    }
   },
   "aiToolset": {
     "header": "AI Toolsets",
@@ -14766,7 +14781,9 @@
       "fixErrorsAndRetry": "There are some errors, please fix them and try again"
     },
     "buildQueryPage": {
-      "validationErrors": "There are some errors, please fix them and try again"
+      "validationErrors": "There are some errors, please fix them and try again",
+      "parserLoadFailed": "Couldn't load the query parser, so the search filter can't be added to the chart. Runs are paused until it loads.",
+      "retryParser": "Retry"
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL Query :",
@@ -14968,6 +14985,22 @@
     },
     "logsNoEventsState": {
       "lastData": "Last data: {formatted} ({zone})"
+    },
+    "rowNav": {
+      "position": "Log {row} of {count}, page {page}",
+      "positionLabel": "Log {row} of {count} · Page {page}",
+      "loadingPage": "Loading page {page}…",
+      "loadingPageAnnouncement": "Loading page {page}",
+      "firstResult": "First result",
+      "lastResult": "Last result",
+      "autoRefreshEdge": "Auto-refresh is on; turn it off to change pages",
+      "pageFailed": "Couldn't load page {page}",
+      "pageEmpty": "Page {page} has no results",
+      "resultsChanged": "Results changed",
+      "notInPage": "Not in the current page",
+      "loadingResults": "Loading results…",
+      "previousLog": "Previous log",
+      "nextLog": "Next log"
     }
   },
   "queryError": {
@@ -16900,7 +16933,17 @@
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
       "oncallResolve": "Resolve",
-      "functionsImport": "Import function"
+      "functionsImport": "Import function",
+      "logsNextRow": "Next log (opens details)",
+      "logsPrevRow": "Previous log (opens details)",
+      "logsRowFocusMove": "Move focus between rows",
+      "logsRowOpen": "Open the focused row",
+      "logsDetailClose": "Close details and return to the row",
+      "tracesNextRow": "Select next trace",
+      "tracesPrevRow": "Select previous trace",
+      "tracesRowOpen": "Open the selected trace",
+      "traceNextVisibleSpan": "Next visible span",
+      "tracePrevVisibleSpan": "Previous visible span"
     }
   },
   "components": {

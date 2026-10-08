@@ -109,6 +109,46 @@ describe("registry", () => {
     expect(ITEM2_TRANSIENT_KEYS.every((k) => k.owner === "item2")).toBe(true);
   });
 
+  it("registers item 4a's drawer and crossing keys as reset keys", () => {
+    const entries = TRANSIENT_SEARCH_KEYS.filter((k) => k.owner === "item4a");
+    expect(Object.fromEntries(entries.map((k) => [k.path, k.mode]))).toEqual({
+      "meta.showDetailTab": "reset",
+      "meta.resultGrid.navigation.currentRowIndex": "reset",
+      "meta.resultGrid.navigation.selectionActive": "reset",
+      "meta.resultGrid.navigation.pendingPageSelection": "reset",
+      "data.resultGrid.pageRequest": "reset",
+      "data.resultGrid.pageLoad": "reset",
+      "data.resultGrid.hitsSettled": "reset",
+    });
+  });
+
+  it("a view saved with the drawer open neither stores nor reopens it", () => {
+    const live = {
+      meta: {
+        showDetailTab: true,
+        resultGrid: {
+          rowsPerPage: 50,
+          navigation: { currentRowIndex: 7, selectionActive: true, pendingPageSelection: null },
+        },
+      },
+      data: { resultGrid: { currentPage: 2, pageRequest: { requestId: "t" }, hitsSettled: false } },
+    };
+    const saved = prepareSearchForSave(JSON.parse(JSON.stringify(live)), live);
+    expect(saved.meta.showDetailTab).toBeUndefined();
+    expect(saved.meta.resultGrid).toEqual({ rowsPerPage: 50, navigation: {} });
+    expect(saved.data.resultGrid).toEqual({ currentPage: 2 });
+
+    const target = JSON.parse(JSON.stringify(live));
+    resetTransient(target);
+    expect(target.meta.showDetailTab).toBe(false);
+    expect(target.meta.resultGrid.navigation).toEqual({
+      currentRowIndex: null,
+      selectionActive: false,
+      pendingPageSelection: null,
+    });
+    expect(target.data.resultGrid.hitsSettled).toBe(true);
+  });
+
   it("replaces an entry registered twice under the same path and unregisters it", () => {
     const before = TRANSIENT_SEARCH_KEYS.length;
     const undo = registerTransientSearchKeys([REPLACE_KEY]);

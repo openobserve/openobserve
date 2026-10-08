@@ -50,6 +50,7 @@ export function resetManager(): void {
 export class ShortcutManager {
   private shortcuts = new Map<string, RegisteredShortcut[]>();
   private activeScope = "global";
+  private scopeStack: { token: symbol; scope: string }[] = [];
   private sequenceBuffer: string[] = [];
   private sequenceTimeout: ReturnType<typeof setTimeout> | null = null;
   private options: ShortcutManagerOptions;
@@ -65,12 +66,25 @@ export class ShortcutManager {
 
   // ---------- Scope ----------
 
+  /** Sets the base scope, used only while no owner holds an acquired scope. */
   setScope(scope: string): void {
     this.activeScope = scope;
   }
 
   getScope(): string {
-    return this.activeScope;
+    return this.scopeStack.at(-1)?.scope ?? this.activeScope;
+  }
+
+  /** Makes `scope` active until the returned token is released. */
+  acquireScope(scope: string): symbol {
+    const token = Symbol(scope);
+    this.scopeStack.push({ token, scope });
+    return token;
+  }
+
+  // Removes the token wherever it sits, so an out-of-order release never clobbers a newer owner.
+  releaseScope(token: symbol): void {
+    this.scopeStack = this.scopeStack.filter((entry) => entry.token !== token);
   }
 
   // ---------- Change listeners (for reactivity) ----------
@@ -234,8 +248,9 @@ export class ShortcutManager {
 
   private findMatch(key: string): RegisteredShortcut | undefined {
     const list = this.shortcuts.get(key) ?? [];
+    const scope = this.getScope();
     return (
-      list.find((s) => (s.scope ?? "global") === this.activeScope) ??
+      list.find((s) => (s.scope ?? "global") === scope) ??
       list.find((s) => (s.scope ?? "global") === "global")
     );
   }
@@ -282,6 +297,6 @@ export class ShortcutManager {
 
     if (this.options.preventDefault && e.key !== "Escape") e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
-    shortcut.handler();
+    shortcut.handler(e);
   }
 }

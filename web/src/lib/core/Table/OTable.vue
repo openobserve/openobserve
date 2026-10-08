@@ -70,6 +70,8 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pageSize: 20,
   pageSizeOptions: () => [20, 50, 100, 250, 500],
   sorting: "client",
+  sortClearable: true,
+  sortDisabled: false,
   selection: "none",
   showSelectAll: true,
   expansion: "none",
@@ -584,6 +586,9 @@ const sorting = useTableSorting(
     },
     get sortFieldMap() {
       return props.sortFieldMap;
+    },
+    get sortClearable() {
+      return props.sortClearable;
     },
   },
   emit,
@@ -1532,6 +1537,8 @@ defineExpose({
             :sort-order="sorting.activeSortOrder.value ?? undefined"
             :sort-field-map="props.sortFieldMap"
             :get-sort-icon="sorting.getSortIcon"
+            :sort-disabled="props.sortDisabled"
+            :sort-disabled-reason="props.sortDisabledReason"
             :sticky-header="props.stickyHeader"
             :bordered="props.bordered"
             :dense="props.dense"
@@ -1589,6 +1596,7 @@ defineExpose({
             :bordered="props.bordered"
             :striped="props.striped"
             :row-class="resolvedRowClass as any"
+            :active-row-index="props.activeRowIndex"
             :row-style-fn="props.getRowStyle"
             :get-status-bar-color="props.getRowStatusColor"
             :enable-cell-copy="props.enableCellCopy"

@@ -32,6 +32,7 @@ import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { notePageLoad } from "@/composables/useLogs/logsRowNav";
 
 export const useSearchResponseHandler = () => {
   const { t } = useI18nTyped();
@@ -208,12 +209,15 @@ export const useSearchResponseHandler = () => {
     }
 
     refreshPagination(true);
-    await processPostPaginationData();
+    // A page of the executed query has the schema its first page loaded; refetching it is the reported bug.
+    await processPostPaginationData(
+      isPagination || !!(payload as { reuseSchema?: boolean }).reuseSchema,
+    );
   };
 
-  const processPostPaginationData = async () => {
+  const processPostPaginationData = async (reuseLoadedSchema = false) => {
     updateFieldValues();
-    await extractFields();
+    await extractFields({ reuseLoadedSchema });
     updateGridColumns();
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
@@ -556,6 +560,10 @@ export const useSearchResponseHandler = () => {
     searchObj.loadingHistogramProgressPercentage = 0;
 
     const { message, trace_id, code, error_detail, error } = err.content;
+
+    if (request.type === "search" && request.isPagination && request.traceId) {
+      notePageLoad(searchObj, request.traceId, code === 20009 ? "cancelled" : "error");
+    }
 
     if (code === 20009) {
       showCancelSearchNotification(t);

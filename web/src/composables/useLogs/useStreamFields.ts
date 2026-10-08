@@ -181,7 +181,7 @@ export const useStreamFields = () => {
     }
   };
 
-  const extractFields = async () => {
+  const extractFields = async (options: { reuseLoadedSchema?: boolean } = {}) => {
     schemaRequestToken.value++;
     const capturedToken = schemaRequestToken.value;
     searchObj.loadingStream = true;
@@ -317,7 +317,14 @@ export const useStreamFields = () => {
 
             // check for schema exist in the object or not
             // if not pull the schema from server.
-            const streamData = await loadStreamFields(stream.name);
+            const streamData =
+              options.reuseLoadedSchema && Array.isArray(stream.schema)
+                ? {
+                    schema: stream.schema,
+                    settings: stream.settings,
+                    removedSchemaFields: stream.removedSchemaFields,
+                  }
+                : await loadStreamFields(stream.name);
             if (capturedToken !== schemaRequestToken.value) return;
             if (streamData.schema === undefined) {
               searchObj.loadingStream = false;
