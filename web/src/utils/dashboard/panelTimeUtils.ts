@@ -202,3 +202,18 @@ export const resolvePanelTimeValue = (
 
   return null;
 };
+
+/** Whether a dashboard URL change can move any panel's time; var-, pt- and cell_ params cannot. */
+export const queryChangeAffectsPanelTimes = (
+  newQuery: Record<string, any>,
+  oldQuery: Record<string, any> | undefined,
+): boolean => {
+  const changedKeys = [...Object.keys(newQuery), ...Object.keys(oldQuery ?? {})].filter(
+    (key) => newQuery[key] !== oldQuery?.[key],
+  );
+  if (changedKeys.length === 0) return true;
+  if (changedKeys.some((key) => key === "period" || key === "from" || key === "to")) return true;
+  return !changedKeys.every(
+    (key) => key.startsWith("pt-") || key.startsWith("cell_") || key.startsWith("var-"),
+  );
+};

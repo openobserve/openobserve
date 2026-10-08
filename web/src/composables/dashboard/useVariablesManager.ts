@@ -15,13 +15,15 @@
 
 import type { I18nText, TranslateFn } from "@/types/i18n";
 
-import { ref, computed, reactive } from "vue";
+import { ref, computed, reactive, watch, getCurrentScope, onScopeDispose } from "vue";
 import {
   buildScopedDependencyGraph,
   detectCyclesInScopedGraph,
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+
+export const LIVE_COMMIT_DEBOUNCE_MS = 300;
 
 export interface VariableConfig {
   name: string;
@@ -286,6 +288,27 @@ export const useVariablesManager = (t: TranslateFn) => {
     return false;
   });
 
+  // Keys a requested commit waits on; null means every visible variable.
+  const settleKeys = ref<Set<string> | null>(new Set());
+
+  // True while a variable the pending commit waits on is fetching or can start fetching.
+  const isSettling = computed(() => {
+    const scope = settleKeys.value;
+    if (scope !== null && scope.size === 0) return false;
+    const allVars = getAllVariablesFlat();
+    return allVars.some((v) => {
+      const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
+      if (scope !== null && !scope.has(key)) return false;
+      return isVariableVisible(v) && isVariableBusy(v, key, allVars);
+    });
+  });
+
+  const isLiveMode = ref(false);
+  const autoCommitListeners = new Set<() => void>();
+  let liveCommitTimer: ReturnType<typeof setTimeout> | null = null;
+  const commitRequested = ref(false);
+  const pendingLiveKeys = new Set<string>();
+
   // ========== HELPER FUNCTIONS ==========
   const areVariableArraysEqual = (
     arr1: VariableRuntimeState[],
@@ -346,6 +369,54 @@ export const useVariablesManager = (t: TranslateFn) => {
     return false;
   };
 
+  const hasUsableValue = (value: any) =>
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    (!Array.isArray(value) || value.length > 0);
+
+  const areParentsReady = (key: string, allVars: VariableRuntimeState[]): boolean => {
+    const parents = dependencyGraph.value[key]?.parents || [];
+    return parents.every((parentKey) => {
+      const parentVar = findVariableByKey(parentKey, allVars);
+      return parentVar?.isVariablePartialLoaded === true && hasUsableValue(parentVar.value);
+    });
+  };
+
+  // Still owed a load: fetching now, or waiting on parents that are themselves loading or hold a value.
+  // A parent that finished with no value blocks it for good, so it never counts as busy.
+  const isVariableBusy = (
+    v: VariableRuntimeState,
+    key: string,
+    allVars: VariableRuntimeState[],
+    path: Set<string> = new Set(),
+  ): boolean => {
+    if (v.isLoading) return true;
+    if (v.type !== "query_values") return false;
+    if (v.isVariableLoadingPending !== true && v.isVariablePartialLoaded === true) return false;
+    const nextPath = new Set(path).add(key);
+    return (dependencyGraph.value[key]?.parents || []).every((parentKey) => {
+      const parent = findVariableByKey(parentKey, allVars);
+      if (!parent || nextPath.has(parentKey)) return false;
+      if (isVariableBusy(parent, parentKey, allVars, nextPath)) return true;
+      return parent.isVariablePartialLoaded === true && hasUsableValue(parent.value);
+    });
+  };
+
+  const collectDescendants = (keys: string[]): Set<string> => {
+    const result = new Set<string>();
+    const queue = [...keys];
+    while (queue.length) {
+      const key = queue.shift()!;
+      (dependencyGraph.value[key]?.children || []).forEach((child) => {
+        if (result.has(child)) return;
+        result.add(child);
+        queue.push(child);
+      });
+    }
+    return result;
+  };
+
   const canVariableLoad = (variable: VariableRuntimeState): boolean => {
     const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
 
@@ -359,33 +430,8 @@ export const useVariablesManager = (t: TranslateFn) => {
       return false;
     }
 
-    // Check 3: All parents ready?
-    const parents = dependencyGraph.value[key]?.parents || [];
-    const allVars = getAllVariablesFlat();
-
-    const allParentsReady = parents.every((parentKey) => {
-      const parentVar = findVariableByKey(parentKey, allVars);
-      // Parent MUST be marked as partially loaded - this is the authoritative flag
-      // that indicates the variable is ready to be used in queries
-      if (!parentVar) {
-        return false;
-      }
-
-      if (parentVar.isVariablePartialLoaded !== true) {
-        return false;
-      }
-
-      // Additionally check that parent has a valid value
-      const hasValue =
-        parentVar.value !== null &&
-        parentVar.value !== undefined &&
-        parentVar.value !== "" &&
-        (!Array.isArray(parentVar.value) || parentVar.value.length > 0);
-
-      return hasValue;
-    });
-
-    return allParentsReady;
+    // Check 3: All parents loaded with a usable value?
+    return areParentsReady(key, getAllVariablesFlat());
   };
 
   const buildPanelTabMapping = (dashboard: any) => {
@@ -409,6 +455,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     dashboard: any,
     extraPanelTabMapping?: Record<string, string>,
   ) => {
+    cancelPendingCommit();
     currentDashboard.value = dashboard;
     panelTabMapping.value = {
       ...buildPanelTabMapping(dashboard),
@@ -602,6 +649,76 @@ export const useVariablesManager = (t: TranslateFn) => {
     }
   };
 
+  const cancelPendingCommit = () => {
+    if (liveCommitTimer !== null) {
+      clearTimeout(liveCommitTimer);
+      liveCommitTimer = null;
+    }
+    commitRequested.value = false;
+    pendingLiveKeys.clear();
+    settleKeys.value = new Set();
+  };
+
+  const flushRequestedCommit = () => {
+    if (!commitRequested.value || isSettling.value) return;
+    cancelPendingCommit();
+    commitAll();
+    autoCommitListeners.forEach((listener) => listener());
+  };
+
+  /** Commits once the changed keys and all their dependents resolve (all visible ones when no keys are given). */
+  const commitWhenSettled = (changedKeys?: string[]) => {
+    commitRequested.value = true;
+    const current = settleKeys.value;
+    if (!changedKeys || current === null) {
+      settleKeys.value = null;
+    } else {
+      settleKeys.value = new Set([...current, ...changedKeys, ...collectDescendants(changedKeys)]);
+    }
+    flushRequestedCommit();
+  };
+
+  const scheduleLiveCommit = (changedKey: string) => {
+    pendingLiveKeys.add(changedKey);
+    if (liveCommitTimer !== null) clearTimeout(liveCommitTimer);
+    liveCommitTimer = setTimeout(() => {
+      liveCommitTimer = null;
+      const keys = [...pendingLiveKeys];
+      pendingLiveKeys.clear();
+      commitWhenSettled(keys);
+    }, LIVE_COMMIT_DEBOUNCE_MS);
+  };
+
+  const setLiveMode = (on: boolean) => {
+    if (isLiveMode.value === on) return;
+    isLiveMode.value = on;
+    if (!on) {
+      cancelPendingCommit();
+      return;
+    }
+    if (variablesData.isInitialized && hasUncommittedChanges.value) commitWhenSettled();
+  };
+
+  /** Registers a callback run after each settled commit; returns the unsubscribe. */
+  const onAutoCommit = (listener: () => void) => {
+    autoCommitListeners.add(listener);
+    return () => autoCommitListeners.delete(listener);
+  };
+
+  watch(
+    () => commitRequested.value && !isSettling.value,
+    (ready) => {
+      if (ready) flushRequestedCommit();
+    },
+  );
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      cancelPendingCommit();
+      autoCommitListeners.clear();
+    });
+  }
+
   // ========== LOADING STATE MANAGEMENT ==========
   /**
    * Called by VariablesValueSelector when a variable completes loading
@@ -747,6 +864,11 @@ export const useVariablesManager = (t: TranslateFn) => {
         childVar.isVariableLoadingPending = true;
       }
     });
+
+    if (!isLiveMode.value) return;
+    // The textbox input already waited the live debounce, so a second one would stack.
+    if (variable.type === "textbox") commitWhenSettled([variableKey]);
+    else scheduleLiveCommit(variableKey);
   };
 
   // ========== VISIBILITY ==========
@@ -1082,12 +1204,18 @@ export const useVariablesManager = (t: TranslateFn) => {
     tabsVisibility: computed(() => tabsVisibility.value),
     panelsVisibility: computed(() => panelsVisibility.value),
     isLoading,
+    isSettling,
+    isLiveMode: computed(() => isLiveMode.value),
     hasUncommittedChanges,
 
     // Methods
     initialize,
     commitAll,
     commitScope,
+    commitWhenSettled,
+    cancelPendingCommit,
+    setLiveMode,
+    onAutoCommit,
     onVariablePartiallyLoaded,
     updateVariableValue,
     setTabVisibility,
