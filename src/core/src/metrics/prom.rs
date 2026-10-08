@@ -858,24 +858,29 @@ pub async fn get_label_values(
     start: i64,
     end: i64,
 ) -> Result<Vec<String>> {
-    let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
     let stream_type = StreamType::Metrics;
 
     if label_name == NAME_LABEL {
-        // This special case doesn't require any SQL to be executed. All we have
-        // to do is to collect stream names that satisfy selection criteria
-        // (i.e., `selector` and `start`/`end`) and return them.
+        // Lists stream names; no SQL needed, just filter the schema catalogue.
+        let name_matchers: Vec<_> = selector
+            .as_ref()
+            .map(|s| s.matchers.find_matchers(NAME_LABEL))
+            .unwrap_or_default();
         let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
-        for schema in stream_schemas {
-            if let Some(ref metric_name) = opt_metric_name
-                && *metric_name != schema.stream_name
-            {
-                // Client has requested a particular metric name, but this stream is
-                // not it.
-                continue;
+        'schema: for schema in stream_schemas {
+            for matcher in &name_matchers {
+                let ok = match &matcher.op {
+                    MatchOp::Equal => matcher.value == schema.stream_name,
+                    MatchOp::NotEqual => matcher.value != schema.stream_name,
+                    MatchOp::Re(re) => re.is_match(&schema.stream_name),
+                    MatchOp::NotRe(re) => !re.is_match(&schema.stream_name),
+                };
+                if !ok {
+                    continue 'schema;
+                }
             }
             let stats = family_stats(
                 org_id,
@@ -1897,6 +1902,88 @@ mod tests {
     async fn test_get_label_values_requires_metric() {
         let result = get_label_values("default", "job".to_owned(), None, 0, 1).await;
         assert!(result.unwrap_err().to_string().contains("match[]"));
+    }
+
+    fn matches_name_matchers(name: &str, matchers: &[Matcher]) -> bool {
+        for matcher in matchers {
+            let ok = match &matcher.op {
+                MatchOp::Equal => matcher.value == name,
+                MatchOp::NotEqual => matcher.value != name,
+                MatchOp::Re(re) => re.is_match(name),
+                MatchOp::NotRe(re) => !re.is_match(name),
+            };
+            if !ok {
+                return false;
+            }
+        }
+        true
+    }
+
+    #[test]
+    fn test_name_matchers_filter_equal() {
+        // MatchOp::Equal keeps only the exact name
+        let matcher = Matcher {
+            name: NAME_LABEL.to_string(),
+            op: MatchOp::Equal,
+            value: "node_cpu".to_string(),
+        };
+        assert!(matches_name_matchers(
+            "node_cpu",
+            std::slice::from_ref(&matcher)
+        ));
+        assert!(!matches_name_matchers(
+            "node_memory",
+            std::slice::from_ref(&matcher)
+        ));
+    }
+
+    #[test]
+    fn test_name_matchers_filter_not_equal() {
+        let matcher = Matcher {
+            name: NAME_LABEL.to_string(),
+            op: MatchOp::NotEqual,
+            value: "node_cpu".to_string(),
+        };
+        assert!(!matches_name_matchers(
+            "node_cpu",
+            std::slice::from_ref(&matcher)
+        ));
+        assert!(matches_name_matchers(
+            "node_memory",
+            std::slice::from_ref(&matcher)
+        ));
+    }
+
+    #[test]
+    fn test_name_matchers_filter_regex() {
+        use promql_parser::parser;
+        let parser::Expr::VectorSelector(sel) = parser::parse(r#"{__name__=~"node.*"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        let matchers = sel.matchers.find_matchers(NAME_LABEL);
+        assert!(matches_name_matchers("node_cpu", &matchers));
+        assert!(matches_name_matchers("node_memory", &matchers));
+        assert!(!matches_name_matchers("http_requests", &matchers));
+    }
+
+    #[test]
+    fn test_name_matchers_filter_not_regex() {
+        use promql_parser::parser;
+        let parser::Expr::VectorSelector(sel) =
+            parser::parse(r#"{__name__!~"node.*", job="foo"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        let matchers = sel.matchers.find_matchers(NAME_LABEL);
+        assert!(!matches_name_matchers("node_cpu", &matchers));
+        assert!(matches_name_matchers("http_requests", &matchers));
+    }
+
+    #[test]
+    fn test_name_matchers_filter_empty_passes_all() {
+        // no matchers = no filter = every name passes
+        assert!(matches_name_matchers("anything", &[]));
     }
 
     #[tokio::test]
