@@ -27,11 +27,13 @@ use config::{
     },
 };
 use hashbrown::{HashMap, HashSet};
-use infra::errors::{Error, Result};
+use infra::{
+    cache::file_data::disk::METRICS_RESULT_CACHE_FILE_PREFIX,
+    errors::{Error, Result},
+};
 use prost::Message;
 use tokio::sync::RwLock;
 
-const METRICS_RESULT_CACHE_VERSION: &str = "v2-";
 const METRICS_INDEX_CACHE_GC_PERCENT: usize = 10; // gc releases 10% of the memory budget
 const METRICS_INDEX_CACHE_MAX_ITEMS: usize = 100;
 const METRICS_INDEX_CACHE_BUCKETS: usize = 100;
@@ -91,17 +93,17 @@ pub async fn init() -> Result<()> {
             .await;
         let items = std::mem::take(&mut *w);
         let total = items.len();
-        let mut legacy = Vec::new();
+        let mut malformed = Vec::new();
         for item in items {
             if !load(&item).await {
-                legacy.push(item);
+                malformed.push(item);
             }
         }
-        let legacy_len = legacy.len();
-        // legacy payloads may already mix organizations' results, so they are dropped, not migrated
-        infra::cache::file_data::delete::add(legacy);
+        let malformed_len = malformed.len();
+        // the disk scan already dropped legacy names; these carry the prefix but cannot be parsed
+        infra::cache::file_data::delete::add(malformed);
         log::info!(
-            "Loading disk metrics cache done, total items: {total}, dropped legacy items: {legacy_len}"
+            "Loading disk metrics cache done, total items: {total}, dropped malformed items: {malformed_len}"
         );
     });
     Ok(())
@@ -617,7 +619,7 @@ fn get_cache_item_key(org: &str, hash: &str, start: i64, end: i64) -> String {
         "metrics_results/{}/{}/{}{}_{}_{}_{}.pb",
         org,
         get_ymdh_from_micros(start, HourFormat::Real),
-        METRICS_RESULT_CACHE_VERSION,
+        METRICS_RESULT_CACHE_FILE_PREFIX,
         hash,
         start,
         end,
@@ -636,7 +638,7 @@ fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
     if parts.len() != 4 {
         return None;
     }
-    let hash = parts[0].strip_prefix(METRICS_RESULT_CACHE_VERSION)?;
+    let hash = parts[0].strip_prefix(METRICS_RESULT_CACHE_FILE_PREFIX)?;
     if hash.len() != 32 || !hash.bytes().all(|ch| ch.is_ascii_hexdigit()) {
         return None;
     }
@@ -808,7 +810,7 @@ mod tests {
         let bytes = infra::cache::file_data::disk::get(&file, None)
             .await
             .unwrap();
-        let legacy = file.replace(METRICS_RESULT_CACHE_VERSION, "");
+        let legacy = file.replace(METRICS_RESULT_CACHE_FILE_PREFIX, "");
         infra::cache::file_data::disk::set(&legacy, bytes)
             .await
             .unwrap();
