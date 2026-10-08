@@ -292,7 +292,7 @@ export function resolveFiltersForStreams(
     return result;
   }
 
-  const check = checkFilterFields(filter, streams, fields);
+  const check = checkFilterFields(plan.filter, streams, fields);
   result.errors = check.errors;
   result.filterColumns = check.filterColumns;
   result.fieldMapping = check.mapping;

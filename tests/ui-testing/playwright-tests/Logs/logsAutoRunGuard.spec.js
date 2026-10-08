@@ -112,7 +112,7 @@ test.describe('Logs Auto Run cost guard', () => {
 
     await pickRelative(page, 1, 'd');
     await expect(page.locator(banner)).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-test="logs-search-results-stale"]')).toBeVisible();
+    await expect(page.locator('[data-test="logs-search-bar-refresh-btn"][data-run-pending="true"]')).toBeVisible();
     await expect(page.locator('[data-test="logs-search-result-pagination"]')).toHaveAttribute(
       'data-locked',
       'true',
@@ -172,7 +172,7 @@ test.describe('Logs Auto Run cost guard', () => {
     await editor.click();
     await page.keyboard.type("level='error'", { delay: 20 });
     await expect(page.locator(runAnyway)).toHaveCount(0);
-    await expect(page.locator('[data-test="logs-search-bar-run-pending-dot"]')).toBeVisible();
+    await expect(page.locator('[data-test="logs-search-bar-refresh-btn"][data-run-pending="true"]')).toBeVisible();
     expect(searches.all()).toHaveLength(0);
   });
 

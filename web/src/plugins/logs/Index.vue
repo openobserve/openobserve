@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-search-result"
                       class="flex h-full max-h-full flex-col overflow-hidden"
                     >
-                      <!-- Notice order above the table is owned by item 2 (P4): guard banner, then the stale chip. -->
+                      <!-- Notice order above the table is owned by item 2 (P4): guard banner, then the cancelled notice; the Run query button alone shows stale results. -->
                       <LogsAutoRunGuard
                         v-if="showGuardBanner"
                         variant="banner"
@@ -366,20 +366,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @search-job="onGuardSearchJob"
                         @select-stream="onSelectStream"
                       />
-                      <div
-                        v-if="isResultsStale && searchObj.meta.logsVisualizeToggle === 'logs'"
-                        class="flex items-center px-2.5 pt-2"
-                      >
-                        <OBadge
-                          variant="warning-soft"
-                          size="sm"
-                          icon="schedule"
-                          data-test="logs-search-results-stale"
-                        >
-                          {{ t("search.autoRunStaleChip") }}
-                        </OBadge>
-                        <OTooltip :content="t('search.autoRunStaleTooltip')" />
-                      </div>
                       <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
                         <OBadge
                           variant="default-soft"
@@ -728,7 +714,6 @@ import {
 import { useLogsUrlSync } from "@/composables/useLogs/useLogsUrlSync";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   saveLogsSelectedStreams,
   saveLogsStreamType,
@@ -739,6 +724,7 @@ import { fieldSearchPredicate, type NoFtsFieldSubmission } from "./LogsNoFtsFiel
 import { isAuthoredStatement, renderPlan } from "@/utils/query/freeTextFilter";
 import {
   buildFilterContext,
+  rewrittenFilter,
   markFreeTextBlocked,
   noFtsStreams,
   noFtsRecoveryStreams,
@@ -782,7 +768,6 @@ export default defineComponent({
     LogsErrorState,
     LogsAutoRunGuard,
     OBadge,
-    OTooltip,
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -1258,9 +1243,24 @@ export default defineComponent({
       autoRun.engine.requestRun("run");
     };
 
+    // After a run the editor shows the filter that was sent: pure text and mixes become their rendering.
+    const showRanFilter = (generationId: number, ranQuery: string) => {
+      if (searchObj.meta.sqlMode || searchObj.meta.editorDirty) return;
+      if (!autoRun.engine.isCurrent(generationId)) return;
+      if (String(searchObj.data.query ?? "").trim() !== ranQuery) return;
+      const ctx = buildFilterContext(searchObj, store.state.zoConfig);
+      const rendered = rewrittenFilter(searchObj, ctx);
+      if (rendered === null || rendered === ranQuery) return;
+      searchObj.data.query = rendered;
+      searchObj.data.editorValue = rendered;
+      searchBarRef.value?.showRanQuery?.(rendered);
+      autoRun.engine.recordQueryRewrite(generationId, rendered);
+    };
+
     // Executor for every grid run (AC4.6 dispatch by mode): full, pagination and page size.
     const executeGridRun = async (ctx: RunContext) => {
       const generationId = ctx.generation.id;
+      const ranQuery = ctx.signature.query;
       autoRun.adoptHandOver(ctx);
       if (!searchObj.data.stream.selectedStream.length) {
         searchObj.loading = false;
@@ -1271,6 +1271,7 @@ export default defineComponent({
       if (ctx.op === "page") mode = ctx.reason === "page-size" ? "page-size" : "page";
       try {
         await runGridSearch(generationId, mode, initOriginForRun(ctx.origin));
+        if (mode === "full") showRanFilter(generationId, ranQuery);
         refreshHistogramChart();
         if (mode === "full") showJobScheduler.value = true;
       } finally {
@@ -1294,7 +1295,11 @@ export default defineComponent({
      * Common method to extract patterns
      * Handles validation, loading states, and error handling
      */
-    const extractPatternsForCurrentQuery = async (clear_cache = false, generationId?: number) => {
+    const extractPatternsForCurrentQuery = async (
+      clear_cache = false,
+      generationId?: number,
+      ranQuery?: string,
+    ) => {
       const engine = autoRun.engine;
       const settle = () => {
         if (generationId != null) engine.settleGeneration(generationId);
@@ -1326,6 +1331,7 @@ export default defineComponent({
           settle();
           return;
         }
+        if (generationId != null && ranQuery != null) showRanFilter(generationId, ranQuery);
 
         // Set size to -1 to let backend determine sampling size based on config
         queryReq.query.size = -1;
@@ -1385,7 +1391,11 @@ export default defineComponent({
 
     const executePatternsRun = async (ctx: RunContext) => {
       autoRun.engine.registerAbort(ctx.generation.id, () => cancelPatterns());
-      await extractPatternsForCurrentQuery(!!searchObj.meta.clearCache, ctx.generation.id);
+      await extractPatternsForCurrentQuery(
+        !!searchObj.meta.clearCache,
+        ctx.generation.id,
+        ctx.signature.query,
+      );
     };
 
     // // Watch for patterns mode switch - completely separate from logs flow
@@ -3771,7 +3781,10 @@ export default defineComponent({
     // A refinement that moves the scope away from a blocked snapshot withdraws "Run anyway" (AC5.1).
     watch(
       () => autoRun.readSignature(),
-      () => autoRun.engine.syncBlockedScope(),
+      () => {
+        autoRun.engine.syncBlockedScope();
+        autoRun.engine.reconcileEditorDirty();
+      },
       { deep: true },
     );
 

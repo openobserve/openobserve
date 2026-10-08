@@ -557,6 +557,10 @@ defineExpose({
       editorRef.value.setValue(value);
     }
   },
+  replaceValue: (value: string) => {
+    if (editorRef.value?.replaceValue) editorRef.value.replaceValue(value);
+    else if (editorRef.value?.setValue) editorRef.value.setValue(value);
+  },
 
   // Cursor and autocomplete (for dashboards)
   getCursorIndex: () => {

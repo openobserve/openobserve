@@ -342,6 +342,10 @@ describe("usePatternActions", () => {
         const sql = usePatternActions().buildPatternsAlertPrefill().sql;
         expect(sql).toContain("(match_all('timeout'))");
         expect(sql).not.toMatch(/\(timeout\)/);
+        mockSearchObj.data.query = "error AND body='x'";
+        expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain(
+          "(match_all('error') AND body='x')",
+        );
       } finally {
         delete (mockSearchObj.data as any).streamResults;
         delete (mockStore.state as any).zoConfig;

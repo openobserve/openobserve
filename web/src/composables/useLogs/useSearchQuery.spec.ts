@@ -1288,10 +1288,22 @@ describe("useSearchQuery › free text (item 1)", () => {
 
   it("sends a field filter byte-identical to the pre-change path (AC2.3)", () => {
     select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = "level='error' and status=500";
+    const { buildSearch } = useSearchQuery(gt);
+
+    expect(getSql(buildSearch())).toBe(
+      `select * from "fts_a"  WHERE level = 'error' and status = 500`,
+    );
+  });
+
+  it("rewrites only the standalone word of a field mix (1-Q7 replaced)", () => {
+    select(ftsStream("fts_a"));
     mockState.searchObj.data.query = "level='error' and timeout";
     const { buildSearch } = useSearchQuery(gt);
 
-    expect(getSql(buildSearch())).toBe(`select * from "fts_a"  WHERE level = 'error' and timeout`);
+    expect(getSql(buildSearch())).toBe(
+      `select * from "fts_a"  WHERE level = 'error' AND match_all('timeout')`,
+    );
   });
 
   it("sends the filter unchanged while the schema is not loaded", () => {

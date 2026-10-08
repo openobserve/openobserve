@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="variant === 'menu-item'"
     :disabled="!!disabledReason"
     focusable-unavailable
-    :description="disabledReason"
+    :description="disabledReason || note"
     :data-test="dataTest"
     @select="onActivate"
   >
@@ -58,7 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="onActivate"
   >
     {{ label }}
-    <OTooltip v-if="disabledReason" :content="disabledReason" side="top" />
+    <OTooltip
+      v-if="disabledReason || note"
+      :content="disabledReason || note || undefined"
+      side="top"
+    />
   </OButton>
 
   <OButton
@@ -114,6 +118,8 @@ const props = withDefaults(
     variant?: "menu-item" | "button" | "toolbar" | "icon";
     /** Non-null disables the control and is shown as the tooltip reason. */
     disabledReason?: I18nText | null;
+    /** Informational line for an enabled control, such as which query it will use. */
+    note?: I18nText | null;
     /** Folder the alert lands in. */
     folder?: string;
     buttonVariant?: "primary" | "secondary" | "outline" | "ghost";
@@ -122,6 +128,7 @@ const props = withDefaults(
   {
     variant: "menu-item",
     disabledReason: null,
+    note: null,
     buttonVariant: "primary",
     dataTest: "create-alert-action",
   },

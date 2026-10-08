@@ -272,7 +272,7 @@ describe(
       expect(wrapper.text()).not.toContain("No events found");
     });
 
-    it("cancellation with retained rows and a dirty editor shows both notices", async () => {
+    it("cancellation with retained rows and a dirty editor shows the notice and a dirty Run query", async () => {
       await runButton().trigger("click");
       await vi.waitFor(() => expect(searchHits()).toHaveLength(1));
       await deliver(hits);
@@ -287,7 +287,7 @@ describe(
 
       expect(wrapper.vm.searchObj.meta.editorDirty).toBe(true);
       expect(wrapper.vm.searchObj.data.queryResults.hits).toEqual(hits);
-      expect(wrapper.find('[data-test="logs-search-results-stale"]').exists()).toBe(true);
+      expect(runButton().attributes("data-run-pending")).toBe("true");
       expect(wrapper.find('[data-test="logs-search-cancelled-notice"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="logs-search-cancelled-state"]').exists()).toBe(false);
     });

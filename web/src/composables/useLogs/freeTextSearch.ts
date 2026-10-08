@@ -149,7 +149,13 @@ export function planStreamsFilter(
   return planFilter(raw, ctx.fieldNames, {
     targetMode: targetModeOf(targets),
     tokenLimits: ctx.tokenLimits,
+    allTargetsFts: targets.every((target) => target.mode === "fts"),
   });
+}
+
+/** True when a run would send something other than the typed filter: pure text or a rewritten mix. */
+function rewritesInput(plan: FilterPlan, raw: string): boolean {
+  return plan.kind === "freeText" || (plan.kind === "sql" && plan.filter !== raw);
 }
 
 export function markFreeTextBlocked(
@@ -176,6 +182,27 @@ export function freeTextHighlight(
   return null;
 }
 
+/** The filter a run sends when the planner rewrote the typed text; null when it is sent as typed. */
+export function rewrittenFilter(
+  searchObj: FreeTextSearchObj,
+  ctx: FilterResolveContext,
+): string | null {
+  if (searchObj.meta.sqlMode) return null;
+  const raw = (searchObj.data.query ?? "").trim();
+  const streams = searchObj.data.stream.selectedStream ?? [];
+  const plan = planStreamsFilter(raw, streams, ctx);
+  if (plan.kind === "freeText") {
+    const rendered = streams.map((stream) =>
+      renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields),
+    );
+    // Text that renders per stream (a no-FTS arm is skipped) keeps that meaning only as typed.
+    const [first] = rendered;
+    return first != null && rendered.every((where) => where === first) ? first : null;
+  }
+  if (plan.kind !== "sql" || plan.filter === raw) return null;
+  return renderPlan(plan, BLOCKED_TARGET, ctx.knownFields);
+}
+
 /** Per-stream WHERE for side requests such as field values; null unless the filter is pure text. */
 export function freeTextWhereByStream(
   searchObj: FreeTextSearchObj,
@@ -198,7 +225,7 @@ export function freeTextWhereByStream(
 /** The filter as parseable SQL: pure text becomes match_all, so a word never reads as a column. */
 export function filterForParsing(raw: string, fieldNames: ReadonlySet<string>): string {
   const plan = planFilter(raw, fieldNames);
-  if (plan.kind !== "freeText") return raw;
+  if (plan.kind !== "freeText") return plan.filter;
   return renderPlan(plan, { mode: "fts", fields: ["_"] }, new Set()) ?? raw;
 }
 
@@ -278,7 +305,7 @@ export function searchTextReplacement(
   return renderPlan(phrasePlan(text), fts[0], ctx.knownFields) ?? quoteFreeTextPhrase(text);
 }
 
-/** Re-reads stale schemas before a pure-text run; a failed read sends the filter unchanged. */
+/** Re-reads stale schemas before a run that rewrites the filter; a failed read sends it unchanged. */
 export async function refreshFreeTextSchemas(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -288,9 +315,8 @@ export async function refreshFreeTextSchemas(
   if (searchObj.meta.sqlMode) return;
   const streams = searchObj.data.stream.selectedStream ?? [];
   const ctx = buildFilterContext(searchObj, zoConfig, { ignoreFailures: true });
-  if (planStreamsFilter((searchObj.data.query ?? "").trim(), streams, ctx).kind !== "freeText") {
-    return;
-  }
+  const raw = (searchObj.data.query ?? "").trim();
+  if (!rewritesInput(planStreamsFilter(raw, streams, ctx), raw)) return;
   const stale = streams.filter((name) => {
     const fresh = freshSchemas.get(schemaKey(searchObj, name));
     return !fresh || now - fresh.at > FREE_TEXT_SCHEMA_MAX_AGE_MS;
