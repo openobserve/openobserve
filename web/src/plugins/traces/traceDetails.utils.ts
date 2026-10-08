@@ -50,10 +50,14 @@ export function resolveSessionId(spans: any[] | null | undefined): string {
   return s ? String(s.gen_ai_conversation_id || s.session_id || "") : "";
 }
 
-/** First RUM bridge span whose browser session has a replay to play; null when the trace has none. */
+/** First span whose browser session has a replay to play; null when the trace has none. */
 export function resolveReplaySpan(spans: any[] | null | undefined): any | null {
   if (!spans?.length) return null;
-  return spans.find((sp: any) => sp?.rum_session_id && sp?.rum_session_has_replay === true) ?? null;
+  // RUM bridge spans carry a boolean; ingested span attributes come back from search as strings.
+  const hasReplay = (flag: unknown) => flag === true || flag === "true";
+  return (
+    spans.find((sp: any) => sp?.rum_session_id && hasReplay(sp?.rum_session_has_replay)) ?? null
+  );
 }
 
 /**

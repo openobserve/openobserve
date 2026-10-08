@@ -165,4 +165,21 @@ describe("resolveReplaySpan", () => {
     ];
     expect(resolveReplaySpan(spans)).toBe(first);
   });
+
+  // Span attributes ingested over OTLP come back from search as strings.
+  it('returns an ingested span whose replay flag is the string "true"', () => {
+    const native = {
+      span_id: "a1b2c3d4e5f60718",
+      rum_session_id: "sess-1",
+      rum_session_has_replay: "true",
+    };
+    expect(resolveReplaySpan([{ span_id: "s-0" }, native])).toBe(native);
+  });
+
+  it('returns null when an ingested replay flag is the string "false"', () => {
+    const spans = [
+      { span_id: "a1b2c3d4e5f60718", rum_session_id: "sess-1", rum_session_has_replay: "false" },
+    ];
+    expect(resolveReplaySpan(spans)).toBeNull();
+  });
 });
