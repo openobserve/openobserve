@@ -23,7 +23,6 @@
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            <!-- max-w-80 ≈ 50 characters, so a long condition cannot stretch the chip across the filter bar. -->
             <OTruncatedText class="max-w-80 leading-normal font-normal"
               ><span class="text-text-body">{{ labelParts(condition).prefix }}</span
               ><span class="text-text-body">{{ labelParts(condition).field }}</span

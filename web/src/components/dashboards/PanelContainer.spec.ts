@@ -339,7 +339,6 @@ describe("PanelContainer", () => {
       expect(header.text()).toBe("Test Panel");
     });
 
-    // The full title shows only when the title is cut, not as an always-on native title.
     it("should give the panel title an overflow-only tooltip instead of a native title", () => {
       wrapper = createWrapper();
 

@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("search.totalTime") }}
             </div>
-            <!-- A number is never cut: it shrinks to fit its card (0.62 ≈ one bold digit's width per em), then wraps. -->
             <div
               data-test="metrics-summary-card-value"
               class="text-accent text-[clamp(0.875rem,calc(100cqi/(var(--chars)*0.62)),1.25rem)] leading-[1.4] font-bold wrap-anywhere"

@@ -480,7 +480,6 @@ watch(shown, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — never grows, but shrinks so a long title cuts instead of pushing the close button out -->
             <div v-if="title || subTitle" class="min-w-0">
               <OTruncatedText
                 v-if="title"

@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   too) magenta, columns body text, parentheses coloured by nesting depth.
 -->
 <template>
-  <!-- max-w-80 ≈ 50 characters, so a long expression cannot stretch the chip across the axis bar. -->
   <span
     class="inline-flex max-w-80 min-w-0 items-center gap-1 leading-normal font-normal"
     data-test="dashboard-axis-field-chip-label"

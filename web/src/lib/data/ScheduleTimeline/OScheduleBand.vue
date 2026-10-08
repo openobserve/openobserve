@@ -96,7 +96,6 @@ const geometry = computed(() => ({
     :data-tone="String(band.tone)"
     :data-variant="band.variant ?? 'soft'"
   >
-    <!-- A flex band clips its text with no "…", so the label cuts inside its own box; the band's fixed height leaves room for leading-normal. -->
     <OTruncatedText class="leading-normal" :tooltip="tooltip">{{ band.label }}</OTruncatedText>
   </div>
 </template>

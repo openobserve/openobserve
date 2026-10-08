@@ -308,7 +308,6 @@ import {
 import { selectDimensionsFromData } from "@/composables/useDimensionSelector";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

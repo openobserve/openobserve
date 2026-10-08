@@ -527,7 +527,8 @@ export default class DashboardVariablesScoped {
    * @returns {import('@playwright/test').Locator}
    */
   getDashboardTitleLocator(title) {
-    return this.page.locator(`[data-test="dashboard-name-cell-${title}"]`);
+    const name = String(title).replace(/["\\]/g, "\\$&");
+    return this.page.locator(`[data-test="dashboard-name-cell-${name}"]`);
   }
 
   /**
