@@ -10485,6 +10485,7 @@
       "roleClaimName": "Claim dei ruoli",
       "roleClaimNamePlaceholder": "Nome del claim, ad es. groups",
       "roleClaimNameHelp": "Facoltativo. Claim del token che elenca i ruoli personalizzati dell'utente; a ogni accesso i suoi ruoli personalizzati in tale organizzazione vengono sincronizzati con esso.",
+      "createMissingRoles": "Crea i ruoli del claim che non esistono nell'organizzazione",
       "duplicateDomain": "Esiste già una mappatura per questo dominio",
       "confirmRemove": "Sei sicuro di voler eliminare la mappatura per {domain}?",
       "deleteTitle": "Elimina mappatura"

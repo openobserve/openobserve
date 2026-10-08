@@ -20,6 +20,7 @@ export interface DomainOrgMapping {
   org_id: string;
   base_role: DomainOrgBaseRole;
   role_claim_name?: string;
+  create_missing_roles?: boolean;
 }
 
 export const makeDomainOrgMappingSchema = (t: (_key: string) => string) =>
@@ -34,6 +35,7 @@ export const makeDomainOrgMappingSchema = (t: (_key: string) => string) =>
     base_role: z.enum(DOMAIN_ORG_BASE_ROLES),
     // "" is the cleared state of the input; normalized away at submit.
     role_claim_name: z.string().optional(),
+    create_missing_roles: z.boolean(),
   });
 
 export type DomainOrgMappingForm = z.infer<ReturnType<typeof makeDomainOrgMappingSchema>>;
@@ -43,4 +45,5 @@ export const domainOrgMappingDefaults = (): DomainOrgMappingForm => ({
   org_id: "",
   base_role: "admin",
   role_claim_name: "",
+  create_missing_roles: false,
 });

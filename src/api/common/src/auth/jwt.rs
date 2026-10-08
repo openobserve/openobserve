@@ -947,7 +947,7 @@ pub async fn process_domain_org_mapping(
             }
 
             log::info!(
-                "user {user_email} joined org {} successfully via domain org mapping",
+                "user {user_email} mapped to org {} successfully via domain org mapping",
                 mapped.org_id
             );
             if need_to_add_user {

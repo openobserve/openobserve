@@ -194,7 +194,7 @@ pub async fn create(
                 if claim.trim().is_empty() {
                     return MetaHttpResponse::bad_request("role claim name must not be empty");
                 }
-                claim = claim.trim();
+                *claim = claim.trim().to_string();
             }
 
             mapping.domain = mapping.domain.to_lowercase();

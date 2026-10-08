@@ -10485,6 +10485,7 @@
       "roleClaimName": "ロールクレーム",
       "roleClaimNamePlaceholder": "クレーム名（例: groups）",
       "roleClaimNameHelp": "任意。ユーザーのカスタムロールを列挙するトークンクレーム。ログインのたびに、その組織でのカスタムロールがこれに同期されます。",
+      "createMissingRoles": "組織に存在しないクレーム内のロールを作成する",
       "duplicateDomain": "このドメインのマッピングはすでに存在します",
       "confirmRemove": "{domain} のマッピングを削除してもよろしいですか？",
       "deleteTitle": "マッピングを削除"

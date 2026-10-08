@@ -10485,6 +10485,7 @@
       "roleClaimName": "Claim vai trò",
       "roleClaimNamePlaceholder": "Tên claim, ví dụ groups",
       "roleClaimNameHelp": "Tùy chọn. Claim của token liệt kê các vai trò tùy chỉnh của người dùng; mỗi lần đăng nhập, các vai trò tùy chỉnh của họ trong tổ chức đó sẽ được đồng bộ theo claim này.",
+      "createMissingRoles": "Tạo các vai trò trong claim chưa có trong tổ chức",
       "duplicateDomain": "Đã tồn tại ánh xạ cho tên miền này",
       "confirmRemove": "Bạn có chắc chắn muốn xóa ánh xạ cho {domain} không?",
       "deleteTitle": "Xóa ánh xạ"

@@ -10480,6 +10480,7 @@
       "roleClaimName": "角色宣告",
       "roleClaimNamePlaceholder": "宣告名稱，例如 groups",
       "roleClaimNameHelp": "選填。列出使用者自訂角色的權杖宣告；每次登入時，使用者在該組織中的自訂角色都會與其同步。",
+      "createMissingRoles": "建立宣告中組織內不存在的角色",
       "duplicateDomain": "此網域的對應已存在",
       "confirmRemove": "您確定要刪除 {domain} 的對應嗎？",
       "deleteTitle": "刪除對應"

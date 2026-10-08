@@ -10485,6 +10485,7 @@
       "roleClaimName": "Rollen-Claim",
       "roleClaimNamePlaceholder": "Claim-Name, z. B. groups",
       "roleClaimNameHelp": "Optional. Token-Claim mit den benutzerdefinierten Rollen des Benutzers; bei jeder Anmeldung werden seine benutzerdefinierten Rollen in dieser Organisation daran angeglichen.",
+      "createMissingRoles": "Im Claim genannte Rollen erstellen, die in der Organisation nicht existieren",
       "duplicateDomain": "Für diese Domain existiert bereits eine Zuordnung",
       "confirmRemove": "Sind Sie sicher, dass Sie die Zuordnung für {domain} löschen möchten?",
       "deleteTitle": "Zuordnung löschen"

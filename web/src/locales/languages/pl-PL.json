@@ -10485,6 +10485,7 @@
       "roleClaimName": "Claim ról",
       "roleClaimNamePlaceholder": "Nazwa claimu, np. groups",
       "roleClaimNameHelp": "Opcjonalne. Claim tokena zawierający niestandardowe role użytkownika; przy każdym logowaniu jego niestandardowe role w tej organizacji są z nim synchronizowane.",
+      "createMissingRoles": "Twórz role z claimu, które nie istnieją w organizacji",
       "duplicateDomain": "Mapowanie dla tej domeny już istnieje",
       "confirmRemove": "Czy na pewno chcesz usunąć mapowanie dla {domain}?",
       "deleteTitle": "Usuń mapowanie"

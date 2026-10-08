@@ -10485,6 +10485,7 @@
       "roleClaimName": "Claim de rôles",
       "roleClaimNamePlaceholder": "Nom du claim, par ex. groups",
       "roleClaimNameHelp": "Facultatif. Claim du jeton listant les rôles personnalisés de l'utilisateur ; à chaque connexion, ses rôles personnalisés dans cette organisation y sont synchronisés.",
+      "createMissingRoles": "Créer les rôles du claim qui n'existent pas dans l'organisation",
       "duplicateDomain": "Une correspondance pour ce domaine existe déjà",
       "confirmRemove": "Êtes-vous sûr de vouloir supprimer la correspondance pour {domain} ?",
       "deleteTitle": "Supprimer la correspondance"

@@ -10485,6 +10485,7 @@
       "roleClaimName": "역할 클레임",
       "roleClaimNamePlaceholder": "클레임 이름(예: groups)",
       "roleClaimNameHelp": "선택 사항입니다. 사용자의 사용자 지정 역할을 나열하는 토큰 클레임으로, 로그인할 때마다 해당 조직의 사용자 지정 역할이 이에 맞춰 동기화됩니다.",
+      "createMissingRoles": "조직에 없는 클레임의 역할 생성",
       "duplicateDomain": "이 도메인에 대한 매핑이 이미 존재합니다",
       "confirmRemove": "{domain}에 대한 매핑을 삭제하시겠습니까?",
       "deleteTitle": "매핑 삭제"
