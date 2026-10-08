@@ -39,7 +39,12 @@ fn map_err(ctx: &str, e: anyhow::Error) -> Response {
         return MetaHttpResponse::forbidden(msg);
     }
     tracing::error!("[public_dashboards] {ctx}: {e}");
-    MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
+    // The raw error names tables and drivers; it stays in the log.
+    MetaHttpResponse::error(
+        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+        "Something went wrong on the server. Please try again.",
+    )
+    .into_response()
 }
 
 /// 404 when the feature flag is off, so the admin surface mirrors the public

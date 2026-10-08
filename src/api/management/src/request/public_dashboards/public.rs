@@ -59,6 +59,7 @@ enum Servable {
     NotFound,
     Unavailable,
     Expired,
+    Error,
     Ok(Box<Model>),
 }
 
@@ -71,7 +72,11 @@ async fn resolve(slug: &str) -> Servable {
     let conn = get_orm_client_ro().await;
     let pd = match table::get_by_slug(conn, slug).await {
         Ok(Some(pd)) => pd,
-        _ => return Servable::NotFound,
+        Ok(None) => return Servable::NotFound,
+        Err(e) => {
+            log::error!("public dashboard lookup failed: {e}");
+            return Servable::Error;
+        }
     };
     let blocked = db::org_status::is_blocked(&pd.org_id);
     servable(pd, blocked, now_micros())
@@ -121,11 +126,16 @@ async fn serve_config(slug: &str) -> Response {
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
+        Servable::Error => return server_error(),
     };
     let conn = get_orm_client_ro().await;
-    let Ok(Some((_folder, dash))) = dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await
-    else {
-        return StatusCode::NOT_FOUND.into_response();
+    let dash = match dashboards::get_by_id(&pd.org_id, &pd.dashboard_id).await {
+        Ok(Some((_folder, dash))) => dash,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            log::error!("public dashboard load failed: {e}");
+            return server_error();
+        }
     };
     let (title, layout) = project_layout(&dash);
     let available_keys = table::list_snapshot_keys(conn, &pd.id)
@@ -162,6 +172,7 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
         Servable::Unavailable => return unavailable(),
         Servable::Expired => return expired(),
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
+        Servable::Error => return server_error(),
     };
     let conn = get_orm_client_ro().await;
     match table::get_snapshot(conn, &pd.id, range_key).await {
@@ -170,7 +181,10 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
             Err(_) => (StatusCode::ACCEPTED, "preparing").into_response(),
         },
         Ok(None) => (StatusCode::ACCEPTED, "preparing").into_response(),
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            log::error!("public dashboard snapshot read failed: {e}");
+            server_error()
+        }
     }
 }
 
@@ -214,6 +228,11 @@ fn too_many_requests() -> Response {
 
 fn expired() -> Response {
     (StatusCode::GONE, "expired").into_response()
+}
+
+// A failed read is temporary, so the viewer retries instead of treating the link as gone.
+fn server_error() -> Response {
+    (StatusCode::INTERNAL_SERVER_ERROR, "Something went wrong.").into_response()
 }
 
 fn unavailable() -> Response {
@@ -458,6 +477,7 @@ mod tests {
             expired(),
             unavailable(),
             too_many_requests(),
+            server_error(),
         ] {
             let resp = with_headers(resp);
             let h = resp.headers();

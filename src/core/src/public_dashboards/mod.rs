@@ -846,7 +846,7 @@ pub async fn update_link(
     Ok(link)
 }
 
-/// Stop serving and rebuilding; the slug, settings and snapshots are kept.
+/// Stop serving and rebuilding and delete the snapshots; the slug and settings are kept.
 pub async fn pause_link(
     link: PublicDashboard,
     user_id: &str,
@@ -885,6 +885,8 @@ async fn set_paused(
         &link.id,
     )
     .await;
+    // Nothing serves or expires a paused link's data, so it isn't kept at rest; resume rebuilds it.
+    pd_table::delete_snapshots(infra::db::get_orm_client_rw().await, &link.id).await?;
     Ok(link)
 }
 
