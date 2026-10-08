@@ -56,7 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="query"
         clearable
         class="w-72 max-md:w-full"
-        :placeholder="t('iam.editRole.searchModuleResources')"
+        :placeholder="
+          listsModules ? t('iam.editRole.filterModules') : t('iam.editRole.searchModuleResources')
+        "
         data-test="edit-role-module-pane-search"
         @update:model-value="(value) => setFilter(String(value ?? ''), scope)"
       />
@@ -178,7 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default text-text-secondary flex shrink-0 items-center gap-2 border-t px-3 py-2 text-xs"
       data-test="edit-role-module-pane-no-match"
     >
-      <span>{{ t("iam.editRole.noMatchingResources") }}</span>
+      <span>{{
+        listsModules ? t("iam.editRole.noModuleMatch") : t("iam.editRole.noMatchingResources")
+      }}</span>
       <OButton
         variant="ghost-primary"
         size="xs"
@@ -276,7 +280,9 @@ const scope = ref("all");
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "label",
-    header: t("iam.editRole.moduleResourceColumn"),
+    header: props.listsModules
+      ? t("iam.editRole.moduleColumn")
+      : t("iam.editRole.moduleResourceColumn"),
     accessorKey: "label",
     size: COL.name,
     meta: { align: "left", autoWidth: true },
@@ -332,8 +338,8 @@ const hasEffectiveGrant = (row: any) =>
 const grantedAtOpen = ref(new Set<string>());
 
 watch(
-  // Length, not identity: the loaders push into the same array, so the reference never changes.
-  () => props.entities.length,
+  // Length, since loaders push into the same array; loading, since a list shown mid-load only learns its grants at the end.
+  [() => props.entities.length, () => props.loading],
   () => {
     grantedAtOpen.value = new Set(props.entities.filter(hasOwnGrant).map((row) => row.name));
   },
@@ -469,29 +475,22 @@ const checkboxHint = (node: any, resource: string, action: string, depth: number
 const change = (row: any, permission: string, newValue: boolean) =>
   emit("change", { row, permission, newValue });
 
-// Every row the filter keeps, not just this page, so the tick reaches modules on later pages too.
+// Every row the filter keeps, on every page; module rows sit under no wider scope, so none is locked.
 const bulkRows = (action: string) =>
-  filteredEntities.value.filter(
-    (node) =>
-      node.permission?.[action]?.show &&
-      !lockedByWiderScope(node, node.resourceName, action, props.scopes.length),
-  );
-
-const isBulkChecked = (node: any, action: string) =>
-  isChecked(node, node.resourceName, action, props.scopes.length);
+  filteredEntities.value.filter((node) => node.permission?.[action]?.show);
 
 const bulkState = (action: string) => {
   const rows = bulkRows(action);
-  const checked = rows.filter((node) => isBulkChecked(node, action)).length;
+  const checked = rows.filter((node) => props.isGranted(node, action)).length;
   if (!checked) return false;
   return checked === rows.length ? true : "indeterminate";
 };
 
 const toggleBulk = (action: string) => {
   const rows = bulkRows(action);
-  const newValue = !rows.every((node) => isBulkChecked(node, action));
+  const newValue = !rows.every((node) => props.isGranted(node, action));
   rows
-    .filter((node) => isBulkChecked(node, action) !== newValue)
+    .filter((node) => props.isGranted(node, action) !== newValue)
     .forEach((node) => change(node, action, newValue));
 };
 
@@ -499,8 +498,9 @@ const toggleBulk = (action: string) => {
 const actionHeader = (label: I18nText) => {
   if (!props.listsModules) return label;
   const hint = t("iam.editRole.bulkSelectColumn", { action: label });
+  // The table truncates header content, which clips anything outside the box; the padding leaves room for the focus ring.
   return ({ column }: { column: { id: string } }) =>
-    h("div", { class: "flex items-center gap-1.5" }, [
+    h("div", { class: "flex items-center gap-1.5 py-1 ps-1" }, [
       h(OCheckbox, {
         modelValue: bulkState(column.id),
         disabled: props.loading || !bulkRows(column.id).length,

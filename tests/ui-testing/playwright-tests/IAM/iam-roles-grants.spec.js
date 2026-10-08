@@ -345,7 +345,7 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
     test('G-14 · ticking the List header in All Modules grants List on every module at once', {
         tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
     }, async ({ page }) => {
-        await openFresh(page, 'bulk');
+        const name = await openFresh(page, 'bulk');
         await pm.rolesPage.openAllModules();
         await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox('AllowList'), true);
 
@@ -360,6 +360,12 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         expect(objects).toEqual(expect.arrayContaining([obj('stream'), obj('function')]));
         // settings hides List, so the header must skip it rather than stage a grant its row cannot show.
         expect(objects).not.toContain(obj('settings'));
+
+        // The body alone proves nothing: OpenFGA must accept every module-wide tuple the one tick sent.
+        const sortedObjects = (perms) => perms.map((p) => p.object).sort();
+        await expect
+            .poll(async () => sortedObjects(await getPerms(page, name)), { timeout: 15000 })
+            .toEqual([...objects].sort());
     });
 
     // ---------------- negative / rejection ----------------

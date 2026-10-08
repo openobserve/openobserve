@@ -2762,6 +2762,7 @@
       "moduleOverviewTitle": "Role Overview",
       "modulesTitle": "Modules",
       "allModulesTitle": "All Modules",
+      "moduleColumn": "Module",
       "bulkSelectColumn": "{action} On Every Listed Module",
       "collapseModuleGroup": "Collapse Group",
       "expandModuleGroup": "Expand Group",

@@ -3570,6 +3570,8 @@ describe("EditRole - all modules", () => {
 
     const keys = wrapper.vm.railModules.map((module) => module.key);
     expect(keys.length).toBeGreaterThan(1);
+    // One row per module and nothing else: a stream type or folder here would be a second, narrower grant.
+    expect(wrapper.vm.paneView.entities.map((row) => row.name)).toEqual(keys);
     keys.forEach((key) => {
       expect(
         wrapper
@@ -3600,5 +3602,35 @@ describe("EditRole - all modules", () => {
         .find('[data-test="edit-role-module-pane-bulk-AllowList"] button[role="checkbox"]')
         .attributes("aria-checked"),
     ).toBe("true");
+  });
+
+  // A role that holds one stream must still show it on the Streams row, or Selected hides the module.
+  it("badges a module row with the grants held inside it", async () => {
+    ctl.rolePermissions = [{ object: "logs:app", permission: "AllowGet" }];
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-inside-stream"]').text()).toBe(
+      String(i18n.global.t("iam.editRole.grantedInsideCount", { count: 1 })),
+    );
+  });
+
+  // A module row switches the rail to that module; treating it as a folder would leave All Modules on screen.
+  it("opens the module itself when its row is clicked", async () => {
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    await wrapper.find('[data-test="edit-role-module-pane-open-stream"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.vm.activeModule).toBe("stream");
+    expect(wrapper.vm.openFolder).toBeNull();
+    expect(wrapper.vm.activeModuleView.entities.map((row) => row.name).sort()).toEqual([
+      "index",
+      "logs",
+      "metrics",
+      "traces",
+    ]);
+    expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
   });
 });

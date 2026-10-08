@@ -221,6 +221,13 @@ describe("ModuleRail - selection", () => {
     await allModules.trigger("mousedown");
 
     expect(allModules.text()).toContain(String(i18n.global.t("iam.editRole.allModulesTitle")));
+    const html = wrapper.html();
+    expect(html.indexOf("edit-role-module-rail-overview")).toBeLessThan(
+      html.indexOf("edit-role-module-rail-all-modules"),
+    );
+    expect(html.indexOf("edit-role-module-rail-all-modules")).toBeLessThan(
+      html.indexOf("edit-role-module-rail-item-logs"),
+    );
     expect(wrapper.emitted("update:modelValue")?.at(-1)).toEqual(["__all__"]);
   });
 });

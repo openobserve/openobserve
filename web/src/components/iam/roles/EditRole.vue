@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:page-size="modulePageSize"
                   :lists-resources="isAllModules || !!moduleOf(activeModule)?.hasEntities"
                   :lists-modules="isAllModules"
-                  :inner-grants="innerGrants"
+                  :inner-grants="isAllModules ? moduleInnerGrants : innerGrants"
                   class="h-full"
                   :trail="paneView.trail"
                   :scopes="paneView.scopes"
@@ -610,7 +610,7 @@ const getOrgId = () => {
   return store.state.selectedOrganization.identifier;
 };
 
-const { summaryModules, pendingChanges, innerGrants } = useRoleSummary({
+const { summaryModules, pendingChanges, innerGrants, moduleInnerGrants } = useRoleSummary({
   selectedPermissionsHash,
   addedPermissions,
   removedPermissions,
