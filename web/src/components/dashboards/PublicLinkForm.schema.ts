@@ -121,7 +121,12 @@ export function rangeError(
   return null;
 }
 
-export const makePublicLinkSchema = (t: TranslateFn, today: string) =>
+/** `storedExpires` reads the edited link's own expiry date, which stays valid so an expired link can still be edited. */
+export const makePublicLinkSchema = (
+  t: TranslateFn,
+  today: string,
+  storedExpires: () => string = () => "",
+) =>
   z
     .object({
       name: z
@@ -135,7 +140,10 @@ export const makePublicLinkSchema = (t: TranslateFn, today: string) =>
       // YYYY-MM-DD strings compare correctly as text.
       expires: z
         .string()
-        .refine((v) => v === "" || v >= today, t("dashboard.publicLinks.expiresInPast")),
+        .refine(
+          (v) => v === "" || v >= today || v === storedExpires(),
+          t("dashboard.publicLinks.expiresInPast"),
+        ),
     })
     .superRefine((v, ctx) => {
       const now = Date.now() * 1000;
@@ -180,6 +188,10 @@ export const publicLinkDefaults = (): PublicLinkForm => ({
   expires: "",
 });
 
+/** An expiry in UTC microseconds as the YYYY-MM-DD date it falls on in the author's timezone. */
+export const expiryDate = (micros: number, timezone: string): string =>
+  formatInTimeZone(micros / 1000, timezone, "yyyy-MM-dd");
+
 /** Pre-fill the form from an existing link, showing its expiry as a date in the author's timezone. */
 export const publicLinkFormFrom = (link: PublicLink, timezone: string): PublicLinkForm => {
   return {
@@ -187,9 +199,7 @@ export const publicLinkFormFrom = (link: PublicLink, timezone: string): PublicLi
     ranges: sortRanges(link.time_range.ranges),
     defaultKey: rangeKey(link.time_range.default),
     rebuildSecs: link.rebuild_secs,
-    expires: link.expires_at
-      ? formatInTimeZone(link.expires_at / 1000, timezone, "yyyy-MM-dd")
-      : "",
+    expires: link.expires_at ? expiryDate(link.expires_at, timezone) : "",
   };
 };
 
@@ -201,10 +211,19 @@ export const endOfDayMicros = (date: string, timezone: string): number =>
 export const todayIn = (timezone: string, now: Date = new Date()): string =>
   formatInTimeZone(now, timezone, "yyyy-MM-dd");
 
+// An untouched date keeps the stored instant, which re-deriving end of day in another timezone would shift.
+const expiresAtFor = (date: string, timezone: string, storedAt: number | null): number | null => {
+  if (!date) return null;
+  if (storedAt !== null && expiryDate(storedAt, timezone) === date) return storedAt;
+  return endOfDayMicros(date, timezone);
+};
+
+/** `storedExpiresAt` is the edited link's current expiry, sent back as is while its date is unchanged. */
 export const toPublicLinkConfig = (
   value: PublicLinkForm,
   frozenVariables: Record<string, unknown>,
   timezone: string,
+  storedExpiresAt: number | null = null,
 ): PublicLinkConfig => {
   const ranges = sortRanges(value.ranges);
   return {
@@ -216,6 +235,6 @@ export const toPublicLinkConfig = (
     },
     frozen_variables: frozenVariables,
     rebuild_secs: value.rebuildSecs,
-    expires_at: value.expires ? endOfDayMicros(value.expires, timezone) : null,
+    expires_at: expiresAtFor(value.expires, timezone, storedExpiresAt),
   };
 };

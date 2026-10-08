@@ -23,23 +23,23 @@
     :title="drawerTitle"
     :form-id="currentView === 'form' ? FORM_ID : undefined"
     :primary-button-label="primaryLabel"
+    :primary-button-disabled="currentView === 'form' && variablesPending"
     :secondary-button-label="currentView === 'form' ? t('common.cancel') : undefined"
     @click:secondary="closeForm"
   >
     <template #header>
       <div class="flex min-w-0 items-center gap-2">
-        <!-- Same tiles as OPageHeader's back button and module icon, which it offers only as page-header props. -->
-        <button
+        <OButton
           v-if="showBack"
-          type="button"
-          class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+          variant="secondary"
+          size="icon-sm"
+          icon-left="chevron-left"
           :aria-label="t('dashboard.publicLinks.backToLinks')"
           data-test="dashboards-public-links-panel-back-btn"
           @click="goBack"
         >
-          <OIcon name="chevron-left" size="md" />
           <OTooltip side="bottom" :content="t('dashboard.publicLinks.backToLinks')" />
-        </button>
+        </OButton>
         <span
           v-else
           class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
@@ -249,6 +249,15 @@
           :content="t('dashboard.publicLinks.frozenVariablesNote')"
           data-test="dashboards-public-links-panel-variables-note"
         />
+        <div
+          v-if="variablesPending"
+          class="text-text-secondary flex items-center gap-2 text-xs"
+          role="status"
+          data-test="dashboards-public-links-panel-variables-loading"
+        >
+          <OSpinner size="xs" />
+          {{ t("dashboard.publicLinks.variablesLoading") }}
+        </div>
         <template v-if="formVarsReady">
           <VariablesValueSelector
             :key="`global-${formKey}`"
@@ -417,8 +426,10 @@
               size="icon-sm"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               class="max-md:hidden"
+              :loading="busyRows.get(row.id) === 'inline'"
+              :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
-              @click="setPaused(row, row.enabled)"
+              @click="setPaused(row, row.enabled, 'inline')"
             >
               <OTooltip
                 side="bottom"
@@ -434,6 +445,7 @@
                   variant="ghost"
                   size="icon-sm"
                   :title="t('dashboard.moreActions')"
+                  :loading="busyRows.get(row.id) === 'menu'"
                   :data-test="`dashboards-public-links-panel-${row.id}-menu-btn`"
                 />
               </template>
@@ -465,8 +477,9 @@
                 v-if="canPause(row)"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                 class="md:hidden"
+                :disabled="busyRows.has(row.id)"
                 :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
-                @select="setPaused(row, row.enabled)"
+                @select="setPaused(row, row.enabled, 'menu')"
               >
                 {{
                   row.enabled ? t("dashboard.publicLinks.pause") : t("dashboard.publicLinks.resume")
@@ -475,6 +488,7 @@
               <ODropdownItem
                 v-if="canRebuild(row)"
                 icon-left="refresh"
+                :disabled="busyRows.has(row.id)"
                 :data-test="`dashboards-public-links-panel-${row.id}-rebuild-menu`"
                 @select="rebuildLink(row)"
               >
@@ -483,6 +497,7 @@
               <ODropdownItem
                 icon-left="delete"
                 variant="destructive"
+                :disabled="busyRows.has(row.id)"
                 :data-test="`dashboards-public-links-panel-${row.id}-revoke-menu`"
                 @select="revokeLink(row)"
               >
@@ -497,7 +512,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -519,6 +534,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -545,6 +561,7 @@ import {
 } from "@/services/public_dashboards.queries";
 import {
   REFRESH_SECONDS,
+  expiryDate,
   makePublicLinkSchema,
   publicLinkDefaults,
   publicLinkFormFrom,
@@ -576,6 +593,8 @@ type DashboardLayout = {
 /** The live dashboard's variables manager, read to seed a new link with what the author sees. */
 type DashboardVariables = { getUrlParams: () => Record<string, unknown> };
 type PanelView = "list" | "form" | "created";
+/** Where a row action was clicked, so the spinner shows on that control. */
+type RowActionSource = "inline" | "menu";
 
 interface PresetOption extends SelectOption {
   value: number;
@@ -667,12 +686,22 @@ const rebuildMutation = useMutation(() => rebuildPublicLinkMutation(orgId.value)
 
 const view = ref<PanelView>("list");
 const editing = ref<PublicLink | null>(null);
+// The backend checks an expiry only when it changes, so an expired link stays editable until its date is touched.
+const storedExpires = computed(() =>
+  editing.value?.expires_at ? expiryDate(editing.value.expires_at, timezone.value) : "",
+);
 const createdLink = ref<PublicLink | null>(null);
 // Remounts the variable pickers so each form opens on its own seed.
 const formKey = ref(0);
 // Its own manager, so editing a link's values never changes the dashboard's selection.
 const formVars = useVariablesManager(t);
 const formVarsReady = ref(false);
+// Saving before every picker has loaded would freeze whatever value a picker held mid-load.
+const variablesPending = computed(
+  () => !!props.variablesConfig?.list?.length && (!formVarsReady.value || formVars.isLoading.value),
+);
+// Rows with a pause, resume, rebuild or revoke in flight, so a second click can't send it again.
+const busyRows = reactive(new Map<string, RowActionSource>());
 
 // A dashboard with no links opens straight on the create form.
 const currentView = computed<PanelView>(() =>
@@ -701,7 +730,7 @@ const primaryLabel = computed<I18nText | undefined>(() => {
 
 const form = useOForm<PublicLinkForm>({
   defaultValues: publicLinkDefaults(),
-  schema: makePublicLinkSchema(t, today.value),
+  schema: makePublicLinkSchema(t, today.value, () => storedExpires.value),
   onSubmit: (value) => submit(value),
 });
 const ranges = form.useStore((s) => s.values.ranges);
@@ -816,6 +845,29 @@ function serverMessage(e: unknown): I18nText {
   return raw((e as { response?: { data?: { message?: string } } })?.response?.data?.message);
 }
 
+function isForbidden(e: unknown): boolean {
+  return (e as { response?: { status?: number } } | null)?.response?.status === 403;
+}
+
+// The list refetch the mutation started must land first, or the row still offers the action it just ran.
+async function runRowAction(
+  link: PublicLink,
+  source: RowActionSource,
+  run: () => Promise<void>,
+  failed: I18nText = t("dashboard.publicLinks.actionFailed"),
+) {
+  if (busyRows.has(link.id)) return;
+  busyRows.set(link.id, source);
+  try {
+    await run();
+    await linksQuery.refetch({ cancelRefetch: false });
+  } catch (e: unknown) {
+    showErrorNotification(serverMessage(e) || failed);
+  } finally {
+    busyRows.delete(link.id);
+  }
+}
+
 // Keys follow the dashboard URL: `name`, `name.t.<tabId>`, `name.p.<panelId>`.
 function frozenVariables(): Record<string, unknown> {
   // Without the pickers (opened from the org list) an edit keeps the link's frozen values.
@@ -882,11 +934,17 @@ function closeForm() {
 }
 
 async function submit(value: PublicLinkForm) {
+  if (variablesPending.value) return;
   try {
     const saved = await saveMutation.mutateAsync({
       dashboardId: props.dashboardId,
       linkId: editing.value?.id,
-      config: toPublicLinkConfig(value, frozenVariables(), timezone.value),
+      config: toPublicLinkConfig(
+        value,
+        frozenVariables(),
+        timezone.value,
+        editing.value?.expires_at ?? null,
+      ),
     });
     if (editing.value) {
       showPositiveNotification(t("dashboard.publicLinks.savedToast"));
@@ -896,28 +954,32 @@ async function submit(value: PublicLinkForm) {
       view.value = "created";
     }
   } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.publishFailed"));
+    if (isForbidden(e)) {
+      showErrorNotification(
+        editing.value
+          ? t("dashboard.publicLinks.editForbidden")
+          : t("dashboard.publicLinks.createForbidden"),
+      );
+    } else {
+      showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.publishFailed"));
+    }
   }
 }
 
-async function setPaused(link: PublicLink, paused: boolean) {
-  try {
+function setPaused(link: PublicLink, paused: boolean, source: RowActionSource) {
+  return runRowAction(link, source, async () => {
     await pauseMutation.mutateAsync({ link, paused });
     showPositiveNotification(
       paused ? t("dashboard.publicLinks.pausedToast") : t("dashboard.publicLinks.resumedToast"),
     );
-  } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
-  }
+  });
 }
 
-async function rebuildLink(link: PublicLink) {
-  try {
+function rebuildLink(link: PublicLink) {
+  return runRowAction(link, "menu", async () => {
     await rebuildMutation.mutateAsync(link);
     showPositiveNotification(t("dashboard.publicLinks.rebuiltToast"));
-  } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
-  }
+  });
 }
 
 async function revokeLink(link: PublicLink) {
@@ -931,12 +993,15 @@ async function revokeLink(link: PublicLink) {
     destructive: true,
   });
   if (!ok) return;
-  try {
-    await revokeMutation.mutateAsync(link);
-    showPositiveNotification(t("dashboard.publicDashboard.revokedToast"));
-  } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.revokeFailed"));
-  }
+  await runRowAction(
+    link,
+    "menu",
+    async () => {
+      await revokeMutation.mutateAsync(link);
+      showPositiveNotification(t("dashboard.publicDashboard.revokedToast"));
+    },
+    t("dashboard.publicDashboard.revokeFailed"),
+  );
 }
 
 function copyLink(link: PublicLink) {

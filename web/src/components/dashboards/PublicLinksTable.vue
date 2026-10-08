@@ -175,8 +175,10 @@
             size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
             class="max-md:hidden"
+            :loading="busyRows.get(row.id) === 'inline'"
+            :disabled="busyRows.has(row.id)"
             :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
-            @click="setPaused(row, row.enabled)"
+            @click="setPaused(row, row.enabled, 'inline')"
           >
             <OTooltip
               side="bottom"
@@ -192,6 +194,7 @@
                 variant="ghost"
                 size="icon-sm"
                 :title="t('dashboard.moreActions')"
+                :loading="busyRows.get(row.id) === 'menu'"
                 :data-test="`dashboards-public-links-${row.id}-menu-btn`"
               />
             </template>
@@ -232,8 +235,9 @@
               v-if="canPause(row)"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               class="md:hidden"
+              :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
-              @select="setPaused(row, row.enabled)"
+              @select="setPaused(row, row.enabled, 'menu')"
             >
               {{
                 row.enabled ? t("dashboard.publicLinks.pause") : t("dashboard.publicLinks.resume")
@@ -242,6 +246,7 @@
             <ODropdownItem
               v-if="canRebuild(row)"
               icon-left="refresh"
+              :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-${row.id}-rebuild-menu`"
               @select="rebuildLink(row)"
             >
@@ -250,6 +255,7 @@
             <ODropdownItem
               icon-left="delete"
               variant="destructive"
+              :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-${row.id}-revoke-menu`"
               @select="revokeLink(row)"
             >
@@ -289,7 +295,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
@@ -331,6 +337,8 @@ import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 
 type StatusFilter = "live" | "paused" | "attention" | "expired" | "all";
+/** Where a row action was clicked, so the spinner shows on that control. */
+type RowActionSource = "inline" | "menu";
 
 const FILTER_STATUSES: Record<Exclude<StatusFilter, "all">, PublicLinkStatus[]> = {
   live: ["live"],
@@ -372,6 +380,8 @@ const statusFilter = ref<StatusFilter>("all");
 const searchQuery = ref("");
 const editing = ref<PublicLink | null>(null);
 const panelOpen = ref(false);
+// Rows with a pause, resume, rebuild or revoke in flight, so a second click can't send it again.
+const busyRows = reactive(new Map<string, RowActionSource>());
 
 const countOf = (filter: Exclude<StatusFilter, "all">) =>
   links.value.filter((l) => FILTER_STATUSES[filter].includes(l.status)).length;
@@ -458,6 +468,25 @@ function serverMessage(e: unknown): I18nText {
   return raw((e as { response?: { data?: { message?: string } } })?.response?.data?.message);
 }
 
+// The list refetch the mutation started must land first, or the row still offers the action it just ran.
+async function runRowAction(
+  link: PublicLink,
+  source: RowActionSource,
+  run: () => Promise<void>,
+  failed: I18nText = t("dashboard.publicLinks.actionFailed"),
+) {
+  if (busyRows.has(link.id)) return;
+  busyRows.set(link.id, source);
+  try {
+    await run();
+    await linksQuery.refetch({ cancelRefetch: false });
+  } catch (e: unknown) {
+    showErrorNotification(serverMessage(e) || failed);
+  } finally {
+    busyRows.delete(link.id);
+  }
+}
+
 function onStatSelect(key: string) {
   statusFilter.value = key as StatusFilter;
 }
@@ -494,24 +523,20 @@ function editLink(link: PublicLink) {
   panelOpen.value = true;
 }
 
-async function setPaused(link: PublicLink, paused: boolean) {
-  try {
+function setPaused(link: PublicLink, paused: boolean, source: RowActionSource) {
+  return runRowAction(link, source, async () => {
     await pauseMutation.mutateAsync({ link, paused });
     showPositiveNotification(
       paused ? t("dashboard.publicLinks.pausedToast") : t("dashboard.publicLinks.resumedToast"),
     );
-  } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
-  }
+  });
 }
 
-async function rebuildLink(link: PublicLink) {
-  try {
+function rebuildLink(link: PublicLink) {
+  return runRowAction(link, "menu", async () => {
     await rebuildMutation.mutateAsync(link);
     showPositiveNotification(t("dashboard.publicLinks.rebuiltToast"));
-  } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicLinks.actionFailed"));
-  }
+  });
 }
 
 async function revokeLink(link: PublicLink) {
@@ -525,11 +550,14 @@ async function revokeLink(link: PublicLink) {
     destructive: true,
   });
   if (!ok) return;
-  try {
-    await revokeMutation.mutateAsync(link);
-    showPositiveNotification(t("dashboard.publicDashboard.revokedToast"));
-  } catch (e: unknown) {
-    showErrorNotification(serverMessage(e) || t("dashboard.publicDashboard.revokeFailed"));
-  }
+  await runRowAction(
+    link,
+    "menu",
+    async () => {
+      await revokeMutation.mutateAsync(link);
+      showPositiveNotification(t("dashboard.publicDashboard.revokedToast"));
+    },
+    t("dashboard.publicDashboard.revokeFailed"),
+  );
 }
 </script>

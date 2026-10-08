@@ -301,6 +301,59 @@ describe("PublicLinksTable", () => {
     expect(admin.resume).toHaveBeenCalledWith("default", "dash-1", "l2");
   });
 
+  it("locks a row's actions while its request runs, so a double click sends one", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    vi.mocked(admin.pause).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }) as never,
+    );
+    const w = build();
+    await flushPromises();
+    const pauseBtn = () => find(w, "dashboards-public-links-l1-pause-btn");
+
+    await pauseBtn().trigger("click");
+    await pauseBtn().trigger("click");
+    await find(w, "dashboards-public-links-l1-pause-menu").trigger("click");
+    expect(admin.pause).toHaveBeenCalledTimes(1);
+    expect(pauseBtn().attributes("aria-busy")).toBe("true");
+    expect(find(w, "dashboards-public-links-l1-menu-btn").attributes("aria-busy")).toBeUndefined();
+    expect(find(w, "dashboards-public-links-l1-revoke-menu").attributes("disabled")).toBeDefined();
+    expect(find(w, "dashboards-public-links-l5-pause-btn").attributes("disabled")).toBeUndefined();
+
+    finish({ data: link({ enabled: false }) });
+    await flushPromises();
+    expect(pauseBtn().attributes("aria-busy")).toBeUndefined();
+    expect(
+      find(w, "dashboards-public-links-l1-revoke-menu").attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("spins the menu button for an action run from the menu", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    vi.mocked(admin.revoke).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }) as never,
+    );
+    confirm.mockResolvedValueOnce(true);
+    const w = build();
+    await flushPromises();
+
+    await find(w, "dashboards-public-links-l1-revoke-menu").trigger("click");
+    await flushPromises();
+    await find(w, "dashboards-public-links-l1-revoke-menu").trigger("click");
+    await flushPromises();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(admin.revoke).toHaveBeenCalledTimes(1);
+    expect(find(w, "dashboards-public-links-l1-menu-btn").attributes("aria-busy")).toBe("true");
+    expect(find(w, "dashboards-public-links-l1-pause-btn").attributes("disabled")).toBeDefined();
+
+    finish({ data: {} });
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-l1-menu-btn").attributes("aria-busy")).toBeUndefined();
+  });
+
   it("shows an absolute-only link as refreshed once and rebuilds it from the menu", async () => {
     const absolute = { type: "absolute" as const, start: 1_000_000, end: 86_401_000_000 };
     vi.mocked(admin.listOrg).mockResolvedValue({

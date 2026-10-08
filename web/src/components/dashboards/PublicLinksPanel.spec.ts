@@ -52,6 +52,7 @@ const ODrawerStub = {
     "size",
     "formId",
     "primaryButtonLabel",
+    "primaryButtonDisabled",
     "secondaryButtonLabel",
     "closeGuard",
   ],
@@ -487,6 +488,130 @@ describe("PublicLinksPanel", () => {
     await w.find('[data-test="dashboards-public-links-panel-l1-pause-menu"]').trigger("click");
     await flushPromises();
     expect(notify.error).toHaveBeenCalledWith("no edit");
+  });
+
+  it("saves an expired link without a new date and sends its expiry back unchanged", async () => {
+    const expiresAt = Date.UTC(2020, 0, 1, 12) * 1000;
+    const expired = link({ status: "expired", expires_at: expiresAt });
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [expired] } } as never);
+    vi.mocked(admin.update).mockResolvedValue({ data: expired } as never);
+    const w = build({ editLinkId: "l1", variablesConfig: undefined });
+    await flushPromises();
+
+    await submit(w);
+    expect(admin.update).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(admin.update).mock.calls[0][3].expires_at).toBe(expiresAt);
+  });
+
+  it("still refuses a different past expiry when editing an expired link", async () => {
+    const expired = link({ status: "expired", expires_at: Date.UTC(2020, 0, 1, 12) * 1000 });
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [expired] } } as never);
+    const w = build({ editLinkId: "l1", variablesConfig: undefined });
+    await flushPromises();
+
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("expires", "2020-01-05");
+    await submit(w);
+    expect(admin.update).not.toHaveBeenCalled();
+    expect(w.text()).toContain("Pick today or a later date");
+  });
+
+  it("keeps Create disabled until the variable pickers have loaded", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    vi.mocked(admin.create).mockResolvedValue({ data: link() } as never);
+    const w = build({
+      variablesConfig: {
+        list: [{ name: "env", type: "query_values", query_data: { stream: "s", field: "f" } }],
+      },
+      currentValues: { values: [] },
+    });
+    await flushPromises();
+    const drawer = () => w.findComponent({ name: "ODrawer" });
+    const vm = w.vm as unknown as {
+      form: { setFieldValue: (k: string, v: string) => void };
+      formVars: {
+        variablesData: {
+          global: Array<{
+            isLoading: boolean;
+            isVariableLoadingPending: boolean;
+            isVariablePartialLoaded: boolean;
+          }>;
+        };
+      };
+    };
+    vm.form.setFieldValue("name", "NOC wall");
+    expect(drawer().props("primaryButtonDisabled")).toBe(true);
+    expect(has(w, "dashboards-public-links-panel-variables-loading")).toBe(true);
+    await submit(w);
+    expect(admin.create).not.toHaveBeenCalled();
+
+    Object.assign(vm.formVars.variablesData.global[0], {
+      isLoading: false,
+      isVariableLoadingPending: false,
+      isVariablePartialLoaded: true,
+    });
+    await flushPromises();
+    expect(drawer().props("primaryButtonDisabled")).toBe(false);
+    expect(has(w, "dashboards-public-links-panel-variables-loading")).toBe(false);
+    await submit(w);
+    expect(admin.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks a row's actions while its request runs, so a double click sends one", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    vi.mocked(admin.pause).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }) as never,
+    );
+    const w = build();
+    await flushPromises();
+    const pauseBtn = () => w.find('[data-test="dashboards-public-links-panel-l1-pause-btn"]');
+    const menuItem = (id: string) =>
+      w.find(`[data-test="dashboards-public-links-panel-l1-${id}-menu"]`);
+
+    await pauseBtn().trigger("click");
+    await pauseBtn().trigger("click");
+    await menuItem("pause").trigger("click");
+    expect(admin.pause).toHaveBeenCalledTimes(1);
+    expect(pauseBtn().attributes("aria-busy")).toBe("true");
+    expect(menuItem("revoke").attributes("disabled")).toBeDefined();
+
+    finish({ data: link({ enabled: false }) });
+    await flushPromises();
+    expect(pauseBtn().attributes("aria-busy")).toBeUndefined();
+    expect(menuItem("revoke").attributes("disabled")).toBeUndefined();
+  });
+
+  it("tells an author without permission to ask an admin, not the server's text", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+    vi.mocked(admin.create).mockRejectedValue({
+      response: { status: 403, data: { message: "Unauthorized Access" } },
+    });
+    const w = build({ variablesConfig: undefined });
+    await flushPromises();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "NOC wall");
+    await submit(w);
+    expect(notify.error).toHaveBeenCalledWith(
+      "You don't have permission to create public links. Ask an admin.",
+    );
+  });
+
+  it("tells an author who can't edit links the same way", async () => {
+    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    vi.mocked(admin.update).mockRejectedValue({
+      response: { status: 403, data: { message: "Unauthorized Access" } },
+    });
+    const w = build({ editLinkId: "l1", variablesConfig: undefined });
+    await flushPromises();
+    await submit(w);
+    expect(notify.error).toHaveBeenCalledWith(
+      "You don't have permission to edit public links. Ask an admin.",
+    );
   });
 
   it("shows the no-permission view on a 403 and no actions", async () => {

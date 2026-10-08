@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import { gt } from "@/types/i18n";
 import {
   endOfDayMicros,
+  expiryDate,
   makePublicLinkSchema,
   publicLinkDefaults,
   publicLinkFormFrom,
@@ -55,6 +56,13 @@ describe("PublicLinkForm schema", () => {
   it("rejects an expiry before today but allows today", () => {
     expect(schema.safeParse({ ...named(), expires: "2026-09-24" }).success).toBe(false);
     expect(schema.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(true);
+  });
+
+  it("keeps an edited link's own past expiry valid, but no other past date", () => {
+    const editing = makePublicLinkSchema(gt, "2026-09-25", () => "2026-09-01");
+    expect(editing.safeParse({ ...named(), expires: "2026-09-01" }).success).toBe(true);
+    expect(editing.safeParse({ ...named(), expires: "2026-09-02" }).success).toBe(false);
+    expect(editing.safeParse({ ...named(), expires: "2026-09-25" }).success).toBe(true);
   });
 
   it("needs a default that is one of the listed ranges", () => {
@@ -203,5 +211,22 @@ describe("PublicLinkForm payload", () => {
     const value = publicLinkFormFrom(link, "America/New_York");
     expect(value.expires).toBe("2026-12-31");
     expect(toPublicLinkConfig(value, {}, "America/New_York").expires_at).toBe(expires_at);
+  });
+
+  it("sends an unchanged expiry back as stored, whatever the author's timezone", () => {
+    const stored = endOfDayMicros("2026-12-31", "America/New_York");
+    const shown = expiryDate(stored, "Asia/Kolkata");
+    expect(shown).toBe("2027-01-01");
+    const value = { ...named(), expires: shown };
+    expect(toPublicLinkConfig(value, {}, "Asia/Kolkata", stored).expires_at).toBe(stored);
+  });
+
+  it("re-derives the expiry from a changed date, and clears a removed one", () => {
+    const stored = endOfDayMicros("2026-12-31", "America/New_York");
+    const changed = { ...named(), expires: "2027-01-05" };
+    expect(toPublicLinkConfig(changed, {}, "Asia/Kolkata", stored).expires_at).toBe(
+      endOfDayMicros("2027-01-05", "Asia/Kolkata"),
+    );
+    expect(toPublicLinkConfig(named(), {}, "Asia/Kolkata", stored).expires_at).toBeNull();
   });
 });
