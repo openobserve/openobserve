@@ -15,14 +15,17 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, Label, Labels, LabelsExt, RangeValue, Sample,
-    Value,
+use config::meta::promql::{
+    is_stale_marker,
+    value::{
+        CounterSeries, EvalContext, ExtrapolationKind, Label, Labels, LabelsExt, RangeValue,
+        Sample, Value,
+    },
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 use rayon::prelude::*;
-use strum::EnumString;
+use strum::{EnumString, IntoStaticStr};
 
 use crate::micros;
 
@@ -34,6 +37,7 @@ mod clamp;
 mod count_over_time;
 mod deriv;
 mod extrapolated;
+mod first_over_time;
 mod histogram;
 mod holt_winters;
 mod idelta;
@@ -41,6 +45,7 @@ mod irate;
 mod label_join;
 mod label_replace;
 mod last_over_time;
+mod mad_over_time;
 mod math_operations;
 mod max_over_time;
 mod min_over_time;
@@ -54,50 +59,69 @@ mod stddev_over_time;
 mod stdvar_over_time;
 mod sum_over_time;
 mod time_operations;
+mod ts_of_over_time;
 mod vector;
 
 pub(crate) use absent::{absent, absent_labels};
 pub(crate) use absent_over_time::absent_over_time;
 pub(crate) use clamp::clamp;
-pub(crate) use histogram::histogram_quantile;
+pub(crate) use histogram::{
+    histogram_fraction, histogram_quantile, histogram_quantiles, native_histogram_guidance,
+};
 pub(crate) use holt_winters::holt_winters;
 pub(crate) use label_join::label_join;
 pub(crate) use label_replace::label_replace;
 pub(crate) use math_operations::*;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
-pub(crate) use scalar::scalar;
+pub(crate) use scalar::{min_max_of, scalar};
 pub(crate) use sort::sort;
 pub(crate) use time_operations::*;
+pub(crate) use ts_of_over_time::{sample_time_offset, stored_sample_times};
 pub(crate) use vector::vector;
 
-pub(crate) const KEEP_METRIC_NAME_FUNC: &str = "last_over_time";
+/// Range functions that act like an offset, so they keep the metric name.
+const KEEP_METRIC_NAME_FUNCS: [&str; 2] = ["last_over_time", "first_over_time"];
 
 /// Reference: https://prometheus.io/docs/prometheus/latest/querying/functions/
-#[derive(Debug, Clone, Copy, PartialEq, EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, EnumString, IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum Func {
     Abs,
     Absent,
     AbsentOverTime,
+    Acos,
+    Acosh,
+    Asin,
+    Asinh,
+    Atan,
+    Atanh,
     AvgOverTime,
     Ceil,
     Changes,
     Clamp,
     ClampMax,
     ClampMin,
+    Cos,
+    Cosh,
     CountOverTime,
     DayOfMonth,
     DayOfWeek,
     DayOfYear,
     DaysInMonth,
+    Deg,
     Delta,
     Deriv,
     Exp,
+    FirstOverTime,
     Floor,
+    HistogramAvg,
     HistogramCount,
     HistogramFraction,
     HistogramQuantile,
+    HistogramQuantiles,
+    HistogramStddev,
+    HistogramStdvar,
     HistogramSum,
     #[strum(serialize = "holt_winters", serialize = "double_exponential_smoothing")]
     HoltWinters,
@@ -111,26 +135,41 @@ pub(crate) enum Func {
     Ln,
     Log10,
     Log2,
+    MadOverTime,
+    MaxOf,
     MaxOverTime,
+    MinOf,
     MinOverTime,
     Minute,
     Month,
+    Pi,
     PredictLinear,
     PresentOverTime,
     QuantileOverTime,
+    Rad,
     Rate,
     Resets,
     Round,
     Scalar,
     Sgn,
+    Sin,
+    Sinh,
     Sort,
+    SortByLabel,
+    SortByLabelDesc,
     SortDesc,
     Sqrt,
     StddevOverTime,
     StdvarOverTime,
     SumOverTime,
+    Tan,
+    Tanh,
     Time,
     Timestamp,
+    TsOfFirstOverTime,
+    TsOfLastOverTime,
+    TsOfMaxOverTime,
+    TsOfMinOverTime,
     Vector,
     Year,
 }
@@ -162,6 +201,20 @@ impl Func {
             Self::Log2 => SingleArgFunc::Value(log2),
             Self::Sgn => SingleArgFunc::Value(sgn),
             Self::Sqrt => SingleArgFunc::Value(sqrt),
+            Self::Sin => SingleArgFunc::Value(sin),
+            Self::Cos => SingleArgFunc::Value(cos),
+            Self::Tan => SingleArgFunc::Value(tan),
+            Self::Asin => SingleArgFunc::Value(asin),
+            Self::Acos => SingleArgFunc::Value(acos),
+            Self::Atan => SingleArgFunc::Value(atan),
+            Self::Sinh => SingleArgFunc::Value(sinh),
+            Self::Cosh => SingleArgFunc::Value(cosh),
+            Self::Tanh => SingleArgFunc::Value(tanh),
+            Self::Asinh => SingleArgFunc::Value(asinh),
+            Self::Acosh => SingleArgFunc::Value(acosh),
+            Self::Atanh => SingleArgFunc::Value(atanh),
+            Self::Deg => SingleArgFunc::Value(deg),
+            Self::Rad => SingleArgFunc::Value(rad),
             Self::Timestamp => SingleArgFunc::Value(timestamp),
             Self::Scalar => SingleArgFunc::Context(scalar),
             Self::Vector => SingleArgFunc::Context(vector),
@@ -185,10 +238,12 @@ impl Func {
             Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc),
             Func::Delta => Box::new(ExtrapolationKind::Delta),
             Func::Deriv => Box::new(deriv::DerivFunc),
+            Func::FirstOverTime => Box::new(first_over_time::FirstOverTimeFunc),
             Func::Idelta => Box::new(idelta::IdeltaFunc),
             Func::Increase => Box::new(ExtrapolationKind::Increase),
             Func::Irate => Box::new(irate::IrateFunc),
             Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
+            Func::MadOverTime => Box::new(mad_over_time::MadOverTimeFunc),
             Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
             Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
             Func::PresentOverTime => Box::new(present_over_time::PresentOverTimeFunc),
@@ -197,6 +252,10 @@ impl Func {
             Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
             Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc),
             Func::SumOverTime => Box::new(sum_over_time::SumOverTimeFunc),
+            Func::TsOfFirstOverTime => Box::new(ts_of_over_time::TsOfOverTimeFunc::First),
+            Func::TsOfLastOverTime => Box::new(ts_of_over_time::TsOfOverTimeFunc::Last),
+            Func::TsOfMaxOverTime => Box::new(ts_of_over_time::TsOfOverTimeFunc::Max),
+            Func::TsOfMinOverTime => Box::new(ts_of_over_time::TsOfOverTimeFunc::Min),
             _ => return None,
         })
     }
@@ -214,6 +273,14 @@ impl<T: RangeFunc + ?Sized> RangeFunc for Box<T> {
     fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
         (**self).counter_extrapolation()
     }
+
+    fn reads_stale_markers(&self) -> bool {
+        (**self).reads_stale_markers()
+    }
+
+    fn returns_sample_time(&self) -> bool {
+        (**self).returns_sample_time()
+    }
 }
 
 impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
@@ -227,6 +294,14 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
 
     fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
         (**self).counter_extrapolation()
+    }
+
+    fn reads_stale_markers(&self) -> bool {
+        (**self).reads_stale_markers()
+    }
+
+    fn returns_sample_time(&self) -> bool {
+        (**self).returns_sample_time()
     }
 }
 
@@ -298,6 +373,16 @@ pub trait RangeFunc: Send + Sync {
     /// replace the per-window reset scan with a per-series prefix.
     fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
         None
+    }
+
+    /// Only a bare selector's lookback reads stale markers; every range function ignores them.
+    fn reads_stale_markers(&self) -> bool {
+        false
+    }
+
+    /// Whether the value is a sample's time, which the engine has shifted by the selector's offset.
+    fn returns_sample_time(&self) -> bool {
+        false
     }
 }
 
@@ -380,6 +465,11 @@ impl<F: RangeFunc + ?Sized> Iterator for SeriesRange<'_, F> {
     }
 }
 
+/// Whether a range function's output keeps the input's metric name.
+pub(crate) fn keeps_metric_name(func_name: &str) -> bool {
+    KEEP_METRIC_NAME_FUNCS.contains(&func_name)
+}
+
 /// The fused evaluators' view of the same table: a name that resolves to a range function.
 pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
     name.parse::<Func>().ok()?.range_func()
@@ -387,7 +477,14 @@ pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
 
 /// The range function a bare instant selector streams as; it keeps the metric name.
 pub(crate) fn instant_lookback_func() -> std::sync::Arc<dyn RangeFunc> {
-    std::sync::Arc::new(last_over_time::LastOverTimeFunc)
+    std::sync::Arc::new(last_over_time::InstantLookbackFunc)
+}
+
+/// Removes the stale markers `func` ignores, before its windows or its `CounterSeries` see them.
+pub(crate) fn drop_stale_markers<F: RangeFunc + ?Sized>(samples: &mut Vec<Sample>, func: &F) {
+    if !func.reads_stale_markers() {
+        samples.retain(|sample| !is_stale_marker(sample.value));
+    }
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -440,11 +537,12 @@ where
         .into_par_iter()
         .flat_map(|mut metric| {
             let mut labels = std::mem::take(&mut metric.labels);
-            if func.name() != KEEP_METRIC_NAME_FUNC {
+            if !keeps_metric_name(func.name()) {
                 labels = labels.without_metric_name();
             }
             let time_window = metric.time_window.as_ref().unwrap();
             let range = time_window.range;
+            drop_stale_markers(&mut metric.samples, &func);
             let mut result_samples = Vec::with_capacity(timestamps.len());
             result_samples.extend(
                 SeriesRange::new(&metric.samples, &func, range, eval_ctx, &timestamps)
@@ -625,6 +723,12 @@ mod tests {
             "delta",
             "last_over_time",
             "avg_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_min_over_time",
+            "ts_of_max_over_time",
+            "ts_of_last_over_time",
+            "ts_of_first_over_time",
         ] {
             let func = fusable_range_func(name).unwrap();
             let actual: Vec<_> =
@@ -678,10 +782,34 @@ mod tests {
     }
 
     #[test]
-    fn test_keep_metric_name_func_contains_last_over_time() {
-        assert_eq!(KEEP_METRIC_NAME_FUNC, "last_over_time");
-        assert_ne!(KEEP_METRIC_NAME_FUNC, "rate");
-        assert_ne!(KEEP_METRIC_NAME_FUNC, "avg_over_time");
+    fn test_only_first_and_last_over_time_keep_the_metric_name() {
+        for (name, keeps) in [
+            ("last_over_time", true),
+            ("first_over_time", true),
+            ("rate", false),
+            ("avg_over_time", false),
+            ("mad_over_time", false),
+            ("ts_of_last_over_time", false),
+        ] {
+            let mut series = range_value(
+                &[("__name__", "m"), ("job", "x")],
+                &[60_000_000, 90_000_000],
+            );
+            let eval_ctx = EvalContext::new(100_000_000, 100_000_000, 0, "test".into());
+            series.time_window = Some(config::meta::promql::value::TimeWindow::new(
+                Duration::from_secs(60),
+            ));
+            let Value::Matrix(out) = eval_range(
+                Value::Matrix(vec![series]),
+                fusable_range_func(name).unwrap(),
+                &eval_ctx,
+            )
+            .unwrap() else {
+                panic!("expected a matrix");
+            };
+            assert_eq!(keeps_metric_name(name), keeps, "{name}");
+            assert_eq!(out[0].labels.len() == 2, keeps, "{name}");
+        }
     }
 
     #[test]

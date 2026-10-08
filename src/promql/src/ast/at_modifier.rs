@@ -16,7 +16,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{AtModifier, Expr, Offset};
+use promql_parser::parser::{AtModifier, Expr, NumberLiteral, Offset};
 
 use super::timestamp_selector::timestamp_selector;
 use crate::{adjust_start_end, utils::offset_micros};
@@ -35,6 +35,9 @@ const TIME_DEPENDENT_FUNCS: [&str; 11] = [
     "timestamp",
     "year",
 ];
+
+/// Functions that read the query's window, which a worker never sees.
+const WINDOW_FUNCS: [&str; 4] = ["start", "end", "range", "step"];
 
 /// Whether an expression evaluates to the same value on every step.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,14 +74,14 @@ pub fn resolve_at_modifiers(expr: &mut Expr, start: i64, end: i64) -> bool {
     changed
 }
 
-/// The query text with `@ start()` / `@ end()` pinned, `None` when it uses neither.
+/// The query text with `@` and `start()`-like calls resolved, `None` when it has neither.
 pub fn resolve_query(
     query: &str,
     start: i64,
     end: i64,
     step: i64,
 ) -> Result<Option<String>, String> {
-    if !query.contains('@') {
+    if !query.contains('@') && !calls_window_func(query) {
         return Ok(None);
     }
     let mut expr = crate::parse(query)?;
@@ -87,7 +90,9 @@ pub fn resolve_query(
         0 => (start, end),
         step => adjust_start_end(start, end, step),
     };
-    Ok(resolve_at_modifiers(&mut expr, start, end).then(|| expr.to_string()))
+    let pinned = resolve_at_modifiers(&mut expr, start, end);
+    let replaced = resolve_window_funcs(&mut expr, start, end, step);
+    Ok((pinned || replaced).then(|| expr.to_string()))
 }
 
 /// The pinned instant in microseconds, `None` while it is still `start()` / `end()`.
@@ -166,6 +171,68 @@ pub(crate) fn rebase_at(expr: &mut Expr, reference: i64) {
             _ => Some(Offset::Neg(Duration::from_micros(behind.unsigned_abs()))),
         };
     });
+}
+
+/// Replaces `start()`, `end()`, `range()` and `step()` with the window they read, in seconds.
+/// A window function name followed by `(`; PromQL allows space before the paren.
+fn calls_window_func(query: &str) -> bool {
+    WINDOW_FUNCS.iter().any(|name| {
+        query
+            .match_indices(name)
+            .any(|(at, _)| query[at + name.len()..].trim_start().starts_with('('))
+    })
+}
+
+fn resolve_window_funcs(expr: &mut Expr, start: i64, end: i64, step: i64) -> bool {
+    let (start, end) = (to_millis(start), to_millis(end));
+    // an instant query has no step, whatever the request carries
+    let step = if start == end { 0 } else { to_millis(step) };
+    let seconds = |micros: i64| micros as f64 / 1e6;
+    replace_window_calls(expr, &|name| match name {
+        "start" => Some(seconds(start)),
+        "end" => Some(seconds(end)),
+        "range" => Some(seconds(end - start)),
+        "step" => Some(seconds(step)),
+        _ => None,
+    })
+}
+
+fn replace_window_calls(expr: &mut Expr, value_of: &impl Fn(&str) -> Option<f64>) -> bool {
+    if let Expr::Call(call) = expr
+        && call.args.is_empty()
+        && let Some(value) = value_of(call.func.name)
+    {
+        *expr = Expr::NumberLiteral(NumberLiteral::new(value));
+        return true;
+    }
+    match expr {
+        Expr::Subquery(sq) => replace_window_calls(&mut sq.expr, value_of),
+        Expr::Unary(unary) => replace_window_calls(&mut unary.expr, value_of),
+        Expr::Paren(paren) => replace_window_calls(&mut paren.expr, value_of),
+        Expr::Binary(binary) => {
+            let lhs = replace_window_calls(&mut binary.lhs, value_of);
+            replace_window_calls(&mut binary.rhs, value_of) || lhs
+        }
+        Expr::Aggregate(agg) => {
+            let param = agg
+                .param
+                .as_deref_mut()
+                .is_some_and(|param| replace_window_calls(param, value_of));
+            replace_window_calls(&mut agg.expr, value_of) || param
+        }
+        Expr::Call(call) => {
+            let mut changed = false;
+            for arg in &mut call.args.args {
+                changed |= replace_window_calls(arg, value_of);
+            }
+            changed
+        }
+        Expr::VectorSelector(_)
+        | Expr::MatrixSelector(_)
+        | Expr::NumberLiteral(_)
+        | Expr::StringLiteral(_)
+        | Expr::Extension(_) => false,
+    }
 }
 
 fn selector_pin(at: &Option<AtModifier>) -> Result<Pin> {
@@ -404,5 +471,79 @@ mod tests {
         assert_eq!(rebased("a @ 1599999900 offset -1m40s"), "a");
         assert_eq!(rebased("a @ 1599999900 offset -5m"), "a offset -3m20s");
         assert_eq!(rebased("a offset 1m"), "a offset 1m");
+    }
+
+    #[test]
+    fn test_resolve_query_replaces_the_window_functions_with_literals() {
+        let second = 1_000_000;
+        let (start, end) = adjust_start_end(1003 * second, 2000 * second, 10 * second);
+        let seconds = |micros: i64| micros as f64 / 1e6;
+        let query = "start() + end() + range() + step()";
+        let resolved = resolve_query(query, 1003 * second, 2000 * second, 10 * second)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            resolved,
+            format!(
+                "{} + {} + {} + 10",
+                seconds(start),
+                seconds(end),
+                seconds(end - start)
+            )
+        );
+        // `@ start()` resolves to the same instant
+        let pinned = resolve_query("a @ start()", 1003 * second, 2000 * second, 10 * second)
+            .unwrap()
+            .unwrap();
+        assert_eq!(pinned, format!("a @ {:.3}", seconds(start)));
+        // every partition of the range keeps the request's window
+        assert_eq!(resolve_query(&resolved, 0, T, 10 * second).unwrap(), None);
+        // a shifted window resolves to a different query, which the result cache keys on
+        let shifted = resolve_query(
+            "vector(1) * start()",
+            1503 * second,
+            2500 * second,
+            10 * second,
+        )
+        .unwrap()
+        .unwrap();
+        let unshifted = resolve_query(
+            "vector(1) * start()",
+            1003 * second,
+            2000 * second,
+            10 * second,
+        )
+        .unwrap()
+        .unwrap();
+        assert_ne!(shifted, unshifted);
+    }
+
+    #[test]
+    fn test_resolve_query_window_functions_in_an_instant_query() {
+        assert_eq!(
+            resolve_query("start() - end() + range() + step()", T, T, 60_000_000).unwrap(),
+            Some("1600000000 - 1600000000 + 0 + 0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_query_keeps_start_and_end_as_names() {
+        let second = 1_000_000;
+        for query in ["start", "end", "sum by (start, end) (m)", "start - end"] {
+            assert_eq!(resolve_query(query, 0, T, second).unwrap(), None, "{query}");
+        }
+        assert_eq!(
+            resolve_query("start @ start() + step()", T, T, 0).unwrap(),
+            Some("start @ 1600000000.000 + 0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_query_parses_only_for_a_window_function_call() {
+        assert_eq!(resolve_query("backend_up{", 0, T, 0).unwrap(), None);
+        assert_eq!(
+            resolve_query("a + step ()", T, T, 0).unwrap(),
+            Some("a + 0".to_string())
+        );
     }
 }

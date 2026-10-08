@@ -58,6 +58,63 @@ pub(crate) fn round(data: Value, to_nearest: &ScalarParam) -> Result<Value> {
     })
 }
 
+pub(crate) fn sin(data: Value) -> Result<Value> {
+    exec(data, f64::sin)
+}
+
+pub(crate) fn cos(data: Value) -> Result<Value> {
+    exec(data, f64::cos)
+}
+
+pub(crate) fn tan(data: Value) -> Result<Value> {
+    exec(data, f64::tan)
+}
+
+pub(crate) fn asin(data: Value) -> Result<Value> {
+    exec(data, f64::asin)
+}
+
+pub(crate) fn acos(data: Value) -> Result<Value> {
+    exec(data, f64::acos)
+}
+
+pub(crate) fn atan(data: Value) -> Result<Value> {
+    exec(data, f64::atan)
+}
+
+pub(crate) fn sinh(data: Value) -> Result<Value> {
+    exec(data, f64::sinh)
+}
+
+pub(crate) fn cosh(data: Value) -> Result<Value> {
+    exec(data, f64::cosh)
+}
+
+pub(crate) fn tanh(data: Value) -> Result<Value> {
+    exec(data, f64::tanh)
+}
+
+pub(crate) fn asinh(data: Value) -> Result<Value> {
+    exec(data, f64::asinh)
+}
+
+pub(crate) fn acosh(data: Value) -> Result<Value> {
+    exec(data, f64::acosh)
+}
+
+pub(crate) fn atanh(data: Value) -> Result<Value> {
+    exec(data, f64::atanh)
+}
+
+// upstream multiplies before dividing; `to_degrees` rounds differently
+pub(crate) fn deg(data: Value) -> Result<Value> {
+    exec(data, |value| value * 180.0 / std::f64::consts::PI)
+}
+
+pub(crate) fn rad(data: Value) -> Result<Value> {
+    exec(data, |value| value * std::f64::consts::PI / 180.0)
+}
+
 pub(crate) fn sgn(data: Value) -> Result<Value> {
     // f64::signum maps ±0 to ±1; Prometheus returns zeros and NaN unchanged.
     exec(data, |value| {

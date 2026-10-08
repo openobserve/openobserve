@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildPrefillFromPanel, type PanelPrefillInput } from "./fromPanel";
-import { normalizePrefill, isPrefillBlocked } from "../alertPrefill";
+import {
+  buildPrefillFromPanel,
+  executedPanelQuery,
+  panelQueryChoices,
+  type PanelPrefillInput,
+} from "./fromPanel";
+import { normalizePrefill, isPrefillBlocked, needsConfirmation } from "../alertPrefill";
 
 let idCounter = 0;
 const makeId = () => `id-${idCounter++}`;
@@ -299,5 +304,327 @@ describe("buildPrefillFromPanel", () => {
     expect(isPrefillBlocked(p)).toBe(false);
     expect(p.streamName).toBeTruthy();
     expect(p.periodMinutes).toBeGreaterThan(0);
+  });
+});
+
+const promqlPanel = (overrides: Partial<PanelPrefillInput> = {}): PanelPrefillInput => ({
+  panelTitle: "Disk",
+  panelType: "line",
+  queryType: "promql",
+  queries: [
+    { query: "avg(disk_used)", fields: { stream: "disk_used", stream_type: "metrics" } },
+    {
+      query: "sum(rate(io_ops[$__rate_interval]))",
+      tabName: "IO",
+      fields: { stream: "io_ops", stream_type: "metrics" },
+    },
+  ],
+  ...overrides,
+});
+
+describe("buildPrefillFromPanel — the query the user points at", () => {
+  it("alerts on the panel query at queryIndex, not always the first", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({ queryIndex: 1, executedQuery: "sum(rate(io_ops[1m]))" }),
+      makeId,
+    );
+    expect(p.streamName).toBe("io_ops");
+    expect(p.promql).toBe("sum(rate(io_ops[1m]))");
+  });
+
+  it("keeps the first query when no index is given", () => {
+    const p = buildPrefillFromPanel(promqlPanel(), makeId);
+    expect(p.streamName).toBe("disk_used");
+    expect(p.promql).toBe("avg(disk_used)");
+  });
+
+  it("carries the query choices and the chosen index, which makes the dialog necessary", () => {
+    const choices = [
+      { index: 0, query: "avg(disk_used)" },
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ];
+    const p = normalizePrefill(
+      buildPrefillFromPanel(promqlPanel({ queryIndex: 1, queryChoices: choices }), makeId),
+    );
+    expect(p.queryChoices).toEqual(choices);
+    expect(p.queryIndex).toBe(1);
+    expect(needsConfirmation(p)).toBe(true);
+  });
+
+  it("does not ask for a dialog when there is only one choice", () => {
+    const p = normalizePrefill(
+      buildPrefillFromPanel(
+        promqlPanel({ queryChoices: [{ index: 0, query: "avg(disk_used)" }] }),
+        makeId,
+      ),
+    );
+    expect(needsConfirmation(p)).toBe(false);
+  });
+});
+
+describe("buildPrefillFromPanel — unresolved dashboard variables", () => {
+  it("blocks raw text that still holds a variable when the query has no executed text", () => {
+    const raw = 'up{host="$host"}';
+    const p = buildPrefillFromPanel(
+      promqlPanel({ queries: [{ query: raw, fields: { stream: "up" } }] }),
+      makeId,
+    );
+    expect(isPrefillBlocked(normalizePrefill(p))).toBe(true);
+
+    const resolved = buildPrefillFromPanel(
+      promqlPanel({
+        queries: [{ query: raw, fields: { stream: "up" } }],
+        executedQuery: 'up{host="a"}',
+      }),
+      makeId,
+    );
+    expect(isPrefillBlocked(normalizePrefill(resolved))).toBe(false);
+  });
+
+  it("lets a regex end anchor through", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({ queries: [{ query: 'up{job=~"api$"}', fields: { stream: "up" } }] }),
+      makeId,
+    );
+    expect(isPrefillBlocked(normalizePrefill(p))).toBe(false);
+  });
+});
+
+describe("buildPrefillFromPanel — the Date pair a rendered panel holds", () => {
+  const TWO_HOURS_US = 2 * 3_600_000_000;
+  const START_US = 1_700_000_000_000_000;
+
+  it("reads a dashboard's Dates, built from microsecond epochs, as the period", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        timeRange: { start_time: new Date(START_US), end_time: new Date(START_US + TWO_HOURS_US) },
+      }),
+      makeId,
+    );
+    expect(p.periodMinutes).toBe(120);
+  });
+
+  it("reads the Explorer's Dates, built from millisecond epochs, as the same period", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({
+        timeRange: {
+          start_time: new Date(START_US / 1000),
+          end_time: new Date((START_US + TWO_HOURS_US) / 1000),
+        },
+      }),
+      makeId,
+    );
+    expect(p.periodMinutes).toBe(120);
+  });
+});
+
+describe("buildPrefillFromPanel — relative or absolute", () => {
+  const HOUR_MS = 3_600_000;
+  const NOW_MS = 1_800_000_000_000;
+  const dates = (endMs: number, unit: number) => ({
+    start_time: new Date((endMs - HOUR_MS) * unit),
+    end_time: new Date(endMs * unit),
+  });
+
+  it("treats a window ending now as a rolling one, without the absolute-range warning", () => {
+    for (const unit of [1, 1000]) {
+      const p = buildPrefillFromPanel(
+        promqlPanel({ timeRange: dates(NOW_MS - 30_000, unit), now: NOW_MS }),
+        makeId,
+      );
+      expect(p.periodMinutes).toBe(60);
+      expect(p.warnings.map((w) => w.key)).not.toContain("absoluteToRolling");
+    }
+  });
+
+  it("warns for a window that ended in the past", () => {
+    const p = buildPrefillFromPanel(
+      promqlPanel({ timeRange: dates(NOW_MS - 24 * HOUR_MS, 1000), now: NOW_MS }),
+      makeId,
+    );
+    expect(p.periodMinutes).toBe(60);
+    expect(p.warnings.map((w) => w.key)).toContain("absoluteToRolling");
+  });
+});
+
+describe("executedPanelQuery", () => {
+  const metadata = [
+    { query: "avg(disk_used)", panelQueryIndex: 0, timeRangeGap: { seconds: 0 } },
+    { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1, timeRangeGap: { seconds: 0 } },
+    { query: "avg(disk_used)", panelQueryIndex: 0, timeRangeGap: { seconds: 86_400_000 } },
+  ];
+
+  it("returns the primary window's executed text for a panel query", () => {
+    expect(executedPanelQuery(metadata, 1)).toBe("sum(rate(io_ops[1m]))");
+    expect(executedPanelQuery([metadata[2], metadata[0]], 0)).toBe("avg(disk_used)");
+  });
+
+  it("falls back to the positional entry when the metadata carries no panel index", () => {
+    expect(executedPanelQuery([{ query: "a" }, { query: "b" }], 1)).toBe("b");
+    expect(executedPanelQuery(undefined, 0)).toBeUndefined();
+  });
+});
+
+describe("panelQueryChoices", () => {
+  it("lists each visible query with its tab name and executed text", () => {
+    const queries = promqlPanel().queries!;
+    const metadata = [
+      { query: "avg(disk_used)", panelQueryIndex: 0 },
+      { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1 },
+    ];
+    expect(panelQueryChoices(queries, metadata)).toEqual([
+      { index: 0, tabName: undefined, query: "avg(disk_used)" },
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ]);
+    expect(panelQueryChoices(queries, metadata, [1])).toEqual([
+      { index: 1, tabName: "IO", query: "sum(rate(io_ops[1m]))" },
+    ]);
+  });
+
+  it("carries each query's legend and formula letter for the picker label", () => {
+    const queries = [
+      { query: "sum(rate(requests[5m]))", config: { ref: "A", promql_legend: "requests" } },
+      { query: "sum(rate(errors[5m]))", config: { ref: "B" } },
+    ];
+    expect(panelQueryChoices(queries, undefined)).toEqual([
+      { index: 0, legend: "requests", ref: "A", query: "sum(rate(requests[5m]))" },
+      { index: 1, ref: "B", query: "sum(rate(errors[5m]))" },
+    ]);
+  });
+});
+
+describe("buildPrefillFromPanel — a formula query", () => {
+  const formulaPanel = (formula: string, overrides: Partial<PanelPrefillInput> = {}) =>
+    promqlPanel({
+      queries: [
+        {
+          query: 'sum(rate(http_errors_total{code=~"5.."}[5m]))',
+          fields: { stream: "http_errors_total", stream_type: "metrics" },
+          config: { ref: "A", hide: true },
+        },
+        {
+          query: "sum(rate(http_requests_total[5m]))",
+          fields: { stream: "http_requests_total", stream_type: "metrics" },
+          config: { ref: "B", hide: true },
+        },
+        {
+          query: "",
+          fields: { stream: "", stream_type: "metrics" },
+          config: { formula },
+        },
+      ],
+      queryIndex: 2,
+      executedQuery:
+        '(sum(rate(http_errors_total{code=~"5.."}[5m]))) / (sum(rate(http_requests_total[5m]))) * 100',
+      ...overrides,
+    });
+
+  it("alerts on the combined expression and offers each input's metric as a stream", () => {
+    const p = normalizePrefill(buildPrefillFromPanel(formulaPanel("A / B * 100"), makeId));
+    expect(p.promql).toBe(
+      '(sum(rate(http_errors_total{code=~"5.."}[5m]))) / (sum(rate(http_requests_total[5m]))) * 100',
+    );
+    expect(p.streamCandidates).toEqual([
+      { name: "http_errors_total", type: "metrics" },
+      { name: "http_requests_total", type: "metrics" },
+    ]);
+    expect(isPrefillBlocked(p)).toBe(false);
+    expect(needsConfirmation(p)).toBe(true);
+  });
+
+  it("lists a metric two inputs share once, and needs no stream choice then", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].query = 'sum(rate(http_requests_total{code=~"5.."}[5m]))';
+    const p = normalizePrefill(buildPrefillFromPanel(panel, makeId));
+    expect(p.streamCandidates).toBeUndefined();
+    expect(p.streamName).toBe("http_requests_total");
+    expect(needsConfirmation(p)).toBe(false);
+  });
+
+  it("takes only the inputs the formula references, by stored letter", () => {
+    const p = buildPrefillFromPanel(formulaPanel("B * 2"), makeId);
+    expect(p.streamName).toBe("http_requests_total");
+    expect(p.streamCandidates).toBeUndefined();
+  });
+
+  it("gives legacy inputs without a stored letter their positional one", () => {
+    const panel = formulaPanel("A + B");
+    delete panel.queries![0].config.ref;
+    delete panel.queries![1].config.ref;
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
+  it("reads code-mode inputs' metrics from their text, not the inherited stream pick", () => {
+    const panel = formulaPanel("A / B * 100");
+    panel.queries![0].fields.stream = "cpu_usage";
+    panel.queries![1].fields.stream = "cpu_usage";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
+  it("finds the inputs' metrics when the inherited stream pick is empty", () => {
+    const panel = formulaPanel("A / B * 100");
+    panel.queries![0].fields.stream = "";
+    panel.queries![1].fields.stream = "";
+    const p = normalizePrefill(buildPrefillFromPanel(panel, makeId));
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+    expect(isPrefillBlocked(p)).toBe(false);
+  });
+
+  it("prefers an input's executed text, so a metric behind a variable is still found", () => {
+    const panel = formulaPanel("A / B", {
+      metadataQueries: [
+        { query: "sum(rate(errors_v2[1m]))", panelQueryIndex: 0, notSent: true },
+        { query: "sum(rate(requests_v2[1m]))", panelQueryIndex: 1, notSent: true },
+      ],
+    });
+    panel.queries![0].query = "sum(rate($errors[$__rate_interval]))";
+    panel.queries![1].query = "sum(rate($requests[$__rate_interval]))";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual(["errors_v2", "requests_v2"]);
+  });
+
+  it("ignores metric names inside an input's comment, but not a '#' in a label value", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].query = 'sum(rate(http_errors_total{path="/a#b"}[5m])) # was old_metric';
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "http_errors_total",
+      "http_requests_total",
+    ]);
+  });
+
+  it("keeps a '#' inside a backtick string from hiding the rest of an input", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].query = "sum(foo{path=`a#b`}) + sum(bar)";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual(["foo", "bar", "http_requests_total"]);
+  });
+
+  it("takes a builder-mode input's metric from its builder stream", () => {
+    const panel = formulaPanel("A / B");
+    panel.queries![0].customQuery = false;
+    panel.queries![0].fields.stream = "builder_metric";
+    const p = buildPrefillFromPanel(panel, makeId);
+    expect(p.streamCandidates?.map((c) => c.name)).toEqual([
+      "builder_metric",
+      "http_requests_total",
+    ]);
+  });
+
+  it("leaves a plain query's single stream alone", () => {
+    const p = buildPrefillFromPanel(formulaPanel("A / B", { queryIndex: 1 }), makeId);
+    expect(p.streamName).toBe("http_requests_total");
+    expect(p.streamCandidates).toBeUndefined();
   });
 });

@@ -37,7 +37,7 @@ const LABEL_DROPPING_AGGS: [token::TokenId; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 45] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 65] = [
     "rate",
     "irate",
     "increase",
@@ -83,6 +83,26 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 45] = [
     "minute",
     "month",
     "year",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "asinh",
+    "acosh",
+    "atanh",
+    "deg",
+    "rad",
+    "first_over_time",
+    "mad_over_time",
+    "ts_of_min_over_time",
+    "ts_of_max_over_time",
+    "ts_of_last_over_time",
+    "ts_of_first_over_time",
 ];
 
 /// Returns true when the query's root aggregation discards all labels and the
@@ -146,9 +166,11 @@ fn selectors_grouped(expr: &PromExpr, grouped: bool, labels: &mut HashSet<String
             param,
             modifier,
         }) => {
-            // topk/bottomk and `without` keep labels that were never loaded
-            let collapses = !matches!(op.id(), token::T_TOPK | token::T_BOTTOMK)
-                && !matches!(modifier, Some(LabelModifier::Exclude(_)));
+            // selecting aggregations and `without` keep labels that were never loaded
+            let collapses = !matches!(
+                op.id(),
+                token::T_TOPK | token::T_BOTTOMK | token::T_LIMITK | token::T_LIMIT_RATIO
+            ) && !matches!(modifier, Some(LabelModifier::Exclude(_)));
             if collapses && let Some(LabelModifier::Include(by)) = modifier {
                 labels.extend(by.labels.iter().cloned());
             }
@@ -188,6 +210,8 @@ mod tests {
                 "sum(double_exponential_smoothing(metric[5m], 0.5, 0.3))",
                 true,
             ),
+            ("sum(deg(atan(metric)))", true),
+            ("max(ts_of_max_over_time(metric[5m]))", true),
             // grouping keeps labels
             ("sum by (region) (rate(metric[5m]))", false),
             ("sum without (le) (rate(metric[5m]))", false),
@@ -214,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_grouping_labels() {
-        let cases: [(&str, &[&str]); 31] = [
+        let cases: [(&str, &[&str]); 34] = [
             ("sum by (job) (m)", &["job"]),
             ("sum by (job) (rate(m[5m]))", &["job"]),
             (
@@ -262,6 +286,12 @@ mod tests {
             ("sum by (job) (m) + n", &[]),
             ("m / on (job) group_left n", &[]),
             ("topk by (job) (1, m)", &[]),
+            ("limitk by (job) (1, m)", &[]),
+            ("limit_ratio by (job) (0.5, m)", &[]),
+            (
+                "limitk by (region) (1, sum by (job, instance) (m))",
+                &["instance", "job"],
+            ),
             ("sum without (instance) (m)", &[]),
             ("sum by (job) (sum without (instance) (m))", &[]),
             ("quantile by (job) (scalar(q), m)", &[]),

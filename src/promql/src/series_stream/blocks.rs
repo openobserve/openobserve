@@ -32,7 +32,7 @@ use bytes::Bytes;
 use config::{
     meta::{
         promql::{
-            MetricsBlockScan,
+            MetricsBlockScan, STALE_NAN_BITS,
             value::{EvalContext, Labels, Sample},
         },
         stream::FileKey,
@@ -282,6 +282,7 @@ pub(crate) struct BlockSeriesStream {
     decoder: Option<BlockDecoder>,
     local_stats: PartitionReadStats,
     stats: Arc<ReadStats>,
+    stale_markers: bool,
 }
 
 impl BlockSeriesStream {
@@ -312,6 +313,7 @@ impl BlockSeriesStream {
             decoder: None,
             local_stats: PartitionReadStats::default(),
             stats: partition.stats,
+            stale_markers: config::get_config().prom.staleness_markers_enabled,
         }
     }
 }
@@ -372,7 +374,9 @@ impl SeriesStream for BlockSeriesStream {
                         .copied()
                         .zip(block.value_bits.iter().copied())
                     {
-                        if timestamp >= self.window.0 && timestamp <= self.window.1 {
+                        // markers compacted while the flag was on stay invisible once it is off
+                        let dropped = !self.stale_markers && bits == STALE_NAN_BITS;
+                        if timestamp >= self.window.0 && timestamp <= self.window.1 && !dropped {
                             let timestamp =
                                 timestamp.checked_add(self.offset).ok_or_else(|| {
                                     DataFusionError::Execution(
@@ -1593,6 +1597,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stale_markers_are_dropped_on_read_when_markers_are_off() {
+        let stale = config::meta::promql::STALE_NAN_BITS;
+        let data = file(&[
+            (1, 20, 1.0, Some("a")),
+            (1, 30, f64::from_bits(stale), Some("a")),
+        ]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let scan = fixture.scan([data.0]);
+        for stale_markers in [true, false] {
+            let prepared = prepare(
+                &scan,
+                &Matchers::empty(),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            )
+            .await
+            .unwrap();
+            let mut actual = Vec::new();
+            for partition in prepared {
+                let mut stream = BlockSeriesStream::new(partition);
+                stream.stale_markers = stale_markers;
+                let mut samples = Vec::new();
+                while stream.advance().await.unwrap().is_some() {
+                    stream.consume(&mut samples).await.unwrap();
+                    actual.extend(samples.iter().map(|s| (s.timestamp, s.value.to_bits())));
+                }
+            }
+            let mut expected = vec![(120, 1f64.to_bits())];
+            if stale_markers {
+                expected.push((130, stale));
+            }
+            assert_eq!(actual, expected, "stale_markers: {stale_markers}");
+        }
+    }
+
+    #[tokio::test]
     async fn merge_orders_shared_hashes_and_exhausted_files() {
         let first = file(&[(1, 10, 1.0, Some("a")), (4, 10, 4.0, Some("d"))]);
         let second = file(&[(1, 20, 2.0, Some("a")), (2, 10, 3.0, Some("b"))]);
@@ -2112,6 +2155,12 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ] {
             let mut outputs = Vec::new();
             for (ctx, source) in &contexts {

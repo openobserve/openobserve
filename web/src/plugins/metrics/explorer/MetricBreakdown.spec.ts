@@ -92,6 +92,10 @@ const MetricCardChartStub = {
     color: String,
     timeRange: Object,
     legend: Boolean,
+    allowAlertCreation: Boolean,
+    shifted: Array,
+    stepSeconds: Number,
+    forecast: Object,
   },
   template: `<div data-test="breakdown-chart-stub"><div data-test="chart-renderer" /></div>`,
 };
@@ -616,6 +620,95 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-breakdown-chart"]').text()).toContain(
         "Rate by method",
       );
+    });
+
+    it("offers the right-click alert on the focused chart, on the metric's own stream", async () => {
+      wrapper = mountBreakdown({ selectedLabel: "method" });
+      await flushPromises();
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("allowAlertCreation")).toBe(true);
+      expect(chart.props("queries")[0].stream).toBe(CARD.name);
+    });
+
+    it("compares the focused chart, and only it, with the chosen period", async () => {
+      const compare = { gapMs: 86_400_000, periodAsStr: "1 day ago" };
+      wrapper = mountBreakdown({ compare, stepSeconds: 60 });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalled();
+      expect(runQuery.mock.calls.some(([, , opts]) => opts?.window)).toBe(false);
+      runQuery.mockClear();
+
+      await wrapper.setProps({ selectedLabel: "method" });
+      await flushPromises();
+      const shiftedCalls = runQuery.mock.calls.filter(([, , opts]) => opts?.window);
+      expect(shiftedCalls).toHaveLength(1);
+      expect(shiftedCalls[0][0]).toContain("by (method)");
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("shifted")).toHaveLength(1);
+      expect(chart.props("stepSeconds")).toBe(60);
+    });
+
+    it("forecasts the focused chart per label value, and only it", async () => {
+      const forecast = { method: "linear", horizon: 900, label: "forecast" };
+      const timeRange = { start_time: 1_000_000_000, end_time: 4_600_000_000 };
+      const twoValues = byMethod(["GET", [[4_600, "1"]]], ["POST", [[4_600, "3"]]]);
+      runQuery.mockResolvedValue(twoValues);
+      wrapper = mountBreakdown({ forecast, stepSeconds: 60, timeRange });
+      await flushPromises();
+      expect(runQuery).toHaveBeenCalled();
+      expect(runQuery.mock.calls.some(([, , opts]) => opts?.instantAt)).toBe(false);
+      runQuery.mockClear();
+
+      await wrapper.setProps({ selectedLabel: "method" });
+      await flushPromises();
+      const fits = runQuery.mock.calls.filter(([, , opts]) => opts?.instantAt);
+      expect(fits.map(([, , opts]) => opts.instantAt)).toEqual([4_600_000_000, 4_600_000_000]);
+      expect(fits[0][0]).toMatch(/^predict_linear\(\(.*by \(method\).*\)\[3600s:60s\], 0\)$/);
+      expect(fits[1][0]).toMatch(/, 900\)$/);
+      const chart = wrapper.findComponent({ name: "MetricCardChart" });
+      expect(chart.props("forecast").until).toBe(4_600_000_000 + 900e6);
+      expect(chart.props("forecast").entries).toHaveLength(1);
+      const lines = chart.props("forecast").entries[0].result.result;
+      expect(lines.map((line: any) => [line.metric.method, line.values[0][1]])).toEqual([
+        ["GET", "1"],
+        ["POST", "3"],
+      ]);
+    });
+
+    it("names the focused chart's overlays, and says when the compared period has no data", async () => {
+      const compare = { gapMs: 86_400_000, periodAsStr: "1 day ago" };
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        Promise.resolve(opts?.window ? { resultType: "matrix", result: [] } : SERIES),
+      );
+      wrapper = mountBreakdown({ compare, stepSeconds: 60, selectedLabel: "method" });
+      await flushPromises();
+      const key = wrapper.find('[data-test="metrics-breakdown-overlay-key"]');
+      expect(key.text()).toContain("No data 1 day ago");
+      expect(key.text()).not.toContain("Forecast");
+      // The chart header is one clipped row, so a phone shows the key above the chart instead.
+      expect(key.classes()).toContain("max-md:hidden");
+      const phoneKey = wrapper.find('[data-test="metrics-breakdown-overlay-key-phone"]');
+      expect(phoneKey.classes()).toContain("md:hidden");
+      expect(phoneKey.text()).toContain("No data 1 day ago");
+    });
+
+    it("names the forecast in the key only once it is drawn", async () => {
+      const forecast = { method: "linear", horizon: 900, label: "forecast" };
+      const timeRange = { start_time: 1_000_000_000, end_time: 4_600_000_000 };
+      runQuery.mockImplementation((_expr: string, _signal: AbortSignal, opts: any) =>
+        opts?.instantAt ? Promise.reject(new Error("timeout")) : Promise.resolve(SERIES),
+      );
+      wrapper = mountBreakdown({ forecast, stepSeconds: 60, timeRange, selectedLabel: "method" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="metrics-breakdown-overlay-key"]').exists()).toBe(false);
+    });
+
+    it("keeps the right-click alert off the small label tiles", async () => {
+      wrapper = mountBreakdown();
+      await flushPromises();
+      const charts = wrapper.findAllComponents({ name: "MetricCardChart" });
+      expect(charts.length).toBeGreaterThan(0);
+      charts.forEach((chart) => expect(chart.props("allowAlertCreation")).toBe(false));
     });
 
     it("charts the selected window with a legend, like the overview above it", async () => {
