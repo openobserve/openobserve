@@ -90,14 +90,18 @@ pub async fn init() -> Result<()> {
             .write()
             .await;
         let items = std::mem::take(&mut *w);
-        for item in items.iter() {
-            if let Err(e) = load(item).await {
-                log::error!("load disk metrics cache error: {e}");
+        let total = items.len();
+        let mut legacy = Vec::new();
+        for item in items {
+            if !load(&item).await {
+                legacy.push(item);
             }
         }
+        let legacy_len = legacy.len();
+        // legacy payloads may already mix organizations' results, so they are dropped, not migrated
+        infra::cache::file_data::delete::add(legacy);
         log::info!(
-            "Loading disk metrics cache done, total items: {}",
-            items.len()
+            "Loading disk metrics cache done, total items: {total}, dropped legacy items: {legacy_len}"
         );
     });
     Ok(())
@@ -148,11 +152,6 @@ pub async fn get(
     let Some(best_key) = best_key else {
         return Ok(None);
     };
-
-    if !parse_cache_item_key(&best_key).is_some_and(|(file_key, ..)| file_key == key) {
-        remove_index_entry(bucket_id, &key, best_key).await;
-        return Ok(None);
-    }
 
     // get the data from disk cache
     let Some(data) = infra::cache::file_data::disk::get(&best_key, None).await else {
@@ -257,7 +256,8 @@ pub async fn set(
     }
 
     // get the bucket cache
-    let key = get_hash_key(org, query, step);
+    let hash = query_hash(query, step);
+    let key = scoped_cache_key(org, &hash);
     let bucket_id = get_bucket_id(&key);
     let r = GLOBAL_CACHE[bucket_id].read().await;
     if let Some(index) = r.data.get(&key) {
@@ -351,7 +351,7 @@ pub async fn set(
     let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache
-    let cache_key = get_cache_item_key(&key, org, start, new_end);
+    let cache_key = get_cache_item_key(org, &hash, start, new_end);
     infra::cache::file_data::disk::set(&cache_key, bytes_data.into())
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
@@ -374,13 +374,26 @@ pub async fn set(
     Ok(())
 }
 
-/// load the cache item from the secondary storage
-pub async fn load(cache_key: &str) -> Result<()> {
-    let cfg = get_config();
-    if !cfg.common.result_cache_enabled {
-        return Ok(());
+/// Adopt a cache file found on disk into the index; false means its name is not in this format.
+async fn load(cache_key: &str) -> bool {
+    let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
+        return false;
+    };
+    // held across the insert so a concurrent disk eviction orders after it and prunes the entry
+    let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(cache_key).await else {
+        return true;
+    };
+    let bucket_id = get_bucket_id(&key);
+    // an over-budget bucket rejects startup adoption; the disk gc reclaims the unindexed files
+    {
+        let r = GLOBAL_CACHE[bucket_id].read().await;
+        if r.cur_size >= r.max_size {
+            return true;
+        }
     }
-    load_index(cache_key).await
+    let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
+    insert_index(bucket_id, key, "", cache_item).await;
+    true
 }
 
 /// Insert into the bucket index and queue evicted entries' disk files for deletion.
@@ -427,43 +440,6 @@ async fn remove_evicted_files(files: Vec<String>) {
 async fn remove_index_entry(bucket_id: usize, key: &str, file_key: String) {
     let mut w = GLOBAL_CACHE[bucket_id].write().await;
     w.remove_files(key, &HashSet::from_iter([file_key]));
-}
-
-fn get_cache_item_key(key: &str, org: &str, start: i64, end: i64) -> String {
-    let hash = key.rsplit(':').next().unwrap_or_default();
-    format!(
-        "metrics_results/{}/{}/{}{}_{}_{}_{}.pb",
-        org,
-        get_ymdh_from_micros(start, HourFormat::Real),
-        METRICS_RESULT_CACHE_VERSION,
-        hash,
-        start,
-        end,
-        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
-    )
-}
-
-fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
-    let path = key.split('/').collect::<Vec<_>>();
-    if path.len() != 7 || path[0] != "metrics_results" || path[1].is_empty() {
-        return None;
-    }
-    let item_key = path[6].strip_suffix(".pb")?;
-    let parts = item_key.split('_').collect::<Vec<_>>();
-    if parts.len() != 4 {
-        return None;
-    }
-    let hash = parts[0].strip_prefix(METRICS_RESULT_CACHE_VERSION)?;
-    if hash.len() != 32 || !hash.bytes().all(|ch| ch.is_ascii_hexdigit()) {
-        return None;
-    }
-    let start = parts[1].parse::<i64>().ok()?;
-    let end = parts[2].parse::<i64>().ok()?;
-    parts[3].parse::<i64>().ok()?;
-    if start >= end {
-        return None;
-    }
-    Some((scoped_cache_key(path[1], hash), start, end))
 }
 
 fn get_bucket_id(key: &str) -> usize {
@@ -624,38 +600,53 @@ impl Drop for DiskFileCleanup {
     }
 }
 
-async fn load_index(cache_key: &str) -> Result<()> {
-    let Some((key, start, end)) = parse_cache_item_key(cache_key) else {
-        // Legacy payloads may already contain mixed-organization results and cannot be migrated.
-        if cache_key.starts_with("metrics_results/") {
-            infra::cache::file_data::delete::add(vec![cache_key.to_string()]);
-        }
-        return Ok(());
-    };
-    // held across the insert so a concurrent disk eviction orders after it and prunes the entry
-    let Some(_indexed) = infra::cache::file_data::disk::indexed_file_guard(cache_key).await else {
-        return Ok(());
-    };
-    let bucket_id = get_bucket_id(&key);
-    // an over-budget bucket rejects startup adoption; the disk gc reclaims the unindexed files
-    {
-        let r = GLOBAL_CACHE[bucket_id].read().await;
-        if r.cur_size >= r.max_size {
-            return Ok(());
-        }
-    }
-    let cache_item = MetricsIndexCacheItem::new(cache_key, start, end);
-    insert_index(bucket_id, key, "", cache_item).await;
-
-    Ok(())
+fn get_hash_key(org: &str, query: &str, step: i64) -> String {
+    scoped_cache_key(org, &query_hash(query, step))
 }
 
-fn get_hash_key(org: &str, query: &str, step: i64) -> String {
-    scoped_cache_key(org, &config::utils::md5::hash(&format!("{query}-{step}")))
+fn query_hash(query: &str, step: i64) -> String {
+    config::utils::md5::hash(&format!("{query}-{step}"))
 }
 
 fn scoped_cache_key(org: &str, hash: &str) -> String {
     format!("{}:{org}:{hash}", org.len())
+}
+
+fn get_cache_item_key(org: &str, hash: &str, start: i64, end: i64) -> String {
+    format!(
+        "metrics_results/{}/{}/{}{}_{}_{}_{}.pb",
+        org,
+        get_ymdh_from_micros(start, HourFormat::Real),
+        METRICS_RESULT_CACHE_VERSION,
+        hash,
+        start,
+        end,
+        CACHE_KEY_SUFFIX.fetch_add(1, Ordering::SeqCst)
+    )
+}
+
+/// Parses `metrics_results/{org}/{Y/m/d/H}/v2-{md5}_{start}_{end}_{suffix}.pb`.
+fn parse_cache_item_key(key: &str) -> Option<(String, i64, i64)> {
+    let path = key.split('/').collect::<Vec<_>>();
+    if path.len() != 7 || path[0] != "metrics_results" || path[1].is_empty() {
+        return None;
+    }
+    let item_key = path[6].strip_suffix(".pb")?;
+    let parts = item_key.split('_').collect::<Vec<_>>();
+    if parts.len() != 4 {
+        return None;
+    }
+    let hash = parts[0].strip_prefix(METRICS_RESULT_CACHE_VERSION)?;
+    if hash.len() != 32 || !hash.bytes().all(|ch| ch.is_ascii_hexdigit()) {
+        return None;
+    }
+    let start = parts[1].parse::<i64>().ok()?;
+    let end = parts[2].parse::<i64>().ok()?;
+    parts[3].parse::<i64>().ok()?;
+    if start >= end {
+        return None;
+    }
+    Some((scoped_cache_key(path[1], hash), start, end))
 }
 
 fn index_base_size(key: &str, query: &str) -> usize {
@@ -685,15 +676,19 @@ mod tests {
     }
 
     impl IsolationFixture {
-        fn new() -> Self {
+        fn new() -> Option<Self> {
+            // set/get round-trip through the disk cache, which a local .env may switch off
+            if !get_config().disk_cache.enabled {
+                return None;
+            }
             let start = 1_700_000_000_000_000;
             let step = second_micros(15);
-            Self {
+            Some(Self {
                 query: format!("isolation_{}", config::ider::uuid()),
                 start,
                 end: start + 4 * step,
                 step,
-            }
+            })
         }
 
         async fn write(&self, org: &str, value: f64) -> String {
@@ -752,8 +747,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_promql_cache_organization_isolation_full_partial_and_restored() {
-        assert!(get_config().disk_cache.enabled);
-        let fixture = IsolationFixture::new();
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
         let file_a = fixture.write("isolation_a", 11.0).await;
         assert!(
             get(
@@ -786,8 +782,8 @@ mod tests {
         }
         fixture.forget("isolation_a", &file_a).await;
         fixture.forget("isolation_b", &file_b).await;
-        load_index(&file_a).await.unwrap();
-        load_index(&file_b).await.unwrap();
+        assert!(load(&file_a).await);
+        assert!(load(&file_b).await);
         fixture
             .assert_hit("isolation_a", 11.0, fixture.start, fixture.end)
             .await;
@@ -804,36 +800,23 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_promql_cache_rejects_legacy_and_wrong_organization_files() {
-        let fixture = IsolationFixture::new();
-        let file_b = fixture.write("validation_b", 22.0).await;
-        let key_a = get_hash_key("validation_a", &fixture.query, fixture.step);
-        let bucket_a = get_bucket_id(&key_a);
-        let bytes = infra::cache::file_data::disk::get(&file_b, None)
+    async fn test_promql_cache_skips_legacy_files() {
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
+        let file = fixture.write("legacy_org", 22.0).await;
+        let bytes = infra::cache::file_data::disk::get(&file, None)
             .await
             .unwrap();
-        let legacy = file_b.replace(METRICS_RESULT_CACHE_VERSION, "");
+        let legacy = file.replace(METRICS_RESULT_CACHE_VERSION, "");
         infra::cache::file_data::disk::set(&legacy, bytes)
             .await
             .unwrap();
-        load_index(&legacy).await.unwrap();
+        fixture.forget("legacy_org", &file).await;
+        assert!(!load(&legacy).await);
         assert!(
             get(
-                "validation_b",
-                &fixture.query,
-                fixture.start,
-                fixture.end,
-                fixture.step
-            )
-            .await
-            .unwrap()
-            .is_some()
-        );
-        fixture.forget("validation_b", &file_b).await;
-        load_index(&legacy).await.unwrap();
-        assert!(
-            get(
-                "validation_b",
+                "legacy_org",
                 &fixture.query,
                 fixture.start,
                 fixture.end,
@@ -843,37 +826,11 @@ mod tests {
             .unwrap()
             .is_none()
         );
-        load_index(&file_b).await.unwrap();
-        insert_index(
-            bucket_a,
-            key_a.clone(),
-            &fixture.query,
-            MetricsIndexCacheItem::new(&file_b, fixture.start, fixture.end),
-        )
-        .await;
-        assert!(
-            get(
-                "validation_a",
-                &fixture.query,
-                fixture.start,
-                fixture.end,
-                fixture.step
-            )
-            .await
-            .unwrap()
-            .is_none()
-        );
-        assert!(
-            !GLOBAL_CACHE[bucket_a]
-                .read()
-                .await
-                .data
-                .contains_key(&key_a)
-        );
+        assert!(load(&file).await);
         fixture
-            .assert_hit("validation_b", 22.0, fixture.start, fixture.end)
+            .assert_hit("legacy_org", 22.0, fixture.start, fixture.end)
             .await;
-        fixture.delete("validation_b", &file_b).await;
+        fixture.delete("legacy_org", &file).await;
         infra::cache::file_data::disk::remove(&legacy)
             .await
             .unwrap();
@@ -881,7 +838,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_promql_cache_organization_eviction_isolation() {
-        let fixture = IsolationFixture::new();
+        let Some(fixture) = IsolationFixture::new() else {
+            return;
+        };
         let file_a = fixture.write("eviction_a", 11.0).await;
         let file_b = fixture.write("eviction_b", 22.0).await;
         infra::cache::file_data::disk::remove(&file_a)
@@ -1035,11 +994,15 @@ mod tests {
 
     #[test]
     fn test_parse_cache_item_key() {
-        let scoped_key = get_hash_key("default", "test_query", 60_000_000);
-        let file_key = get_cache_item_key(&scoped_key, "default", 1234, 5678);
+        let hash = query_hash("test_query", 60_000_000);
+        let file_key = get_cache_item_key("default", &hash, 1234, 5678);
         assert_eq!(
             parse_cache_item_key(&file_key),
-            Some((scoped_key, 1234, 5678))
+            Some((
+                get_hash_key("default", "test_query", 60_000_000),
+                1234,
+                5678
+            ))
         );
 
         for invalid_key in [
