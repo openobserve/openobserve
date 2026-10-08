@@ -159,7 +159,10 @@ def test_smoothing_aliases_return_identical_results(client, seeded_metric, endpo
 @pytest.mark.parametrize("method", ["get", "post"])
 def test_format_query_preserves_smoothing_name(client, name, method):
     query = f"{name}(m[5m], 0.5, 0.3)"
-    request_args = {"params": {"query": query}} if method == "get" else {"data": {"query": query}}
+    request_args = {"params": {"query": query}}
+    if method == "post":
+        # The POST handler requires a query parameter even when the expression is in the form.
+        request_args = {"params": {"query": ""}, "data": {"query": query}}
     resp = getattr(client, method)("prometheus/api/v1/format_query", **request_args)
     assert resp.status_code == 200, resp.text
     body = resp.json()
