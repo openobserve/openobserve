@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
 
@@ -102,6 +102,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   },
   KeyMod: { CtrlCmd: 1 },
   KeyCode: { Enter: 13 },
+  Range: class {
+    constructor(...args: number[]) {
+      Object.assign(this, { args });
+    }
+  },
 }));
 
 // Mock dynamic imports
@@ -648,6 +653,58 @@ describe("CodeQueryEditor", () => {
 
       expect(wrapper.emitted("update:query")?.at(-1)?.[0]).toBe("up");
       mockEditorObj.getValue.mockReturnValue("");
+    });
+
+    describe("user-edit (AC4.4 dirty editor)", () => {
+      const changeHandler = () => mockEditorObj.onDidChangeModelContent.mock.calls[0][0];
+
+      afterEach(() => {
+        mockModel.pushEditOperations.mockReset();
+        mockModel.setValue.mockReset();
+        mockEditorObj.setValue.mockReset();
+        mockModel.getValue.mockReturnValue("");
+      });
+
+      it("emits user-edit at once for a keystroke, before the debounced update", async () => {
+        const wrapper = await mountAndSetup();
+        changeHandler()({ isFlush: false });
+        expect(wrapper.emitted("user-edit")).toHaveLength(1);
+        expect(wrapper.emitted("update:query")).toBeFalsy();
+      });
+
+      it("ignores a flush (a whole-model replace)", async () => {
+        const wrapper = await mountAndSetup();
+        changeHandler()({ isFlush: true });
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for its own setValue", async () => {
+        const wrapper = await mountAndSetup();
+        mockEditorObj.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        (wrapper.vm as any).setValue("level='error'");
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for the blur trim of a URL query with trailing whitespace", async () => {
+        const wrapper = await mountAndSetup();
+        mockModel.getValue.mockReturnValue("status=500   ");
+        mockModel.getLineCount.mockReturnValue(1);
+        mockModel.getLineLength.mockReturnValue(13);
+        mockModel.pushEditOperations.mockImplementation(() => changeHandler()({ isFlush: false }));
+        mockEditorObj.onDidBlurEditorWidget.mock.calls[0][0]();
+        expect(mockModel.pushEditOperations).toHaveBeenCalled();
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for the unfocused prop sync", async () => {
+        const wrapper = await mountAndSetup();
+        mockEditorObj.hasWidgetFocus.mockReturnValue(false);
+        mockModel.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        await wrapper.setProps({ query: "SELECT * FROM other" });
+        await flushPromises();
+        expect(mockModel.setValue).toHaveBeenCalled();
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
     });
   });
 

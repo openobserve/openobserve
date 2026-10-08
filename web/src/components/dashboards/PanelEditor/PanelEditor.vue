@@ -123,10 +123,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="panel-editor-add-to-dashboard-btn"
                         variant="primary"
                         size="xs"
+                        :disabled="!!addToDashboardDisabledReason"
                         @click="emit('addToDashboard')"
-                        :title="t('search.addToDashboard')"
+                        :title="
+                          addToDashboardDisabledReason ? undefined : t('search.addToDashboard')
+                        "
                       >
                         {{ t("search.addToDashboard") }}
+                        <OTooltip
+                          v-if="addToDashboardDisabledReason"
+                          :content="addToDashboardDisabledReason"
+                        />
                       </OButton>
                     </div>
                   </div>
@@ -760,6 +767,7 @@ const props = withDefaults(defineProps<PanelEditorProps>(), {
   showLastRefreshedTime: undefined,
   showOutdatedWarning: undefined,
   showAddToDashboardButton: undefined,
+  addToDashboardDisabledReason: null,
   allowedChartTypes: undefined,
   externalChartData: undefined,
   searchResponse: undefined,

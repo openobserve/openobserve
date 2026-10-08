@@ -680,6 +680,12 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     // do not rely on spying internal closures; assert state change
     await wrapper.vm.runQueryFn();
+    // The run is explicit: it opens a generation at once, and the executor finishes asynchronously.
+    expect(wrapper.vm.autoRun.engine.currentGeneration("grid")).toMatchObject({
+      reason: "run",
+      kind: "explicit",
+    });
+    await flushPromises();
     expect(wrapper.vm.showJobScheduler).toBe(true);
   });
 
@@ -834,8 +840,12 @@ describe("Logs Index", async () => {
 
       wrapper.vm.searchData();
 
+      // Explicit Run supersedes in place: a generation and loading, no runQuery flag hand-off.
       expect(wrapper.vm.searchObj.loading).toBe(true);
-      expect(wrapper.vm.searchObj.runQuery).toBe(true);
+      expect(wrapper.vm.autoRun.engine.currentGeneration("grid")).toMatchObject({
+        reason: "run",
+        kind: "explicit",
+      });
       expect((analytics as any).track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({ button: "Search Data" }),

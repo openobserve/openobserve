@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -173,6 +174,12 @@ export const usePagination = () => {
             if (searchObj.data.queryResults.partitionDetail.partitions.length == 1) {
               searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
                 res.data.new_start_time;
+            }
+            if (searchObj.meta.jobId == "") {
+              useLogsAutoRun().recordWindowMove(null, {
+                startUs: Number(res.data.new_start_time),
+                endUs: Number(res.data.new_end_time),
+              });
             }
             updateUrlQueryParams();
           }

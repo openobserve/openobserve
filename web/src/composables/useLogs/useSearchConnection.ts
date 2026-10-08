@@ -29,6 +29,8 @@ import {
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
 import { raw } from "@/types/i18n";
+import { setAutoRunTransport, useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import searchService from "@/services/search";
 
 export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -40,7 +42,14 @@ export const useSearchConnection = (t: TranslateFn) => {
 
   const { sendSearchMessageBasedOnRequestId, closeSocketBasedOnRequestId } = useSearchWebSocket();
 
-  const { fetchQueryDataWithHttpStream } = useStreamingSearch();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
+
+  useLogsAutoRun();
+  setAutoRunTransport({
+    abortTrace: (traceId, orgId) =>
+      cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId }),
+    serverCancel: (orgId, traceIds) => searchService.delete_running_queries(orgId, traceIds),
+  });
 
   const buildWebSocketPayload = (
     queryReq: SearchRequestPayload,
@@ -85,6 +94,13 @@ export const useSearchConnection = (t: TranslateFn) => {
   };
 
   const initializeSearchConnection = (payload: any): string | Promise<void> | null => {
+    if (!useLogsAutoRun().bindPayload(payload)) {
+      // A follow-up of a replaced or cancelled generation: nothing is sent.
+      if (payload.type === "histogram" || payload.type === "pageCount") {
+        searchObj.loadingHistogram = false;
+      }
+      return null;
+    }
     payload.searchType = "ui";
     payload.pageType = searchObj.data.stream.streamType;
     return fetchQueryDataWithHttpStream(payload, {
@@ -155,6 +171,7 @@ export const useSearchConnection = (t: TranslateFn) => {
       onComplete: (payload: any, response: any) => void;
       onReset: (data: any, traceId?: string) => void;
     },
+    generationId?: number,
   ) => {
     try {
       if (!queryReq) return;
@@ -200,6 +217,8 @@ export const useSearchConnection = (t: TranslateFn) => {
         searchObj.meta.clearCache,
       );
 
+      if (generationId != null) (payload as { generationId?: number }).generationId = generationId;
+
       // Add callbacks to payload
       payload.onData = callbacks.onData;
       payload.onError = callbacks.onError;
@@ -219,6 +238,7 @@ export const useSearchConnection = (t: TranslateFn) => {
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
+        if (generationId != null && !useLogsAutoRun().engine.isCurrent(generationId)) return;
         throw new Error(`Failed to initialize ${searchObj.communicationMethod} connection`);
       }
 

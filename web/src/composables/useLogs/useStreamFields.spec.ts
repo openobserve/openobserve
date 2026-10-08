@@ -18,8 +18,9 @@ import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
-import useStreamFields from "./useStreamFields";
+import useStreamFields, { pickInitialLogsStreams } from "./useStreamFields";
 import { searchState } from "./searchState";
+import { restoreLogsSelectedStreams, saveLogsSelectedStreams } from "@/utils/streamPersist";
 
 // Create i18n instance
 const i18n = createI18n({
@@ -29,6 +30,7 @@ const i18n = createI18n({
     en: {
       search: {
         queryRangeRestrictionMsg: "Query range restricted to {range}",
+        streamNotExist: "The following [STREAM_NAME] streams were not found.",
       },
     },
   },
@@ -163,6 +165,164 @@ describe("useStreamFields Composable", () => {
       wrapper.vm.updateGridColumns();
 
       expect(columnIds()).toEqual(["_timestamp", "source"]);
+    });
+  });
+
+  describe("pickInitialLogsStreams (P1)", () => {
+    const list = [
+      { name: "old", stats: { doc_time_max: 10 } },
+      { name: "b_new", stats: { doc_time_max: 50 } },
+      { name: "a_new", stats: { doc_time_max: 50 } },
+      { name: "empty", stats: { doc_time_max: 0 } },
+    ];
+    const pick = (overrides: Partial<Parameters<typeof pickInitialLogsStreams>[0]>) =>
+      pickInitialLogsStreams({
+        list,
+        current: [],
+        currentFromUrl: false,
+        persisted: [],
+        allowLatest: true,
+        ...overrides,
+      });
+
+    it("prefers the URL, then the in-session pick, then the persisted set, then the newest", () => {
+      expect(pick({ current: ["old"], currentFromUrl: true, persisted: ["b_new"] })).toEqual({
+        selected: ["old"],
+        missing: [],
+        source: "url",
+      });
+      expect(pick({ current: ["old"], persisted: ["b_new"] }).source).toBe("current");
+      expect(pick({ persisted: ["old"] })).toMatchObject({
+        selected: ["old"],
+        source: "persisted",
+      });
+      expect(pick({})).toMatchObject({ selected: ["a_new"], source: "latest" });
+    });
+
+    it("breaks a doc_time_max tie by name ascending (shared comparator)", () => {
+      expect(pick({}).selected).toEqual(["a_new"]);
+    });
+
+    it("reports an unreadable URL stream instead of searching a silent subset (AC3.2)", () => {
+      expect(pick({ current: ["old", "secret"], currentFromUrl: true })).toEqual({
+        selected: [],
+        missing: ["secret"],
+        source: "url",
+      });
+    });
+
+    it("drops unreadable persisted members and falls through when none remain (AC2.1)", () => {
+      expect(pick({ persisted: ["gone", "old"] })).toMatchObject({ selected: ["old"] });
+      expect(pick({ persisted: ["gone"], allowLatest: false })).toEqual({
+        selected: [],
+        missing: [],
+        source: "none",
+      });
+    });
+
+    it("never preselects the newest stream when the guard is not active", () => {
+      expect(pick({ allowLatest: false })).toMatchObject({ selected: [], source: "none" });
+    });
+
+    it("selects nothing when every stream has doc_time_max 0 (AC1.2)", () => {
+      expect(
+        pickInitialLogsStreams({
+          list: [{ name: "x", stats: { doc_time_max: 0 } }],
+          current: [],
+          currentFromUrl: false,
+          persisted: [],
+          allowLatest: true,
+        }),
+      ).toMatchObject({ selected: [], source: "none" });
+    });
+  });
+
+  describe("loadStreamLists wiring of P1", () => {
+    const { searchObj } = searchState();
+    const zoConfig = { ...store.state.zoConfig };
+
+    beforeEach(() => {
+      localStorage.clear();
+      searchObj.data.filterErrMsg = "";
+      searchObj.data.stream.streamType = "logs";
+      searchObj.data.streamResults = {
+        list: [
+          { name: "app", stats: { doc_time_max: 5 } },
+          { name: "newest", stats: { doc_time_max: 9 } },
+        ],
+      } as any;
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = zoConfig;
+    });
+
+    it("shows the error state for an unreadable URL stream and selects nothing", async () => {
+      store.state.zoConfig = { ...zoConfig, auto_query_enabled: true };
+      searchObj.data.stream.selectedStream = ["secret"];
+      await wrapper.vm.loadStreamLists(true, { fromUrl: true });
+      expect(searchObj.data.stream.selectedStream).toEqual([]);
+      expect(searchObj.data.filterErrMsg).toContain("secret");
+    });
+
+    it("restores the persisted set for this org and type with AQE on, and nothing with AQE off", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      saveLogsSelectedStreams(org, "logs", ["app"]);
+      searchObj.data.stream.selectedStream = [];
+      store.state.zoConfig = { ...zoConfig, auto_query_enabled: true };
+      await wrapper.vm.loadStreamLists(true);
+      expect(searchObj.data.stream.selectedStream).toEqual(["app"]);
+
+      searchObj.data.stream.selectedStream = [];
+      store.state.zoConfig = {
+        ...zoConfig,
+        auto_query_enabled: false,
+        query_on_stream_selection: true,
+      };
+      await wrapper.vm.loadStreamLists(true);
+      expect(searchObj.data.stream.selectedStream).toEqual([]);
+    });
+
+    it("preselects the newest stream only while the guard is active", async () => {
+      searchObj.data.stream.selectedStream = [];
+      store.state.zoConfig = {
+        ...zoConfig,
+        auto_query_enabled: true,
+        query_on_stream_selection: true,
+      };
+      await wrapper.vm.loadStreamLists(true);
+      expect(searchObj.data.stream.selectedStream).toEqual([]);
+
+      store.state.zoConfig = {
+        ...zoConfig,
+        auto_query_enabled: true,
+        query_on_stream_selection: true,
+        auto_query_max_scan_mb: 1024,
+      };
+      await wrapper.vm.loadStreamLists(true);
+      expect(searchObj.data.stream.selectedStream).toEqual(["newest"]);
+    });
+  });
+
+  describe("per-type Logs selection keys (P1 step 2)", () => {
+    beforeEach(() => localStorage.clear());
+
+    it("writes only the namespaced Logs key, never the Traces or Metrics keys", () => {
+      saveLogsSelectedStreams("org1", "traces", ["t1"]);
+      saveLogsSelectedStreams("org1", "metrics", ["m1"]);
+      expect(localStorage.getItem("oo_logs_selected_stream_traces_org1")).toBe('["t1"]');
+      expect(localStorage.getItem("oo_selected_stream_traces_org1")).toBeNull();
+      expect(localStorage.getItem("oo_selected_stream_metrics_org1")).toBeNull();
+      expect(restoreLogsSelectedStreams("org1", "traces")).toEqual(["t1"]);
+    });
+
+    it("reads the legacy logs key as a fallback for logs only, and never writes it", () => {
+      localStorage.setItem("oo_selected_stream_logs_org1", '["legacy"]');
+      expect(restoreLogsSelectedStreams("org1", "logs")).toEqual(["legacy"]);
+      expect(restoreLogsSelectedStreams("org1", "enrichment_tables")).toEqual([]);
+      saveLogsSelectedStreams("org1", "logs", ["new"]);
+      expect(restoreLogsSelectedStreams("org1", "logs")).toEqual(["new"]);
+      expect(localStorage.getItem("oo_selected_stream_logs_org1")).toBe('["legacy"]');
     });
   });
 });

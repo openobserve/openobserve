@@ -166,6 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
+                        :stream-type="searchObj.data.stream.streamType"
+                        :auto-run="isAutoRunOn"
                         data-test="logs-search-no-stream-selected-text"
                         @select-stream="onSelectStream"
                         @pick-stream="onPickStream"
@@ -199,6 +201,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
                         @widen-range="onWidenRange"
+                      />
+                    </div>
+                    <div v-else-if="showGuardEmptyState" class="h-full max-lg:overflow-y-auto">
+                      <LogsAutoRunGuard
+                        :blocked="searchObj.meta.autoRunBlocked"
+                        :auto-run-on="isAutoRunOn"
+                        :show-search-job="showGuardSearchJob"
+                        @run="onGuardRunAnyway"
+                        @narrow="onGuardNarrow"
+                        @search-job="onGuardSearchJob"
+                        @select-stream="onSelectStream"
                       />
                     </div>
                     <div
@@ -261,22 +274,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       data-test="logs-search-search-result"
-                      class="h-full max-h-full overflow-hidden"
+                      class="flex h-full max-h-full flex-col overflow-hidden"
                     >
-                      <SearchResult
-                        ref="searchResultRef"
-                        :expandedLogs="expandedLogs"
-                        :stream-doc-time-range="streamDocTimeRange"
-                        :query-window-us="queryWindowUs"
-                        @update:datetime="setHistogramDate"
-                        @update:scroll="getMoreData"
-                        @update:recordsPerPage="getMoreDataRecordsPerPage"
-                        @expandlog="toggleExpandLog"
-                        @send-to-ai-chat="sendToAiChat"
-                        @run-query="searchData"
-                        @jump-to-stream-data="onJumpToStreamData"
-                        @open-mobile-fields="mobileFieldsOpen = true"
+                      <!-- Notice order above the table is owned by item 2 (P4): guard banner, then the stale chip. -->
+                      <LogsAutoRunGuard
+                        v-if="showGuardBanner"
+                        variant="banner"
+                        :blocked="searchObj.meta.autoRunBlocked"
+                        :auto-run-on="isAutoRunOn"
+                        :show-search-job="showGuardSearchJob"
+                        @run="onGuardRunAnyway"
+                        @narrow="onGuardNarrow"
+                        @search-job="onGuardSearchJob"
+                        @select-stream="onSelectStream"
                       />
+                      <div
+                        v-if="isResultsStale && searchObj.meta.logsVisualizeToggle === 'logs'"
+                        class="flex items-center px-2.5 pt-2"
+                      >
+                        <OBadge
+                          variant="warning-soft"
+                          size="sm"
+                          icon="schedule"
+                          data-test="logs-search-results-stale"
+                        >
+                          {{ t("search.autoRunStaleChip") }}
+                        </OBadge>
+                        <OTooltip :content="t('search.autoRunStaleTooltip')" />
+                      </div>
+                      <div class="min-h-0 flex-1">
+                        <SearchResult
+                          ref="searchResultRef"
+                          :expandedLogs="expandedLogs"
+                          :stream-doc-time-range="streamDocTimeRange"
+                          :query-window-us="queryWindowUs"
+                          @update:datetime="setHistogramDate"
+                          @update:scroll="getMoreData"
+                          @update:recordsPerPage="getMoreDataRecordsPerPage"
+                          @expandlog="toggleExpandLog"
+                          @send-to-ai-chat="sendToAiChat"
+                          @run-query="searchData"
+                          @jump-to-stream-data="onJumpToStreamData"
+                          @open-mobile-fields="mobileFieldsOpen = true"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -285,10 +326,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            class="border-border-default h-full border-t"
+            class="border-border-default flex h-full flex-col border-t"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
+            <LogsAutoRunGuard
+              v-if="searchObj.meta.autoRunBlocked?.op === 'visualize'"
+              variant="banner"
+              :blocked="searchObj.meta.autoRunBlocked"
+              :auto-run-on="isAutoRunOn"
+              :show-search-job="showGuardSearchJob"
+              @run="onGuardRunAnyway"
+              @narrow="onGuardNarrow"
+              @search-job="onGuardSearchJob"
+              @select-stream="onSelectStream"
+            />
             <VisualizeLogsQuery
+              class="min-h-0 flex-1"
               :visualizeChartData="visualizeChartData"
               :errorData="visualizeErrorData"
               :searchResponse="searchResponseForVisualization"
@@ -327,6 +380,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.data.filterErrMsg === ''
               "
               :org-id="store.state.selectedOrganization.identifier"
+              :stream-type="searchObj.data.stream.streamType"
+              :auto-run="isAutoRunOn"
               data-test="logs-drill-down-no-stream-selected-text"
               @select-stream="onSelectStream"
               @pick-stream="onPickStream"
@@ -358,6 +413,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else-if="searchObj.loading" class="flex h-full items-center justify-center">
               <OSpinner size="lg" />
             </div>
+            <LogsAutoRunGuard
+              v-else-if="searchObj.meta.autoRunBlocked && !searchObj.data.queryResults.hits?.length"
+              :blocked="searchObj.meta.autoRunBlocked"
+              :auto-run-on="isAutoRunOn"
+              :show-search-job="showGuardSearchJob"
+              @run="onGuardRunAnyway"
+              @narrow="onGuardNarrow"
+              @search-job="onGuardSearchJob"
+              @select-stream="onSelectStream"
+            />
             <!-- Mounted only once a search settles, so each search rebuilds it from the new results. -->
             <TracesAnalysisDashboard
               v-else-if="searchObj.data.queryResults.hits?.length > 0"
@@ -500,7 +565,7 @@ import {
   getVisualizationConfig,
   decodeVisualizationConfig,
 } from "@/composables/useLogs/logsVisualization";
-import useSearchBar from "@/composables/useLogs/useSearchBar";
+import useSearchBar, { bumpSelectionToken } from "@/composables/useLogs/useSearchBar";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
@@ -517,12 +582,16 @@ import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
+import LogsAutoRunGuard from "@/plugins/logs/LogsAutoRunGuard.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
-  saveLogsStream,
-  restoreLogsStream,
+  saveLogsSelectedStreams,
   saveLogsStreamType,
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { isAutoRunActive, type RunContext } from "@/composables/useLogs/useAutoRun";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -546,18 +615,20 @@ export default defineComponent({
     FirstDataPanel,
     LogsNoStreamState,
     LogsErrorState,
+    LogsAutoRunGuard,
+    OBadge,
+    OTooltip,
   },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
   methods: {
     setHistogramDate(date: any) {
+      this.searchBarRef?.markZoom?.();
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
     },
     searchData() {
-      if (this.searchObj.loading == false) {
-        this.searchObj.loading = true;
-        this.searchObj.runQuery = true;
-      }
+      // Explicit: supersedes an in-flight run instead of waiting for it (P2).
+      this.autoRun.engine.requestRun("run");
 
       analytics.track("Button Click", {
         button: "Search Data",
@@ -580,16 +651,13 @@ export default defineComponent({
         //   1;
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
-        this.searchObj.loading = true;
-
-        // As page count request was getting fired on changing date records per page instead of histogram,
-        // so added this condition to avoid that
-        this.searchObj.meta.refreshHistogram = true;
-        this.searchObj.data.queryResults.aggs = null;
         if (this.searchObj.meta.jobId == "") {
-          await this.getQueryData(false);
-          this.refreshHistogramChart();
+          this.autoRun.engine.requestRun("page-size");
         } else {
+          this.searchObj.loading = true;
+          // Without this a page-size change fired a page-count request instead of the histogram.
+          this.searchObj.meta.refreshHistogram = true;
+          this.searchObj.data.queryResults.aggs = null;
           await this.getJobData(false);
         }
 
@@ -611,11 +679,10 @@ export default defineComponent({
         //   1;
         // this.searchObj.data.resultGrid.currentPage =
         //   this.searchObj.data.resultGrid.currentPage + 1;
-        this.searchObj.loading = true;
         if (this.searchObj.meta.jobId == "") {
-          await this.getQueryData(true);
-          this.refreshHistogramChart();
+          this.autoRun.engine.requestRun("pagination");
         } else {
+          this.searchObj.loading = true;
           await this.getJobData(false);
         }
 
@@ -644,8 +711,7 @@ export default defineComponent({
         //   1;
         this.searchObj.data.resultGrid.currentPage = this.searchObj.data.resultGrid.currentPage - 1;
 
-        await this.getQueryData(true);
-        this.refreshHistogramChart();
+        this.autoRun.engine.requestRun("pagination");
 
         analytics.track("Button Click", {
           button: "Get Less Data",
@@ -670,7 +736,7 @@ export default defineComponent({
       resetSearchError,
     } = searchState();
     const { getStreamList, updateGridColumns, extractFields } = useStreamFields();
-    const { getFunctions, getQueryData, cancelQuery, getRegionInfo, setCommunicationMethod } =
+    const { getFunctions, getQueryData, getRegionInfo, setCommunicationMethod, onStreamChange } =
       useSearchBar(t);
     let {
       getJobData,
@@ -684,7 +750,10 @@ export default defineComponent({
       processHttpHistogramResults,
       loadVisualizeData,
       loadPatternsData,
+      runGridSearch,
+      resetRunStateForReapply,
     } = useLogs(t);
+    const autoRun = useLogsAutoRun();
 
     const {
       getHistogramQueryData,
@@ -838,7 +907,7 @@ export default defineComponent({
       // Cancel all the search queries
       if (store.state.refreshIntervalID) clearInterval(store.state.refreshIntervalID);
 
-      cancelQuery();
+      autoRun.engine.cancelGeneration(null, { cause: "unmount" });
       cancelPatterns();
 
       removeAiContextHandler();
@@ -933,7 +1002,7 @@ export default defineComponent({
           if (prev === "stream_explorer" && (type == undefined || type !== "stream_explorer")) {
             searchObj.meta.refreshHistogram = true;
           }
-          loadLogsData();
+          loadLogsData("landing");
         }
       },
     );
@@ -942,6 +1011,7 @@ export default defineComponent({
       async (type) => {
         if (type == "search_history_re_apply" || type == "ai_chat_query") {
           searchObj.meta.jobId = "";
+          resetRunStateForReapply();
 
           searchObj.organizationIdetifier = router.currentRoute.value.query.org_identifier;
           searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
@@ -997,27 +1067,50 @@ export default defineComponent({
           searchObj.meta.searchApplied = false;
           resetStreamData();
           await restoreUrlQueryParams(dashboardPanelData);
-          await loadLogsData();
+          await loadLogsData("url");
         }
       },
     );
 
+    // The `runQuery` flag path (Run, legacy QOSS=false runs): an explicit run under a generation.
     const runQueryFn = async () => {
-      // searchObj.data.resultGrid.currentPage = 0;
-      // searchObj.runQuery = false;
+      searchObj.runQuery = false;
       if (!searchObj.data.stream.selectedStream.length) {
         searchObj.loading = false;
-        searchObj.runQuery = false;
         return;
       }
+      autoRun.engine.requestRun("run");
+    };
+
+    // Executor for every grid run (AC4.6 dispatch by mode): full, pagination and page size.
+    const executeGridRun = async (ctx: RunContext) => {
+      const generationId = ctx.generation.id;
+      autoRun.adoptHandOver(ctx);
+      if (!searchObj.data.stream.selectedStream.length) {
+        searchObj.loading = false;
+        autoRun.finishDispatch(generationId, { hitsDone: true });
+        return;
+      }
+      let mode: "full" | "page" | "page-size" = "full";
+      if (ctx.op === "page") mode = ctx.reason === "page-size" ? "page-size" : "page";
       try {
-        searchObj.loading = true;
-        searchObj.meta.refreshHistogram = true;
-        await getQueryData();
+        await runGridSearch(generationId, mode);
         refreshHistogramChart();
-        showJobScheduler.value = true;
-      } catch (e) {
-        console.log(e);
+        if (mode === "full") showJobScheduler.value = true;
+      } finally {
+        autoRun.finishDispatch(generationId);
+      }
+    };
+
+    // Executor for the histogram reveal (C14): one histogram request, rows kept, zero hits requests.
+    const executeHistogramRun = async (ctx: RunContext) => {
+      const generationId = ctx.generation.id;
+      try {
+        searchObj.meta.histogramDirtyFlag = false;
+        await generateHistogramSkeleton();
+        getHistogramData(searchObj.data.histogramQuery, { generationId });
+      } finally {
+        autoRun.finishDispatch(generationId, { hitsDone: true });
       }
     };
 
@@ -1025,7 +1118,11 @@ export default defineComponent({
      * Common method to extract patterns
      * Handles validation, loading states, and error handling
      */
-    const extractPatternsForCurrentQuery = async (clear_cache = false) => {
+    const extractPatternsForCurrentQuery = async (clear_cache = false, generationId?: number) => {
+      const engine = autoRun.engine;
+      const settle = () => {
+        if (generationId != null) engine.settleGeneration(generationId);
+      };
       // Clear any stale error from previous logs search
       resetSearchError();
 
@@ -1037,6 +1134,8 @@ export default defineComponent({
         cancelPatterns();
         clearPatterns();
         showErrorNotification(t("logs.index.patternsUnavailableForMultiStream"));
+        if (generationId != null) engine.recordPatternsFailure(generationId);
+        settle();
         return;
       }
 
@@ -1047,6 +1146,8 @@ export default defineComponent({
         const queryReq = buildSearch(false, true);
         if (!queryReq) {
           searchObj.loading = false;
+          if (generationId != null) engine.recordPatternsFailure(generationId);
+          settle();
           return;
         }
 
@@ -1071,13 +1172,18 @@ export default defineComponent({
           if (!selectedStreams?.length) {
             searchObj.loading = false;
             showErrorNotification(t("logs.index.selectStreamToExtractPatterns"));
+            if (generationId != null) engine.recordPatternsFailure(generationId);
+            settle();
             return;
           }
           streamName = selectedStreams[0];
         }
 
         await extractPatterns(searchObj.organizationIdentifier, streamName, queryReq);
+        // A cancelled or replaced extraction returns quietly; it must not publish a record.
+        if (generationId != null && !engine.isCurrent(generationId)) return;
         searchObj.loading = false;
+        if (generationId != null) engine.recordPatternsComplete(generationId);
 
         // Only update histogram for patterns mode, don't fetch logs data
         // Patterns have their own separate state and don't need logs data
@@ -1091,11 +1197,19 @@ export default defineComponent({
         // rejection rather than surfacing as a search error.
         await getHistogramData(queryReq, { clear_cache });
         refreshHistogramChart();
+        settle();
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
         showErrorNotification(t("logs.index.errorExtractingPatterns"));
+        if (generationId != null) engine.recordPatternsFailure(generationId);
+        settle();
       }
+    };
+
+    const executePatternsRun = async (ctx: RunContext) => {
+      autoRun.engine.registerAbort(ctx.generation.id, () => cancelPatterns());
+      await extractPatternsForCurrentQuery(!!searchObj.meta.clearCache, ctx.generation.id);
     };
 
     // // Watch for patterns mode switch - completely separate from logs flow
@@ -1217,17 +1331,6 @@ export default defineComponent({
             }
           }
 
-          if (
-            store.state.zoConfig?.auto_query_enabled &&
-            !router.currentRoute.value.query.stream &&
-            !searchObj.data.stream.selectedStream.length
-          ) {
-            const persisted = restoreLogsStream(store.state.selectedOrganization.identifier);
-            if (persisted.length) {
-              searchObj.data.stream.selectedStream = persisted;
-            }
-          }
-
           if (isEnterpriseClusterEnabled()) {
             await getRegionInfo();
           }
@@ -1238,11 +1341,11 @@ export default defineComponent({
               await applyReAppliedQuery();
             } else {
               searchObj.loading = true;
-              loadLogsData();
+              loadLogsData("landing");
             }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
-            await extractPatternsForCurrentQuery();
+            autoRun.request("patterns");
           } else {
             await loadVisualizeData();
             searchObj.loading = false;
@@ -1379,11 +1482,12 @@ export default defineComponent({
       resetSearchObj();
       resetStreamData();
       await restoreUrlQueryParams(dashboardPanelData);
-      loadLogsData();
+      loadLogsData("url");
     }
 
     // loadLogsData() minus getQueryData(): a re-applied query is loaded for the user to run, not run for them.
     async function applyReAppliedQuery() {
+      resetRunStateForReapply();
       searchObj.meta.searchApplied = false;
       await getStreamList();
       await getFunctions();
@@ -1397,14 +1501,17 @@ export default defineComponent({
       resetSearchObj();
       resetStreamData();
       await restoreUrlQueryParams(dashboardPanelData);
-      loadLogsData();
+      loadLogsData("url");
     }
 
-    // Helper function for organization change
+    // Helper function for organization change (C20): the old org's generation is cancelled with its own orgId.
     function handleOrganizationChange() {
+      bumpSelectionToken();
+      autoRun.engine.resetScope("org");
       searchObj.loading = true;
       resetStreamData();
-      loadLogsData();
+      // The URL still names the previous org's stream; this is a landing in the new org (C20).
+      loadLogsData("landing", { ignoreUrl: true });
     }
 
     // Check if the selected organization has changed
@@ -1412,9 +1519,11 @@ export default defineComponent({
       return searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier;
     }
 
-    // Helper function for handling the visualize tab
+    // Visualize / Patterns / Build restore and keep-alive reactivation are guarded entry points (C17, C21).
     function handleVisualizeTab() {
-      handleRunQueryFn();
+      autoRun.request(
+        searchObj.meta.logsVisualizeToggle === "patterns" ? "patterns" : "visualize-restore",
+      );
     }
 
     const refreshTimezone = () => {
@@ -1572,6 +1681,7 @@ export default defineComponent({
       ) {
         searchObj.meta.refreshInterval = 0;
       }
+      autoRun.engine.onRefreshIntervalChanged(Number(searchObj.meta.refreshInterval) || 0);
 
       updateUrlQueryParams();
       refreshData();
@@ -1619,9 +1729,10 @@ export default defineComponent({
       trigger?.click();
     };
 
+    // A hero chip is a stream pick: fields load, then a guarded "stream" refinement (F4).
     const onPickStream = (stream: string) => {
       searchObj.data.stream.selectedStream = [stream];
-      searchObj.runQuery = true;
+      onStreamChange("", { origin: "selector" });
     };
 
     const firstDataArrival = ref<FirstEventResult | null>(null);
@@ -1642,7 +1753,7 @@ export default defineComponent({
       searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
       searchObj.data.datetime.relativeTimePeriod = period;
       searchObj.data.datetime.type = "relative";
-      searchObj.runQuery = true;
+      autoRun.engine.requestRun("run");
     };
 
     // Microsecond bounds of the selected streams' data (union across all selected streams).
@@ -1697,11 +1808,7 @@ export default defineComponent({
       // extracted through handleRunQueryFn (the same path as the Run query
       // button), so a jump from the patterns empty state must route there —
       // otherwise the new window is set but patterns never re-extract.
-      if (searchObj.meta.logsVisualizeToggle === "patterns") {
-        handleRunQueryFn();
-      } else {
-        searchObj.runQuery = true;
-      }
+      autoRun.engine.requestRun("run");
       nextTick(() => {
         searchObj.shouldIgnoreWatcher = false;
       });
@@ -1710,7 +1817,7 @@ export default defineComponent({
     const onRemoveFilter = () => {
       searchObj.data.query = "";
       searchBarRef.value?.updateQuery?.();
-      searchObj.runQuery = true;
+      autoRun.engine.requestRun("run");
     };
 
     const onAskAiFixQuery = () => {
@@ -1914,13 +2021,12 @@ export default defineComponent({
     watch(
       () => searchObj.data.stream.selectedStream,
       (streams: string[]) => {
-        if (
-          store.state.zoConfig?.auto_query_enabled &&
-          searchObj.data.stream.streamType === "logs" &&
-          Array.isArray(streams) &&
-          streams.length
-        ) {
-          saveLogsStream(store.state.selectedOrganization.identifier, streams);
+        if (store.state.zoConfig?.auto_query_enabled && Array.isArray(streams) && streams.length) {
+          saveLogsSelectedStreams(
+            store.state.selectedOrganization.identifier,
+            searchObj.data.stream.streamType,
+            streams,
+          );
         }
       },
       { deep: true },
@@ -2638,7 +2744,25 @@ export default defineComponent({
       },
     );
 
+    // Run for Visualize, Patterns and Build: explicit, so it always opens a generation and never waits on the guard.
     const handleRunQueryFn = async (clear_cache = false) => {
+      const mode = searchObj.meta.logsVisualizeToggle;
+      if (mode !== "visualize" && mode !== "patterns" && mode !== "build") return;
+      searchObj.meta.clearCache = clear_cache;
+      autoRun.engine.requestRun("run");
+    };
+
+    // G1 for Visualize and Build: the proof is the panel's own completed run (J7).
+    const executePanelRun = async (ctx: RunContext) => {
+      autoRun.beginPanelRun(ctx.generation.id, () =>
+        searchBarRef.value?.cancelVisualizeQueries?.(),
+      );
+      const launched = await runPanelQuery(!!searchObj.meta.clearCache, ctx.generation.id);
+      if (!launched && autoRun.hasPanelRun(ctx.generation.id)) autoRun.endPanelRun(false);
+    };
+
+    // Returns false when validation stopped the run before any panel request was made.
+    const runPanelQuery = async (clear_cache = false, generationId?: number): Promise<boolean> => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // Set the shouldRefreshWithoutCache flag
         shouldRefreshWithoutCache.value = clear_cache;
@@ -2668,12 +2792,12 @@ export default defineComponent({
           buildSearch();
           if (dashboardPanelData.data.type === "table" && isSelectStarForTable()) {
             showErrorNotification(t("logs.index.selectStarNotSupportedForVisualization"));
-            return;
+            return false;
           }
 
           const success = await updateVisualization(false);
           if (!success) {
-            return;
+            return false;
           }
         } catch (err: any) {
           // this will clear dummy trace id
@@ -2682,12 +2806,12 @@ export default defineComponent({
           // Extraction was cancelled, so do not proceed further
           // if its abort, then do not show any error notification
           if (err.name === "AbortError") {
-            return;
+            return false;
           }
 
           // show error notification
           showErrorNotification(err.message ?? t("logs.index.errorUpdatingVisualization"));
-          return;
+          return false;
         }
 
         const currentQuery =
@@ -2721,14 +2845,12 @@ export default defineComponent({
         };
 
         await copyDashboardDataToVisualize();
+        // The chart renders this copy, so it is the config the panel run certifies.
+        if (generationId != null) autoRun.markPanelDispatched(generationId);
 
         // Sync visualization config to URL parameters
         updateUrlQueryParams(dashboardPanelData);
-      }
-
-      if (searchObj.meta.logsVisualizeToggle == "patterns") {
-        // Extract patterns when user clicks run query in patterns mode
-        await extractPatternsForCurrentQuery(clear_cache);
+        return true;
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
@@ -2741,7 +2863,7 @@ export default defineComponent({
           !buildDashboardPanelData.data.queries[0]?.query?.trim()
         ) {
           showErrorNotification(t("logs.index.queryEmptySelectFieldsToBuild"));
-          return;
+          return false;
         }
 
         // Run query in build mode - same approach as visualization
@@ -2759,14 +2881,17 @@ export default defineComponent({
         }
 
         // Trigger PanelEditor's runQuery
-        buildQueryPageRef.value?.runQuery(clear_cache);
+        buildQueryPageRef.value?.runQuery(clear_cache, generationId);
 
         // Sync build config to URL parameters
         updateUrlQueryParams(null, buildQueryPageRef.value?.dashboardPanelData);
+        return true;
       }
+      return false;
     };
 
     const handleChartApiError = (errorMessage: any) => {
+      autoRun.markPanelFailed();
       const errorList = visualizeErrorData.errors;
       errorList.splice(0);
       errorList.push(errorMessage);
@@ -3151,6 +3276,31 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
+    const panelsLoading = computed(() =>
+      Object.values(variablesAndPanelsDataLoadingState.panels ?? {}).some(Boolean),
+    );
+    watch(panelsLoading, (loading) => {
+      const surfaceErrors =
+        searchObj.meta.logsVisualizeToggle === "build"
+          ? (buildQueryPageRef.value?.panelEditorRef?.errorData?.errors ?? [])
+          : (visualizeErrorData.errors ?? []);
+      autoRun.panelLoadingChanged(loading, surfaceErrors.length > 0);
+    });
+
+    autoRun.setPanelConfigReader((surface) => {
+      const data = surface === "build" ? buildDashboardPanelData.data : dashboardPanelData.data;
+      return {
+        type: data?.type,
+        config: data?.config,
+        queries: (data?.queries ?? []).map((query: any) => ({
+          query: query?.query,
+          customQuery: query?.customQuery,
+          fields: query?.fields,
+          vrlFunctionQuery: query?.vrlFunctionQuery,
+        })),
+      };
+    });
+
     // ---------------------------------------------------------------------
     // WATCHERS
     // ---------------------------------------------------------------------
@@ -3299,23 +3449,73 @@ export default defineComponent({
       }
     };
 
+    autoRun.setExecutors({
+      logs: executeGridRun,
+      patterns: executePatternsRun,
+      histogram: executeHistogramRun,
+      visualize: executePanelRun,
+    });
+
+    const isAutoRunOn = computed(() => isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta));
+    const isResultsStale = computed(() => autoRun.engine.isResultsStale());
+    const guardBlocksGrid = computed(
+      () => !!searchObj.meta.autoRunBlocked && searchObj.meta.autoRunBlocked.op !== "visualize",
+    );
+    const showGuardEmptyState = computed(() => {
+      if (!guardBlocksGrid.value || searchObj.loading) return false;
+      if (searchObj.meta.logsVisualizeToggle === "patterns") {
+        return !patternsState.value?.patterns?.patterns?.length;
+      }
+      return (
+        searchObj.meta.logsVisualizeToggle === "logs" && !searchObj.data.queryResults?.hits?.length
+      );
+    });
+    const showGuardBanner = computed(() => guardBlocksGrid.value && !showGuardEmptyState.value);
+    const showGuardSearchJob = computed(() => config.isEnterprise === "true");
+
+    // A paused interval resumes once nothing pauses it any more (P3 "missedTick").
+    watch(
+      () => [isResultsStale.value, !!searchObj.meta.autoRunBlocked],
+      () => autoRun.engine.checkRefreshResume(),
+    );
+
+    // A refinement that moves the scope away from a blocked snapshot withdraws "Run anyway" (AC5.1).
+    watch(
+      () => autoRun.readSignature(),
+      () => autoRun.engine.syncBlockedScope(),
+      { deep: true },
+    );
+
+    const onGuardRunAnyway = () => {
+      autoRun.engine.runAnyway();
+    };
+
+    // Narrow to sets only the date, then runs once after re-checking the guard (J5).
+    const onGuardNarrow = (period: string) => {
+      searchObj.shouldIgnoreWatcher = true;
+      searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
+      searchObj.data.datetime.relativeTimePeriod = period;
+      searchObj.data.datetime.type = "relative";
+      autoRun.engine.requestRun("narrow");
+      nextTick(() => {
+        searchObj.shouldIgnoreWatcher = false;
+      });
+    };
+
+    // G1-X1: the job runs the frozen blocked scope, so it bypasses canPersistOrShare.
+    const onGuardSearchJob = () => {
+      const snapshot = buildSearch(true);
+      if (!snapshot) return;
+      searchBarRef.value?.openGuardSearchJob?.(cloneDeep(snapshot));
+    };
+
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "logsRunQuery",
         handler: () => {
-          // In normal logs mode `handleRunQueryFn` only handles
-          // visualize/patterns/build — trigger the logs search the same way the
-          // refresh shortcut and the run button do (via the runQuery watcher).
-          // Drill down is built from the logs results, so it runs that search too.
-          const mode = searchObj.meta.logsVisualizeToggle;
-          if (!mode || mode === "logs" || mode === "drilldown") {
-            if (searchObj.loading) return;
-            searchObj.loading = true;
-            searchObj.runQuery = true;
-          } else {
-            handleRunQueryFn();
-          }
+          // Explicit in every mode: it supersedes an in-flight run instead of waiting (P2).
+          searchBarRef.value?.handleRunQueryFn?.();
         },
       },
       {
@@ -3336,9 +3536,7 @@ export default defineComponent({
         id: "logsRefresh",
         handler: () => {
           if (isInputFocused()) return;
-          if (searchObj.loading) return;
-          searchObj.loading = true;
-          searchObj.runQuery = true;
+          searchBarRef.value?.handleRunQueryFn?.();
         },
       },
       {
@@ -3358,12 +3556,14 @@ export default defineComponent({
         id: "logsSaveView",
         handler: () => {
           if (isInputFocused()) return;
+          // fnSavedView applies the same G1 save gate as the buttons (2-U-2).
           (searchBarRef.value as any)?.fnSavedView?.();
         },
       },
       {
         id: "logsExport",
         handler: () => {
+          if (autoRun.engine.isResultsStale()) return;
           (searchBarRef.value as any)?.downloadLogs?.(
             searchObj.data?.queryResults?.hits ?? [],
             "csv",
@@ -3373,6 +3573,15 @@ export default defineComponent({
     ]);
 
     return {
+      autoRun,
+      isAutoRunOn,
+      isResultsStale,
+      showGuardEmptyState,
+      showGuardBanner,
+      showGuardSearchJob,
+      onGuardRunAnyway,
+      onGuardNarrow,
+      onGuardSearchJob,
       t,
       store,
       router,
@@ -3569,10 +3778,8 @@ export default defineComponent({
         ) {
           this.searchObj.meta.histogramDirtyFlag = false;
 
-          // Generate histogram skeleton before making request
-          await this.generateHistogramSkeleton();
-
-          this.getHistogramData(this.searchObj.data.histogramQuery);
+          // A histogram-only entry point, guarded against the executed scope (C14).
+          this.autoRun.request("histogram");
         }
       }
 
@@ -3663,8 +3870,7 @@ export default defineComponent({
           this.searchObj.shouldIgnoreWatcher == false &&
           this.store.state.zoConfig.query_on_stream_selection == false
         ) {
-          this.searchObj.loading = true;
-          this.getQueryData();
+          this.autoRun.engine.requestRun("explicit");
         }
       }
       // this.searchResultRef.reDrawChart();

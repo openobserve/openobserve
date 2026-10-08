@@ -160,6 +160,21 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
   })),
 }));
 
+// G1 for Add to dashboard is driven by the auto-run engine; each test sets the panel's reason.
+const persistReasonMock = vi.hoisted(() => {
+  // A reactive box, so the component's computed reason follows each test's value.
+  const { ref } = require("vue");
+  return ref(null as string | null);
+});
+const openPanelRunMock = vi.hoisted(() => vi.fn(() => 1));
+vi.mock("@/composables/useLogs/logsAutoRun", () => ({
+  setAutoRunTransport: vi.fn(),
+  useLogsAutoRun: () => ({
+    persistReason: () => persistReasonMock.value,
+    openPanelRun: openPanelRunMock,
+  }),
+}));
+
 vi.mock("@/composables/useNotifications", () => ({
   default: vi.fn(() => ({
     showErrorNotification: vi.fn(),
@@ -515,6 +530,21 @@ describe("VisualizeLogsQuery Component", () => {
   });
 
   describe("addToDashboard Function", () => {
+    afterEach(() => {
+      persistReasonMock.value = null;
+    });
+
+    it("G1: stays closed, with the reason for the button, until the panel's run completes", () => {
+      persistReasonMock.value = "Run the query first: this action saves or shares what you ran";
+      expect((wrapper.vm as any).addToDashboardReason).toBe(
+        "Run the query first: this action saves or shares what you ran",
+      );
+      mockValidatePanel.mockImplementation(() => {});
+      wrapper.vm.addToDashboard();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+      expect(mockValidatePanel).not.toHaveBeenCalled();
+    });
+
     it("should show dialog when no errors", () => {
       mockValidatePanel.mockImplementation(() => {
         // No errors added to array

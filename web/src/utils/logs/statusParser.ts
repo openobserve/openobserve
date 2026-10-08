@@ -747,7 +747,10 @@ function computeLogSeverity(
     const text = row[field];
     if (typeof text !== "string" || text.trim() === "") continue;
     const level = inferSeverityFromMessage(text);
-    return level ? { level, source: "message", field, notFetched: false } : UNKNOWN_SEVERITY;
+    // An unknown row still names the text field it scanned, for the drawer's evidence line.
+    return level
+      ? { level, source: "message", field, notFetched: false }
+      : { level: "unknown", source: "none", field, notFetched: false };
   }
   return UNKNOWN_SEVERITY;
 }

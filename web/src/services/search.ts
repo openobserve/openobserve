@@ -177,6 +177,7 @@ const search = {
     is_multistream,
     traceparent,
     body,
+    signal,
   }: {
     org_identifier: string;
     index: string;
@@ -190,6 +191,7 @@ const search = {
     is_multistream: boolean;
     traceparent: string;
     body: any;
+    signal?: AbortSignal;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -209,7 +211,8 @@ const search = {
     if (clusters.trim() != "") {
       url = url + `&clusters=${clusters}`;
     }
-    return http({ headers: { traceparent } }).post(url, body);
+    const client = http({ headers: { traceparent } });
+    return signal ? client.post(url, body, { signal }) : client.post(url, body);
   },
   metrics_query_range: ({
     org_identifier,

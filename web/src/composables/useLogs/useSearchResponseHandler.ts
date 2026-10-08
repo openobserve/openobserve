@@ -31,6 +31,7 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 
 export const useSearchResponseHandler = () => {
   const { t } = useI18nTyped();
@@ -236,7 +237,7 @@ export const useSearchResponseHandler = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
-    handleFunctionError(payload.queryReq, response);
+    handleFunctionError(payload.queryReq, response, (payload as any).generationId);
     handleAggregation(payload.queryReq, response);
     resetFieldValues();
 
@@ -490,7 +491,11 @@ export const useSearchResponseHandler = () => {
     searchObj.data.queryResults.took += response.content.results.took;
   };
 
-  const handleFunctionError = (queryReq: SearchRequestPayload, response: any) => {
+  const handleFunctionError = (
+    queryReq: SearchRequestPayload,
+    response: any,
+    generationId?: number,
+  ) => {
     if (
       Object.prototype.hasOwnProperty.call(response.content.results, "function_error") &&
       response.content.results.function_error != ""
@@ -517,6 +522,10 @@ export const useSearchResponseHandler = () => {
       queryReq.query.end_time = response.content.results.new_end_time;
       searchObj.data.histogramQuery.query.start_time = response.content.results.new_start_time;
       searchObj.data.histogramQuery.query.end_time = response.content.results.new_end_time;
+      useLogsAutoRun().recordWindowMove(generationId, {
+        startUs: Number(response.content.results.new_start_time),
+        endUs: Number(response.content.results.new_end_time),
+      });
 
       updateUrlQueryParams();
     }

@@ -156,6 +156,19 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 
 // Mock useNotifications composable
 const mockShowErrorNotification = vi.fn();
+// G1 for Add to dashboard is driven by the auto-run engine; each test sets the panel's reason.
+const persistReasonMock = vi.hoisted(() => ({ value: null as string | null }));
+const openPanelRunMock = vi.hoisted(() => vi.fn(() => 1));
+const markPanelDispatchedMock = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useLogs/logsAutoRun", () => ({
+  setAutoRunTransport: vi.fn(),
+  useLogsAutoRun: () => ({
+    persistReason: () => persistReasonMock.value,
+    openPanelRun: openPanelRunMock,
+    markPanelDispatched: markPanelDispatchedMock,
+  }),
+}));
+
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showErrorNotification: mockShowErrorNotification,
@@ -524,6 +537,43 @@ describe("BuildQueryPage Component", () => {
   });
 
   describe("Add to Dashboard Dialog", () => {
+    afterEach(() => {
+      persistReasonMock.value = null;
+    });
+
+    it("G1: is refused with the reason until the Build panel's run completes", async () => {
+      persistReasonMock.value = "Run the query first: this action saves or shares what you ran";
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.onAddToDashboard();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+      expect(mockShowErrorNotification).toHaveBeenCalledWith(
+        "Run the query first: this action saves or shares what you ran",
+      );
+    });
+
+    it("opens its own panel generation for Build's own runs, not for a Run that passed one", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      openPanelRunMock.mockClear();
+      await wrapper.vm.runQuery(false, 7);
+      expect(openPanelRunMock).not.toHaveBeenCalled();
+      await wrapper.vm.runQuery(false);
+      expect(openPanelRunMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("marks the panel run dispatched right after the editor copies its config (F2)", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const order: string[] = [];
+      wrapper.vm.panelEditorRef = { runQuery: vi.fn(() => order.push("run")) };
+      markPanelDispatchedMock.mockImplementation((id: number) => order.push(`mark:${id}`));
+      openPanelRunMock.mockReturnValueOnce(11);
+      await wrapper.vm.runQuery(false, 7);
+      await wrapper.vm.runQuery(false);
+      expect(order).toEqual(["run", "mark:7", "run", "mark:11"]);
+    });
+
     it("should not show AddToDashboard drawer initially", async () => {
       wrapper = createWrapper();
       await flushPromises();

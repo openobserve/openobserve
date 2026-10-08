@@ -15,7 +15,7 @@
 
 import { nextTick, ref } from "vue";
 import { byString } from "@/utils/json";
-import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -48,6 +48,53 @@ import {
 import { buildStreamNameColumn, shouldShowStreamNameColumn } from "@/utils/logs/streamNameColumn";
 import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { isGuardActive } from "@/composables/useLogs/useAutoRun";
+import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
+import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
+import { sqlSources } from "@/utils/logs/sqlSources";
+
+export interface InitialStreamInput {
+  list: StreamStatsEntry[];
+  /** The selection already on the page: a URL restore, or the in-session pick. */
+  current: string[];
+  currentFromUrl: boolean;
+  persisted: string[];
+  allowLatest: boolean;
+}
+
+export interface InitialStreamPick {
+  selected: string[];
+  missing: string[];
+  source: "url" | "current" | "persisted" | "latest" | "none";
+}
+
+export interface StreamListOptions {
+  fromUrl?: boolean;
+  // False once a later selection owns the list; checked before any shared-state write.
+  isCurrent?: () => boolean;
+}
+
+/** P1 order: URL, then the in-session pick, then the persisted set, then the newest stream, then none. */
+export function pickInitialLogsStreams(input: InitialStreamInput): InitialStreamPick {
+  const readable = new Set(input.list.map((entry) => entry.name));
+  const current = input.current.filter((name) => !!name);
+  if (current.length) {
+    const valid = current.filter((name) => readable.has(name));
+    const missing = current.filter((name) => !readable.has(name));
+    // A URL naming an unreadable stream is an error the recipient must see, never a silent subset.
+    if (input.currentFromUrl) {
+      return missing.length
+        ? { selected: [], missing, source: "url" }
+        : { selected: valid, missing: [], source: "url" };
+    }
+    if (valid.length) return { selected: valid, missing, source: "current" };
+  }
+  const persisted = input.persisted.filter((name) => readable.has(name));
+  if (persisted.length) return { selected: persisted, missing: [], source: "persisted" };
+  const latest = input.allowLatest ? pickLatestStream(input.list) : null;
+  if (latest) return { selected: [latest], missing: [], source: "latest" };
+  return { selected: [], missing: [], source: "none" };
+}
 
 export const useStreamFields = () => {
   const { t } = useI18nTyped();
@@ -871,81 +918,75 @@ export const useStreamFields = () => {
     }
   };
 
-  const getStreamList = async (selectStream: boolean = true) => {
+  const getStreamList = async (selectStream: boolean = true, options: StreamListOptions = {}) => {
     try {
       // commented below function as we are doing resetStreamData from all the places where getStreamList is called
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData: any = await getStreams(streamType, false);
+      if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {
         ...streamData,
       };
       await nextTick();
-      await loadStreamLists(selectStream);
+      if (options.isCurrent && !options.isCurrent()) return;
+      await loadStreamLists(selectStream, options);
       return;
     } catch (e: any) {
       console.error("Error while getting stream list", e);
     }
   };
 
-  const loadStreamLists = async (selectStream: boolean = true) => {
+  const initialStreamInput = (options: StreamListOptions): InitialStreamInput => {
+    const zoConfig = store.state.zoConfig ?? {};
+    const streamType = searchObj.data.stream.streamType || "logs";
+    let current: string[] = Array.isArray(searchObj.data.stream.selectedStream)
+      ? [...searchObj.data.stream.selectedStream]
+      : [];
+    // A SQL-only link names its streams in FROM; they are resolved before selection (P1).
+    if (options.fromUrl && !current.length && searchObj.meta.sqlMode && searchObj.data.query) {
+      current = sqlSources(searchObj.data.query).sources;
+    }
+    const legacy =
+      zoConfig.query_on_stream_selection == false ||
+      router?.currentRoute?.value?.query?.type == "stream_explorer";
+    return {
+      list: searchObj.data.streamResults.list,
+      current,
+      currentFromUrl: !!options.fromUrl,
+      persisted: zoConfig.auto_query_enabled
+        ? restoreLogsSelectedStreams(store.state.selectedOrganization?.identifier, streamType)
+        : [],
+      // Never an unguarded auto-run of a stream the user did not choose (DECISIONS: preselect).
+      allowLatest: legacy || isGuardActive(zoConfig),
+    };
+  };
+
+  const loadStreamLists = async (selectStream: boolean = true, options: StreamListOptions = {}) => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
-        let lastUpdatedStreamTime = 0;
-        let latestStream = "";
+        searchObj.data.stream.streamLists = searchObj.data.streamResults.list.map((item: any) => ({
+          label: item.name,
+          value: item.name,
+        }));
 
-        let selectedStream: any[] = [];
-        let existingValidStreams: any[] = [];
-
-        // Capture current selection (from localStorage restore or in-session state)
-        // to use as a fallback when no URL param is present.
-        const currentSelection: string[] = Array.isArray(searchObj.data.stream.selectedStream)
-          ? searchObj.data.stream.selectedStream
-          : [];
-
-        searchObj.data.stream.streamLists = [];
-        let itemObj: {
-          label: I18nText;
-          value: string;
-        };
-
-        for (const item of searchObj.data.streamResults.list) {
-          itemObj = {
-            label: item.name,
-            value: item.name,
-          };
-
-          searchObj.data.stream.streamLists.push(itemObj);
-
-          // If isFirstLoad is true, then select the stream from query params
-          if (router.currentRoute.value?.query?.stream == item.name) {
-            selectedStream.push(itemObj.value);
-          }
-          if (!router.currentRoute.value?.query?.stream && currentSelection.includes(item.name)) {
-            existingValidStreams.push(itemObj.value);
-          }
-          if (
-            !router.currentRoute.value?.query?.stream &&
-            item.stats.doc_time_max >= lastUpdatedStreamTime
-          ) {
-            lastUpdatedStreamTime = item.stats.doc_time_max;
-            latestStream = item.name;
-          }
+        if (!selectStream) return;
+        const pick = pickInitialLogsStreams(initialStreamInput(options));
+        if (pick.source === "url" && pick.missing.length) {
+          searchObj.data.stream.selectedStream = [];
+          searchObj.data.filterErrMsg = t("search.streamNotExist").replace(
+            "[STREAM_NAME]",
+            pick.missing.join(", "),
+          );
+          return;
         }
-
-        // Priority: URL param > existing valid selection > latest by doc_time_max
-        if (!selectedStream.length && existingValidStreams.length) {
-          selectedStream = existingValidStreams;
-        } else if (!selectedStream.length && latestStream) {
-          selectedStream = [latestStream];
-        }
-
+        const current = searchObj.data.stream.selectedStream;
         if (
-          (store.state.zoConfig.query_on_stream_selection == false ||
-            router.currentRoute.value.query?.type == "stream_explorer") &&
-          selectStream
+          !Array.isArray(current) ||
+          current.length !== pick.selected.length ||
+          current.some((name: string, i: number) => name !== pick.selected[i])
         ) {
-          searchObj.data.stream.selectedStream = selectedStream;
+          searchObj.data.stream.selectedStream = pick.selected;
         }
       } else {
         searchObj.data.errorMsg = t("search.noStreamFoundInOrganization");

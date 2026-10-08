@@ -643,6 +643,15 @@ describe("resolveLogSeverity — precedence and fall-through (J-A3, J-A5)", () =
     expect(levelOf({ error: "boom", message: "user logged in" })).toBe("unknown");
   });
 
+  it("names the scanned text field when it holds no level word", () => {
+    expect(sev({ host: "a", body: "heartbeat ok" })).toEqual({
+      level: "unknown",
+      source: "none",
+      field: "body",
+      notFetched: false,
+    });
+  });
+
   it("resolves unknown with no evidence and for non-objects", () => {
     expect(sev({ host: "a" })).toEqual({
       level: "unknown",

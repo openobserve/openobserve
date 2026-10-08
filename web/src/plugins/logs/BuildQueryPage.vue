@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :editMode="true"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       :showAddToDashboardButton="true"
+      :addToDashboardDisabledReason="addToDashboardReason"
       @addToDashboard="onAddToDashboard"
       @chartApiError="handleChartApiError"
       @queryGenerated="onQueryGenerated"
@@ -43,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineAsyncComponent, provide } from "vue";
+import { ref, onMounted, watch, defineAsyncComponent, provide, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -56,6 +57,7 @@ import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 import { parseWhereClauseToFilter } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 
 // ============================================================================
 // Component Imports
@@ -461,7 +463,15 @@ const handleChartApiError = (error: any) => {
   console.error("Chart API error:", error);
 };
 
+const autoRun = useLogsAutoRun();
+// G1: Add to dashboard follows the Build panel's own completed run (J7).
+const addToDashboardReason = computed(() => autoRun.persistReason("build", "add-to-dashboard"));
+
 const onAddToDashboard = () => {
+  if (addToDashboardReason.value) {
+    showErrorNotification(addToDashboardReason.value);
+    return;
+  }
   const errors: string[] = [];
   validatePanel(errors, true);
   if (errors.length) {
@@ -535,7 +545,10 @@ onMounted(() => {
 /**
  * Run the query in PanelEditor
  */
-const runQuery = async (withoutCache?: boolean) => {
+const runQuery = async (withoutCache?: boolean, generationId?: number) => {
+  // Build's own runs (init, apply) open their generation here; Run passes the one it opened.
+  const panelGenerationId =
+    generationId ?? autoRun.openPanelRun(() => panelEditorRef.value?.cancelRunningQuery?.());
   // Sync latest datetime from parent before running the query
   if (props.selectedDateTime) {
     dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
@@ -555,6 +568,8 @@ const runQuery = async (withoutCache?: boolean) => {
   }
 
   panelEditorRef.value?.runQuery(withoutCache);
+  // The editor copied its config synchronously above; that copy is what this run certifies.
+  autoRun.markPanelDispatched(panelGenerationId);
 };
 
 defineExpose({
