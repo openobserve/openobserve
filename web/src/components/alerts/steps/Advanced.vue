@@ -258,6 +258,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="rowTemplatePlaceholder"
               :rows="4"
             />
+            <span
+              v-if="isForecastMode"
+              class="text-text-secondary mt-1 block text-xs"
+              data-test="add-alert-row-forecast-hint"
+              >{{ t("alerts.forecast.rowTemplateHint") }}</span
+            >
           </div>
         </div>
       </div>
@@ -404,6 +410,7 @@ export default defineComponent({
     const templateValue = form.useStore((s: any) => (s.values?.template ?? "") as string);
     const descriptionValue = form.useStore((s: any) => (s.values?.description ?? "") as string);
     const rowTemplateValue = form.useStore((s: any) => (s.values?.row_template ?? "") as string);
+    const isForecastMode = form.useStore((s: any) => !!s.values?._ui?.forecast);
     const rowTemplateTypeValue = form.useStore(
       (s: any) => (s.values?.row_template_type ?? "String") as string,
     );
@@ -506,6 +513,7 @@ export default defineComponent({
       templateValue,
       descriptionValue,
       rowTemplateValue,
+      isForecastMode,
       rowTemplateTypeValue,
       formattedTemplates,
       rowTemplatePlaceholder,

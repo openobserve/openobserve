@@ -1234,6 +1234,9 @@ export default defineComponent({
       operations: [],
     });
 
+    // Per query, the builder state as loaded from the panel; that query's text is the user's until it changes.
+    const loadedStates = new WeakMap<object, string>();
+
     /**
      * Reads a panel's saved operations, upgrading any step ids it was stored
      * under, and writes the upgrade back into the panel.
@@ -1352,6 +1355,7 @@ export default defineComponent({
           // panel was saved under.
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
       { immediate: true },
@@ -1411,6 +1415,7 @@ export default defineComponent({
           // Load saved builder state, migrating any legacy step ids (see above).
           promqlBuilderQuery.labels = currentQuery?.fields?.promql_labels || [];
           promqlBuilderQuery.operations = loadSavedSteps(currentQuery);
+          if (currentQuery) loadedStates.set(currentQuery, JSON.stringify(promqlBuilderQuery));
         }
       },
     );
@@ -1425,6 +1430,8 @@ export default defineComponent({
 
         const currentQuery =
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+        if (loadedStates.get(currentQuery) === JSON.stringify(promqlBuilderQuery)) return;
+        loadedStates.delete(currentQuery);
 
         // Save labels and operations to schema
         currentQuery.fields.promql_labels = promqlBuilderQuery.labels;
