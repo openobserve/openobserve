@@ -578,7 +578,8 @@ describe("ModulePane - column select all", () => {
   const bulkBox = (wrapper: any, action: string) =>
     wrapper.find(`[data-test="edit-role-module-pane-bulk-${action}"] button[role="checkbox"]`);
 
-  const mountBulk = (entities: any[]) => mountPane([], entities, ALL_MODULES, { listsModules: true });
+  const mountBulk = (entities: any[]) =>
+    mountPane([], entities, ALL_MODULES, { listsModules: true });
 
   const emittedRows = (wrapper: any) =>
     (wrapper.emitted("change") ?? []).map(([change]: any) => [change.row.name, change.newValue]);
@@ -586,7 +587,10 @@ describe("ModulePane - column select all", () => {
   it("reads unticked, mixed and ticked from the rows it covers", async () => {
     const none = await mountBulk([makeNode("logs"), makeNode("alert")]);
     const some = await mountBulk([makeNode("logs", ["AllowList"]), makeNode("alert")]);
-    const all = await mountBulk([makeNode("logs", ["AllowList"]), makeNode("alert", ["AllowList"])]);
+    const all = await mountBulk([
+      makeNode("logs", ["AllowList"]),
+      makeNode("alert", ["AllowList"]),
+    ]);
 
     expect(bulkBox(none, "AllowList").attributes("aria-checked")).toBe("false");
     expect(bulkBox(some, "AllowList").attributes("aria-checked")).toBe("mixed");
