@@ -412,6 +412,9 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+static STORED_EXT_AUTH_SALT: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+/// Installs older than the stored salt hash with this value: rotating it breaks their logins.
+pub const LEGACY_EXT_AUTH_SALT: &str = "openobserve";
 
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
@@ -575,6 +578,30 @@ pub fn cache_stored_grpc_token(token: &str) {
 
 pub fn get_stored_grpc_token() -> String {
     STORED_GRPC_TOKEN.load().to_string()
+}
+
+/// Caches the ext auth salt stored in the meta db; empty means none is stored.
+pub fn cache_stored_ext_auth_salt(salt: &str) {
+    STORED_EXT_AUTH_SALT.store(Arc::new(salt.to_owned()));
+}
+
+pub fn get_stored_ext_auth_salt() -> String {
+    STORED_EXT_AUTH_SALT.load().to_string()
+}
+
+pub fn get_ext_auth_salt() -> String {
+    select_ext_auth_salt(
+        &get_config().auth.ext_auth_salt,
+        &get_stored_ext_auth_salt(),
+    )
+}
+
+fn select_ext_auth_salt(env_salt: &str, stored_salt: &str) -> String {
+    [env_salt, stored_salt]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .unwrap_or(LEGACY_EXT_AUTH_SALT)
+        .to_string()
 }
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
@@ -1488,8 +1515,8 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
-    /// Secret for presigned and ext-token logins; a new install refuses to start with the default.
-    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
+    /// Empty: a new install generates one and stores it in the meta db.
+    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "")]
     pub ext_auth_salt: String,
     #[env_config(
         name = "ZO_ALERT_CHART_SIGNING_KEY",
@@ -6361,5 +6388,12 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn test_select_ext_auth_salt_prefers_env_then_stored_then_legacy() {
+        assert_eq!(select_ext_auth_salt("env", "stored"), "env");
+        assert_eq!(select_ext_auth_salt("", "stored"), "stored");
+        assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
     }
 }
