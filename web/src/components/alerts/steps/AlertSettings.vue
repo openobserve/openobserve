@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-else>
           <!-- Period -->
           <div
+            v-if="!isForecastMode"
             ref="periodFieldRef"
             class="me-2 mb-4! flex items-start max-md:flex-col max-md:gap-1"
           >
@@ -502,6 +503,10 @@ export default defineComponent({
     // keyed on `destinations` in AddAlert.schema.ts, so it lands on this path.
     const destinationsError = fieldError("destinations");
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
+    // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
+    const isForecastMode = form
+      ? form.useStore((s: any) => !!s.values?._ui?.forecast)
+      : computed(() => false);
 
     // General field get/set — same shape as QueryConfig's `fv`/`setFV`: a
     // reactive snapshot registers the dependency, the synchronous
@@ -708,6 +713,7 @@ export default defineComponent({
       destinationsFieldRef,
       pendingPeriodFieldRef,
       periodError,
+      isForecastMode,
       silenceError,
       destinationsError,
       pendingPeriodError,

@@ -23,6 +23,7 @@ use arrow::{
     },
     datatypes::{DataType, SchemaRef},
 };
+use config::meta::promql::STALE_NAN_BITS;
 use parquet::{
     arrow::arrow_reader::{ArrowReaderMetadata, ArrowReaderOptions},
     file::metadata::ParquetMetaData,
@@ -295,7 +296,7 @@ impl<W: Write> BlockWriter<W> {
             .downcast_ref::<Float64Array>()
             .context("value array type")?;
         ensure!(
-            hashes.null_count() == 0 && times.null_count() == 0 && values.null_count() == 0,
+            hashes.null_count() == 0 && times.null_count() == 0,
             "nullable samples unsupported"
         );
         for row in 0..batch.num_rows() {
@@ -330,7 +331,12 @@ impl<W: Write> BlockWriter<W> {
                 "source exceeds parent row count"
             );
             self.timestamps.push(timestamp);
-            self.values.push(values.value(row).to_bits());
+            // a NULL value is a stale marker, which the codecs carry as its NaN bits
+            self.values.push(if values.is_null(row) {
+                STALE_NAN_BITS
+            } else {
+                values.value(row).to_bits()
+            });
             self.rows = self.rows.checked_add(1).context("row count overflow")?;
             self.previous = Some((hash, timestamp));
             if self.timestamps.len() == self.max_block_rows {

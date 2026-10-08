@@ -1033,13 +1033,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-2">
                       <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                       <span class="text-xs font-semibold">{{
-                        localTab === "sql" ? t("alerts.sqlEditor") : t("alerts.promqlEditor")
+                        localTab === "sql"
+                          ? t("alerts.sqlEditor")
+                          : isForecastMode
+                            ? t("alerts.forecast.expression")
+                            : t("alerts.promqlEditor")
                       }}</span>
                     </div>
                     <!-- fx toggle shown here only when VRL is not yet enabled -->
                     <OSwitch v-if="localTab === 'sql' && !showVrl" v-model="showVrl">
                       <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" :delay="300" />
                     </OSwitch>
+                    <OToggleGroup
+                      v-if="localTab === 'promql'"
+                      :model-value="isForecastMode ? 'forecast' : 'threshold'"
+                      type="single"
+                      data-test="alert-promql-mode"
+                      @update:model-value="onPromqlModeChange"
+                    >
+                      <OToggleGroupItem
+                        value="threshold"
+                        size="xs"
+                        data-test="alert-promql-mode-threshold"
+                      >
+                        {{ t("alerts.forecast.modeThreshold") }}
+                      </OToggleGroupItem>
+                      <OToggleGroupItem
+                        value="forecast"
+                        size="xs"
+                        data-test="alert-promql-mode-forecast"
+                      >
+                        {{ t("alerts.forecast.modeForecast") }}
+                      </OToggleGroupItem>
+                    </OToggleGroup>
                   </div>
                   <div class="relative min-h-0 flex-1">
                     <div class="absolute inset-0">
@@ -1048,7 +1074,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test-prefix="alert-inline-sql"
                         :languages="localTab === 'promql' ? ['promql'] : ['sql']"
                         :default-language="localTab === 'promql' ? 'promql' : 'sql'"
-                        :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
+                        :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
                         :keywords="effectiveKeywords"
@@ -1061,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="
-                        (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
+                        (localTab === 'sql' ? !localSqlQuery : !editorPromqlQuery) &&
                         queryEditorPlaceholderFlag
                       "
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
@@ -1540,8 +1566,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
+              <ForecastAlertFields v-if="localTab === 'promql' && isForecastMode" />
+
               <!-- PromQL: Alert if the value is + Having series -->
-              <template v-if="localTab === 'promql' && promqlCondition">
+              <template v-else-if="localTab === 'promql' && promqlCondition">
                 <div
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
@@ -1718,7 +1746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="viewSqlEditor"
       :tab="localTab === 'promql' ? 'promql' : 'sql'"
       :sqlQuery="localSqlQuery"
-      :promqlQuery="localPromqlQuery"
+      :promqlQuery="editorPromqlQuery"
       :vrlFunction="vrlFunctionContent"
       :streamName="streamName"
       :streamType="streamType"
@@ -1728,7 +1756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :savedFunctions="functionsList"
       :sqlQueryErrorMsg="sqlQueryErrorMsg"
       @update:sqlQuery="updateSqlQuery"
-      @update:promqlQuery="updatePromqlQuery"
+      @update:promqlQuery="onEditorPromqlUpdate"
       @update:vrlFunction="handleVrlFunctionUpdate"
       @validate-sql="handleValidateSql"
     />
@@ -1791,6 +1819,13 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
+import ForecastAlertFields from "@/components/alerts/steps/ForecastAlertFields.vue";
+import {
+  FORECAST_FREQUENCY_MINUTES,
+  FORECAST_PERIOD_MINUTES,
+  isForecastRowTemplate,
+  parseForecastAlertPromql,
+} from "@/utils/alerts/forecastAlert";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -1807,6 +1842,7 @@ export default defineComponent({
   components: {
     OTag,
     AlertMultiToggle,
+    ForecastAlertFields,
     AlertQueryPreview,
     FilterGroup,
     QueryEditorDialog,
@@ -2083,7 +2119,7 @@ export default defineComponent({
       if (localTab.value === "sql") {
         updateSqlQuery(newQuery);
       } else {
-        updatePromqlQuery(newQuery);
+        onEditorPromqlUpdate(newQuery);
       }
       autoCompleteData.value.query = newQuery;
       autoCompleteData.value.cursorIndex = inlineQueryEditorRef.value?.getCursorIndex?.() ?? 0;
@@ -2097,7 +2133,7 @@ export default defineComponent({
     // Inline editor status bar state
     const inlineStatusState = computed(() => {
       if (props.sqlQueryErrorMsg?.trim()) return "sql-status-bar--error";
-      const query = localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value;
+      const query = localTab.value === "sql" ? localSqlQuery.value : editorPromqlQuery.value;
       if (!query?.trim()) return "sql-status-bar--hint";
       return "sql-status-bar--idle";
     });
@@ -2181,16 +2217,16 @@ export default defineComponent({
 
     // Chips insert only into an EMPTY editor — silently replacing a
     // half-written query is the one way this feature makes someone angry.
-    const canInsertPromqlSample = computed(() => !localPromqlQuery.value);
+    const canInsertPromqlSample = computed(() => !editorPromqlQuery.value);
     const insertPromqlSample = (sample: { query: string }) => {
       if (!canInsertPromqlSample.value) return;
-      updatePromqlQuery(sample.query);
+      onEditorPromqlUpdate(sample.query);
       queryEditorPlaceholderFlag.value = false;
     };
 
     const onBlurInlineSqlEditor = async () => {
       queryEditorPlaceholderFlag.value =
-        localTab.value === "sql" ? localSqlQuery.value === "" : localPromqlQuery.value === "";
+        localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
         await _sqlOnBlur();
         emit("validate-sql");
@@ -2556,6 +2592,75 @@ export default defineComponent({
       (s: any) => !!s.values?.query_condition?.promql_multi_alert,
     );
     const isPromqlMultiAlert = computed(() => promqlMultiAlertStore.value);
+
+    // Forecast mode edits U and a few fields; the PromQL and its condition are generated from them.
+    const forecastStore = form.useStore((s: any) => s.values?._ui?.forecast ?? null);
+    const isForecastMode = computed(() => !!forecastStore.value);
+    const forecastExpression = computed(() => String(forecastStore.value?.U ?? ""));
+
+    // Editor affordances work on U in Forecast mode, never on the generated query.
+    const editorPromqlQuery = computed(() =>
+      isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
+    );
+    const onEditorPromqlUpdate = (query: string) => {
+      if (isForecastMode.value) setFV("_ui.forecast.U", query);
+      else updatePromqlQuery(query);
+    };
+
+    // Threshold settings Forecast mode overwrites, restored when the user switches back.
+    const THRESHOLD_FIELDS = [
+      "query_condition.promql_condition",
+      "query_condition.promql_multi_alert",
+      "query_condition.promql_warning_value",
+      "trigger_condition.threshold",
+      "trigger_condition.operator",
+      "trigger_condition.period",
+      "trigger_condition.frequency",
+      "_ui.checkEvery",
+      "row_template",
+    ];
+    let thresholdSnapshot: Record<string, unknown> | null = null;
+
+    const leaveForecastMode = () => {
+      updatePromqlQuery(forecastExpression.value);
+      setFV("_ui.forecast", null);
+      if (thresholdSnapshot) {
+        Object.entries(thresholdSnapshot).forEach(([path, value]) => setFV(path, value));
+      } else {
+        setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
+        if (isForecastRowTemplate(String(fv("row_template") ?? ""))) setFV("row_template", "");
+      }
+      thresholdSnapshot = null;
+    };
+
+    const onPromqlModeChange = (mode: unknown) => {
+      if (!mode || mode === (isForecastMode.value ? "forecast" : "threshold")) return;
+      if (mode === "threshold") {
+        leaveForecastMode();
+        return;
+      }
+      thresholdSnapshot = Object.fromEntries(
+        THRESHOLD_FIELDS.map((path) => [path, JSON.parse(JSON.stringify(fv(path) ?? null))]),
+      );
+      setFV("query_condition.promql_warning_value", "");
+      // A query this mode generated earlier reopens with its own fields, not as a nested U.
+      const promql = String(fv("query_condition.promql") ?? "");
+      setFV(
+        "_ui.forecast",
+        parseForecastAlertPromql(promql, fv("query_condition.promql_condition")) ?? {
+          U: promql,
+          T: "",
+          direction: "rises",
+          W: "2d",
+          H: 7,
+        },
+      );
+      setFV("trigger_condition.period", FORECAST_PERIOD_MINUTES);
+      if (frequencyMode.value === "minutes") {
+        checkEveryFrequency.value = FORECAST_FREQUENCY_MINUTES;
+        setStoredFrequency(FORECAST_FREQUENCY_MINUTES);
+      }
+    };
 
     /** M-10 for the series-count gate — same rule, same reason as groups. */
     const onPromqlMultiAlertChange = (value: unknown) => {
@@ -3709,6 +3814,11 @@ export default defineComponent({
       viewSqlEditor,
       localSqlQuery,
       localPromqlQuery,
+      isForecastMode,
+      forecastExpression,
+      editorPromqlQuery,
+      onEditorPromqlUpdate,
+      onPromqlModeChange,
       vrlFunctionContent,
       selectedSavedFunctionName,
       updateSqlQuery,

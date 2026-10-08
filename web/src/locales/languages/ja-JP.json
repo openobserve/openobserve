@@ -5286,8 +5286,9 @@
     "hundredPlaceholder": "100",
     "last": "最後",
     "alertContextMenu": {
-      "thresholdAbove": "しきい値が{value}を超える場合にアラートを作成",
-      "thresholdBelow": "しきい値が{value}未満の場合にアラートを作成"
+      "thresholdAbove": "{value} を超えたらアラート",
+      "thresholdBelow": "{value} を下回ったらアラート",
+      "forecastReaches": "予測が {value} に達したらアラート"
     },
     "dashboardErrors": {
       "errorsCount": "エラー ({count})"
@@ -5309,6 +5310,12 @@
     "showQueryResults": "クエリ結果を表示",
     "hideQueryResults": "クエリ結果を非表示にする",
     "renameQuery": "クエリ名を変更",
+    "addFormula": "数式を追加",
+    "formulaNumber": "数式 {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} はこのパネルのクエリではありません",
+    "formulaReferencesFormula": "{letter} は数式であり、数式から別の数式を参照することはできません",
+    "formulaInputNote": "数式で使用する場合、このクエリのインスタント/レンジ設定、凡例、ステップ、タイムシフトは適用されません。",
     "multiSqlQueryLabel": "クエリーラベル",
     "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
     "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
@@ -6338,8 +6345,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "クエリモードを変更",
-      "changeQueryModeConfirm": "クエリモードを変更してもよろしいですか？X軸、Y軸、フィルタに保存されたデータは消去されます。",
-      "switchToBuilderConfirm": "ビルダーモードに切り替えてもよろしいですか？カスタムPromQLクエリは消去されます。"
+      "changeQueryModeConfirm": "クエリモードを変更してもよろしいですか？X軸、Y軸、フィルタに保存されたデータは消去されます。"
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "クエリをサンプルクエリに置き換える",
@@ -6487,6 +6493,7 @@
       "selectRequiredFields": "チャートを表示するには必須フィールドを選択してください",
       "noDataFound": "データが見つかりません",
       "seriesLimitWarning": "最適なパフォーマンスを確保するために表示シリーズを制限しています",
+      "fitted": "近似",
       "mapLayerName": "レイヤー 1",
       "mapLayerNameIndexed": "レイヤー {index}",
       "secondsAgo": "{count} 秒前 | {count} 秒前",
@@ -8673,10 +8680,39 @@
     "noData": "データなし",
     "recentData": "最近のデータ",
     "theLastDay": "過去1日 | 過去 {count} 日",
+    "forecast": {
+      "modeThreshold": "しきい値",
+      "modeForecast": "予測",
+      "expression": "予測する式",
+      "alertWhen": "アラートする条件:",
+      "rises": "上昇して次の値に達したとき",
+      "falls": "下降して次の値に達したとき",
+      "threshold": "しきい値",
+      "within": "期間:",
+      "days": "日以内",
+      "basedOn": "直近の",
+      "window6h": "6 時間",
+      "window1d": "1 日",
+      "window2d": "2 日",
+      "window7d": "7 日",
+      "help": "各シリーズについて、この長さの履歴を通る直線のトレンドラインを描画します。トレンドラインが期間内にしきい値へ達したシリーズは、それぞれ個別にアラートします。",
+      "horizonRange": "{min} から {max} までの整数の日数を入力してください",
+      "horizonLabel": "予測期間(日数)",
+      "dayCount": "{n} 日 | {n} 日",
+      "summaryRises": "{horizon} 以内に {threshold} まで上昇すると予測されたらアラート",
+      "summaryFalls": "{horizon} 以内に {threshold} まで下降すると予測されたらアラート",
+      "triggerRises": "{horizon} 以内に {threshold} まで上昇すると予測",
+      "triggerFalls": "{horizon} 以内に {threshold} まで下降すると予測",
+      "previewSeries": "{threshold} までの日数",
+      "previewReason": "{horizon} 以内に {threshold} に達すると予測される系列が {count} 件",
+      "rowTemplateHint": "各系列の行は「3 日で 90 に達する」のように表示されます。行は {'{'}rows{'}'} を含む送信先テンプレートでのみ表示されます。"
+    },
     "prefill": {
       "dialog": {
         "title": "アラートを作成",
         "continue": "アラートに進む",
+        "queryChoiceLabel": "クエリでアラート",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "ストリーム",
         "thresholdLabel": "アラート対象",
         "thresholdMatchingRows": "一致する行",
@@ -8712,6 +8748,10 @@
         "library": {
           "label": "エディタでカスタマイズ",
           "toast": "アラートライブラリから: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "アラートを作成",
+          "toast": "メトリクスエクスプローラーからクエリをインポートしました"
         },
         "dbm": {
           "label": "通知する",
@@ -9758,11 +9798,77 @@
         "close": "メトリクスに戻る",
         "backTo": "メトリクス",
         "openInVisualize": "Visualize で開く",
+        "overlay": {
+          "current": "現在",
+          "noData": "{period} のデータがありません",
+          "forecast": "予測"
+        },
+        "noAlertQuery": "このメトリクスにはアラート対象のクエリがありません",
+        "drilldown": {
+          "button": "ログとトレース",
+          "help": "このメトリクスのサービスのログとトレースを開きます。相関にはサービスを識別するラベルが必要なため、サービスラベルのないインフラメトリクスでは通常何も見つかりません。ただし、組織がサービスを任意に設定している場合は除きます。",
+          "enterprise": "ログとトレースのドリルダウンは Enterprise の機能です。",
+          "discoveryOff": "この組織ではサービスディスカバリーが無効になっています。",
+          "forbidden": "サービス相関を使用する権限がありません。",
+          "checking": "アクセスを確認しています…",
+          "loading": "読み込み中…",
+          "schemaError": "このメトリクスのラベルを読み込めませんでした。",
+          "retry": "再試行",
+          "pickService": "{label}を選択すると、そのログとトレースを表示できます",
+          "noServiceValues": "この時間範囲に{label}の値がありません。",
+          "noServiceLabel": "このメトリクスには相関に使用できるサービスラベルがありません。",
+          "needIdentity": "相関させるには、namespace などの識別ラベルでフィルターしてください。",
+          "noService": "これらのフィルターに一致するサービスが見つかりません。",
+          "noPermission": "サービスを表示する権限がありません。",
+          "logs": "ログ",
+          "traces": "トレース",
+          "noLogsStream": "サービス {service} のログストリームがありません",
+          "noTracesStream": "サービス {service} のトレースストリームがありません",
+          "noServiceField": "このストリームにサービスフィールドがありません",
+          "notApplied": "適用されません: {labels}（このストリームに一致するフィールドがありません）"
+        },
+        "forecast": {
+          "label": "予測",
+          "off": "オフ",
+          "linear": "線形",
+          "smoothed": "平滑化トレンド",
+          "smoothedHelp": "平滑化トレンドは、平滑化された系列の線形投影です。各ポイントは直前の10ステップにわたって平滑化され、その後直線が当てはめられます。季節性を考慮した予測ではありません。",
+          "horizon": "予測期間",
+          "horizonAuto": "範囲の25%",
+          "horizonComputed": "{duration}（範囲の25%）",
+          "linearHelp": "線形: 表示範囲に当てはめた直線です。",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1時間",
+          "horizon6h": "6時間",
+          "horizon1d": "1日",
+          "horizon1w": "1週間",
+          "suffix": "予測"
+        },
+        "compare": {
+          "label": "比較対象",
+          "off": "オフ",
+          "ago1h": "1時間前",
+          "ago1d": "1日前",
+          "ago1w": "1週間前"
+        },
         "noPreview": "プレビューがありません — Visualize で開いてください",
         "exemplars": "エクセンプラー",
         "filtersNotApplied": "{filters} のフィルターはこのメトリクスに適用されません。すべての系列を表示しています | {filters} のフィルターはこのメトリクスに適用されません。すべての系列を表示しています",
         "tabBreakdown": "内訳",
         "tabRelated": "関連",
+        "tabUsedIn": "使用箇所",
+        "tabUsedInCount": "使用箇所（{count}）",
+        "usedIn": {
+          "dashboards": "ダッシュボード（{count}）",
+          "alerts": "アラート（{count}）",
+          "slos": "SLOs（{count}）",
+          "pipelines": "スケジュール済みパイプライン（{count}）",
+          "empty": "閲覧可能なダッシュボード、アラート、SLO、スケジュール済みパイプラインのいずれもこのメトリクスを使用していません",
+          "error": "このメトリクスの使用箇所を検索できませんでした",
+          "unparsed": "{count} 件のクエリは解析できず、名前で一致しました | {count} 件のクエリは解析できず、名前で一致しました",
+          "textMatch": "名前で一致",
+          "textMatchHelp": "このクエリは解析できなかったため、テキスト内でメトリクス名を検索して見つかりました。このメトリクスを読み取っていない可能性があります。"
+        },
         "breakdown": {
           "distinctCount": "{count} 個の値 | {count} 個の値",
           "distinctMany": "{count}+ 個の値",
@@ -10014,6 +10120,30 @@
       "regexPattern": "正規表現パターン（例: prod.*）",
       "regexNotMatching": "正規表現不一致（例: test.*）"
     },
+    "builderSwitch": {
+      "unsupported": "ビルダーは{construct}を表示できません",
+      "twoMetrics": "ビルダーは2つのメトリクス間の演算を表示できません — 数式を使用してください",
+      "noMetric": "ビルダーには1つの名前付きメトリクスに対するクエリが必要です",
+      "mismatch": "ビルダーはこのクエリを正確に表示できません",
+      "constructs": {
+        "without": "without (…) グルーピング",
+        "offset": "オフセット修飾子",
+        "at": "{'@'} 修飾子",
+        "orMatchers": "ラベルマッチャー間の or",
+        "subquery": "サブクエリ",
+        "vectorMatching": "on (…) または ignoring (…) によるベクトルマッチング",
+        "bool": "bool 比較",
+        "unaryMinus": "否定された式",
+        "string": "文字列引数",
+        "nonFinite": "非有限数値",
+        "rangeVector": "範囲ベクトル単体",
+        "setOperator": "集合演算子 {op}",
+        "function": "関数 {name}()",
+        "aggregation": "集約 {name}",
+        "numberFirst": "{op} の左側の数値",
+        "operator": "演算子 {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "レート計算の時間範囲",
@@ -10033,6 +10163,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "最も近い倍数"
       },
+      "rangeOnlyFirst": "範囲関数は最初のステップにのみ使用できます",
+      "rangeOnlyFirstNote": "範囲関数は生のサンプルを読み取るため、最初のステップにのみ使用できます。追加するには他のステップを削除してください。",
       "dragToReorder": "ドラッグして並べ替え",
       "noMatchingLabels": "一致するラベルがありません",
       "selectMetricFirst": "ラベルを読み込むには最初にメトリクスを選択してください",

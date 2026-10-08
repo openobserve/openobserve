@@ -31,9 +31,9 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, kv, model_pricing,
-    organization, query_history, rum_analytics, service_accounts, short_url, slos, sourcemaps,
-    status, status_pages, stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, kv, metrics_usage,
+    model_pricing, organization, query_history, rum_analytics, service_accounts, short_url, slos,
+    sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -954,6 +954,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/streams/{stream_name}/cache/results", delete(stream::delete_stream_cache))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range", delete(stream::delete_stream_data_by_time_range))
         .route("/{org_id}/streams/{stream_name}/data_by_time_range/status/{id}", get(stream::get_delete_stream_data_status))
+        .route("/{org_id}/metrics/{metric_name}/usage", get(metrics_usage::get_metric_usage))
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
@@ -965,10 +966,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
         .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
         // OTLP Profiles is still development; otlp_http exporter defaults to this path.
-        .route(
-            "/{org_id}/v1development/profiles",
-            post(profiles::ingest::otlp_profiles_write),
-        )
+        .route("/{org_id}/v1development/profiles", post(profiles::ingest::otlp_profiles_write))
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
@@ -1048,6 +1046,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/prometheus/api/v1/labels", get(promql::labels_get).post(promql::labels_post))
         .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/{org_id}/prometheus/api/v1/format_query", get(promql::format_query_get).post(promql::format_query_post))
+        .route("/{org_id}/prometheus/api/v1/parse_tree", post(promql::parse_tree))
 
         // Search
         .route("/{org_id}/_search", post(search::search))
@@ -3555,6 +3554,98 @@ mod tests {
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// `service_routes()` minus comments, whitespace and wrap commas.
+    fn service_routes_registrations() -> String {
+        let source = include_str!("mod.rs");
+        let start = source.find("pub fn service_routes() -> Router {").unwrap();
+        let end = start + source[start..].find("\npub fn ").unwrap();
+        let mut body = String::new();
+        let mut rest = &source[start..end];
+        while let Some(at) = rest.find("/*") {
+            body.push_str(&rest[..at]);
+            rest = rest[at..]
+                .find("*/")
+                .map_or("", |close| &rest[at + close + 2..]);
+        }
+        body.push_str(rest);
+        body.lines()
+            .map(|line| line.split("//").next().unwrap_or_default())
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<String>()
+            .replace(",)", ")")
+    }
+
+    #[test]
+    fn metric_usage_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/metrics/{metric_name}/usage",get(metrics_usage::get_metric_usage))"#
+            ),
+            "GET /{{org_id}}/metrics/{{metric_name}}/usage must be registered in service_routes()"
+        );
+    }
+
+    #[test]
+    fn metric_usage_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/metrics/{metric_name}/usage")
+            .expect("metric usage is missing from the OpenAPI surface");
+        assert_eq!(
+            path.get.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("GetMetricUsage")
+        );
+    }
+
+    #[test]
+    fn parse_tree_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/prometheus/api/v1/parse_tree")
+            .expect("parse_tree is missing from the OpenAPI surface");
+        assert_eq!(
+            path.post.as_ref().and_then(|op| op.operation_id.as_deref()),
+            Some("PrometheusParseTree")
+        );
+    }
+
+    #[test]
+    fn parse_tree_route_is_registered_in_service_routes() {
+        assert!(
+            service_routes_registrations().contains(
+                r#".route("/{org_id}/prometheus/api/v1/parse_tree",post(promql::parse_tree))"#
+            ),
+            "POST /{{org_id}}/prometheus/api/v1/parse_tree must be registered in service_routes()"
+        );
+    }
+
+    #[tokio::test]
+    async fn metric_usage_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/metrics/{metric_name}/usage",
+            get(metrics_usage::get_metric_usage),
+        );
+        let request = |method: &str| {
+            Request::builder()
+                .method(method)
+                .uri("/myorg/metrics/http_requests_total/usage")
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        // No user header: the handler's own extractor answers, before any scan.
+        let get = app.clone().oneshot(request("GET")).await.unwrap();
+        assert_eq!(get.status(), StatusCode::BAD_REQUEST);
+
+        let post = app.oneshot(request("POST")).await.unwrap();
+        assert_eq!(post.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     fn node_request(user_id: &str) -> Request<Body> {

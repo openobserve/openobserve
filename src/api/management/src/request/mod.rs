@@ -46,6 +46,7 @@ pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod license;
+pub mod metrics_usage;
 pub mod model_pricing;
 pub mod oncall;
 pub mod organization;

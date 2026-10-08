@@ -1461,18 +1461,18 @@ pub async fn list_v2<C: ConnectionTrait>(
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(f, a)| {
-            // Include the alert if all alerts are permitted.
-            is_all_permitted
-                // Include the alert if the alert is permitted with the old OpenFGA identifier.
-                || permissions.contains(&format!("alert:{}", a.name))
-                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
-                // Include the alert if the alert is permitted with the new OpenFGA identifier.
-                || a.id
-                    .is_some_and(|id| permissions.contains(&format!("alert:{id}")))
-        })
+        .filter(|(f, a)| is_all_permitted || is_alert_permitted(f, a, &permissions))
         .collect_vec();
     Ok(alerts)
+}
+
+/// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
+pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[String]) -> bool {
+    permissions.contains(&format!("alert:{}", alert.name))
+        || alert.id.is_some_and(|id| {
+            permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
+                || permissions.contains(&format!("alert:{id}"))
+        })
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -7256,6 +7256,137 @@ mod tests {
         );
 
         assert_eq!(out[0].as_str().unwrap(), "Stream: default Type: metrics");
+    }
+
+    /// A forecast alert as the web form saves it: per series, `value` is days until 0.9.
+    fn forecast_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "disk-full".into();
+        alert.org_id = "default".into();
+        alert.stream_name = "node_filesystem_avail_bytes".into();
+        alert.stream_type = config::meta::stream::StreamType::Metrics;
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_condition = Some(config::meta::alerts::Condition {
+            column: "value".into(),
+            operator: config::meta::alerts::Operator::LessThanEquals,
+            value: json!(7),
+            ignore_case: false,
+        });
+        alert.query_condition.promql = Some(
+            "((disk_used) >= 0.9) * 0 or clamp_min(ceil((0.9 - (disk_used)) / (deriv((disk_used)[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0) or ((disk_used) * 0 + 36500)".into(),
+        );
+        alert.query_condition.promql_multi_alert = true;
+        alert.trigger_condition.threshold = 1;
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.row_template = "reaches 0.9 in {value} days".into();
+        alert
+    }
+
+    fn forecast_row(device: &str, days: f64) -> Map<String, Value> {
+        let mut row = Map::new();
+        row.insert("device".to_string(), json!(device));
+        row.insert("_timestamp".to_string(), json!(1_700_000_000_000_000_i64));
+        row.insert("value".to_string(), json!(days));
+        row
+    }
+
+    fn firing_devices(rows: &[Map<String, Value>]) -> Vec<String> {
+        let classification = config::meta::alerts::grouping::classify_promql_series(
+            rows,
+            config::meta::alerts::Operator::LessThanEquals,
+            7.0,
+            None,
+            100,
+        );
+        let mut firing: Vec<String> = classification
+            .groups
+            .into_iter()
+            .filter(|group| group.level.is_some())
+            .map(|group| group.labels["device"].clone())
+            .collect();
+        firing.sort();
+        firing
+    }
+
+    #[tokio::test]
+    async fn a_forecast_alert_fires_per_series_and_says_when_it_crosses() {
+        let alert = forecast_alert_fixture();
+        // Rising, 6.96 days out, already past 0.9, and moving away.
+        let rows = vec![
+            forecast_row("a", 5.0),
+            forecast_row("b", 7.0),
+            forecast_row("c", 0.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&rows), ["a", "b", "c"]);
+
+        // Next evaluation: a's trend reversed and c stopped reporting.
+        let next = vec![
+            forecast_row("a", 36500.0),
+            forecast_row("b", 7.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&next), ["b"]);
+
+        let fired = &rows[..3];
+        let rows_tpl = process_row_template(
+            "default",
+            &alert.row_template,
+            &alert,
+            RowTemplateType::String,
+            fired,
+        );
+        let lines = [
+            "reaches 0.9 in 5 days",
+            "reaches 0.9 in 7 days",
+            "reaches 0.9 in 0 days",
+        ];
+        assert_eq!(rows_tpl, lines.map(|line| Value::String(line.into())));
+
+        let custom = process_dest_template(
+            "default",
+            "{rows}",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        for line in lines {
+            assert!(custom.contains(line), "{custom}");
+        }
+
+        let ctx = build_notification_context(
+            "default",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            None,
+        )
+        .await;
+        let spec = crate::alerts::notifications::default_template::compiled_default_content();
+        let content = resolve_content(&spec, &ctx, ChannelFormat::Webhook.channel_family());
+        let Ok(RenderedMessage::Http { body }) = render(ChannelFormat::Webhook, &content, &ctx)
+        else {
+            panic!("expected a webhook body");
+        };
+        // The default template ignores the row template: each fired series is its labels and days.
+        let body: Value = serde_json::from_str(&body).unwrap();
+        let rows: Vec<(&str, f64)> = body["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row["device"].as_str().unwrap(),
+                    row["value"].as_f64().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(rows, [("a", 5.0), ("b", 7.0), ("c", 0.0)]);
     }
 
     // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────
