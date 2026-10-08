@@ -116,9 +116,9 @@
                   class="rounded-default hover:bg-surface-base flex items-center justify-between px-2 py-1.5 transition-colors duration-100"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <span class="text-compact text-text-body truncate leading-snug">{{
+                  <OTruncatedText class="text-compact text-text-body leading-snug">{{
                     entry.label
-                  }}</span>
+                  }}</OTruncatedText>
                   <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
@@ -173,9 +173,9 @@
                   class="rounded-default hover:bg-surface-base flex items-center justify-between px-2 py-1.5 transition-colors duration-100"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <span class="text-compact text-text-body truncate leading-snug">{{
+                  <OTruncatedText class="text-compact text-text-body leading-snug">{{
                     entry.label
-                  }}</span>
+                  }}</OTruncatedText>
                   <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
@@ -226,6 +226,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcut } from "./composables";
 import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
 import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";

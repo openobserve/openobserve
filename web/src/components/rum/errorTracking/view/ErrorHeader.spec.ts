@@ -291,12 +291,15 @@ describe("ErrorHeader", () => {
       );
     });
 
-    it("keeps a very long event id reachable through its title attribute", async () => {
+    it("truncates a very long event id without a native title attribute", async () => {
       const longId = "very-long-error-id-that-might-cause-layout-issues-12345678901234567890";
       wrapper = mountComponent({ ...mockError, error_id: longId });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="error-id"]').attributes("title")).toBe(longId);
+      const errorId = wrapper.find('[data-test="error-id"]');
+      expect(errorId.text()).toBe(longId);
+      expect(errorId.classes()).toContain("truncate");
+      expect(errorId.attributes("title")).toBeUndefined();
     });
   });
 });

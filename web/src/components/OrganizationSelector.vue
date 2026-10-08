@@ -36,6 +36,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
 interface OrgOption {
@@ -212,7 +213,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           <template #icon-left>
             <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
           </template>
-          <span class="min-w-0 flex-1 truncate text-left">{{ current?.label || "" }}</span>
+          <OTruncatedText class="flex-1 text-left">{{ current?.label || "" }}</OTruncatedText>
           <template #icon-right>
             <OIcon
               name="arrow-drop-down"
@@ -284,17 +285,15 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                    if it alone exceeds the whole row); the id yields, truncating
                    to whatever space is left. -->
               <div class="flex min-w-0 flex-1 items-baseline gap-2">
-                <span
-                  class="text-compact max-w-full min-w-0 flex-none truncate leading-tight font-medium"
-                >
+                <OTruncatedText class="text-compact max-w-full flex-none leading-tight font-medium">
                   {{ row.org.label }}
-                </span>
-                <span
+                </OTruncatedText>
+                <OTruncatedText
                   v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="text-2xs text-text-secondary min-w-0 shrink truncate font-mono leading-tight"
+                  class="text-2xs text-text-secondary shrink font-mono leading-tight"
                 >
                   {{ row.org.identifier }}
-                </span>
+                </OTruncatedText>
               </div>
 
               <!-- Copy identifier without selecting the row. Feedback is the

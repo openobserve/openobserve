@@ -7,6 +7,7 @@ import { TabsTrigger } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useDragHandle from "@/composables/useDragHandle";
 
 // Disable auto-attribute inheritance so the consumer's `data-test="..."` lands
@@ -226,11 +227,12 @@ const heightClasses = computed<string>(() => {
             >{{ icon }}</span
           >
         </slot>
-        <span
+        <OTruncatedText
           v-if="label"
-          class="o-tab__label truncate"
+          class="o-tab__label"
           :class="context?.collapseLabels && !isActive ? 'max-md:hidden' : ''"
-          >{{ label }}</span
+          :tooltip="tooltip ? false : undefined"
+          >{{ label }}</OTruncatedText
         >
       </template>
       <slot v-else />

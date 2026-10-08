@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
-                  <span class="truncate">{{ row.name || "--" }}</span>
+                  <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -295,33 +295,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          events originating in a button — but the row click
                          navigates elsewhere, and that is not a default worth
                          depending on another component to keep. -->
-                    <button
+                    <OTruncatedText
                       v-if="row.slo_id"
+                      as="button"
                       type="button"
-                      class="text-text-link truncate hover:underline"
+                      class="text-text-link hover:underline"
                       :aria-label="t('alerts.sloColumn') + ': ' + sloLabel(row)"
                       :data-test="`alert-list-${row.name}-slo-link`"
                       @click.stop="goToSlo(row)"
                     >
                       {{ sloLabel(row) }}
-                    </button>
+                    </OTruncatedText>
                   </template>
                 </div>
                 <!-- Composite rows have no stream/query summary: show the
                      name-resolved expression the backend supplied instead. -->
-                <span
+                <OTruncatedText
                   v-if="row.alert_type === 'Composite' && row.conditions && row.conditions !== '--'"
-                  class="text-text-secondary min-w-0 truncate text-xs"
-                  :title="row.conditions"
+                  class="text-text-secondary block text-xs"
                   :data-test="`alert-list-composite-expression-${row.alert_id}`"
                 >
                   {{ row.conditions }}
-                </span>
-                <OTooltip
-                  v-if="row.name"
-                  :content="row.name"
-                  content-class="max-w-100 whitespace-normal break-words text-xs"
-                />
+                </OTruncatedText>
               </template>
 
               <template #cell-owner="{ row }">
@@ -985,6 +980,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1030,6 +1026,7 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     OTag,
+    OTruncatedText,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,

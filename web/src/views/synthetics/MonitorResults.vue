@@ -147,8 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-w-xs min-w-0"
         data-test="synthetics-run-drawer-url-badge"
       >
-        <span class="block min-w-0 truncate">{{ drawerUrl }}</span>
-        <OTooltip side="bottom" :content="raw(drawerUrl)" :max-width="'32rem'" />
+        <OTruncatedText class="block">{{ drawerUrl }}</OTruncatedText>
       </OBadge>
     </template>
     <RunDetail
@@ -173,7 +172,7 @@ import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

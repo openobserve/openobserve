@@ -13,6 +13,8 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import type { OTableColumnMeta } from "../OTable.types";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
@@ -268,13 +270,27 @@ function headerTooltip(header: any): I18nText | undefined {
   return (header.column.columnDef.meta as OTableColumnMeta | undefined)?.headerTooltip || undefined;
 }
 
-// A header narrow enough to ellipsise must still be READABLE somewhere, or the
-// column silently renames itself. The native `title` carries the full label on
-// hover; it costs nothing when the label fits and is the only recourse when a
-// column's width is fixed by its `size`.
-function headerTitleAttr(header: any): string | undefined {
-  const h = header.column.columnDef.header;
-  return typeof h === "string" && h.length ? h : undefined;
+// The help bubble covers the whole <th>, so a second bubble on the cut label would open on top of it.
+function labelTooltip(header: any): false | undefined {
+  return headerTooltip(header) ? false : undefined;
+}
+
+// Filled on hover, before the help bubble's delay ends, so the bubble can lead with a cut name.
+const cutHeaderNames = reactive<Record<string, { name: string; subLabel: string }>>({});
+
+function noteCutHeaderName(header: any, event: MouseEvent) {
+  if (!headerTooltip(header)) return;
+  const th = event.currentTarget as HTMLElement;
+  const name = th.querySelector("[data-o2-th-label]");
+  const subLabel = th.querySelector("[data-o2-th-sublabel]");
+  if (!isElementTruncated(name) && !isElementTruncated(subLabel)) {
+    delete cutHeaderNames[header.id];
+    return;
+  }
+  cutHeaderNames[header.id] = {
+    name: name ? readElementText(name) : "",
+    subLabel: subLabel ? readElementText(subLabel) : "",
+  };
 }
 
 // Stacking the label turns the row into a COLUMN, where the main axis is
@@ -425,7 +441,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             level.isLeaf ? 'justify-start' : 'justify-center',
           ]"
         >
-          <span class="truncate" :title="String(cell.label ?? '')">{{ cell.label }}</span>
+          <OTruncatedText>{{ cell.label }}</OTruncatedText>
           <OIcon
             v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
             name="arrow-upward"
@@ -529,6 +545,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :colspan="header.colSpan"
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
+        @mouseenter="noteCutHeaderName(header, $event)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           'table-head',
@@ -587,10 +604,25 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
              header a hover target rather than just the label text. -->
         <OTooltip
           v-if="headerTooltip(header)"
-          :content="headerTooltip(header)"
           side="top"
           :data-test="`o2-table-th-tooltip-${header.id}`"
-        />
+        >
+          <template #content>
+            <span
+              v-if="cutHeaderNames[header.id]?.name"
+              class="block font-semibold"
+              data-test="o2-table-th-tooltip-name"
+              >{{ cutHeaderNames[header.id].name }}</span
+            >
+            <span
+              v-if="cutHeaderNames[header.id]?.subLabel"
+              class="text-text-secondary block"
+              data-test="o2-table-th-tooltip-sublabel"
+              >{{ cutHeaderNames[header.id].subLabel }}</span
+            >
+            {{ headerTooltip(header) }}
+          </template>
+        </OTooltip>
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -614,20 +646,26 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               class="flex min-w-0 shrink flex-col justify-center"
               :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
             >
-              <span class="w-full min-w-0 truncate leading-tight" :title="headerTitleAttr(header)">
+              <OTruncatedText
+                class="w-full leading-tight"
+                data-o2-th-label
+                :tooltip="labelTooltip(header)"
+              >
                 <FlexRender
                   v-if="!header.isPlaceholder"
                   :render="header.column.columnDef.header"
                   :props="header.getContext()"
                 />
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="headerSubLabel(header)"
-                class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                data-o2-th-sublabel
                 :data-test="`o2-table-th-sublabel-${header.id}`"
+                :tooltip="labelTooltip(header)"
               >
                 {{ headerSubLabel(header) }}
-              </span>
+              </OTruncatedText>
             </span>
             <!-- Sort icons — `shrink-0` so they're never clipped even when the
                  header title truncates. -->
@@ -673,20 +711,22 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 : headerAlignClass(header),
             ]"
           >
-            <span class="w-full min-w-0 truncate" :title="headerTitleAttr(header)">
+            <OTruncatedText class="w-full" data-o2-th-label :tooltip="labelTooltip(header)">
               <FlexRender
                 v-if="!header.isPlaceholder"
                 :render="header.column.columnDef.header"
                 :props="header.getContext()"
               />
-            </span>
-            <span
+            </OTruncatedText>
+            <OTruncatedText
               v-if="headerSubLabel(header)"
-              class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+              class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+              data-o2-th-sublabel
               :data-test="`o2-table-th-sublabel-${header.id}`"
+              :tooltip="labelTooltip(header)"
             >
               {{ headerSubLabel(header) }}
-            </span>
+            </OTruncatedText>
           </div>
 
           <!-- Column close ("x"), shown on hover for columns marked closable. -->
@@ -761,9 +801,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
                   />
-                  <span class="flex-1 truncate text-sm select-none">
+                  <OTruncatedText class="flex-1 text-sm select-none">
                     {{ filterDisplayValue(header.column.id, rawVal) }}
-                  </span>
+                  </OTruncatedText>
                 </li>
                 <li
                   v-if="filteredUniqueValues(header.column.id).length === 0"
@@ -870,6 +910,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         v-for="header in headerGroup.headers"
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
+        @mouseenter="noteCutHeaderName(header, $event)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           dense ? 'group h-8' : 'group h-9',
@@ -923,10 +964,25 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
              header a hover target rather than just the label text. -->
         <OTooltip
           v-if="headerTooltip(header)"
-          :content="headerTooltip(header)"
           side="top"
           :data-test="`o2-table-th-tooltip-${header.id}`"
-        />
+        >
+          <template #content>
+            <span
+              v-if="cutHeaderNames[header.id]?.name"
+              class="block font-semibold"
+              data-test="o2-table-th-tooltip-name"
+              >{{ cutHeaderNames[header.id].name }}</span
+            >
+            <span
+              v-if="cutHeaderNames[header.id]?.subLabel"
+              class="text-text-secondary block"
+              data-test="o2-table-th-tooltip-sublabel"
+              >{{ cutHeaderNames[header.id].subLabel }}</span
+            >
+            {{ headerTooltip(header) }}
+          </template>
+        </OTooltip>
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -949,20 +1005,26 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               class="flex min-w-0 shrink flex-col justify-center"
               :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
             >
-              <span class="w-full min-w-0 truncate leading-tight" :title="headerTitleAttr(header)">
+              <OTruncatedText
+                class="w-full leading-tight"
+                data-o2-th-label
+                :tooltip="labelTooltip(header)"
+              >
                 <FlexRender
                   v-if="!header.isPlaceholder"
                   :render="header.column.columnDef.header"
                   :props="header.getContext()"
                 />
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="headerSubLabel(header)"
-                class="text-text-secondary text-2xs w-full min-w-0 truncate leading-tight font-normal normal-case"
+                class="text-text-secondary text-2xs w-full leading-tight font-normal normal-case"
+                data-o2-th-sublabel
                 :data-test="`o2-table-th-sublabel-${header.id}`"
+                :tooltip="labelTooltip(header)"
               >
                 {{ headerSubLabel(header) }}
-              </span>
+              </OTruncatedText>
             </span>
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
@@ -991,20 +1053,22 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               />
             </template>
           </div>
-          <div
+          <OTruncatedText
             v-else
+            as="div"
             :class="[
-              'min-w-0 truncate',
               isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
+            data-o2-th-label
+            :tooltip="labelTooltip(header)"
           >
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
               :props="header.getContext()"
             />
-          </div>
+          </OTruncatedText>
 
           <!-- Column close ("x"), shown on hover for columns marked closable. -->
           <button
@@ -1078,9 +1142,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
                   />
-                  <span class="flex-1 truncate text-sm select-none">
+                  <OTruncatedText class="flex-1 text-sm select-none">
                     {{ filterDisplayValue(header.column.id, rawVal) }}
-                  </span>
+                  </OTruncatedText>
                 </li>
                 <li
                   v-if="filteredUniqueValues(header.column.id).length === 0"

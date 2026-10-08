@@ -143,9 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="alerts"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
-              <span v-else class="text-text-body min-w-0 truncate font-medium">
+              <OTruncatedText v-else class="text-text-body font-medium">
                 {{ activeFolderName }}
-              </span>
+              </OTruncatedText>
             </span>
           </template>
         </OPageHeader>
@@ -669,6 +669,7 @@ import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
 
@@ -725,6 +726,7 @@ export default defineComponent({
     OFormInlineEdit,
     OFormSelect,
     OPageHeader,
+    OTruncatedText,
     CompositeAlertForm,
   },
   setup(props, { emit }) {

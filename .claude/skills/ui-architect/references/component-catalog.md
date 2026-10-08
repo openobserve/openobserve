@@ -12,7 +12,7 @@ markup — don't guess a prop name.
 
 | File                                                        | Covers                                                                                                                                                                                                              |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [references/core-display.md](core-display.md)               | Badge/Tag/DimensionChip, Card, Code, Collapsible, EmptyState, Icon, Separator, Shortcut, **Text (typography)**, VirtualScroll                                                                                       |
+| [references/core-display.md](core-display.md)               | Badge/Tag/DimensionChip, Card, Code, Collapsible, EmptyState, Icon, Separator, Shortcut, **Text (typography)**, **TruncatedText (cut text)**, VirtualScroll                                                         |
 | [references/core-controls-table.md](core-controls-table.md) | **Button**/ButtonGroup, Navbar, RefreshButton, Splitter, ToggleGroup, **Table** (+ cell renderers)                                                                                                                  |
 | [references/forms-inputs.md](forms-inputs.md)               | Input/Textarea, Select, Combobox, SearchInput, Checkbox, Radio, Switch, OptionGroup                                                                                                                                 |
 | [references/forms-specialized.md](forms-specialized.md)     | **Form + useOForm**, Color, Date, DateTimeRange, Time, File, Range, Slider                                                                                                                                          |
@@ -41,6 +41,8 @@ markup — don't guess a prop name.
 | Show a status label / count / tag                    | `OBadge`, `OTag`, `ODimensionChip`                                                                                   | core-display            |
 | Group content in a surface                           | `OCard` (+ `OCardSection`, `OCardActions`)                                                                           | core-display            |
 | Body / heading / muted text                          | `OText` (pick the `variant`)                                                                                         | core-display            |
+| Text that may not fit (cut with "…")                 | `OTruncatedText` — full text on hover only when cut; `:tooltip="false"` for secrets / text shown elsewhere           | **core-display**        |
+| Cut text in a table cell                             | nothing — `OTable` shows it; secret column → `meta.cellOverflowTooltip: false`                                      | **core-controls-table** |
 | Show an icon                                         | `OIcon` (`name` from the icon registry)                                                                              | core-display            |
 | A divider / hairline                                 | `OSeparator`                                                                                                         | core-display            |
 | Show code / a code block                             | `OCode`, `OCodeBlock`                                                                                                | core-display            |
@@ -69,7 +71,7 @@ markup — don't guess a prop name.
 | Side panel / large or contextual form                | `ODrawer`                                                                                                            | overlay-navigation      |
 | Menu of actions                                      | `ODropdown` (+ `ODropdownItem`)                                                                                      | overlay-navigation      |
 | Freeform floating content                            | `OPopover`                                                                                                           | overlay-navigation      |
-| Hover hint                                           | `OTooltip`                                                                                                           | overlay-navigation      |
+| Hover hint (that adds information)                   | `OTooltip` — not for repeating cut text; use `OTruncatedText`                                                       | overlay-navigation      |
 | Switch between content sections                      | `OTabs` (+ `OTab`/`OTabPanel`); `ORouteTab` for route-driven                                                         | overlay-navigation      |
 | Multi-step wizard                                    | `OStepper` (+ `OStep`)                                                                                               | overlay-navigation      |
 | Paginate a list                                      | `OPagination`                                                                                                        | overlay-navigation      |

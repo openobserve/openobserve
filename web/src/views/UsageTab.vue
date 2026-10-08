@@ -194,9 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="function" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("home.functionTitle")
-                }}</span>
+                }}</OTruncatedText>
                 <span
                   class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-functions-count"
@@ -223,9 +223,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="dashboard" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("home.dashboardTitle")
-                }}</span>
+                }}</OTruncatedText>
                 <span
                   class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-dashboards-count"
@@ -267,9 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="search" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.search")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -291,9 +291,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="account-tree" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.traces")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -315,9 +315,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.metrics")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -339,9 +339,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="devices" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   raw("RUM")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -363,9 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="notifications-active" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.incidents")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -387,9 +387,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="description" size="sm" />
                 </span>
-                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                <OTruncatedText class="text-text-body flex-1 text-sm font-medium">{{
                   t("menu.report")
-                }}</span>
+                }}</OTruncatedText>
                 <OIcon
                   name="chevron-right"
                   size="sm"
@@ -566,6 +566,7 @@ import { formatEventCount } from "@/utils/formatters";
 import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
