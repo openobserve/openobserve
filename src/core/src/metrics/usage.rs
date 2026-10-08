@@ -63,6 +63,7 @@ pub struct DashboardUsage {
     pub id: String,
     pub title: String,
     pub folder_id: String,
+    /// `text` when only an unparseable query names the metric; absent for a parsed match.
     #[serde(rename = "match", skip_serializing_if = "Option::is_none")]
     pub match_kind: Option<MatchKind>,
 }
@@ -73,6 +74,7 @@ pub struct AlertUsage {
     pub id: String,
     pub name: String,
     pub folder_id: String,
+    /// `text` when only an unparseable query names the metric; absent for a parsed match.
     #[serde(rename = "match", skip_serializing_if = "Option::is_none")]
     pub match_kind: Option<MatchKind>,
 }
@@ -82,6 +84,7 @@ pub struct AlertUsage {
 pub struct ObjectUsage {
     pub id: String,
     pub name: String,
+    /// `text` when only an unparseable query names the metric; absent for a parsed match.
     #[serde(rename = "match", skip_serializing_if = "Option::is_none")]
     pub match_kind: Option<MatchKind>,
 }
@@ -93,6 +96,7 @@ pub struct MetricUsage {
     pub alerts: Vec<AlertUsage>,
     pub slos: Vec<ObjectUsage>,
     pub pipelines: Vec<ObjectUsage>,
+    /// Queries that name the metric but could not be parsed, so matched only as text.
     pub unparsed: usize,
 }
 
