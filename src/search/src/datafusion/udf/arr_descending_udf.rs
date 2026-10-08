@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::Ordering,
-    sync::{Arc, LazyLock as Lazy},
-};
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::utils::json;
 use datafusion::{
@@ -30,6 +27,8 @@ use datafusion::{
     prelude::create_udf,
     sql::sqlparser::parser::ParserError,
 };
+
+use super::arrsort_udf::json_total_cmp;
 
 /// The name of the arr_descending UDF given to DataFusion.
 pub const ARR_DESCENDING_UDF_NAME: &str = "arr_descending";
@@ -76,22 +75,7 @@ pub fn arr_descending_impl(args: &[ColumnarValue]) -> datafusion::error::Result<
                             if field1.is_empty() {
                                 None
                             } else {
-                                field1.sort_by(|a, b| {
-                                    // Assuming the array having elements of same type
-                                    if a.is_f64() {
-                                        b.as_f64().unwrap().total_cmp(a.as_f64().as_ref().unwrap())
-                                    } else if a.is_i64() {
-                                        b.as_i64().unwrap().cmp(a.as_i64().as_ref().unwrap())
-                                    } else if a.is_u64() {
-                                        b.as_u64().unwrap().cmp(a.as_u64().as_ref().unwrap())
-                                    } else if a.is_string() {
-                                        b.as_str().unwrap().cmp(a.as_str().unwrap())
-                                    } else if a.is_boolean() {
-                                        b.as_bool().unwrap().cmp(a.as_bool().as_ref().unwrap())
-                                    } else {
-                                        Ordering::Greater
-                                    }
-                                });
+                                field1.sort_by(|a, b| json_total_cmp(b, a));
                                 json::to_string(&field1).ok()
                             }
                         } else {
@@ -357,5 +341,79 @@ mod tests {
         // Test with multiple arguments
         let result = ctx.sql("select arr_descending('a', 'b') as ret").await;
         assert!(result.is_err());
+    }
+
+    fn call_arr_descending(json_array: &str) -> String {
+        let input = StringArray::from(vec![json_array]);
+        let args = [ColumnarValue::Array(Arc::new(input))];
+        let result = arr_descending_impl(&args).unwrap();
+        match result {
+            ColumnarValue::Array(out) => out
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .value(0)
+                .to_string(),
+            _ => panic!("expected array result"),
+        }
+    }
+
+    #[test]
+    fn test_arr_descending_mixed_number_and_string_does_not_panic() {
+        call_arr_descending(r#"[1.5,"a"]"#);
+    }
+
+    #[test]
+    fn test_arr_descending_float_and_int_does_not_panic() {
+        call_arr_descending(r#"[2.5,1]"#);
+    }
+
+    #[test]
+    fn test_arr_descending_negative_and_huge_unsigned_does_not_panic() {
+        call_arr_descending(r#"[-1,18446744073709551615]"#);
+    }
+
+    #[test]
+    fn test_arr_descending_null_mixed_with_strings_does_not_panic() {
+        call_arr_descending(r#"[null,"a","b"]"#);
+    }
+
+    #[test]
+    fn test_arr_descending_large_shuffled_mixed_type_array_does_not_panic() {
+        use rand::prelude::SliceRandom;
+
+        let mut values: Vec<json::Value> = Vec::with_capacity(200);
+        for i in 0..200 {
+            values.push(match i % 7 {
+                0 => json::Value::from(i as i64),
+                1 => json::Value::from(i as f64 + 0.5),
+                2 => json::Value::from(format!("s{i}")),
+                3 => json::Value::Bool(i % 2 == 0),
+                4 => json::Value::Null,
+                // arbitrary_precision numbers with no f64 representation, one per sign.
+                5 => json::from_str::<json::Value>(&format!("{i}e400")).unwrap(),
+                _ => json::from_str::<json::Value>(&format!("-{i}e400")).unwrap(),
+            });
+        }
+        values.shuffle(&mut rand::rng());
+        let json_array = json::to_string(&values).unwrap();
+        call_arr_descending(&json_array);
+    }
+
+    #[test]
+    fn test_arr_descending_orders_integers_above_2_pow_53_exactly() {
+        assert_eq!(
+            call_arr_descending("[1727000000000000001,1727000000000000002]"),
+            "[1727000000000000002,1727000000000000001]"
+        );
+    }
+
+    #[test]
+    fn test_arr_descending_with_overflow_numbers_is_deterministic_and_ordered() {
+        let result = call_arr_descending(r#"[1e400,-1e400,100.0,50,2e300,-3]"#);
+        assert_eq!(result, "[1e+400,2e+300,100.0,50,-3,-1e+400]");
+
+        let result2 = call_arr_descending(r#"[50,-1e400,2e300,-3,1e400,100.0]"#);
+        assert_eq!(result, result2);
     }
 }
