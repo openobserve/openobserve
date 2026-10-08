@@ -53,7 +53,7 @@ use crate::organization::is_org_in_free_trial_period;
 use crate::{
     alerts::{
         alert::{
-            AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
+            AlertError, AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
             get_row_column_map,
         },
         derived_streams::DerivedStreamExt,
@@ -988,6 +988,7 @@ async fn handle_composite_alert_trigger(
     transaction.commit().await?;
 
     let mut delivery_retry_at = None;
+    let mut delivery_error = None;
     if evaluated.result {
         scheduled_data.last_satisfied_at = Some(now);
         // Hoisted: correlation runs in the deliverable branch, but paging needs the answer.
@@ -1087,6 +1088,7 @@ async fn handle_composite_alert_trigger(
                     )
                     .await
             };
+            delivery_error = composite_delivery_error(&delivery_result);
             match delivery_result {
                 Ok(outcome) if outcome.failed.is_empty() => {
                     scheduled_data.notified_destinations.clear();
@@ -1143,7 +1145,12 @@ async fn handle_composite_alert_trigger(
             "{}/{}",
             definition.definition.name, definition.definition.id
         ),
-        status: outcome.clone(),
+        status: if delivery_error.is_some() {
+            RunOutcome::NotifyFailed
+        } else {
+            outcome.clone()
+        },
+        error: delivery_error,
         actual_value: Some(i32::from(evaluated.result) as f64),
         level: Some(evaluated.level.to_i32()),
         scheduler_trace_id: Some(trace_id.to_string()),
@@ -1228,6 +1235,15 @@ fn should_dispatch_after_incident(
     has_workflows: bool,
 ) -> bool {
     !incident_destinations_handled || has_workflows
+}
+
+/// Why a composite's send left something undelivered; a partial send is retried but still failed.
+fn composite_delivery_error(delivery: &Result<NotificationOutcome, AlertError>) -> Option<String> {
+    match delivery {
+        Ok(outcome) if outcome.failed.is_empty() => None,
+        Ok(outcome) => Some(outcome.error_message.trim().to_owned()),
+        Err(error) => Some(format!("error sending notification for alert: {error}")),
+    }
 }
 
 fn composite_notification_alert(
@@ -6291,6 +6307,34 @@ mod tests {
         assert!(should_dispatch_after_incident(true, true));
         assert!(!should_dispatch_after_incident(true, false));
         assert!(should_dispatch_after_incident(false, false));
+    }
+
+    #[test]
+    fn test_composite_delivery_error_for_every_send_result() {
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            ..Default::default()
+        });
+        assert_eq!(composite_delivery_error(&delivered), None);
+
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            error_message: " pagerduty timed out ".to_string(),
+            ..Default::default()
+        });
+        assert_eq!(
+            composite_delivery_error(&partial).as_deref(),
+            Some("pagerduty timed out")
+        );
+
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(
+            composite_delivery_error(&failed)
+                .is_some_and(|error| error.starts_with("error sending notification for alert:"))
+        );
     }
 
     #[cfg(feature = "enterprise")]
