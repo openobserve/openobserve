@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type {
   BrowserStep,
@@ -103,7 +102,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const store = useStore();
 
 /**
  * Apply an edit and keep the recorded wire step in sync.
@@ -161,16 +159,8 @@ const showTarget = computed(() => stepNeedsTarget(props.step));
  */
 const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { candidates: [] });
 
-// A computed so the wording follows the locale; `=== true` hides subtest on an unknown flag.
-const actionSelectOptions = computed(() =>
-  actionOptions(t).filter(
-    (o) =>
-      o.value !== "subtest" ||
-      // A row that already holds a reference keeps it: the server lets it save unchanged.
-      props.step.action === "subtest" ||
-      store?.state?.zoConfig?.synthetics_subtests_enabled === true,
-  ),
-);
+// A computed so the wording follows the locale.
+const actionSelectOptions = computed(() => actionOptions(t));
 
 const showValue = computed(() => VALUE_ACTIONS.includes(props.step.action));
 /** `upload` writes `files`, which the probe never substitutes, so its value field stays plain. */

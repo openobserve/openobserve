@@ -1268,11 +1268,6 @@ function retryChildLoad(row: BrowserStep) {
   void ensureChildLoaded(row);
 }
 
-// `=== true` so an unknown flag hides the button, as the step editor does.
-const isCompositionEnabled = computed(
-  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
-);
-
 const addDisabled = computed(
   () => !!props.readonly || isRecording.value || isRestoring.value || isReplayLocked.value,
 );
@@ -1292,10 +1287,8 @@ const addMenuItems = computed(() => [
     key: "subtest",
     icon: "account-tree" as const,
     label: t("synthetics.journey.addMenu.addSubtest"),
-    hint: isCompositionEnabled.value
-      ? t("synthetics.journey.addMenu.subtestHint")
-      : t("synthetics.journey.subtest.disabledTooltip"),
-    disabled: !isCompositionEnabled.value || addDisabled.value,
+    hint: t("synthetics.journey.addMenu.subtestHint"),
+    disabled: addDisabled.value,
     onSelect: addSubtestStep,
     dataTest: "synthetics-journey-toolbar-menu-add-subtest",
   },
@@ -1590,7 +1583,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <SubtestMenu
             :own-check-id="ownCheckId"
             :disabled="addDisabled"
-            :composition-enabled="isCompositionEnabled"
             @pick="addSubtestReference"
           />
         </div>

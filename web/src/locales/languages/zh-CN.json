@@ -15568,7 +15568,6 @@
         "previewLabel": "在此运行的步骤",
         "openChild": "打开“{name}”",
         "noAccessRemedy": "请申请其所在文件夹的读取权限，或移除该引用。",
-        "disabledTooltip": "此部署未启用子测试。",
         "loadFailed": "无法加载此子测试，因此其步骤和步骤数未知。",
         "missing": "此子测试已不存在。请移除引用，或选择其他测试。",
         "noAccessBadge": "无权访问",

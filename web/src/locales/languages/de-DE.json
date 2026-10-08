@@ -15568,7 +15568,6 @@
         "previewLabel": "Schritte, die hier ausgeführt werden",
         "openChild": "\"{name}\" öffnen",
         "noAccessRemedy": "Bitten Sie um Lesezugriff auf seinen Ordner, oder entfernen Sie den Verweis.",
-        "disabledTooltip": "Subtests sind in dieser Bereitstellung nicht aktiviert.",
         "loadFailed": "Dieser Subtest konnte nicht geladen werden, daher sind seine Schritte und die Schrittanzahl unbekannt.",
         "missing": "Dieser Subtest existiert nicht mehr. Entfernen Sie die Referenz oder wählen Sie einen anderen Test.",
         "noAccessBadge": "kein Zugriff",

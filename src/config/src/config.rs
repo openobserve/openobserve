@@ -453,7 +453,6 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_ENABLED",
         SyntheticsReloadClass::RestartRequired,
     ),
-    ("ZO_SYNTHETICS_SUBTESTS_ENABLED", SyntheticsReloadClass::Hot),
     (
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         SyntheticsReloadClass::Hot,
@@ -516,7 +515,6 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
-        subtests_enabled: _,
         subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
@@ -1106,13 +1104,6 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
-    /// Off by default so no composed check can exist until an org opts in.
-    #[env_config(
-        name = "ZO_SYNTHETICS_SUBTESTS_ENABLED",
-        default = false,
-        help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
-    )]
-    pub subtests_enabled: bool,
     /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
     #[env_config(
         name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
@@ -5086,7 +5077,6 @@ mod tests {
     /// `synthetics_restart_required_changes`.
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
-        "ZO_SYNTHETICS_SUBTESTS_ENABLED",
         "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
@@ -5121,8 +5111,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            17,
-            "Synthetics has 17 keys; every one needs a reload class"
+            16,
+            "Synthetics has 16 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -5159,7 +5149,6 @@ mod tests {
                 "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
-                "ZO_SYNTHETICS_SUBTESTS_ENABLED",
                 "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
@@ -5198,21 +5187,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn composition_is_off_by_default() {
-        let cfg = Config::init().unwrap();
-        assert!(
-            !cfg.synthetics.subtests_enabled,
-            "composition must ship dark: a fresh deployment must refuse subtest writes"
-        );
-    }
-
     /// Mutates every field away from its current value, so the two tests below
     /// run against the whole struct — an implementation that warns about an
     /// extra key cannot hide in the fields a subset forgot to touch.
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
-        cfg.subtests_enabled = !cfg.subtests_enabled;
         cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
