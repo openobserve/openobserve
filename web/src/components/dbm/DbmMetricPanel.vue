@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-heading text-compact min-w-0 truncate font-medium"
         :class="identifier ? 'font-mono' : ''"
       >
+        <OTooltip v-if="helpText" side="bottom" :content="helpText" />
         {{ title }}
       </h4>
       <OSelect
@@ -52,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`dbm-metric-panel-by-${panelKey}`"
         @update:model-value="emit('update:by', $event as string)"
       />
-      <OTooltip v-if="helpText" side="bottom" :content="helpText" />
       <a
         v-if="exploreUrl"
         :href="exploreUrl"

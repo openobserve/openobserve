@@ -92,11 +92,7 @@
         </template>
 
         <template #cell-input="{ row }">
-          <span
-            class="text-text-body block truncate text-xs"
-            :title="raw(displayRowInput(row.input))"
-            data-test="ai-experiment-comparison-row-input"
-          >
+          <span class="text-text-body text-xs" data-test="ai-experiment-comparison-row-input">
             {{ displayRowInput(row.input) }}
           </span>
         </template>
@@ -106,10 +102,13 @@
           :key="dimensionColumnId(dimension)"
           #[dimensionSlot(dimension)]="{ row }"
         >
-          <div class="flex items-center gap-1.5">
-            <span class="text-text-body text-xs">{{ rowDimensionValue(row, dimension) }}</span>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <OTruncatedText class="text-text-body text-xs">{{
+              rowDimensionValue(row, dimension)
+            }}</OTruncatedText>
             <OTag
               v-if="hasDeltaTag(row, dimension)"
+              class="shrink-0"
               size="sm"
               icon=""
               :variant="deltaVariant(rowDimension(row, dimension)!)"
@@ -126,6 +125,7 @@
 import { computed, h, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";

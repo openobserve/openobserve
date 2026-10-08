@@ -48,13 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
           <template #title>
-            <span
-              data-test="trace-details-operation-name"
-              class="block truncate"
-              :title="traceTree[0]?.operationName"
-            >
+            <OTruncatedText data-test="trace-details-operation-name" class="block">
               {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-            </span>
+            </OTruncatedText>
           </template>
 
           <template #subtitle>
@@ -242,14 +238,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="flex w-full min-w-0 items-center gap-2.5!">
               <!-- Operation Name -->
-              <div
+              <OTruncatedText
+                as="div"
                 data-test="trace-details-operation-name"
-                class="text-text-heading max-w-96! min-w-0 truncate text-base leading-tight font-semibold"
-                :title="traceTree[0]?.operationName"
+                class="text-text-heading max-w-96! text-base leading-tight font-semibold"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-                <OTooltip :content="traceTree[0]?.operationName" />
-              </div>
+              </OTruncatedText>
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
@@ -1046,6 +1041,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -1282,6 +1278,7 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OSpinner,
     OTooltip,
+    OTruncatedText,
     OSearchInput,
     OSelect,
     OSwitch,

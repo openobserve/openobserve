@@ -191,6 +191,18 @@ describe("ProtocolRunSummary", () => {
       loading.value = false;
     });
 
+    it("cuts a long target inside its badge with a cut-only tooltip", async () => {
+      protocolRunDetail.value = makeProtocolRun({ target: "https://example.com/a/long/path" });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const target = wrapper
+        .findAll('[data-test="o-truncated-text"]')
+        .find((t) => t.text() === "https://example.com/a/long/path");
+      expect(target?.attributes("data-o-tooltip-trigger")).toBe("overflow");
+    });
+
     it("should display passed status badge when run has passed status", async () => {
       protocolRunDetail.value = makeProtocolRun({ status: "passed" });
 
