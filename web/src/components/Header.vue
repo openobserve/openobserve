@@ -218,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :organizations="organizations"
           :current="userClickedOrg"
           @select="handleOrgSelection"
+          @edit="handleOrgEdit"
         />
 
         <div class="header-utility-icons flex items-center gap-x-2">
@@ -745,6 +746,21 @@ export default defineComponent({
       emit("updateOrganization");
     };
 
+    // Open the rename dialog on the IAM Organizations page for the chosen org —
+    // the same deep-link contract that page's own row-level edit button pushes
+    // (see ListOrganizations.vue's renameOrganization), so it lands pre-filled.
+    const handleOrgEdit = (org: any) => {
+      router.push({
+        name: "organizations",
+        query: {
+          action: "update",
+          org_identifier: props.store.state.selectedOrganization?.identifier,
+          to_be_updated_org_id: org.identifier,
+          to_be_updated_org_name: org.label,
+        },
+      });
+    };
+
     // Open enterprise upgrade dialog
     const openEnterpriseDialog = () => {
       showEnterpriseDialog.value = true;
@@ -779,6 +795,7 @@ export default defineComponent({
       handleMouseEnter,
       handleMouseLeave,
       handleOrgSelection,
+      handleOrgEdit,
       openEnterpriseDialog,
     };
   },

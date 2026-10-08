@@ -845,6 +845,7 @@
     "columns": "Columns",
     "toggleColumn": "Toggle {name} column",
     "copyOrganizationId": "Copy organization ID {id}",
+    "editOrganization": "Edit {name}",
     "applyTheme": "Apply {name} theme",
     "pipelinesAssociatedWith": "Pipelines Associated with {name}",
     "removeField": "Remove {name}",
@@ -3160,9 +3161,11 @@
     "selectOrganizationForQuota": "Select an Organization to set quotas"
   },
   "organization": {
-    "searchByNameOrId": "Search by name or ID",
+    "searchByNameOrId": "Search by name, ID or owner email",
     "noOrganizationsFound": "No organizations found",
     "header": "Organizations",
+    "ownedByYou": "Owned by you",
+    "sharedWithYou": "Shared with you",
     "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
     "createOrganization": "New organization",
     "updateOrganization": "Update organization",

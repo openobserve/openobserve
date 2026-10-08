@@ -1081,6 +1081,12 @@ export default defineComponent({
                   id: data.id,
                   identifier: data.identifier,
                   user_email: store.state.userInfo.email,
+                  // The org's owner (not the logged-in user) — undefined on OSS,
+                  // where the org list carries no UserObj.
+                  owner_email: data.UserObj?.email,
+                  // OSS orgs carry no UserObj, so there's no "shared" concept —
+                  // treat them as owned by the current user.
+                  is_owned: !data.UserObj || data.UserObj.email === store.state.userInfo.email,
                   ingest_threshold: data.ingest_threshold,
                   search_threshold: data.search_threshold,
                   subscription_type: Object.prototype.hasOwnProperty.call(
@@ -1153,6 +1159,8 @@ export default defineComponent({
             id: data.id,
             identifier: data.identifier,
             user_email: store.state.userInfo.email,
+            owner_email: data.UserObj?.email,
+            is_owned: !data.UserObj || data.UserObj.email === store.state.userInfo.email,
             ingest_threshold: data.ingest_threshold,
             search_threshold: data.search_threshold,
             subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")

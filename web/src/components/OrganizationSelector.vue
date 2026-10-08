@@ -41,6 +41,10 @@ import { copyToClipboard } from "@/utils/clipboard";
 interface OrgOption {
   label: I18nText;
   identifier: string;
+  /** The org owner's email — absent on OSS, which has no sharing concept. */
+  owner_email?: string;
+  /** Whether the current user owns this org (vs. it being shared with them). */
+  is_owned?: boolean;
   [key: string]: any;
 }
 
@@ -53,6 +57,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "select", org: OrgOption): void;
+  (e: "edit", org: OrgOption): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -60,27 +65,65 @@ const { t } = useI18nTyped();
 const open = ref(false);
 const searchQuery = ref("");
 
-// Matches both the display name and the identifier.
+// Matches the display name, the identifier, and (for shared orgs) the owner's email.
 const filtered = computed<OrgOption[]>(() => {
   if (!searchQuery.value) return props.organizations;
   const q = searchQuery.value.toLowerCase();
   return props.organizations.filter(
-    (o) => o.label?.toLowerCase().includes(q) || o.identifier?.toLowerCase().includes(q),
+    (o) =>
+      o.label?.toLowerCase().includes(q) ||
+      o.identifier?.toLowerCase().includes(q) ||
+      o.owner_email?.toLowerCase().includes(q),
   );
 });
 
+// ── Grouping ─────────────────────────────────────────────────────
+// Owned orgs first, then shared, each under its own section label. The
+// "Owned by you" label stays up even when nothing is shared with the user —
+// it's the top label of the list, so it shouldn't flicker in and out as the
+// shared group empties; "Shared with you" simply doesn't appear when that
+// group has nothing in it.
+type ListRow =
+  | { kind: "header"; key: string; text: string }
+  | { kind: "item"; key: string; org: OrgOption };
+
+const groupedRows = computed<ListRow[]>(() => {
+  const owned = filtered.value.filter((o) => o.is_owned);
+  const shared = filtered.value.filter((o) => !o.is_owned);
+
+  const rows: ListRow[] = [];
+  if (owned.length) {
+    rows.push({ kind: "header", key: "header-owned", text: t("organization.ownedByYou") });
+    owned.forEach((org) => rows.push({ kind: "item", key: org.identifier, org }));
+  }
+  if (shared.length) {
+    rows.push({ kind: "header", key: "header-shared", text: t("organization.sharedWithYou") });
+    shared.forEach((org) => rows.push({ kind: "item", key: org.identifier, org }));
+  }
+  return rows;
+});
+
+const itemRowIndices = computed(() =>
+  groupedRows.value.reduce<number[]>((acc, row, index) => {
+    if (row.kind === "item") acc.push(index);
+    return acc;
+  }, []),
+);
+
 // ── Virtualization ──────────────────────────────────────────────
-// One line per org: the name, with the id inline beside it only when it
-// differs from the name (an id equal to the name is redundant). Rows are a
-// uniform single line, so a fixed height is enough.
+// One line per org/header row. Header rows are shorter than item rows, so
+// size is picked per row kind; both are fixed (not estimates), so there's no
+// need for dynamic measurement.
 const ROW_HEIGHT = 36;
+const HEADER_ROW_HEIGHT = 28;
 const scrollRef = ref<HTMLElement | null>(null);
 
 const virtualizer = useVirtualizer(
   computed(() => ({
-    count: filtered.value.length,
+    count: groupedRows.value.length,
     getScrollElement: () => scrollRef.value,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (index: number) =>
+      groupedRows.value[index]?.kind === "header" ? HEADER_ROW_HEIGHT : ROW_HEIGHT,
     overscan: 8,
   })),
 );
@@ -92,7 +135,7 @@ const rows = computed(() =>
     index: v.index,
     start: v.start,
     size: v.size,
-    org: filtered.value[v.index],
+    row: groupedRows.value[v.index],
   })),
 );
 
@@ -108,6 +151,11 @@ const scrollHighlightedIntoView = (align: "auto" | "center" = "auto") => {
 const select = (org: OrgOption) => {
   open.value = false;
   emit("select", org);
+};
+
+const editOrg = (org: OrgOption) => {
+  open.value = false;
+  emit("edit", org);
 };
 
 // Copy feedback lives on the button itself (icon flips to a tick) — no toast.
@@ -129,24 +177,26 @@ onBeforeUnmount(() => {
 });
 
 const onSearchKeydown = (e: KeyboardEvent) => {
-  const len = filtered.value.length;
+  const indices = itemRowIndices.value;
   if (e.key === "Escape") {
     open.value = false;
     return;
   }
-  if (!len) return;
+  if (!indices.length) return;
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    highlightedIndex.value = highlightedIndex.value < len - 1 ? highlightedIndex.value + 1 : 0;
+    const pos = indices.indexOf(highlightedIndex.value);
+    highlightedIndex.value = indices[pos < indices.length - 1 ? pos + 1 : 0];
     nextTick(scrollHighlightedIntoView);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
-    highlightedIndex.value = highlightedIndex.value > 0 ? highlightedIndex.value - 1 : len - 1;
+    const pos = indices.indexOf(highlightedIndex.value);
+    highlightedIndex.value = indices[pos > 0 ? pos - 1 : indices.length - 1];
     nextTick(scrollHighlightedIntoView);
   } else if (e.key === "Enter") {
     e.preventDefault();
-    const org = filtered.value[Math.max(0, highlightedIndex.value)];
-    if (org) select(org);
+    const row = groupedRows.value[highlightedIndex.value];
+    if (row?.kind === "item") select(row.org);
   }
 };
 
@@ -160,8 +210,10 @@ watch(open, async (isOpen) => {
   virtualizer.value.measure();
   // Highlight the current org (fallback to first) and center it in view so it
   // never lands stuck at the bottom edge.
-  const activeIdx = filtered.value.findIndex((o) => o.identifier === props.current?.identifier);
-  highlightedIndex.value = activeIdx >= 0 ? activeIdx : 0;
+  const activeIdx = groupedRows.value.findIndex(
+    (row) => row.kind === "item" && row.org.identifier === props.current?.identifier,
+  );
+  highlightedIndex.value = activeIdx >= 0 ? activeIdx : (itemRowIndices.value[0] ?? -1);
   nextTick(() => scrollHighlightedIntoView("center"));
   const input = document.querySelector(
     '[data-test="organization-search-input"] input',
@@ -177,8 +229,8 @@ watch(open, async (isOpen) => {
 // element already exists here (unlike on open), and deferring means rows paint
 // at stale offsets for one tick, then shift. A click landing in that window
 // hits a row that is about to move out from under the pointer.
-watch(filtered, (list) => {
-  highlightedIndex.value = list.length ? 0 : -1;
+watch(groupedRows, () => {
+  highlightedIndex.value = itemRowIndices.value[0] ?? -1;
   if (scrollRef.value) scrollRef.value.scrollTop = 0;
   virtualizer.value.measure();
 });
@@ -187,8 +239,9 @@ const isSelected = (org: OrgOption) => org.identifier === props.current?.identif
 
 // Selection reuses the same tokens OSelect uses, so the menu is visually
 // consistent with every other dropdown in the app.
-const rowStateClass = (row: { org: OrgOption; index: number }) => {
-  if (isSelected(row.org)) {
+const rowStateClass = (row: { row: ListRow; index: number }) => {
+  if (row.row.kind !== "item") return "";
+  if (isSelected(row.row.org)) {
     return "bg-select-item-selected-bg text-select-item-selected-text";
   }
   if (row.index === highlightedIndex.value) {
@@ -264,62 +317,98 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           class="relative max-h-80 overflow-x-hidden overflow-y-auto pt-2 pb-1"
         >
           <div class="relative w-full" :style="{ height: `${totalSize}px` }">
-            <div
-              v-for="row in rows"
-              :key="row.org.identifier"
-              data-test="organization-menu-item-label-item-label"
-              :data-test-org-identifier="row.org.identifier"
-              class="group rounded-default absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-2 px-3 transition-colors"
-              :class="rowStateClass(row)"
-              :style="{
-                transform: `translateY(${row.start}px)`,
-                height: `${row.size}px`,
-              }"
-              @click="select(row.org)"
-              @mousemove="highlightedIndex = row.index"
-            >
-              <!-- Name with the id inline beside it. The id shows only when it
-                   differs from the name (an equal id is just a redundant echo).
-                   The name takes priority and is never truncated (it only clips
-                   if it alone exceeds the whole row); the id yields, truncating
-                   to whatever space is left. -->
-              <div class="flex min-w-0 flex-1 items-baseline gap-2">
-                <span
-                  class="text-compact max-w-full min-w-0 flex-none truncate leading-tight font-medium"
-                >
-                  {{ row.org.label }}
-                </span>
-                <span
-                  v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="text-2xs text-text-secondary min-w-0 shrink truncate font-mono leading-tight"
-                >
-                  {{ row.org.identifier }}
-                </span>
+            <template v-for="row in rows" :key="row.row.key">
+              <!-- Section label: "Owned by you" / "Shared with you". Each
+                   only appears when its own group has something in it (see
+                   groupedRows) — "Owned by you" doesn't depend on whether
+                   anything is shared. -->
+              <div
+                v-if="row.row.kind === 'header'"
+                data-test="organization-menu-section-header"
+                class="text-dropdown-label absolute top-0 right-0 left-0 box-border flex items-center px-3 py-1 text-xs font-semibold select-none"
+                :style="{
+                  transform: `translateY(${row.start}px)`,
+                  height: `${row.size}px`,
+                }"
+              >
+                {{ row.row.text }}
               </div>
 
-              <!-- Copy identifier without selecting the row. Feedback is the
-                   tick on the button itself (kept visible during the flash),
-                   no toast. -->
-              <button
-                type="button"
-                data-test="organization-menu-item-copy-id"
-                :aria-label="t('common.copyOrganizationId', { id: row.org.identifier })"
-                class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
-                :class="
-                  copiedId === row.org.identifier
-                    ? 'text-accent opacity-100'
-                    : row.index === highlightedIndex
+              <div
+                v-else
+                data-test="organization-menu-item-label-item-label"
+                :data-test-org-identifier="row.row.org.identifier"
+                class="group rounded-default absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-2 px-3 transition-colors"
+                :class="rowStateClass(row)"
+                :style="{
+                  transform: `translateY(${row.start}px)`,
+                  height: `${row.size}px`,
+                }"
+                @click="select(row.row.org)"
+                @mousemove="highlightedIndex = row.index"
+              >
+                <!-- Name with the id inline beside it. The id shows only when it
+                     differs from the name (an equal id is just a redundant echo).
+                     The name takes priority and is never truncated (it only clips
+                     if it alone exceeds the whole row); the id yields, truncating
+                     to whatever space is left. -->
+                <div class="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span
+                    class="text-compact max-w-full min-w-0 flex-none truncate leading-tight font-medium"
+                  >
+                    {{ row.row.org.label }}
+                  </span>
+                  <span
+                    v-if="row.row.org.identifier && row.row.org.identifier !== row.row.org.label"
+                    class="text-2xs text-text-secondary min-w-0 shrink truncate font-mono leading-tight"
+                  >
+                    {{ row.row.org.identifier }}
+                  </span>
+                </div>
+
+                <!-- Edit the organization's name, without selecting the row.
+                     Only the owner can rename it — a shared org's owner is
+                     someone else, so there's nothing to offer here. -->
+                <button
+                  v-if="row.row.org.is_owned"
+                  type="button"
+                  data-test="organization-menu-item-edit"
+                  :aria-label="t('common.editOrganization', { name: row.row.org.label })"
+                  class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
+                  :class="
+                    row.index === highlightedIndex
                       ? 'text-text-secondary opacity-100'
                       : 'text-text-secondary opacity-0 focus-visible:opacity-100'
-                "
-                @click.stop="copyId(row.org)"
-              >
-                <OIcon
-                  :name="copiedId === row.org.identifier ? 'check' : 'content-copy'"
-                  size="xs"
-                />
-              </button>
-            </div>
+                  "
+                  @click.stop="editOrg(row.row.org)"
+                >
+                  <OIcon name="edit" size="xs" />
+                </button>
+
+                <!-- Copy identifier without selecting the row. Feedback is the
+                     tick on the button itself (kept visible during the flash),
+                     no toast. -->
+                <button
+                  type="button"
+                  data-test="organization-menu-item-copy-id"
+                  :aria-label="t('common.copyOrganizationId', { id: row.row.org.identifier })"
+                  class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
+                  :class="
+                    copiedId === row.row.org.identifier
+                      ? 'text-accent opacity-100'
+                      : row.index === highlightedIndex
+                        ? 'text-text-secondary opacity-100'
+                        : 'text-text-secondary opacity-0 focus-visible:opacity-100'
+                  "
+                  @click.stop="copyId(row.row.org)"
+                >
+                  <OIcon
+                    :name="copiedId === row.row.org.identifier ? 'check' : 'content-copy'"
+                    size="xs"
+                  />
+                </button>
+              </div>
+            </template>
           </div>
         </div>
 
