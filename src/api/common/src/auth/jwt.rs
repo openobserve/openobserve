@@ -874,8 +874,9 @@ pub async fn process_domain_org_mapping(
                 )
             })?;
 
-            let need_to_add_user =
-                org_users::get_cached_user_org(&mapped.org_id, user_email).is_none();
+            let need_to_add_user = org_users::get_optional(&mapped.org_id, user_email)
+                .await?
+                .is_none();
 
             if is_new_user || need_to_add_user {
                 let mut new_tuples = Vec::new();
