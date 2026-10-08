@@ -142,6 +142,7 @@ fn split_page(mut response: SearchResponse, size: usize) -> TraceDetailsResponse
         log::warn!(
             "[TRACE DETAILS] last span of a page has no usable start_time/span_id; paging stops"
         );
+        response.is_partial = true;
     }
     TraceDetailsResponse {
         response,
@@ -467,8 +468,7 @@ mod tests {
 
     #[test]
     fn test_split_page_orders_a_crowded_f64_bucket_exactly() {
-        // Five spans inside one 256 ns f64 bucket, delivered in span_id order as an f64 sort leaves
-        // them.
+        // Five spans in one 256 ns f64 bucket, in the span_id order an f64 sort leaves them.
         let base = 1_759_000_000_123_456_768u64;
         let hits = ["a", "b", "c", "d", "e"]
             .iter()
@@ -488,8 +488,7 @@ mod tests {
 
     #[test]
     fn test_details_request_bypasses_the_result_cache() {
-        // A cache merge re-sorts through f64 and truncates to the limit, which can drop an earlier
-        // span.
+        // A cache merge re-sorts through f64 and truncates, which can drop an earlier span.
         let request = details_request("SELECT 1".to_string(), 10, (1, 2), 30);
         assert!(!request.use_cache);
         assert_eq!(request.query.size, 11);
@@ -515,6 +514,7 @@ mod tests {
             );
             assert!(!page.has_more, "{last}");
             assert!(page.next_after.is_none(), "{last}");
+            assert!(page.response.is_partial, "{last}");
         }
     }
 

@@ -626,19 +626,14 @@ fn assemble_edges(results: &[Vec<InstantValue>]) -> (Vec<MetricEdge>, u64) {
 fn assemble_nodes(results: &[Vec<InstantValue>]) -> Vec<MetricNode> {
     let mut nodes: BTreeMap<String, MetricNode> = BTreeMap::new();
     for (server, stream, v) in server_stream_rows(&results[IDX_SERVER_COUNT]) {
-        let n = nodes.entry(server).or_insert_with(|| MetricNode {
-            errors_server: Some(0.0),
-            ..Default::default()
-        });
+        let n = nodes.entry(server).or_default();
         n.requests_server += count(v);
         add_stream(&mut n.streams, stream, count(v));
     }
+    // Written with every node sample, so a missing series predates the counter.
     for (server, v) in label_rows(&results[IDX_SERVER_FAILED], "server") {
-        if let Some(e) = nodes
-            .get_mut(&server)
-            .and_then(|n| n.errors_server.as_mut())
-        {
-            *e += count(v);
+        if let Some(n) = nodes.get_mut(&server) {
+            *n.errors_server.get_or_insert(0.0) += count(v);
         }
     }
     for (i, pick) in NODE_QUANTILE_SLOTS.into_iter().enumerate() {
@@ -1377,7 +1372,7 @@ mod tests {
         assert_eq!(input.nodes[0].p99_ns, None);
         assert_eq!(input.nodes[0].errors_server, Some(4.0));
         assert_eq!(input.nodes[1].server, "lonely");
-        assert_eq!(input.nodes[1].errors_server, Some(0.0));
+        assert_eq!(input.nodes[1].errors_server, None);
 
         let key = (
             "a".to_string(),
@@ -1592,11 +1587,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_a_failed_server_error_query_leaves_node_errors_unknown() {
-        let read = |fail: bool| async move {
+    async fn test_node_errors_are_unknown_when_the_error_query_fails_or_has_no_series() {
+        let read = |failed: Result<Option<f64>, ()>| async move {
             fetch_topology_with(&ReadFilter::default(), 0, 60_000_000, |q, _| async move {
-                if q.contains(M_SERVER_FAILED_TOTAL) && fail {
-                    return Err(anyhow::anyhow!("boom"));
+                if q.contains(M_SERVER_FAILED_TOTAL) {
+                    return match failed {
+                        Err(()) => Err(anyhow::anyhow!("boom")),
+                        Ok(v) => Ok(v
+                            .map(|v| vec![row(&[("server", "b")], v)])
+                            .unwrap_or_default()),
+                    };
                 }
                 if q.starts_with("sum by (server, trace_stream)") {
                     return Ok(vec![row(&[("server", "b"), ("trace_stream", "t")], 10.0)]);
@@ -1606,12 +1606,14 @@ mod tests {
             .await
             .unwrap()
         };
-        let (input, meta) = read(true).await;
+        let (input, meta) = read(Err(())).await;
         assert_eq!(meta.degraded, vec!["server_failed"]);
         assert_eq!(input.nodes[0].requests_server, 10.0);
         assert_eq!(input.nodes[0].errors_server, None);
-        let (input, meta) = read(false).await;
+        let (input, meta) = read(Ok(None)).await;
         assert!(meta.degraded.is_empty());
+        assert_eq!(input.nodes[0].errors_server, None);
+        let (input, _) = read(Ok(Some(0.0))).await;
         assert_eq!(input.nodes[0].errors_server, Some(0.0));
     }
 

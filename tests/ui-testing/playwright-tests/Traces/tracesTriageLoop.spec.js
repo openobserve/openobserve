@@ -46,10 +46,10 @@ test.describe('Traces triage loop', () => {
     const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });
     const page = await context.newPage();
     try {
-      await ingestTraces(page, 6, { forceScenario: 'error' });
-      await ingestTraces(page, 10, { forceScenario: 'success' });
-    } catch (e) {
-      testLogger.warn('Trace seeding failed (continuing)', { error: e.message });
+      for (const scenario of [{ count: 6, forceScenario: 'error' }, { count: 10, forceScenario: 'success' }]) {
+        const seeded = await ingestTraces(page, scenario.count, { forceScenario: scenario.forceScenario });
+        expect(seeded.failed, `Seeding ${scenario.forceScenario} traces must succeed`).toBe(0);
+      }
     } finally {
       await context.close();
     }
@@ -108,13 +108,17 @@ test.describe('Traces triage loop', () => {
       await searchWith(USER_FILTER);
       const preBox = queries.filter(isTableSearch).at(-1);
 
-      // Step 2: box; manual mode sends no table search for it.
+      // Step 2: box the slow rows across the whole range, where the just-seeded spans are; manual mode sends no table search.
       const beforeBox = queries.length;
-      expect(await pm.tracesPage.zoomDurationBand(), 'Heatmap must accept the box drag').toBeTruthy();
+      expect(
+        await pm.tracesPage.zoomOnMetricsPanel('Duration', { startRatio: 0.2, endRatio: 0.97, yStartRatio: 0.15, yEndRatio: 0.45 }),
+        'Heatmap must accept the box drag',
+      ).toBeTruthy();
       await page.waitForTimeout(2000);
       const editor = (await pm.tracesPage.getQueryEditorContent()).trim();
       expect(editor.startsWith(`(${USER_FILTER}) and `), `Editor keeps the user filter: ${editor}`).toBeTruthy();
       const band = bandSql(editor.slice(`(${USER_FILTER}) and `.length));
+      expect(band, `The box must write a duration bound: ${editor}`).not.toBe('');
       if (!live) {
         expect(queries.slice(beforeBox).filter(isTableSearch), 'Manual mode must not search on a box').toHaveLength(0);
       }
