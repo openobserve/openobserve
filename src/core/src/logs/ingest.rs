@@ -851,23 +851,15 @@ fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
     }
 }
 
-/// Adds the RUM routes' extra fields to a record, which only an object or `null` can take.
+/// RUM intake is NDJSON with one object per line, so any other record is refused.
 fn add_extra_fields(item: &mut json::Value, extend: &HashMap<String, json::Value>) -> Result<()> {
-    let kind = match item {
-        json::Value::Object(_) | json::Value::Null => None,
-        json::Value::Array(_) => Some("an array"),
-        json::Value::String(_) => Some("a string"),
-        json::Value::Number(_) => Some("a number"),
-        json::Value::Bool(_) => Some("a boolean"),
+    let Some(record) = item.as_object_mut() else {
+        return Err(Error::IngestionError(
+            "Failed processing: each line must be a JSON object".to_string(),
+        ));
     };
-    if let Some(kind) = kind {
-        // `item[key] = …` panics on these, which drops the request without any response
-        return Err(Error::IngestionError(format!(
-            "Failed processing: a record must be a JSON object, got {kind}"
-        )));
-    }
-    for (key, val) in extend.iter() {
-        item[key] = val.clone();
+    for (key, val) in extend {
+        record.insert(key.clone(), val.clone());
     }
     Ok(())
 }
@@ -1616,49 +1608,19 @@ mod tests {
         assert_eq!(status.error, "Can't parse timestamp");
     }
 
-    fn rum_extra_fields() -> HashMap<String, json::Value> {
-        HashMap::from([
-            ("ip".to_string(), json::json!("127.0.0.1")),
-            ("geo_info".to_string(), json::json!({"country": null})),
-        ])
-    }
-
-    /// A RUM record the extra fields cannot be added to is refused, and left as it was.
     #[test]
-    fn a_rum_record_that_is_not_an_object_is_refused() {
-        for (record, kind) in [
-            (json::json!([]), "an array"),
-            (json::json!([{"service": "web"}]), "an array"),
-            (json::json!("text"), "a string"),
-            (json::json!(123), "a number"),
-            (json::json!(true), "a boolean"),
-        ] {
-            let mut item = record.clone();
-            let err = add_extra_fields(&mut item, &rum_extra_fields()).unwrap_err();
-            assert_eq!(
-                err.to_string(),
-                format!("Error# Failed processing: a record must be a JSON object, got {kind}")
-            );
-            assert_eq!(item, record);
-        }
-    }
-
-    #[test]
-    fn the_rum_extra_fields_are_added_to_an_object_or_null_record() {
+    fn a_rum_line_must_be_a_json_object() {
+        let extend = HashMap::from([("ip".to_string(), json::json!("127.0.0.1"))]);
+        let mut array = json::json!([{"service": "web"}]);
+        assert_eq!(
+            add_extra_fields(&mut array, &extend)
+                .unwrap_err()
+                .to_string(),
+            "Error# Failed processing: each line must be a JSON object"
+        );
         let mut object = json::json!({"service": "web"});
-        add_extra_fields(&mut object, &rum_extra_fields()).unwrap();
-        assert_eq!(
-            object,
-            json::json!({"service": "web", "ip": "127.0.0.1", "geo_info": {"country": null}})
-        );
-
-        // serde_json's index-assign turns null into an object
-        let mut null = json::Value::Null;
-        add_extra_fields(&mut null, &rum_extra_fields()).unwrap();
-        assert_eq!(
-            null,
-            json::json!({"ip": "127.0.0.1", "geo_info": {"country": null}})
-        );
+        add_extra_fields(&mut object, &extend).unwrap();
+        assert_eq!(object, json::json!({"service": "web", "ip": "127.0.0.1"}));
     }
 
     #[test]
