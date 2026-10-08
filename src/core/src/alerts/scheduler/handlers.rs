@@ -290,20 +290,6 @@ async fn load_tracked_group_states(
     Ok(prev)
 }
 
-/// Per-group notification dispatch (§5.5 MN-1..MN-8) — the OSS tail.
-///
-/// Returns `Some((delivered, failed))` when this alert dispatched per group,
-/// and `None` when it is not a multi-alert and the caller should fall through
-/// to the ordinary alert-level send.
-///
-/// **This replaces the alert-level send; it does not supplement it.** Sending
-/// both would page the worst group twice per incident — once as itself and
-/// once as the rollup.
-///
-/// Order is load-bearing: the group plan is committed BEFORE anything is sent,
-/// so `plan_dispatch` reads back this evaluation's own level axis, and a send
-/// that fails leaves durable state describing what was observed.
-#[allow(clippy::too_many_arguments)]
 /// What [`dispatch_per_group`] actually did, per group.
 struct GroupDispatchOutcome {
     delivered: usize,
@@ -321,6 +307,41 @@ struct GroupDispatchOutcome {
     state_failed: bool,
 }
 
+impl GroupDispatchOutcome {
+    /// The evaluation's record: any undelivered destination is a delivery failure.
+    fn history_status(&self) -> Option<RunOutcome> {
+        if self.errors.is_empty() {
+            self.rollup_rewrite()
+        } else {
+            Some(RunOutcome::NotifyFailed)
+        }
+    }
+
+    /// The rollup state: a partial send counts as delivered (MN-7), so it is not rewritten.
+    fn rollup_rewrite(&self) -> Option<RunOutcome> {
+        if self.failed > 0 {
+            Some(RunOutcome::NotifyFailed)
+        } else if self.delivered == 0 && self.pending != 0 {
+            Some(RunOutcome::Pending)
+        } else {
+            None
+        }
+    }
+}
+
+/// Per-group notification dispatch (§5.5 MN-1..MN-8) — the OSS tail.
+///
+/// Returns what each group's send did for a multi-alert, and `None` when it is
+/// not a multi-alert and the caller should fall through to the ordinary
+/// alert-level send.
+///
+/// **This replaces the alert-level send; it does not supplement it.** Sending
+/// both would page the worst group twice per incident — once as itself and
+/// once as the rollup.
+///
+/// Order is load-bearing: the group plan is committed BEFORE anything is sent,
+/// so `plan_dispatch` reads back this evaluation's own level axis, and a send
+/// that fails leaves durable state describing what was observed.
 #[allow(clippy::too_many_arguments)]
 async fn dispatch_per_group(
     alert: &config::meta::alerts::alert::Alert,
@@ -544,8 +565,8 @@ async fn dispatch_per_group(
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
          pending={} failed={failed} suppressed={} candidates={}",
-        plan.suppressed,
         plan.pending,
+        plan.suppressed,
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
@@ -3307,51 +3328,28 @@ async fn handle_alert_triggers(
                 publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
-            if dispatch.failed > 0 {
-                // MN-7: the evaluation's single trigger record (D8) reports a
-                // delivery failure if ANY group's send failed; the per-group
-                // detail lives on each group's own state row.
-                trigger_data_stream.status = RunOutcome::NotifyFailed;
-                // The rollup row was committed as Firing before anything was
-                // sent; leave it and the detail page contradicts both the
-                // record and the failed groups.
-                if let Some(alert_id) = alert.id.as_ref() {
-                    let _ = persist_alert_run_state(
-                        &alert,
-                        &alert_id.to_string(),
-                        &RunOutcome::NotifyFailed,
-                        eval_level,
-                        None,
-                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                            alert.keep_firing_for,
-                        ),
-                    )
-                    .await;
-                }
+            // MN-7: one record (D8) for the evaluation; per-group detail lives on each group's row.
+            if let Some(status) = dispatch.history_status() {
+                trigger_data_stream.status = status;
             }
             if !dispatch.errors.is_empty() {
-                // Partial-destination failures reach the record too, even when
-                // the group counts as delivered.
                 trigger_data_stream.error = Some(dispatch.errors.join("; "));
             }
-
-            if dispatch.delivered == 0 && dispatch.failed == 0 && dispatch.pending != 0 {
-                // this is when no group was fired, but some were pending,
-                // in which case mark the whole alert in pending state
-                trigger_data_stream.status = RunOutcome::Pending;
-                if let Some(alert_id) = alert.id.as_ref() {
-                    let _ = persist_alert_run_state(
-                        &alert,
-                        &alert_id.to_string(),
-                        &RunOutcome::Pending,
-                        eval_level,
-                        None,
-                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                            alert.keep_firing_for,
-                        ),
-                    )
-                    .await;
-                }
+            // The rollup row was committed before anything was sent.
+            if let Some(outcome) = dispatch.rollup_rewrite()
+                && let Some(alert_id) = alert.id.as_ref()
+            {
+                let _ = persist_alert_run_state(
+                    &alert,
+                    &alert_id.to_string(),
+                    &outcome,
+                    eval_level,
+                    None,
+                    &config::meta::alerts::recovery::EpisodeInput::undelivered(
+                        alert.keep_firing_for,
+                    ),
+                )
+                .await;
             }
             // MN-6: a reservation is confirmed by its own group's delivery.
             // An unkeyed one falls back to "any delivery confirms".
@@ -6291,6 +6289,42 @@ mod tests {
         assert!(should_dispatch_after_incident(true, true));
         assert!(!should_dispatch_after_incident(true, false));
         assert!(should_dispatch_after_incident(false, false));
+    }
+
+    fn dispatch_counts(
+        delivered: usize,
+        failed: usize,
+        pending: usize,
+        errors: &[&str],
+    ) -> GroupDispatchOutcome {
+        GroupDispatchOutcome {
+            delivered,
+            failed,
+            pending,
+            errors: errors.iter().map(|e| (*e).to_string()).collect(),
+            delivered_groups: std::collections::HashSet::new(),
+            state_failed: false,
+        }
+    }
+
+    #[test]
+    fn test_group_dispatch_status_diverges_from_rollup_only_on_partial_send() {
+        use RunOutcome::{NotifyFailed, Pending};
+        let partial = &["group a: pagerduty err: boom"][..];
+        for (delivered, failed, pending, errors, history, rollup) in [
+            (2, 0, 0, partial, Some(NotifyFailed), None),
+            (3, 0, 2, partial, Some(NotifyFailed), None),
+            (1, 1, 0, partial, Some(NotifyFailed), Some(NotifyFailed)),
+            (0, 1, 4, partial, Some(NotifyFailed), Some(NotifyFailed)),
+            (0, 0, 3, &[][..], Some(Pending), Some(Pending)),
+            (2, 0, 1, &[][..], None, None),
+            (0, 0, 0, &[][..], None, None),
+        ] {
+            let dispatch = dispatch_counts(delivered, failed, pending, errors);
+            let case = format!("delivered={delivered} failed={failed} pending={pending}");
+            assert_eq!(dispatch.history_status(), history, "{case}");
+            assert_eq!(dispatch.rollup_rewrite(), rollup, "{case}");
+        }
     }
 
     #[cfg(feature = "enterprise")]
