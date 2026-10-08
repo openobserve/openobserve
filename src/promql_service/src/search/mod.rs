@@ -351,7 +351,7 @@ async fn search_in_cluster(
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
-        match cache::get(query, start, end, step).await {
+        match cache::get(&req.org_id, query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 let cache_ratio = (new_start - start) as f64 / (end - start) as f64;

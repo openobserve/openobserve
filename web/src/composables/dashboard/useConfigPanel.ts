@@ -254,6 +254,10 @@ export function useConfigPanel(
         label: [t("common.yAxisMin"), t("common.yAxisMax")],
         visible: shouldShowCartesianAxisConfig(dashboardPanelData),
       },
+      "axis-label-mode": {
+        label: t("dashboard.axisLabelMode"),
+        visible: !promqlMode.value && shouldShowCartesianAxisConfig(dashboardPanelData),
+      },
       gridlines: {
         label: t("dashboard.showGridlines"),
         visible: shouldShowGridlines(dashboardPanelData),

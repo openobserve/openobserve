@@ -150,6 +150,16 @@ describe("applyHBarChart", () => {
     expect((ctx.options.xAxis as any).name).toBe("Value");
   });
 
+  it("leaves xAxis.name empty when the axis label mode is hide", () => {
+    const ctx = makeMockContext();
+    ctx.panelSchema = {
+      ...ctx.panelSchema,
+      config: { ...ctx.panelSchema.config, axis_label_mode: "hide" },
+    };
+    applyHBarChart(ctx);
+    expect((ctx.options.xAxis as any).name).toBe("");
+  });
+
   it("sets xAxis.nameGap to dynamicXAxisNameGap", () => {
     const ctx = makeMockContext();
     applyHBarChart(ctx);

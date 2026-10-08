@@ -73,7 +73,7 @@ const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddT
 
 /** Default x-axis field: histogram(_timestamp) */
 const DEFAULT_X_AXIS_FIELD = () => ({
-  label: "_timestamp",
+  label: "",
   alias: "x_axis_1",
   column: "_timestamp",
   color: null,
@@ -90,7 +90,7 @@ const DEFAULT_X_AXIS_FIELD = () => ({
 
 /** Default y-axis field: count(_timestamp) */
 const DEFAULT_Y_AXIS_FIELD = () => ({
-  label: "_timestamp",
+  label: "",
   alias: "y_axis_1",
   column: "_timestamp",
   color: "#5960b2",
