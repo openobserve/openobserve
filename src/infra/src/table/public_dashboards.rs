@@ -20,7 +20,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, QuerySelect, prelude::Expr,
+    QueryOrder, QuerySelect, TransactionTrait, prelude::Expr,
 };
 
 use super::entity::{public_dashboard_snapshots, public_dashboards};
@@ -246,15 +246,19 @@ pub async fn update(model: &public_dashboards::Model) -> Result<(), errors::Erro
 
 /// Delete a share (org-scoped) and all its snapshots. Returns whether it existed.
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let conn = get_orm_client_rw().await;
-    public_dashboard_snapshots::Entity::delete_many()
-        .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(id))
-        .exec(conn)
-        .await?;
+    let txn = get_orm_client_rw().await.begin().await?;
     let res = public_dashboards::Entity::delete_many()
         .filter(public_dashboards::Column::Id.eq(id))
         .filter(public_dashboards::Column::OrgId.eq(org_id))
-        .exec(conn)
+        .exec(&txn)
         .await?;
-    Ok(res.rows_affected > 0)
+    let existed = res.rows_affected > 0;
+    if existed {
+        public_dashboard_snapshots::Entity::delete_many()
+            .filter(public_dashboard_snapshots::Column::PublicDashboardId.eq(id))
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await?;
+    Ok(existed)
 }

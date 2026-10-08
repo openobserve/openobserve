@@ -130,6 +130,10 @@ pub async fn rebuild_one(pd: &PublicDashboard) -> Result<(), anyhow::Error> {
             built_at: now,
             variables,
         })?;
+        // A revoke or pause mid-build already deleted the snapshots, so none may be written back.
+        if !still_enabled(&pd.id).await? {
+            return Ok(());
+        }
         pd_table::upsert_snapshot(conn, &pd.id, &range.key(), &json, now).await?;
     }
 
@@ -580,6 +584,13 @@ async fn run_values(
 fn parse_frozen_vars(json: Option<&str>) -> BTreeMap<String, serde_json::Value> {
     json.and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or_default()
+}
+
+async fn still_enabled(id: &str) -> Result<bool, anyhow::Error> {
+    let conn = infra::db::get_orm_client_rw().await;
+    Ok(pd_table::get(conn, id)
+        .await?
+        .is_some_and(|link| link.enabled))
 }
 
 /// Checks every stream the final query reads, since SQL and PromQL can read beyond the picked one.
