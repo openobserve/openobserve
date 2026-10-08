@@ -158,10 +158,9 @@ export default defineComponent({
       }
     }
 
-    // Re-fetch when streams list changes
-    watch(() => props.streams, fetchFieldsForStreams, {
+    // Callers pass a fresh array on every render, so only a change in content may refetch the schema.
+    watch(() => JSON.stringify(props.streams ?? []), fetchFieldsForStreams, {
       immediate: true,
-      deep: true,
     });
 
     return {
