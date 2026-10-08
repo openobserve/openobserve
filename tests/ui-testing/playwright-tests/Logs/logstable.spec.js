@@ -606,20 +606,16 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
   }, async ({ page }) => {
     testLogger.info('Testing severity color mapping for all severity levels');
 
-    // Expected color per detected level, based on STATUS_COLORS in statusParser.ts
-    // (aligned with convertLogData.ts SEMANTIC_COLORS_LIGHT). The status color bar
-    // exposes the detected level via data-test-status-level, so this is verified
-    // independently of which column is displayed (e.g. the FTS "body" column).
-    // Severity 0 and 6 both map to "info", so 8 severity numbers collapse to 7
-    // distinct levels.
+    // severity 0 is not a level on `severity`, so those rows resolve from `level: "emergency"`.
     const expectedColorByLevel = {
-      info:     '#1e88e5', // severity 0 (UNSPECIFIED) and 6
-      alert:    '#ea580c', // severity 1
-      critical: '#f4511e', // severity 2
-      error:    '#ef5350', // severity 3
-      warning:  '#fb8c00', // severity 4
-      notice:   '#16a34a', // severity 5
-      debug:    '#00acc1', // severity 7
+      emergency: '#e53935', // severity 0 → level field
+      alert:     '#ea580c', // severity 1
+      critical:  '#f4511e', // severity 2
+      error:     '#ef5350', // severity 3
+      warning:   '#dd7b00', // severity 4
+      notice:    '#16a34a', // severity 5
+      info:      '#1e88e5', // severity 6
+      debug:     '#00a3b7', // severity 7
     };
 
     // Wait for the results table to actually render its per-row status color bars
@@ -647,6 +643,7 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
       const expected = expectedColorByLevel[level];
       if (!expected) continue; // ignore levels outside the tested set
 
+      expect(result.backgroundImage).toBe('none');
       const hexColor = pageManager.logsPage.normalizeHexColor(pageManager.logsPage.rgbToHex(result.color));
       const expectedHex = pageManager.logsPage.normalizeHexColor(expected);
 
@@ -657,7 +654,7 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
       verified.add(level);
     }
 
-    // All 7 distinct levels (severity 0-7 collapses 0 and 6 to "info") must render.
+    // All 8 levels must render, each from an explicit field (solid spine).
     expect(verified.size).toBe(Object.keys(expectedColorByLevel).length);
     testLogger.info(`Successfully verified all ${verified.size} severity levels`);
   });
@@ -672,6 +669,174 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
     const cleanupPageManager = new PageManager(page);
     await cleanupPageManager.logsPage.deleteStream(testStreamName);
 
+    await context.close();
+  });
+});
+// 4c Part A journeys: one fixture row per journey, all in one stream (also J-A7: a mixed stream).
+test.describe("Severity inference journeys (4c Part A)", () => {
+  const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+  let pageManager;
+  let journeyStream;
+
+  const JOURNEY_ROWS = [
+    { tag: 'ja1-inferred', message: '2026-10-06 12:00:01 ERROR payment failed' },
+    { tag: 'ja1-unknown', message: 'user logged in' },
+    { tag: 'ja2-503', status: 503 },
+    { tag: 'ja2-404', status: 404 },
+    { tag: 'ja2-200', status: 200 },
+    { tag: 'ja3-warn2', severity: 'WARN2', severity_number: 14 },
+    { tag: 'ja3-number', severity_number: 18 },
+    { tag: 'ja4-syslog3', syslog_severity: 3 },
+    { tag: 'ja4-syslog0', syslog_severity: 0 },
+    { tag: 'ja5-fallthrough', severity: 'W', level: 'error' },
+    { tag: 'ja5-level-wins', level: 'info', message: '[ERROR] x' },
+    { tag: 'ja5-pino', level: '50' },
+  ];
+
+  const rowFor = (page, tag) =>
+    page.locator('[data-test="logs-search-result-logs-table"] tbody tr', { hasText: tag }).first();
+
+  const rowState = (row) =>
+    row.evaluate((tr) => {
+      const firstCell = tr.querySelector('td');
+      const spine = getComputedStyle(firstCell, '::before');
+      const classes = Array.from(tr.classList);
+      return {
+        level: classes.find((c) => c.startsWith('o2-log-level-') && !c.startsWith('o2-log-level-src-')),
+        source: classes.find((c) => c.startsWith('o2-log-level-src-')),
+        backgroundImage: spine.backgroundImage,
+        backgroundColor: spine.backgroundColor,
+        rowStatusColor: tr.style.getPropertyValue('--row-status-color').trim(),
+        paddingLeft: getComputedStyle(firstCell).paddingLeft,
+      };
+    });
+
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    journeyStream = `severity_journeys_${Date.now()}`;
+    const url = `${process.env.INGESTION_URL}/api/${getOrgIdentifier()}/${journeyStream}/_json`;
+    const response = await page.request.post(url, { headers: getAuthHeaders(), data: JOURNEY_ROWS });
+    expect(response.ok()).toBe(true);
+    await page.waitForTimeout(3000);
+    await context.close();
+  });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pageManager = new PageManager(page);
+    await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
+    await pageManager.logsPage.selectStream(journeyStream);
+    await pageManager.logsPage.clickDateTimeButton();
+    await pageManager.logsPage.selectRelative1Hour();
+    await pageManager.logsPage.ensureQuickModeState(false);
+    await pageManager.logsPage.clickSearchBarRefreshButton();
+    // The grid shows `message` by default; the tag column makes every journey row findable.
+    await pageManager.logsPage.fillIndexFieldSearchInput('tag');
+    await pageManager.logsPage.hoverOnFieldExpandButton('tag');
+    await pageManager.logsPage.clickAddFieldToTableButton('tag');
+    await expect(rowFor(page, 'ja1-inferred')).toBeVisible({ timeout: 30000 });
+  });
+
+  test("J-A1: inferred rows draw the same solid spine as field rows, evidence-less rows keep a transparent spine and padding", {
+    tag: ['@logsTable', '@logs', '@severityInference']
+  }, async ({ page }) => {
+    const inferred = await rowState(rowFor(page, 'ja1-inferred'));
+    expect(inferred.level).toBe('o2-log-level-error');
+    expect(inferred.source).toBe('o2-log-level-src-message');
+    expect(inferred.backgroundImage).toBe('none');
+    const fieldError = await rowState(rowFor(page, 'ja3-number'));
+    expect(fieldError.level).toBe('o2-log-level-error');
+    expect(fieldError.source).toBe('o2-log-level-src-field');
+    expect(inferred.backgroundColor).toBe(fieldError.backgroundColor);
+    expect(inferred.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+
+    const unknown = await rowState(rowFor(page, 'ja1-unknown'));
+    expect(unknown.level).toBe('o2-log-level-unknown');
+    expect(unknown.source).toBe('o2-log-level-src-none');
+    expect(unknown.rowStatusColor).toBe('transparent');
+    expect(unknown.backgroundImage).toBe('none');
+    expect(unknown.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    const coloured = await rowState(rowFor(page, 'ja2-503'));
+    expect(unknown.paddingLeft).toBe(coloured.paddingLeft);
+  });
+
+  test("J-A2…J-A5: explicit evidence resolves per the precedence table", {
+    tag: ['@logsTable', '@logs', '@severityInference']
+  }, async ({ page }) => {
+    const expected = {
+      'ja2-503': ['error', 'http'],
+      'ja2-404': ['warning', 'http'],
+      'ja2-200': ['ok', 'http'],
+      'ja3-warn2': ['warning', 'field'],
+      'ja3-number': ['error', 'field'],
+      'ja4-syslog3': ['error', 'field'],
+      'ja4-syslog0': ['emergency', 'field'],
+      'ja5-fallthrough': ['error', 'field'],
+      'ja5-level-wins': ['info', 'field'],
+      'ja5-pino': ['error', 'field'],
+    };
+    for (const [tag, [level, source]] of Object.entries(expected)) {
+      const state = await rowState(rowFor(page, tag));
+      expect(state.level, tag).toBe(`o2-log-level-${level}`);
+      expect(state.source, tag).toBe(`o2-log-level-src-${source}`);
+      expect(state.backgroundImage, tag).toBe('none');
+      expect(state.backgroundColor, tag).not.toBe('rgba(0, 0, 0, 0)');
+    }
+  });
+
+  test("sr-only severity text sits in the timestamp cell only, after the value span", {
+    tag: ['@logsTable', '@logs', '@severityInference']
+  }, async ({ page }) => {
+    const row = rowFor(page, 'ja1-inferred');
+    await expect(row.locator('[data-test="log-row-severity-sr"]')).toHaveCount(1);
+    const cell = row.locator('[data-test="o2-table-cell-_timestamp"]');
+    await expect(cell.locator('[data-test="log-row-severity-sr"]')).toHaveText('Severity error, inferred');
+    await expect(cell.locator('[data-test="log-row-timestamp-value"]')).toHaveCount(1);
+    const values = await pageManager.logsPage.getTimestampCellValues(3);
+    values.forEach((v) => expect(v).not.toContain('Severity'));
+    await expect(rowFor(page, 'ja1-unknown').locator('[data-test="log-row-severity-sr"]')).toHaveText('Severity unknown');
+  });
+
+  test("AC-A1.3: the drawer tag is reachable by Tab and opens its popover with Enter", {
+    tag: ['@logsTable', '@logs', '@severityInference']
+  }, async ({ page }) => {
+    await rowFor(page, 'ja1-inferred').locator('[data-test="o2-table-cell-_timestamp"]').click();
+    const badge = page.locator('[data-test="log-detail-severity-badge"]');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveAttribute('data-severity-source', 'message');
+    await expect(badge).toContainText('inferred');
+
+    await page.locator('[data-test="log-detail-json-tab"]').focus();
+    let reached = false;
+    for (let i = 0; i < 6 && !reached; i++) {
+      await page.keyboard.press('Tab');
+      reached = await badge.evaluate((el) => el === document.activeElement);
+    }
+    expect(reached).toBe(true);
+    await page.keyboard.press('Enter');
+    const popover = page.locator('[data-test="log-detail-severity-popover"]');
+    await expect(popover).toBeVisible();
+    await expect(popover).toContainText('Not searchable');
+    await page.keyboard.press('Escape');
+    await expect(popover).toBeHidden();
+  });
+
+  test("an HTTP row's drawer names the status field", {
+    tag: ['@logsTable', '@logs', '@severityInference']
+  }, async ({ page }) => {
+    await rowFor(page, 'ja2-503').locator('[data-test="o2-table-cell-_timestamp"]').click();
+    const badge = page.locator('[data-test="log-detail-severity-badge"]');
+    await expect(badge).toHaveAttribute('data-severity-source', 'http');
+    await badge.click();
+    await expect(page.locator('[data-test="log-detail-severity-popover"]')).toContainText('status');
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await new PageManager(page).logsPage.deleteStream(journeyStream);
     await context.close();
   });
 });

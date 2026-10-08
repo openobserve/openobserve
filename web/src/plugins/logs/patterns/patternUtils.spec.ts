@@ -23,6 +23,8 @@ import {
   buildPatternAlertData,
   compactCount,
   formatBucketDuration,
+  patternSeverityKey,
+  patternSeverityKeyForPattern,
 } from "./patternUtils";
 
 describe("extractConstantsFromPattern", () => {
@@ -363,5 +365,30 @@ describe("buildPatternSetSqlQuery", () => {
     expect(buildPatternSetSqlQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
       buildPatternSqlQuery(ERROR_PATTERN, "s"),
     );
+  });
+});
+
+// Pins today's buckets: Patterns keep the legacy parser, unaffected by the grid's severity resolver.
+describe("pattern severity buckets", () => {
+  it.each([
+    ["trace", "debug"],
+    ["0", "info"],
+    [0, "info"],
+    ["3", "error"],
+    ["WARN2", "info"],
+    ["failure", "info"],
+    ["error", "error"],
+    ["notice", "warning"],
+    ["ok", "info"],
+  ])("backend level %s → %s", (level, bucket) => {
+    expect(patternSeverityKeyForPattern({ level, template: "x" })).toBe(bucket);
+  });
+
+  it.each([
+    ["GET /api ERROR <*>", "error"],
+    ["trace span <*>", "debug"],
+    ["user logged in <*>", "uncategorized"],
+  ])("template %s → %s", (template, bucket) => {
+    expect(patternSeverityKey(template)).toBe(bucket);
   });
 });

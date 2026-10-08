@@ -140,6 +140,13 @@ vi.mock("./logsUtils", () => ({
   })),
 }));
 
+const { recordSeverityRequestMock } = vi.hoisted(() => ({ recordSeverityRequestMock: vi.fn() }));
+
+vi.mock("./useLogSeverity", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./useLogSeverity")>()),
+  recordSeverityRequest: recordSeverityRequestMock,
+}));
+
 vi.mock("./usePatterns", () => ({
   patternsState: ref({ scanSize: 1000 }),
 }));
@@ -1040,5 +1047,43 @@ describe("useSearchQuery › getQueryReq › highlightQuery", () => {
     mockState.searchObj.data.query = 'SELECT * FROM "my-stream" WHERE str_match(body, WARN)';
     getQueryReq(false);
     expect((mockState.searchObj.data as any).highlightQuery).toBe(" str_match(body, WARN)");
+  });
+});
+
+describe("useSearchQuery › getQueryReq records the severity guard of the dispatched request", () => {
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    (mockState.searchObj.data.stream as any).streamLists = [
+      { label: "my-stream", value: "my-stream" },
+    ];
+  });
+
+  it("snapshots quick mode, interesting fields and streams at dispatch", () => {
+    mockState.searchObj.meta.quickMode = true;
+    mockState.searchObj.data.stream.interestingFieldList = ["_timestamp", "message"];
+    const { getQueryReq } = useSearchQuery(gt);
+    const req = getQueryReq(false);
+    expect(req).not.toBeNull();
+    expect(recordSeverityRequestMock).toHaveBeenCalledTimes(1);
+    const snapshot = recordSeverityRequestMock.mock.calls[0][0];
+    expect(snapshot).toMatchObject({
+      sqlMode: false,
+      quickMode: req!.query.quick_mode,
+      selectedStreams: ["my-stream"],
+      sqlColumns: "all",
+    });
+    expect(snapshot.interestingFields).toEqual(
+      mockState.searchObj.data.stream.interestingFieldList,
+    );
+    mockState.searchObj.data.stream.interestingFieldList.push("level");
+    expect(snapshot.interestingFields).not.toContain("level");
+  });
+
+  it("records nothing when no request is built", () => {
+    mockState.searchObj.data.stream.selectedStream = [];
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).toBeNull();
+    expect(recordSeverityRequestMock).not.toHaveBeenCalled();
   });
 });
