@@ -1183,9 +1183,7 @@ describe("AppSessions.vue", () => {
         if (params?.query?.query?.sql?.includes('FROM "_rumdata"')) {
           return {
             data: {
-              hits: [
-                { session_id: "no-replay-1", zo_sql_timestamp: 1672531200000, source: "web" },
-              ],
+              hits: [{ session_id: "no-replay-1", zo_sql_timestamp: 1672531200000, source: "web" }],
             },
           };
         }

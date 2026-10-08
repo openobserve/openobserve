@@ -98,9 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #cell-duration="{ row }">
         <span class="tabular-nums">{{
-          durationFormatter(
-            Math.round((Number(row.ended) - Number(row.started)) / 1000),
-          )
+          durationFormatter(Math.round((Number(row.ended) - Number(row.started)) / 1000))
         }}</span>
       </template>
       <template #cell-open="{ index }">
