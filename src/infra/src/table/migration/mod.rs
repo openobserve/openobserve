@@ -212,6 +212,7 @@ mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
 mod m20261005_000001_public_dashboards_time_ranges;
+mod m20261007_000001_scope_alert_dedup_state_by_org;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -523,6 +524,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
             Box::new(m20261004_000001_create_query_history::Migration),
+            Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
             Box::new(m20260907_000001_create_public_dashboards_tables::Migration),
             Box::new(m20260925_000001_add_name_to_public_dashboards::Migration),
             Box::new(m20260930_000001_add_updated_by_to_public_dashboards::Migration),
@@ -583,10 +585,11 @@ mod tests {
         (95, "m20261001_000001_add_anomaly_band_settings"),
         (96, "m20261003_000001_create_rum_pa_tables"),
         (97, "m20261004_000001_create_query_history"),
+        (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
         // Also covers m20260907 (public dashboards tables), which no earlier bump did.
-        (98, "m20260925_000001_add_name_to_public_dashboards"),
-        (99, "m20260930_000001_add_updated_by_to_public_dashboards"),
-        (100, "m20261005_000001_public_dashboards_time_ranges"),
+        (99, "m20260925_000001_add_name_to_public_dashboards"),
+        (100, "m20260930_000001_add_updated_by_to_public_dashboards"),
+        (101, "m20261005_000001_public_dashboards_time_ranges"),
     ];
 
     #[test]

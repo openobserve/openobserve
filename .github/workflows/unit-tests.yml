@@ -112,7 +112,6 @@ jobs:
       contents: read
     env:
       ZO_INTERNAL_GRPC_TOKEN: fake
-      ZO_EXT_AUTH_SALT: ci-only-ext-auth-salt-0123456789abcdef
       ZO_TEXT_DATA_TYPE: text
       ZO_META_STORE: postgres
       ZO_META_POSTGRES_DSN: postgres://postgres:password@localhost:5432/postgres
@@ -187,7 +186,6 @@ jobs:
       contents: read
     env:
       ZO_INTERNAL_GRPC_TOKEN: fake
-      ZO_EXT_AUTH_SALT: ci-only-ext-auth-salt-0123456789abcdef
       ZO_TEXT_DATA_TYPE: text
       ZO_META_STORE: sqlite
       ZO_META_POSTGRES_DSN: ""

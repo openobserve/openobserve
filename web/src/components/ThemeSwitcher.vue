@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :variant="bordered ? 'outline' : 'ghost'"
     :size="bordered ? 'icon-sm' : 'icon-toolbar'"
     data-test="navbar-theme-toggle-btn"
+    :aria-label="raw(tooltipText)"
     @click="toggleDarkMode"
   >
     <Transition name="theme-icon" mode="out-in">

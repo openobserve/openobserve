@@ -13,12 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
+import { computed, nextTick } from "vue";
 import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
+
+const breakpoint = vi.hoisted(() => ({ lgUp: true }));
+vi.mock("@/composables/useBreakpoint", () => ({
+  default: () => ({
+    isMobile: computed(() => false),
+    isTablet: computed(() => !breakpoint.lgUp),
+    isDesktop: computed(() => breakpoint.lgUp),
+    mdUp: computed(() => true),
+    lgUp: computed(() => breakpoint.lgUp),
+  }),
+}));
 
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -890,7 +902,9 @@ describe("Header Component", () => {
       expect(submenu.classes()).toContain("end-full");
       expect(submenu.classes()).toContain("me-1");
       expect(submenu.classes()).not.toContain("right-full");
-      expect(submenu.find("button").classes()).toContain("text-start");
+      expect(submenu.classes()).toContain("max-lg:static");
+      expect(submenu.classes()).not.toContain("max-md:static");
+      expect(submenu.findAll('[data-test^="language-dropdown-item-"]')).toHaveLength(2);
 
       languageWrapper.unmount();
     });
@@ -1221,6 +1235,214 @@ describe("Header Component", () => {
       expect(wrapper.props("userClickedOrg").identifier).toBe(
         wrapper.props("selectedOrg").identifier,
       );
+    });
+  });
+
+  describe("accessible names (AC-9)", () => {
+    it("gives every header icon button an aria-label equal to its tooltip text", () => {
+      const named = createWrapper({
+        mountType: "mount",
+        configOverrides: { isEnterprise: "true" },
+        storeOverrides: { state: { zoConfig: { ai_enabled: true } } },
+      });
+
+      const tooltipByHost = new Map<string, string>();
+      for (const tooltip of named.findAllComponents({ name: "OTooltip" })) {
+        const host = (tooltip.vm.$el as Node).parentElement?.closest("[data-test]");
+        if (host)
+          tooltipByHost.set(host.getAttribute("data-test") as string, tooltip.props("content"));
+      }
+
+      const buttons = [
+        "menu-link-ai-item",
+        "menu-link-slack-item",
+        "menu-link-help-item",
+        "header-my-account-profile-icon",
+      ];
+      for (const id of buttons) {
+        const btn = named.find(`[data-test="${id}"]`);
+        expect(btn.exists(), id).toBe(true);
+        expect(tooltipByHost.get(id), id).toBeTruthy();
+        expect(btn.attributes("aria-label"), id).toBe(tooltipByHost.get(id));
+      }
+      expect(tooltipByHost.get("header-my-account-profile-icon")).toBe("John Doe");
+
+      named.unmount();
+    });
+  });
+
+  describe("language row keyboard (AC-10)", () => {
+    const DropdownItemStub = {
+      emits: ["select"],
+      template:
+        '<div role="menuitem" tabindex="-1" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /></div>',
+    };
+
+    const mountLanguage = (dir: "ltr" | "rtl" = "ltr") => {
+      document.documentElement.dir = dir;
+      const store = mockStore;
+      return mount(Header, {
+        attachTo: document.body,
+        props: { ...defaultProps, store },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            ThemeSwitcher: true,
+            OrganizationSelector: true,
+            EnterpriseUpgradeDialog: true,
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            ODropdownItem: DropdownItemStub,
+          },
+        },
+      });
+    };
+
+    const row = (w: any) => w.find('[data-test="header-language-submenu-trigger"]');
+    const list = (w: any) => w.find('[data-test="language-dropdown-item"]');
+    const option = (w: any, code: string) => w.find(`[data-test="language-dropdown-item-${code}"]`);
+    const activeTest = () => (document.activeElement as HTMLElement | null)?.dataset.test;
+
+    const openByKey = async (w: any, key: string) => {
+      await row(w).trigger("keydown", { key });
+      await nextTick();
+    };
+
+    let w: any;
+
+    beforeEach(() => {
+      breakpoint.lgUp = true;
+    });
+
+    afterEach(() => {
+      w?.unmount();
+      w = null;
+      document.documentElement.dir = "ltr";
+    });
+
+    it("gives only the Language row a keyboard focus ring, so other dropdowns keep their look", () => {
+      w = mountLanguage();
+      expect(row(w).classes()).toEqual(
+        expect.arrayContaining([
+          "focus-visible:ring-2",
+          "focus-visible:ring-inset",
+          "focus-visible:ring-focus-ring-accent",
+        ]),
+      );
+    });
+
+    it("exposes haspopup and an expanded state that follows the list", async () => {
+      w = mountLanguage();
+      expect(row(w).attributes("aria-haspopup")).toBe("menu");
+      expect(row(w).attributes("aria-expanded")).toBe("false");
+      expect(list(w).exists()).toBe(false);
+
+      await row(w).trigger("click");
+      await nextTick();
+      expect(row(w).attributes("aria-expanded")).toBe("true");
+      expect(list(w).exists()).toBe(true);
+    });
+
+    it("select opens the list, keeps the menu open and focuses the selected language", async () => {
+      w = mountLanguage();
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      row(w).element.dispatchEvent(event);
+      await nextTick();
+      await nextTick();
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(list(w).exists()).toBe(true);
+      expect(activeTest()).toBe("language-dropdown-item-en-us");
+    });
+
+    it.each([
+      ["ltr", "ArrowLeft"],
+      ["ltr", "ArrowRight"],
+      ["rtl", "ArrowLeft"],
+      ["rtl", "ArrowRight"],
+    ] as const)("%s: %s on the row opens the list and stops before the menu", async (dir, key) => {
+      w = mountLanguage(dir);
+      const seenByMenu = vi.fn();
+      w.element.addEventListener("keydown", seenByMenu);
+
+      await openByKey(w, key);
+      await nextTick();
+
+      expect(list(w).exists()).toBe(true);
+      expect(activeTest()).toBe("language-dropdown-item-en-us");
+      expect(seenByMenu).not.toHaveBeenCalled();
+    });
+
+    it("Up and Down stay inside the list", async () => {
+      w = mountLanguage();
+      await openByKey(w, "ArrowRight");
+      await nextTick();
+      expect(activeTest()).toBe("language-dropdown-item-en-us");
+
+      await option(w, "en-us").trigger("keydown", { key: "ArrowDown" });
+      expect(activeTest()).toBe("language-dropdown-item-fr");
+      await option(w, "fr").trigger("keydown", { key: "ArrowDown" });
+      expect(activeTest()).toBe("language-dropdown-item-en-us");
+      await option(w, "en-us").trigger("keydown", { key: "ArrowUp" });
+      expect(activeTest()).toBe("language-dropdown-item-fr");
+      expect(list(w).exists()).toBe(true);
+    });
+
+    it("Enter on an option emits changeLanguage", async () => {
+      w = mountLanguage();
+      await openByKey(w, "ArrowRight");
+      await option(w, "fr").trigger("click");
+
+      expect(w.emitted("changeLanguage")?.[0]).toEqual([{ code: "fr", label: "Français" }]);
+    });
+
+    it("Escape closes the list and refocuses the row without reaching the menu", async () => {
+      w = mountLanguage();
+      await openByKey(w, "ArrowRight");
+      await nextTick();
+      const seenByMenu = vi.fn();
+      w.element.addEventListener("keydown", seenByMenu);
+
+      await option(w, "en-us").trigger("keydown", { key: "Escape" });
+      await nextTick();
+
+      expect(list(w).exists()).toBe(false);
+      expect(row(w).attributes("aria-expanded")).toBe("false");
+      expect(activeTest()).toBe("header-language-submenu-trigger");
+      expect(seenByMenu).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["ltr", "ArrowRight", "ArrowLeft"],
+      ["rtl", "ArrowLeft", "ArrowRight"],
+    ] as const)(
+      "%s: the arrow away (%s) closes at lg and up; %s does nothing",
+      async (dir, away, toward) => {
+        w = mountLanguage(dir);
+        await openByKey(w, "ArrowRight");
+        await nextTick();
+
+        await option(w, "en-us").trigger("keydown", { key: toward });
+        expect(list(w).exists()).toBe(true);
+        expect(activeTest()).toBe("language-dropdown-item-en-us");
+
+        await option(w, "en-us").trigger("keydown", { key: away });
+        await nextTick();
+        expect(list(w).exists()).toBe(false);
+        expect(activeTest()).toBe("header-language-submenu-trigger");
+      },
+    );
+
+    it("the arrow away does nothing below lg, where the list sits under its row", async () => {
+      breakpoint.lgUp = false;
+      w = mountLanguage();
+      await openByKey(w, "ArrowRight");
+      await nextTick();
+
+      await option(w, "en-us").trigger("keydown", { key: "ArrowRight" });
+      await nextTick();
+      expect(list(w).exists()).toBe(true);
+      expect(activeTest()).toBe("language-dropdown-item-en-us");
     });
   });
 

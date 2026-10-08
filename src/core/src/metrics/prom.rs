@@ -1334,10 +1334,7 @@ mod tests {
                 let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
                     panic!("expected a vector selector");
                 };
-                // The parser retains escape text, so SQL must preserve Matcher.value verbatim.
-                let encoded = serde_json::to_string(value).unwrap();
-                let parsed_value = &encoded[1..encoded.len() - 1];
-                assert_eq!(selector.matchers.matchers[0].value, parsed_value);
+                assert_eq!(selector.matchers.matchers[0].value, value);
                 for (sql, projection) in [
                     (
                         metadata_sql("up", &["job"], &schema, Some(&selector)),
@@ -1354,10 +1351,7 @@ mod tests {
                         let mut literals = 0;
                         let _ = visit_expressions_mut(&mut statements, |expr| {
                             if let Expr::Value(literal) = expr {
-                                assert_eq!(
-                                    literal.value,
-                                    Value::SingleQuotedString(parsed_value.into())
-                                );
+                                assert_eq!(literal.value, Value::SingleQuotedString(value.into()));
                                 literal.value = Value::SingleQuotedString(String::new());
                                 literals += 1;
                             }
@@ -1394,9 +1388,9 @@ mod tests {
 
         for (op, pattern, matching) in [
             ("=", "x' OR '1'='1", "x' OR '1'='1"),
-            ("!=", r"worker's\path", r"worker's\\path"),
-            ("=~", r"worker\\path's.*", r"worker\\path'suffix"),
-            ("!~", r"worker\\path's.*", r"worker\\path'suffix"),
+            ("!=", r"worker's\path", r"worker's\path"),
+            ("=~", r"worker\\path's.*", r"worker\path'suffix"),
+            ("!~", r"worker\\path's.*", r"worker\path'suffix"),
         ] {
             let ctx = SessionContext::new();
             ctx.register_udf(REGEX_MATCH_UDF.clone());

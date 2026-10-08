@@ -220,6 +220,28 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 **Slots:** `trigger` (as-child), `default` (content)
 **Emits:** `update:open` (boolean)
 
+**Info-popover recipe.** Explanatory copy that would otherwise be a paragraph or a
+truncated sentence (copy-and-values.md § A sentence cut by an ellipsis): a ghost
+info button labelled with what it explains, placed beside the control it qualifies,
+icon-only on phones with the label kept for screen readers; the body is one `meta`
+paragraph capped to the viewport.
+
+```vue
+<OPopover v-model:open="noteOpen" side="bottom" align="start" :aria-label="t('dbm.metrics.load.about')">
+  <template #trigger>
+    <OButton variant="ghost" size="xs" icon-left="info-outline" data-test="dbm-metrics-load-hint-trigger">
+      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
+    </OButton>
+  </template>
+  <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5" data-test="dbm-metrics-load-hint">
+    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
+  </p>
+</OPopover>
+```
+
+Use `align="start"` when the button sits at the start of its row; an `OTooltip` is
+not a substitute — it is hover-only and never opens on touch.
+
 **Filter-popover recipe.** A "Filters" / "Narrow results" popover is not a loose
 stack of selects — build it as **one panel you fill in and dismiss**: a title, a
 column of **labelled** fields, then a **pinned action row**. Three rules:
