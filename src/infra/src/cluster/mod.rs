@@ -15,7 +15,10 @@
 
 use std::{
     ops::Bound,
-    sync::{Arc, LazyLock as Lazy},
+    sync::{
+        Arc, LazyLock as Lazy,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -54,6 +57,7 @@ pub static COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> = Lazy::new(
 pub static FLATTEN_COMPACTOR_CONSISTENT_HASH: Lazy<RwBTreeMap<u64, String>> =
     Lazy::new(Default::default);
 pub static NODES_HEALTH_CHECK: Lazy<RwAHashMap<String, usize>> = Lazy::new(Default::default);
+static STALENESS_MARKERS_SUPPORTED: AtomicBool = AtomicBool::new(false);
 
 pub async fn add_node_to_cache(node: Node) {
     NODES.write().await.insert(node.uuid.clone(), node);
@@ -696,9 +700,80 @@ pub async fn cache_node_list() -> Result<Vec<i32>> {
     Ok(node_ids)
 }
 
+/// Whether ingesters may write staleness markers; once true it stays true for the process.
+pub fn staleness_markers_supported() -> bool {
+    get_config().common.local_mode || STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed)
+}
+
+/// Latches [`staleness_markers_supported`] once every registered node advertises the capability.
+pub async fn refresh_staleness_markers_supported() {
+    if STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed) {
+        return;
+    }
+    // the registry, not the cache: a failed health check drops a live node from the cache
+    if let Ok(nodes) = list_nodes().await {
+        latch_staleness_markers(&nodes);
+    }
+}
+
+fn latch_staleness_markers(nodes: &[Node]) {
+    if all_support_staleness_markers(nodes) {
+        STALENESS_MARKERS_SUPPORTED.store(true, Ordering::Relaxed);
+        log::info!("[CLUSTER] every node supports staleness markers, ingesters now write them");
+    }
+}
+
+// every role counts, since any node may read or merge metrics; a starting node counts too
+fn all_support_staleness_markers(nodes: &[Node]) -> bool {
+    let mut live = nodes
+        .iter()
+        .filter(|node| node.status != NodeStatus::Offline)
+        .peekable();
+    live.peek().is_some() && live.all(|node| node.staleness_markers)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // a registry entry as written by a release that predates staleness markers
+    fn old_node(status: &str) -> Node {
+        json::from_str(&format!(
+            r#"{{"id":2,"uuid":"old","name":"old","http_addr":"","grpc_addr":"","role":["Querier"],"cpu_num":1,"status":"{status}","version":"v1.1.0-rc2"}}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn test_staleness_markers_need_every_registered_node() {
+        let new = Node::default();
+        let stored: Node = json::from_str(&json::to_string(&new).unwrap()).unwrap();
+        assert!(stored.staleness_markers);
+        assert!(!old_node("Online").staleness_markers);
+        assert!(all_support_staleness_markers(&[new.clone(), stored]));
+        assert!(!all_support_staleness_markers(&[
+            new.clone(),
+            old_node("Online")
+        ]));
+        assert!(!all_support_staleness_markers(&[
+            new.clone(),
+            old_node("Prepare")
+        ]));
+        assert!(all_support_staleness_markers(&[new, old_node("Offline")]));
+        assert!(!all_support_staleness_markers(&[old_node("Offline")]));
+        assert!(!all_support_staleness_markers(&[]));
+    }
+
+    #[test]
+    fn test_staleness_markers_gate_latches_open() {
+        let new = Node::default();
+        latch_staleness_markers(&[new.clone(), old_node("Online")]);
+        assert!(!STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
+        latch_staleness_markers(std::slice::from_ref(&new));
+        assert!(STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
+        latch_staleness_markers(&[new, old_node("Online")]);
+        assert!(STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
+    }
 
     #[tokio::test]
     #[ignore]

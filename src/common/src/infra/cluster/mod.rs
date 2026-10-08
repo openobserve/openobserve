@@ -64,6 +64,7 @@ pub async fn register_and_keep_alive() -> Result<()> {
             if let Err(e) = check_nodes_status(&client).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {e}");
             }
+            refresh_staleness_markers_supported().await;
         }
     });
 

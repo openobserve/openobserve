@@ -61,6 +61,9 @@ pub struct Node {
     pub metrics: NodeMetrics,
     #[serde(default)]
     pub version: String,
+    /// Reads and compacts Prometheus staleness markers; a node that predates them omits it.
+    #[serde(default)]
+    pub staleness_markers: bool,
 }
 
 impl Node {
@@ -79,6 +82,7 @@ impl Node {
             status: NodeStatus::Prepare,
             metrics: Default::default(),
             version: crate::VERSION.to_string(),
+            staleness_markers: true,
         }
     }
 

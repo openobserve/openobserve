@@ -47,6 +47,7 @@ fn load_local_node() -> Node {
         status: NodeStatus::Online,
         metrics: Default::default(),
         version: crate::VERSION.to_string(),
+        staleness_markers: true,
     }
 }
 
