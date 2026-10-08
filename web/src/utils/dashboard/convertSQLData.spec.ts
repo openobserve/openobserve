@@ -2857,6 +2857,71 @@ describe("convertSQLData", () => {
         expect(narrow.options.yAxis.name).toBe("");
       });
 
+      describe("axis labels", () => {
+        const searchData = [
+          [
+            { timestamp: "2023-01-01", value: 10 },
+            { timestamp: "2023-01-02", value: 20 },
+          ],
+        ];
+        const convert = (config: Record<string, unknown>, labels = { x: "Day", y: "Requests" }) =>
+          convertSQLData(
+            {
+              ...mockPanelSchema,
+              type: "bar",
+              config: { ...mockPanelSchema.config, ...config },
+              queries: [
+                {
+                  ...mockPanelSchema.queries[0],
+                  fields: {
+                    ...mockPanelSchema.queries[0].fields,
+                    x: [{ alias: "timestamp", label: labels.x, column: "timestamp" }],
+                    y: [{ alias: "value", label: labels.y, column: "request_count" }],
+                  },
+                },
+              ],
+            },
+            searchData,
+            mockStore,
+            mockChartPanelRef,
+            mockHoveredSeriesState,
+            mockResultMetaData,
+            mockMetadata,
+            mockChartPanelStyle,
+            mockAnnotations,
+          );
+
+        it("shows typed axis names unless the mode is hide", async () => {
+          const hidden = await convert({ axis_label_mode: "hide" });
+          expect(hidden.options.xAxis[0].name).toBe("");
+          expect(hidden.options.yAxis.name).toBe("");
+
+          for (const config of [{ axis_label_mode: "auto" }, { axis_label_mode: "show" }, {}]) {
+            const shown = await convert(config);
+            expect(shown.options.xAxis[0].name).toBe("Day");
+            expect(shown.options.yAxis.name).toBe("Requests");
+          }
+        });
+
+        it("names blank fields from the field but never puts that name on an axis", async () => {
+          const blank = { x: "", y: "" };
+
+          for (const mode of ["auto", "show"]) {
+            const chart = await convert({ axis_label_mode: mode }, blank);
+            expect(chart.options.xAxis[0].name).toBe("");
+            expect(chart.options.yAxis.name).toBe("");
+            expect(chart.options.series[0].name).toBe("Request Count");
+          }
+        });
+
+        it("leaves blank labels blank on a panel saved before the mode existed", async () => {
+          const legacy = await convert({}, { x: "", y: "" });
+          expect(legacy.options.xAxis[0].name).toBe("");
+          expect(legacy.options.yAxis.name).toBe("");
+          expect(legacy.options.series[0].name).toBe("");
+        });
+      });
+
       it("should handle horizontal bar charts (h-bar and h-stacked)", async () => {
         const hBarTypes = ["h-bar", "h-stacked"];
 
