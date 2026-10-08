@@ -861,11 +861,16 @@ pub async fn check_and_create_org_without_ofga(
     }
 }
 
-pub async fn rename_org(
-    org_id: &str,
-    name: &str,
-    user_email: &str,
-) -> Result<Organization, anyhow::Error> {
+/// Whether `user_email` is allowed to rename an org. Per-org `Admin`/`Root` role in
+/// `org_users` does NOT grant this on its own — rename is gated to the global root
+/// user, unless enterprise OpenFGA is enabled.
+///
+/// ONLY valid when called from a route whose middleware already scoped an OpenFGA
+/// check to this exact `org_id` (e.g. `PUT /{org_id}/rename`) — with OpenFGA
+/// enabled this always returns `true`, trusting that gate. Do NOT reuse this to
+/// compute a flag for multiple orgs in one request (e.g. a listing endpoint): use
+/// [`org_rename_permission`] there, which checks each org individually.
+fn can_rename_org(user_email: &str) -> bool {
     #[cfg(not(feature = "enterprise"))]
     let is_allowed = false;
     #[cfg(feature = "enterprise")]
@@ -876,7 +881,47 @@ pub async fn rename_org(
     } else {
         false
     };
-    if !is_allowed && !is_root_user(user_email) {
+    is_allowed || is_root_user(user_email)
+}
+
+/// Per-org variant of [`can_rename_org`] for callers (like the `/organizations`
+/// listing) that enumerate many orgs in one request and so cannot rely on a
+/// single route-level OpenFGA gate — this runs the real per-org check itself.
+pub async fn org_rename_permission(org_id: &str, user_email: &str) -> bool {
+    if is_root_user(user_email) {
+        return true;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        false
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        if !get_openfga_config().enabled {
+            return false;
+        }
+        crate::auth::check_permissions(
+            org_id,
+            org_id,
+            user_email,
+            "organizations",
+            "PUT",
+            None,
+            false,
+            false,
+            false,
+        )
+        .await
+    }
+}
+
+pub async fn rename_org(
+    org_id: &str,
+    name: &str,
+    user_email: &str,
+) -> Result<Organization, anyhow::Error> {
+    if !can_rename_org(user_email) {
         return Err(anyhow::anyhow!("Not allowed to rename org"));
     }
 

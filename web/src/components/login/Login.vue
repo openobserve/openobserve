@@ -407,7 +407,7 @@ export default defineComponent({
                           name: any;
                           type: any;
                           identifier: any;
-                          UserObj: any;
+                          is_owner: boolean;
                           ingest_threshold: any;
                           search_threshold: any;
                           CustomerBillingObj: any;
@@ -435,7 +435,7 @@ export default defineComponent({
                           if (
                             (Object.keys(selectedOrg.value).length == 0 &&
                               (data.type == "default" || data.id == "1") &&
-                              store.state.userInfo.email == data.UserObj.email) ||
+                              data.is_owner) ||
                             res.data.data.length == 1
                           ) {
                             localOrgFlag = true;

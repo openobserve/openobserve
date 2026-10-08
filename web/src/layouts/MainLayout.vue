@@ -1070,7 +1070,8 @@ export default defineComponent({
                 name: any;
                 type: any;
                 identifier: any;
-                UserObj: any;
+                is_owner: boolean;
+                is_admin: boolean;
                 ingest_threshold: number;
                 search_threshold: number;
                 CustomerBillingObj: { subscription_type: string; note: string };
@@ -1081,12 +1082,8 @@ export default defineComponent({
                   id: data.id,
                   identifier: data.identifier,
                   user_email: store.state.userInfo.email,
-                  // The org's owner (not the logged-in user) — undefined on OSS,
-                  // where the org list carries no UserObj.
-                  owner_email: data.UserObj?.email,
-                  // OSS orgs carry no UserObj, so there's no "shared" concept —
-                  // treat them as owned by the current user.
-                  is_owned: !data.UserObj || data.UserObj.email === store.state.userInfo.email,
+                  is_owned: data.is_owner,
+                  is_admin: data.is_admin,
                   ingest_threshold: data.ingest_threshold,
                   search_threshold: data.search_threshold,
                   subscription_type: Object.prototype.hasOwnProperty.call(
@@ -1122,7 +1119,7 @@ export default defineComponent({
                 if (
                   (Object.keys(selectedOrg.value).length == 0 &&
                     data.type == "default" &&
-                    store.state.userInfo.email == data.UserObj.email &&
+                    data.is_owner &&
                     (customOrganization == "" || customOrganization == undefined)) ||
                   (store.state.organizations?.length == 1 &&
                     (customOrganization == "" || customOrganization == undefined))
@@ -1159,8 +1156,8 @@ export default defineComponent({
             id: data.id,
             identifier: data.identifier,
             user_email: store.state.userInfo.email,
-            owner_email: data.UserObj?.email,
-            is_owned: !data.UserObj || data.UserObj.email === store.state.userInfo.email,
+            is_owned: data.is_owner,
+            is_admin: data.is_admin,
             ingest_threshold: data.ingest_threshold,
             search_threshold: data.search_threshold,
             subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")

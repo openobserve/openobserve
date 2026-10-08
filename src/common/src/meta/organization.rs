@@ -167,6 +167,14 @@ pub struct OrgDetails {
     pub user_obj: OrgUser,
     #[serde(default)]
     pub plan: i32,
+    /// Whether the requesting user is actually allowed to rename this org (global
+    /// root, or enterprise OpenFGA-authorized) — gates the rename UI.
+    #[serde(default)]
+    pub is_owner: bool,
+    /// Whether the requesting user's role on this org is Admin or Root. Informational
+    /// only — does NOT by itself imply rename rights; see `is_owner`.
+    #[serde(default)]
+    pub is_admin: bool,
 }
 
 #[derive(Serialize, ToSchema)]

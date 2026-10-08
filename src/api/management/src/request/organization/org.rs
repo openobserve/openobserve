@@ -79,6 +79,8 @@ pub async fn organizations(
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    use config::meta::user::UserRole;
+
     let user_id = user_email.user_id.as_str();
     let mut id = 0;
 
@@ -97,16 +99,35 @@ pub async fn organizations(
         .parse::<i64>()
         .ok();
     let is_root_user = is_root_user(user_id);
-    let all_orgs = if is_root_user {
+    // (org, is_owner, is_admin). is_owner mirrors organization::org_rename_permission,
+    // checked per org, so the UI only ever offers rename where the backend will
+    // actually allow it for THAT org — per-org Admin/Root role does NOT by itself
+    // grant rename, and (on enterprise OpenFGA builds) permission can differ org to
+    // org, so it cannot be computed once and reused across every row.
+    // is_admin is purely informational: whether this user's role on that org is
+    // Admin/Root, regardless of whether they can rename it.
+    let all_orgs: Vec<(Organization, bool, bool)> = if is_root_user {
         let Ok(records) = organization::list_all_orgs(limit).await else {
             return MetaHttpResponse::internal_error("Something went wrong");
         };
-        records
+        records.into_iter().map(|org| (org, true, true)).collect()
     } else {
-        let Ok(records) = organization::list_orgs_by_user(user_id).await else {
+        let Ok(records) = organization::list_org_users_by_user(user_id).await else {
             return MetaHttpResponse::not_found("Something went wrong");
         };
-        records
+        let mut result = Vec::with_capacity(records.len());
+        for record in records {
+            let is_admin = matches!(record.role, UserRole::Admin | UserRole::Root);
+            let is_owner = organization::org_rename_permission(&record.org_id, user_id).await;
+            let org = Organization {
+                identifier: record.org_id,
+                name: record.org_name,
+                org_type: record.org_type.to_string(),
+                service_account: None,
+            };
+            result.push((org, is_owner, is_admin));
+        }
+        result
     };
 
     #[cfg(feature = "cloud")]
@@ -120,7 +141,7 @@ pub async fn organizations(
         }
     };
 
-    for org in all_orgs {
+    for (org, is_owner, is_admin) in all_orgs {
         // Hide blocked orgs (pending_deletion or deleting) from the regular org
         // list (switcher) so a soft-deleted org feels gone. _meta admins inspect
         // them via the dedicated all_organizations endpoint instead. This matches
@@ -147,6 +168,8 @@ pub async fn organizations(
             org_type: org.org_type,
             user_obj: user_detail.clone(),
             plan: org_subscription,
+            is_owner,
+            is_admin,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());

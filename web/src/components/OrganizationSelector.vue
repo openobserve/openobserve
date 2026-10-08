@@ -41,9 +41,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 interface OrgOption {
   label: I18nText;
   identifier: string;
-  /** The org owner's email — absent on OSS, which has no sharing concept. */
-  owner_email?: string;
-  /** Whether the current user owns this org (vs. it being shared with them). */
+  /** Whether the current user owns/administers this org (vs. it being shared with them). */
   is_owned?: boolean;
   [key: string]: any;
 }
@@ -65,15 +63,12 @@ const { t } = useI18nTyped();
 const open = ref(false);
 const searchQuery = ref("");
 
-// Matches the display name, the identifier, and (for shared orgs) the owner's email.
+// Matches the display name and the identifier.
 const filtered = computed<OrgOption[]>(() => {
   if (!searchQuery.value) return props.organizations;
   const q = searchQuery.value.toLowerCase();
   return props.organizations.filter(
-    (o) =>
-      o.label?.toLowerCase().includes(q) ||
-      o.identifier?.toLowerCase().includes(q) ||
-      o.owner_email?.toLowerCase().includes(q),
+    (o) => o.label?.toLowerCase().includes(q) || o.identifier?.toLowerCase().includes(q),
   );
 });
 

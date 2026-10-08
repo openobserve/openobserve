@@ -125,7 +125,7 @@ export default defineComponent({
           store.dispatch("setOrganizations", res.data.data);
 
           orgOptions.value = res.data.data.map(
-            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+            (data: { id: any; name: any; type: any; identifier: any; is_owner: boolean }) => {
               let optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -143,7 +143,7 @@ export default defineComponent({
               } else if (
                 (Object.keys(selectedOrg.value).length == 0 &&
                   (data.type == "default" || data.id == "1") &&
-                  store.state.userInfo.email == data.UserObj.email) ||
+                  data.is_owner) ||
                 res.data.data.length == 1
               ) {
                 localOrgFlag = true;
