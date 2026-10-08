@@ -33,7 +33,15 @@ use config::{
 };
 use vector_enrichment::{Table, TableRegistry};
 use vrl::{
-    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
+    compiler::{
+        CompilationResult, Function, Parameter, TargetValueRef,
+        function::{
+            ArgumentList, Compiled, Error as FunctionError, Example, FunctionCompileContext,
+            closure,
+        },
+        runtime::Runtime,
+        state::TypeState,
+    },
     prelude::NotNan,
 };
 
@@ -54,6 +62,99 @@ pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
 /// Organization-owned stream enrichment tables live in [`ENRICHMENT_TABLES`].
 static GLOBAL_ENRICHMENT_TABLES: LazyLock<RwHashMap<String, Box<dyn Table + Send + Sync>>> =
     LazyLock::new(Default::default);
+
+/// VRL functions that reach the network, the environment or host files.
+const DENIED_VRL_FUNCTIONS: &[&str] = &[
+    "http_request",
+    "dns_lookup",
+    "reverse_dns",
+    "get_env_var",
+    "get_hostname",
+    "parse_proto",
+    "encode_proto",
+    "validate_json_schema",
+];
+
+/// VRL function arguments that name a host file to read.
+const DENIED_VRL_FILE_ARGUMENTS: &[(&str, &str)] =
+    &[("parse_groks", "alias_sources"), ("parse_etld", "psl")];
+
+/// Rejects calls that pass `keyword`, delegating everything else to `inner`.
+#[derive(Debug)]
+struct WithoutFileArgument {
+    inner: Box<dyn Function>,
+    keyword: &'static str,
+}
+
+impl Function for WithoutFileArgument {
+    fn identifier(&self) -> &'static str {
+        self.inner.identifier()
+    }
+
+    fn summary(&self) -> &'static str {
+        self.inner.summary()
+    }
+
+    fn usage(&self) -> &'static str {
+        self.inner.usage()
+    }
+
+    fn category(&self) -> &'static str {
+        self.inner.category()
+    }
+
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
+        self.inner.internal_failure_reasons()
+    }
+
+    fn return_kind(&self) -> u16 {
+        self.inner.return_kind()
+    }
+
+    fn return_rules(&self) -> &'static [&'static str] {
+        self.inner.return_rules()
+    }
+
+    fn notices(&self) -> &'static [&'static str] {
+        self.inner.notices()
+    }
+
+    fn pure(&self) -> bool {
+        self.inner.pure()
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        self.inner.examples()
+    }
+
+    fn compile(
+        &self,
+        state: &TypeState,
+        ctx: &mut FunctionCompileContext,
+        arguments: ArgumentList,
+    ) -> Compiled {
+        if arguments.optional(self.keyword).is_some() {
+            return Err(Box::new(FunctionError::InvalidArgument {
+                keyword: self.keyword,
+                value: arguments
+                    .optional_literal(self.keyword, state)
+                    .ok()
+                    .flatten()
+                    .unwrap_or(vrl::value::Value::Null),
+                error: "reading host files is not supported",
+            }));
+        }
+        self.inner.compile(state, ctx, arguments)
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        self.inner.parameters()
+    }
+
+    fn closure(&self) -> Option<closure::Definition> {
+        self.inner.closure()
+    }
+}
 
 pub fn register_global_enrichment_table<T>(name: impl Into<String>, table: T)
 where
@@ -102,7 +203,7 @@ pub fn get_enrichment_tables(org_id: &str) -> HashMap<String, Box<dyn Table + Se
 }
 
 pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
-    let mut functions = vrl::stdlib::all();
+    let mut functions = vrl_stdlib_functions();
     functions.append(&mut vector_enrichment::vrl_functions());
     let registry = TableRegistry::default();
     registry.load(get_enrichment_tables(org_id));
@@ -115,10 +216,6 @@ pub fn compile_vrl_function(
     source: &str,
     org_id: &str,
 ) -> Result<VRLRuntimeConfig, std::io::Error> {
-    if source.contains("get_env_var") {
-        return Err(std::io::Error::other("get_env_var is not supported"));
-    }
-
     let external = vrl::prelude::state::ExternalEnv::default();
     let vrl_config = get_vrl_compiler_config(org_id);
     match vrl::compiler::compile_with_external(
@@ -261,6 +358,22 @@ pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
     }
 }
 
+fn vrl_stdlib_functions() -> Vec<Box<dyn Function>> {
+    vrl::stdlib::all()
+        .into_iter()
+        .filter(|f| !DENIED_VRL_FUNCTIONS.contains(&f.identifier()))
+        .map(|f| {
+            match DENIED_VRL_FILE_ARGUMENTS
+                .iter()
+                .find(|(name, _)| *name == f.identifier())
+            {
+                Some((_, keyword)) => Box::new(WithoutFileArgument { inner: f, keyword }),
+                None => f,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -332,12 +445,84 @@ mod tests {
         QUERY_FUNCTIONS.remove(key);
     }
 
+    fn compile_error(source: &str) -> String {
+        match compile_vrl_function(source, "vrl_crate_test") {
+            Ok(_) => panic!("{source} must not compile"),
+            Err(error) => error.to_string(),
+        }
+    }
+
     #[test]
     fn rejects_environment_access() {
-        let error = match compile_vrl_function("get_env_var!(\"HOME\")", "default") {
-            Ok(_) => panic!("get_env_var must be rejected"),
-            Err(error) => error,
-        };
-        assert_eq!(error.to_string(), "get_env_var is not supported");
+        let error = compile_error("get_env_var!(\"HOME\")");
+        assert!(error.contains("call to undefined function"), "{error}");
+    }
+
+    #[test]
+    fn rejects_network_and_host_functions() {
+        let sources = [
+            ".x = http_request!(\"http://127.0.0.1/\")",
+            ".x = dns_lookup!(\"localhost\")",
+            ".x = reverse_dns!(\"127.0.0.1\")",
+            ".x = get_env_var!(\"HOME\")",
+            ".x = get_hostname!()",
+            ".x = parse_proto!(.m, \"/etc/hosts\", \"a.B\")",
+            ".x = encode_proto!(.m, \"/etc/hosts\", \"a.B\")",
+            ".x = validate_json_schema!(.m, \"/etc/hosts\")",
+        ];
+        let allowed: Vec<&str> =
+            sources
+                .into_iter()
+                .filter(|source| {
+                    std::panic::catch_unwind(|| compile_vrl_function(source, "vrl_crate_test"))
+                        .map_or(true, |res| {
+                            res.map_or_else(
+                                |e| !e.to_string().contains("call to undefined function"),
+                                |_| true,
+                            )
+                        })
+                })
+                .collect();
+        assert!(allowed.is_empty(), "still callable: {allowed:?}");
+    }
+
+    #[test]
+    fn rejects_host_file_arguments() {
+        let dir = std::env::temp_dir().join(format!("vrl_crate_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let aliases = dir.join("aliases.json");
+        std::fs::write(&aliases, r#"{"secret": "s3cr3t"}"#).unwrap();
+        let psl = dir.join("psl.dat");
+        std::fs::write(&psl, "com\n").unwrap();
+        let sources = [
+            format!(
+                ".x = parse_groks!(.m, patterns: [\"%{{secret}}\"], alias_sources: [\"{}\"])",
+                aliases.display()
+            ),
+            format!(".x = parse_etld!(\"a.b.com\", psl: \"{}\")", psl.display()),
+        ];
+        let allowed: Vec<String> = sources
+            .into_iter()
+            .filter(|source| {
+                compile_vrl_function(source, "vrl_crate_test")
+                    .map_or_else(|e| !e.to_string().contains("host files"), |_| true)
+            })
+            .collect();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(allowed.is_empty(), "still reads host files: {allowed:?}");
+    }
+
+    #[test]
+    fn keeps_file_free_uses_of_guarded_functions() {
+        for source in [
+            ".x = parse_groks!(.m, patterns: [\"%{WORD:w}\"])",
+            ".x = parse_etld!(\"a.b.com\")",
+            ".x = parse_json!(.m)",
+        ] {
+            assert!(
+                compile_vrl_function(source, "vrl_crate_test").is_ok(),
+                "{source}"
+            );
+        }
     }
 }

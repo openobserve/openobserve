@@ -369,23 +369,18 @@ export const convertServiceGraphToTree = (
       .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Direction-aware request count based on tree position
+    // The node's own request count, as the graph view shows it; edge traffic stays on the edges.
     let totalRequests: number;
 
-    if (incomingEdge) {
-      // Non-root: show traffic via this specific edge from parent
+    if (typeof node.requests === "number") {
+      totalRequests = node.requests;
+    } else if (incomingEdge) {
       totalRequests = incomingEdge.total_requests ?? 0;
     } else {
-      // Root: sum of outgoing edges
       totalRequests = outgoingEdges.reduce(
         (sum: number, edge: any) => sum + (edge.total_requests ?? 0),
         0,
       );
-
-      // If no edges, fall back to node's own metrics
-      if (totalRequests === 0 && node.requests !== undefined) {
-        totalRequests = node.requests;
-      }
     }
 
     // Node border: colored by this node's error rate relative to baseline

@@ -51,6 +51,7 @@ import { useRouter, type LocationQueryRaw } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import { isGateOpen, useNavGateContext } from "./useNavGateContext";
 import type { SubnavChild } from "./ONavbar.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -542,6 +543,7 @@ function onChildMouseenter(event: MouseEvent) {
             <span class="leading-tight">{{
               child.title ? raw(child.title) : t(child.titleKey)
             }}</span>
+            <BetaBadge v-if="child.beta" size="xs" />
           </router-link>
         </div>
 
@@ -563,6 +565,7 @@ function onChildMouseenter(event: MouseEvent) {
           <span class="leading-tight">{{
             block.child.title ? raw(block.child.title) : t(block.child.titleKey)
           }}</span>
+          <BetaBadge v-if="block.child.beta" size="xs" />
         </router-link>
       </template>
     </div>
@@ -638,6 +641,7 @@ function onChildMouseenter(event: MouseEvent) {
               <span class="leading-none">{{
                 child.title ? raw(child.title) : t(child.titleKey)
               }}</span>
+              <BetaBadge v-if="child.beta" size="xs" />
             </router-link>
           </div>
 
@@ -664,6 +668,7 @@ function onChildMouseenter(event: MouseEvent) {
             <span class="leading-none">{{
               block.child.title ? raw(block.child.title) : t(block.child.titleKey)
             }}</span>
+            <BetaBadge v-if="block.child.beta" size="xs" />
           </router-link>
         </template>
       </div>

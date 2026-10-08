@@ -249,6 +249,15 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
+    fn canonical_root(&self) -> Option<&PathBuf> {
+        if let Some(root) = self.canonical_root.get() {
+            return Some(root);
+        }
+        let root = std::fs::canonicalize(&self.root_dir).ok()?;
+        let _ = self.canonical_root.set(root);
+        self.canonical_root.get()
+    }
+
     /// Resolve a cache key to an on-disk path, returning `None` when it would
     /// escape `root_dir`. The cache namespace is flat, so a `..`/absolute key or
     /// any path that canonicalizes outside the cache root is a traversal attempt.
@@ -257,16 +266,28 @@ impl FileData {
             return None;
         }
         let path = self.get_file_path(file);
-        let canonical_root = match self.canonical_root.get() {
-            Some(root) => root,
-            None => {
-                let root = std::fs::canonicalize(&self.root_dir).ok()?;
-                let _ = self.canonical_root.set(root);
-                self.canonical_root.get()?
-            }
-        };
         let resolved = std::fs::canonicalize(&path).ok()?;
-        resolved.starts_with(canonical_root).then_some(path)
+        resolved.starts_with(self.canonical_root()?).then_some(path)
+    }
+
+    /// Like `safe_read_path`, but for a file that may not exist yet.
+    fn safe_file_path(&self, file: &str) -> Option<String> {
+        if key_escapes(file) {
+            return None;
+        }
+        let path = self.get_file_path(file);
+        let Some(existing) = Path::new(&path)
+            .ancestors()
+            .find(|p| p.symlink_metadata().is_ok())
+        else {
+            return Some(path);
+        };
+        // nothing under the root exists yet, so no symlink can redirect the path
+        if !existing.starts_with(&self.root_dir) {
+            return Some(path);
+        }
+        let resolved = std::fs::canonicalize(existing).ok()?;
+        resolved.starts_with(self.canonical_root()?).then_some(path)
     }
 
     async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
@@ -294,6 +315,13 @@ impl FileData {
         tmp_file: &str,
         data_size: usize,
     ) -> Result<(), anyhow::Error> {
+        let Some(file_path) = self.safe_file_path(file) else {
+            _ = std::fs::remove_file(tmp_file);
+            return Err(anyhow::anyhow!(
+                "[CacheType:{}] File disk cache rejected key outside the cache root: {file}",
+                self.file_type,
+            ));
+        };
         if self.cur_size + data_size >= self.max_size {
             log::info!(
                 "[CacheType:{}] File disk cache is full, can't cache extra {data_size} bytes",
@@ -312,7 +340,6 @@ impl FileData {
 
         // rename tmp file to real file
         let file_ops_start = std::time::Instant::now();
-        let file_path = self.get_file_path(file);
         std::fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
         // sync on purpose: the rename and the set_size index insert must be one uncancellable poll
         std::fs::rename(tmp_file, &file_path).map_err(|e| {
@@ -337,28 +364,7 @@ impl FileData {
         // update size
         self.cur_size += data_size;
         self.data.insert(file.to_string(), data_size);
-        // update metrics
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .inc();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
-                .add(data_size as i64);
-        } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "results"])
-                .add(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[columns[1]])
-                .add(data_size as i64);
-        } else if columns[0] == "aggregations" && columns.len() >= 3 {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "aggregations"])
-                .add(data_size as i64);
-        };
+        update_key_metrics(file, data_size as i64);
         Ok(())
     }
 
@@ -412,30 +418,9 @@ impl FileData {
             self.cur_size -= data_size;
             release_size += data_size;
 
-            // metrics
-            let columns = key.split('/').collect::<Vec<&str>>();
-            let is_metrics_key = columns[0] == "metrics_results";
-            let is_results_key = columns[0] == "results";
-            if columns[0] == "files" {
-                metrics::QUERY_DISK_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .dec();
-                metrics::QUERY_DISK_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "results" {
-                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "results"])
-                    .sub(data_size as i64);
-            } else if columns[0] == "metrics_results" {
-                metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1]])
-                    .sub(data_size as i64);
-            } else if columns[0] == "aggregations" && columns.len() >= 3 {
-                metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                    .with_label_values(&[columns[1], columns[2], "aggregations"])
-                    .sub(data_size as i64);
-            }
+            update_key_metrics(&key, -(data_size as i64));
+            let is_metrics_key = key.starts_with("metrics_results/");
+            let is_results_key = key.starts_with("results/");
             if is_results_key {
                 remove_result_files.push(key);
             } else if is_metrics_key {
@@ -485,28 +470,7 @@ impl FileData {
         };
         self.cur_size -= data_size;
 
-        // metrics
-        let columns = key.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::QUERY_DISK_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .dec();
-            metrics::QUERY_DISK_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2]])
-                .sub(data_size as i64);
-        } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "results"])
-                .sub(data_size as i64);
-        } else if columns[0] == "metrics_results" {
-            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
-                .with_label_values(&[columns[1]])
-                .sub(data_size as i64);
-        } else if columns[0] == "aggregations" && columns.len() >= 3 {
-            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
-                .with_label_values(&[columns[1], columns[2], "aggregations"])
-                .sub(data_size as i64);
-        }
+        update_key_metrics(&key, -(data_size as i64));
 
         RemoveOutcome::Removed(trash_file)
     }
@@ -646,6 +610,39 @@ fn key_escapes(file: &str) -> bool {
     Path::new(file)
         .components()
         .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
+/// Applies `delta` bytes (and one file for `files/` keys, by sign) to the key's cache metrics.
+fn update_key_metrics(key: &str, delta: i64) {
+    let mut columns = key.split('/');
+    let (kind, org, stream_type) = (columns.next(), columns.next(), columns.next());
+    match (kind, org, stream_type) {
+        (Some("files"), Some(org), Some(stream_type)) => {
+            let files = metrics::QUERY_DISK_CACHE_FILES.with_label_values(&[org, stream_type]);
+            if delta >= 0 {
+                files.inc()
+            } else {
+                files.dec()
+            }
+            metrics::QUERY_DISK_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type])
+                .add(delta);
+        }
+        (Some("results"), Some(org), Some(stream_type)) => {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type, "results"])
+                .add(delta)
+        }
+        (Some("metrics_results"), Some(org), _) => metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+            .with_label_values(&[org])
+            .add(delta),
+        (Some("aggregations"), Some(org), Some(stream_type)) => {
+            metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
+                .with_label_values(&[org, stream_type, "aggregations"])
+                .add(delta)
+        }
+        _ => log::warn!("disk cache key {key} has no metric labels, skipping metrics"),
+    }
 }
 
 #[inline]
@@ -794,7 +791,7 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
 #[inline]
 pub fn get_file_path(file: &str) -> Option<String> {
     let files = get_file_reader(file)?;
-    Some(files.get_file_path(file))
+    files.safe_file_path(file)
 }
 
 #[inline]
@@ -901,6 +898,11 @@ pub async fn set(file: &str, data: Bytes) -> Result<(), anyhow::Error> {
 pub async fn set_size(file: &str, data_size: usize) -> Result<(), anyhow::Error> {
     if !get_config().disk_cache.enabled {
         return Ok(());
+    }
+    if key_escapes(file) {
+        return Err(anyhow::anyhow!(
+            "disk cache rejected key outside the cache root: {file}"
+        ));
     }
 
     // hash the file name and get the bucket index
@@ -1573,11 +1575,111 @@ mod tests {
             std::process::id()
         );
         std::fs::write(&secret, b"TOP SECRET").unwrap();
-        let evil = format!("../escape_target_{}.txt", std::process::id());
-        assert!(file_data.get(&evil, None).await.is_none());
-        assert!(file_data.get_size(&evil).await.is_none());
+        let escaping = format!("../escape_target_{}.txt", std::process::id());
+        assert!(file_data.get(&escaping, None).await.is_none());
+        assert!(file_data.get_size(&escaping).await.is_none());
         assert!(file_data.get("/etc/hosts", None).await.is_none());
         let _ = std::fs::remove_file(&secret);
+    }
+
+    #[test]
+    fn get_file_path_rejects_keys_escaping_cache_root() {
+        for escaping in [
+            "../../etc/passwd",
+            "files/../../../etc/passwd",
+            "aggregations/../../../../etc/passwd",
+            "/etc/passwd",
+        ] {
+            let resolved = get_file_path(escaping);
+            assert!(
+                resolved.is_none(),
+                "{escaping} resolved outside the cache root: {resolved:?}"
+            );
+        }
+        let legit = "aggregations/default/logs/t/hash/1000_2000.arrow";
+        let resolved = get_file_path(legit).unwrap();
+        assert!(resolved.ends_with(legit));
+    }
+
+    fn temp_root_file_data(tmp: &tempfile::TempDir) -> FileData {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(FileType::Data, 1024, "lru");
+        let root = tmp.path().join("cache");
+        std::fs::create_dir_all(&root).unwrap();
+        file_data.root_dir = format!("{}/", root.display());
+        file_data.multi_dir.clear();
+        file_data
+    }
+
+    #[tokio::test]
+    async fn set_rejects_key_escaping_cache_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("data")).await.unwrap();
+
+        let ret = file_data.set("files/../../x", &tmp_file, 4).await;
+
+        assert!(ret.is_err(), "escaping key was written: {ret:?}");
+        assert!(!tmp.path().join("x").exists());
+        assert!(!file_data.exist("files/../../x").await);
+        assert!(!std::path::Path::new(&tmp_file).exists());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn set_rejects_parent_resolving_outside_cache_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        let outside = tmp.path().join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, tmp.path().join("cache").join("files")).unwrap();
+        let (_, tmp_file) = write_tmp_file("x", Bytes::from("data")).await.unwrap();
+
+        let ret = file_data
+            .set("files/default/logs/x.parquet", &tmp_file, 4)
+            .await;
+
+        assert!(ret.is_err(), "write followed a symlink out of the root");
+        assert!(!outside.join("default/logs/x.parquet").exists());
+        assert!(
+            file_data
+                .safe_file_path("files/default/logs/x.parquet")
+                .is_none()
+        );
+        assert!(file_data.safe_file_path("results/a/b.json").is_some());
+    }
+
+    #[tokio::test]
+    async fn set_size_rejects_key_escaping_cache_root() {
+        let key = "files/../../set_size_escape.parquet";
+
+        let ret = set_size(key, 1).await;
+
+        assert!(ret.is_err(), "escaping key was indexed: {ret:?}");
+        assert!(!FILES[get_bucket_idx(key)].read().await.exist(key).await);
+    }
+
+    #[tokio::test]
+    async fn short_keys_do_not_panic_in_metrics() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut file_data = temp_root_file_data(&tmp);
+        file_data.max_size = usize::MAX;
+        let keys = [
+            "files",
+            "files/org",
+            "results/org",
+            "metrics_results",
+            "aggregations/org",
+        ];
+        for key in keys {
+            file_data.set_size(key, 1).await.unwrap();
+        }
+
+        assert!(matches!(
+            file_data.remove("files").await,
+            RemoveOutcome::Removed(_)
+        ));
+        file_data.gc(keys.len()).await;
+        assert_eq!(file_data.size().1, 0);
     }
 
     #[tokio::test]

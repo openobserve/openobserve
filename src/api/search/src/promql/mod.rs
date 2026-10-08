@@ -1318,6 +1318,53 @@ pub async fn format_query_post(
     format_query(query)
 }
 
+/// PromQL as a small JSON tree, for the visual builder to read a hand-written query.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/prometheus/api/v1/parse_tree",
+    context_path = "/api",
+    tag = "Metrics",
+    operation_id = "PrometheusParseTree",
+    summary = "Parse a PromQL query into a tree",
+    description = "Parses a PromQL query and returns OpenObserve's JSON tree of it: selectors, matrices, calls, aggregates, binary operations, numbers and parentheses, with every other construct marked unsupported. Distinct from Prometheus's parse_query, whose response shape differs.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(content = config::meta::promql::RequestParseTree, description = "The query to parse", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
+            "status": "success",
+            "data": { "type": "selector", "name": "up", "matchers": [] }
+        })),
+        (status = 400, description = "The query does not parse", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"}))
+    )
+)]
+pub async fn parse_tree(
+    Path(_org_id): Path<String>,
+    axum::Json(req): axum::Json<config::meta::promql::RequestParseTree>,
+) -> Response {
+    match promql::ast::tree::parse_tree(&req.query) {
+        Ok(tree) => (
+            StatusCode::OK,
+            axum::Json(config::meta::promql::ApiFuncResponse::ok(tree, None)),
+        )
+            .into_response(),
+        Err(err) => (
+            StatusCode::BAD_REQUEST,
+            axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                err, None,
+            )),
+        )
+            .into_response(),
+    }
+}
+
 fn format_query(query: &str) -> Response {
     let expr = match promql_parser::parser::parse(query) {
         Ok(expr) => expr,
@@ -1735,6 +1782,41 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn parse_tree_response(query: &str) -> (StatusCode, serde_json::Value) {
+        let response = parse_tree(
+            Path("org".to_string()),
+            axum::Json(config::meta::promql::RequestParseTree {
+                query: query.to_string(),
+            }),
+        )
+        .await;
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn parse_tree_returns_the_tree() {
+        let (status, body) = parse_tree_response("rate(x[5m])").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["data"]["type"], "call");
+        assert_eq!(body["data"]["func"], "rate");
+    }
+
+    #[tokio::test]
+    async fn parse_tree_answers_400_with_the_parser_message() {
+        let (status, body) = parse_tree_response("sum(x").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(
+            body["error"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("unclosed")
+        );
+    }
 
     #[test]
     fn test_validate_label_values_params() {

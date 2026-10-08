@@ -2766,6 +2766,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha256",
+ "snap",
  "sqlparser",
  "sqlx",
  "strum 0.28.0",
@@ -9457,7 +9458,7 @@ dependencies = [
 [[package]]
 name = "promql-parser"
 version = "0.6.0"
-source = "git+https://github.com/openobserve/promql-parser?branch=openobserve#621826255a3b5fa083decab7419aa2ca6c6e14dd"
+source = "git+https://github.com/openobserve/promql-parser?branch=openobserve#97db71f3ee6292b21f504fd8a52039868bb7a229"
 dependencies = [
  "cfgrammar",
  "chrono",
@@ -10352,6 +10353,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tower",
 ]
 
 [[package]]

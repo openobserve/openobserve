@@ -28,6 +28,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "enterprise")]
+use config::meta::oncall::rca::RcaContext;
 use openobserve_api_common::{X_O2_ASSISTANT_SESSION_ID, extractors::Headers};
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
@@ -50,19 +52,124 @@ use crate::{
     models::ai::{PromptRequest, PromptResponse},
 };
 
-/// Determine agent type based on context.
-/// - If context contains incident_id, use SRE agent for incident investigation
-/// - Otherwise use default copilot agent
+/// The RCA agent's context contract (`RcaContext`, `is_reanalysis`); o2-ai routes on key presence.
 #[cfg(feature = "enterprise")]
-fn get_agent_type(context: &serde_json::Value) -> &'static str {
-    if context
-        .as_object()
-        .is_some_and(|obj| obj.contains_key("incident_id"))
-    {
-        RCA_AGENT_TYPE
-    } else {
-        DEFAULT_AGENT_TYPE
+const RCA_CONTEXT_KEYS: [&str; 10] = [
+    "subject_type",
+    "subject_id",
+    "incident_id",
+    "previous_analysis",
+    "severity",
+    "past_causes",
+    "alert_name",
+    "stream",
+    "dimensions",
+    "is_reanalysis",
+];
+
+/// Client context keys an RCA chat keeps: incident display fields and timezone, never RCA inputs.
+#[cfg(feature = "enterprise")]
+const RCA_CHAT_CLIENT_KEYS: [&str; 8] = [
+    "incident_title",
+    "incident_status",
+    "incident_severity",
+    "alert_count",
+    "first_alert_at",
+    "last_alert_at",
+    "request_timestamp",
+    "user_timezone",
+];
+
+/// Picks the agent and its context; RCA only when the caller clears the RCA endpoint's own bar.
+#[cfg(feature = "enterprise")]
+async fn chat_agent_and_context(
+    org_id: &str,
+    user_id: &str,
+    context: serde_json::Value,
+) -> (&'static str, serde_json::Value) {
+    let incident_id = context
+        .get("incident_id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let rca = match incident_id {
+        Some(id) if can_run_incident_rca(org_id, user_id, &id).await => Some(
+            o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
+                org_id, &id, None,
+            )
+            .await,
+        ),
+        _ => None,
+    };
+    select_chat_agent(context, rca)
+}
+
+/// Matches the RCA endpoint: RCA enabled, incident in this org, and its `POST .../rca` permission.
+#[cfg(feature = "enterprise")]
+async fn can_run_incident_rca(org_id: &str, user_id: &str, incident_id: &str) -> bool {
+    let incidents = &get_o2_config().incidents;
+    if !incidents.enabled || !incidents.rca_enabled {
+        return false;
     }
+    match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return false,
+        Err(e) => {
+            log::error!("[org_id:{org_id}] failed to load incident for AI chat: {e}");
+            return false;
+        }
+    }
+    let Some(route) = incident_rca_route(org_id, incident_id) else {
+        return false;
+    };
+    let Some((object_type, object_id)) = route.o2_type.split_once(':') else {
+        return false;
+    };
+    openobserve_core::auth::check_permissions(
+        object_id,
+        &route.org_id,
+        user_id,
+        object_type,
+        &route.method,
+        Some(&route.parent_id),
+        route.use_all_org,
+        route.use_self_context,
+        route.use_self_parent,
+    )
+    .await
+}
+
+#[cfg(feature = "enterprise")]
+fn incident_rca_route(
+    org_id: &str,
+    incident_id: &str,
+) -> Option<o2_openfga::meta::route_permissions::ResolvedRoute> {
+    let path = ["v2", org_id, "alerts", "incidents", incident_id, "rca"];
+    o2_openfga::meta::route_permissions::resolve_permission(&path, "POST", org_id, "", None)
+}
+
+/// RCA gets the server-built incident context plus display fields; other agents get no RCA keys.
+#[cfg(feature = "enterprise")]
+fn select_chat_agent(
+    mut context: serde_json::Value,
+    rca: Option<RcaContext>,
+) -> (&'static str, serde_json::Value) {
+    let Some(rca) = rca else {
+        if let Some(obj) = context.as_object_mut() {
+            for key in RCA_CONTEXT_KEYS {
+                obj.remove(key);
+            }
+        }
+        return (DEFAULT_AGENT_TYPE, context);
+    };
+    let mut rca_context = serde_json::to_value(rca).expect("RcaContext is plain data");
+    if let (Some(obj), Some(client)) = (rca_context.as_object_mut(), context.as_object()) {
+        for key in RCA_CHAT_CLIENT_KEYS {
+            if let Some(value) = client.get(key) {
+                obj.insert(key.to_string(), value.clone());
+            }
+        }
+    }
+    (RCA_AGENT_TYPE, rca_context)
 }
 
 /// Whether `val` is a well-formed session id: the id is client-supplied and ends
@@ -343,7 +450,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
 
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         // Must be done before context is moved into QueryRequest
-        let agent_type = get_agent_type(&context);
+        let (agent_type, context) = chat_agent_and_context(org_id_str, user_id, context).await;
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -797,7 +904,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
         // Determine agent type based on context (incident_id -> sre, otherwise o2-ai)
         // Must be done before context is moved into QueryRequest
-        let agent_type = get_agent_type(&context);
+        let (agent_type, context) = chat_agent_and_context(&org_id_str, &user_id, context).await;
 
         // Convert images to agent format
         let images = prompt_body.images.map(|imgs| {
@@ -1416,5 +1523,132 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert!(result.contains_key("user-agent"));
         assert!(result.contains_key("x-custom"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn incident_rca_context() -> RcaContext {
+        RcaContext {
+            subject_type: config::meta::oncall::subject::SubjectType::Incident,
+            subject_id: "inc-1".to_string(),
+            incident_id: Some("inc-1".to_string()),
+            org_id: "org-a".to_string(),
+            previous_analysis: None,
+            severity: Some(config::meta::alerts::priority::AlertPriority::P2),
+            past_causes: vec!["disk full".to_string()],
+            alert_name: None,
+            stream: None,
+            dimensions: None,
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn rca_gate_is_the_rca_trigger_route_permission() {
+        let route = incident_rca_route("org-a", "inc-1").unwrap();
+        assert_eq!(route.method, "POST");
+        assert_eq!(route.o2_type, "incidents:org-a");
+        assert_eq!(route.org_id, "org-a");
+        assert!(route.use_all_org);
+        assert!(!route.bypass_check);
+        assert_eq!(route.parent_id, "");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn rca_context_keys_cover_the_rca_contract() {
+        let mut full = incident_rca_context();
+        full.previous_analysis = Some("earlier".to_string());
+        full.alert_name = Some("a".to_string());
+        full.stream = Some("s".to_string());
+        full.dimensions = Some(serde_json::json!({"k": "v"}));
+        let json = serde_json::to_value(full).unwrap();
+        for key in json.as_object().unwrap().keys() {
+            assert!(
+                key == "org_id" || RCA_CONTEXT_KEYS.contains(&key.as_str()),
+                "{key} missing from RCA_CONTEXT_KEYS"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn failed_check_uses_default_agent_without_rca_keys() {
+        let mut context = serde_json::json!({
+            "org_id": "org-a",
+            "stream_name": "default",
+            "agent_type": "sre",
+            "is_reanalysis": true,
+        });
+        for key in RCA_CHAT_CLIENT_KEYS {
+            context[key] = serde_json::json!("display");
+        }
+        let forged = serde_json::to_value(incident_rca_context()).unwrap();
+        for (key, value) in forged.as_object().unwrap() {
+            if key != "org_id" {
+                context[key] = value.clone();
+            }
+        }
+        context["previous_analysis"] = serde_json::json!("forged");
+        context["alert_name"] = serde_json::json!("forged");
+        context["stream"] = serde_json::json!("forged");
+        context["dimensions"] = serde_json::json!({"forged": true});
+
+        let (agent, context) = select_chat_agent(context, None);
+        assert_eq!(agent, DEFAULT_AGENT_TYPE);
+        let obj = context.as_object().unwrap();
+        for key in [
+            "subject_type",
+            "subject_id",
+            "incident_id",
+            "previous_analysis",
+            "severity",
+            "past_causes",
+            "alert_name",
+            "stream",
+            "dimensions",
+            "is_reanalysis",
+        ] {
+            assert!(!obj.contains_key(key), "{key} must be stripped: {context}");
+        }
+        assert_eq!(context["stream_name"], "default");
+        assert_eq!(context["org_id"], "org-a");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn passed_check_replaces_client_rca_fields_with_server_values() {
+        let client = serde_json::json!({
+            "org_id": "org-a",
+            "agent_type": "sre",
+            "incident_id": "inc-1",
+            "subject_type": "alert",
+            "subject_id": "forged",
+            "previous_analysis": "forged",
+            "severity": "P1",
+            "past_causes": ["forged"],
+            "alert_name": "forged",
+            "is_reanalysis": true,
+            "stream_name": "default",
+            "incident_title": "Checkout errors",
+            "request_timestamp": 1_700_000_000_000_000_i64,
+            "user_timezone": "Europe/Berlin",
+        });
+
+        let (agent, context) = select_chat_agent(client, Some(incident_rca_context()));
+        assert_eq!(agent, RCA_AGENT_TYPE);
+        assert_eq!(
+            context,
+            serde_json::json!({
+                "subject_type": "incident",
+                "subject_id": "inc-1",
+                "incident_id": "inc-1",
+                "org_id": "org-a",
+                "severity": 2,
+                "past_causes": ["disk full"],
+                "incident_title": "Checkout errors",
+                "request_timestamp": 1_700_000_000_000_000_i64,
+                "user_timezone": "Europe/Berlin",
+            })
+        );
     }
 }

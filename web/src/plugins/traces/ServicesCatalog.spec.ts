@@ -19,6 +19,12 @@ import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
+// web/.env sets VITE_OPENOBSERVE_ENTERPRISE=true locally but CI does not, so pin it.
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { default: { ...actual.default, isEnterprise: "false", isCloud: "false" } };
+});
+
 // ---------------------------------------------------------------------------
 // Mock search service
 // ---------------------------------------------------------------------------
@@ -65,8 +71,6 @@ const mockSearchObj = reactive({
   loading: false,
   loadingStream: false,
   meta: {
-    refreshInterval: 0,
-    refreshIntervalLabel: "Off",
     showFields: true,
     showQuery: true,
     showHistogram: true,
@@ -208,6 +212,7 @@ vi.mock("vue-router", async () => {
 // Import the component (must come after all vi.mock calls so hoisting applies)
 // ---------------------------------------------------------------------------
 import ServicesCatalog from "./ServicesCatalog.vue";
+import config from "@/aws-exports";
 
 // ---------------------------------------------------------------------------
 // Mock store
@@ -228,6 +233,7 @@ function createMockStore(overrides: Record<string, any> = {}) {
         organizationSettings: {
           trace_id_field_name: "trace_id",
           span_id_field_name: "span_id",
+          red_insights_enabled: true,
         },
         streams: {},
       },
@@ -2675,6 +2681,7 @@ describe("ServicesCatalog", () => {
     }
 
     beforeEach(() => {
+      config.isEnterprise = "true";
       stubSchemas(() => Promise.resolve(anomaliesSchema("is_absence", "direction")));
       mockSearchFn.mockResolvedValue({ data: { hits: [anomalyRow()] } });
       mockAnomalyList.mockResolvedValue({
@@ -2683,6 +2690,7 @@ describe("ServicesCatalog", () => {
     });
 
     afterEach(() => {
+      config.isEnterprise = "false";
       mockStreamSchema.mockReset();
       mockStreamSchema.mockResolvedValue({ data: { schema: [] } });
       mockSearchFn.mockReset();
@@ -2692,9 +2700,29 @@ describe("ServicesCatalog", () => {
       mockSearchObj.data.datetime.type = "relative";
     });
 
-    it("does not query _anomalies when the setting is off", async () => {
+    const anomaliesSchemaCalls = () =>
+      mockStreamSchema.mock.calls.filter((call: any[]) => call[1] === "_anomalies");
+
+    it("never fetches the _anomalies schema on an OSS build, although the setting is on", async () => {
+      config.isEnterprise = "false";
       wrapper = mountServicesCatalog();
       await flushPromises();
+      expect(anomaliesSchemaCalls()).toHaveLength(0);
+      expect(anomalyCalls()).toHaveLength(0);
+      expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
+    });
+
+    it("does not query _anomalies when the setting is explicitly off", async () => {
+      wrapper = mountServicesCatalog({
+        storeOverrides: {
+          organizationData: {
+            organizationSettings: { red_insights_enabled: false },
+            streams: {},
+          },
+        },
+      });
+      await flushPromises();
+      expect(anomaliesSchemaCalls()).toHaveLength(0);
       expect(anomalyCalls()).toHaveLength(0);
       expect(wrapper.find('[data-test="services-catalog-insights"]').exists()).toBe(false);
     });
@@ -3160,6 +3188,63 @@ describe("ServicesCatalog", () => {
 
       expect(wrapper.vm.showSidePanel).toBe(false);
       expect(wrapper.vm.selectedServiceRow).toBeNull();
+    });
+  });
+
+  describe("side panel time range", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const mockOneService = () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks?.data?.(null, {
+          type: "search_response_hits",
+          content: {
+            results: {
+              hits: [{ service_name: "email-service", _is_real_service: 1, total_requests: 1 }],
+            },
+          },
+        });
+        callbacks?.complete?.(null, {});
+      });
+    };
+
+    it("resolves a relative range against the time the panel opens", async () => {
+      mockOneService();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const openedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(openedAt);
+
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("timeRange")).toEqual({
+        startTime: (openedAt - 15 * 60 * 1000) * 1000,
+        endTime: openedAt * 1000,
+      });
+    });
+
+    it("re-resolves when the panel opens again later", async () => {
+      mockOneService();
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const firstOpen = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(firstOpen);
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+      wrapper.vm.handleCloseSidePanel();
+      await flushPromises();
+
+      const secondOpen = firstOpen + 10 * 60 * 1000;
+      vi.setSystemTime(secondOpen);
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
+      expect(panel.props("timeRange").endTime).toBe(secondOpen * 1000);
     });
   });
 });
