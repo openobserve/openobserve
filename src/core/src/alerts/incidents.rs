@@ -552,6 +552,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 ///   alerts.
 /// - `NewAlertTypeJoined` → same as above (new alert type joining is an escalation signal).
 /// - `ExistingAlertRepeated` → notification suppressed (same alert type already in incident).
+/// - A failed send is returned in `CorrelatedIncident::notify_error` for the caller to record.
 ///
 /// When `notify_rows` is empty the function still correlates but sends no notification.
 /// Pass an empty slice from manual test-trigger paths that send their own notification.
