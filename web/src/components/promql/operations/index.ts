@@ -565,6 +565,8 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       defaultParams: [],
       group: PromqlStepGroup.Trigonometry,
       documentation: gt("promql.operations.piDoc"),
+      // A constant takes no input, so it renders the invalid `pi(<expr>)`; saved panels keep it.
+      retired: true,
     },
 
     // ============ Time Functions ============

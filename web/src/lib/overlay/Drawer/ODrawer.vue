@@ -61,6 +61,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   portalTarget: undefined,
   anchor: undefined,
   anchorEdge: "top",
+  modal: true,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -68,6 +69,9 @@ const emit = defineEmits<DrawerEmits>();
 defineSlots<DrawerSlots>();
 
 const slots = useSlots();
+
+const ESCAPE_KEEPS_OPEN =
+  "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
 // Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
 // boolean-casts an absent `open` prop to `false`, locking reka-ui into
@@ -122,8 +126,11 @@ function setOpen(v: boolean) {
 }
 
 function handleEscapeKeyDown(e: KeyboardEvent) {
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  const keepsOpen = !props.modal && target?.closest(ESCAPE_KEEPS_OPEN);
   // A vetoed Escape must also cancel the library's own dismiss, or it closes on a second guard call.
-  if (props.persistent || props.closeGuard?.() === false) {
+  if (props.persistent || keepsOpen || props.closeGuard?.() === false) {
     e.preventDefault();
     return;
   }
@@ -131,7 +138,7 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
 }
 
 function handleInteractOutside(e: Event) {
-  if (props.persistent) {
+  if (props.persistent || !props.modal) {
     e.preventDefault();
     return;
   }
@@ -394,7 +401,7 @@ watch(shown, (open) => {
 </script>
 
 <template>
-  <DialogRoot :open="shown" @update:open="handleOpenChange">
+  <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
     <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />

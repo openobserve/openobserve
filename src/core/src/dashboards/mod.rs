@@ -1160,28 +1160,26 @@ async fn filter_permitted_dashboards(
 
     let permitted_dashboards = dashboards
         .into_iter()
-        .filter(|(f, d)| {
-            let folder_id = &f.folder_id;
-            let Some(dashboard_id) = d.dashboard_id() else {
-                return false;
-            };
-
-            permitted_objects.is_none()
-                || permitted_objects
-                    .as_ref()
-                    .unwrap()
-                    .contains(&format!("dashboard:{folder_id}/{dashboard_id}"))
-                || permitted_objects
-                    .as_ref()
-                    .unwrap()
-                    .contains(&format!("dashboard:{dashboard_id}"))
-                || permitted_objects
-                    .as_ref()
-                    .unwrap()
-                    .contains(&format!("dashboard:_all_{org_id}"))
-        })
+        .filter(|(f, d)| is_dashboard_permitted(org_id, f, d, permitted_objects.as_deref()))
         .collect();
     Ok(permitted_dashboards)
+}
+
+/// Whether `dashboard` passes the individual grants in `permitted`; `None` means no filtering.
+pub(crate) fn is_dashboard_permitted(
+    org_id: &str,
+    folder: &Folder,
+    dashboard: &Dashboard,
+    permitted: Option<&[String]>,
+) -> bool {
+    let Some(dashboard_id) = dashboard.dashboard_id() else {
+        return false;
+    };
+    permitted.is_none_or(|permitted| {
+        permitted.contains(&format!("dashboard:{}/{dashboard_id}", folder.folder_id))
+            || permitted.contains(&format!("dashboard:{dashboard_id}"))
+            || permitted.contains(&format!("dashboard:_all_{org_id}"))
+    })
 }
 
 #[cfg(test)]

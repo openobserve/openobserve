@@ -28,7 +28,7 @@ use config::{
 };
 use futures::StreamExt;
 use hashbrown::{HashMap, HashSet};
-use proto::cluster_rpc::{SimpleFileList, event_client::EventClient};
+use proto::cluster_rpc::{FileContent, SimpleFileList, event_client::EventClient};
 use tokio::sync::{
     Mutex,
     mpsc::{Receiver, Sender},
@@ -452,6 +452,7 @@ pub async fn download_from_node(
     if file_size_map.is_empty() {
         return Ok(files.to_vec());
     }
+    let requested: HashSet<&str> = files.iter().map(|(_, _, f, ..)| f.as_str()).collect();
     let request = tonic::Request::new(SimpleFileList {
         files: files.iter().map(|(_, _, f, ..)| f.to_string()).collect(),
     });
@@ -466,7 +467,6 @@ pub async fn download_from_node(
         .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
 
     let mut file_contents = HashMap::new();
-    let mut downloaded_files = HashSet::new();
     let mut resp_stream = resp.into_inner();
     while let Some(resp) = resp_stream.next().await {
         let resp = match resp {
@@ -486,13 +486,10 @@ pub async fn download_from_node(
             }
         };
         for content in resp.entries {
-            let entry = file_contents
-                .entry(content.filename.clone())
-                .or_insert(bytes::BytesMut::new());
-            entry.extend_from_slice(&content.content);
-            downloaded_files.insert(content.filename);
+            collect_chunk(&mut file_contents, &requested, content);
         }
     }
+    let mut downloaded_files: HashSet<String> = file_contents.keys().cloned().collect();
 
     log::debug!(
         "[FILE_CACHE_DOWNLOAD:gRPC] Successfully retrieved {} files from {} in {} ms",
@@ -524,11 +521,7 @@ pub async fn download_from_node(
     }
 
     // Return list of failed files
-    let failed_files: Vec<_> = files
-        .iter()
-        .filter(|(_, f, ..)| !downloaded_files.contains(f))
-        .cloned()
-        .collect();
+    let failed_files = failed_downloads(files, &downloaded_files);
 
     log::debug!(
         "[FILE_CACHE_DOWNLOAD:gRPC] Failed to retrieve {} files from {} in {} ms",
@@ -697,13 +690,42 @@ fn exceeds_max_age(ts: i64, max_age_days: i64) -> bool {
     ts < now_micros() - day_micros(max_age_days)
 }
 
+fn collect_chunk(
+    file_contents: &mut HashMap<String, bytes::BytesMut>,
+    requested: &HashSet<&str>,
+    content: FileContent,
+) {
+    // a peer must not choose cache keys, and unrequested files would skip the size check
+    if !requested.contains(content.filename.as_str()) {
+        log::warn!(
+            "[FILE_CACHE_DOWNLOAD:gRPC] dropping unrequested file {} from peer",
+            content.filename
+        );
+        return;
+    }
+    file_contents
+        .entry(content.filename)
+        .or_default()
+        .extend_from_slice(&content.content);
+}
+
+fn failed_downloads(files: &[DownloadFile], downloaded: &HashSet<String>) -> Vec<DownloadFile> {
+    files
+        .iter()
+        .filter(|(_, _, f, ..)| !downloaded.contains(f))
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use config::utils::time::{day_micros, hour_micros, now_micros};
+    use hashbrown::{HashMap, HashSet};
+    use proto::cluster_rpc::FileContent;
 
     use super::{
-        Duration, FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files,
-        queued_files,
+        Duration, FileInfo, PriorityDownloadQueue, collect_chunk, exceeds_max_age,
+        failed_downloads, file_data, processing_files, queued_files,
     };
 
     #[test]
@@ -887,5 +909,55 @@ mod tests {
             ))
             .await;
         assert!(!overflow, "push beyond cap must return false");
+    }
+
+    #[test]
+    fn test_peer_chunks_for_unrequested_files_are_dropped() {
+        let requested: HashSet<&str> = ["files/default/logs/a.parquet"].into_iter().collect();
+        let mut contents = HashMap::new();
+        for (filename, content) in [
+            ("files/default/logs/a.parquet", b"ab".to_vec()),
+            ("files/other/logs/b.parquet", b"planted".to_vec()),
+            ("../../../../tmp/x", b"planted".to_vec()),
+            ("files/default/logs/a.parquet", b"cd".to_vec()),
+        ] {
+            collect_chunk(
+                &mut contents,
+                &requested,
+                FileContent {
+                    content,
+                    filename: filename.to_string(),
+                },
+            );
+        }
+
+        assert_eq!(contents.len(), 1);
+        assert_eq!(&contents["files/default/logs/a.parquet"][..], b"abcd");
+    }
+
+    #[test]
+    fn test_failed_downloads_matches_on_file_name() {
+        let files = vec![
+            (
+                1,
+                "acct".to_string(),
+                "files/default/logs/a.parquet".to_string(),
+                2,
+                0,
+            ),
+            (
+                2,
+                "acct".to_string(),
+                "files/default/logs/b.parquet".to_string(),
+                2,
+                0,
+            ),
+        ];
+        let downloaded: HashSet<String> = ["files/default/logs/a.parquet".to_string()].into();
+
+        assert_eq!(
+            failed_downloads(&files, &downloaded),
+            vec![files[1].clone()]
+        );
     }
 }

@@ -209,6 +209,14 @@ pub async fn labels_by_ids(
         .collect())
 }
 
+/// Lists dashboards like [`list`], but logs and skips rows that do not convert.
+pub async fn list_skipping_invalid(
+    params: ListDashboardsParams,
+) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Ok(convert_skipping_invalid(list_models(client, params).await?))
+}
+
 /// Lists all existing dashboards
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -485,6 +493,23 @@ async fn list_models(
     Ok(folders_and_dashboards)
 }
 
+fn convert_skipping_invalid(
+    rows: Vec<(folders::Model, dashboards::Model)>,
+) -> Vec<(Folder, Dashboard)> {
+    rows.into_iter()
+        .filter_map(|(f, d)| {
+            let id = d.id.clone();
+            match Dashboard::try_from(d) {
+                Ok(d) => Some((Folder::from(f), d)),
+                Err(e) => {
+                    log::warn!("[dashboards] skipping dashboard {id} that does not convert: {e}");
+                    None
+                }
+            }
+        })
+        .collect()
+}
+
 /// Lists all existing dashboard ORM models
 async fn list_all_models(
     db: &DatabaseConnection,
@@ -635,6 +660,25 @@ mod tests {
         // data is null, not an object — injection is skipped, deserialization must fail
         let model = make_model(1, serde_json::Value::Null);
         assert!(Dashboard::try_from(model).is_err());
+    }
+
+    #[test]
+    fn convert_skipping_invalid_drops_only_the_bad_row() {
+        let folder = folders::Model {
+            id: "folder-1".to_string(),
+            org: "org".to_string(),
+            folder_id: "f1".to_string(),
+            name: "F".to_string(),
+            description: None,
+            icon: None,
+            r#type: 0,
+        };
+        let good = make_model(8, serde_json::json!({}));
+        let mut bad = make_model(999, serde_json::json!({}));
+        bad.id = "id-2".to_string();
+        let kept = convert_skipping_invalid(vec![(folder.clone(), bad), (folder, good)]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].1.dashboard_id(), Some("dash-1"));
     }
 
     #[tokio::test]

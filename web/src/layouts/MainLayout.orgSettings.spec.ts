@@ -99,7 +99,7 @@ describe("MainLayout — organization settings load", () => {
     },
   );
 
-  it("defaults red_insights_enabled to false when the server omits it", async () => {
+  it("defaults red_insights_enabled to true when the server omits it", async () => {
     getOrgSettings.mockResolvedValue({ data: { data: {} } });
     wrapper = await mountLayout();
     await flushPromises();
@@ -107,6 +107,6 @@ describe("MainLayout — organization settings load", () => {
     await (
       wrapper.vm as unknown as { getOrganizationSettings: () => Promise<void> }
     ).getOrganizationSettings();
-    expect(store.state.organizationData.organizationSettings.red_insights_enabled).toBe(false);
+    expect(store.state.organizationData.organizationSettings.red_insights_enabled).toBe(true);
   });
 });

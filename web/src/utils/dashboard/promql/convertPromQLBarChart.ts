@@ -109,6 +109,8 @@ export class BarConverter implements PromQLChartConverter {
 
           series.push({
             name: seriesData.name,
+            _panelQueryIndex: queryData.queryIndex,
+            _seriesRole: queryData.seriesRole,
             type: "bar",
             stack: "total",
             data,

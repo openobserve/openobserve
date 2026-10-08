@@ -143,17 +143,8 @@ const makeSearchObj = () =>
     loading: false,
     loadingStream: false,
     searchApplied: false,
-    config: {
-      refreshTimes: [
-        [
-          { label: "5 sec", value: 5 },
-          { label: "1 min", value: 60 },
-        ],
-      ],
-    },
+    config: {},
     meta: {
-      refreshInterval: 0,
-      refreshIntervalLabel: "Off",
       showFields: true,
       showQuery: true,
       showHistogram: true,
@@ -1428,31 +1419,6 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
-  // [auto-generated] refreshTimeChange
-  // -------------------------------------------------------------------------
-  describe("refreshTimeChange", () => {
-    it("should update meta.refreshInterval and meta.refreshIntervalLabel", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      (wrapper.vm as any).refreshTimeChange({ value: 30, label: "30 sec" });
-
-      expect(searchObjInstance.meta.refreshInterval).toBe(30);
-      expect(searchObjInstance.meta.refreshIntervalLabel).toBe("30 sec");
-    });
-
-    it("should set btnRefreshInterval to false after the change", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      (wrapper.vm as any).btnRefreshInterval = true;
-      (wrapper.vm as any).refreshTimeChange({ value: 60, label: "1 min" });
-
-      expect((wrapper.vm as any).btnRefreshInterval).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // [auto-generated] Props
   // -------------------------------------------------------------------------
   // -------------------------------------------------------------------------
@@ -1602,12 +1568,35 @@ describe("SearchBar", () => {
       expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
     });
 
+    it("opens the save dialog from the save button beside the menu, as logs does", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const saveBtn = wrapper.find('[data-test="traces-search-bar-saved-views-create-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+      await saveBtn.trigger("click");
+      expect((wrapper.vm as any).saveViewDialogOpen).toBe(true);
+    });
+
+    it("separates the menu and the save button with a divider", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const group = wrapper.find('[data-test="traces-search-bar-saved-views"]');
+      const separator = group.findComponent({ name: "OSeparator" });
+      expect(separator.exists()).toBe(true);
+      expect(separator.props("vertical")).toBe(true);
+    });
+
     it.each(["service-graph", "services-catalog"])("is hidden on the %s tab", async (mode) => {
       searchObjInstance.meta.searchMode = mode as any;
       wrapper = mountSearchBar();
       await flushPromises();
 
       expect(wrapper.find('[data-test="traces-search-bar-saved-views-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-bar-saved-views-create-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("save serialises exactly the view fields", async () => {

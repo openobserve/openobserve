@@ -26,7 +26,7 @@ import {
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, debounce } from "lodash-es";
+import { cloneDeep, debounce, set } from "lodash-es";
 
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
@@ -95,7 +95,12 @@ import {
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
-import type { AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
+import {
+  forecastModeFields,
+  parseForecastAlertPromql,
+  type ForecastAlert,
+} from "@/utils/alerts/forecastAlert";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -292,6 +297,17 @@ export const anomalyBandPayload = (
   alert_window_recover_pct: numberOrNull(c.alert_window_recover_pct),
 });
 
+/**
+ * Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+ * Band/percentile mode must send an explicit null (not omit the field): the update endpoint's
+ * `alert_budget_per_day` is a double-Option, so an absent field means "leave as-is" and a
+ * previously stored budget would never clear.
+ */
+export const anomalySensitivityPayload = (budgetPerDay: number | null, threshold: unknown) =>
+  budgetPerDay !== null
+    ? { alert_budget_per_day: budgetPerDay }
+    : { threshold, alert_budget_per_day: null };
+
 export const defaultAnomalyConfig = () => ({
   name: "",
   description: "",
@@ -337,6 +353,30 @@ export const defaultAnomalyConfig = () => ({
   priority: null as number | null,
   tags: [] as string[],
 });
+
+/** A saved alert's forecast fields, when its PromQL is a generated forecast query. */
+export const formForecastOf = (alert: any): ForecastAlert | null =>
+  alert?.query_condition?.type === "promql"
+    ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
+    : null;
+
+/** Seeds a form value from a PromQL prefill; a generated forecast query opens Forecast mode. */
+export const applyPromqlPrefill = (data: any, prefill: AlertPrefill): any => {
+  data.query_condition.type = "promql";
+  data.query_condition.promql = prefill.promql ?? "";
+  if (prefill.promqlCondition) {
+    data.query_condition.promql_condition = { ...prefill.promqlCondition };
+  }
+  if (prefill.promqlMultiAlert !== undefined) {
+    data.query_condition.promql_multi_alert = prefill.promqlMultiAlert;
+  }
+  const forecast = formForecastOf(data);
+  data._ui = { ...data._ui, forecast };
+  if (forecast) {
+    Object.entries(forecastModeFields(forecast)).forEach(([path, value]) => set(data, path, value));
+  }
+  return data;
+};
 
 // ─── Composable ─────────────────────────────────────────────────────────────
 
@@ -456,6 +496,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       _ui: obj?._ui ?? {
         checkEvery: freq.checkEvery,
         pendingPeriod: pendingPeriodDisplay(obj).value,
+        forecast: formForecastOf(obj),
       },
       _meta:
         obj?._meta ??
@@ -1761,11 +1802,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
 
       if (prefill.queryType === "promql") {
-        data.query_condition.type = "promql";
-        data.query_condition.promql = prefill.promql ?? "";
-        if (prefill.promqlCondition) {
-          data.query_condition.promql_condition = { ...prefill.promqlCondition };
-        }
+        applyPromqlPrefill(data, prefill);
       } else if (prefill.queryType === "custom" && prefill.conditions) {
         data.query_condition.type = "custom";
         data.query_condition.conditions = cloneDeep(prefill.conditions);
@@ -2044,10 +2081,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ...anomalyIntervalPayload(c, anomalyStoredIntervals.value),
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
-          ...(budgetPerDay !== null
-            ? { alert_budget_per_day: budgetPerDay }
-            : { threshold: c.threshold }),
+          ...anomalySensitivityPayload(budgetPerDay, c.threshold),
           ...anomalyBandPayload(c, budgetPerDay !== null),
           alert_enabled: c.alert_enabled,
         },

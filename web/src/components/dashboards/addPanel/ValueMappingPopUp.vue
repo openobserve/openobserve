@@ -98,6 +98,8 @@
                 <OInput
                   v-model="mapping.pattern"
                   :placeholder="t('dashboard.valueMappingRegex')"
+                  :error="!!patternErrors[index]"
+                  :error-message="patternErrors[index]"
                   class="w-full"
                   :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
                 />
@@ -167,7 +169,7 @@
 </template>
 <script lang="ts">
 import { ref, computed, watch, defineComponent, onMounted } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -177,6 +179,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ColorSwatchPicker from "../ColorSwatchPicker.vue";
 import { TEXT_SWATCHES, BG_SWATCHES } from "@/composables/dashboard/useColumnFormatting";
+import { valueMappingPatternError } from "@/utils/dashboard/tableConfigUtils";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
@@ -206,12 +209,14 @@ export default defineComponent({
 
     // editedValueMapping is populated by the watch below (on every open)
     const editedValueMapping = ref<any[]>([]);
+    const patternErrors = ref<Record<number, I18nText>>({});
 
     // Deep-clone prop on every open so edits never leak back to the chart
     watch(
       () => props.open,
       (isOpen) => {
         if (isOpen) {
+          patternErrors.value = {};
           editedValueMapping.value = props.valueMapping?.length
             ? JSON.parse(JSON.stringify(props.valueMapping))
             : [{ type: "value", value: "", text: "", color: null }];
@@ -248,6 +253,7 @@ export default defineComponent({
 
     const removeValueMappingByIndex = (index: number) => {
       editedValueMapping.value.splice(index, 1);
+      patternErrors.value = {};
     };
 
     onMounted(() => {
@@ -258,11 +264,21 @@ export default defineComponent({
     });
 
     const applyValueMapping = () => {
+      const errors: Record<number, I18nText> = {};
+      editedValueMapping.value.forEach((mapping, index) => {
+        if (mapping?.type !== "regex") return;
+        const error = valueMappingPatternError(String(mapping.pattern ?? ""));
+        if (error === "tooLong") errors[index] = t("dashboard.valueMappingRegexTooLong");
+        if (error === "unsupported") errors[index] = t("dashboard.valueMappingRegexUnsupported");
+      });
+      patternErrors.value = errors;
+      if (Object.keys(errors).length > 0) return;
       emit("save", editedValueMapping.value);
     };
 
     const cancelEdit = () => {
       // Reset to last saved state so unsaved edits are discarded
+      patternErrors.value = {};
       editedValueMapping.value = props.valueMapping?.length
         ? JSON.parse(JSON.stringify(props.valueMapping))
         : [{ type: "value", value: "", text: "", color: null }];
@@ -278,6 +294,7 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
+      patternErrors,
       TEXT_SWATCHES,
       BG_SWATCHES,
       cancel: "cancel",

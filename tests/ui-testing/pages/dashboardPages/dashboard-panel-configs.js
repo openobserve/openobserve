@@ -284,7 +284,7 @@ export default class DashboardPanelConfigs {
     this.geoWeightLabel = page.locator('[data-test="dashboard-config-geo-weight-label"]');
     this.mapsNameLabel = page.locator('[data-test="dashboard-config-maps-name-label"]');
     this.promqlLegend = page.locator('[data-test="dashboard-config-promql-legend"]');
-    this.addQueryBtn = page.locator('[data-test*="query-tab-add"]');
+    this.addQueryBtn = page.locator('[data-test="dashboard-panel-query-tab-add"]');
   }
   async _clickVirtualOption(dataTestParent, label) {
     const option = this.page.locator(

@@ -48,17 +48,33 @@ describe("query history entries", () => {
     );
   });
 
-  it("leaves hidden queries out of the panel blob, so loading the entry runs only the visible ones", () => {
+  it("keeps hidden queries, with their hide flag, in the panel blob", () => {
     const p = panel({
       queries: [
         { query: "a", fields: {} },
-        { query: "b", fields: {} },
+        { query: "b", fields: {}, config: { hide: true } },
       ],
     });
     p.layout.hiddenQueries = [1];
     const entry = buildHistoryEntry(p, { valueType: "relative", relativeTimePeriod: "1h" });
     const loaded = decodeMetricsConfig(historyEntryToLoad(entry!.context)!.metricsData);
-    expect(loaded?.data.queries.map((q: any) => q.query)).toEqual(["a"]);
+    expect(loaded?.data.queries.map((q: any) => q.query)).toEqual(["a", "b"]);
+    expect(loaded?.data.queries[1].config.hide).toBe(true);
+  });
+
+  it("records a formula over hidden inputs, keeping the inputs in the blob", () => {
+    const p = panel({
+      queries: [
+        { query: "a", fields: {}, config: { ref: "A", hide: true } },
+        { query: "b", fields: {}, config: { ref: "B", hide: true } },
+        { query: "", fields: {}, config: { formula: "A / B * 100" } },
+      ],
+    });
+    p.layout.hiddenQueries = [0, 1];
+    const entry = buildHistoryEntry(p, { valueType: "relative", relativeTimePeriod: "1h" });
+    expect(entry?.query).toBe("A / B * 100");
+    const loaded = decodeMetricsConfig(historyEntryToLoad(entry!.context)!.metricsData);
+    expect(loaded?.data.queries).toHaveLength(3);
   });
 
   it("returns nothing when there is no query text", () => {
