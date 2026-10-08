@@ -10482,9 +10482,10 @@
       "organizationRequired": "Organisation ist erforderlich",
       "baseRole": "Basisrolle",
       "baseRoleHelp": "Die Rolle, die passende Benutzer in dieser Organisation erhalten.",
-      "userGroup": "Benutzergruppe",
-      "userGroupPlaceholder": "Gruppenname",
-      "userGroupHelp": "Optional. Passende Benutzer treten in dieser Organisation auch dieser Gruppe bei.",
+      "roleClaimName": "Rollen-Claim",
+      "roleClaimNamePlaceholder": "Claim-Name, z. B. groups",
+      "roleClaimNameHelp": "Optional. Token-Claim mit den benutzerdefinierten Rollen des Benutzers; bei jeder Anmeldung werden seine benutzerdefinierten Rollen in dieser Organisation daran angeglichen.",
+      "createMissingRoles": "Im Claim genannte Rollen erstellen, die in der Organisation nicht existieren",
       "duplicateDomain": "Für diese Domain existiert bereits eine Zuordnung",
       "confirmRemove": "Sind Sie sicher, dass Sie die Zuordnung für {domain} löschen möchten?",
       "deleteTitle": "Zuordnung löschen"

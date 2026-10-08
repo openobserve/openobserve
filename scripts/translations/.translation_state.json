@@ -16987,6 +16987,7 @@
       "baseRole": "33551d66efcd283e",
       "baseRoleHelp": "50482be96fa489a0",
       "confirmRemove": "f10b126b0e82cab8",
+      "createMissingRoles": "469ee08dedc79c24",
       "deleteTitle": "06380e0419eca2ef",
       "domain": "f865f1ee55b26840",
       "domainHelp": "c927b335c093577b",
@@ -16997,11 +16998,11 @@
       "organizationHelp": "783574eea65c82ad",
       "organizationPlaceholder": "d7f6cb5385e83aca",
       "organizationRequired": "7d12b1ae42d8cc36",
+      "roleClaimName": "ed8728fb5ccdde85",
+      "roleClaimNameHelp": "3247090d0155c3cb",
+      "roleClaimNamePlaceholder": "2fc659f8dd586eba",
       "subtitle": "031a53b7414811e0",
-      "title": "ac852cfa9baf6fa9",
-      "userGroup": "ccd983e3c5253d45",
-      "userGroupHelp": "30b9ca455711411b",
-      "userGroupPlaceholder": "762ebb70ef0ea2e8"
+      "title": "ac852cfa9baf6fa9"
     },
     "domainPlaceholder": "cc921aaa05754257",
     "domainRemoved": "2984d48362fadf0b",

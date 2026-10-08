@@ -10482,9 +10482,10 @@
       "organizationRequired": "A organização é obrigatória",
       "baseRole": "Função base",
       "baseRoleHelp": "A função atribuída aos usuários correspondentes nessa organização.",
-      "userGroup": "Grupo de usuários",
-      "userGroupPlaceholder": "Nome do grupo",
-      "userGroupHelp": "Opcional. Os usuários correspondentes também entram nesse grupo nessa organização.",
+      "roleClaimName": "Claim de funções",
+      "roleClaimNamePlaceholder": "Nome do claim, ex.: groups",
+      "roleClaimNameHelp": "Opcional. Claim do token que lista as funções personalizadas do usuário; a cada login, as funções personalizadas dele nessa organização são sincronizadas com ele.",
+      "createMissingRoles": "Criar as funções do claim que não existem na organização",
       "duplicateDomain": "Já existe um mapeamento para este domínio",
       "confirmRemove": "Tem certeza de que deseja excluir o mapeamento para {domain}?",
       "deleteTitle": "Excluir mapeamento"

@@ -10482,9 +10482,10 @@
       "organizationRequired": "La organización es obligatoria",
       "baseRole": "Rol base",
       "baseRoleHelp": "El rol que se asigna a los usuarios coincidentes en esa organización.",
-      "userGroup": "Grupo de usuarios",
-      "userGroupPlaceholder": "Nombre del grupo",
-      "userGroupHelp": "Opcional. Los usuarios coincidentes también se unen a este grupo en esa organización.",
+      "roleClaimName": "Claim de roles",
+      "roleClaimNamePlaceholder": "Nombre del claim, p. ej. groups",
+      "roleClaimNameHelp": "Opcional. Claim del token que enumera los roles personalizados del usuario; en cada inicio de sesión, sus roles personalizados en esa organización se sincronizan con él.",
+      "createMissingRoles": "Crear los roles del claim que no existan en la organización",
       "duplicateDomain": "Ya existe una asignación para este dominio",
       "confirmRemove": "¿Está seguro de que desea eliminar la asignación de {domain}?",
       "deleteTitle": "Eliminar asignación"

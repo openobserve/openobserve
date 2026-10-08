@@ -10482,9 +10482,10 @@
       "organizationRequired": "组织为必填项",
       "baseRole": "基础角色",
       "baseRoleHelp": "匹配用户在该组织中被赋予的角色。",
-      "userGroup": "用户组",
-      "userGroupPlaceholder": "组名称",
-      "userGroupHelp": "可选。匹配用户还会加入该组织中的此组。",
+      "roleClaimName": "角色声明",
+      "roleClaimNamePlaceholder": "声明名称，例如 groups",
+      "roleClaimNameHelp": "可选。列出用户自定义角色的令牌声明；每次登录时，用户在该组织中的自定义角色都会与其同步。",
+      "createMissingRoles": "创建声明中组织内不存在的角色",
       "duplicateDomain": "该域名的映射已存在",
       "confirmRemove": "确定要删除 {domain} 的映射吗？",
       "deleteTitle": "删除映射"

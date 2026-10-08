@@ -10482,9 +10482,10 @@
       "organizationRequired": "Organizasyon gereklidir",
       "baseRole": "Temel rol",
       "baseRoleHelp": "Eşleşen kullanıcılara bu organizasyonda verilen rol.",
-      "userGroup": "Kullanıcı grubu",
-      "userGroupPlaceholder": "Grup adı",
-      "userGroupHelp": "İsteğe bağlı. Eşleşen kullanıcılar bu organizasyondaki bu gruba da katılır.",
+      "roleClaimName": "Rol talebi",
+      "roleClaimNamePlaceholder": "Talep adı, ör. groups",
+      "roleClaimNameHelp": "İsteğe bağlı. Kullanıcının özel rollerini listeleyen token talebi; her girişte kullanıcının o organizasyondaki özel rolleri buna göre eşitlenir.",
+      "createMissingRoles": "Talepteki, organizasyonda bulunmayan rolleri oluştur",
       "duplicateDomain": "Bu alan adı için bir eşleme zaten mevcut",
       "confirmRemove": "{domain} için eşlemeyi silmek istediğinizden emin misiniz?",
       "deleteTitle": "Eşlemeyi Sil"
