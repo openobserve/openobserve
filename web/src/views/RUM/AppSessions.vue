@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
-    <template v-if="isSessionReplayEnabled">
+    <template v-if="isRumEnabled || isSessionReplayEnabled">
       <div>
         <div
           class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5"
@@ -347,8 +347,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <NoData v-else />
                 </template>
-                <template #cell-action_play>
+                <template #cell-action_play="{ row }">
                   <OIcon
+                    v-if="row.has_replay"
                     name="play-circle-filled"
                     size="md"
                     class="session-play-icon text-icon-color hover:text-button-primary cursor-pointer"
@@ -564,6 +565,10 @@ interface SessionInsight {
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 defineProps({
+  isRumEnabled: {
+    type: Boolean,
+    default: false,
+  },
   isSessionReplayEnabled: {
     type: Boolean,
     default: false,
@@ -592,10 +597,9 @@ const rumSessionStreamName = "_rumdata";
 // cannot edit would show there as permanently ticked.
 // The health/type/device segments stay out — they filter the fetched rows
 // client-side (see tableRows), not the underlying query.
-// session_has_replay may not exist yet, and no replay data means no session can match it, so the fallback is always-false, not unfiltered.
-const fieldListBaseFilter = computed(() =>
-  schemaMapping.value["session_has_replay"] ? "session_has_replay IS NOT NULL" : "1 = 0",
-);
+// Sessions are listed regardless of replay availability; has_replay only toggles the
+// per-row play icon (see the cell-action_play template and getSessions()'s hasReplayField).
+const fieldListBaseFilter = "1 = 1";
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -1001,10 +1005,15 @@ const getSessions = () => {
       "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END) AS frustration_count";
   }
 
-  // Build WHERE clause with session replay filter
-  let whereClause = schemaMapping.value["session_has_replay"]
-    ? "session_has_replay IS NOT NULL"
-    : "1 = 0";
+  // has_replay only toggles the per-row play icon — it never excludes a session from the
+  // list, since replay recording is optional and most sessions won't have it.
+  let hasReplayField = "0 AS has_replay";
+  if (schemaMapping.value["session_has_replay"]) {
+    hasReplayField =
+      "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS has_replay";
+  }
+
+  let whereClause = "1 = 1";
   if (sessionState.data.editorValue.length) {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
@@ -1023,6 +1032,7 @@ const getSessions = () => {
       ${frustrationCountField},
       SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
       ${geoFields}
+      ${hasReplayField},
       session_id
     FROM "_rumdata"
     WHERE ${whereClause}
@@ -1073,13 +1083,24 @@ const getSessions = () => {
           country: hit.country,
           city: hit.city,
           country_iso_code: hit.country_iso_code?.toLowerCase(),
+          has_replay: hit.has_replay === 1 || hit.has_replay === true,
         };
       });
 
-      const sessionIds = hits.map((hit: any) => hit.session_id);
+      // Most sessions have no replay recording, so paint the list from _rumdata alone —
+      // don't make it wait on a second query to a stream that may not even exist.
+      rows.value = Object.values(sessionState.data.sessions);
 
-      // Query 2: Get start/end times from _sessionreplay
-      await getSessionTimeFromReplay(req, sessionIds, signal);
+      // Only this page's hits, not the full accumulated rows.value, so a later scroll
+      // page doesn't re-query replay data for sessions already enriched by an earlier one.
+      const replaySessionIds = hits
+        .filter((hit: any) => sessionState.data.sessions[hit.session_id]?.has_replay)
+        .map((hit: any) => hit.session_id);
+
+      // Query 2: Get start/end times from _sessionreplay, only for sessions that have it
+      if (replaySessionIds.length) {
+        await getSessionTimeFromReplay(req, replaySessionIds, signal);
+      }
       return "loaded" as const;
     })
     .catch((err) => {
@@ -1150,10 +1171,12 @@ function clearWindowAggregates() {
   errorCluster.value = null;
 }
 
-// Query 2: Get start/end times from _sessionreplay for the sessions
+// Query 2: Get start/end times from _sessionreplay, enriching the rows Query 1 already
+// painted. Only ever called with replay-tagged session IDs, so an empty/sanitized-away
+// list just means nothing to enrich — rows.value already holds the real session data and
+// must be left alone.
 const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: AbortSignal) => {
   if (sessionIds.length === 0) {
-    rows.value = [];
     isLoading.value.pop();
     return Promise.resolve();
   }
@@ -1167,7 +1190,6 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: Abort
     .join(", ");
 
   if (!sanitizedIds) {
-    rows.value = [];
     isLoading.value.pop();
     return Promise.resolve();
   }
