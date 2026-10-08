@@ -47,7 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onUpdateBuilderMode($event as string)"
       >
         <OToggleGroupItem
-          v-if="dashboardPanelData.data.type != 'custom_chart'"
+          v-if="
+            dashboardPanelData.data.type != 'custom_chart' &&
+            !isFormulaQuery(
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex],
+            )
+          "
           value="builder"
           size="sm"
           data-test="dashboard-builder-query-type"
@@ -82,6 +87,10 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
+import { promqlToBuilder } from "@/components/promql/astToBuilder";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
+import { normalizeSteps } from "@/components/promql/types";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -209,7 +218,61 @@ export default defineComponent({
       // }
     };
 
-    const onUpdateBuilderMode = (selectedQueryType: any) => {
+    const switchPromqlCodeToBuilder = async () => {
+      const index = dashboardPanelData.layout.currentQueryIndex;
+      const slot = dashboardPanelData.data.queries[index];
+      const text = slot.query;
+      // Unedited since the builder wrote it: its saved state (incomplete filters too) is the exact answer.
+      if (text === builderRendering(slot)) {
+        dashboardPanelData.meta.errors.queryErrors = [];
+        selectedButtonType.value = "builder";
+        dashboardPanelData.layout.showQueryBar = true;
+        return;
+      }
+      const mapped = await promqlToBuilder(store.state.selectedOrganization?.identifier, text);
+      // The user moved tab or edited the code while this parsed; the result describes neither.
+      if (
+        dashboardPanelData.layout.currentQueryIndex !== index ||
+        dashboardPanelData.data.queries[index] !== slot ||
+        slot.query !== text
+      ) {
+        return;
+      }
+      if (!mapped.ok) {
+        dashboardPanelData.meta.errors.queryErrors = [mapped.reason];
+        return;
+      }
+      slot.fields.stream = mapped.query.metric;
+      slot.fields.promql_labels = mapped.query.labels;
+      slot.fields.promql_operations = mapped.query.operations;
+      dashboardPanelData.meta.errors.queryErrors = [];
+      selectedButtonType.value = "builder";
+      dashboardPanelData.layout.showQueryBar = true;
+    };
+
+    const builderRendering = (slot: any): string | null => {
+      try {
+        return promqlRenderer.renderQuery({
+          metric: slot.fields?.stream ?? "",
+          labels: slot.fields?.promql_labels ?? [],
+          operations: normalizeSteps(slot.fields?.promql_operations ?? []),
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    const onUpdateBuilderMode = async (selectedQueryType: any) => {
+      const slot = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      if (
+        isPromQLMode.value &&
+        isCustomMode.value &&
+        selectedQueryType === "builder" &&
+        slot?.query?.trim()
+      ) {
+        await switchPromqlCodeToBuilder();
+        return;
+      }
       if (selectedQueryType != selectedButtonType.value) {
         // some exceptions
         // If user is switching from auto to custom, promql to auto, promql to custom-sql,
@@ -222,15 +285,7 @@ export default defineComponent({
           dashboardPanelData.layout.showQueryBar = true;
         } else {
           popupSelectedButtonType.value = selectedQueryType;
-
-          // Set appropriate message based on the transition
-          if (isPromQLMode.value && isCustomMode.value && selectedQueryType === "builder") {
-            // Switching from PromQL custom to builder
-            confirmDialogMessage.value = t("dashboard.queryTypeSelector.switchToBuilderConfirm");
-          } else {
-            // Default message for other transitions
-            confirmDialogMessage.value = t("dashboard.queryTypeSelector.changeQueryModeConfirm");
-          }
+          confirmDialogMessage.value = t("dashboard.queryTypeSelector.changeQueryModeConfirm");
 
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query != ""
             ? (confirmQueryModeChangeDialog.value = true)
@@ -441,6 +496,7 @@ export default defineComponent({
       selectedButtonType,
       store,
       selectedButtonQueryType,
+      isFormulaQuery,
     };
   },
   components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, OIcon },

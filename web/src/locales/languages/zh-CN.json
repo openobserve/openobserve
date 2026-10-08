@@ -5284,8 +5284,9 @@
     "hundredPlaceholder": "100",
     "last": "最后",
     "alertContextMenu": {
-      "thresholdAbove": "创建阈值高于 {value} 的告警",
-      "thresholdBelow": "创建阈值低于 {value} 的告警"
+      "thresholdAbove": "高于 {value} 时告警",
+      "thresholdBelow": "低于 {value} 时告警",
+      "forecastReaches": "预测达到 {value} 时告警"
     },
     "dashboardErrors": {
       "errorsCount": "错误 ({count})"
@@ -5307,6 +5308,12 @@
     "showQueryResults": "显示查询结果",
     "hideQueryResults": "隐藏查询结果",
     "renameQuery": "重命名查询",
+    "addFormula": "添加公式",
+    "formulaNumber": "公式 {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} 不是此面板中的查询",
+    "formulaReferencesFormula": "{letter} 是公式，而公式不能引用另一个公式",
+    "formulaInputNote": "用于公式时，此查询的即时/范围设置、图例、步长和时间偏移均不适用。",
     "multiSqlQueryLabel": "查询标签",
     "multiSqlQueryLabelHint": "图例中此查询的自定义名称（例如，“生产”）",
     "multiQueryWarning": "仅为 {chartType} 呈现查询 1",
@@ -5828,6 +5835,9 @@
     "valueMappingTypeLte": "小于或等于",
     "valueMappingEmptyTitle": "无值映射",
     "valueMappingEmptyDescription": "将值、范围或模式映射到显示文本和颜色。",
+    "valueMappingRegexTooLong": "模式最多 256 个字符。",
+    "valueMappingRegexUnsupported": "此模式无效或不受支持。不能使用先行断言、后行断言和反向引用。",
+    "htmlPanelEmbedBlocked": "此嵌入已被阻止。只能嵌入来自其他站点的 https 页面。",
     "configSectionFieldOverrides": "字段覆盖",
     "configSectionFieldOverridesTooltip": "将单位映射到所选列以增强数据可视化。",
     "addFieldOverride": "添加字段覆盖",
@@ -6333,8 +6343,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "更改查询模式",
-      "changeQueryModeConfirm": "确定要更改查询模式吗？为 X 轴、Y 轴和过滤器保存的数据将被清除。",
-      "switchToBuilderConfirm": "确定要切换到构建器模式吗？自定义PromQL查询将被清除。"
+      "changeQueryModeConfirm": "确定要更改查询模式吗？为 X 轴、Y 轴和过滤器保存的数据将被清除。"
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "同时用示例查询替换查询",
@@ -6482,6 +6491,7 @@
       "selectRequiredFields": "请选择渲染图表所需的字段",
       "noDataFound": "未找到数据",
       "seriesLimitWarning": "限制显示的系列以确保最佳性能",
+      "fitted": "拟合",
       "mapLayerName": "图层 1",
       "mapLayerNameIndexed": "图层 {index}",
       "secondsAgo": "{count} 秒前 | {count} 秒前",
@@ -8668,10 +8678,39 @@
     "noData": "无数据",
     "recentData": "最近数据",
     "theLastDay": "最近一天 | 最近 {count} 天",
+    "forecast": {
+      "modeThreshold": "阈值",
+      "modeForecast": "预测",
+      "expression": "要预测的表达式",
+      "alertWhen": "当它",
+      "rises": "上升至",
+      "falls": "下降至",
+      "threshold": "阈值",
+      "within": "在",
+      "days": "天",
+      "basedOn": "基于最近",
+      "window6h": "6 小时",
+      "window1d": "1 天",
+      "window2d": "2 天",
+      "window7d": "7 天",
+      "help": "对每个序列，基于这段历史数据绘制一条直线趋势线。任何序列的趋势线在规定时间内达到阈值时，该序列会各自触发告警。",
+      "horizonRange": "请输入 {min} 到 {max} 之间的整数天数",
+      "horizonLabel": "预测期（天）",
+      "dayCount": "{n} 天 | {n} 天",
+      "summaryRises": "预测在 {horizon} 内上升至 {threshold} 时告警",
+      "summaryFalls": "预测在 {horizon} 内下降至 {threshold} 时告警",
+      "triggerRises": "预测在 {horizon} 内上升至 {threshold}",
+      "triggerFalls": "预测在 {horizon} 内下降至 {threshold}",
+      "previewSeries": "距 {threshold} 的天数",
+      "previewReason": "{count} 个序列预测在 {horizon} 内达到 {threshold}",
+      "rowTemplateHint": "每个序列的行显示为“3 天内达到 90”。这些行仅在包含 {'{'}rows{'}'} 的目标模板中显示。"
+    },
     "prefill": {
       "dialog": {
         "title": "创建告警",
         "continue": "继续到告警",
+        "queryChoiceLabel": "告警所针对的查询",
+        "queryChoiceOption": "{name}：{query}",
         "streamLabel": "数据流",
         "thresholdLabel": "告警条件",
         "thresholdMatchingRows": "匹配行",
@@ -8707,6 +8746,10 @@
         "library": {
           "label": "在编辑器中自定义",
           "toast": "来自告警库：{sourceLabel}"
+        },
+        "explorer": {
+          "label": "创建告警",
+          "toast": "已从指标浏览器导入查询"
         },
         "dbm": {
           "label": "提醒我",
@@ -9390,11 +9433,77 @@
         "close": "返回指标",
         "backTo": "指标",
         "openInVisualize": "在可视化中打开",
+        "overlay": {
+          "current": "当前",
+          "noData": "{period} 无数据",
+          "forecast": "预测"
+        },
+        "noAlertQuery": "该指标没有可用于告警的查询",
+        "drilldown": {
+          "button": "日志与追踪",
+          "help": "打开该指标所属服务的日志与追踪。服务关联需要能标识服务的标签，因此没有服务标签的基础设施指标通常找不到匹配，除非组织将服务设为可选。",
+          "enterprise": "日志与追踪下钻是企业版功能。",
+          "discoveryOff": "该组织已关闭服务发现。",
+          "forbidden": "您没有使用服务关联的权限。",
+          "checking": "正在检查访问权限…",
+          "loading": "加载中…",
+          "schemaError": "无法加载此指标的标签。",
+          "retry": "重试",
+          "pickService": "选择一个 {label} 以查看其日志和追踪",
+          "noServiceValues": "此时间范围内没有 {label} 值。",
+          "noServiceLabel": "此指标没有可用于关联的服务标签。",
+          "needIdentity": "按身份标签（例如命名空间）进行过滤，以便关联。",
+          "noService": "未找到符合这些过滤器的服务。",
+          "noPermission": "您没有查看服务的权限。",
+          "logs": "日志",
+          "traces": "追踪",
+          "noLogsStream": "服务 {service} 没有日志数据流",
+          "noTracesStream": "服务 {service} 没有追踪数据流",
+          "noServiceField": "此数据流中没有服务字段",
+          "notApplied": "未应用：{labels}（此数据流中没有匹配的字段）"
+        },
+        "forecast": {
+          "label": "预测",
+          "off": "关闭",
+          "linear": "线性",
+          "smoothed": "平滑趋势",
+          "smoothedHelp": "平滑趋势是对平滑后序列的线性投影：每个点都基于其之前的十个步长进行平滑，然后拟合一条直线。它并非季节性预测。",
+          "horizon": "预测范围",
+          "horizonAuto": "范围的 25%",
+          "horizonComputed": "{duration}（范围的 25%）",
+          "linearHelp": "线性：对可见范围拟合的一条直线。",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 小时",
+          "horizon6h": "6 小时",
+          "horizon1d": "1 天",
+          "horizon1w": "1 周",
+          "suffix": "预测"
+        },
+        "compare": {
+          "label": "对比",
+          "off": "关闭",
+          "ago1h": "1 小时前",
+          "ago1d": "1 天前",
+          "ago1w": "1 周前"
+        },
         "noPreview": "无预览 — 请在可视化中打开",
         "exemplars": "范例",
         "filtersNotApplied": "过滤器 {filters} 不适用于该指标；显示其全部序列 | 过滤器 {filters} 不适用于该指标；显示其全部序列",
         "tabBreakdown": "细分",
         "tabRelated": "相关",
+        "tabUsedIn": "使用位置",
+        "tabUsedInCount": "使用位置 ({count})",
+        "usedIn": {
+          "dashboards": "仪表盘 ({count})",
+          "alerts": "告警 ({count})",
+          "slos": "SLO ({count})",
+          "pipelines": "定时流水线 ({count})",
+          "empty": "您可见的仪表盘、告警、SLO 或定时流水线均未使用此指标",
+          "error": "无法查找此指标的使用位置",
+          "unparsed": "{count} 个查询无法解析，已按名称匹配 | {count} 个查询无法解析，已按名称匹配",
+          "textMatch": "按名称匹配",
+          "textMatchHelp": "此查询无法解析，因此通过在其文本中搜索指标名称找到了它。它可能并未读取此指标。"
+        },
         "breakdown": {
           "distinctCount": "{count} 个值 | {count} 个值",
           "distinctMany": "{count}+ 个值",
@@ -9646,6 +9755,30 @@
       "regexPattern": "正则模式（例如 prod.*）",
       "regexNotMatching": "正则不匹配（例如 test.*）"
     },
+    "builderSwitch": {
+      "unsupported": "构建器无法显示 {construct}",
+      "twoMetrics": "构建器无法显示两个指标之间的运算——请使用公式",
+      "noMetric": "构建器需要针对一个具名指标的查询",
+      "mismatch": "构建器无法精确显示此查询",
+      "constructs": {
+        "without": "一个 without (…) 分组",
+        "offset": "一个 offset 修饰符",
+        "at": "一个 {'@'} 修饰符",
+        "orMatchers": "标签匹配器之间的一个 or",
+        "subquery": "一个子查询",
+        "vectorMatching": "使用 on (…) 或 ignoring (…) 的向量匹配",
+        "bool": "一个布尔比较",
+        "unaryMinus": "一个取反的表达式",
+        "string": "一个字符串参数",
+        "nonFinite": "一个非有限数值",
+        "rangeVector": "一个裸范围向量",
+        "setOperator": "集合运算符 {op}",
+        "function": "函数 {name}()",
+        "aggregation": "聚合 {name}",
+        "numberFirst": "位于 {op} 左侧的一个数字",
+        "operator": "运算符 {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "速率计算的时间范围",
@@ -9665,6 +9798,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "最接近的倍数"
       },
+      "rangeOnlyFirst": "范围函数只能作为第一步",
+      "rangeOnlyFirstNote": "范围函数读取原始样本，因此只能作为第一步。请移除其他步骤以添加范围函数。",
       "dragToReorder": "拖动以重新排序",
       "noMatchingLabels": "没有匹配的标签",
       "selectMetricFirst": "请先选择一个指标以加载标签",
@@ -10499,6 +10634,67 @@
     "searchTypeOthers": "其他"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "持续时间",
+      "tooltipSpans": "{count} 个 Span | {count} 个 Span",
+      "tooltipErrors": "{count} 个错误（{share}） | {count} 个错误（{share}）",
+      "colorBy": {
+        "label": "着色依据",
+        "spans": "Span",
+        "errors": "错误"
+      },
+      "noData": "无数据",
+      "unavailable": "此搜索无法使用延迟热力图",
+      "loadFailed": "加载延迟热力图失败"
+    },
+    "comparison": {
+      "title": "比较所选内容",
+      "baselineOutside": "所选范围之外",
+      "baselineBefore": "紧邻之前",
+      "sampleNote": "所选：{selection} · 基线：{baseline}",
+      "sampleNoteAll": "全部 {count} 个 Span | 全部 {count} 个 Span",
+      "sampleCapped": "已采样 {sampled} 个，共 {total} 个 Span",
+      "noiseNote": "低于 {pts} 个百分点的差异属于采样噪声",
+      "loading": "正在采样 Span…",
+      "loadFailed": "无法比较所选内容",
+      "sampleOverflow": "采样结果与 Span 数量不一致，例如有延迟数据到达。请重试以重新计数。",
+      "baselineCapped": "基线限制为 {range}，即所选范围前后各最多 3 小时",
+      "baselineLimited": "受此数据流的 {hours} 小时查询限制，基线被限制为 {range}",
+      "rangeClamped": "服务器缩短了时间范围，因此比较结果可能不完整",
+      "rangeTooLong": "所选范围超过此数据流的 {hours} 小时查询限制",
+      "retry": "重试",
+      "noSelectionTitle": "选择要比较的 Span",
+      "noSelectionBody": "在持续时间热力图上框选，或在错误或速率图表上刷选，然后打开下钻。",
+      "emptySelection": "所选范围内没有 Span",
+      "emptyBaseline": "没有基线 Span",
+      "emptyBaselineHint": "此基线没有匹配项。请改为尝试{mode}。",
+      "scorePts": "Δ {pts} 个百分点",
+      "presentIn": "出现在 {pct} 的所选内容中",
+      "filterTo": "过滤为此值",
+      "exclude": "排除此值",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "所选 {pct}",
+      "baselineShare": "基线 {pct}",
+      "noValue": "（无值）",
+      "emptyValue": "（空）",
+      "otherValues": "其他（{count} 个值） | 其他（{count} 个值）",
+      "showMore": "再显示 {count} 个字段 | 再显示 {count} 个字段",
+      "mostlyEmpty": "所选内容中大多为空（{count}）",
+      "highCardinality": "高基数字段（{count}）",
+      "distinctInSample": "样本中有 {count} 个不同的值 | 样本中有 {count} 个不同的值",
+      "constantFields": "{count} 个字段在所有位置都只有一个值 | {count} 个字段在所有位置都只有一个值",
+      "excludedFields": "未比较：{fields}",
+      "summaryErrors": "错误 · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "结果",
+    "metrics": {
+      "perSecond": {
+        "traces": "追踪/秒",
+        "spans": "Span/s"
+      }
+    },
     "errLabel": "错误",
     "agentDefaultVariant": "默认",
     "agentNoEnv": "（无环境）",
@@ -11068,7 +11264,11 @@
       "unknownOperation": "未知操作",
       "unknownService": "未知服务",
       "traceIdCopied": "追踪 ID 已复制到剪贴板",
-      "sessionIdCopied": "会话ID已复制到剪贴板"
+      "sessionIdCopied": "会话ID已复制到剪贴板",
+      "partial": "此追踪的部分 Span 无法读取。瀑布图可能不完整。",
+      "truncated": "正在按开始时间顺序显示此追踪的第一个 Span。后续 Span 尚未加载。 | 正在按开始时间顺序显示此追踪的前 {count} 个 Span。后续 Span 尚未加载。",
+      "loadMore": "加载下一个 Span | 加载接下来的 {size} 个 Span",
+      "loadMoreFailed": "无法加载此追踪的更多 Span"
     },
     "traceTree": {
       "clickToExpand": "点击展开",

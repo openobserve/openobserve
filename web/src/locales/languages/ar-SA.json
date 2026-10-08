@@ -5284,8 +5284,9 @@
     "hundredPlaceholder": "100",
     "last": "الأخير",
     "alertContextMenu": {
-      "thresholdAbove": "إنشاء تنبيه بالحد الأعلى فوق {value}",
-      "thresholdBelow": "إنشاء تنبيه بالحد الأدنى تحت {value}"
+      "thresholdAbove": "تنبيه عند الارتفاع فوق {value}",
+      "thresholdBelow": "تنبيه عند الانخفاض دون {value}",
+      "forecastReaches": "تنبيه عندما يبلغ التوقع {value}"
     },
     "dashboardErrors": {
       "errorsCount": "الأخطاء ({count})"
@@ -5307,6 +5308,12 @@
     "showQueryResults": "عرض نتائج الاستعلام",
     "hideQueryResults": "إخفاء نتائج الاستعلام",
     "renameQuery": "إعادة تسمية الاستعلام",
+    "addFormula": "إضافة معادلة",
+    "formulaNumber": "المعادلة {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} ليس استعلامًا في هذه اللوحة",
+    "formulaReferencesFormula": "{letter} معادلة، ولا يجوز لمعادلة أن تشير إلى معادلة أخرى",
+    "formulaInputNote": "يُستخدم في معادلة: هناك، لا ينطبق إعداد اللحظة/النطاق لهذا الاستعلام، ولا المفتاح التوضيحي، ولا الخطوة، ولا الإزاحة الزمنية.",
     "multiSqlQueryLabel": "تسمية الاستعلام",
     "multiSqlQueryLabelHint": "اسم مخصص لهذا الاستعلام في الأساطير (على سبيل المثال، 'الإنتاج')",
     "multiQueryWarning": "يتم عرض الاستعلام 1 فقط لـ {chartType}",
@@ -5828,6 +5835,9 @@
     "valueMappingTypeLte": "أقل من أو متساوي",
     "valueMappingEmptyTitle": "لا توجد خرائط قيمة.",
     "valueMappingEmptyDescription": "قيم الخرائط أو النطاقات أو الأنماط لعرض النصوص والألوان.",
+    "valueMappingRegexTooLong": "اجعل النمط 256 حرفًا أو أقل.",
+    "valueMappingRegexUnsupported": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية.",
+    "htmlPanelEmbedBlocked": "هذا التضمين محظور. يمكن تضمين صفحات https من موقع آخر فقط.",
     "configSectionFieldOverrides": "تنسيق الأعمدة",
     "configSectionFieldOverridesTooltip": "قم بتكوين أنواع الخلايا، الألوان، الوحدات، والقواعد الشرطية لكل عمود.",
     "addFieldOverride": "تكوين تنسيق الأعمدة",
@@ -6333,8 +6343,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "تغيير وضع الاستعلام",
-      "changeQueryModeConfirm": "هل أنت متأكد أنك تريد تغيير وضع الاستعلام؟ سيتم مسح البيانات المحفوظة لمحور X، ومحور Y، والفلاتر.",
-      "switchToBuilderConfirm": "هل أنت متأكد أنك تريد التحول إلى وضع البناء؟ سيتم مسح استعلام PromQL المخصص الخاص بك."
+      "changeQueryModeConfirm": "هل أنت متأكد أنك تريد تغيير وضع الاستعلام؟ سيتم مسح البيانات المحفوظة لمحور X، ومحور Y، والفلاتر."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "استبدل الاستعلام أيضا بمثال استعلام",
@@ -6482,6 +6491,7 @@
       "selectRequiredFields": "يرجى اختيار الحقول المطلوبة لعرض المخطط",
       "noDataFound": "لم يتم العثور على بيانات",
       "seriesLimitWarning": "تحديد السلسلة المعروضة لضمان الأداء الأمثل",
+      "fitted": "مطابق",
       "mapLayerName": "الطبقة 1",
       "mapLayerNameIndexed": "الطبقة {index}",
       "secondsAgo": "{count} ثانية مضت | {count} ثوانٍ مضت",
@@ -8668,10 +8678,39 @@
     "noData": "لا توجد بيانات",
     "recentData": "البيانات الحديثة",
     "theLastDay": "اليوم الأخير | آخر {count} أيام",
+    "forecast": {
+      "modeThreshold": "الحد",
+      "modeForecast": "التنبؤ",
+      "expression": "التعبير المراد التنبؤ به",
+      "alertWhen": "تنبيه عندما",
+      "rises": "يرتفع إلى",
+      "falls": "ينخفض إلى",
+      "threshold": "الحد",
+      "within": "خلال",
+      "days": "أيام",
+      "basedOn": "استنادًا إلى آخر",
+      "window6h": "6 ساعات",
+      "window1d": "يوم واحد",
+      "window2d": "يومان",
+      "window7d": "7 أيام",
+      "help": "يُرسم خط اتجاه مستقيم عبر هذا القدر من السجل لكل سلسلة. وكل سلسلة يبلغ خطها الحد في الوقت المحدد تُطلق تنبيهًا بمفردها.",
+      "horizonRange": "أدخل عددًا صحيحًا من الأيام من {min} إلى {max}",
+      "horizonLabel": "الأفق بالأيام",
+      "dayCount": "{n} يوم | {n} أيام",
+      "summaryRises": "تنبيه عندما يُتوقع ارتفاعه إلى {threshold} خلال {horizon}",
+      "summaryFalls": "تنبيه عندما يُتوقع انخفاضه إلى {threshold} خلال {horizon}",
+      "triggerRises": "يُتوقع ارتفاعه إلى {threshold} خلال {horizon}",
+      "triggerFalls": "يُتوقع انخفاضه إلى {threshold} خلال {horizon}",
+      "previewSeries": "أيام حتى {threshold}",
+      "previewReason": "{count} سلسلة يُتوقع بلوغها {threshold} خلال {horizon}",
+      "rowTemplateHint": "يُقرأ صف كل سلسلة على نحو «يبلغ 90 خلال 3 أيام». تظهر الصفوف فقط في قالب الوجهة الذي يتضمن {'{'}rows{'}'}."
+    },
     "prefill": {
       "dialog": {
         "title": "إنشاء تنبيه",
         "continue": "استمر في التنبيه",
+        "queryChoiceLabel": "تنبيه على الاستعلام",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "البث",
         "thresholdLabel": "تنبيه مفعل",
         "thresholdMatchingRows": "الصفوف المتطابقة",
@@ -8707,6 +8746,10 @@
         "library": {
           "label": "تخصيص في المحرر",
           "toast": "من مكتبة التنبيه: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "إنشاء تنبيه",
+          "toast": "تم استيراد الاستعلام من مستكشف المقاييس"
         },
         "dbm": {
           "label": "أبلغني",
@@ -9390,11 +9433,77 @@
         "close": "العودة إلى المقاييس",
         "backTo": "المقاييس",
         "openInVisualize": "فتح في Visualize",
+        "overlay": {
+          "current": "الحالي",
+          "noData": "لا توجد بيانات {period}",
+          "forecast": "التنبؤ"
+        },
+        "noAlertQuery": "لا يحتوي هذا المقياس على استعلام لإنشاء تنبيه عليه",
+        "drilldown": {
+          "button": "السجلات والآثار",
+          "help": "يفتح سجلات وآثار خدمة هذا المقياس. يتطلب الربط تسميات تحدد الخدمة، لذلك لا يجد عادةً مقاييس البنية التحتية التي لا تحمل تسمية خدمة أي شيء، إلا إذا جعلت المؤسسة الخدمة اختيارية.",
+          "enterprise": "الاستعلام التفصيلي للسجلات والآثار ميزة في خطة Enterprise.",
+          "discoveryOff": "اكتشاف الخدمة معطّل لهذه المؤسسة.",
+          "forbidden": "ليس لديك إذن لاستخدام ربط الخدمة.",
+          "checking": "جارٍ التحقق من الوصول…",
+          "loading": "جارٍ التحميل…",
+          "schemaError": "تعذر تحميل تسميات هذا المقياس.",
+          "retry": "إعادة المحاولة",
+          "pickService": "اختر {label} لعرض سجلاته وآثاره",
+          "noServiceValues": "لا توجد قيم {label} في هذا النطاق الزمني.",
+          "noServiceLabel": "لا يحتوي هذا المقياس على تسمية خدمة للربط بها.",
+          "needIdentity": "قم بالتصفية حسب تسمية هوية، مثل مساحة الأسماء، للربط.",
+          "noService": "لم يتم العثور على خدمة لهذه المرشحات.",
+          "noPermission": "ليس لديك إذن لعرض الخدمات.",
+          "logs": "السجلات",
+          "traces": "آثار",
+          "noLogsStream": "لا يوجد جدول السجلات للخدمة {service}",
+          "noTracesStream": "لا يوجد جدول الآثار للخدمة {service}",
+          "noServiceField": "لا يوجد حقل خدمة في هذا الجدول",
+          "notApplied": "لم يتم التطبيق: {labels} (لا يوجد حقل مطابق في هذا الجدول)"
+        },
+        "forecast": {
+          "label": "توقع",
+          "off": "إيقاف",
+          "linear": "خطي",
+          "smoothed": "اتجاه مُنعّم",
+          "smoothedHelp": "الاتجاه المُنعّم هو إسقاط خطي لسلسلة مُنعّمة: يتم تنعيم كل نقطة على مدى الخطوات العشر السابقة لها، ثم يتم تركيب خط مستقيم. وهو ليس توقعًا موسميًا.",
+          "horizon": "الأفق",
+          "horizonAuto": "25% من النطاق",
+          "horizonComputed": "{duration} (25% من النطاق)",
+          "linearHelp": "خطي: خط مستقيم مركّب على النطاق المرئي.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "ساعة واحدة",
+          "horizon6h": "6 ساعات",
+          "horizon1d": "يوم واحد",
+          "horizon1w": "أسبوع واحد",
+          "suffix": "توقع"
+        },
+        "compare": {
+          "label": "مقارنة بـ",
+          "off": "إيقاف",
+          "ago1h": "قبل ساعة واحدة",
+          "ago1d": "قبل يوم واحد",
+          "ago1w": "قبل أسبوع واحد"
+        },
         "noPreview": "لا توجد معاينة — افتحه في Visualize",
         "exemplars": "أمثلة توضيحية",
         "filtersNotApplied": "المرشح {filters} لا ينطبق على هذا المقياس؛ يتم عرض كل سلاسله | المرشحات {filters} لا تنطبق على هذا المقياس؛ يتم عرض كل سلاسله",
         "tabBreakdown": "التفصيل",
         "tabRelated": "ذات صلة",
+        "tabUsedIn": "مستخدم في",
+        "tabUsedInCount": "مستخدم في ({count})",
+        "usedIn": {
+          "dashboards": "لوحات المعلومات ({count})",
+          "alerts": "تنبيهات ({count})",
+          "slos": "SLOs ({count})",
+          "pipelines": "مسارات المعالجة المجدولة ({count})",
+          "empty": "لا توجد لوحة معلومات أو تنبيه أو SLO أو مسار معالجة مجدول يمكنك رؤيته يستخدم هذا المقياس",
+          "error": "تعذر البحث عن مكان استخدام هذا المقياس",
+          "unparsed": "{count} استعلام تعذر تحليله وتمت مطابقته بالاسم | {count} استعلامات تعذر تحليلها وتمت مطابقتها بالاسم",
+          "textMatch": "تمت المطابقة بالاسم",
+          "textMatchHelp": "تعذر تحليل هذا الاستعلام، لذلك تم العثور عليه بالبحث في نصه عن اسم المقياس. قد لا يقرأ هذا المقياس."
+        },
         "breakdown": {
           "distinctCount": "{count} قيمة | {count} قيم",
           "distinctMany": "{count}+ قيمة",
@@ -9646,6 +9755,30 @@
       "regexPattern": "نمط Regex (مثل prod.*)",
       "regexNotMatching": "عدم تطابق Regex (مثلا، اختبار.*)"
     },
+    "builderSwitch": {
+      "unsupported": "لا يمكن للمنشئ عرض {construct}",
+      "twoMetrics": "لا يمكن للمنشئ عرض عملية بين مقياسين — استخدم صيغة",
+      "noMetric": "يحتاج المنشئ إلى استعلام على مقياس مسمى واحد",
+      "mismatch": "لا يمكن للمنشئ عرض هذا الاستعلام بدقة",
+      "constructs": {
+        "without": "تجميع without (…)",
+        "offset": "مُعدِّل إزاحة",
+        "at": "مُعدِّل {'@'}",
+        "orMatchers": "or بين مطابِقات التسميات",
+        "subquery": "استعلام فرعي",
+        "vectorMatching": "مطابقة المتجهات باستخدام on (…) أو ignoring (…)",
+        "bool": "مقارنة من النوع bool",
+        "unaryMinus": "تعبير منفي",
+        "string": "وسيط نصي",
+        "nonFinite": "رقم غير منتهٍ",
+        "rangeVector": "متجه نطاق مجرّد",
+        "setOperator": "عامل المجموعة {op}",
+        "function": "الدالة {name}()",
+        "aggregation": "التجميع {name}",
+        "numberFirst": "رقم على يسار {op}",
+        "operator": "العامل {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "النطاق الزمني لحساب المعدل",
@@ -9665,6 +9798,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "أقرب مضاعف"
       },
+      "rangeOnlyFirst": "يمكن أن تكون دالة النطاق الخطوة الأولى فقط",
+      "rangeOnlyFirstNote": "تقرأ دالة النطاق العينات الخام، لذا يمكن أن تكون الخطوة الأولى فقط. أزل الخطوات الأخرى لإضافة واحدة.",
       "dragToReorder": "سحب لإعادة ترتيب",
       "noMatchingLabels": "لا توجد ملصقات مطابقة",
       "selectMetricFirst": "اختر مقياس أولا لتحميل التسميات",
@@ -10499,6 +10634,67 @@
     "searchTypeOthers": "آخرون"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "المدة",
+      "tooltipSpans": "{count} Span | {count} Span",
+      "tooltipErrors": "{count} خطأ ({share}) | {count} أخطاء ({share})",
+      "colorBy": {
+        "label": "التلوين حسب",
+        "spans": "Spans",
+        "errors": "الأخطاء"
+      },
+      "noData": "لا توجد بيانات",
+      "unavailable": "خريطة الحرارة للكمون غير متاحة لهذا البحث",
+      "loadFailed": "فشل تحميل خريطة الحرارة للكمون"
+    },
+    "comparison": {
+      "title": "مقارنة التحديد",
+      "baselineOutside": "خارج التحديد",
+      "baselineBefore": "مباشرة قبل",
+      "sampleNote": "التحديد: {selection} · خط الأساس: {baseline}",
+      "sampleNoteAll": "كل {count} Span | كل {count} Span",
+      "sampleCapped": "{sampled} عيّنة من أصل {total} Span",
+      "noiseNote": "الفروق الأقل من {pts} نقطة تقع ضمن ضجيج أخذ العينات",
+      "loading": "جارٍ أخذ عينات من Span…",
+      "loadFailed": "تعذّرت مقارنة التحديد",
+      "sampleOverflow": "لا تطابق العينة عدد Span، مثلًا بسبب وصول بيانات متأخرة. أعد المحاولة لإعادة العد.",
+      "baselineCapped": "خط الأساس محدود بـ {range}، حتى 3 ساعات على جانبي التحديد",
+      "baselineLimited": "خط الأساس محدود بـ {range} بسبب حد الاستعلام البالغ {hours} ساعة لهذا الجدول",
+      "rangeClamped": "قام الخادم بتقصير النطاق الزمني، لذا ستكون المقارنة غير مكتملة",
+      "rangeTooLong": "التحديد أطول من حد الاستعلام البالغ {hours} ساعة لهذا الجدول",
+      "retry": "إعادة المحاولة",
+      "noSelectionTitle": "حدّد Span للمقارنة",
+      "noSelectionBody": "ارسم مستطيلًا على خريطة الحرارة للمدة، أو اسحب على مخطط الأخطاء أو المعدل، ثم افتح التعمّق.",
+      "emptySelection": "لا يوجد Span في التحديد",
+      "emptyBaseline": "لا يوجد Span في خط الأساس",
+      "emptyBaselineHint": "لم يطابق أي شيء خط الأساس هذا. جرّب {mode} بدلًا من ذلك.",
+      "scorePts": "Δ {pts} نقطة",
+      "presentIn": "موجود في {pct} من التحديد",
+      "filterTo": "تصفية حسب هذه القيمة",
+      "exclude": "استبعاد هذه القيمة",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "التحديد {pct}",
+      "baselineShare": "خط الأساس {pct}",
+      "noValue": "(لا توجد قيمة)",
+      "emptyValue": "(فارغ)",
+      "otherValues": "أخرى ({count} قيمة) | أخرى ({count} قيم)",
+      "showMore": "عرض {count} حقل إضافي | عرض {count} حقول إضافية",
+      "mostlyEmpty": "فارغ في الغالب في التحديد ({count})",
+      "highCardinality": "حقول ذات تعددية عالية ({count})",
+      "distinctInSample": "{count} قيمة مميزة في العينة | {count} قيم مميزة في العينة",
+      "constantFields": "{count} حقل له قيمة واحدة في كل مكان | {count} حقول لها قيمة واحدة في كل مكان",
+      "excludedFields": "غير مقارن: {fields}",
+      "summaryErrors": "الأخطاء · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "النتائج",
+    "metrics": {
+      "perSecond": {
+        "traces": "آثار/ث",
+        "spans": "Spans/ث"
+      }
+    },
     "errLabel": "آه",
     "agentDefaultVariant": "الافتراضي",
     "agentNoEnv": "(لا يوجد إنبي)",
@@ -11068,7 +11264,11 @@
       "unknownOperation": "عملية غير معروفة",
       "unknownService": "خدمة غير معروفة",
       "traceIdCopied": "تم نسخ معرف التتبع إلى لوحة الحافظة",
-      "sessionIdCopied": "تم نسخ معرف الجلسة إلى الحافظة"
+      "sessionIdCopied": "تم نسخ معرف الجلسة إلى الحافظة",
+      "partial": "تعذّر قراءة بعض الـ Spans من هذا الأثر. قد يكون مخطط الشلال غير مكتمل.",
+      "truncated": "يُعرض أول Span من هذا الأثر، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد. | يُعرض أول {count} من الـ Spans لهذا الأثر، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد.",
+      "loadMore": "تحميل الـ Span التالي | تحميل {size} من الـ Spans التالية",
+      "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا الأثر"
     },
     "traceTree": {
       "clickToExpand": "انقر للتوسع",

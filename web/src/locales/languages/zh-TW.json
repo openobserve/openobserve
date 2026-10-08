@@ -5284,8 +5284,9 @@
     "hundredPlaceholder": "100",
     "last": "最後",
     "alertContextMenu": {
-      "thresholdAbove": "建立閾值高於 {value} 的警示",
-      "thresholdBelow": "建立閾值低於 {value} 的警示"
+      "thresholdAbove": "高於 {value} 時警示",
+      "thresholdBelow": "低於 {value} 時警示",
+      "forecastReaches": "預測達到 {value} 時警示"
     },
     "dashboardErrors": {
       "errorsCount": "錯誤 ({count})"
@@ -5307,6 +5308,12 @@
     "showQueryResults": "顯示查詢結果",
     "hideQueryResults": "隱藏查詢結果",
     "renameQuery": "重新命名查詢",
+    "addFormula": "新增公式",
+    "formulaNumber": "公式 {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} 不是此面板中的查詢",
+    "formulaReferencesFormula": "{letter} 是公式，公式不得參照另一個公式",
+    "formulaInputNote": "用於公式時：此查詢的即時/範圍設定、圖例、步長與時間位移在該處不適用。",
     "multiSqlQueryLabel": "查詢標籤",
     "multiSqlQueryLabelHint": "此查詢在圖例中的自訂名稱（例如「Production」）",
     "multiQueryWarning": "{chartType} 僅會呈現查詢 1",
@@ -5823,6 +5830,9 @@
     "valueMappingTypeLte": "小於或等於",
     "valueMappingEmptyTitle": "沒有值對應",
     "valueMappingEmptyDescription": "將值、範圍或模式對應到顯示文字和顏色。",
+    "valueMappingRegexTooLong": "模式最多 256 個字元。",
+    "valueMappingRegexUnsupported": "此模式無效或不受支援。不能使用先行斷言、後行斷言和反向參照。",
+    "htmlPanelEmbedBlocked": "此嵌入已被封鎖。只能嵌入來自其他網站的 https 頁面。",
     "configSectionFieldOverrides": "欄位覆寫",
     "configSectionFieldOverridesTooltip": "將單位對應至選取的欄位以增強資料視覺化。",
     "addFieldOverride": "新增欄位覆寫",
@@ -6328,8 +6338,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "變更查詢模式",
-      "changeQueryModeConfirm": "您確定要變更查詢模式嗎？為 X 軸、Y 軸和篩選器儲存的資料將被清除。",
-      "switchToBuilderConfirm": "您確定要切換到建置器模式嗎？您的自訂 PromQL 查詢將會被清除。"
+      "changeQueryModeConfirm": "您確定要變更查詢模式嗎？為 X 軸、Y 軸和篩選器儲存的資料將被清除。"
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "同時用範例查詢取代目前查詢",
@@ -6477,6 +6486,7 @@
       "selectRequiredFields": "請選取必要欄位以繪製圖表",
       "noDataFound": "找不到資料",
       "seriesLimitWarning": "限制顯示的數列以確保最佳效能",
+      "fitted": "已擬合",
       "mapLayerName": "圖層 1",
       "mapLayerNameIndexed": "圖層 {index}",
       "secondsAgo": "{count} 秒前 | {count} 秒前",
@@ -8663,10 +8673,39 @@
     "noData": "無資料",
     "recentData": "最近資料",
     "theLastDay": "最近一天 | 最近 {count} 天",
+    "forecast": {
+      "modeThreshold": "閾值",
+      "modeForecast": "預測",
+      "expression": "要預測的運算式",
+      "alertWhen": "當它",
+      "rises": "上升至",
+      "falls": "下降至",
+      "threshold": "閾值",
+      "within": "在",
+      "days": "天內",
+      "basedOn": "根據過去",
+      "window6h": "6 小時",
+      "window1d": "1 天",
+      "window2d": "2 天",
+      "window7d": "7 天",
+      "help": "會針對每個序列，以這段歷史資料繪製一條直線趨勢線。任何序列的趨勢線若在時間內達到閾值，就會自行發出警示。",
+      "horizonRange": "請輸入 {min} 到 {max} 之間的整數天數",
+      "horizonLabel": "預測範圍（天）",
+      "dayCount": "{n} 天 | {n} 天",
+      "summaryRises": "當預測於 {horizon} 內上升至 {threshold} 時警示",
+      "summaryFalls": "當預測於 {horizon} 內下降至 {threshold} 時警示",
+      "triggerRises": "預測於 {horizon} 內上升至 {threshold}",
+      "triggerFalls": "預測於 {horizon} 內下降至 {threshold}",
+      "previewSeries": "距離 {threshold} 的天數",
+      "previewReason": "預測 {count} 個序列會在 {horizon} 內達到 {threshold}",
+      "rowTemplateHint": "每個序列的列會顯示類似「3 天內達到 90」。列只會顯示在包含 {'{'}rows{'}'} 的目標範本中。"
+    },
     "prefill": {
       "dialog": {
         "title": "建立警示",
         "continue": "繼續前往警示",
+        "queryChoiceLabel": "對查詢發出警示",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "串流",
         "thresholdLabel": "警示條件",
         "thresholdMatchingRows": "符合的資料列",
@@ -8702,6 +8741,10 @@
         "library": {
           "label": "在編輯器中自訂",
           "toast": "來自警示庫：{sourceLabel}"
+        },
+        "explorer": {
+          "label": "建立警示",
+          "toast": "已從指標探索器匯入查詢"
         },
         "dbm": {
           "label": "警示我",
@@ -9385,11 +9428,77 @@
         "close": "返回指標",
         "backTo": "指標",
         "openInVisualize": "在視覺化中開啟",
+        "overlay": {
+          "current": "目前",
+          "noData": "無資料 {period}",
+          "forecast": "預測"
+        },
+        "noAlertQuery": "此指標沒有可發出警示的查詢",
+        "drilldown": {
+          "button": "日誌與追蹤",
+          "help": "開啟此指標所屬服務的日誌與追蹤。關聯功能需要能識別服務的標籤，因此沒有服務標籤的基礎設施指標通常找不到任何結果，除非組織將服務設為選用。",
+          "enterprise": "日誌與追蹤下鑽是企業版功能。",
+          "discoveryOff": "此組織已關閉服務探索。",
+          "forbidden": "您沒有使用服務關聯的權限。",
+          "checking": "正在檢查存取權…",
+          "loading": "載入中…",
+          "schemaError": "無法載入此指標的標籤。",
+          "retry": "重試",
+          "pickService": "選擇一個 {label} 以查看其日誌與追蹤",
+          "noServiceValues": "此時間範圍內沒有 {label} 值。",
+          "noServiceLabel": "此指標沒有可用於關聯的服務標籤。",
+          "needIdentity": "請依身分標籤（例如命名空間）篩選以進行關聯。",
+          "noService": "找不到符合這些篩選條件的服務。",
+          "noPermission": "您沒有檢視服務的權限。",
+          "logs": "日誌",
+          "traces": "追蹤",
+          "noLogsStream": "服務 {service} 沒有日誌串流",
+          "noTracesStream": "服務 {service} 沒有追蹤串流",
+          "noServiceField": "此串流中沒有服務欄位",
+          "notApplied": "未套用：{labels}（此串流中沒有相符的欄位）"
+        },
+        "forecast": {
+          "label": "預測",
+          "off": "關閉",
+          "linear": "線性",
+          "smoothed": "平滑趨勢",
+          "smoothedHelp": "平滑趨勢是對平滑化序列的線性投影：每個點會以先前十個步長進行平滑，再擬合出一條直線。這不是季節性預測。",
+          "horizon": "預測範圍",
+          "horizonAuto": "範圍的 25%",
+          "horizonComputed": "{duration}（範圍的 25%）",
+          "linearHelp": "線性：擬合至可見範圍的直線。",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 小時",
+          "horizon6h": "6 小時",
+          "horizon1d": "1 天",
+          "horizon1w": "1 週",
+          "suffix": "預測"
+        },
+        "compare": {
+          "label": "比較對象",
+          "off": "關閉",
+          "ago1h": "1 小時前",
+          "ago1d": "1 天前",
+          "ago1w": "1 週前"
+        },
         "noPreview": "沒有預覽 — 請在視覺化中開啟",
         "exemplars": "範例",
         "filtersNotApplied": "篩選條件 {filters} 不適用於此指標；顯示其所有序列 | 篩選條件 {filters} 不適用於此指標；顯示其所有序列",
         "tabBreakdown": "細分",
         "tabRelated": "相關",
+        "tabUsedIn": "用於",
+        "tabUsedInCount": "用於（{count}）",
+        "usedIn": {
+          "dashboards": "儀表板（{count}）",
+          "alerts": "警示（{count}）",
+          "slos": "SLOs（{count}）",
+          "pipelines": "排程管線（{count}）",
+          "empty": "您可見的儀表板、警示、SLO 或排程管線皆未使用此指標",
+          "error": "無法查詢此指標的使用位置",
+          "unparsed": "{count} 個查詢無法解析，已依名稱比對 | {count} 個查詢無法解析，已依名稱比對",
+          "textMatch": "依名稱比對",
+          "textMatchHelp": "此查詢無法解析，因此是透過在查詢文字中搜尋指標名稱而找到的。它可能並未讀取此指標。"
+        },
         "breakdown": {
           "distinctCount": "{count} 個值 | {count} 個值",
           "distinctMany": "{count}+ 個值",
@@ -9641,6 +9750,30 @@
       "regexPattern": "正則表達式模式 (例如：prod.*)",
       "regexNotMatching": "正則表達式不匹配 (例如：test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "建構器無法顯示 {construct}",
+      "twoMetrics": "建構器無法顯示兩個指標之間的運算 — 請改用公式",
+      "noMetric": "建構器需要對單一具名指標的查詢",
+      "mismatch": "建構器無法精確顯示此查詢",
+      "constructs": {
+        "without": "without (…) 分組",
+        "offset": "offset 修飾符",
+        "at": "{'@'} 修飾符",
+        "orMatchers": "標籤比對器之間的 or",
+        "subquery": "子查詢",
+        "vectorMatching": "使用 on (…) 或 ignoring (…) 的向量比對",
+        "bool": "bool 比較",
+        "unaryMinus": "取負的表達式",
+        "string": "字串引數",
+        "nonFinite": "非有限數值",
+        "rangeVector": "裸範圍向量",
+        "setOperator": "集合運算子 {op}",
+        "function": "函式 {name}()",
+        "aggregation": "聚合 {name}",
+        "numberFirst": "{op} 左側的數字",
+        "operator": "運算子 {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "速率計算的時間範圍",
@@ -9660,6 +9793,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "最接近的倍數"
       },
+      "rangeOnlyFirst": "範圍函式只能是第一步",
+      "rangeOnlyFirstNote": "範圍函式會讀取原始樣本，因此只能是第一步。請移除其他步驟以新增。",
       "dragToReorder": "拖動以重新排序",
       "noMatchingLabels": "無匹配標籤",
       "selectMetricFirst": "請先選擇指標以載入標籤",
@@ -10494,6 +10629,67 @@
     "searchTypeOthers": "其他"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "持續時間",
+      "tooltipSpans": "{count} 個 Span | {count} 個 Span",
+      "tooltipErrors": "{count} 個錯誤（{share}） | {count} 個錯誤（{share}）",
+      "colorBy": {
+        "label": "顏色依據",
+        "spans": "Span",
+        "errors": "錯誤"
+      },
+      "noData": "無數據",
+      "unavailable": "此搜尋無法使用延遲熱圖",
+      "loadFailed": "無法載入延遲熱圖"
+    },
+    "comparison": {
+      "title": "比較選取項目",
+      "baselineOutside": "選取項目之外",
+      "baselineBefore": "緊接之前",
+      "sampleNote": "選取項目：{selection} · 基準：{baseline}",
+      "sampleNoteAll": "全部 {count} 個 Span | 全部 {count} 個 Span",
+      "sampleCapped": "已取樣 {sampled}，共 {total} 個 Span",
+      "noiseNote": "差異低於 {pts} 個百分點即屬於取樣雜訊",
+      "loading": "正在取樣 Span…",
+      "loadFailed": "無法比較選取項目",
+      "sampleOverflow": "取樣結果與 Span 數量不符，例如因為資料延遲送達。請重試以重新計數。",
+      "baselineCapped": "基準限制為 {range}，選取項目前後最多 3 小時",
+      "baselineLimited": "由於此串流的 {hours} 小時查詢限制，基準限制為 {range}",
+      "rangeClamped": "伺服器縮短了時間範圍，因此比較結果將不完整",
+      "rangeTooLong": "選取範圍超過此串流的 {hours} 小時查詢限制",
+      "retry": "重試",
+      "noSelectionTitle": "選取要比較的 Span",
+      "noSelectionBody": "在持續時間熱圖上繪製方框，或在錯誤或速率圖表上刷選，然後開啟深入分析",
+      "emptySelection": "選取項目中沒有 Span",
+      "emptyBaseline": "沒有基準 Span",
+      "emptyBaselineHint": "沒有項目符合此基準。請改試 {mode}。",
+      "scorePts": "Δ {pts} 個百分點",
+      "presentIn": "出現在 {pct} 的選取項目中",
+      "filterTo": "篩選至此值",
+      "exclude": "排除此值",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "選取佔比 {pct}",
+      "baselineShare": "基準佔比 {pct}",
+      "noValue": "（無值）",
+      "emptyValue": "（空）",
+      "otherValues": "其他（{count} 個值） | 其他（{count} 個值）",
+      "showMore": "顯示另外 {count} 個欄位 | 顯示另外 {count} 個欄位",
+      "mostlyEmpty": "選取項目中大多為空（{count}）",
+      "highCardinality": "高基數欄位（{count}）",
+      "distinctInSample": "取樣中有 {count} 個相異值 | 取樣中有 {count} 個相異值",
+      "constantFields": "{count} 個欄位在各處都是單一值 | {count} 個欄位在各處都是單一值",
+      "excludedFields": "未比較：{fields}",
+      "summaryErrors": "錯誤 · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "結果",
+    "metrics": {
+      "perSecond": {
+        "traces": "追蹤/秒",
+        "spans": "Span/秒"
+      }
+    },
     "errLabel": "錯誤",
     "agentDefaultVariant": "預設",
     "agentNoEnv": "（無環境）",
@@ -11063,7 +11259,11 @@
       "unknownOperation": "未知操作",
       "unknownService": "未知服務",
       "traceIdCopied": "追蹤 ID 已複製到剪貼簿",
-      "sessionIdCopied": "工作階段 ID 已複製到剪貼簿"
+      "sessionIdCopied": "工作階段 ID 已複製到剪貼簿",
+      "partial": "無法讀取此追蹤的部分 Span。瀑布圖可能不完整。",
+      "truncated": "顯示此追蹤的第一個 Span，依開始時間排序。後續 Span 尚未載入。 | 顯示此追蹤的前 {count} 個 Span，依開始時間排序。後續 Span 尚未載入。",
+      "loadMore": "載入下一個 Span | 載入接下來 {size} 個 Span",
+      "loadMoreFailed": "無法載入此追蹤的更多 Span"
     },
     "traceTree": {
       "clickToExpand": "點擊展開",

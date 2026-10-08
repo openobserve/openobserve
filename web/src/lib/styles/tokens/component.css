@@ -527,6 +527,7 @@
   --color-progress-bar-success: var(--color-success-600);
   --color-progress-bar-warning: var(--color-warning-500);
   --color-progress-bar-danger: var(--color-error-600);
+  --color-progress-bar-neutral: var(--color-grey-400);
   --color-progress-bar-track: var(--color-grey-200);
   --color-progress-bar-label: var(--color-white);
 
@@ -1915,6 +1916,7 @@
   --color-progress-bar-success: var(--color-progress-bar-success);
   --color-progress-bar-warning: var(--color-progress-bar-warning);
   --color-progress-bar-danger: var(--color-progress-bar-danger);
+  --color-progress-bar-neutral: var(--color-progress-bar-neutral);
   --color-progress-bar-track: var(--color-progress-bar-track);
   --color-progress-bar-label: var(--color-progress-bar-label);
 

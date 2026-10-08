@@ -83,6 +83,7 @@
     "moment": "^2.31.0",
     "moment-timezone": "^0.6.3",
     "monaco-editor": "^0.52.2",
+    "re2js": "^2.8.6",
     "reka-ui": "^2.10.1",
     "reodotdev": "^1.1.0",
     "rollup-plugin-node-polyfills": "^0.2.1",

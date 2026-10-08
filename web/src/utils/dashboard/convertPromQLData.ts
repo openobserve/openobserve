@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { gt } from "@/types/i18n";
+import echartsTokens from "echarts/lib/visual/tokens.js";
 
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
@@ -43,6 +44,7 @@ import { buildPromqlSeriesNames, getLegendPosition } from "./promql/shared/legen
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
+import { legendFallbackOf } from "@/utils/dashboard/promql/formula";
 
 /** Rows a tooltip will list before it collapses the rest into a "+N more". */
 const TOOLTIP_MAX_SERIES = 10;
@@ -81,34 +83,68 @@ const getMarkLineData = (panelSchema: any) => {
   );
 };
 
+export type SeriesRole = "primary" | "shifted" | "forecast";
+
 const labelSetKey = (metric: Record<string, string> = {}) =>
   JSON.stringify(Object.entries(metric).sort(([a], [b]) => a.localeCompare(b)));
+
+/** The fit starts at the range end, usually after the last sample: without this a gap opens between them. */
+const closeForecastSeam = (twin: any, from: number) => {
+  const first: number = twin._fitStartIndex;
+  const next = twin.data.findIndex((point: any, i: number) => i > first && point[1] != null);
+  if (from < 0 || first <= from || next < 0) return;
+  const times: number[] = twin._timestamps;
+  const start = Number(twin.data[first][1]);
+  const slope = (Number(twin.data[next][1]) - start) / (times[next] - times[first]);
+  for (let i = from; i < first; i++) {
+    twin.data[i] = [twin.data[i][0], start + slope * (times[i] - times[first])];
+  }
+};
 
 /** Snaps shifted results onto the step grid and their primaries' series; read config via `parentQueryIndex`. */
 export const alignShiftedPromQLResults = (
   data: any[],
   metadata: any,
   resultMetaData?: any,
-): { data: any[]; parentQueryIndex: number[]; nameSuffixes: string[] } => {
+): {
+  data: any[];
+  parentQueryIndex: number[];
+  nameSuffixes: string[];
+  seriesRoles: SeriesRole[];
+} => {
   const metas = metadata?.queries ?? [];
   const gapMsOf = (i: number) => Number(metas[i]?.timeRangeGap?.seconds) || 0;
+  const seriesRoles: SeriesRole[] = data.map((_, i) =>
+    metas[i]?.seriesRole === "forecast" ? "forecast" : gapMsOf(i) ? "shifted" : "primary",
+  );
   const parentQueryIndex = data.map((_, i) => metas[i]?.panelQueryIndex ?? i);
+  // A non-empty suffix is what marks an overlay to the series budget, so a forecast always has one.
   const nameSuffixes = data.map((_, i) =>
-    gapMsOf(i) ? (metas[i]?.timeRangeGap?.periodAsStr ?? "") : "",
+    seriesRoles[i] === "primary"
+      ? ""
+      : metas[i]?.timeRangeGap?.periodAsStr || (seriesRoles[i] === "forecast" ? "forecast" : ""),
   );
 
   const primaryAt = new Map<number, number>();
   data.forEach((_, i) => {
-    if (!gapMsOf(i) && !primaryAt.has(parentQueryIndex[i])) primaryAt.set(parentQueryIndex[i], i);
+    if (seriesRoles[i] === "primary" && !primaryAt.has(parentQueryIndex[i])) {
+      primaryAt.set(parentQueryIndex[i], i);
+    }
   });
 
   const aligned = data.map((entry, i) => {
     const gapMs = gapMsOf(i);
-    if (!gapMs || !Array.isArray(entry?.result)) return entry;
+    if (seriesRoles[i] === "primary" || !Array.isArray(entry?.result)) return entry;
 
     const p = primaryAt.get(parentQueryIndex[i]);
     const primarySeries: any[] = (p === undefined ? undefined : data[p]?.result) ?? [];
-    const primaryByLabels = new Map(primarySeries.map((m: any) => [labelSetKey(m?.metric), m]));
+    // predict_linear drops __name__, so a forecast matches its primary on the other labels.
+    const keyOf = (metric: Record<string, string> = {}) => {
+      if (seriesRoles[i] !== "forecast") return labelSetKey(metric);
+      const { __name__: _name, ...labels } = metric;
+      return labelSetKey(labels);
+    };
+    const primaryByLabels = new Map(primarySeries.map((m: any) => [keyOf(m?.metric), m]));
 
     // Units: timeRangeGap ms, sample timestamps s, metadata times and step µs.
     const gapS = gapMs / 1000;
@@ -117,15 +153,19 @@ export const alignShiftedPromQLResults = (
     const anchorS =
       primarySeries.find((m: any) => m?.values?.length)?.values[0][0] ??
       Number(metas[i]?.startTime) / 1e6 + gapS;
+    // A forecast's own times lie past the range end, so they are kept as they are.
     const snap = (ts: number) =>
-      stepS > 0 && Number.isFinite(anchorS)
-        ? anchorS + Math.round((ts + gapS - anchorS) / stepS) * stepS
-        : ts + gapS;
+      seriesRoles[i] === "forecast"
+        ? ts
+        : stepS > 0 && Number.isFinite(anchorS)
+          ? anchorS + Math.round((ts + gapS - anchorS) / stepS) * stepS
+          : ts + gapS;
 
     const result = entry.result
       .map((m: any) => {
-        const primary = primaryByLabels.get(labelSetKey(m?.metric));
-        if (primarySeries.length && !primary) return null;
+        const primary = primaryByLabels.get(keyOf(m?.metric));
+        // A forecast continues a drawn series; a past period may stand alone when the current one is empty.
+        if ((primarySeries.length || seriesRoles[i] === "forecast") && !primary) return null;
         return {
           ...m,
           metric: primary?.metric ?? m.metric,
@@ -138,7 +178,7 @@ export const alignShiftedPromQLResults = (
     return { ...entry, result };
   });
 
-  return { data: aligned, parentQueryIndex, nameSuffixes };
+  return { data: aligned, parentQueryIndex, nameSuffixes, seriesRoles };
 };
 
 /**
@@ -176,7 +216,28 @@ export const convertPromQLData = async (
 
   const alignment = alignShiftedPromQLResults(searchQueryData, metadata, resultMetaData);
   searchQueryData = alignment.data;
-  const { parentQueryIndex, nameSuffixes } = alignment;
+  const { parentQueryIndex, nameSuffixes, seriesRoles } = alignment;
+  // Set by the Metrics Explorer, whose overlays are styled, keyed and hovered apart from a dashboard's time shift.
+  const explorerOverlays = !!panelSchema?.config?.explorer_overlays;
+  const stepSeconds = Number(resultMetaData?.[0]?.[0]?.step) / 1e6;
+  // Overlay grids interleave with the primary's, so a hover between two samples reads the nearest within a step.
+  const nearestSample = (data: any[] | undefined, index: number) => {
+    const at = xAxisData[index]?.[0];
+    if (!data || !(stepSeconds > 0) || at === undefined) return null;
+    let best: any = null;
+    let bestGap = Infinity;
+    for (const direction of [-1, 1]) {
+      for (let i = index + direction; i >= 0 && i < data.length; i += direction) {
+        const gap = Math.abs(xAxisData[i][0] - at);
+        if (gap > stepSeconds) break;
+        if (data[i]?.[1] != null) {
+          if (gap < bestGap) [best, bestGap] = [data[i][1], gap];
+          break;
+        }
+      }
+    }
+    return best;
+  };
   const nameOf = (names: Map<any, string>, metric: any, index: number) => {
     const name = names.get(metric) ?? "";
     return nameSuffixes[index] ? `${name} (${nameSuffixes[index]})` : name;
@@ -518,10 +579,19 @@ export const convertPromQLData = async (
 
         const hoverText: string[] = [];
         name.forEach((it: any) => {
+          if (explorerOverlays && it.data[1] == null) {
+            const near = nearestSample(options.series?.[it.seriesIndex]?.data, it.dataIndex);
+            if (near != null) it = { ...it, data: [it.data[0], near] };
+          }
           // if data is not null than show in tooltip
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
             // if have than bold it
+            // A forecast point is the fit, which can differ from the sample drawn at the same time.
+            const fitted =
+              options.series?.[it.seriesIndex]?._seriesRole === "forecast"
+                ? ` (${gt("dashboard.utils.fitted")})`
+                : "";
             const row = `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
               formatUnitValue(
                 getUnitValue(
@@ -531,7 +601,7 @@ export const convertPromQLData = async (
                   panelSchema.config?.decimals,
                 ),
               ),
-            )}`;
+            )}${escapeHtml(fitted)}`;
             hoverText.push(
               it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
                 ? `<strong>${row} </strong>`
@@ -539,6 +609,9 @@ export const convertPromQLData = async (
             );
           }
         });
+
+        // Overlays add x values where no series has a sample; a timestamp alone says nothing.
+        if (explorerOverlays && !hoverText.length) return "";
 
         // A query fanning out to dozens of series makes an unreadable wall of
         // rows; the list is already sorted by value with the hovered series
@@ -749,7 +822,7 @@ export const convertPromQLData = async (
     (limitedSearchQueryData ?? []).map((it: any, index: number) => ({
       metrics: (it?.result ?? []).map((m: any) => m?.metric).filter(Boolean),
       template: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend,
-      fallback: panelSchema.queries?.[parentQueryIndex[index]]?.config?.promql_legend_fallback,
+      fallback: legendFallbackOf(panelSchema.queries, parentQueryIndex[index]),
     })),
     getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
   );
@@ -808,6 +881,12 @@ export const convertPromQLData = async (
                 // Position among the rendered queries; exemplar markers take the colour of their query's first series.
                 // A shifted series is never a query's first series.
                 ...(nameSuffixes[index] ? {} : { _queryIndex: index }),
+                _panelQueryIndex: parentQueryIndex[index],
+                _seriesRole: seriesRoles[index],
+                // A right-click on a forecast needs the clicked point's time, which `data` holds only formatted.
+                ...(seriesRoles[index] === "forecast"
+                  ? { _timestamps: xAxisData.map((value: any) => value[0]) }
+                  : {}),
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",
@@ -839,9 +918,17 @@ export const convertPromQLData = async (
                   seriesDataObj[value[0]] ?? null,
                 ]),
                 ...seriesPropsBasedOnChartType,
-                // The shared colour leaves the dash as the only cue to the earlier period.
+                // Twins share their primary's colour, so the line style is what tells them apart.
                 ...(nameSuffixes[index]
-                  ? { lineStyle: { ...seriesPropsBasedOnChartType?.lineStyle, type: "dashed" } }
+                  ? {
+                      lineStyle: {
+                        ...seriesPropsBasedOnChartType?.lineStyle,
+                        type:
+                          explorerOverlays && seriesRoles[index] !== "forecast"
+                            ? "dotted"
+                            : "dashed",
+                      },
+                    }
                   : {}),
                 ...getAreaStyleOverride(
                   panelSchema.type,
@@ -897,6 +984,8 @@ export const convertPromQLData = async (
 
               return {
                 name: seriesName,
+                _panelQueryIndex: parentQueryIndex[index],
+                _seriesRole: seriesRoles[index],
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
                   position: panelSchema.config?.label_option?.position || "None",
@@ -1242,7 +1331,33 @@ export const convertPromQLData = async (
       .filter((mapping: any) => mapping?.value && mapping?.color)
       .map((mapping: any) => String(mapping.value)),
   );
+  // ECharts gives each name the next theme colour, so a twin would take the next series' colour; pin the primaries' own.
+  if (explorerOverlays && panelSchema?.config?.color?.mode === "palette-classic") {
+    const palette: string[] = echartsTokens.color.theme;
+    [...primaryByMetric.entries()].forEach(([metric, primary], position) => {
+      if (primary.itemStyle.color) return;
+      primary.itemStyle.color = palette[position % palette.length];
+      Object.assign(
+        primary,
+        getAreaStyleOverride(
+          panelSchema.type,
+          seriesPropsBasedOnChartType?.areaStyle,
+          primary.itemStyle.color,
+          seriesNames.get(metric) ?? "",
+          store.state.theme,
+        ),
+      );
+    });
+  }
   for (const [twin, metric] of shiftedTwins) {
+    if (twin._seriesRole === "forecast") {
+      const drawn: any[] = primaryByMetric.get(metric)?.data ?? [];
+      const last = drawn.findLastIndex((point: any) => point[1] != null);
+      // The series' own value at the range end; a forecast alert's direction is judged against it.
+      twin._rangeEndValue = last >= 0 ? Number(drawn[last][1]) : undefined;
+      twin._fitStartIndex = twin.data.findIndex((point: any) => point[1] != null);
+      closeForecastSeam(twin, last);
+    }
     // A mapping on the twin's own name is the user's choice and outranks the primary's colour.
     if (!mappedNames.has(twin.name)) {
       const color = primaryByMetric.get(metric)?.itemStyle?.color;
@@ -1259,6 +1374,17 @@ export const convertPromQLData = async (
         store.state.theme,
       ),
     );
+  }
+
+  // A twin is drawn in its primary's colour and named in the Explorer's key, so its legend entry would repeat the primary's.
+  if (explorerOverlays && shiftedTwins.length) {
+    // A past period drawn without a current series has no entry to follow, so it keeps its own.
+    const followers = shiftedTwins.filter(([, metric]) => primaryByMetric.has(metric));
+    for (const [twin, metric] of followers) twin._legendFollows = primaryByMetric.get(metric).name;
+    const twins = new Set(followers.map(([twin]) => twin));
+    legendConfig.data = options.series
+      .filter((series: any) => series?.name && !twins.has(series))
+      .map((series: any) => series.name);
   }
 
   //from this maxValue want to set the width of the chart based on max value is greater than 30% than give default legend width other wise based on max value get legend width

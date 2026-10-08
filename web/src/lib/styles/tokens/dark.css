@@ -545,6 +545,7 @@
   --color-progress-bar-success: var(--color-success-500);
   --color-progress-bar-warning: var(--color-warning-400);
   --color-progress-bar-danger: var(--color-error-500);
+  --color-progress-bar-neutral: var(--color-grey-500);
   --color-progress-bar-track: var(--color-grey-700);
 
   /* Banner (OBanner) */

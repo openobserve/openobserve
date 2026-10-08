@@ -5284,8 +5284,9 @@
     "hundredPlaceholder": "100",
     "last": "Laatste",
     "alertContextMenu": {
-      "thresholdAbove": "Waarschuwing maken met drempelwaarde boven {value}",
-      "thresholdBelow": "Waarschuwing maken met drempelwaarde onder {value}"
+      "thresholdAbove": "Alarm wanneer boven {value}",
+      "thresholdBelow": "Alarm wanneer onder {value}",
+      "forecastReaches": "Alarm wanneer de prognose {value} bereikt"
     },
     "dashboardErrors": {
       "errorsCount": "Fouten ({count})"
@@ -5307,6 +5308,12 @@
     "showQueryResults": "Resultaten van de zoekopdracht weergeven",
     "hideQueryResults": "Resultaten van zoekopdrachten verbergen",
     "renameQuery": "Query hernoemen",
+    "addFormula": "Formule toevoegen",
+    "formulaNumber": "Formule {index}",
+    "queryTabWithRef": "{ref} · {name}",
+    "formulaUnknownLetter": "{letter} is geen query in dit paneel",
+    "formulaReferencesFormula": "{letter} is een formule, en een formule mag niet naar een andere formule verwijzen",
+    "formulaInputNote": "Gebruikt in een formule: daar gelden de instelling voor instant/bereik, de legenda, de stap en de tijdsverschuiving van deze query niet.",
     "multiSqlQueryLabel": "Query-label",
     "multiSqlQueryLabelHint": "Aangepaste naam voor deze zoekopdracht in legenda's (bijvoorbeeld 'Productie')",
     "multiQueryWarning": "Alleen Query 1 wordt weergegeven voor {chartType}",
@@ -5828,6 +5835,9 @@
     "valueMappingTypeLte": "Kleiner dan of gelijk aan",
     "valueMappingEmptyTitle": "Geen waardetoewijzingen",
     "valueMappingEmptyDescription": "Wijs waarden, bereiken of patronen toe aan weergavetekst en kleuren.",
+    "valueMappingRegexTooLong": "Gebruik maximaal 256 tekens voor het patroon.",
+    "valueMappingRegexUnsupported": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt.",
+    "htmlPanelEmbedBlocked": "Deze insluiting is geblokkeerd. Alleen https-pagina's van een andere site kunnen worden ingesloten.",
     "configSectionFieldOverrides": "Veldoverschrijvingen",
     "configSectionFieldOverridesTooltip": "Wijs eenheden toe aan de geselecteerde kolommen voor verbeterde datavisualisatie.",
     "addFieldOverride": "Veldoverride toevoegen",
@@ -6333,8 +6343,7 @@
     },
     "queryTypeSelector": {
       "changeQueryMode": "Querymodus wijzigen",
-      "changeQueryModeConfirm": "Weet u zeker dat u de querymodus wilt wijzigen? De opgeslagen gegevens voor X-as, Y-as en filters worden gewist.",
-      "switchToBuilderConfirm": "Weet u zeker dat u wilt overschakelen naar bouwmodus? Uw aangepaste PromQL-query wordt gewist."
+      "changeQueryModeConfirm": "Weet u zeker dat u de querymodus wilt wijzigen? De opgeslagen gegevens voor X-as, Y-as en filters worden gewist."
     },
     "customChartConfirmDialog": {
       "alsoReplaceQuery": "Vervang query ook door voorbeeldquery",
@@ -6482,6 +6491,7 @@
       "selectRequiredFields": "Selecteer de vereiste velden om de grafiek weer te geven",
       "noDataFound": "Geen gegevens gevonden",
       "seriesLimitWarning": "De weergegeven series worden beperkt om optimale prestaties te garanderen",
+      "fitted": "gefit",
       "mapLayerName": "Laag 1",
       "mapLayerNameIndexed": "Laag {index}",
       "secondsAgo": "{count} seconde geleden | {count} seconden geleden",
@@ -8668,10 +8678,39 @@
     "noData": "Geen gegevens",
     "recentData": "recente gegevens",
     "theLastDay": "de laatste dag | de laatste {count} dagen",
+    "forecast": {
+      "modeThreshold": "Drempelwaarde",
+      "modeForecast": "Prognose",
+      "expression": "Expressie om te voorspellen",
+      "alertWhen": "Alarm wanneer het",
+      "rises": "stijgt tot",
+      "falls": "daalt tot",
+      "threshold": "Drempelwaarde",
+      "within": "binnen",
+      "days": "dagen",
+      "basedOn": "Op basis van de laatste",
+      "window6h": "6 uur",
+      "window1d": "1 dag",
+      "window2d": "2 dagen",
+      "window7d": "7 dagen",
+      "help": "Voor elke reeks wordt een rechte trendlijn door deze hoeveelheid historie getrokken. Elke reeks waarvan de lijn de drempelwaarde tijdig bereikt, slaat zelf alarm.",
+      "horizonRange": "Voer een geheel aantal dagen in van {min} tot {max}",
+      "horizonLabel": "Horizon in dagen",
+      "dayCount": "{n} dag | {n} dagen",
+      "summaryRises": "Alarm wanneer het naar verwachting stijgt tot {threshold} binnen {horizon}",
+      "summaryFalls": "Alarm wanneer het naar verwachting daalt tot {threshold} binnen {horizon}",
+      "triggerRises": "naar verwachting stijgt tot {threshold} binnen {horizon}",
+      "triggerFalls": "naar verwachting daalt tot {threshold} binnen {horizon}",
+      "previewSeries": "dagen tot {threshold}",
+      "previewReason": "{count} reeksen die naar verwachting {threshold} bereiken binnen {horizon}",
+      "rowTemplateHint": "De rij van elke reeks leest als “bereikt 90 in 3 dagen”. Rijen worden alleen weergegeven in een bestemmingssjabloon dat {'{'}rows{'}'} bevat."
+    },
     "prefill": {
       "dialog": {
         "title": "Alert maken",
         "continue": "Doorgaan naar alert",
+        "queryChoiceLabel": "Alarm op query",
+        "queryChoiceOption": "{name}: {query}",
         "streamLabel": "Stream",
         "thresholdLabel": "Alert op",
         "thresholdMatchingRows": "Overeenkomende rijen",
@@ -8707,6 +8746,10 @@
         "library": {
           "label": "Aanpassen in editor",
           "toast": "Uit de meldingenbibliotheek: {sourceLabel}"
+        },
+        "explorer": {
+          "label": "Alarm aanmaken",
+          "toast": "Query geïmporteerd uit de Metrieken Explorer"
         },
         "dbm": {
           "label": "Waarschuw mij",
@@ -9390,11 +9433,77 @@
         "close": "Terug naar metrieken",
         "backTo": "metrieken",
         "openInVisualize": "Openen in Visualiseren",
+        "overlay": {
+          "current": "Huidig",
+          "noData": "Geen gegevens {period}",
+          "forecast": "Prognose"
+        },
+        "noAlertQuery": "Deze metriek heeft geen query om op te alarmeren",
+        "drilldown": {
+          "button": "Logboeken en traces",
+          "help": "Opent de logboeken en traces van de service van deze metriek. Correlatie vereist labels die een service identificeren, dus infrastructuurmetrieken zonder servicelabel vinden er meestal geen, tenzij de organisatie de service optioneel maakt.",
+          "enterprise": "Drilldown naar logboeken en traces is een Enterprise-functie.",
+          "discoveryOff": "Servicedetectie is uitgeschakeld voor deze organisatie.",
+          "forbidden": "Je hebt geen toestemming om servicecorrelatie te gebruiken.",
+          "checking": "Toegang controleren…",
+          "loading": "Laden…",
+          "schemaError": "Kan de labels van deze metriek niet laden.",
+          "retry": "Opnieuw proberen",
+          "pickService": "Kies een {label} om de bijbehorende logboeken en traces te bekijken",
+          "noServiceValues": "Geen {label}-waarden in dit tijdsbereik.",
+          "noServiceLabel": "Deze metriek heeft geen servicelabel om op te correleren.",
+          "needIdentity": "Filter op een identiteitslabel, zoals een namespace, om te correleren.",
+          "noService": "Geen service gevonden voor deze filters.",
+          "noPermission": "Je hebt geen toestemming om services te bekijken.",
+          "logs": "Logboeken",
+          "traces": "Traces",
+          "noLogsStream": "Geen logboekenstream voor service {service}",
+          "noTracesStream": "Geen tracestream voor service {service}",
+          "noServiceField": "Geen serviceveld in deze stream",
+          "notApplied": "Niet toegepast: {labels} (geen overeenkomstig veld in deze stream)"
+        },
+        "forecast": {
+          "label": "Prognose",
+          "off": "Uit",
+          "linear": "Lineair",
+          "smoothed": "Afgevlakte trend",
+          "smoothedHelp": "Afgevlakte trend is een lineaire projectie van een afgevlakte reeks: elk punt wordt afgevlakt over de tien voorgaande stappen, waarna een rechte lijn wordt gefit. Het is geen seizoensprognose.",
+          "horizon": "Tijdshorizon",
+          "horizonAuto": "25% van het bereik",
+          "horizonComputed": "{duration} (25% van het bereik)",
+          "linearHelp": "Lineair: een rechte lijn gefit op het zichtbare bereik.",
+          "methodsHelp": "{linear} {smoothed}",
+          "horizon1h": "1 uur",
+          "horizon6h": "6 uur",
+          "horizon1d": "1 dag",
+          "horizon1w": "1 week",
+          "suffix": "prognose"
+        },
+        "compare": {
+          "label": "Vergelijken met",
+          "off": "Uit",
+          "ago1h": "1 uur geleden",
+          "ago1d": "1 dag geleden",
+          "ago1w": "1 week geleden"
+        },
         "noPreview": "Geen voorbeeld — open het in Visualiseren",
         "exemplars": "Exemplars",
         "filtersNotApplied": "Filter {filters} is niet van toepassing op deze metriek; alle series worden getoond | Filters {filters} zijn niet van toepassing op deze metriek; alle series worden getoond",
         "tabBreakdown": "Uitsplitsing",
         "tabRelated": "Gerelateerd",
+        "tabUsedIn": "Gebruikt in",
+        "tabUsedInCount": "Gebruikt in ({count})",
+        "usedIn": {
+          "dashboards": "Dashboards ({count})",
+          "alerts": "Alarmen ({count})",
+          "slos": "SLO's ({count})",
+          "pipelines": "Geplande pijpleidingen ({count})",
+          "empty": "Geen enkel dashboard, alarm, SLO of geplande pijpleiding die je kunt zien, gebruikt deze metriek",
+          "error": "Kan niet nagaan waar deze metriek wordt gebruikt",
+          "unparsed": "{count} query kon niet worden geparseerd en is op naam gematcht | {count} query's konden niet worden geparseerd en zijn op naam gematcht",
+          "textMatch": "Op naam gematcht",
+          "textMatchHelp": "Deze query kon niet worden geparseerd, dus is gevonden door de tekst te doorzoeken op de naam van de metriek. Mogelijk leest deze de metriek niet."
+        },
         "breakdown": {
           "distinctCount": "{count} waarde | {count} waarden",
           "distinctMany": "{count}+ waarden",
@@ -9646,6 +9755,30 @@
       "regexPattern": "Regex patroon (bijv. prod.*)",
       "regexNotMatching": "Regex niet overeenkomend (bijv. test.*)"
     },
+    "builderSwitch": {
+      "unsupported": "De builder kan {construct} niet weergeven",
+      "twoMetrics": "De builder kan geen bewerking tussen twee metrieken weergeven — gebruik een formule",
+      "noMetric": "De builder heeft een query nodig over één benoemde metriek",
+      "mismatch": "De builder kan deze query niet exact weergeven",
+      "constructs": {
+        "without": "een without (…)-groepering",
+        "offset": "een offset-modifier",
+        "at": "een {'@'} modifier",
+        "orMatchers": "een or tussen labelmatchers",
+        "subquery": "een subquery",
+        "vectorMatching": "vector matching met on (…) of ignoring (…)",
+        "bool": "een bool-vergelijking",
+        "unaryMinus": "een negatieve expressie",
+        "string": "een stringargument",
+        "nonFinite": "een niet-eindig getal",
+        "rangeVector": "een kale rangevector",
+        "setOperator": "de set-operator {op}",
+        "function": "de functie {name}()",
+        "aggregation": "de aggregatie {name}",
+        "numberFirst": "een getal links van {op}",
+        "operator": "de operator {op}"
+      }
+    },
     "operationsList": {
       "params": {
         "rateRangeDesc": "Tijdsbereik voor snelheidsberekening",
@@ -9665,6 +9798,8 @@
         "kLabel": "K",
         "nearestMultipleLabel": "Dichtstbijzijnde veelvoud"
       },
+      "rangeOnlyFirst": "Een range-functie kan alleen de eerste stap zijn",
+      "rangeOnlyFirstNote": "Een range-functie leest de ruwe samples, dus kan alleen de eerste stap zijn. Verwijder de andere stappen om er een toe te voegen.",
       "dragToReorder": "Sleep om te herordenen",
       "noMatchingLabels": "Geen overeenkomende labels",
       "selectMetricFirst": "Selecteer eerst een metriek om labels te laden",
@@ -10499,6 +10634,67 @@
     "searchTypeOthers": "Overige"
   },
   "traces": {
+    "latencyHeatmap": {
+      "title": "Duur",
+      "tooltipSpans": "{count} span | {count} spans",
+      "tooltipErrors": "{count} fout ({share}) | {count} fouten ({share})",
+      "colorBy": {
+        "label": "Kleur op",
+        "spans": "Spans",
+        "errors": "Fouten"
+      },
+      "noData": "Geen gegevens",
+      "unavailable": "De latentie-heatmap is niet beschikbaar voor deze zoekopdracht",
+      "loadFailed": "Kan de latentie-heatmap niet laden"
+    },
+    "comparison": {
+      "title": "Selectie vergelijken",
+      "baselineOutside": "Buiten de selectie",
+      "baselineBefore": "Net ervoor",
+      "sampleNote": "Selectie: {selection} · Basislijn: {baseline}",
+      "sampleNoteAll": "alle {count} span | alle {count} spans",
+      "sampleCapped": "{sampled} bemonsterd van {total} spans",
+      "noiseNote": "Verschillen onder {pts} punten vallen binnen de steekproefruis",
+      "loading": "Spans bemonsteren…",
+      "loadFailed": "Kan de selectie niet vergelijken",
+      "sampleOverflow": "De steekproef komt niet overeen met het aantal spans, bijvoorbeeld doordat er gegevens te laat zijn aangekomen. Probeer opnieuw om de telling te herhalen.",
+      "baselineCapped": "Basislijn beperkt tot {range}, tot 3 u aan weerszijden van de selectie",
+      "baselineLimited": "Basislijn beperkt tot {range} door de querylimiet van {hours} uur van deze stream",
+      "rangeClamped": "De server heeft het tijdsbereik ingekort, waardoor de vergelijking onvolledig zou zijn",
+      "rangeTooLong": "De selectie is langer dan de querylimiet van {hours} uur van deze stream",
+      "retry": "Opnieuw proberen",
+      "noSelectionTitle": "Selecteer spans om te vergelijken",
+      "noSelectionBody": "Teken een vak op de Duur-heatmap, of selecteer een bereik in de grafiek Fouten of Snelheid, en open vervolgens Drill-down.",
+      "emptySelection": "Geen spans in de selectie",
+      "emptyBaseline": "Geen spans in de basislijn",
+      "emptyBaselineHint": "Er kwam niets overeen met deze basislijn. Probeer in plaats daarvan {mode}.",
+      "scorePts": "Δ {pts} punten",
+      "presentIn": "aanwezig in {pct} van de selectie",
+      "filterTo": "Filter op deze waarde",
+      "exclude": "Deze waarde uitsluiten",
+      "atLeast": "≥ {value}",
+      "below": "< {value}",
+      "selectionShare": "Selectie {pct}",
+      "baselineShare": "Basislijn {pct}",
+      "noValue": "(geen waarde)",
+      "emptyValue": "(leeg)",
+      "otherValues": "Overige ({count} waarde) | Overige ({count} waarden)",
+      "showMore": "Toon {count} extra veld | Toon {count} extra velden",
+      "mostlyEmpty": "Grotendeels leeg in de selectie ({count})",
+      "highCardinality": "Velden met hoge cardinaliteit ({count})",
+      "distinctInSample": "{count} afzonderlijke waarde in de steekproef | {count} afzonderlijke waarden in de steekproef",
+      "constantFields": "{count} veld heeft overal één enkele waarde | {count} velden hebben overal één enkele waarde",
+      "excludedFields": "Niet vergeleken: {fields}",
+      "summaryErrors": "Fouten · {window}",
+      "summaryBand": "{window} · {band}"
+    },
+    "drillDownBackTarget": "resultaten",
+    "metrics": {
+      "perSecond": {
+        "traces": "traces/s",
+        "spans": "spans/s"
+      }
+    },
     "errLabel": "FOUT",
     "agentDefaultVariant": "standaard",
     "agentNoEnv": "(Geen omgeving)",
@@ -11068,7 +11264,11 @@
       "unknownOperation": "Onbekende bewerking",
       "unknownService": "Onbekende service",
       "traceIdCopied": "Trace ID naar klembord gekopieerd",
-      "sessionIdCopied": "Sessie-ID gekopieerd naar klembord"
+      "sessionIdCopied": "Sessie-ID gekopieerd naar klembord",
+      "partial": "Sommige spans van deze trace konden niet worden gelezen. De waterval is mogelijk onvolledig.",
+      "truncated": "Toont de eerste span van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen. | Toont de eerste {count} spans van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen.",
+      "loadMore": "Laad de volgende span | Laad de volgende {size} spans",
+      "loadMoreFailed": "Kon niet meer spans van deze trace laden"
     },
     "traceTree": {
       "clickToExpand": "Klik om uit te vouwen",

@@ -21,6 +21,8 @@ import i18n from "@/locales";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 import MetricCardChart from "./MetricCardChart.vue";
+import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
+import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 
 const RESULTS = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "1"]] }] }];
 
@@ -37,6 +39,7 @@ const PanelSchemaRendererStub = {
     "allowAlertCreation",
     "allowAnnotationsAdd",
     "allowAnnotationsAPI",
+    "alertSource",
   ],
   template: "<div data-test='panel-schema-renderer' />",
 };
@@ -73,6 +76,10 @@ describe("MetricCardChart builds the panel schema from its props", () => {
    * schema must track the live value so the axis is not formatted with a
    * superseded unit.
    */
+  it("names the Explorer as the source of a right-click alert", () => {
+    expect(panelProp(mountChart({ allowAlertCreation: true }), "alertSource")).toBe("explorer");
+  });
+
   it("reflects unitCustom in the schema config and updates when it changes", async () => {
     const wrapper = mountChart();
     expect(panelProp(wrapper, "panelSchema").config.unit_custom).toBe("c/s");
@@ -120,6 +127,45 @@ describe("MetricCardChart builds the panel schema from its props", () => {
     await nextTick();
 
     expect(panelProp(wrapper, "panelSchema").queries[0].query).toBe("sum(rate(up[5m]))");
+  });
+
+  it("hands a right-click alert the bare metric name, and marks the chart as the Explorer's", () => {
+    const wrapper = mountChart({
+      queries: [{ expr: 'sum(rate({__name__="up",job="api"}[5m]))', legendTemplate: "" }],
+    });
+    const schema = panelProp(wrapper, "panelSchema");
+    expect(schema.queries[0].query).toBe('sum(rate(up{job="api"}[5m]))');
+    expect(schema.config.explorer_overlays).toBe(true);
+  });
+
+  it("gives each query the stream it reads, so an alert from the chart has one", () => {
+    const queries = withSourceStreams(
+      [
+        {
+          expr: "histogram_quantile(0.9, sum by (le) (rate(req_bucket[5m])))",
+          builder: { metric: "req_bucket", labels: [], operations: [] },
+        },
+        {
+          expr: "sum(rate(req_count[5m]))",
+          builder: { metric: "req_count", labels: [], operations: [] },
+        },
+        { expr: "avg(req_bucket)" },
+      ] as any[],
+      "req_bucket",
+    );
+    const schemaQueries = panelProp(mountChart({ queries }), "panelSchema").queries;
+
+    expect(schemaQueries.map((q: any) => q.fields)).toEqual([
+      { stream: "req_bucket", stream_type: "metrics" },
+      { stream: "req_count", stream_type: "metrics" },
+      { stream: "req_bucket", stream_type: "metrics" },
+    ]);
+  });
+
+  it("leaves the stream out when a query does not name one", () => {
+    expect(panelProp(mountChart(), "panelSchema").queries[0].fields).toEqual({
+      stream_type: "metrics",
+    });
   });
 
   it("pins the x-axis to the queried range (injected, non-streaming data)", () => {
@@ -207,6 +253,118 @@ describe("MetricCardChart feeds the queue's results in as injected data", () => 
       startTime: 1_000_000,
       endTime: 2_000_000,
     });
+  });
+
+  it("appends shifted results after the primaries, with their offset window and parent query", () => {
+    const DAY_MS = 86_400_000;
+    const past = { resultType: "matrix", result: [{ metric: {}, values: [[1, "3"]] }] };
+    const wrapper = mountChart({
+      results: [RESULTS[0], RESULTS[0]],
+      queries: [{ expr: "a" }, { expr: "b" }],
+      stepSeconds: 30,
+      shifted: [{ result: past, gapMs: DAY_MS, periodAsStr: "1 day ago", parentIndex: 1 }],
+    });
+    const injected = panelProp(wrapper, "injectedPromqlData");
+
+    expect(injected.data).toEqual([RESULTS[0], RESULTS[0], past]);
+    expect(injected.metadata.queries).toEqual([
+      { startTime: 1_000_000, endTime: 2_000_000 },
+      { startTime: 1_000_000, endTime: 2_000_000 },
+      {
+        startTime: 1_000_000 - DAY_MS * 1000,
+        endTime: 2_000_000 - DAY_MS * 1000,
+        timeRangeGap: { seconds: DAY_MS, periodAsStr: "1 day ago" },
+        panelQueryIndex: 1,
+      },
+    ]);
+    expect(injected.resultMetaData).toEqual([
+      [{ step: 30_000_000 }],
+      [{ step: 30_000_000 }],
+      [{ step: 30_000_000 }],
+    ]);
+    expect(panelProp(wrapper, "panelSchema").queries).toHaveLength(2);
+  });
+
+  it("draws a dashed twin per series, on the current x values, when the step does not divide the offset", async () => {
+    const DAY_S = 86_400;
+    const STEP = 35;
+    const START_S = 1_700_000_005;
+    const grid = (start: number) => Array.from({ length: 10 }, (_, i) => start + i * STEP);
+    const series = (ts: number[]) => ({
+      resultType: "matrix",
+      result: [{ metric: { pod: "a" }, values: ts.map((t) => [t, "1"]) }],
+    });
+    const wrapper = mountChart({
+      results: [series(grid(START_S))],
+      queries: [{ expr: "x" }],
+      timeRange: { start_time: START_S * 1e6, end_time: (START_S + 9 * STEP) * 1e6 },
+      stepSeconds: STEP,
+      shifted: [
+        {
+          result: series(grid(START_S - DAY_S + 17)),
+          gapMs: DAY_S * 1000,
+          periodAsStr: "1 day ago",
+          parentIndex: 0,
+        },
+      ],
+    });
+    const injected = panelProp(wrapper, "injectedPromqlData");
+    const { options } = await convertPromQLData(
+      panelProp(wrapper, "panelSchema"),
+      injected.data,
+      { state: { zoConfig: { max_dashboard_series: 100 }, timezone: "UTC", theme: "light" } },
+      { value: { offsetWidth: 500, offsetHeight: 300 } },
+      null,
+      [],
+      injected.metadata,
+      injected.resultMetaData,
+      false,
+    );
+
+    const named = options.series.filter((s: any) => s.name);
+    expect(named.map((s: any) => s.name)).toEqual(["a", "a (1 day ago)"]);
+    expect(named[1].lineStyle.type).toBe("dotted");
+    const xs = new Set(named.flatMap((s: any) => s.data.map((point: any) => String(point[0]))));
+    expect(xs.size).toBe(10);
+  });
+
+  it("appends the forecast after the primaries and extends the axis to its horizon", () => {
+    const ahead = { resultType: "matrix", result: [{ metric: {}, values: [[2, "5"]] }] };
+    const wrapper = mountChart({
+      results: [RESULTS[0], RESULTS[0]],
+      queries: [{ expr: "a" }, { expr: "b" }],
+      forecast: {
+        until: 3_000_000,
+        label: "forecast",
+        entries: [{ result: ahead, parentIndex: 1 }],
+      },
+    });
+    const injected = panelProp(wrapper, "injectedPromqlData");
+
+    expect(injected.data).toEqual([RESULTS[0], RESULTS[0], ahead]);
+    expect(injected.metadata.queries).toEqual([
+      { startTime: 1_000_000, endTime: 3_000_000 },
+      { startTime: 1_000_000, endTime: 2_000_000 },
+      {
+        startTime: 1_000_000,
+        endTime: 2_000_000,
+        seriesRole: "forecast",
+        timeRangeGap: { seconds: 0, periodAsStr: "forecast" },
+        panelQueryIndex: 1,
+      },
+    ]);
+  });
+
+  it("keeps the axis on the queried window without a forecast", () => {
+    const injected = panelProp(mountChart(), "injectedPromqlData");
+    expect(injected.metadata.queries[0].endTime).toBe(2_000_000);
+  });
+
+  it("passes no shifted entries or step metadata without a comparison", () => {
+    const injected = panelProp(mountChart(), "injectedPromqlData");
+    expect(injected.data).toEqual(RESULTS);
+    expect(injected.metadata.queries).toHaveLength(1);
+    expect(injected.resultMetaData).toBeUndefined();
   });
 
   it("converts the µs window into the Date pair the panel expects", () => {

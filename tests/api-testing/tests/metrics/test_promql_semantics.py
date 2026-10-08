@@ -15,8 +15,8 @@ A fourth group came from the same sweep: ``sort``, ``sort_desc``,
 ``present_over_time`` and the ``@`` modifier were reported as unimplemented and
 now evaluate. They are pinned here because nothing else covers them — an
 "unsupported function" error is a silent regression for a dashboard that uses
-one. ``mad_over_time`` and ``double_exponential_smoothing`` are still
-unimplemented and are deliberately NOT asserted.
+one. ``double_exponential_smoothing`` is still unimplemented and is
+deliberately NOT asserted.
 
 Each assertion is on ``resultType``/series count, not on the numbers, so the
 tests stay stable whatever else the instance holds.
@@ -103,6 +103,39 @@ def test_instant_query_on_a_range_selector_returns_a_matrix(client, seeded_metri
         "sort_desc({metric})",
         "present_over_time({metric}[5m])",
         "{metric} @ end()",
+        "sin({metric})",
+        "cos({metric})",
+        "tan({metric})",
+        "asin({metric})",
+        "acos({metric})",
+        "atan({metric})",
+        "sinh({metric})",
+        "cosh({metric})",
+        "tanh({metric})",
+        "asinh({metric})",
+        "acosh({metric})",
+        "atanh({metric})",
+        "deg({metric})",
+        "rad({metric})",
+        "pi()",
+        "first_over_time({metric}[5m])",
+        "mad_over_time({metric}[5m])",
+        "ts_of_min_over_time({metric}[5m])",
+        "ts_of_max_over_time({metric}[5m])",
+        "ts_of_last_over_time({metric}[5m])",
+        "ts_of_first_over_time({metric}[5m])",
+        "histogram_fraction(0, 1, {metric})",
+        'histogram_quantiles({metric}, "q", 0.5, 0.9)',
+        'sort_by_label({metric}, "__name__")',
+        'sort_by_label_desc({metric}, "__name__")',
+        "min_of(1, 2)",
+        "max_of(1, 2)",
+        "vector(1) * start()",
+        "vector(1) * end()",
+        "vector(1) * range()",
+        "vector(1) * step()",
+        "limitk(1, {metric})",
+        "limit_ratio(0.5, {metric})",
     ],
 )
 def test_previously_unsupported_functions_now_evaluate(client, seeded_metric, query):

@@ -3273,6 +3273,33 @@
       "toggleOperatorTooltip": "863c24b825b741d6"
     },
     "folder": "74ccd43303847f26",
+    "forecast": {
+      "alertWhen": "95c9e2eb15a56e19",
+      "basedOn": "811809a2c585a5e7",
+      "dayCount": "99ebe133d8337e64",
+      "days": "ab51004e9d71a485",
+      "expression": "32f013d946c9acc8",
+      "falls": "f9297bea99c119ad",
+      "help": "96f22cba1b7602b5",
+      "horizonLabel": "a05d215daf2c3df2",
+      "horizonRange": "e63ecffe451582d2",
+      "modeForecast": "75205de8b342f506",
+      "modeThreshold": "0da627ada476c179",
+      "previewReason": "c8434d3465d99111",
+      "previewSeries": "16dc7f6e67357c30",
+      "rises": "835468ed0e32d508",
+      "rowTemplateHint": "99f2caceb6f701fd",
+      "summaryFalls": "c3e3c834b3103ee5",
+      "summaryRises": "b2df6b606fe1779d",
+      "threshold": "0da627ada476c179",
+      "triggerFalls": "a9f1d6b9b6d323e2",
+      "triggerRises": "7dae4534397b229c",
+      "window1d": "fa665d95d29e83bc",
+      "window2d": "ec13178b98722aec",
+      "window6h": "4105ae3b8a605fb6",
+      "window7d": "7f920bb639c93075",
+      "within": "f106376011688eda"
+    },
     "frequency": "a0b9aa23865d3a8f",
     "groupBy": "956a51f6b098a41b",
     "groupedNotification": "adab1906b22a52ec",
@@ -3825,6 +3852,8 @@
         "patternsNone": "d4fdd8f09e4bbfb2",
         "patternsScopeAll": "d545cfadc92b6638",
         "patternsScopeFiltered": "84831d5cb11e2d69",
+        "queryChoiceLabel": "30ef72d7baa09e82",
+        "queryChoiceOption": "7c9f5e99b9d5a837",
         "queryCopied": "30c07770b92bac5d",
         "queryLabel": "b80a37564fbb3c07",
         "streamLabel": "1eec3071dd26e224",
@@ -3847,6 +3876,10 @@
         "default": {
           "label": "0d45260035d06818",
           "toast": "59219e19e8aa4b19"
+        },
+        "explorer": {
+          "label": "a7aa98743fde8426",
+          "toast": "4e3fc93fb5e79433"
         },
         "library": {
           "label": "cbd25697f502caf2",
@@ -5656,6 +5689,7 @@
       "folderUpdateFailed": "351df5bb16003329",
       "folderUpdated": "a941f91a64db8ec7"
     },
+    "addFormula": "05f5e5c6dc9ae0f4",
     "addGeneralSettings": "c910d474dcd724bf",
     "addJoinPopUp": {
       "addClause": "e6fad2e68acc1581",
@@ -5725,8 +5759,9 @@
     "addValueMapping": "05f7e934196bc245",
     "aggregationFunction": "6c24bd8fdfb56ee4",
     "alertContextMenu": {
-      "thresholdAbove": "e5f356e7f8182707",
-      "thresholdBelow": "dc4c5a2c6609d29d"
+      "forecastReaches": "aa3e21b112f45043",
+      "thresholdAbove": "b8eeb59499d4710d",
+      "thresholdBelow": "e5e2ed8b8a348f21"
     },
     "alignCenter": "d946067427e930a1",
     "alignLeft": "58eb9032e3bb83f0",
@@ -6129,6 +6164,10 @@
     "folderIconAria": "4c879f8b05b36809",
     "folderRequired": "e3d91814a2d89326",
     "folders": "c4d6bb200f4c058a",
+    "formulaInputNote": "ea1cb557dd6e40c1",
+    "formulaNumber": "119ddb9ca4b5e088",
+    "formulaReferencesFormula": "d36c0f6d86ea4619",
+    "formulaUnknownLetter": "584a5e08971aa8a6",
     "fullscreen": "d920ce826795038d",
     "functionAppliedSuccess": "87b2a1bf7b616f84",
     "gaugeMaxValue": "d2fb1376c0b2ebcb",
@@ -6194,6 +6233,7 @@
     "homePinUnavailable": "da8d4ae6604f4b26",
     "horizontalLabel": "0abba441f16eff90",
     "hstackedLabel": "0bf475d412d632f3",
+    "htmlPanelEmbedBlocked": "34424226c6a45711",
     "hundredPlaceholder": "ad57366865126e55",
     "id": "12156e921bdb6085",
     "identifier": "9b10587f84a2c374",
@@ -6499,10 +6539,10 @@
       "variables": "02db55bac5e3f7ce"
     },
     "queryLimit": "419adc0e60c01ab5",
+    "queryTabWithRef": "5786d276e77ed8e8",
     "queryTypeSelector": {
       "changeQueryMode": "cccecf44d3eb19a2",
-      "changeQueryModeConfirm": "a09ff355ffc3152f",
-      "switchToBuilderConfirm": "ace1891700fbecad"
+      "changeQueryModeConfirm": "a09ff355ffc3152f"
     },
     "queryValues": "20b17d788ab154fa",
     "rawQueryBuilder": {
@@ -6749,6 +6789,7 @@
       "filterConditionValueRequired": "c485b4d336e2b391",
       "filterOperatorRequired": "62fd6e18b03e7f8c",
       "filterSelectAtLeastOne": "4f7edb57ec68b280",
+      "fitted": "c0164c09bb2aa50c",
       "forbiddenFunctionCall": "5af1ce1665380824",
       "forbiddenIdentifierAccess": "089119bd17f6c43f",
       "forbiddenInsideSetTimeout": "5d3df88c8171f6ce",
@@ -6837,6 +6878,8 @@
     "valueMappingFrom": "218197693424e015",
     "valueMappingIfValue": "31e026778e65872f",
     "valueMappingRegex": "0f2712521d504431",
+    "valueMappingRegexTooLong": "9f6a51cd0180181d",
+    "valueMappingRegexUnsupported": "0aaa0248a076f2f1",
     "valueMappingTo": "f4b06ef6d3c81436",
     "valueMappingType": "baaddf70fb5d432b",
     "valueMappingTypeGt": "1fbcaddaa36260ff",
@@ -11393,6 +11436,30 @@
       "other": "f97e9da0e3b879f0",
       "summary": "8e76a94ac8320d51"
     },
+    "builderSwitch": {
+      "constructs": {
+        "aggregation": "349961c49b0f04fa",
+        "at": "bd89fa351031a684",
+        "bool": "cc4a62b842703ede",
+        "function": "c987e8f1272b0a47",
+        "nonFinite": "bec3d54b53fcec2e",
+        "numberFirst": "de156d4465c30fe4",
+        "offset": "10d0597981aa9a17",
+        "operator": "b017b394e3427e8a",
+        "orMatchers": "e9124327dcc9d701",
+        "rangeVector": "8cfb0c2fd44d85fa",
+        "setOperator": "346b644936661fe2",
+        "string": "d06848063c0f1981",
+        "subquery": "46241ea248f204c5",
+        "unaryMinus": "0f732f52f0cbd270",
+        "vectorMatching": "310f03d4e299b1c9",
+        "without": "8adb3a19db888327"
+      },
+      "mismatch": "71057903e534e01e",
+      "noMetric": "23c78ce7ee319b1b",
+      "twoMetrics": "ef195a795b6f1aa1",
+      "unsupported": "6bb50ac4b1b3035f"
+    },
     "explorer": {
       "all": "a52ace420f2175d0",
       "allTitle": "4c60b5d294b5105b",
@@ -11466,20 +11533,86 @@
           "valuesOf": "0e77cb83ab5db1b1"
         },
         "close": "bcb3b7df22f2aa4c",
+        "compare": {
+          "ago1d": "961f4ea2623a7fd9",
+          "ago1h": "e4bc2973fad40459",
+          "ago1w": "b3a32d4c827ad4bd",
+          "label": "7c54b8f2d5e1b1c3",
+          "off": "ca7981b46ecf2c17"
+        },
+        "drilldown": {
+          "button": "d1903bab1dfa58d4",
+          "checking": "22e56ba5f3553b8e",
+          "discoveryOff": "dfce353cd6d70d1e",
+          "enterprise": "9895e876c6cc98b4",
+          "forbidden": "bf8968c155718811",
+          "help": "10c4e7bae51a8c2c",
+          "loading": "ba3bbbe10d8bef66",
+          "logs": "ea2100dc89ae9fe2",
+          "needIdentity": "d8cfc7b2fb4aaf52",
+          "noLogsStream": "74a53b7f6e282144",
+          "noPermission": "2e6c082a52bb6914",
+          "noService": "56fc4d53f4ca8efc",
+          "noServiceField": "6b15e948df4b3cad",
+          "noServiceLabel": "8a6aa3e4cc2a37d5",
+          "noServiceValues": "fc42aab187f47fe7",
+          "noTracesStream": "adb457a0b2336787",
+          "notApplied": "1958759b09683123",
+          "pickService": "d33466636a7e5ee2",
+          "retry": "942087cc2d41e013",
+          "schemaError": "7c571f0b4d77bafe",
+          "traces": "998741a58ed2b411"
+        },
         "exemplars": "92f6b3f1e81e4797",
         "filtersNotApplied": "0f4ce76d467dd3d8",
+        "forecast": {
+          "horizon": "ae8359684edfa68a",
+          "horizon1d": "fa665d95d29e83bc",
+          "horizon1h": "f8b8883f0c9d8d82",
+          "horizon1w": "c8cc522340b984b5",
+          "horizon6h": "4105ae3b8a605fb6",
+          "horizonAuto": "89912679f0759531",
+          "horizonComputed": "c87becd6841da05b",
+          "label": "75205de8b342f506",
+          "linear": "e6950b45d25c2027",
+          "linearHelp": "fd1133bdf6acd499",
+          "methodsHelp": "31edd2373aaa4dac",
+          "off": "ca7981b46ecf2c17",
+          "smoothed": "fe9d74806fecceaa",
+          "smoothedHelp": "f2a9069cfa93e95c",
+          "suffix": "59f0db478528b4c4"
+        },
         "loading": "20faede0927ec846",
+        "noAlertQuery": "7f32c0ce74cd5af4",
         "noPreview": "f7e196acafcfe6c6",
         "notFound": "59ed9694fac915ff",
         "notFoundDesc": "cc91f7cb076a2442",
         "openInVisualize": "638de5175ad21671",
+        "overlay": {
+          "current": "e0d1b68224bf0b31",
+          "forecast": "75205de8b342f506",
+          "noData": "101f6c97de954d7b"
+        },
         "related": {
           "empty": "e6496e32e449055c",
           "noSharedLabels": "302d0e6ef41bd37f",
           "sharedLabels": "624698b35cc56707"
         },
         "tabBreakdown": "3ffe201a20342a4c",
-        "tabRelated": "45ca56d179d4788c"
+        "tabRelated": "45ca56d179d4788c",
+        "tabUsedIn": "a02dadd12c8ec211",
+        "tabUsedInCount": "9bbee6855e2b6d7c",
+        "usedIn": {
+          "alerts": "c8ddecbd67497917",
+          "dashboards": "d0f5f76ec2f7798c",
+          "empty": "296a45145d2b733c",
+          "error": "189cf729df0976bc",
+          "pipelines": "75a292d8e0f7ec14",
+          "slos": "8754a0d50d0bdb77",
+          "textMatch": "c8d7cb0a85e7c034",
+          "textMatchHelp": "71f6e19b02664a87",
+          "unparsed": "6002441e13eb2038"
+        }
       },
       "emptyActions": {
         "clearAllDesc": "fd924a82bfbdf362",
@@ -11691,6 +11824,8 @@
         "valueToMultiplyDesc": "486363f2100cc065",
         "valueToSubtractDesc": "5104b400b638c651"
       },
+      "rangeOnlyFirst": "a3131b014a015277",
+      "rangeOnlyFirstNote": "236fc66fce4ca2b3",
       "selectMetricFirst": "4cedcbda8e577579"
     },
     "panelTitleRequired": "efbd17b6064659af",
@@ -20095,6 +20230,47 @@
     "clearErrorFilter": "b634835f3e3a5324",
     "collapseFields": "166bd3007d204cc4",
     "comingSoon": "0c47ae112d18c257",
+    "comparison": {
+      "atLeast": "e4acb4ebacae154a",
+      "baselineBefore": "e22168a9f1142b44",
+      "baselineCapped": "2a35b2657e586e14",
+      "baselineLimited": "fc04692876e6e264",
+      "baselineOutside": "0d4ba36ae3c9f536",
+      "baselineShare": "526bab9d7263e71e",
+      "below": "d4ff5bc0b7d6a2bf",
+      "constantFields": "f7b6a29aa581efb3",
+      "distinctInSample": "4633e2533386e770",
+      "emptyBaseline": "1e01d97cfe4ff9f9",
+      "emptyBaselineHint": "3bfe4dfe25e46be6",
+      "emptySelection": "b9bfb4d44c005a56",
+      "emptyValue": "d29a0939bcb51176",
+      "exclude": "fe98541ea9f4b8b1",
+      "excludedFields": "cc4445c0970567a0",
+      "filterTo": "91b758676659c166",
+      "highCardinality": "7b0b942811311958",
+      "loadFailed": "80412999dc291fa1",
+      "loading": "4ec91d26bb950e67",
+      "mostlyEmpty": "870587bfeb0c564a",
+      "noSelectionBody": "a1953a2aafd5116f",
+      "noSelectionTitle": "cbcf6c2cb06db290",
+      "noValue": "c4d8151192263973",
+      "noiseNote": "de3b873e13228bc5",
+      "otherValues": "1ff77bc517a812fe",
+      "presentIn": "2674f4772762aca9",
+      "rangeClamped": "63e37aa8d7d63a08",
+      "rangeTooLong": "179837435ca279ae",
+      "retry": "942087cc2d41e013",
+      "sampleCapped": "94752e5390a0d6ab",
+      "sampleNote": "3963db5e4c80c6e5",
+      "sampleNoteAll": "acfceca42e461144",
+      "sampleOverflow": "4de16f5c04bd68e6",
+      "scorePts": "e34b973219b43538",
+      "selectionShare": "f7d9962b6a594d09",
+      "showMore": "034680a266d075fc",
+      "summaryBand": "5a52d0990da526b3",
+      "summaryErrors": "0c2bb5b9a2fe7e6a",
+      "title": "9087fcde7c5af00c"
+    },
     "copyStacktrace": "ffe4845db8d7fc77",
     "copyTraceId": "f8619a86627d2a9c",
     "correlation": {
@@ -20137,6 +20313,7 @@
       "viewQueryTrend": "df5dc6da572cfc5a"
     },
     "drillDown": "682c25289fd57604",
+    "drillDownBackTarget": "c099142bc3186ded",
     "errLabel": "af440ad05977eb32",
     "error": "d98ee0e5f9399db9",
     "errorCount": "6b8c59fe228558f0",
@@ -20253,6 +20430,19 @@
       "totalTraces": "9de25747b79f02a6",
       "viewByStream": "a0d0cca9513a3a25"
     },
+    "latencyHeatmap": {
+      "colorBy": {
+        "errors": "cb702378f31507ef",
+        "label": "26e43ef8709fee68",
+        "spans": "b3393bfb2a55adff"
+      },
+      "loadFailed": "6ca3f7cd177dee77",
+      "noData": "3b41ba9c7cb8c5d6",
+      "title": "4fc52a3c4c558b51",
+      "tooltipErrors": "e8495a4105eacd41",
+      "tooltipSpans": "7c048203171e0876",
+      "unavailable": "89a2fbf65d5db050"
+    },
     "latencyPercentile": "f338082c29a968ed",
     "layoutForce": "a708bb3fbe01d68c",
     "layoutHorizontal": "0abba441f16eff90",
@@ -20262,6 +20452,12 @@
     "loadingTraceDag": "0a46f9f7189493b9",
     "max": "a1a5936d3b0f8a69",
     "messageLabel": "f5394f7279eef0f3",
+    "metrics": {
+      "perSecond": {
+        "spans": "111b3567f8b41fe5",
+        "traces": "193e2a906f4d0881"
+      }
+    },
     "nextMatch": "825e5abd0762be6e",
     "noCorrelatedLogsFound": "643231c56fd2784d",
     "noData": {
@@ -20667,6 +20863,9 @@
     "traceDetails": {
       "copySessionId": "59cbf182087e3665",
       "filterAdded": "dc54e5b8268d5412",
+      "loadMore": "e05a37bbbf469ccf",
+      "loadMoreFailed": "2ed38582e9961e72",
+      "partial": "18c05b286d0d0a6d",
       "serviceMap": "d20cdb31d1fbd506",
       "sessionId": "cb9ac5c561daa670",
       "sessionIdCopied": "0e11de60b6c2f5dd",
@@ -20674,6 +20873,7 @@
       "timeline": "9dcff98e275f0cb9",
       "traceIdCopied": "0ccb198be88d79c8",
       "traceNotFound": "a975517058ef6c9c",
+      "truncated": "bbd1154b6fc37b6a",
       "unknownOperation": "5a4ac8326c4f4d8b",
       "unknownService": "30dbef66f0d96ed5"
     },

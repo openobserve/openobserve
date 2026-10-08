@@ -353,7 +353,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :logSamples="searchObj.data.queryResults.hits"
               analysisType="volume"
-              :availableAnalysisTypes="['volume']"
             />
             <LogsNoEventsState
               v-else-if="searchObj.meta.searchApplied == true"

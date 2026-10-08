@@ -82,6 +82,12 @@ export const labelFilterKey = (filter: LabelFilter): string =>
   // plain-text source.
   `${filter.label}\u0000${filter.operator ?? "="}\u0000${filter.value}`;
 
+/** A query window other than the grid's own, in µs. */
+export interface QueryWindow {
+  start: number;
+  end: number;
+}
+
 export type PreviewStatus =
   | "idle"
   | "loading"
@@ -492,29 +498,30 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * returning early — callers like `loadLabelValues` read `labelsByStream`
    * immediately after awaiting, so an early return would hand them an empty map.
    */
-  let schemaInFlight: Promise<void> | null = null;
+  let schemaInFlight: Promise<boolean> | null = null;
 
-  const ensureSchemas = (): Promise<void> => {
-    if (schemaLoaded.value) return Promise.resolve();
+  /** Resolves `false` when the load failed; it is then not marked loaded, so the next call tries again. */
+  const ensureSchemas = (): Promise<boolean> => {
+    if (schemaLoaded.value) return Promise.resolve(true);
     if (schemaInFlight) return schemaInFlight;
     // Self-comparing clear: an org switch nulls the slot and a new load may
     // claim it before THIS one settles — its finally must not evict the
     // successor.
-    const self: Promise<void> = doEnsureSchemas().finally(() => {
+    const self: Promise<boolean> = doEnsureSchemas().finally(() => {
       if (schemaInFlight === self) schemaInFlight = null;
     });
     schemaInFlight = self;
     return self;
   };
 
-  const doEnsureSchemas = async () => {
+  const doEnsureSchemas = async (): Promise<boolean> => {
     const generation = orgGeneration;
     schemaLoading.value = true;
     try {
       // Called directly: useStreams cannot request schemas on a bulk fetch.
       const response = await StreamService.nameList(org.value, "metrics", true);
       // The org may have changed while this was in flight; its cards are not ours.
-      if (generation !== orgGeneration) return;
+      if (generation !== orgGeneration) return false;
       const list = (response?.data?.list ?? []) as MetricStream[];
 
       // An empty list is not an answer, it is a failure that did not throw — and
@@ -523,10 +530,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       // cannot help here because nothing was thrown. Keep the cards we have; the
       // filter then fails open (see `isLabelEligible`), which is the same
       // outcome as a rejected request.
-      if (!list.length) {
-        schemaLoaded.value = true;
-        return;
-      }
+      if (!list.length) return false;
 
       cards.value = buildMetricCards(list);
       const map: Record<string, string[]> = {};
@@ -535,10 +539,11 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
       }
       labelsByStream.value = map;
       schemaLoaded.value = true;
+      return true;
     } catch {
       // Fail open: without membership data every card stays eligible. The chips
       // still work; we just cannot narrow the grid.
-      if (generation === orgGeneration) schemaLoaded.value = true;
+      return false;
     } finally {
       if (generation === orgGeneration) schemaLoading.value = false;
     }
@@ -1133,8 +1138,8 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
 
   /* ------------------------------------------------------------- previews */
 
-  const previewCacheKey = (query: string, step: number) =>
-    `${org.value}|${query}|${timeRange.value.start_time}|${timeRange.value.end_time}|${step}`;
+  const previewCacheKey = (query: string, step: number, window?: QueryWindow, instant = false) =>
+    `${org.value}|${query}|${window?.start ?? timeRange.value.start_time}|${window?.end ?? timeRange.value.end_time}|${step}${instant ? "|instant" : ""}`;
 
   /**
    * Drops a card's rendered preview and abandons whatever it still has running.
@@ -1166,7 +1171,14 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
    * the queue's AbortSignal is what the grid already fires on scroll-away,
    * filter change and refresh, so it is bridged to `cancelStreamQueryBasedOnRequestId`.
    */
-  const streamQuery = (query: string, step: number, signal: AbortSignal, seriesLimit?: number) =>
+  const streamQuery = (
+    query: string,
+    step: number,
+    signal: AbortSignal,
+    seriesLimit?: number,
+    window?: QueryWindow,
+    queryType: "range" | "instant" = "range",
+  ) =>
     new Promise<any>((resolve, reject) => {
       const { traceId } = generateTraceContext();
       const maxSeries = seriesLimit ?? store.state?.zoConfig?.max_dashboard_series ?? 100;
@@ -1204,10 +1216,10 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         {
           queryReq: {
             query,
-            start_time: timeRange.value.start_time,
-            end_time: timeRange.value.end_time,
+            start_time: window?.start ?? timeRange.value.start_time,
+            end_time: window?.end ?? timeRange.value.end_time,
             step: `${step}s`,
-            query_type: "range",
+            query_type: queryType,
           },
           type: "promql",
           traceId,
@@ -1917,16 +1929,27 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     expr: string,
     card: MetricCard,
     signal: AbortSignal,
-    opts?: { maxSeries?: number },
+    opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
   ) => {
     const step = dialogStepFor(card);
-    const key = previewCacheKey(expr, step);
+    // The streaming transport reads an instant query's time from end_time, so start and end are both T.
+    const window =
+      opts?.instantAt === undefined ? opts?.window : { start: opts.instantAt, end: opts.instantAt };
+    const instant = opts?.instantAt !== undefined;
+    // The window is in the key, so a shifted request gets its own job instead of joining the current one.
+    const key = previewCacheKey(expr, step, window, instant);
     if (signal.aborted) return Promise.reject(new PreviewCancelledError(key));
     const owner = `${DETAIL_OWNER}:${++detailRequests}`;
     const onAbort = () => queue.cancel(key, owner);
     signal.addEventListener("abort", onAbort, { once: true });
     return queue
-      .run(key, PRIORITY.DIALOG, (abort) => streamQuery(expr, step, abort, opts?.maxSeries), owner)
+      .run(
+        key,
+        PRIORITY.DIALOG,
+        (abort) =>
+          streamQuery(expr, step, abort, opts?.maxSeries, window, instant ? "instant" : "range"),
+        owner,
+      )
       .finally(() => signal.removeEventListener("abort", onAbort));
   };
 
@@ -2430,6 +2453,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     runDialogQuery,
     cancelDialogQueries,
     runDetailQuery,
+    detailStepFor: dialogStepFor,
     rateWindowFor,
 
     labelsByStream,
