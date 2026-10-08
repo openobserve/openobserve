@@ -174,6 +174,10 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
+    // Only an offered range is ever built, so any other key would answer "preparing" forever.
+    if !offers_range(&pd, range_key) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
     let conn = get_orm_client_ro().await;
     match table::get_snapshot(conn, &pd.id, range_key).await {
         Ok(Some(snap)) => match serde_json::from_str::<serde_json::Value>(&snap.data) {
@@ -186,6 +190,13 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
             server_error()
         }
     }
+}
+
+fn offers_range(pd: &Model, range_key: &str) -> bool {
+    openobserve_core::public_dashboards::time_ranges(pd)
+        .ranges
+        .iter()
+        .any(|range| range.key() == range_key)
 }
 
 /// Visible variables with their frozen values; one missing from the capture shows as null.
@@ -412,10 +423,8 @@ mod tests {
         assert_eq!(v, serde_json::json!("plain"));
     }
 
-    #[test]
-    fn only_a_live_public_link_is_served() {
-        let now = 1_000_000;
-        let live = || Model {
+    fn link() -> Model {
+        Model {
             id: "l1".into(),
             org_id: "o".into(),
             folder_id: "f".into(),
@@ -441,7 +450,13 @@ mod tests {
             updated_at: 0,
             last_accessed_at: None,
             access_count: 0,
-        };
+        }
+    }
+
+    #[test]
+    fn only_a_live_public_link_is_served() {
+        let now = 1_000_000;
+        let live = link;
         assert!(matches!(servable(live(), false, now), Servable::Ok(_)));
         let draft = Model {
             visibility: 0,
@@ -467,6 +482,22 @@ mod tests {
             ..live()
         };
         assert!(matches!(servable(not_yet, false, now), Servable::Ok(_)));
+    }
+
+    #[test]
+    fn only_an_offered_range_is_served() {
+        let pd = Model {
+            time_ranges: Some(
+                r#"[{"type":"relative","secs":3600},{"type":"absolute","start":10,"end":20}]"#
+                    .into(),
+            ),
+            ..link()
+        };
+        assert!(offers_range(&pd, "r3600"));
+        assert!(offers_range(&pd, "a10-20"));
+        assert!(!offers_range(&pd, "r86400"));
+        assert!(!offers_range(&pd, "a10-21"));
+        assert!(!offers_range(&link(), "r3600"));
     }
 
     #[test]
