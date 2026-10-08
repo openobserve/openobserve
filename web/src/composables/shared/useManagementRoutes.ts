@@ -240,6 +240,29 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "announcements",
+          name: "announcementBanners",
+          component: () => import("@/components/settings/AnnouncementBannerList.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "announcements.settings.label",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "announcements/edit",
+          name: "announcementBannerEditor",
+          component: () => import("@/components/settings/AnnouncementBannerEditor.vue"),
+          meta: {
+            titleKey: "announcements.editor.routeTitle",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "password_policy",
           name: "passwordPolicy",
           component: () => import("@/components/settings/PasswordPolicy.vue"),

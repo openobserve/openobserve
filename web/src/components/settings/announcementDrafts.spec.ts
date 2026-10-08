@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   authoredFromDraft,
+  bannerStatus,
   configFromDrafts,
   draftFromAuthored,
   draftsFromConfig,
@@ -24,6 +25,7 @@ import {
   parseDurationMs,
   toLocalInput,
   toRfc3339,
+  withResolvedDuration,
 } from "./announcementDrafts";
 
 describe("parseDurationMs", () => {
@@ -201,5 +203,79 @@ describe("the form/JSON round trip", () => {
     const once = configFromDrafts(draftsFromConfig({ banners: [{ message: "Stable" }] }));
 
     expect(configFromDrafts(draftsFromConfig(once))).toEqual(once);
+  });
+});
+
+describe("appearance", () => {
+  it("reads text size and per-mode colours", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      text_size: "large",
+      colors: { light: "#DBEAFE", dark: "#1E3A8A" },
+    });
+
+    expect(draft).toMatchObject({ textSize: "large", colorLight: "#DBEAFE", colorDark: "#1E3A8A" });
+  });
+
+  it("falls back to the defaults for values it cannot use", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      text_size: "huge",
+      colors: { light: "blue", dark: "#FFF" },
+    });
+
+    expect(draft).toMatchObject({ textSize: "medium", colorLight: "", colorDark: "" });
+  });
+
+  it("omits defaults and uppercases colours on write", () => {
+    expect(authoredFromDraft({ ...emptyDraft(), message: "m" })).toEqual({ message: "m" });
+    expect(
+      authoredFromDraft({ ...emptyDraft(), message: "m", textSize: "small", colorDark: "#1e3a8a" }),
+    ).toEqual({ message: "m", text_size: "small", colors: { dark: "#1E3A8A" } });
+  });
+
+  it("round-trips a styled banner", () => {
+    const config = {
+      banners: [
+        { message: "Styled", text_size: "large", colors: { light: "#FEF3C7", dark: "#78350F" } },
+      ],
+    };
+
+    expect(configFromDrafts(draftsFromConfig(config))).toEqual(config);
+  });
+});
+
+describe("bannerStatus", () => {
+  const now = new Date("2026-10-08T12:00").getTime();
+  const at = (value: string) => ({
+    ...emptyDraft(),
+    schedule: "window" as const,
+    ...JSON.parse(value),
+  });
+
+  it("reads a window against the clock", () => {
+    expect(bannerStatus(at('{"startsAt":"2026-10-08T13:00"}'), now)).toBe("scheduled");
+    expect(bannerStatus(at('{"endsAt":"2026-10-08T11:00"}'), now)).toBe("ended");
+    expect(
+      bannerStatus(at('{"startsAt":"2026-10-08T11:00","endsAt":"2026-10-08T13:00"}'), now),
+    ).toBe("live");
+    expect(bannerStatus(emptyDraft(), now)).toBe("live");
+  });
+});
+
+describe("withResolvedDuration", () => {
+  it("turns a duration into an end time counted from now", () => {
+    const now = new Date("2026-10-08T12:00").getTime();
+    const draft = withResolvedDuration(
+      { ...emptyDraft(), schedule: "duration", duration: "90m" },
+      now,
+    );
+
+    expect(draft).toMatchObject({ schedule: "window", startsAt: "", endsAt: "2026-10-08T13:30" });
+  });
+
+  it("leaves other schedules alone", () => {
+    const draft = { ...emptyDraft(), schedule: "always" as const };
+    expect(withResolvedDuration(draft)).toBe(draft);
   });
 });

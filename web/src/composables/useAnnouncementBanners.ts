@@ -19,6 +19,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import announcements from "@/services/announcements";
 import { raw, type I18nText } from "@/types/i18n";
+import type { BannerColors, BannerTextSize } from "@/utils/announcementAppearance";
 import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
 
 export type BannerVariant = BannerVariantName;
@@ -38,6 +39,8 @@ export interface Banner {
   ends_at?: number;
   dismissible: boolean;
   cta?: BannerCta;
+  text_size?: BannerTextSize;
+  colors?: BannerColors;
 }
 
 /** The banner as it arrives from the API, before its copy is branded via `raw()`. */

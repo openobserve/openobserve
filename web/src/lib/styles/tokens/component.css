@@ -793,7 +793,11 @@
   /* Darker than the fill so the header/body edge stays readable. NOT
      border-default — see above. */
   --color-panel-bar-border: var(--color-grey-300);
+}
 
+/* The attribute lets a preview render light banners inside a dark app; see AnnouncementBannerPreview. */
+:root,
+[data-banner-theme="light"] {
   /* ── Banner (OBanner) ──────────────────────────────────── */
   /* default */
   --color-banner-default-bg: var(--color-grey-100);
@@ -824,6 +828,12 @@
   --color-banner-error-soft-border: var(--color-error-300);
   --color-banner-error-soft-text: var(--color-error-700);
 
+  /* custom: an operator-chosen colour set per element by OBanner's `colors` prop. */
+  --color-banner-custom-bg: var(--color-banner-default-bg);
+  --color-banner-custom-text: var(--color-banner-default-text);
+}
+
+:root {
   /* usage-report severity banners (enterprise billings) — right-fade gradient bg +
      border. Light values here / dark overrides in dark.css, so the token carries
      the theme automatically (no dark: variant needed at the call site). */
@@ -2051,6 +2061,8 @@
   --color-banner-error-soft-bg: var(--color-banner-error-soft-bg);
   --color-banner-error-soft-border: var(--color-banner-error-soft-border);
   --color-banner-error-soft-text: var(--color-banner-error-soft-text);
+  --color-banner-custom-bg: var(--color-banner-custom-bg);
+  --color-banner-custom-text: var(--color-banner-custom-text);
   --color-banner-error-text: var(--color-banner-error-text);
   --color-banner-info-bg: var(--color-banner-info-bg);
   --color-banner-info-border: var(--color-banner-info-border);

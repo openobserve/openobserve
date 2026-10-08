@@ -15,7 +15,14 @@
 
 import { z } from "zod";
 
+import { isHexColor } from "@/utils/announcementAppearance";
 import { parseDurationMs } from "./announcementDrafts";
+
+/** Past this a banner wraps onto several lines on a laptop and stops reading as a notice. */
+export const MESSAGE_MAX_LENGTH = 300;
+
+/** A longer button label pushes the message into a narrow column on phones. */
+export const CTA_MAX_LENGTH = 30;
 
 /**
  * The same rules the API enforces, checked here so an author is told at the
@@ -28,7 +35,8 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
       message: z
         .string()
         .trim()
-        .min(1, { message: t("announcements.form.messageRequired") }),
+        .min(1, { message: t("announcements.form.messageRequired") })
+        .max(MESSAGE_MAX_LENGTH, { message: t("announcements.form.messageTooLong") }),
       variant: z.enum(["info", "warning", "critical", "promo"]),
       schedule: z.enum(["always", "duration", "window"]),
       duration: z.string().optional(),
@@ -39,6 +47,9 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
       ctaText: z.string().optional(),
       ctaUrl: z.string().optional(),
       orgs: z.array(z.string()).optional(),
+      textSize: z.enum(["small", "medium", "large"]),
+      colorLight: z.string().optional(),
+      colorDark: z.string().optional(),
     })
     .superRefine((value, ctx) => {
       if (value.schedule === "duration" && !parseDurationMs(value.duration ?? "")) {
@@ -71,7 +82,25 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
         }
       }
 
+      for (const field of ["colorLight", "colorDark"] as const) {
+        const color = value[field]?.trim();
+        if (color && !isHexColor(color)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [field],
+            message: t("announcements.form.colorInvalid"),
+          });
+        }
+      }
+
       if (value.hasCta) {
+        if ((value.ctaText?.trim().length ?? 0) > CTA_MAX_LENGTH) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["ctaText"],
+            message: t("announcements.editor.ctaTooLong"),
+          });
+        }
         if (!value.ctaText?.trim()) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

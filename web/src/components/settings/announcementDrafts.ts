@@ -21,6 +21,12 @@
  * author's work when it is wrong — is stated and tested in one place.
  */
 
+import {
+  DEFAULT_TEXT_SIZE,
+  isHexColor,
+  isTextSize,
+  type BannerTextSize,
+} from "@/utils/announcementAppearance";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 
 /**
@@ -48,6 +54,10 @@ export interface BannerDraft {
   ctaUrl: string;
   /** Empty means every organization. */
   orgs: string[];
+  textSize: BannerTextSize;
+  /** `#RRGGBB` background per theme mode; empty keeps the severity's colours. */
+  colorLight: string;
+  colorDark: string;
 }
 
 export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
@@ -66,6 +76,9 @@ export function emptyDraft(): BannerDraft {
     ctaText: "",
     ctaUrl: "",
     orgs: [],
+    textSize: DEFAULT_TEXT_SIZE,
+    colorLight: "",
+    colorDark: "",
   };
 }
 
@@ -136,7 +149,7 @@ export function toRfc3339(value: string): string {
 }
 
 /** One authored banner, as loose as it arrives from the API. */
-interface AuthoredBanner {
+export interface AuthoredBanner {
   message?: unknown;
   id?: unknown;
   variant?: unknown;
@@ -146,6 +159,8 @@ interface AuthoredBanner {
   dismissible?: unknown;
   cta?: { text?: unknown; url?: unknown } | null;
   orgs?: unknown;
+  text_size?: unknown;
+  colors?: { light?: unknown; dark?: unknown } | null;
 }
 
 function str(value: unknown): string {
@@ -196,6 +211,14 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
     draft.orgs = banner.orgs.filter((org): org is string => typeof org === "string");
   }
 
+  if (isTextSize(banner.text_size)) draft.textSize = banner.text_size;
+
+  // An unreadable colour falls back to the severity's own rather than blocking the edit.
+  const light = banner.colors?.light;
+  const dark = banner.colors?.dark;
+  if (isHexColor(light)) draft.colorLight = light;
+  if (isHexColor(dark)) draft.colorDark = dark;
+
   return draft;
 }
 
@@ -241,9 +264,45 @@ export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
 
   if (draft.orgs.length) banner.orgs = [...draft.orgs];
 
+  if (draft.textSize !== DEFAULT_TEXT_SIZE) banner.text_size = draft.textSize;
+
+  const colors: Record<string, string> = {};
+  if (draft.colorLight) colors.light = draft.colorLight.toUpperCase();
+  if (draft.colorDark) colors.dark = draft.colorDark.toUpperCase();
+  if (Object.keys(colors).length) banner.colors = colors;
+
   return banner;
 }
 
 export function configFromDrafts(drafts: BannerDraft[]): { banners: Record<string, unknown>[] } {
   return { banners: drafts.map(authoredFromDraft) };
+}
+
+/** Where a banner is in its display window, judged against the viewer's clock. */
+export type BannerStatus = "live" | "scheduled" | "ended";
+
+export function bannerStatus(draft: BannerDraft, now: number = Date.now()): BannerStatus {
+  if (draft.schedule !== "window") return "live";
+
+  const start = draft.startsAt ? new Date(draft.startsAt).getTime() : null;
+  const end = draft.endsAt ? new Date(draft.endsAt).getTime() : null;
+
+  if (start !== null && now < start) return "scheduled";
+  if (end !== null && now >= end) return "ended";
+  return "live";
+}
+
+/** Pins a duration to an absolute end, since a stored `duration` restarts on every later save. */
+export function withResolvedDuration(draft: BannerDraft, now: number = Date.now()): BannerDraft {
+  if (draft.schedule !== "duration") return draft;
+
+  const durationMs = parseDurationMs(draft.duration);
+  if (!durationMs) return draft;
+
+  return {
+    ...draft,
+    schedule: "window",
+    startsAt: "",
+    endsAt: toLocalInput(new Date(now + durationMs).toISOString()),
+  };
 }
