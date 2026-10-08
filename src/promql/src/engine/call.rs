@@ -411,6 +411,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn newly_parsed_functions_without_execution_support_return_errors() {
+        for query in ["info(m)", "integral(m[5m])"] {
+            let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let mut engine = Engine::new(
+                "test",
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx("test", "test_org", 30),
+                    CountingProvider(calls.clone()),
+                    vec![],
+                )),
+                create_test_eval_ctx(),
+            );
+            let expr = crate::parse(query).unwrap();
+            let error = engine.exec_expr(&expr).await.unwrap_err();
+            assert!(
+                matches!(error, DataFusionError::NotImplemented(_)),
+                "{query}: {error}"
+            );
+            assert!(error.to_string().contains("Unsupported function"));
+            assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        }
+    }
+
+    #[tokio::test]
     async fn test_quantile_over_time_reads_range_argument_once() {
         let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let mut engine = Engine::new(
@@ -422,7 +446,7 @@ mod tests {
             )),
             create_test_eval_ctx(),
         );
-        let expr = promql_parser::parser::parse("quantile_over_time(0.95, m[5m])").unwrap();
+        let expr = crate::parse("quantile_over_time(0.95, m[5m])").unwrap();
         let value = engine.exec_expr(&expr).await.unwrap();
         assert!(matches!(value, Value::None));
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
@@ -440,8 +464,7 @@ mod tests {
             )),
             EvalContext::new(1_000_000, 1_000_000, 1_000_000, "test".into()),
         );
-        let expr =
-            promql_parser::parser::parse("clamp_min(vector(5), scalar(m) > bool 0)").unwrap();
+        let expr = crate::parse("clamp_min(vector(5), scalar(m) > bool 0)").unwrap();
         let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
             panic!("expected clamped matrix");
         };
@@ -463,7 +486,7 @@ mod tests {
             eval_ctx,
         );
         for query in ["year()", "year(vector(time()))"] {
-            let expr = promql_parser::parser::parse(query).unwrap();
+            let expr = crate::parse(query).unwrap();
             let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
                 panic!("expected a matrix for {query}");
             };
@@ -505,7 +528,7 @@ mod tests {
                 )),
                 eval_ctx.clone(),
             );
-            let expr = promql_parser::parser::parse(query).unwrap();
+            let expr = crate::parse(query).unwrap();
             match engine.exec_expr(&expr).await.unwrap() {
                 Value::Float(value) => assert_eq!(value, expected, "{query}"),
                 Value::Matrix(series) => {
@@ -533,7 +556,7 @@ mod tests {
         let args = FunctionArgs {
             args: ["vector(-5)", "m"]
                 .into_iter()
-                .map(|expr| Box::new(promql_parser::parser::parse(expr).unwrap()))
+                .map(|expr| Box::new(crate::parse(expr).unwrap()))
                 .collect(),
         };
         let Value::Matrix(series) = engine.call_builtin(Func::Abs, &args).await.unwrap() else {
@@ -643,7 +666,7 @@ mod tests {
             let args = FunctionArgs {
                 args: expressions
                     .into_iter()
-                    .map(|expr| Box::new(promql_parser::parser::parse(expr).unwrap()))
+                    .map(|expr| Box::new(crate::parse(expr).unwrap()))
                     .collect(),
             };
             let result = engine.call_builtin(Func::LabelJoin, &args).await;
@@ -665,7 +688,7 @@ mod tests {
             create_test_eval_ctx(),
         );
         let query = r#"label_join(label_replace(vector(1), "dst", "old", "", ""), "dst", ",")"#;
-        let expr = promql_parser::parser::parse(query).unwrap();
+        let expr = crate::parse(query).unwrap();
         let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
             panic!("expected matrix");
         };
@@ -685,7 +708,7 @@ mod tests {
             create_test_eval_ctx(),
         );
         let query = r#"label_replace(label_replace(label_replace(vector(1), "instance", "a", "", ""), "__name__", "mem_usage", "", ""), "host", "$1", "instance", "(.*)")"#;
-        let expr = promql_parser::parser::parse(query).unwrap();
+        let expr = crate::parse(query).unwrap();
         let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
             panic!("expected matrix");
         };
@@ -717,8 +740,8 @@ mod tests {
 
         let args = FunctionArgs {
             args: vec![
-                Box::new(promql_parser::parser::parse("42").unwrap()),
-                Box::new(promql_parser::parser::parse(r#""text""#).unwrap()),
+                Box::new(crate::parse("42").unwrap()),
+                Box::new(crate::parse(r#""text""#).unwrap()),
             ],
         };
         assert_eq!(
@@ -939,7 +962,7 @@ mod tests {
             )),
             eval_ctx,
         );
-        let expr = promql_parser::parser::parse(query).unwrap();
+        let expr = crate::parse(query).unwrap();
         engine
             .exec_expr(&expr)
             .await
@@ -981,6 +1004,29 @@ mod tests {
             .into_iter()
             .map(|((_, timestamp), bits)| (timestamp, f64::from_bits(bits)))
             .collect()
+    }
+
+    #[tokio::test]
+    async fn double_exponential_smoothing_matches_holt_winters() {
+        let squares = format!("vector((time() - {BASE}) ^ 2)[3m:1m]");
+        for query in [
+            format!("holt_winters({squares}, 0.5, 0.3)"),
+            format!("holt_winters({squares}, 0.2 + 0.3 * ((time() - {BASE}) / 60), 0.3)"),
+        ] {
+            let alias = query.replace("holt_winters", "double_exponential_smoothing");
+            for eval_ctx in [
+                EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into()),
+                range_ctx(),
+            ] {
+                let expected = samples(eval_at(&query, eval_ctx.clone()).await);
+                assert!(!expected.is_empty(), "{query}");
+                assert_eq!(
+                    samples(eval_at(&alias, eval_ctx).await),
+                    expected,
+                    "{alias}"
+                );
+            }
+        }
     }
 
     #[tokio::test]

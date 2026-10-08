@@ -84,7 +84,7 @@ pub fn resolve_query(
     if !query.contains('@') && !calls_window_func(query) {
         return Ok(None);
     }
-    let mut expr = promql_parser::parser::parse(query)?;
+    let mut expr = crate::parse(query)?;
     // the evaluated grid is the adjusted one, so `end()` is its last step
     let (start, end) = match step {
         0 => (start, end),
@@ -297,6 +297,34 @@ mod tests {
 
     fn pin_of(query: &str) -> Result<Pin> {
         pin(&parser::parse(query).unwrap())
+    }
+
+    #[test]
+    fn escaped_matchers_survive_pinned_query_transport() {
+        let query = r#"m{path=~"api\\.v[0-9]+",note="a\"b\\c\n"} @ end()"#;
+        let Expr::VectorSelector(mut original) = crate::parse(query).unwrap() else {
+            panic!("expected vector selector");
+        };
+        let forwarded = resolve_query(query, T, T + 60_000_000, 0).unwrap().unwrap();
+        let Expr::VectorSelector(mut reparsed) = crate::parse(&forwarded).unwrap() else {
+            panic!("expected vector selector");
+        };
+        original
+            .matchers
+            .matchers
+            .sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+        reparsed
+            .matchers
+            .matchers
+            .sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+        assert_eq!(reparsed.matchers, original.matchers);
+        assert_eq!(
+            at_micros(reparsed.at.as_ref().unwrap()),
+            Some(T + 60_000_000)
+        );
+        assert!(reparsed.matchers.matchers[1].is_match("api.v1"));
+        assert!(!reparsed.matchers.matchers[1].is_match("apiXv1"));
+        assert_eq!(reparsed.matchers.matchers[0].value, "a\"b\\c\n");
     }
 
     #[test]
