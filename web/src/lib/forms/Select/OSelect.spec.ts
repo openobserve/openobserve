@@ -254,6 +254,29 @@ describe("OSelect", () => {
       expect(input!.value).toBe("s");
     });
 
+    it("leaves the seeded character unselected so the next keystroke appends to it", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [
+            { label: "sample", value: "s1" },
+            { label: "other", value: "o1" },
+          ],
+        },
+      });
+      await wrapper.find("button").trigger("keydown", { key: "s" });
+      await flushPromises();
+      // ListboxFilter's own autoFocus fires on a 1 ms timer.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const input = document.body.querySelector(
+        'input[placeholder="Search..."]',
+      ) as HTMLInputElement;
+      expect(document.activeElement).toBe(input);
+      expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1]);
+    });
+
     it("should not open the dropdown when a modifier combo is pressed on the trigger", async () => {
       wrapper = mount(OSelect, {
         attachTo: document.body,
