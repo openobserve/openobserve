@@ -32,8 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, metrics_usage,
-    model_pricing, organization, query_history, rum_analytics, service_accounts, short_url, slos,
-    sourcemaps, status, status_pages, stream, synthetics, users,
+    model_pricing, organization, public_dashboards, query_history, rum_analytics, service_accounts,
+    short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -671,6 +671,37 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
 }
 
 /// Create proxy routes
+/// Public dashboard links admin CRUD; handlers 404 when the feature is off.
+fn public_dashboard_admin_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/public_dashboards",
+            get(public_dashboards::admin::list_org),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links",
+            get(public_dashboards::admin::list).post(public_dashboards::admin::create),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}",
+            get(public_dashboards::admin::get)
+                .put(public_dashboards::admin::update)
+                .delete(public_dashboards::admin::delete),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/pause",
+            post(public_dashboards::admin::pause),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/resume",
+            post(public_dashboards::admin::resume),
+        )
+        .route(
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild",
+            post(public_dashboards::admin::rebuild),
+        )
+}
+
 pub fn proxy_routes(enable_auth: bool) -> Router {
     let mut router = Router::new().route("/proxy/{org_id}/{*target_url}", get(proxy));
 
@@ -825,6 +856,21 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
+    // Public dashboards: same unauthenticated point-read plane (basic_routes),
+    // gated by its own master switch. The SPA viewer route (/public/dashboards)
+    // is served by the frontend catch-all, so only the data APIs live here.
+    if get_config().public_dashboards.enabled {
+        router = router
+            .route(
+                "/api/public_dashboards/{slug}",
+                get(public_dashboards::public::config),
+            )
+            .route(
+                "/api/public_dashboards/{slug}/data",
+                get(public_dashboards::public::data),
+            );
+    }
+
     router
 }
 
@@ -869,7 +915,7 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    let mut router = Router::new();
+    let mut router = public_dashboard_admin_routes(Router::new());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));

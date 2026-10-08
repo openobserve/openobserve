@@ -276,6 +276,36 @@ describe("FolderList.vue", () => {
       favWrapper.unmount();
     });
 
+    it("renders Public links under Favorites with no folder menu when show-public-links is on", () => {
+      const plWrapper = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: "dashboards", showFavorites: true, showPublicLinks: true },
+      });
+
+      const tab = plWrapper.find('[data-test="dashboard-folder-tab-__public_links__"]');
+      expect(tab.exists()).toBe(true);
+      expect(plWrapper.vm.filteredTabs[1].folderId).toBe("__public_links__");
+      expect(plWrapper.vm.filteredTabs[2].folderId).toBe("default");
+      expect(tab.find('[data-test="dashboard-more-icon"]').exists()).toBe(false);
+      expect(
+        plWrapper
+          .find('[data-test="dashboard-folder-tab-folder1"] [data-test="dashboard-more-icon"]')
+          .exists(),
+      ).toBe(true);
+      plWrapper.unmount();
+    });
+
+    it("does NOT render the Public links entry without the prop", () => {
+      expect(wrapper.find('[data-test="dashboard-folder-tab-__public_links__"]').exists()).toBe(
+        false,
+      );
+    });
+
     it("does NOT render the Favorites entry without the prop (alerts/reports)", () => {
       // The default wrapper is type=alerts with no show-favorites.
       expect(wrapper.find('[data-test="dashboard-folder-tab-__favorites__"]').exists()).toBe(false);

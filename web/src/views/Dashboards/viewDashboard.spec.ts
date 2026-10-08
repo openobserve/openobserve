@@ -408,6 +408,23 @@ describe("ViewDashboard", () => {
     });
   });
 
+  describe("Publish button", () => {
+    it.each([
+      ["admin", true],
+      ["editor", true],
+      ["root", true],
+      ["viewer", false],
+      ["user", false],
+    ])("offers publishing to a %s: %s", async (role, offered) => {
+      const before = mockStoreState.userInfo;
+      mockStoreState.userInfo = { ...before, role };
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.vm.canPublishPublicly).toBe(offered);
+      mockStoreState.userInfo = before;
+    });
+  });
+
   describe("Store Integration", () => {
     it("should access store state correctly", async () => {
       wrapper = createWrapper();
@@ -1512,5 +1529,17 @@ describe("ViewDashboard", () => {
 
       expect(analytics.track).not.toHaveBeenCalled();
     });
+  });
+
+  it("hands the live variables manager to the template, so public links seed from it", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const manager = {
+      committedVariablesData: { global: [], tabs: {}, panels: {} },
+      getUrlParams: () => ({ "var-qns": "ingress-nginx" }),
+    };
+    await wrapper.vm.onVariablesManagerReady(manager);
+
+    expect(wrapper.vm.variablesManager.getUrlParams()).toEqual({ "var-qns": "ingress-nginx" });
   });
 });

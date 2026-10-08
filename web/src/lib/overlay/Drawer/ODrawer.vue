@@ -116,6 +116,11 @@ function handleCloseAutoFocus(event: Event) {
 }
 
 function handleOpenChange(v: boolean) {
+  if (!v && props.closeGuard?.() === false) return;
+  setOpen(v);
+}
+
+function setOpen(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
@@ -123,11 +128,13 @@ function handleOpenChange(v: boolean) {
 function handleEscapeKeyDown(e: KeyboardEvent) {
   const target = e.target instanceof Element ? e.target : null;
   // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
-  if (props.persistent || (!props.modal && target?.closest(ESCAPE_KEEPS_OPEN))) {
+  const keepsOpen = !props.modal && target?.closest(ESCAPE_KEEPS_OPEN);
+  // A vetoed Escape must also cancel the library's own dismiss, or it closes on a second guard call.
+  if (props.persistent || keepsOpen || props.closeGuard?.() === false) {
     e.preventDefault();
     return;
   }
-  handleOpenChange(false);
+  setOpen(false);
 }
 
 function handleInteractOutside(e: Event) {

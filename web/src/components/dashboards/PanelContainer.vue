@@ -402,6 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :viewOnly="viewOnly"
         :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
         :exemplars-override="exemplarOverride"
+        :injectedPromqlData="props.injectedPanelData"
         @loading-state-change="handleLoadingStateChange"
         @metadata-update="metaDataValue"
         @limit-number-of-series-warning-message-update="
@@ -421,7 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @is-partial-data-update="handleIsPartialDataUpdate"
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
-        :allowAnnotationsAdd="true"
+        :allowAnnotationsAdd="!props.injectedPanelData"
+        :allowDrilldown="!props.injectedPanelData"
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
@@ -576,6 +578,7 @@ export default defineComponent({
     "simplifiedPanelView",
     "shouldRefreshWithoutCache",
     "showLegendsButton",
+    "injectedPanelData",
   ],
   components: {
     OTag,

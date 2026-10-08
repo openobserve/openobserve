@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <FolderIcon
                   :token="iconFor(tab)"
                   :favorite="tab.folderId === FAVORITES_FOLDER_ID"
+                  :icon="tab.glyph"
                   :data-test="`dashboard-folder-icon-${tab.name}`"
                 />
                 <span
@@ -116,9 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  matching the row, and OTab only paints a hover background on
                  INACTIVE tabs, so it would read wrong on the open folder. -->
                 <div
-                  v-if="
-                    tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID
-                  "
+                  v-if="tab.folderId.toLowerCase() !== 'default' && !isPseudoFolder(tab.folderId)"
                   class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
                   @click="isMobile && $event.stopPropagation()"
                 >
@@ -198,7 +197,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderIcon from "./FolderIcon.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
-import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import {
+  FAVORITES_FOLDER_ID,
+  PUBLIC_LINKS_FOLDER_ID,
+  isPseudoFolder,
+} from "@/utils/dashboard/pseudoFolders";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -225,6 +228,11 @@ export default defineComponent({
     // Dashboards-only: prepends a fixed "Favorites" pseudo-folder entry at
     // the top of the rail. Alerts/Reports keep the plain folder list.
     showFavorites: {
+      type: Boolean,
+      default: false,
+    },
+    // Dashboards-only: adds the org-wide "Public links" view under Favorites.
+    showPublicLinks: {
       type: Boolean,
       default: false,
     },
@@ -367,9 +375,21 @@ export default defineComponent({
       const folders = store.state.organizationData.foldersByType[props.type] ?? [];
       // The Favorites pseudo-folder sits above everything, including Default,
       // and participates in the folder search like any other entry.
-      const tabs = props.showFavorites
-        ? [{ folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") }, ...folders]
-        : folders;
+      const pseudo = [
+        ...(props.showFavorites
+          ? [{ folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") }]
+          : []),
+        ...(props.showPublicLinks
+          ? [
+              {
+                folderId: PUBLIC_LINKS_FOLDER_ID,
+                name: t("dashboard.publicLinks.panelTitle"),
+                glyph: "public" as const,
+              },
+            ]
+          : []),
+      ];
+      const tabs = pseudo.length ? [...pseudo, ...folders] : folders;
       if (!searchQuery.value || searchQuery.value == "") {
         return tabs;
       }
@@ -402,6 +422,7 @@ export default defineComponent({
       onTabClick,
       iconFor,
       FAVORITES_FOLDER_ID,
+      isPseudoFolder,
     };
   },
 });
