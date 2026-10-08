@@ -1091,8 +1091,7 @@ pub struct DatabaseMonitoring {
     pub rollup_interval_secs: u64,
 }
 
-/// Public (unauthenticated) dashboards. Master switch plus the timing/limit
-/// knobs the rebuilder and public serving plane clamp to.
+/// Public (unauthenticated) dashboards: the master switch and the per-IP rate limit.
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct PublicDashboards {
     #[env_config(
@@ -1107,18 +1106,6 @@ pub struct PublicDashboards {
         help = "Per-IP requests-per-minute limit on the unauthenticated public-dashboard routes (0 disables)."
     )]
     pub rpm: u64,
-    #[env_config(
-        name = "ZO_PUBLIC_DASHBOARD_DEFAULT_REBUILD_SECS",
-        default = 60,
-        help = "Default seconds between snapshot rebuilds when the share does not specify a cadence."
-    )]
-    pub default_rebuild_secs: u64,
-    #[env_config(
-        name = "ZO_PUBLIC_DASHBOARD_SNAPSHOT_CACHE_TTL_SECS",
-        default = 30,
-        help = "In-process cache TTL for public-dashboard point-reads; keep it below the shortest link refresh so viewers never lag a rebuild behind."
-    )]
-    pub snapshot_cache_ttl_secs: u64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
