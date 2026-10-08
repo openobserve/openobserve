@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { onMounted, ref } from "vue";
 import { usePanelDataLoader } from "./usePanelDataLoader";
+import queryService from "../../services/search";
 
 /**
  * Lets the NEXT usePanelDataLoader() install its visibility observer.
@@ -1507,6 +1508,44 @@ describe("usePanelDataLoader", () => {
   });
 
   describe("superseded runs", () => {
+    it("cancels the superseded run's search on the server before starting the next", async () => {
+      const streams: any[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema(),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+      const [{ payload }] = streams;
+      expect(loader.searchRequestTraceIds.value).toContain(payload.traceId);
+      vi.mocked(queryService.delete_running_queries).mockClear();
+
+      await loader.loadData();
+
+      expect(queryService.delete_running_queries).toHaveBeenCalledWith("test-org", [
+        payload.traceId,
+      ]);
+      expect(streams).toHaveLength(2);
+    });
+
     it("a stream completing while the rerun is debounced writes nothing", async () => {
       const streams: any[] = [];
       streamOverride = (payload, callbacks) => {

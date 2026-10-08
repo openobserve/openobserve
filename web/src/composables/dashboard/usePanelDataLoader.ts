@@ -346,6 +346,22 @@ export const usePanelDataLoader = (
     saveCurrentStateToCache();
   };
 
+  // Aborting the controller only stops the client; the superseded searches keep running server-side until cancelled.
+  const cancelSupersededSearches = () => {
+    const traceIds = state.searchRequestTraceIds ?? [];
+    if (!traceIds.length) return;
+    const orgId = store?.state?.selectedOrganization?.identifier;
+    state.searchRequestTraceIds = [];
+    try {
+      traceIds.forEach((traceId: string) => {
+        cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
+      });
+      queryService.delete_running_queries(orgId, traceIds)?.catch?.(() => {});
+    } catch (error) {
+      console.error("Error cancelling superseded searches:", error);
+    }
+  };
+
   const loadData = async () => {
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
@@ -362,6 +378,7 @@ export const usePanelDataLoader = (
       // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");
+        cancelSupersededSearches();
         abortController.abort();
       }
 
