@@ -21,7 +21,7 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
 import store from "@/test/unit/helpers/store";
-import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type { ChannelReadiness, OnCallTeamMember } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -35,6 +35,9 @@ vi.mock("@/services/oncall", () => ({
   },
 }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
+
+const push = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
 const users = vi.mocked(usersService);
 const oncall = vi.mocked(oncallService);
@@ -80,6 +83,11 @@ const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
+  OTooltip: {
+    name: "OTooltip",
+    props: ["content"],
+    template: "<span data-test='tip'>{{ content }}</span>",
+  },
   OButton: {
     name: "OButton",
     props: ["disabled"],
@@ -148,6 +156,34 @@ function render(arg: OnCallTeamMember[] | RenderOpts = []) {
 
 function member(email: string): OnCallTeamMember {
   return { id: email, team_id: "team_1", user_email: email };
+}
+
+function ready(channel: ChannelReadiness["channel"]): ChannelReadiness {
+  return { channel, deliverable: true, configured_but_unverified: false };
+}
+
+function reach(email: string, lands: boolean, channels: ChannelReadiness[]) {
+  return {
+    user_email: email,
+    is_org_user: true,
+    mailbox_shaped: true,
+    deliverable_channels: channels.filter((c) => c.deliverable).map((c) => c.channel),
+    configured_but_unverified: [],
+    would_a_page_land: lands,
+    channels,
+  };
+}
+
+function reachability(members: ReturnType<typeof reach>[]) {
+  return {
+    team_id: "team_1",
+    team_name: "T",
+    smtp_configured: true,
+    reachable: members.filter((m) => m.would_a_page_land).length,
+    total: members.length,
+    unreachable_members: [],
+    members,
+  };
 }
 
 describe("OnCallMembers", () => {
@@ -391,33 +427,11 @@ describe("OnCallMembers", () => {
     it("draws a chip per channel the server evaluated", async () => {
       const wrapper = render({
         members: [ana],
-        reachability: {
-          team_id: "team_1",
-          team_name: "T",
-          smtp_configured: true,
-          reachable: 1,
-          total: 1,
-          unreachable_members: [],
-          members: [
-            {
-              user_email: "ana@o2.ai",
-              is_org_user: true,
-              mailbox_shaped: true,
-              deliverable_channels: ["email"],
-              configured_but_unverified: [],
-              would_a_page_land: true,
-              channels: [
-                { channel: "email", deliverable: true, configured_but_unverified: false },
-                { channel: "webhook", deliverable: true, configured_but_unverified: false },
-              ],
-            },
-          ],
-        },
+        reachability: reachability([reach("ana@o2.ai", true, [ready("email")])]),
       });
       await flushPromises();
 
       expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-email"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="oncall-channel-ana@o2.ai-webhook"]').exists()).toBe(true);
     });
 
     /// A failed schedule fetch must cost the shift column, not the table.
@@ -443,6 +457,133 @@ describe("OnCallMembers", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-members-shift-ana@o2.ai"]').text()).toContain(
         "In the rotation",
+      );
+    });
+  });
+
+  /// U2, U5, S1: three person chips per row, the server's reason on each, and red only when nothing lands.
+  describe("the reach chips", () => {
+    const SELF = String(store.state.userInfo.email);
+    const blocked = (channel: "sms" | "voice", why: string): ChannelReadiness => ({
+      channel,
+      deliverable: false,
+      configured_but_unverified: false,
+      blocked_because: why,
+    });
+    const noPhone = [
+      ready("email"),
+      blocked("sms", "no phone on file"),
+      blocked("voice", "no phone on file"),
+    ];
+
+    function chipsOf(wrapper: ReturnType<typeof render>, email: string) {
+      return wrapper
+        .find(`[data-test="oncall-channels-${email}"]`)
+        .findAll("[data-test]")
+        .map((el) => el.attributes("data-test"));
+    }
+
+    function tipsOf(wrapper: ReturnType<typeof render>, email: string) {
+      return wrapper
+        .find(`[data-test="oncall-channels-${email}"]`)
+        .findAll('[data-test="tip"]')
+        .map((el) => el.text());
+    }
+
+    function renderReach(rows: ReturnType<typeof reach>[]) {
+      return render({
+        members: rows.map((r) => member(r.user_email)),
+        reachability: reachability(rows),
+      });
+    }
+
+    it("orders the chips Email, SMS, Voice whatever order the server sent", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, [
+          blocked("voice", "no phone on file"),
+          ready("email"),
+          blocked("sms", "no phone on file"),
+        ]),
+      ]);
+      await flushPromises();
+
+      expect(chipsOf(wrapper, "bob@o2.ai")).toEqual([
+        "oncall-channel-bob@o2.ai-email",
+        "tip",
+        "oncall-channel-bob@o2.ai-sms",
+        "tip",
+        "oncall-channel-bob@o2.ai-voice",
+        "tip",
+      ]);
+    });
+
+    it("tips a blocked chip with the server's reason and a deliverable one with the delivers line", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, [
+          ready("email"),
+          ready("sms"),
+          blocked("voice", "the last 3 Voice attempts failed"),
+        ]),
+      ]);
+      await flushPromises();
+
+      expect(tipsOf(wrapper, "bob@o2.ai")).toEqual([
+        "Email — verified, a page lands here",
+        "SMS — verified, a page lands here",
+        "the last 3 Voice attempts failed",
+      ]);
+    });
+
+    it("links only the caller's own blocked phone chips to My on-call", async () => {
+      const own = SELF.toUpperCase();
+      const wrapper = renderReach([reach(own, true, noPhone), reach("bob@o2.ai", true, noPhone)]);
+      await flushPromises();
+
+      expect(chipsOf(wrapper, own)).toEqual([
+        `oncall-channel-${own}-email`,
+        "tip",
+        `oncall-channel-${own}-sms-link`,
+        "tip",
+        `oncall-channel-${own}-voice-link`,
+        "tip",
+      ]);
+      expect(tipsOf(wrapper, own).slice(1)).toEqual([
+        "no phone on file. Add your phone on My on-call",
+        "no phone on file. Add your phone on My on-call",
+      ]);
+      expect(tipsOf(wrapper, "bob@o2.ai").slice(1)).toEqual([
+        "no phone on file",
+        "no phone on file",
+      ]);
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-sms-link"]').exists()).toBe(false);
+
+      await wrapper.find(`[data-test="oncall-channel-${own}-voice-link"]`).trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "onCallMine",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    it("never turns a member red for a missing phone while email lands", async () => {
+      const wrapper = renderReach([
+        reach("bob@o2.ai", true, noPhone),
+        reach("cara@o2.ai", false, [
+          blocked("sms", "no phone on file"),
+          blocked("voice", "no phone on file"),
+        ]),
+      ]);
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test="row"]');
+      const bob = rows.find((r) => r.text().includes("bob@o2.ai"))!;
+      const cara = rows.find((r) => r.text().includes("cara@o2.ai"))!;
+      expect(bob.text()).not.toContain("Unreachable");
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-sms"]').classes()).toContain(
+        "border-dashed",
+      );
+      expect(cara.text()).toContain("Unreachable");
+      expect(wrapper.find('[data-test="oncall-channel-cara@o2.ai-sms"]').classes()).toContain(
+        "bg-icon-chip-error-bg",
       );
     });
   });

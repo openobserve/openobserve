@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
@@ -77,7 +78,7 @@ const stubs = {
   },
   OnCallRoutingSimulator: {
     name: "OnCallRoutingSimulator",
-    props: ["preview", "teams", "aliases", "loading", "sending"],
+    props: ["preview", "teams", "aliases", "loading", "sending", "canConfigure"],
     template: "<div />",
   },
   // Both tables render the host's toolbar, which carries the tabs, search and refresh.
@@ -211,6 +212,7 @@ describe("OnCallRouting", () => {
     // The catch-all is cached module-wide so one screen reads it once;
     // without this it survives into the next test.
     __resetOnCallRoutingConfig();
+    resetOnCallPermissions();
     vi.clearAllMocks();
     service.listTeams.mockResolvedValue({ data: TEAMS } as any);
     service.ownershipStats.mockResolvedValue({ data: { rules: [], total: 0 } } as any);
@@ -300,6 +302,21 @@ describe("OnCallRouting", () => {
     expect(simulator(wrapper).exists()).toBe(true);
     // In a drawer, so opening it does not push the lists down the page.
     expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
+  });
+
+  /// A10: Send test page renders for everyone; the server's 403 is what closes it for the org.
+  it("latches Send test page disabled after a 403 on the test page", async () => {
+    service.testPage.mockRejectedValue({ response: { status: 403, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+    expect(simulator(wrapper).props("canConfigure")).toBe(true);
+
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
+    await flushPromises();
+
+    expect(service.testPage).toHaveBeenCalled();
+    expect(simulator(wrapper).props("canConfigure")).toBe(false);
   });
 
   /// Nominating a catch-all is a one-time act, but whether one exists is a

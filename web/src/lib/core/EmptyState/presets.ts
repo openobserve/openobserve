@@ -863,6 +863,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-phone-provider": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noPhoneProvider.title",
+    descriptionKey: "emptyState.noPhoneProvider.description",
+    actions: [
+      {
+        id: "connect",
+        icon: "call",
+        titleKey: "emptyState.noPhoneProvider.action",
+        descriptionKey: "emptyState.noPhoneProvider.actionDesc",
+      },
+    ],
+  },
   "no-model-pricing": {
     illustration: "box",
     variant: "create",

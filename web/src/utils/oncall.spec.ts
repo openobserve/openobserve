@@ -52,6 +52,7 @@ import {
   priorityTagVariant,
   priorityTone,
   parseRoutingReason,
+  phoneWithoutEmail,
   promoteSeverityFloor,
   promoteSeverityOptions,
   resolvableTimezones,
@@ -1077,9 +1078,29 @@ describe("CHANNEL_WAKES", () => {
   // how a team discovers at 3 a.m. that their P1 only ever sent an email.
   it.each([
     ["email", false],
+    ["sms", true],
+    ["voice", true],
     ["webhook", false],
   ] as const)("%s wakes a locked phone: %s", (channel, expected) => {
     expect(CHANNEL_WAKES[channel]).toBe(expected);
+  });
+});
+
+describe("phoneWithoutEmail", () => {
+  // D13: the server refuses the same rungs on save, and only when the rung has steps.
+  const STEP = { after_micros: 0, targets: [] };
+  it.each([
+    [["sms"], 1, true],
+    [["voice"], 1, true],
+    [["sms", "voice"], 1, true],
+    [["email", "sms"], 1, false],
+    [["email", "sms", "voice"], 1, false],
+    [["webhook"], 1, false],
+    [[], 1, false],
+    [["sms"], 0, false],
+  ] as const)("%j with %i steps needs Email: %s", (channels, steps, expected) => {
+    const rung = { priority: 1, steps: Array(steps).fill(STEP), channels: [...channels] };
+    expect(phoneWithoutEmail(rung)).toBe(expected);
   });
 });
 

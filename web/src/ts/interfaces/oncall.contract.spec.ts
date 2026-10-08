@@ -145,7 +145,7 @@ const RESPONSE_EVENT_KINDS = [
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
-const CHANNELS = ["email", "webhook"] as const satisfies readonly Channel[];
+const CHANNELS = ["email", "sms", "voice", "webhook"] as const satisfies readonly Channel[];
 const _c2: Complete<Channel, typeof CHANNELS> = true;
 
 const RESPONSE_STATES = [

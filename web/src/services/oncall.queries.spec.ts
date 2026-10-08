@@ -15,13 +15,20 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryClient } from "@/composables/query/queryClient";
+import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import {
+  confirmCodeMutation,
+  contactQuery,
   createOwnershipRuleMutation,
   deleteOwnershipRuleMutation,
+  deleteTelephonyMutation,
   oncallTeamsQuery,
   pagedResponsesQuery,
   responsesQuery,
   routingConfigQuery,
+  saveTelephonyMutation,
+  setContactMutation,
+  telephonyQuery,
   updateOwnershipRuleMutation,
   updateTeamMutation,
 } from "./oncall.queries";
@@ -162,5 +169,50 @@ describe("the team page's pages and the Pages list", () => {
     expect(
       queryClient.getQueryState(pagedResponsesQuery(ORG, FILTERS).queryKey)?.isInvalidated,
     ).toBe(true);
+  });
+});
+
+describe("the caller's phone", () => {
+  // Provider presence and another org's verification both change it without a write from this page.
+  it("reads on the live tier", () => {
+    expect(contactQuery(ORG, "ana@o2.ai").staleTime).toBe(LIVE_STALE_TIME);
+  });
+
+  it.each([
+    ["saving a number", setContactMutation],
+    ["confirming a code", confirmCodeMutation],
+  ])("%s expires every team's reachability and the contact", (_, mutation) => {
+    const scopes = mutation(ORG, "ana@o2.ai").meta?.invalidates ?? [];
+    const covers = (key: readonly unknown[]) =>
+      scopes.some((scope) => scope.every((part, i) => part === key[i]));
+    expect(covers(oncallKeys.teamReachability(ORG, "any-team"))).toBe(true);
+    expect(covers(oncallKeys.contact(ORG, "ana@o2.ai"))).toBe(true);
+  });
+});
+
+describe("the org's phone provider", () => {
+  it("reads on the settings tier", () => {
+    expect(telephonyQuery(ORG).staleTime).toBe(NORMAL_STALE_TIME);
+  });
+
+  it.each([
+    ["saving the account", saveTelephonyMutation],
+    ["disconnecting it", deleteTelephonyMutation],
+  ])(
+    "%s expires the telephony read, every member's contact and every team's reachability",
+    (_, mutation) => {
+      const scopes = mutation(ORG).meta?.invalidates ?? [];
+      const covers = (key: readonly unknown[]) =>
+        scopes.some((scope) => scope.every((part, i) => part === key[i]));
+      expect(covers(oncallKeys.telephony(ORG))).toBe(true);
+      expect(covers(oncallKeys.contact(ORG, "ana@o2.ai"))).toBe(true);
+      expect(covers(oncallKeys.contact(ORG, "bob@o2.ai"))).toBe(true);
+      expect(covers(oncallKeys.teamReachability(ORG, "any-team"))).toBe(true);
+    },
+  );
+
+  // The save carries the plaintext token, so its mutation must not outlive the dialog.
+  it("drops a save from the mutation cache as soon as nothing observes it", () => {
+    expect(saveTelephonyMutation(ORG).gcTime).toBe(0);
   });
 });

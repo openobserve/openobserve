@@ -17,6 +17,7 @@ import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
+import { oncallRouteGuard } from "./oncallRouteGuard";
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
@@ -54,18 +55,6 @@ const privateLocationRouteGuard = (to: any, from: any, next: any) => {
 // syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
   if (store.state.zoConfig?.workflows_enabled === false) {
-    next("/");
-    return;
-  }
-  routeGuard(to, from, next);
-};
-
-// On-call routes are gated on the backend /config flag `oncall_enabled`
-// (enterprise O2_ONCALL_ENABLED). Same `=== false` stance as synthetics above:
-// the flag is briefly undefined on a cold load, and bouncing a bookmarked page
-// home on "not yet known" is worse than a moment of empty state.
-const oncallRouteGuard = (to: any, from: any, next: any) => {
-  if (store.state.zoConfig?.oncall_enabled === false) {
     next("/");
     return;
   }
