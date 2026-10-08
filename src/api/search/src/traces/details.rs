@@ -55,7 +55,9 @@ struct TraceDetailsCursor {
 struct TraceDetailsResponse {
     #[serde(flatten)]
     response: SearchResponse,
+    /// More spans follow this page.
     has_more: bool,
+    /// Send back as `after_start_time` and `after_span_id` to fetch the next page.
     next_after: Option<TraceDetailsCursor>,
 }
 
