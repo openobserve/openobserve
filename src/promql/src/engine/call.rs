@@ -349,12 +349,7 @@ mod tests {
 
     #[tokio::test]
     async fn newly_parsed_functions_without_execution_support_return_errors() {
-        for query in [
-            "first_over_time(m[5m])",
-            "double_exponential_smoothing(m[5m], 0.5, 0.3)",
-            "info(m)",
-            "histogram_avg(m)",
-        ] {
+        for query in ["first_over_time(m[5m])", "info(m)", "histogram_avg(m)"] {
             let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             let mut engine = Engine::new(
                 "test",
@@ -920,6 +915,29 @@ mod tests {
             .into_iter()
             .map(|((_, timestamp), bits)| (timestamp, f64::from_bits(bits)))
             .collect()
+    }
+
+    #[tokio::test]
+    async fn double_exponential_smoothing_matches_holt_winters() {
+        let squares = format!("vector((time() - {BASE}) ^ 2)[3m:1m]");
+        for query in [
+            format!("holt_winters({squares}, 0.5, 0.3)"),
+            format!("holt_winters({squares}, 0.2 + 0.3 * ((time() - {BASE}) / 60), 0.3)"),
+        ] {
+            let alias = query.replace("holt_winters", "double_exponential_smoothing");
+            for eval_ctx in [
+                EvalContext::new(BASE * SECOND, BASE * SECOND, 0, "test".into()),
+                range_ctx(),
+            ] {
+                let expected = samples(eval_at(&query, eval_ctx.clone()).await);
+                assert!(!expected.is_empty(), "{query}");
+                assert_eq!(
+                    samples(eval_at(&alias, eval_ctx).await),
+                    expected,
+                    "{alias}"
+                );
+            }
+        }
     }
 
     #[tokio::test]

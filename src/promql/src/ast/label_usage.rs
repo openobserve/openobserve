@@ -37,7 +37,7 @@ const LABEL_DROPPING_AGGS: [token::TokenId; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 44] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 45] = [
     "rate",
     "irate",
     "increase",
@@ -58,6 +58,7 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 44] = [
     "quantile_over_time",
     "predict_linear",
     "holt_winters",
+    "double_exponential_smoothing",
     "abs",
     "ceil",
     "floor",
@@ -183,6 +184,10 @@ mod tests {
             ("count(metric)", true),
             ("(sum(rate(metric[5m])))", true),
             ("sum(clamp(rate(metric[5m]), 0, 100))", true),
+            (
+                "sum(double_exponential_smoothing(metric[5m], 0.5, 0.3))",
+                true,
+            ),
             // grouping keeps labels
             ("sum by (region) (rate(metric[5m]))", false),
             ("sum without (le) (rate(metric[5m]))", false),
@@ -209,9 +214,13 @@ mod tests {
 
     #[test]
     fn test_grouping_labels() {
-        let cases: [(&str, &[&str]); 30] = [
+        let cases: [(&str, &[&str]); 31] = [
             ("sum by (job) (m)", &["job"]),
             ("sum by (job) (rate(m[5m]))", &["job"]),
+            (
+                "sum by (job) (double_exponential_smoothing(m[5m], 0.5, 0.3))",
+                &["job"],
+            ),
             ("sum by (job) (abs(-m))", &["job"]),
             ("max by (job) (timestamp(m))", &["job"]),
             ("count by (job) (hour(m))", &["job"]),

@@ -99,6 +99,7 @@ pub(crate) enum Func {
     HistogramFraction,
     HistogramQuantile,
     HistogramSum,
+    #[strum(serialize = "holt_winters", serialize = "double_exponential_smoothing")]
     HoltWinters,
     Hour,
     Idelta,
@@ -829,6 +830,7 @@ mod tests {
         assert!(fusable_range_func("quantile_over_time").is_none());
         assert!(fusable_range_func("predict_linear").is_none());
         assert!(fusable_range_func("holt_winters").is_none());
+        assert!(fusable_range_func("double_exponential_smoothing").is_none());
         assert!(fusable_range_func("absent_over_time").is_none());
         assert!(fusable_range_func("histogram_quantile").is_none());
     }
