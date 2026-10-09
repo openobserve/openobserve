@@ -130,11 +130,10 @@ function earliestAliveViewSnapshot(
   target: number,
   targetIndex: number,
 ): number | null {
-  const lastEnd = new Map<string, number>();
+  const lastEnd = lastEndByView(manifest);
   const firstSnapshot = new Map<string, number>();
   manifest.forEach((row, i) => {
     if (typeof row.view_id !== "string") return;
-    lastEnd.set(row.view_id, Math.max(lastEnd.get(row.view_id) ?? -Infinity, Number(row.end)));
     if (i <= targetIndex && hasFullSnapshot(row) && !firstSnapshot.has(row.view_id)) {
       firstSnapshot.set(row.view_id, i);
     }
@@ -145,6 +144,16 @@ function earliestAliveViewSnapshot(
     if (earliest === null || index < earliest) earliest = index;
   });
   return earliest;
+}
+
+/** The end of each view's last row; rows without a view id are left out. */
+export function lastEndByView(manifest: ManifestEntry[]): Map<string, number> {
+  const lastEnd = new Map<string, number>();
+  manifest.forEach((row) => {
+    if (typeof row.view_id !== "string") return;
+    lastEnd.set(row.view_id, Math.max(lastEnd.get(row.view_id) ?? -Infinity, Number(row.end)));
+  });
+  return lastEnd;
 }
 
 /** Every row after the run starts at or after this, so the replay decoder never sees an earlier record later. */

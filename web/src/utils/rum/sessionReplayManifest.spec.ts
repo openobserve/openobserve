@@ -18,6 +18,7 @@ import {
   dedupManifest,
   trimBeforeReplayStart,
   findTargetIndex,
+  lastEndByView,
   replayWatermark,
   segmentId,
   selectInitialWindow,
@@ -99,6 +100,22 @@ describe("sessionReplayManifest", () => {
   describe("snapshotStarts", () => {
     it("lists only the segments that can anchor a cold player", () => {
       expect(snapshotStarts(manifest)).toEqual([1000, 4000]);
+    });
+  });
+
+  describe("lastEndByView", () => {
+    it("maps each view id to the end of its last row and ignores rows without one", () => {
+      const rows = [
+        { start: 1000, end: 1900, view_id: "A" },
+        { start: 1500, end: 2500, view_id: "B" },
+        { start: 2000, end: 2400, view_id: "A" },
+        { start: 3000, end: 3100 },
+        { start: 3200, end: 3300, view_id: null },
+      ];
+      expect([...lastEndByView(rows)]).toEqual([
+        ["A", 2400],
+        ["B", 2500],
+      ]);
     });
   });
 
