@@ -68,6 +68,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   }
 
   const dashboardPanelData = reactive(dashboardPanelDataObj[pageKey]);
+
+  // Auto shows exactly the labels a saved panel already stores, so a panel without a mode can adopt it.
+  const ensureAxisLabelMode = () => {
+    const config = dashboardPanelData.data?.config;
+    if (config && config.axis_label_mode == null) config.axis_label_mode = "auto";
+  };
+  ensureAxisLabelMode();
+  watch(() => dashboardPanelData.data?.config?.axis_label_mode, ensureAxisLabelMode);
+
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;
     dashboardPanelData.meta.dragAndDrop.targetDragIndex = -1;
@@ -168,6 +177,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
+        hide: false,
       },
     };
     // Seed the new query's default builder fields synchronously (mirrors the
@@ -216,6 +226,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   const resetDashboardPanelData = () => {
     Object.assign(dashboardPanelData, getDefaultDashboardPanelData(store));
+    ensureAxisLabelMode();
   };
 
   const resetDashboardPanelDataAndAddTimeField = () => {
@@ -235,6 +246,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     (newQueryType) => {
       if (newQueryType === "promql") {
         dashboardPanelData.layout.vrlFunctionToggle = false;
+      } else {
+        // A formula is PromQL-only; outside PromQL it would hide the query text from the editor.
+        dashboardPanelData.data.queries.forEach((query: any) => {
+          if (query?.config && "formula" in query.config) delete query.config.formula;
+        });
       }
     },
   );

@@ -28,11 +28,13 @@ const props = withDefaults(
     loading?: boolean;
     /** Rows currently selected; read only when `#selection-actions` is provided. */
     selectedCount?: number;
+    bordered?: boolean;
   }>(),
   {
     position: "bottom",
     totalCountExact: true,
     selectedCount: 0,
+    bordered: true,
   },
 );
 
@@ -75,7 +77,10 @@ const selectionLabel = computed(() => {
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="border-border-default flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3 py-1"
+    :class="[
+      'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1',
+      bordered ? 'border-border-default border-t' : '',
+    ]"
   >
     <!-- Slot presence is read here, not in a computed: slots are not reactive, so a cached answer would miss a slot the page adds later. -->
     <div

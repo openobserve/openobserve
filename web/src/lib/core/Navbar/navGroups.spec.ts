@@ -559,10 +559,11 @@ describe("groupNavLinks", () => {
       "infraHosts",
       "dbmDatabases",
       "infraKubernetes",
+      "infraKubernetes2",
     ]);
   });
 
-  it("declares the two workload children ungated, with their titleKey/icon/route", () => {
+  it("declares the workload children ungated, with their titleKey/icon/route", () => {
     // Ungated = always present under Infra; detection changes page state, never existence.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     const byName = (name: string) => infra?.children.find((c) => c.name === name);
@@ -576,7 +577,12 @@ describe("groupNavLinks", () => {
       icon: "hub",
       name: "infraKubernetes",
     });
-    for (const name of ["infraHosts", "infraKubernetes"]) {
+    expect(byName("infraKubernetes2")).toMatchObject({
+      titleKey: "menu.kubernetes2",
+      icon: "hub",
+      name: "infraKubernetes2",
+    });
+    for (const name of ["infraHosts", "infraKubernetes", "infraKubernetes2"]) {
       expect(byName(name)?.gate, name).toBeUndefined();
     }
   });
@@ -643,7 +649,7 @@ describe("groupNavLinks", () => {
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     expect(infra?.standalone).toBe(true);
     expect(infra?.absorbs).toEqual([]);
-    expect(infra?.children).toHaveLength(3);
+    expect(infra?.children).toHaveLength(4);
     expect(infraGroup(groupNavLinks([link("home"), link("traces")]))).toBeTruthy();
   });
 
@@ -763,6 +769,51 @@ describe("groupNavLinks", () => {
         if (c.gate) expect(GATE_PREDICATES[c.gate]).toBeTypeOf("function");
       }
     }
+  });
+});
+
+describe("ship guards (AC-15, AC-22, D-27)", () => {
+  it("keeps the Reliability flyout children exactly: no on-call My on-call or Policies rows (AC-15, D-8)", () => {
+    const reliability = NAV_GROUPS.find((g) => g.key === "reliability")!;
+    expect(reliability.children.map((c) => c.name)).toEqual([
+      "alertList",
+      "alertDestinations",
+      "alertTemplates",
+      "alertLibrary",
+      "sloList",
+      "incidentList",
+      "onCallResponses",
+      "onCallTeams",
+      "onCallRouting",
+      "alertSources",
+    ]);
+  });
+
+  it("still lands the Traces tile on the Spans tab (AC-22, #13852)", () => {
+    const spans = NAV_SUBNAV.traces.find((c) => c.tab === "spans")!;
+    expect(spans.defaultForRoute).toBe(true);
+    expect(NAV_SUBNAV.traces.filter((c) => c.defaultForRoute)).toHaveLength(1);
+  });
+
+  it("emits the children its requires/gate filter removed as `filtered` (D-27)", () => {
+    const entries = groupNavLinks(
+      [
+        { title: "Home", icon: "home", link: "/home", name: "home" },
+        { title: "Alerts", icon: "shield", link: "/alerts", name: "alertList" },
+      ],
+      undefined,
+      () => true,
+    );
+    const reliability = entries.find(
+      (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
+        e.type === "linkGroup" && e.item.name === "reliability",
+    );
+    expect(reliability?.filtered?.map((c) => c.name)).toEqual([
+      "sloList",
+      "incidentList",
+      "alertSources",
+    ]);
+    expect(reliability?.children.some((c) => c.name === "alertSources")).toBe(false);
   });
 });
 

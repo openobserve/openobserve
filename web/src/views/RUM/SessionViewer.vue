@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
       label: t('rum.sessionReplay'),
       onClick: () => router.back(),
@@ -27,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #title>
       <span class="inline-flex max-w-full min-w-0 items-center gap-2">
-        <span class="truncate">{{
+        <OTruncatedText>{{
           sessionDetails.id ? raw(sessionDetails.id) : t("rum.sessionReplay")
-        }}</span>
+        }}</OTruncatedText>
         <OBadge
           v-if="isLive && loadState !== 'error'"
           variant="success"
@@ -46,33 +45,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
         data-test="session-viewer-subtitle"
       >
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="language" size="sm" />
-          {{ sessionDetails.ip }}
+          <OTruncatedText>{{ sessionDetails.ip }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="calendar-month" size="sm" />
-          {{ sessionDetails.date }}
+          <OTruncatedText>{{ sessionDetails.date }}</OTruncatedText>
         </div>
         <div
           v-if="sessionDetails.duration"
-          class="flex items-center gap-1.5 truncate text-xs"
+          class="flex min-w-0 items-center gap-1.5 text-xs"
           data-test="session-viewer-duration"
         >
           <OIcon name="access-time" size="sm" />
-          {{ sessionDetails.duration }}
+          <OTruncatedText>{{ sessionDetails.duration }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="person" size="sm" />
-          {{ sessionDetails.user_email || t("common.unknownUser") }}
+          <OTruncatedText>{{
+            sessionDetails.user_email || t("common.unknownUser")
+          }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="location-on" size="sm" />
-          {{ sessionDetails.city }}, {{ sessionDetails.country }}
+          <OTruncatedText>{{ sessionDetails.city }}, {{ sessionDetails.country }}</OTruncatedText>
         </div>
-        <div class="flex items-center gap-1.5 truncate text-xs">
+        <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="settings" size="sm" />
-          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+          <OTruncatedText>{{ sessionDetails.browser }}, {{ sessionDetails.os }}</OTruncatedText>
         </div>
         <div
           v-if="frustrationCount > 0"
@@ -156,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-time="currentTime"
         :start-time="sessionState.data.selectedSession?.start_time || 0"
         :end-time="sessionState.data.selectedSession?.end_time || 0"
+        :rum-window-us="eventsOnlyRumWindowUs"
         :marked-timestamps="markedTimestamps"
         @event-emitted="handleSidebarEvent"
         class="min-h-0 flex-1"
@@ -286,6 +288,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import useStreams from "@/composables/useStreams";
 import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyticsQueries";
@@ -472,6 +475,7 @@ const rumEvents = new Map<string, any>();
 const logEvents = new Map<string, any>();
 const rumEventArrivals = new Map<string, number>();
 const eventsOnly = ref(false);
+const eventsOnlyRumWindowUs = ref<QueryWindow | null>(null);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -760,6 +764,7 @@ async function openSession(): Promise<void> {
       return;
     }
     sessionNotFound.value = false;
+    eventsOnlyRumWindowUs.value = routeRangeUs();
     eventsOnly.value = true;
     getSessionEvents();
     return;

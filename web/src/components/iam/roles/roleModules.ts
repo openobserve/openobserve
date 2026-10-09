@@ -49,6 +49,11 @@ export type RoleModule = {
   countedKeys: string[];
 };
 
+/** Rail key of the view that lists every module's own grant row; no resource key starts with `__`. */
+export const ALL_MODULES_KEY = "__all__";
+
+export const ALL_MODULES_ICON: IconName = "checklist";
+
 /** Stream types are type-level children of `stream`, opened from the Streams module like folders. */
 export const STREAM_PARENT_KEY = "stream";
 

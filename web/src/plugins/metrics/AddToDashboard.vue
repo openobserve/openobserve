@@ -13,7 +13,7 @@
     <OForm
       id="add-to-dashboard-form"
       :schema="addToDashboardSchema"
-      :default-values="addToDashboardDefaults()"
+      :default-values="addToDashboardDefaults(defaultPanelTitle)"
       @submit="onSubmit"
     >
       <div class="add-dashboard-form-card-section flex flex-col gap-4">
@@ -110,6 +110,11 @@ export default defineComponent({
       type: String as unknown as PropType<I18nText>,
       default: undefined,
     },
+    /** A caller that already knows what the panel shows names it, so the user need not. */
+    defaultPanelTitle: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["save", "update:open"],
   setup(props, { emit }) {
@@ -136,7 +141,7 @@ export default defineComponent({
     // component mounted only on first open). Avoids an eager API call on page load.
     // On close, reset the non-form dropdown state (folder/dashboard/tab). The
     // form-owned `panelTitle` needs no manual reset — ODialog unmounts the body
-    // on close and re-seeds via `:default-values="addToDashboardDefaults()"` on reopen.
+    // on close and re-seeds via `:default-values` on reopen.
     watch(
       () => props.open,
       async (isOpen) => {

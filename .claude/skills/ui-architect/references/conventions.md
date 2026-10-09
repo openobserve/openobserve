@@ -169,6 +169,39 @@ Drop ticket ids, "review finding", "as discussed", "previously we…", and any
 line that just narrates the next statement. Same rule in `.spec.ts` files: one
 line on why a setup is unusual, not a paragraph defending it.
 
+### A UI pass changes UI only
+
+When the task is "fix the UI", the diff must not change what a screen can do.
+
+- **No new capabilities in shared engines.** Readable headers for one page's tables
+  were first built as a new `display_name` override type in the dashboard table
+  engine — a feature every dashboard would inherit, with its own review. It was
+  pulled; propose such a change separately.
+- **A shared component's visual change is gated.** Gate it below lg (desktop frozen)
+  or key it on a flag only the target page sets (curated tiles are recognised by
+  `config.curated_no_data_eligible`), then open a **regular** page that uses the
+  component at ≥1024 and confirm it is unchanged.
+- **A real bug found on the way** (panels that never mounted) gets its own commit
+  and spec, and keeps main's code path for every case it does not need (tab
+  switches keep their existing refresh).
+- **No hand-built controls.** Every clickable thing is an O2 component (rule 2): an
+  expandable row is `OCollapsible`, an explainer is the `OPopover` info recipe, a
+  disclosure that shares its row is an `OButton` with `aria-expanded`, never a
+  `<button>` with hand-made focus and hover classes.
+
+### The same affordance looks the same on every page
+
+Reach for the component the rest of the app already uses for the job, so a reader
+recognises it without reading:
+
+| Job                              | Component                                                            |
+| -------------------------------- | -------------------------------------------------------------------- |
+| Refresh with "last run" age      | `ORefreshButton layout="inline" variant="outline"`                   |
+| Explain a set of numbers / chart | `OPopover` info recipe (overlay-navigation.md), label "About …"      |
+| Expandable item in a list        | `OCollapsible` rich-row recipe (core-display.md)                     |
+| View toggle in a toolbar         | `OToggleGroup` with `mobile-dropdown`                                |
+| "Stopped" / "nothing yet" screen | `OEmptyState` + `EmptyStateActionCard`, one line per affected source |
+
 ### No component fits? Build a reusable one — don't assemble raw classes
 
 When you need a UI element and **no existing component matches it**, the answer

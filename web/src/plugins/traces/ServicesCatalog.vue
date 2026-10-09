@@ -210,6 +210,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <div
+      v-if="insights.length > 0"
+      class="border-border-default bg-surface-panel rounded-surface mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 border px-3 py-1.5 text-xs"
+      data-test="services-catalog-insights"
+    >
+      <span class="text-text-heading font-semibold">{{
+        t("traces.servicesCatalog.insights.title")
+      }}</span>
+      <div
+        v-for="(entry, i) in insights"
+        :key="entry.key"
+        class="flex items-center gap-1.5"
+        :data-test="`services-catalog-insight-entry-${i}`"
+      >
+        <span class="font-medium">{{ entry.service }}</span>
+        <span class="text-text-secondary">{{
+          t(`traces.servicesCatalog.insights.signals.${entry.signal}`)
+        }}</span>
+        <span class="text-text-secondary tabular-nums">{{
+          formatInsightTime(entry.timestampUs)
+        }}</span>
+        <span class="text-text-secondary tabular-nums">{{
+          t("traces.servicesCatalog.insights.scoreAbove", {
+            percent: entry.deviationPercent.toFixed(1),
+          })
+        }}</span>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          :data-test="`services-catalog-insight-traces-${i}`"
+          @click="openInsightTraces(entry)"
+        >
+          {{ t("traces.servicesCatalog.insights.viewTraces") }}
+        </OButton>
+        <OButton
+          v-if="entry.folder"
+          variant="ghost-primary"
+          size="xs"
+          :data-test="`services-catalog-insight-charts-${i}`"
+          @click="openInsightCharts(entry)"
+        >
+          {{ t("traces.servicesCatalog.insights.viewCharts") }}
+        </OButton>
+      </div>
+    </div>
+
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
          folder-rail + table layout (panel bg + vertical separator, 230px). -->
     <div class="flex min-h-0 flex-1 max-md:flex-col">
@@ -241,9 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`services-catalog-type-${cat}`"
             >
               <div class="flex w-full flex-nowrap items-center justify-between gap-2">
-                <span class="min-w-0 flex-1 truncate text-left">{{
+                <OTruncatedText class="flex-1 text-left">{{
                   t(`traces.servicesCatalog.types.${cat}`)
-                }}</span>
+                }}</OTruncatedText>
                 <span class="flex shrink-0 items-center gap-1">
                   <span class="text-text-tertiary tabular-nums">{{ categoryCounts[cat] }}</span>
                   <!-- Unhealthy count in a filled circle, colored by the tab's
@@ -310,9 +356,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-click="(row) => handleRowClick(row)"
             @sort-change="(p) => handleSortChange(p.column)"
           >
-            <!-- Status badge -->
+            <!-- Status badge; a row with no requests has no health to report -->
             <template #cell-status="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <OTag
+                v-else
                 type="serviceStatus"
                 :value="row.status"
                 :data-test="`services-catalog-status-${row.service_name}`"
@@ -323,17 +371,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Service name via TraceServiceCell -->
             <template #cell-service_name="{ row }">
-              <TraceServiceCell
-                :item="row"
-                class="cursor-pointer"
-                :data-test="`services-catalog-service-link-${row.service_name}`"
-                @click.stop="handleRowClick(row)"
-              />
+              <div class="flex min-w-0 items-center gap-1.5">
+                <TraceServiceCell
+                  :item="row"
+                  class="min-w-0 cursor-pointer"
+                  :data-test="`services-catalog-service-link-${row.service_name}`"
+                  @click.stop="handleRowClick(row)"
+                />
+                <span
+                  v-if="row.infer_service_name && row.infer_service_system"
+                  class="text-text-secondary max-w-24 shrink-0 truncate text-xs"
+                  :title="row.infer_service_system"
+                  data-test="services-catalog-service-system"
+                  >{{ row.infer_service_system }}</span
+                >
+              </div>
             </template>
 
             <!-- Error rate with progress bar -->
             <template #cell-error_rate="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
                 :label="raw(formatPercent(row.error_rate))"
@@ -361,48 +420,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Latency / duration columns -->
             <template #cell-p50_latency_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.p50_latency_ns"
                 :max="columnMaxes.p50_latency_ns"
                 :label="raw(formatLat(row.p50_latency_ns))"
-                :tooltip="raw(row.p50_latency_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.p50_latency_ns.toLocaleString() + ' µs')"
               />
             </template>
 
             <template #cell-p95_latency_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.p95_latency_ns"
                 :max="columnMaxes.p95_latency_ns"
                 :label="raw(formatLat(row.p95_latency_ns))"
-                :tooltip="raw(row.p95_latency_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.p95_latency_ns.toLocaleString() + ' µs')"
               />
             </template>
 
             <template #cell-p99_latency_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.p99_latency_ns"
                 :max="columnMaxes.p99_latency_ns"
                 :label="raw(formatLat(row.p99_latency_ns))"
-                :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' ns')"
-                :variant="row.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
+                :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' µs')"
+                :variant="row.p99_latency_ns > P99_WARN_US ? 'warning' : 'default'"
               />
             </template>
 
             <template #cell-avg_duration_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.avg_duration_ns"
                 :max="columnMaxes.avg_duration_ns"
                 :label="raw(formatLat(row.avg_duration_ns))"
-                :tooltip="raw(row.avg_duration_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.avg_duration_ns.toLocaleString() + ' µs')"
               />
             </template>
 
             <template #cell-max_duration_ns="{ row }">
+              <span v-if="row.total_requests === 0" class="text-text-muted">—</span>
               <ServiceCatalogBarCell
+                v-else
                 :value="row.max_duration_ns"
                 :max="columnMaxes.max_duration_ns"
                 :label="raw(formatLat(row.max_duration_ns))"
-                :tooltip="raw(row.max_duration_ns.toLocaleString() + ' ns')"
+                :tooltip="raw(row.max_duration_ns.toLocaleString() + ' µs')"
               />
             </template>
           </OTable>
@@ -451,6 +520,7 @@ import {
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -460,6 +530,12 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 import { resolveTraceStream } from "@/utils/traces/streamSelection";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import searchService from "@/services/search";
+import config from "@/aws-exports";
+import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
+import { timestampToTimezoneDate } from "@/utils/timezone";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -468,6 +544,8 @@ const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
 const { getStreams } = useStreams(t);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+const store = useStore();
+const router = useRouter();
 
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
@@ -475,8 +553,16 @@ const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
 }>();
 
-// p99 > 1 second triggers the orange highlight
-const P99_WARN_NS = 1_000_000_000;
+// Latencies are in µs, so this is a p99 above 1 second.
+const P99_WARN_US = 1_000_000;
+
+const RED_MANAGED_TAG = "auto:red-insights";
+const RED_NAME_PATTERN = /^RED (rate|errors|p95) · /;
+const RED_NAME_SEPARATOR = " · ";
+// Alert names forbid "/", so the backend writes U+2215 in its place.
+const RED_NAME_SLASH = "\u2215";
+const RED_BUCKET_US = 300_000_000;
+const MAX_INSIGHTS = 5;
 
 // Stream filter — synced from traces page selected stream
 const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
@@ -556,17 +642,33 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
-/**
- * Tri-state cache for whether the current stream's schema contains the `infer_service_name` column.
- *
- * - `null`  — not yet checked for the current stream; triggers a schema API call on next load.
- * - `true`  — column exists; queries will use `infer_service_name` for service grouping.
- * - `false` — column absent; queries will fall back to `service_name` only.
- *
- * The value is reset to `null` whenever the stream filter changes so that the next
- * `loadServicesCatalog()` call re-validates against the new stream's schema.
- */
-const hasInferColumns = ref<boolean | null>(null);
+interface StreamSchemaFlags {
+  org: string;
+  stream: string;
+  hasInferColumns: boolean;
+  hasParentColumn: boolean;
+}
+const schemaFlags = ref<StreamSchemaFlags | null>(null);
+
+interface RedInsight {
+  key: string;
+  anomalyId: string;
+  signal: string;
+  stream: string;
+  service: string;
+  timestampUs: number;
+  deviationPercent: number;
+  folder?: string;
+}
+const insights = ref<RedInsight[]>([]);
+let insightsRequest = 0;
+let catalogLoad = 0;
+// The RED insights job is enterprise-only, so OSS never fetches the _anomalies schema for it.
+const redInsightsEnabled = computed(
+  () =>
+    config.isEnterprise == "true" &&
+    store.state.organizationData?.organizationSettings?.red_insights_enabled === true,
+);
 
 // OTable owns pagination internally; `currentPage` is retained only as the
 // "reset to page 1 on sort/filter change" signal the tests assert against.
@@ -609,10 +711,20 @@ const selectedServiceNode = computed(() =>
 
 const emptyGraphData = { nodes: [], edges: [] };
 
-const timeRange = computed(() => ({
-  startTime: searchObj.data.datetime.startTime,
-  endTime: searchObj.data.datetime.endTime,
-}));
+// Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+const timeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
+watch(
+  () => [
+    selectedServiceRow.value,
+    searchObj.data.datetime.type,
+    searchObj.data.datetime.relativeTimePeriod,
+    searchObj.data.datetime.startTime,
+    searchObj.data.datetime.endTime,
+  ],
+  () => {
+    if (selectedServiceRow.value) timeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
+  },
+);
 
 let currentTraceId: string | null = null;
 
@@ -650,7 +762,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
     sortable: true,
     resizable: true,
     size: 110,
-    meta: { align: "right" },
+    meta: { align: "right", headerTooltip: t("traces.servicesCatalog.columns.requestsTooltip") },
   },
   {
     id: "error_count",
@@ -955,9 +1067,202 @@ const onStreamFilterChange = (stream: SelectModelValue) => {
   emit("request:stream-change", String(stream ?? ""));
 };
 
+async function fetchSchemaFlags(org: string, stream: string): Promise<StreamSchemaFlags> {
+  try {
+    const schemaPayload = await queryClient.fetchQuery(streamSchemaQuery(org, stream, "traces"));
+    const schemaFields: any[] = schemaPayload?.schema || schemaPayload?.fields || [];
+    const has = (name: string) => schemaFields.some((f: any) => f.name === name);
+    return {
+      org,
+      stream,
+      hasInferColumns: has("infer_service_name"),
+      hasParentColumn: has("reference_parent_span_id"),
+    };
+  } catch {
+    return { org, stream, hasInferColumns: false, hasParentColumn: false };
+  }
+}
+
+function requestPredicate(hasParentColumn: boolean): string {
+  const kinds = "CAST(span_kind AS VARCHAR) IN ('2','5')";
+  if (!hasParentColumn) return `(${kinds})`;
+  // Any root counts, whatever its kind: a trace that starts at a client span still entered the system there.
+  return `(${kinds} OR (reference_parent_span_id IS NULL OR reference_parent_span_id = ''))`;
+}
+
+// Conditional aggregation, not WHERE, so services with no request spans still get a row.
+function redAggregates(pred: string): string {
+  const requests = `COUNT(*) FILTER (WHERE ${pred})`;
+  const errors = `COUNT(*) FILTER (WHERE ${pred} AND span_status = 'ERROR')`;
+  const duration = `CASE WHEN ${pred} THEN duration END`;
+  return [
+    `${requests} AS total_requests`,
+    `${errors} AS error_count`,
+    `CASE WHEN ${requests} = 0 THEN 0 ELSE CAST(${errors} AS DOUBLE) / CAST(${requests} AS DOUBLE) * 100 END AS error_rate`,
+    `AVG(${duration}) AS avg_duration_ns`,
+    `MAX(${duration}) AS max_duration_ns`,
+    `approx_percentile_cont(${duration}, 0.5) AS p50_latency_ns`,
+    `approx_percentile_cont(${duration}, 0.95) AS p95_latency_ns`,
+    `approx_percentile_cont(${duration}, 0.99) AS p99_latency_ns`,
+  ]
+    .map((item) => `  ${item}`)
+    .join(",\n");
+}
+
+function catalogSql(streamName: string, flags: StreamSchemaFlags): string {
+  const requestPred = requestPredicate(flags.hasParentColumn);
+  if (!flags.hasInferColumns) {
+    return `SELECT
+  service_name,
+${redAggregates(requestPred)}
+FROM "${streamName}"
+GROUP BY service_name
+ORDER BY total_requests DESC`;
+  }
+  // infer_service_name is only set on CLIENT and PRODUCER spans (traces/inferred.rs).
+  const inferPred = `((NULLIF(infer_service_name, '') IS NOT NULL AND CAST(span_kind AS VARCHAR) IN ('3','4')) OR ${requestPred})`;
+  return `SELECT
+  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
+  NULLIF(infer_service_name, '') AS _infer_service_name,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END AS _infer_service_system,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END AS _infer_service_type,
+  MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
+${redAggregates(inferPred)}
+FROM "${streamName}"
+GROUP BY
+  COALESCE(NULLIF(infer_service_name, ''), service_name),
+  NULLIF(infer_service_name, ''),
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END
+ORDER BY total_requests DESC`;
+}
+
+function parseRedInsight(row: any): RedInsight | null {
+  const name = String(row.anomaly_name ?? "");
+  const stream = String(row.stream_name ?? "");
+  const match = RED_NAME_PATTERN.exec(name);
+  if (!match || !stream) return null;
+  const prefix = match[0] + stream.replaceAll("/", RED_NAME_SLASH) + RED_NAME_SEPARATOR;
+  if (!name.startsWith(prefix)) return null;
+  const timestampUs = Number(row._timestamp);
+  return {
+    key: `${row.anomaly_id}:${timestampUs}`,
+    anomalyId: String(row.anomaly_id),
+    signal: match[1],
+    stream,
+    service: name.slice(prefix.length).replaceAll(RED_NAME_SLASH, "/"),
+    timestampUs,
+    deviationPercent: Number(row.deviation_percent ?? 0),
+  };
+}
+
+// Overlapping detection windows re-score a bucket, so the same anomaly can arrive twice.
+function toInsights(hits: any[]): RedInsight[] {
+  const seen = new Set<string>();
+  const out: RedInsight[] = [];
+  for (const hit of hits) {
+    const entry = parseRedInsight(hit);
+    if (!entry || seen.has(entry.key)) continue;
+    seen.add(entry.key);
+    out.push(entry);
+    if (out.length === MAX_INSIGHTS) break;
+  }
+  return out;
+}
+
+// A filter on a column the stream never wrote fails the whole query, so it is added per schema.
+function insightsSql(columns: Set<string>): string {
+  const clauses = ["stream_type = 'traces'", "anomaly_name LIKE 'RED %'", "is_anomaly = true"];
+  if (columns.has("is_absence")) clauses.push("(is_absence IS NULL OR is_absence = false)");
+  // Rate is watched in both directions; errors and latency only matter going up.
+  clauses.push(
+    columns.has("direction")
+      ? "(anomaly_name LIKE 'RED rate %' OR direction = 'above')"
+      : "anomaly_name LIKE 'RED rate %'",
+  );
+  return `SELECT _timestamp, anomaly_id, anomaly_name, stream_name, deviation_percent FROM "_anomalies" WHERE ${clauses.join(" AND ")} ORDER BY _timestamp DESC LIMIT 100`;
+}
+
+async function anomaliesColumns(org: string): Promise<Set<string> | null> {
+  try {
+    const payload = await queryClient.fetchQuery(streamSchemaQuery(org, "_anomalies", "logs"));
+    const fields: any[] = payload?.schema || payload?.fields || [];
+    const names = new Set(fields.map((f: any) => String(f.name)));
+    return names.has("anomaly_name") ? names : null;
+  } catch {
+    return null;
+  }
+}
+
+// The config list needs alert-folder permission, which the job-created folder grants only to admins.
+async function managedFolders(org: string): Promise<Map<string, string>> {
+  try {
+    const configs = await queryClient.fetchQuery(anomalyConfigsQuery(org));
+    return new Map(
+      configs
+        .filter((c: any) => (c.tags ?? []).includes(RED_MANAGED_TAG) && c.folder_id)
+        .map((c: any) => [String(c.anomaly_id), String(c.folder_id)]),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+async function loadInsights() {
+  const request = ++insightsRequest;
+  const org = searchObj.organizationIdentifier;
+  const columns = redInsightsEnabled.value ? await anomaliesColumns(org) : null;
+  if (request !== insightsRequest) return;
+  if (!columns) {
+    insights.value = [];
+    return;
+  }
+  const { start_time, end_time } = getTimeRange();
+  try {
+    const res = await searchService.search(
+      {
+        org_identifier: org,
+        query: {
+          query: { sql: insightsSql(columns), start_time, end_time, from: 0, size: 100 },
+        },
+        page_type: "logs",
+      },
+      "ui",
+    );
+    const entries = toInsights(res?.data?.hits ?? []);
+    const folders = entries.length ? await managedFolders(org) : new Map<string, string>();
+    if (request !== insightsRequest) return;
+    insights.value = entries.map((entry) => ({ ...entry, folder: folders.get(entry.anomalyId) }));
+  } catch {
+    if (request === insightsRequest) insights.value = [];
+  }
+}
+
+function formatInsightTime(timestampUs: number): string {
+  return timestampToTimezoneDate(timestampUs / 1000, store.state.timezone, "yyyy-MM-dd HH:mm");
+}
+
+function openInsightTraces(entry: RedInsight) {
+  emit("view-traces", {
+    serviceName: entry.service,
+    stream: entry.stream,
+    mode: "traces",
+    timeRange: { startTime: entry.timestampUs, endTime: entry.timestampUs + RED_BUCKET_US },
+  });
+}
+
+function openInsightCharts(entry: RedInsight) {
+  router.push({
+    name: "alertDetail",
+    params: { alert_id: entry.anomalyId },
+    query: { org_identifier: searchObj.organizationIdentifier, folder: entry.folder },
+  });
+}
+
 async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
+  void loadInsights();
 
   if (availableStreams.value.length && !availableStreams.value.includes(streamName)) {
     return;
@@ -974,63 +1279,53 @@ async function loadServicesCatalog() {
   // stay on screen while the next search runs rather than the panel emptying.
   isLoading.value = services.value.length === 0;
   isSearching.value = true;
+  const load = ++catalogLoad;
 
   const { start_time, end_time } = getTimeRange();
 
-  // Check stream schema for infer_service_name column (cache result per stream)
-  if (hasInferColumns.value === null) {
-    try {
-      const org = searchObj.organizationIdentifier;
-      const schemaPayload = await queryClient.fetchQuery(
-        streamSchemaQuery(org, streamName, "traces"),
-      );
-      const schemaFields = schemaPayload?.schema || schemaPayload?.fields || [];
-      hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
-    } catch {
-      // If schema check fails, default to false (use service_name only)
-      hasInferColumns.value = false;
+  const org = searchObj.organizationIdentifier;
+  let flags = schemaFlags.value;
+  if (!flags || flags.org !== org || flags.stream !== streamName) {
+    flags = await fetchSchemaFlags(org, streamName);
+    // A newer load owns the catalog once it started or the org or stream changed during the fetch.
+    if (
+      load !== catalogLoad ||
+      org !== searchObj.organizationIdentifier ||
+      streamName !== streamFilter.value?.replaceAll('"', "")
+    ) {
+      // A newer load that got this far owns the flags; otherwise nothing would ever clear them.
+      if (load === catalogLoad) {
+        isLoading.value = false;
+        isSearching.value = false;
+      }
+      return;
     }
+    schemaFlags.value = flags;
   }
+  const sql = catalogSql(streamName, flags);
 
-  // Build SQL: use infer_service_name when the column exists in the schema
-  const useInfer = hasInferColumns.value;
-  const sql = useInfer
-    ? `SELECT
-  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
-  NULLIF(infer_service_name, '') AS _infer_service_name,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END AS _infer_service_system,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END AS _infer_service_type,
-  MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
-  COUNT(*) AS total_requests,
-  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
-  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
-  AVG(duration) AS avg_duration_ns,
-  MAX(duration) AS max_duration_ns,
-  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
-  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
-  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-FROM "${streamName}"
-GROUP BY
-  COALESCE(NULLIF(infer_service_name, ''), service_name),
-  NULLIF(infer_service_name, ''),
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END,
-  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END
-ORDER BY total_requests DESC`
-    : `SELECT
-  service_name,
-  COUNT(*) AS total_requests,
-  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
-  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
-  AVG(duration) AS avg_duration_ns,
-  MAX(duration) AS max_duration_ns,
-  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
-  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
-  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
-FROM "${streamName}"
-GROUP BY service_name
-ORDER BY total_requests DESC`;
-
-  currentTraceId = generateTraceContext().traceId;
+  const traceId = generateTraceContext().traceId;
+  currentTraceId = traceId;
+  // Owned by this request so a superseded search cannot leak rows or real names into the current one.
+  const rows = new Map<string, ServiceRow>();
+  const realNames = new Set<string>();
+  const publish = () => {
+    // Inferred HTTP/RPC rows named like an instrumented service are its callers' view of the same calls; datastores and queues are distinct backends.
+    services.value = Array.from(rows.values()).filter(
+      (r) =>
+        !(
+          r.infer_service_name &&
+          realNames.has(r.service_name) &&
+          ["external", "rpc", "service"].includes(classifyEntity(false, r.infer_service_type))
+        ),
+    );
+  };
+  const closePanelIfRowGone = () => {
+    const selectedId = selectedServiceRow.value?.id;
+    if (selectedId && !services.value.some((r) => r.id === selectedId)) {
+      handleCloseSidePanel();
+    }
+  };
 
   await fetchQueryDataWithHttpStream(
     {
@@ -1047,17 +1342,17 @@ ORDER BY total_requests DESC`;
       type: "search",
       pageType: "traces",
       searchType: "ui",
-      traceId: currentTraceId,
+      traceId,
       org_id: searchObj.organizationIdentifier,
     },
     {
       data: (_payload: any, response: any) => {
+        if (load !== catalogLoad) return;
         if (
           response.type === "search_response_hits" ||
           response.type === "search_response_metadata"
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
-          const serviceMap = new Map(services.value.map((s) => [s.id, s]));
           for (const hit of hits) {
             const name = hit.service_name ?? "";
             const inferredName = hit._infer_service_name ?? undefined;
@@ -1069,7 +1364,7 @@ ORDER BY total_requests DESC`;
               infer_service_system: inferredSystem,
               infer_service_type: inferredType,
             });
-            serviceMap.set(id, {
+            rows.set(id, {
               id,
               service_name: name,
               total_requests: hit.total_requests ?? 0,
@@ -1086,23 +1381,29 @@ ORDER BY total_requests DESC`;
               infer_service_system: inferredSystem,
               infer_service_type: inferredType,
             });
+            if (hit._is_real_service) realNames.add(name);
           }
-          // RPC entities are kept as their own category (matching the Service
-          // Graph and the shared classifier) — never dropped, so a genuine
-          // uninstrumented gRPC backend is never hidden.
-          services.value = Array.from(serviceMap.values());
+          // Metadata arrives before any hits, so publishing it would blank the previous rows mid-refresh.
+          if (hits.length > 0) publish();
         }
       },
       error: () => {
+        if (load !== catalogLoad) return;
+        closePanelIfRowGone();
         isLoading.value = false;
         isSearching.value = false;
       },
       complete: () => {
+        if (load !== catalogLoad) return;
+        // Publishing here also clears the previous search's rows when this one returned no batches.
+        publish();
+        closePanelIfRowGone();
         isLoading.value = false;
         isSearching.value = false;
         lastRunAt.value = Date.now();
       },
       reset: () => {
+        if (load !== catalogLoad) return;
         services.value = [];
         isLoading.value = false;
         isSearching.value = false;
@@ -1128,7 +1429,6 @@ watch(
     if (newStream && newStream !== streamFilter.value) {
       streamFilter.value = newStream;
       localStorage.setItem("servicesCatalog_streamFilter", newStream);
-      hasInferColumns.value = null;
     }
   },
 );

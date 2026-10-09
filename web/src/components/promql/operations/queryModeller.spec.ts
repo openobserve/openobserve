@@ -686,4 +686,88 @@ describe("QueryModeller", () => {
       );
     });
   });
+
+  describe("parentheses around a scalar step's input", () => {
+    const render = (operations: { id: string; params: any[] }[]) =>
+      promqlRenderer.renderQuery({ metric: "x", labels: [], operations });
+
+    it("wraps a lower-precedence binary step", () => {
+      expect(
+        render([
+          { id: PromqlStepId.Addition, params: [1] },
+          { id: PromqlStepId.MultiplyBy, params: [2] },
+        ]),
+      ).toBe("(x{} + 1) * 2");
+    });
+
+    it("wraps an equal-precedence binary step", () => {
+      expect(
+        render([
+          { id: PromqlStepId.Exponent, params: [2] },
+          { id: PromqlStepId.Exponent, params: [3] },
+        ]),
+      ).toBe("(x{} ^ 2) ^ 3");
+    });
+
+    it("adds no parentheses where precedence already holds", () => {
+      expect(
+        render([
+          { id: PromqlStepId.MultiplyBy, params: [2] },
+          { id: PromqlStepId.Addition, params: [1] },
+        ]),
+      ).toBe("x{} * 2 + 1");
+      expect(
+        render([
+          { id: PromqlStepId.Sum, params: [[]] },
+          { id: PromqlStepId.MultiplyBy, params: [2] },
+        ]),
+      ).toBe("sum(x{}) * 2");
+    });
+  });
+
+  describe("a zero quantile", () => {
+    it("is rendered, not replaced by the default", () => {
+      const render = (operations: { id: string; params: any[] }[]) =>
+        promqlRenderer.renderQuery({ metric: "x", labels: [], operations });
+      expect(render([{ id: PromqlStepId.HistogramQuantile, params: [0] }])).toBe(
+        "histogram_quantile(0, x{})",
+      );
+      expect(render([{ id: PromqlStepId.QuantileOverTime, params: [0, "5m"] }])).toBe(
+        "quantile_over_time(0, x{}[5m])",
+      );
+    });
+  });
+
+  describe("clamp_max and clamp_min", () => {
+    it("render their bound", () => {
+      const render = (id: string, value: number) =>
+        promqlRenderer.renderQuery({
+          metric: "x",
+          labels: [],
+          operations: [{ id, params: [value] }],
+        });
+      expect(render(PromqlStepId.ClampMax, 100)).toBe("clamp_max(x{}, 100)");
+      expect(render(PromqlStepId.ClampMin, 0)).toBe("clamp_min(x{}, 0)");
+    });
+  });
+
+  describe("a step the picker no longer offers", () => {
+    const render = (operations: { id: string; params: any[] }[]) =>
+      promqlRenderer.renderQuery({ metric: "x", labels: [], operations });
+
+    it("still renders a saved pi step instead of dropping it", () => {
+      expect(render([{ id: "pi", params: [] }])).toBe("pi(x{})");
+      expect(promqlRenderer.getStepSpec("pi")?.name).toBe("Pi");
+    });
+
+    it("keeps precedence across a step id the catalog does not know", () => {
+      expect(
+        render([
+          { id: PromqlStepId.Addition, params: [1] },
+          { id: "no_such_step", params: [] },
+          { id: PromqlStepId.MultiplyBy, params: [2] },
+        ]),
+      ).toBe("(x{} + 1) * 2");
+    });
+  });
 });

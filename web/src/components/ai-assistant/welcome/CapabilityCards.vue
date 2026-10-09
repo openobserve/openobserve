@@ -2,6 +2,7 @@
 import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { CAPABILITY_CARDS } from "./welcomeContent";
 
 const { t } = useI18nTyped();
@@ -41,11 +42,12 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
-      <div
-        class="capability-card__title text-typography-body relative z-1 m-0 overflow-hidden text-sm leading-[1.3] font-semibold text-ellipsis whitespace-nowrap max-md:whitespace-normal"
+      <OTruncatedText
+        as="div"
+        class="capability-card__title text-typography-body relative z-1 m-0 text-sm leading-[1.3] font-semibold max-md:whitespace-normal"
       >
         {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
-      </div>
+      </OTruncatedText>
       <div
         class="capability-card__desc text-text-secondary relative z-1 mt-1.5 mb-0 text-xs leading-[1.45] max-md:hidden"
       >

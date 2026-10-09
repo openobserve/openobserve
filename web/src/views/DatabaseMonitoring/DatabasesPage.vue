@@ -77,6 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @sort-change="onSortChange"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-databases-error"
+            @action="onRefresh()"
+          />
+        </template>
         <!-- ONE toolbar row, the same one Top queries uses. The engine select
              is a dimension inside the shared filter popover rather than a bare
              full-width select, so both tabs filter the same way. -->
@@ -149,14 +157,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              what is happening to it. -->
         <template #cell-instance="{ row }">
           <div v-if="isBreakdownRow(row)" class="flex min-w-0 items-center gap-1.5">
-            <span
+            <OTruncatedText
               v-if="row.kind === 'status'"
-              class="text-2xs truncate italic"
+              class="text-2xs italic"
               :class="row.status === 'error' ? 'text-status-error-text' : 'text-text-secondary'"
               :data-test="`dbm-databases-breakdown-status-${row.status}`"
             >
               {{ statusLine(row) }}
-            </span>
+            </OTruncatedText>
             <template v-else>
               <DbmServiceList
                 v-if="row.kind === 'service' && row.name"
@@ -169,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <template v-else>
                 <OIcon name="database" size="xs" class="text-text-secondary shrink-0" />
-                <span class="text-text-heading text-2xs min-w-0 truncate font-semibold">
+                <OTruncatedText class="text-text-heading text-2xs font-semibold">
                   {{ row.name ? raw(row.name) : t("dbm.breakdown.noSchema") }}
-                </span>
+                </OTruncatedText>
               </template>
               <span class="text-text-secondary text-3xs shrink-0">
                 {{ t("dbm.breakdown.queryCount", { count: row.queryCount }, row.queryCount) }}
@@ -179,12 +187,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
           <div v-else class="flex min-w-0 flex-col gap-px">
-            <span
+            <OTruncatedText
               v-if="row.db_instance"
-              class="text-text-heading text-compact truncate font-semibold"
+              class="text-text-heading text-compact font-semibold"
             >
               {{ row.db_instance }}
-            </span>
+            </OTruncatedText>
             <!-- An engine-only fleet row: the statement feed proved this engine
                  exists but named no host. Saying so beats a blank name line. -->
             <span
@@ -195,18 +203,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dbm.databases.unnamedInstance") }}
               <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
-            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <template v-if="row.db_namespace">
                 <span class="opacity-45">·</span>
-                <span>{{ row.db_namespace }}</span>
+                <OTruncatedText>{{ row.db_namespace }}</OTruncatedText>
               </template>
               <!-- The receiver can reach it, no application asked it anything.
                    That is a finding, not an absence — an idle replica is what
                    the client-vantage list cannot show by construction. -->
               <template v-if="row.trafficless">
                 <span class="opacity-45">·</span>
-                <span class="text-text-secondary italic" data-test="dbm-databases-no-traffic">
+                <span
+                  class="text-text-secondary shrink-0 italic"
+                  data-test="dbm-databases-no-traffic"
+                >
                   {{ t("dbm.instanceMetrics.noTraffic") }}
                   <OTooltip side="bottom" :content="t('dbm.instanceMetrics.noTrafficHint')" />
                 </span>
@@ -447,7 +458,9 @@ import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

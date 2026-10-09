@@ -304,6 +304,89 @@ describe("buildAnomalyBandOptions", () => {
   });
 });
 
+describe("buildAnomalyBandOptions units", () => {
+  const tooltipOf = (over: Partial<AnomalyBandRow>, unit?: string) =>
+    buildAnomalyBandOptions([row(1000, over)], LABELS, COLORS, SPAN, null, unit).tooltip.formatter([
+      { axisValue: 1000, axisValueLabel: "00:00" },
+    ]);
+  const axisLabel = (value: number, unit?: string) =>
+    buildAnomalyBandOptions(
+      [row(1000)],
+      LABELS,
+      COLORS,
+      SPAN,
+      null,
+      unit,
+    ).yAxis.axisLabel.formatter(value);
+
+  it("labels the y-axis compactly when no unit is known", () => {
+    expect(axisLabel(939_000)).toBe("939K");
+    expect(axisLabel(1_100_000)).toBe("1.1M");
+    expect(axisLabel(12)).toBe("12");
+    expect(axisLabel(12.5)).toBe("12.5");
+  });
+
+  it("labels the y-axis in time units for microseconds", () => {
+    expect(axisLabel(800_000, "microseconds")).toBe("800ms");
+    expect(axisLabel(1_100_000, "microseconds")).toBe("1.1s");
+  });
+
+  it("moves a tick that rounds up to 1,000 into the next step", () => {
+    expect(axisLabel(999_999)).toBe("1M");
+    expect(axisLabel(999_999, "microseconds")).toBe("1s");
+  });
+
+  it("scales tooltip readings to microsecond time units", () => {
+    const html = tooltipOf(
+      { value: 938_661, lower: 801_027, upper: 1_083_743, expected: 942_385 },
+      "microseconds",
+    );
+    expect(html).toContain("Value: 939ms");
+    expect(html).toContain("Expected range: [801ms, 1.08s]");
+    expect(html).toContain("Expected: 942ms");
+  });
+
+  it("shows tooltip readings compactly when no unit is known", () => {
+    const html = tooltipOf({ value: 938_661, lower: 801_027, upper: 1_083_743, expected: 942_385 });
+    expect(html).toContain("Value: 939K");
+    expect(html).toContain("Expected range: [801K, 1.08M]");
+    expect(html).toContain("Expected: 942K");
+  });
+
+  it("widens precision after scaling when a value and its bound would read alike", () => {
+    const html = tooltipOf({ value: 100_490, lower: 90_000, upper: 100_480 });
+    expect(html).toContain("Value: 100.49K");
+    expect(html).toContain("Expected range: [90.00K, 100.48K]");
+  });
+
+  it("widens on the exact scaled value for a near-equal billions pair", () => {
+    const html = tooltipOf({ value: 1_234_567_892, lower: 1_000_000_000, upper: 1_234_567_891 });
+    expect(html).toContain("Value: 1.234567892B");
+    expect(html).toContain("Expected range: [1.000000000B, 1.234567891B]");
+  });
+
+  it("widens on the exact scaled value for a near-equal minutes pair", () => {
+    const html = tooltipOf(
+      { value: 61_000_030, lower: 50_000_000, upper: 61_000_000 },
+      "microseconds",
+    );
+    expect(html).toContain("Value: 1.0166672m");
+    expect(html).toContain("Expected range: [50.0000000s, 1.0166667m]");
+  });
+
+  it("keeps tiny readings apart instead of rounding them to zero", () => {
+    const html = tooltipOf({ value: 4e-7, lower: 1e-7, upper: 2e-7 });
+    expect(html).toContain("Value: 0.0000004");
+    expect(html).toContain("Expected range: [0.0000001, 0.0000002]");
+  });
+
+  it("moves a reading that rounds up to 1,000 into the next step", () => {
+    expect(tooltipOf({ value: 999_999.6 })).toContain("Value: 1.00M");
+    expect(tooltipOf({ value: 999_999.6 }, "microseconds")).toContain("Value: 1.00s");
+    expect(tooltipOf({ value: -999_999.6 })).toContain("Value: -1.00M");
+  });
+});
+
 describe("formatReading", () => {
   it("formats by magnitude so a value and its bounds read alike", () => {
     expect(formatReading(4060.45)).toBe("4,060");

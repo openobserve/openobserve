@@ -158,7 +158,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @commit="onNameCommit"
           />
           <div class="mt-0.5 flex items-center gap-2">
-            <span class="text-text-secondary truncate text-xs">{{ typeBreadcrumb }}</span>
+            <OTruncatedText class="text-text-secondary text-xs">{{
+              typeBreadcrumb
+            }}</OTruncatedText>
 
             <!-- Run label + switcher — read-only history only. A run is identified by
                WHEN it ran, as the runs table and the switcher menu both do; the raw id
@@ -690,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="workflow-ndv-branch-path"
                 class="text-text-secondary flex items-center justify-between gap-2 text-xs"
               >
-                <span class="truncate">{{ p.label }}</span>
+                <OTruncatedText>{{ p.label }}</OTruncatedText>
                 <span class="font-semibold" :class="{ 'text-text-body': p.count > 0 }">{{
                   p.count
                 }}</span>
@@ -782,6 +784,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";

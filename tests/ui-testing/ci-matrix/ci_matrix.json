@@ -27,7 +27,8 @@
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
       "alertDestinationsPagination.spec.js",
-      "alerts-destinations-usage.spec.js"
+      "alerts-destinations-usage.spec.js",
+      "alerts-save-query-mode.spec.js"
     ],
     "disabled": [
       {
@@ -61,7 +62,8 @@
       "dashboard-config-trellis.spec.js",
       "dashboard-config-drilldown.spec.js",
       "dashboard-config-promql.spec.js",
-      "dashboard-config-markline.spec.js"
+      "dashboard-config-markline.spec.js",
+      "dashboard-config-unit-locale.spec.js"
     ],
     "disabled": []
   },
@@ -318,7 +320,10 @@
       "ftsDefaultColumn.spec.js",
       "logsVisualizePersistence.spec.js",
       "streamNotFound.spec.js",
-      "logsRefreshCacheDropdown.spec.js"
+      "logsRefreshCacheDropdown.spec.js",
+      "logs-highlighting.spec.js",
+      "logs-search-around-multistream.spec.js",
+      "logs-default-columns.spec.js"
     ],
     "disabled": [
       {
@@ -379,7 +384,15 @@
       "metrics-promql-builder.spec.js",
       "metrics-share-deep-link.spec.js",
       "metrics-explorer-share-visualize.spec.js",
-      "metrics-explorer-stream-cache.spec.js"
+      "metrics-explorer-stream-cache.spec.js",
+      "metrics-promql-time-shift.spec.js",
+      "metrics-explorer-detail-view.spec.js",
+      "metrics-query-history.spec.js",
+      "metrics-explorer-create-alert.spec.js",
+      "metrics-explorer-drilldown.spec.js",
+      "metrics-explorer-used-in.spec.js",
+      "metrics-promql-builder-roundtrip.spec.js",
+      "metrics-promql-formula.spec.js"
     ],
     "disabled": [],
     "paths": [
@@ -502,8 +515,9 @@
       "traceQueryEditor.spec.js",
       "traceErrorFilter.spec.js",
       "traceDetails.spec.js",
+      "traceDetailsPaging.spec.js",
       "traceAdvancedFiltering.spec.js",
-      "tracesAnalyzeDimensions.spec.js",
+      "tracesTriageLoop.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",

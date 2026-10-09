@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
@@ -319,6 +319,38 @@ describe("useSearchBar Composable", () => {
 
       wrapper.vm.getSavedViews();
       // Loading state is set before the async call
+    });
+
+    it("lists only logs views: untyped ones and view_type logs", async () => {
+      mockSavedViewsGet.mockResolvedValue({
+        data: {
+          views: [
+            { view_id: "1", view_name: "legacy" },
+            { view_id: "2", view_name: "logs", view_type: "logs" },
+            { view_id: "3", view_name: "traces", view_type: "traces" },
+            { view_id: "4", view_name: "grid", view_type: "metrics_explorer" },
+          ],
+        },
+      });
+
+      wrapper.vm.getSavedViews(true);
+      await flushPromises();
+
+      const ids = searchState().searchObj.data.savedViews.map((v: any) => v.view_id);
+      expect(ids).toEqual(["1", "2"]);
+    });
+
+    it("resolves with the complete list on success and undefined on failure", async () => {
+      const views = [
+        { view_id: "1", view_name: "legacy" },
+        { view_id: "3", view_name: "traces", view_type: "traces" },
+      ];
+      mockSavedViewsGet.mockResolvedValue({ data: { views } });
+      await expect(wrapper.vm.getSavedViews(true)).resolves.toEqual(views);
+
+      mockSavedViewsGet.mockRejectedValue(new Error("boom"));
+      await expect(wrapper.vm.getSavedViews(true)).resolves.toBeUndefined();
+      expect(searchState().searchObj.loadingSavedView).toBe(false);
     });
   });
 

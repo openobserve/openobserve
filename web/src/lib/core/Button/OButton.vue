@@ -191,32 +191,32 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "focus-visible:ring-3 focus-visible:ring-white/50",
     "disabled:opacity-50",
   ].join(" "),
-  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
+  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards.
+  // The cards are fixed-light brand replicas, so each label uses its fixed
+  // `text-brand-*-foreground` token, never the theme-following text-text-inverse.
   // preview-slack: Slack green (#007a5a)
   "preview-slack": [
-    "bg-brand-slack text-text-inverse border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "bg-brand-slack text-brand-slack-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
     "enabled:hover:bg-brand-slack-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-teams: Microsoft Teams purple (#6264a7)
   "preview-teams": [
-    "bg-brand-teams text-text-inverse border-0 !rounded !h-auto !py-2 !px-4",
+    "bg-brand-teams text-brand-teams-foreground border-0 !rounded !h-auto !py-2 !px-4",
     "enabled:hover:bg-brand-teams-hover",
     "disabled:opacity-60",
   ].join(" "),
-  // preview-email: Email blue (#007bff)
+  // preview-email: Email blue (#0069d9)
   "preview-email": [
-    "bg-brand-email text-text-inverse border-0 !rounded !h-auto !py-3 !px-6",
+    "bg-brand-email text-brand-email-foreground border-0 !rounded !h-auto !py-3 !px-6",
     "enabled:hover:bg-brand-email-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-opsgenie: Opsgenie ink (dark neutral CTA). Was a scoped
   // `.opsgenie-actions button` override in DestinationPreview.vue that beat this
   // variant map from unlayered CSS; it belongs with its sibling brand variants.
-  // `text-white` (not text-text-inverse) — the preview card is a fixed-light
-  // brand replica, so the label must stay white in dark mode too.
   "preview-opsgenie": [
-    "bg-brand-email-ink text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "bg-brand-email-ink text-brand-email-ink-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
     "enabled:hover:bg-brand-email-ink-deep",
     "disabled:opacity-60",
   ].join(" "),
@@ -276,6 +276,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  "xs-grouped": "h-6.5 ps-2 pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
@@ -302,7 +303,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
   "icon-toolbar": "size-[1.875rem] shrink-0 p-0 rounded-default gap-x-0",
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
-  "icon-panel": "size-[1.625rem] shrink-0 p-0 rounded-default gap-x-0",
+  "icon-panel": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
   "sidebar-button": "h-8 w-3 shrink-0 p-0 rounded-default overflow-hidden gap-x-0",
 };

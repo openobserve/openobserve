@@ -28,6 +28,37 @@ use super::context::NotificationContext;
 
 /// Render `tpl` against `ctx`. Pure: no I/O, no clock, no DB.
 pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: bool) -> String {
+    let prepared = super::modifiers::prepare_modifiers(
+        tpl,
+        |field| {
+            let placeholder = format!("{{{field}}}");
+            let value = apply_custom_template_plain(&placeholder, ctx, is_email);
+            (value != placeholder).then_some(value)
+        },
+        |field| {
+            ctx.row_columns.iter().any(|(key, _)| key == field)
+                || ctx.context_attributes.iter().any(|(key, _)| key == field)
+                || ctx.metadata.iter().any(|(key, _)| key == field)
+                || field.strip_prefix("group.").is_some_and(|name| {
+                    ctx.group_labels
+                        .as_ref()
+                        .is_some_and(|labels| labels.contains_key(name))
+                })
+        },
+        is_email,
+    );
+    prepared.finish(apply_custom_template_plain(
+        &prepared.template,
+        ctx,
+        is_email,
+    ))
+}
+
+pub(crate) fn apply_custom_template_plain(
+    tpl: &str,
+    ctx: &NotificationContext,
+    is_email: bool,
+) -> String {
     let evaluation_timestamp = ctx.alert_trigger_time;
     let evaluation_timestamp_millis = evaluation_timestamp / 1000;
     let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
@@ -676,5 +707,191 @@ mod golden {
         // Single-column, two distinct values → deterministic encounter-order join.
         let out = apply_custom_template(r#"{"hosts":"{host}"}"#, &fixture_ctx(), false);
         assert_eq!(out, GOLDEN_HOSTS);
+    }
+
+    #[test]
+    fn custom_numeric_modifiers_and_precedence() {
+        let mut ctx = fixture_ctx();
+        ctx.alert_agg_value = "0.9123".into();
+        ctx.row_columns = vec![
+            ("bytes".into(), vec!["1048576".into()]),
+            ("rate".into(), vec!["1234567".into()]),
+            ("latency".into(), vec!["3661.9".into()]),
+            ("alert_agg_value".into(), vec!["0.5".into()]),
+            ("multi".into(), vec!["1".into(), "2".into()]),
+            ("literal|humanize".into(), vec!["raw".into()]),
+        ];
+        ctx.context_attributes.push(("rate".into(), "10".into()));
+        ctx.metadata.push(("rate".into(), "20".into()));
+        assert_eq!(
+            apply_custom_template(
+                "{alert_agg_value|humanizePercentage} {bytes|humanize1024} {rate|humanize} {latency|humanizeDuration} {multi|humanize} {literal|humanize} {rate:2}",
+                &ctx,
+                false
+            ),
+            "91.23% 1Mi 1.235M 1h 1m 1s {multi|humanize} raw 12"
+        );
+    }
+
+    #[test]
+    fn custom_modifiers_leave_fallbacks_and_data_untouched() {
+        let mut ctx = fixture_ctx();
+        ctx.context_attributes.extend([
+            ("bad".into(), "abc".into()),
+            ("nan".into(), "NaN".into()),
+            ("inf".into(), "+Inf".into()),
+            ("negative_inf".into(), "-Inf".into()),
+            ("payload".into(), "{alert_count|humanizePercentage}".into()),
+        ]);
+        ctx.rows_tpl_val = vec![Value::String("{alert_count|humanizePercentage}".into())];
+        let tpl = "{bad|humanize} {missing|humanize} {nan|humanizeDuration} {inf|humanize1024} {negative_inf|humanizePercentage} {alert_count|unknown} {alert_count|} {payload} {rows}";
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, true),
+            "{bad|humanize} {missing|humanize} NaN +Inf -Inf% {alert_count|unknown} {alert_count|} {alert_count|humanizePercentage} {alert_count|humanizePercentage}"
+        );
+    }
+
+    #[test]
+    fn custom_timestamp_and_size_modifiers() {
+        let mut ctx = fixture_ctx();
+        ctx.row_columns = vec![
+            ("bytes".into(), vec!["1536".into()]),
+            ("t".into(), vec!["1700000000123456".into()]),
+        ];
+        ctx.context_attributes = vec![("zero".into(), "0".into())];
+        assert_eq!(
+            apply_custom_template(
+                r#"{bytes|humanSize} {t|formatTimestampMicros} {zero|formatTimestamp("%Y-%m-%d %H:%M %:z", "Asia/Shanghai")}"#,
+                &ctx,
+                true
+            ),
+            "1.5 KiB 2023-11-14T22:13:20.123456Z 1970-01-01 08:00 +08:00"
+        );
+        let tpl = r#"{"date":"{zero|formatTimestamp("{host} %Y \"quoted\"", "UTC")}"}"#;
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, false),
+            r#"{"date":"{host} 1970 \"quoted\""}"#
+        );
+        let bad = r#"{zero|formatTimestamp("%Q")} {zero|formatTimestamp("%Y", "bad")} {bytes|humanSize()}"#;
+        assert_eq!(apply_custom_template(bad, &ctx, true), bad);
+    }
+
+    #[test]
+    fn custom_modifiers_use_existing_json_column_aggregation() {
+        let rows = vec![serde_json::from_value(serde_json::json!({"ratio":0.9123,"bytes":"1048576","rate":1234567,"latency":"61.9"})).unwrap(), serde_json::from_value(serde_json::json!({"ratio":"0.9123","bytes":1048576,"rate":"1234567","latency":61.9})).unwrap()];
+        let ctx = NotificationContext {
+            row_columns: super::super::context::build_row_columns(&rows),
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_custom_template(
+                "{ratio|humanizePercentage} {bytes|humanize1024} {rate|humanize} {latency|humanizeDuration}",
+                &ctx,
+                false
+            ),
+            "91.23% 1Mi 1.235M 1m 1s"
+        );
+    }
+
+    #[test]
+    fn custom_rejects_lengths_and_preserves_literal_field_names() {
+        let ctx = NotificationContext {
+            alert_count: "1536".into(),
+            row_columns: vec![
+                ("bytes".into(), vec!["1536".into()]),
+                ("metric:2".into(), vec!["1536".into()]),
+                ("literal:2|humanSize".into(), vec!["literal value".into()]),
+            ],
+            ..Default::default()
+        };
+        let tpl = "{bytes:2|humanSize} {metric:2|humanSize} {literal:2|humanSize} {literal:2|humanSize:4} {bytes|humanSize} {alert_count:1|humanize}";
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, false),
+            "{bytes:2|humanSize} 1.5 KiB literal value lite 1.5 KiB {alert_count:1|humanize}"
+        );
+    }
+
+    #[test]
+    fn custom_rejected_modifiers_preserve_exact_source() {
+        let ctx = NotificationContext {
+            row_columns: vec![
+                ("t".into(), vec!["0".into()]),
+                ("host".into(), vec!["expanded".into()]),
+                ("bad".into(), vec!["NaN".into()]),
+            ],
+            ..Default::default()
+        };
+        for tpl in [
+            r#"{t|formatTimestamp("{host} %Q")}"#,
+            r#"{t|formatTimestamp("{host} %Y", "invalid-zone")}"#,
+            r#"{missing|formatTimestamp("{host} %Y")}"#,
+            r#"{bad|formatTimestamp("{host} %Y")}"#,
+            r#"{t|formatTimestamp("{host} %Y",)}"#,
+            r#"{t|formatTimestamp({host})}"#,
+            r#"{t|unknown("{host}")}"#,
+        ] {
+            for is_email in [false, true] {
+                assert_eq!(apply_custom_template(tpl, &ctx, is_email), tpl);
+            }
+        }
+        for (tpl, expected) in [
+            (
+                r#"{t|formatTimestamp("{host} %Q")} {host}"#,
+                r#"{t|formatTimestamp("{host} %Q")} expanded"#,
+            ),
+            (
+                r#"{t|formatTimestamp("{host} %Y)} {host} {t|formatTimestamp("%Y")}"#,
+                r#"{t|formatTimestamp("expanded %Y)} expanded 1970"#,
+            ),
+            (
+                "{t|formatTimestamp fired on {host} at {t}",
+                "{t|formatTimestamp fired on expanded at 0",
+            ),
+        ] {
+            assert_eq!(apply_custom_template(tpl, &ctx, true), expected);
+        }
+    }
+
+    #[test]
+    fn custom_json_pipes_and_links_preserve_placeholders() {
+        let ctx = NotificationContext {
+            alert_count: "3".into(),
+            row_columns: vec![("bytes".into(), vec!["1536".into()])],
+            ..Default::default()
+        };
+        for prefix in ["a|b", "<https://example.com|View>"] {
+            let tpl = format!(
+                r#"{{"text":"{prefix}","count":"{{alert_count}}","size":"{{bytes|humanSize}}","invalid":"{{bytes:2|humanSize}}","unknown":"{{bytes|unknown}}"}}"#
+            );
+            let expected = serde_json::json!({"text":prefix,"count":"3","size":"1.5 KiB","invalid":"{bytes:2|humanSize}","unknown":"{bytes|unknown}"});
+            for is_email in [false, true] {
+                let rendered = apply_custom_template(&tpl, &ctx, is_email);
+                assert_eq!(serde_json::from_str::<Value>(&rendered).unwrap(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn custom_nested_json_pipes_quotes_and_newlines() {
+        let ctx = NotificationContext {
+            row_columns: vec![
+                ("ratio".into(), vec!["0.9123".into()]),
+                ("host".into(), vec!["web\"1".into()]),
+            ],
+            ..Default::default()
+        };
+        let tpl = r#"{
+            "text": "a|b \"quoted\"",
+            "nested": { "link": "<https://example.com|View>",
+                "host": "{host}", "ratio": "{ratio|humanizePercentage}",
+                "fallback": "{missing|humanSize}" }
+        }"#;
+        let rendered = apply_custom_template(tpl, &ctx, false);
+        assert_eq!(
+            serde_json::from_str::<Value>(&rendered).unwrap(),
+            serde_json::json!({
+                "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
+            })
+        );
     }
 }

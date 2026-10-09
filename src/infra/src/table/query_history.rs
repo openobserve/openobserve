@@ -1,0 +1,746 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, Func, LikeExpr, SimpleExpr},
+};
+
+use super::entity::query_history::{ActiveModel, Column, Entity, Model};
+use crate::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors,
+};
+
+/// Recording prunes the user's oldest unstarred entries beyond this many.
+pub const MAX_UNSTARRED_PER_USER: u64 = 1000;
+/// Starring past this many is refused; recording never stars, so it is unaffected.
+pub const MAX_STARRED_PER_USER: u64 = 200;
+
+/// Outcome of starring or unstarring an entry.
+pub enum SetStarred {
+    Updated(Model),
+    NotFound,
+    /// Starring would take the user past `MAX_STARRED_PER_USER`.
+    StarredCapReached,
+}
+
+/// Records a query for this org and user; the same query as their latest entry refreshes it.
+pub async fn record(
+    org_id: &str,
+    user_email: &str,
+    query: &str,
+    context: serde_json::Value,
+    now_us: i64,
+) -> Result<Model, errors::Error> {
+    let client = get_orm_client_rw().await;
+    record_with(client, org_id, user_email, query, context, now_us).await
+}
+
+pub async fn record_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+    query: &str,
+    context: serde_json::Value,
+    now_us: i64,
+) -> Result<Model, errors::Error> {
+    let txn = conn.begin().await?;
+    let latest = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email))
+        .select_only()
+        .column(Column::Id)
+        .column(Column::Query)
+        .column(Column::Starred)
+        .order_by_desc(Column::CreatedAt)
+        .order_by_desc(Column::Id)
+        .into_tuple::<(String, String, bool)>()
+        .one(&txn)
+        .await?;
+    let model = match latest {
+        Some((id, latest_query, starred)) if latest_query == query => {
+            Entity::update_many()
+                .col_expr(Column::CreatedAt, Expr::value(now_us))
+                .col_expr(Column::Context, Expr::value(context.clone()))
+                .filter(Column::Id.eq(&id))
+                .exec(&txn)
+                .await?;
+            Model {
+                id,
+                org_id: org_id.to_string(),
+                user_email: user_email.to_string(),
+                query: latest_query,
+                context,
+                starred,
+                created_at: now_us,
+            }
+        }
+        _ => {
+            let model = Model {
+                id: config::ider::uuid(),
+                org_id: org_id.to_string(),
+                user_email: user_email.to_string(),
+                query: query.to_string(),
+                context,
+                starred: false,
+                created_at: now_us,
+            };
+            Entity::insert(ActiveModel {
+                id: Set(model.id.clone()),
+                org_id: Set(model.org_id.clone()),
+                user_email: Set(model.user_email.clone()),
+                query: Set(model.query.clone()),
+                context: Set(model.context.clone()),
+                starred: Set(false),
+                created_at: Set(now_us),
+            })
+            .exec(&txn)
+            .await?;
+            prune_unstarred_over_cap(&txn, org_id, user_email).await?;
+            model
+        }
+    };
+    txn.commit().await?;
+    Ok(model)
+}
+
+/// Lists one user's entries in one org, newest first.
+pub async fn list(
+    org_id: &str,
+    user_email: &str,
+    starred: Option<bool>,
+    q: Option<&str>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_with(client, org_id, user_email, starred, q, limit, offset).await
+}
+
+pub async fn list_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+    starred: Option<bool>,
+    q: Option<&str>,
+    limit: u64,
+    offset: u64,
+) -> Result<Vec<Model>, errors::Error> {
+    let mut select = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email));
+    if let Some(starred) = starred {
+        select = select.filter(Column::Starred.eq(starred));
+    }
+    if let Some(q) = q.filter(|q| !q.is_empty()) {
+        select = select.filter(query_matches(q));
+    }
+    Ok(select
+        .order_by_desc(Column::CreatedAt)
+        .order_by_desc(Column::Id)
+        .limit(limit)
+        .offset(offset)
+        .all(conn)
+        .await?)
+}
+
+/// Deletes the user's unstarred rows from the `MAX_UNSTARRED_PER_USER + 1`-th newest onward.
+async fn prune_unstarred_over_cap<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+) -> Result<(), errors::Error> {
+    let unstarred = Condition::all()
+        .add(Column::OrgId.eq(org_id))
+        .add(Column::UserEmail.eq(user_email))
+        .add(Column::Starred.eq(false));
+    let Some((created_at, id)) = Entity::find()
+        .filter(unstarred.clone())
+        .select_only()
+        .column(Column::CreatedAt)
+        .column(Column::Id)
+        .order_by_desc(Column::CreatedAt)
+        .order_by_desc(Column::Id)
+        .offset(MAX_UNSTARRED_PER_USER)
+        .into_tuple::<(i64, String)>()
+        .one(conn)
+        .await?
+    else {
+        return Ok(());
+    };
+    let at_or_before_boundary = Condition::any().add(Column::CreatedAt.lt(created_at)).add(
+        Condition::all()
+            .add(Column::CreatedAt.eq(created_at))
+            .add(Column::Id.lte(id)),
+    );
+    Entity::delete_many()
+        .filter(unstarred)
+        .filter(at_or_before_boundary)
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+/// Case-insensitive literal substring match: `%`, `_` and `\` match only themselves.
+fn query_matches(q: &str) -> SimpleExpr {
+    let mut pattern = String::with_capacity(q.len() + 2);
+    pattern.push('%');
+    for c in q.to_lowercase().chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            pattern.push('\\');
+        }
+        pattern.push(c);
+    }
+    pattern.push('%');
+    Expr::expr(Func::lower(Expr::col(Column::Query))).like(LikeExpr::new(pattern).escape('\\'))
+}
+
+/// Stars or unstars one of the user's entries; starring is refused at `MAX_STARRED_PER_USER`.
+pub async fn set_starred(
+    org_id: &str,
+    user_email: &str,
+    id: &str,
+    starred: bool,
+) -> Result<SetStarred, errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_starred_with(client, org_id, user_email, id, starred).await
+}
+
+pub async fn set_starred_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+    id: &str,
+    starred: bool,
+) -> Result<SetStarred, errors::Error> {
+    // MySQL rows_affected counts changed rows, so a re-star reports 0; "not found" needs a lookup.
+    let Some(entry) = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email))
+        .filter(Column::Id.eq(id))
+        .one(conn)
+        .await?
+    else {
+        return Ok(SetStarred::NotFound);
+    };
+    if starred && !entry.starred {
+        let starred_count = Entity::find()
+            .filter(Column::OrgId.eq(org_id))
+            .filter(Column::UserEmail.eq(user_email))
+            .filter(Column::Starred.eq(true))
+            .count(conn)
+            .await?;
+        if starred_count >= MAX_STARRED_PER_USER {
+            return Ok(SetStarred::StarredCapReached);
+        }
+    }
+    Entity::update_many()
+        .col_expr(Column::Starred, Expr::value(starred))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(SetStarred::Updated(Model { starred, ..entry }))
+}
+
+/// Deletes one of the user's entries in the org; false when it is not theirs or does not exist.
+pub async fn delete(org_id: &str, user_email: &str, id: &str) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_with(client, org_id, user_email, id).await
+}
+
+pub async fn delete_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+    id: &str,
+) -> Result<bool, errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected > 0)
+}
+
+/// Deletes unstarred entries older than `cutoff_us` across every org and user; starred are kept.
+pub async fn delete_unstarred_before(cutoff_us: i64) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_unstarred_before_with(client, cutoff_us).await
+}
+
+pub async fn delete_unstarred_before_with<C: ConnectionTrait>(
+    conn: &C,
+    cutoff_us: i64,
+) -> Result<u64, errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::Starred.eq(false))
+        .filter(Column::CreatedAt.lt(cutoff_us))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_by_org_with(client, org_id).await
+}
+
+pub async fn delete_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<u64, errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+pub async fn delete_by_user(org_id: &str, user_email: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_by_user_with(client, org_id, user_email).await
+}
+
+pub async fn delete_by_user_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    user_email: &str,
+) -> Result<u64, errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::UserEmail.eq(user_email))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+pub async fn delete_by_email(user_email: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_by_email_with(client, user_email).await
+}
+
+pub async fn delete_by_email_with<C: ConnectionTrait>(
+    conn: &C,
+    user_email: &str,
+) -> Result<u64, errors::Error> {
+    let res = Entity::delete_many()
+        .filter(Column::UserEmail.eq(user_email))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{Database, DatabaseConnection, PaginatorTrait, Schema};
+    use serde_json::json;
+
+    use super::*;
+
+    const A: &str = "a@x.com";
+    const B: &str = "b@x.com";
+
+    async fn db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        db
+    }
+
+    fn updated(outcome: SetStarred) -> Model {
+        match outcome {
+            SetStarred::Updated(m) => m,
+            _ => panic!("expected the entry to be updated"),
+        }
+    }
+
+    async fn all(db: &DatabaseConnection, user: &str) -> Vec<Model> {
+        list_with(db, "default", user, None, None, 10_000, 0)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_same_query_as_latest_updates_time_and_context() {
+        let db = db().await;
+        let first = record_with(&db, "default", A, "up", json!({"chart": "line"}), 1)
+            .await
+            .unwrap();
+        let again = record_with(&db, "default", A, "up", json!({"chart": "bar"}), 2)
+            .await
+            .unwrap();
+        assert_eq!(again.id, first.id);
+        let rows = all(&db, A).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].created_at, 2);
+        assert_eq!(rows[0].context, json!({"chart": "bar"}));
+
+        record_with(&db, "default", A, "rate(x[5m])", json!({}), 3)
+            .await
+            .unwrap();
+        record_with(&db, "default", A, "up", json!({}), 4)
+            .await
+            .unwrap();
+        assert_eq!(all(&db, A).await.len(), 3, "only the latest entry dedupes");
+    }
+
+    #[tokio::test]
+    async fn test_dedupe_is_per_user() {
+        let db = db().await;
+        record_with(&db, "default", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+        record_with(&db, "default", B, "up", json!({}), 2)
+            .await
+            .unwrap();
+        assert_eq!(all(&db, A).await.len(), 1);
+        assert_eq!(all(&db, B).await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_cap_prunes_oldest_unstarred_and_keeps_starred() {
+        let db = db().await;
+        let starred = record_with(&db, "default", A, "starred", json!({}), 0)
+            .await
+            .unwrap();
+        set_starred_with(&db, "default", A, &starred.id, true)
+            .await
+            .unwrap();
+        for i in 1..=MAX_UNSTARRED_PER_USER as i64 {
+            record_with(&db, "default", A, &format!("q{i}"), json!({}), i)
+                .await
+                .unwrap();
+        }
+        record_with(&db, "default", B, "other user", json!({}), 1)
+            .await
+            .unwrap();
+        assert_eq!(all(&db, A).await.len(), 1001);
+
+        record_with(&db, "default", A, "q1001", json!({}), 1001)
+            .await
+            .unwrap();
+        let rows = all(&db, A).await;
+        assert_eq!(rows.len(), 1001);
+        assert!(rows.iter().all(|r| r.query != "q1"), "oldest is pruned");
+        assert!(rows.iter().any(|r| r.query == "q2"));
+        assert!(rows.iter().any(|r| r.id == starred.id && r.starred));
+        assert_eq!(all(&db, B).await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_cap_holds_when_timestamps_tie() {
+        let db = db().await;
+        for i in 0..=MAX_UNSTARRED_PER_USER {
+            record_with(&db, "default", A, &format!("q{i}"), json!({}), 7)
+                .await
+                .unwrap();
+        }
+        assert_eq!(all(&db, A).await.len() as u64, MAX_UNSTARRED_PER_USER);
+    }
+
+    #[tokio::test]
+    async fn test_list_filters_newest_first() {
+        let db = db().await;
+        let up = record_with(&db, "default", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+        record_with(&db, "default", A, "rate(http_total[5m])", json!({}), 2)
+            .await
+            .unwrap();
+        record_with(&db, "default", A, "sum(http_total)", json!({}), 3)
+            .await
+            .unwrap();
+        record_with(&db, "other", A, "http_total", json!({}), 4)
+            .await
+            .unwrap();
+        set_starred_with(&db, "default", A, &up.id, true)
+            .await
+            .unwrap();
+
+        let queries = |rows: Vec<Model>| rows.into_iter().map(|r| r.query).collect::<Vec<_>>();
+        assert_eq!(
+            queries(all(&db, A).await),
+            vec!["sum(http_total)", "rate(http_total[5m])", "up"]
+        );
+        let starred = list_with(&db, "default", A, Some(true), None, 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(queries(starred), vec!["up"]);
+        let matched = list_with(&db, "default", A, None, Some("http_total"), 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(
+            queries(matched),
+            vec!["sum(http_total)", "rate(http_total[5m])"]
+        );
+        let page = list_with(&db, "default", A, None, None, 1, 1)
+            .await
+            .unwrap();
+        assert_eq!(queries(page), vec!["rate(http_total[5m])"]);
+    }
+
+    #[tokio::test]
+    async fn test_search_is_a_case_insensitive_literal_substring() {
+        let db = db().await;
+        for (i, query) in [
+            "cpu > 50%",
+            "rate(x[50m])",
+            "a_b",
+            "axb",
+            "rate(x[5m])",
+            r"a\b",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            record_with(&db, "default", A, query, json!({}), i as i64)
+                .await
+                .unwrap();
+        }
+        let search = |q: &'static str| {
+            let db = &db;
+            async move {
+                let mut rows: Vec<String> = list_with(db, "default", A, None, Some(q), 50, 0)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|r| r.query)
+                    .collect();
+                rows.sort();
+                rows
+            }
+        };
+        assert_eq!(search("50%").await, vec!["cpu > 50%"]);
+        assert_eq!(search("a_b").await, vec!["a_b"]);
+        assert_eq!(search(r"a\b").await, vec![r"a\b"]);
+        assert_eq!(search("RATE").await, vec!["rate(x[50m])", "rate(x[5m])"]);
+    }
+
+    // Postgres LIKE is case-sensitive, so the filter must lower both sides.
+    #[test]
+    fn test_search_sql_lowers_and_escapes_on_postgres() {
+        use sea_orm::{DbBackend, QueryTrait};
+        let sql = Entity::find()
+            .filter(query_matches("50%_X"))
+            .build(DbBackend::Postgres)
+            .to_string();
+        assert!(
+            sql.contains(r#"LOWER("query") LIKE E'%50\\%\\_x%' ESCAPE E'\\'"#),
+            "{sql}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_by_id_operations_are_scoped_to_org_and_user() {
+        let db = db().await;
+        let entry = record_with(&db, "default", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            set_starred_with(&db, "default", B, &entry.id, true)
+                .await
+                .unwrap(),
+            SetStarred::NotFound
+        ));
+        assert!(matches!(
+            set_starred_with(&db, "other", A, &entry.id, true)
+                .await
+                .unwrap(),
+            SetStarred::NotFound
+        ));
+        assert!(!delete_with(&db, "default", B, &entry.id).await.unwrap());
+        assert!(!delete_with(&db, "other", A, &entry.id).await.unwrap());
+        assert!(!all(&db, A).await[0].starred);
+
+        let starred = updated(
+            set_starred_with(&db, "default", A, &entry.id, true)
+                .await
+                .unwrap(),
+        );
+        assert!(starred.starred);
+        assert!(delete_with(&db, "default", A, &entry.id).await.unwrap());
+        assert!(all(&db, A).await.is_empty());
+    }
+
+    // MySQL counts changed rows, so a no-op update reports 0; existence is a lookup.
+    #[tokio::test]
+    async fn test_starring_twice_still_returns_the_entry() {
+        let db = db().await;
+        let entry = record_with(&db, "default", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+        for _ in 0..2 {
+            let starred = updated(
+                set_starred_with(&db, "default", A, &entry.id, true)
+                    .await
+                    .unwrap(),
+            );
+            assert!(starred.starred);
+        }
+        let unstarred = updated(
+            set_starred_with(&db, "default", A, &entry.id, false)
+                .await
+                .unwrap(),
+        );
+        assert!(!unstarred.starred);
+        assert!(matches!(
+            set_starred_with(&db, "default", A, "missing", true)
+                .await
+                .unwrap(),
+            SetStarred::NotFound
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_starring_past_the_cap_is_refused_per_user() {
+        let db = db().await;
+        let mut ids = Vec::new();
+        for i in 0..=MAX_STARRED_PER_USER as i64 {
+            let entry = record_with(&db, "default", A, &format!("q{i}"), json!({}), i)
+                .await
+                .unwrap();
+            assert!(!entry.starred, "recording never stars");
+            ids.push(entry.id);
+        }
+        let (over, at_cap) = ids.split_last().unwrap();
+        for id in at_cap {
+            updated(set_starred_with(&db, "default", A, id, true).await.unwrap());
+        }
+        assert!(matches!(
+            set_starred_with(&db, "default", A, over, true)
+                .await
+                .unwrap(),
+            SetStarred::StarredCapReached
+        ));
+        assert!(
+            updated(
+                set_starred_with(&db, "default", A, &at_cap[0], true)
+                    .await
+                    .unwrap()
+            )
+            .starred,
+            "re-starring an already starred entry at the cap still succeeds"
+        );
+        let other_user = record_with(&db, "default", B, "up", json!({}), 1)
+            .await
+            .unwrap();
+        updated(
+            set_starred_with(&db, "default", B, &other_user.id, true)
+                .await
+                .unwrap(),
+        );
+        let other_org = record_with(&db, "other", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+        updated(
+            set_starred_with(&db, "other", A, &other_org.id, true)
+                .await
+                .unwrap(),
+        );
+
+        updated(
+            set_starred_with(&db, "default", A, &at_cap[0], false)
+                .await
+                .unwrap(),
+        );
+        assert!(
+            updated(
+                set_starred_with(&db, "default", A, over, true)
+                    .await
+                    .unwrap()
+            )
+            .starred,
+            "unstarring frees a slot"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dedupe_keeps_the_starred_flag() {
+        let db = db().await;
+        let entry = record_with(&db, "default", A, "up", json!({}), 1)
+            .await
+            .unwrap();
+        updated(
+            set_starred_with(&db, "default", A, &entry.id, true)
+                .await
+                .unwrap(),
+        );
+        let again = record_with(&db, "default", A, "up", json!({"chart": "bar"}), 2)
+            .await
+            .unwrap();
+        assert_eq!(again.id, entry.id);
+        assert!(again.starred);
+        assert_eq!(again.org_id, "default");
+        assert_eq!(again.user_email, A);
+        assert_eq!(again.query, "up");
+    }
+
+    #[tokio::test]
+    async fn test_retention_deletes_only_old_unstarred_rows() {
+        let db = db().await;
+        let day_us = 86_400 * 1_000_000;
+        let now = 100 * day_us;
+        let old = record_with(&db, "default", A, "old", json!({}), now - 15 * day_us)
+            .await
+            .unwrap();
+        let old_starred = record_with(
+            &db,
+            "default",
+            A,
+            "old starred",
+            json!({}),
+            now - 15 * day_us,
+        )
+        .await
+        .unwrap();
+        set_starred_with(&db, "default", A, &old_starred.id, true)
+            .await
+            .unwrap();
+        record_with(&db, "default", A, "fresh", json!({}), now)
+            .await
+            .unwrap();
+
+        let deleted = delete_unstarred_before_with(&db, now - 14 * day_us)
+            .await
+            .unwrap();
+        assert_eq!(deleted, 1);
+        let ids: Vec<String> = all(&db, A).await.into_iter().map(|r| r.id).collect();
+        assert!(!ids.contains(&old.id));
+        assert!(ids.contains(&old_starred.id));
+        assert_eq!(ids.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_by_org_user_and_email() {
+        let db = db().await;
+        for (org, user) in [("default", A), ("default", B), ("other", A), ("other", B)] {
+            record_with(&db, org, user, "up", json!({}), 1)
+                .await
+                .unwrap();
+        }
+        assert_eq!(delete_by_user_with(&db, "default", A).await.unwrap(), 1);
+        assert!(all(&db, A).await.is_empty());
+        assert_eq!(all(&db, B).await.len(), 1);
+
+        assert_eq!(delete_by_email_with(&db, B).await.unwrap(), 2);
+        assert_eq!(delete_by_org_with(&db, "other").await.unwrap(), 1);
+        assert_eq!(Entity::find().count(&db).await.unwrap(), 0);
+    }
+}

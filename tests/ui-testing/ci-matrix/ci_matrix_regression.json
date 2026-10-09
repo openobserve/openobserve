@@ -45,7 +45,9 @@
       "alerts-from-dashboard-panel.spec.js",
       "alerts-query-editor-search-endpoint.spec.js",
       "alerts-13243-prebuilt-form-reuse.spec.js",
-      "alerts-14796-destination-usage.spec.js"
+      "alerts-14796-destination-usage.spec.js",
+      "alerts-15091-alert-edit-flow.spec.js",
+      "alerts-15096-query-mode-regressions.spec.js"
     ],
     "disabled": []
   },
@@ -56,7 +58,8 @@
     "run_files": [
       "dashboard-regression.spec.js",
       "dashboard-cache-browser-refresh.spec.js",
-      "dashboard-save-validation-message-11283.spec.js"
+      "dashboard-save-validation-message-11283.spec.js",
+      "dashboard-14479-variable-name-prefix.spec.js"
     ],
     "disabled": []
   },
@@ -95,7 +98,8 @@
       "traces-11615-flame-graph-span-selection.spec.js",
       "traces-6591-explorer-state.spec.js",
       "traces-6591-details-interactions.spec.js",
-      "traces-14317-error-filter-pagination.spec.js"
+      "traces-14317-error-filter-pagination.spec.js",
+      "traces-15130-time-window-error-state.spec.js"
     ],
     "disabled": []
   },
@@ -164,7 +168,8 @@
       "pipeline-query-filter-removal.spec.js",
       "enrichment-explore-context.spec.js",
       "pipeline-default-destination-guard.spec.js",
-      "function-import-non-object-entry.spec.js"
+      "function-import-non-object-entry.spec.js",
+      "function-import-rejection-prompt.spec.js"
     ],
     "disabled": []
   },
@@ -192,8 +197,12 @@
     "actual_folder": "RegressionSet/RUM",
     "browser": "chrome",
     "run_files": [
-      "rum-11749-session-trace-correlation.spec.js"
+      "rum-11749-session-trace-correlation.spec.js",
+      "rum-product-analytics-schema-states.spec.js"
     ],
-    "disabled": []
+    "disabled": [],
+    "ingest_allowed_upto": "1440",
+    "workers": 1,
+    "_comment": "RUM bug-fix regressions. rum-product-analytics-schema-states seeds _rumdata up to ~5 hours old, right on the workflow default ZO_INGEST_ALLOWED_UPTO of 5 hours, so the shard raises it to 1440 like RUM-Analytics; workers 1 for long analytics searches."
   }
 ]

@@ -52,16 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The line itself. `min-h-6.5` holds the 26px budget the space plan
          allocates it, so a healthy page spends no more than that. -->
     <div
-      class="px-page-edge flex min-h-6.5 min-w-0 items-center justify-between gap-4 py-1"
+      class="px-page-edge flex min-h-6.5 min-w-0 items-center justify-between gap-4 py-1 max-lg:flex-wrap max-lg:gap-y-0.5"
       :class="toneSurface"
       data-test="dbm-coverage-line"
     >
       <div class="flex min-w-0 items-center gap-2">
         <span class="size-1.5 shrink-0 rounded-full" :class="dotTone" aria-hidden="true"></span>
 
-        <span class="text-2xs min-w-0 truncate" :class="toneText" data-test="dbm-coverage-text">
+        <OTruncatedText class="text-2xs" :class="toneText" data-test="dbm-coverage-text">
           {{ summary }}
-        </span>
+        </OTruncatedText>
 
         <!-- The bar is the same claim as the number beside it, drawn. It appears
              only when there IS a share to draw — and `showBar` requires a healthy
@@ -122,6 +122,7 @@ import { computed } from "vue";
 
 import DbmToolbarNote, { type DbmToolbarNoteTone } from "./DbmToolbarNote.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { Freshness, QueryStatsRow } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";

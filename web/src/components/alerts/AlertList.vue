@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
-                  <span class="truncate">{{ row.name || "--" }}</span>
+                  <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -295,33 +295,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          events originating in a button — but the row click
                          navigates elsewhere, and that is not a default worth
                          depending on another component to keep. -->
-                    <button
+                    <OTruncatedText
                       v-if="row.slo_id"
+                      as="button"
                       type="button"
-                      class="text-text-link truncate hover:underline"
+                      class="text-text-link hover:underline"
                       :aria-label="t('alerts.sloColumn') + ': ' + sloLabel(row)"
                       :data-test="`alert-list-${row.name}-slo-link`"
                       @click.stop="goToSlo(row)"
                     >
                       {{ sloLabel(row) }}
-                    </button>
+                    </OTruncatedText>
                   </template>
                 </div>
                 <!-- Composite rows have no stream/query summary: show the
                      name-resolved expression the backend supplied instead. -->
-                <span
+                <OTruncatedText
                   v-if="row.alert_type === 'Composite' && row.conditions && row.conditions !== '--'"
-                  class="text-text-secondary min-w-0 truncate text-xs"
-                  :title="row.conditions"
+                  class="text-text-secondary block text-xs"
                   :data-test="`alert-list-composite-expression-${row.alert_id}`"
                 >
                   {{ row.conditions }}
-                </span>
-                <OTooltip
-                  v-if="row.name"
-                  :content="row.name"
-                  content-class="max-w-100 whitespace-normal break-words text-xs"
-                />
+                </OTruncatedText>
               </template>
 
               <template #cell-owner="{ row }">
@@ -339,34 +334,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at_raw"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
+                />
+              </template>
+
+              <template #cell-last_satisfied_at="{ row }">
                 <span class="inline-flex min-w-0 items-center gap-1.5">
                   <span
-                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_triggered_at_raw))"
+                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_satisfied_at_raw))"
                     class="h-1.5 w-1.5 shrink-0 rounded-full"
                     :class="
-                      recencyLevel(row.last_triggered_at_raw) === 'hot'
+                      recencyLevel(row.last_satisfied_at_raw) === 'hot'
                         ? 'bg-warning-500 motion-safe:animate-pulse'
                         : 'bg-text-muted'
                     "
                   />
                   <OTimeCell
-                    :value="row.last_triggered_at_raw"
-                    unit="us"
-                    mode="relative"
+                    :value="row.last_satisfied_at"
+                    unit="iso"
+                    mode="absolute"
                     :timezone="store.state.timezone"
                     :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
-              </template>
-
-              <template #cell-last_satisfied_at="{ row }">
-                <OTimeCell
-                  :value="row.last_satisfied_at"
-                  unit="iso"
-                  mode="absolute"
-                  :timezone="store.state.timezone"
-                  :empty-label="t('alerts.anomaly.retrainNever')"
-                />
               </template>
 
               <template #cell-status="{ row }">
@@ -985,6 +980,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -1030,6 +1026,7 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     OTag,
+    OTruncatedText,
     OStatStrip,
     CompositeReferencesDrawer,
     ExportResourceDialog,
@@ -1242,9 +1239,7 @@ export default defineComponent({
     const filteredResults: Ref<any[]> = ref([]);
 
     // ── "Calm Signal" table helpers ─────────────────────────────────────────
-    // Recency of the last trigger, bucketed for the trigger-time dot + the
-    // recently-fired row highlight. Derived from the RAW microsecond timestamp
-    // (last_triggered_at_raw) so it stays correct regardless of display timezone.
+    // Keyed on firing time, not run time; raw µs keeps it timezone-independent.
     const RECENT_TRIGGER_MS = 15 * 60 * 1000; // "hot" — fired in the last 15 min
     const RECENT_TRIGGER_DAY_MS = 24 * 60 * 60 * 1000; // "warm" — within a day
     const triggerAgeMs = (rawMicros: unknown): number | null => {
@@ -1414,7 +1409,7 @@ export default defineComponent({
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
           failed += 1;
-        if (recencyLevel(r.last_triggered_at_raw) === "hot") recent += 1;
+        if (recencyLevel(r.last_satisfied_at_raw) === "hot") recent += 1;
       }
       return { active, paused, failed, recent, total: rows.length };
     });
@@ -1493,7 +1488,7 @@ export default defineComponent({
       const f = stateFilter.value;
       if (!f) return rows;
       if (f === "recent")
-        return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
+        return rows.filter((r: any) => recencyLevel(r.last_satisfied_at_raw) === "hot");
       if (f === "failed")
         return rows.filter(
           (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
@@ -1809,9 +1804,8 @@ export default defineComponent({
       last_triggered_at: anomaly.last_triggered_at
         ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
-      // Raw microsecond epoch — drives the relative-time cell, recency dot and
-      // recently-fired row highlight (timezone-independent).
       last_triggered_at_raw: anomaly.last_triggered_at ?? null,
+      last_satisfied_at_raw: anomaly.last_satisfied_at ?? null,
       last_satisfied_at: anomaly.last_satisfied_at
         ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
@@ -1945,6 +1939,7 @@ export default defineComponent({
               is_real_time: "composite",
               last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
               last_triggered_at_raw: data.last_triggered_at ?? null,
+              last_satisfied_at_raw: data.last_satisfied_at ?? null,
               last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             };
           }
@@ -1972,9 +1967,8 @@ export default defineComponent({
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
             last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
-            // Raw microsecond epoch — drives the relative-time cell, recency dot
-            // and recently-fired row highlight (timezone-independent).
             last_triggered_at_raw: data.last_triggered_at ?? null,
+            last_satisfied_at_raw: data.last_satisfied_at ?? null,
             last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
@@ -2719,6 +2713,14 @@ export default defineComponent({
       //this is done to avoid multiple api calls , when we assign the folderId before fetching it will trigger the watch and it will fetch the alerts again
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
+      // An editor save lands here, and the editor opens alerts from their detail
+      // cache (getAlertById): mark those stale, or a reopen within a minute shows
+      // the pre-save copy.
+      void queryClient.invalidateQueries({
+        queryKey: alertKeys.all(store.state.selectedOrganization.identifier),
+        predicate: (q: any) => q.queryKey[3] === "detail",
+        refetchType: "none",
+      });
       // Always fetch the latest alerts for the folder from backend
       await getAlertsFn(store, resolvedFolderId, "", true, "", true);
       // Re-apply active search/filter on the freshly fetched data

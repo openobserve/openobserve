@@ -38,6 +38,19 @@ pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
 }
 
+/// Streams O2 writes itself; a closed list, since user stream names may start with `_` too.
+pub fn is_internal_stream(stream_name: &str) -> bool {
+    is_internal_rollup_stream(stream_name)
+        || matches!(
+            stream_name,
+            super::redaction::REDACTION_EVIDENCE_STREAM
+                | super::evaluator::EVALUATOR_STREAM
+                | super::llm_scores::LLM_SCORES_STREAM
+                | super::llm_experiments::LLM_EXPERIMENT_STREAM
+                | "_anomalies"
+        )
+}
+
 /// Outcome of a single scheduled evaluation — "did it fire?".
 ///
 /// Part III of `alerts.md`. Replaces the former `TriggerDataStatus`, whose
@@ -298,6 +311,9 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
+    /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_attempted: Option<bool>,
 }
 
 impl Default for TriggerData {
@@ -337,6 +353,7 @@ impl Default for TriggerData {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         }
     }
 }
@@ -387,6 +404,7 @@ impl TriggerData {
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
+            delivery_attempted: Some(true),
         }
     }
 
@@ -1454,6 +1472,32 @@ mod tests {
     }
 
     #[test]
+    fn test_is_internal_stream() {
+        for name in [
+            "_o2_db_stats",
+            "_o2_dbm_server",
+            "_agent_signals",
+            "_redaction_evidence",
+            "_evaluator",
+            "_llm_scores",
+            "_llm_experiment",
+            "_anomalies",
+        ] {
+            assert!(is_internal_stream(name), "{name}");
+        }
+        // User streams, including `_`-prefixed ones, are kept.
+        for name in [
+            "default",
+            "_orders",
+            "_orders_logs",
+            "_anomalies_v2",
+            "_rumlog",
+        ] {
+            assert!(!is_internal_stream(name), "{name}");
+        }
+    }
+
+    #[test]
     fn test_is_internal_rollup_stream() {
         // The whole _o2_ prefix family — existing rollup streams and any
         // future sibling — plus the pre-prefix-era _agent_signals.
@@ -1661,6 +1705,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2615,6 +2660,27 @@ mod tests {
                  `init_for_reflection` sets it, and a `triggers` schema without the column is a \
                  column the quota alert rule can never fire on"
             );
+        }
+    }
+
+    #[test]
+    fn trigger_data_delivery_attempted_reads_legacy_rows_as_unknown() {
+        let json =
+            serde_json::to_value(TriggerData::default()).expect("TriggerData must serialize");
+        assert!(json.get("delivery_attempted").is_none());
+        let legacy: TriggerData =
+            serde_json::from_value(json).expect("a row written before the field must deserialize");
+        assert_eq!(legacy.delivery_attempted, None);
+
+        for attempted in [true, false] {
+            let row = TriggerData {
+                delivery_attempted: Some(attempted),
+                ..TriggerData::default()
+            };
+            let json = serde_json::to_value(&row).expect("TriggerData must serialize");
+            assert_eq!(json["delivery_attempted"], attempted);
+            let back: TriggerData = serde_json::from_value(json).expect("must read back");
+            assert_eq!(back.delivery_attempted, Some(attempted));
         }
     }
 }

@@ -21,89 +21,166 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
+        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 max-lg:w-full max-lg:flex-none max-lg:flex-wrap max-lg:gap-y-1"
       >
-        <!-- Unified View Toggle: Service Graph / Traces / Spans -->
-        <OToggleGroup
-          :model-value="searchObj.meta.searchMode"
-          @update:model-value="$emit('update:searchMode', $event)"
+        <!-- Clips its overflow so More, a shrink-0 sibling, is never clipped. -->
+        <div
+          class="flex min-w-0 flex-initial flex-row items-center gap-1.5 overflow-hidden max-lg:flex-wrap max-lg:gap-y-1 max-lg:overflow-visible"
         >
-          <OToggleGroupItem
-            data-test="traces-search-mode-spans-btn"
-            value="spans"
-            size="sm"
-            :tooltip="shouldHideToggleText ? t('traces.spansTab') : undefined"
+          <!-- Unified View Toggle: Service Graph / Traces / Spans -->
+          <OToggleGroup
+            :model-value="searchObj.meta.searchMode"
+            @update:model-value="$emit('update:searchMode', $event)"
           >
-            <template #icon-left><OIcon name="layers" size="sm" class="shrink-0" /></template>
-            <span v-if="!shouldHideToggleText">{{ t("traces.spansTab") }}</span>
-          </OToggleGroupItem>
-          <OToggleGroupItem
-            data-test="traces-search-mode-traces-btn"
-            value="traces"
-            size="sm"
-            :tooltip="shouldHideToggleText ? t('traces.tracesTab') : undefined"
-          >
-            <template #icon-left><OIcon name="account-tree" size="sm" class="shrink-0" /></template>
-            <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
-          </OToggleGroupItem>
-          <OToggleGroupItem
-            v-if="config.isEnterprise == 'true'"
-            data-test="traces-service-graph-toggle"
-            value="service-graph"
-            size="sm"
-            :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
-          >
-            <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
-            <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
-          </OToggleGroupItem>
-          <OToggleGroupItem
-            data-test="traces-search-mode-services-catalog-btn"
-            value="services-catalog"
-            size="sm"
-            :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
-          >
-            <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
-            <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
-          </OToggleGroupItem>
-        </OToggleGroup>
+            <OToggleGroupItem
+              data-test="traces-search-mode-spans-btn"
+              value="spans"
+              size="sm"
+              :tooltip="shouldHideToggleText ? t('traces.spansTab') : undefined"
+            >
+              <template #icon-left><OIcon name="layers" size="sm" class="shrink-0" /></template>
+              <span v-if="!shouldHideToggleText">{{ t("traces.spansTab") }}</span>
+            </OToggleGroupItem>
+            <OToggleGroupItem
+              data-test="traces-search-mode-traces-btn"
+              value="traces"
+              size="sm"
+              :tooltip="shouldHideToggleText ? t('traces.tracesTab') : undefined"
+            >
+              <template #icon-left
+                ><OIcon name="account-tree" size="sm" class="shrink-0"
+              /></template>
+              <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
+            </OToggleGroupItem>
+            <OToggleGroupItem
+              v-if="config.isEnterprise == 'true'"
+              data-test="traces-service-graph-toggle"
+              value="service-graph"
+              size="sm"
+              :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
+            >
+              <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+              <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
+            </OToggleGroupItem>
+            <OToggleGroupItem
+              data-test="traces-search-mode-services-catalog-btn"
+              value="services-catalog"
+              size="sm"
+              :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
+            >
+              <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
+              <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
+            </OToggleGroupItem>
+          </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog -->
-        <template
-          v-if="
-            searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog'
-          "
-        >
-          <!-- Reset: icon+text at wide widths, icon-only when narrow -->
           <OButton
-            data-test="traces-search-bar-reset-filters-btn"
+            v-if="showDrillDown"
+            data-test="insights-button"
             variant="outline"
             size="xs"
-            @click="resetFilters"
+            @click="$emit('drill-down')"
           >
             <template #icon-left>
-              <OIcon name="restart-alt" size="sm" class="shrink-0" />
+              <OIcon name="timeline" size="sm" class="shrink-0" />
             </template>
-            <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+            <span v-if="!shouldHideToggleText">{{ t("traces.drillDown") }}</span>
+            <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
           </OButton>
 
-          <div
-            class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
+          <!-- Show search controls only when not on Service Graph or Services Catalog -->
+          <template
+            v-if="
+              searchObj.meta.searchMode !== 'service-graph' &&
+              searchObj.meta.searchMode !== 'services-catalog'
+            "
           >
-            <OSwitch
-              data-test="traces-search-bar-show-metrics-toggle-btn"
-              v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs flex items-center justify-center pe-1"
-              size="lg"
-            />
-            <OIcon name="bar-chart" size="sm" class="shrink-0" />
-            <OTooltip :content="raw('RED Metrics')" />
-          </div>
-        </template>
+            <!-- Reset: icon+text at wide widths, icon-only when narrow -->
+            <OButton
+              data-test="traces-search-bar-reset-filters-btn"
+              variant="outline"
+              size="xs"
+              @click="resetFilters"
+            >
+              <template #icon-left>
+                <OIcon name="restart-alt" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+            </OButton>
+          </template>
 
-        <!-- More menu: Syntax Guide — always last.
-             Sessions + LLM Insights were removed from Traces; they now
-             live as standalone pages under AI Observability. -->
+          <OButton
+            v-if="showPinnedMetrics"
+            data-test="traces-search-bar-metrics-pinned-btn"
+            size="xs"
+            variant="outline"
+            class="gap-1.5"
+            @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
+            <OIcon name="bar-chart" size="sm" class="shrink-0" />
+            <OTooltip :content="t('traces.redMetrics')" />
+          </OButton>
+
+          <OButtonGroup
+            v-if="showPinnedSavedViews"
+            data-test="traces-search-bar-saved-views"
+            class="element-box-shadow border-button-outline-border shrink-0 border p-0"
+          >
+            <ODropdown
+              :open="savedViewsDropdownOpen"
+              side="bottom"
+              align="start"
+              @update:open="savedViewsDropdownOpen = $event"
+            >
+              <template #trigger>
+                <OButton
+                  data-test="traces-search-bar-saved-views-btn"
+                  variant="ghost"
+                  size="xs-grouped"
+                >
+                  <OIcon name="saved-search" size="sm" />
+                  <OIcon name="arrow-drop-down" size="sm" />
+                  <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
+                </OButton>
+              </template>
+              <ODropdownGroup :label="t('search.savedViewsLabel')">
+                <TracesSavedViewsMenuItems
+                  :views="sortedTracesSavedViews"
+                  :favorite-ids="favoriteIds"
+                  :loading="savedViewsLoading"
+                  @apply="applySavedView"
+                  @update="quickUpdateSavedView"
+                />
+              </ODropdownGroup>
+              <ODropdownSeparator />
+              <ODropdownItem
+                icon-left="save"
+                data-test="traces-saved-view-create"
+                @select="openSaveViewDialog"
+              >
+                {{ t("search.createSavedView") }}
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="settings"
+                data-test="traces-saved-view-manage"
+                @select="openSavedViewsDialog"
+              >
+                {{ t("search.manageSavedViews") }}
+              </ODropdownItem>
+            </ODropdown>
+            <OSeparator vertical />
+            <OButton
+              data-test="traces-search-bar-saved-views-create-btn"
+              variant="ghost"
+              size="icon-panel"
+              @click="openSaveViewDialog"
+            >
+              <OIcon name="save" size="sm" />
+              <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+            </OButton>
+          </OButtonGroup>
+        </div>
+
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -111,10 +188,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               icon-left="more-horiz"
-              class="max-lg:ms-auto"
+              class="shrink-0 max-lg:ms-auto"
             >
               {{ t("search.menuMore") }}
             </OButton>
+          </template>
+
+          <ODropdownItem
+            v-if="isSearchMode"
+            data-test="traces-search-bar-menu-metrics-btn"
+            @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <template #icon-left>
+              <span
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              >
+                <OIcon name="bar-chart" size="sm" />
+              </span>
+            </template>
+            {{ t("traces.redMetrics") }}
+            <template #icon-right>
+              <span class="ms-auto flex items-center gap-1">
+                <OSwitch
+                  v-model="searchObj.meta.showHistogram"
+                  size="md"
+                  data-test="traces-search-bar-show-metrics-toggle-btn"
+                  @click.stop
+                />
+                <OButton
+                  data-test="traces-search-bar-menu-pin-metrics-btn"
+                  variant="ghost-neutral"
+                  size="icon-sm"
+                  :title="
+                    isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('histogram')"
+                >
+                  <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </span>
+            </template>
+          </ODropdownItem>
+
+          <template v-if="isSearchMode">
+            <ODropdownSeparator />
+            <ODropdownGroup
+              :label="t('search.menuGroupSavedViews')"
+              data-test="traces-search-bar-menu-saved-views-group"
+            >
+              <template #label-action>
+                <OButton
+                  data-test="traces-search-bar-menu-pin-saved-views-btn"
+                  variant="ghost-neutral"
+                  size="icon-sm"
+                  :title="
+                    isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('savedViews')"
+                >
+                  <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </template>
+              <ODropdownItem
+                data-test="traces-search-bar-menu-list-saved-views-btn"
+                @select="openSavedViewsDialog"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="format-list-bulleted" size="sm" />
+                  </span>
+                </template>
+                {{ t("search.listSavedViews") }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="traces-search-bar-menu-create-saved-view-btn"
+                @select="openSaveViewDialog"
+              >
+                <template #icon-left>
+                  <span
+                    class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  >
+                    <OIcon name="add" size="sm" />
+                  </span>
+                </template>
+                {{ t("search.createSavedView") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
           </template>
 
           <SyntaxGuide
@@ -357,6 +519,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <ODialog
+      v-model:open="saveViewDialogOpen"
+      size="xs"
+      :title="t('search.createSavedView')"
+      :primary-button-label="t('common.save')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-loading="isSavingView"
+      @click:primary="saveAsNewView"
+      @click:secondary="saveViewDialogOpen = false"
+    >
+      <OInput
+        v-model="newViewName"
+        :label="t('search.savedViewName')"
+        autofocus
+        data-test="traces-saved-view-name-input"
+      />
+    </ODialog>
+    <SavedViewsListDialog
+      v-model:open="savedViewsDialogOpen"
+      data-test-prefix="traces-saved-views-dialog"
+      :views="tracesSavedViews"
+      :favorite-ids="favoriteIds"
+      :favorite-views="favoriteViews"
+      :loading="savedViewsLoading"
+      @apply="applySavedView"
+      @update="confirmUpdateSavedView"
+      @delete="deleteTracesSavedView"
+      @toggle-favorite="toggleFavorite"
+    />
   </div>
 </template>
 
@@ -373,7 +564,7 @@ import {
   toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -382,9 +573,14 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -392,11 +588,17 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
+import TracesSavedViewsMenuItems from "./TracesSavedViewsMenuItems.vue";
+import SavedViewsListDialog from "@/components/savedViews/SavedViewsListDialog.vue";
+import { sortSavedViews } from "@/components/savedViews/savedViewsSort";
+import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 
 import { debounce } from "lodash-es";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
+import { useToolbarPins } from "@/composables/useToolbarPins";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
 import {
@@ -408,6 +610,16 @@ import { isDatetimeChanged } from "./tracesSearchBar.utils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import savedViewsService from "@/services/saved_views";
+import {
+  savedViewsQuery,
+  createSavedViewMutation,
+  updateSavedViewMutation,
+  deleteSavedViewMutation,
+} from "@/services/saved_views.queries";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -418,14 +630,21 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OButtonGroup,
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
+    ODialog,
+    OInput,
     OSwitch,
     OSelect,
     OTooltip,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     SyntaxGuide,
+    TracesSavedViewsMenuItems,
+    SavedViewsListDialog,
   },
   emits: [
     "searchdata",
@@ -436,6 +655,8 @@ export default defineComponent({
     "onChangeTimezone",
     "service-graph-refresh",
     "services-catalog-refresh",
+    "apply-saved-view",
+    "drill-down",
   ],
   props: {
     fieldValues: {
@@ -465,7 +686,6 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
-    const btnRefreshInterval = ref(null);
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
     const queryEditorRef = ref(null);
@@ -520,12 +740,6 @@ export default defineComponent({
         );
       }
     });
-
-    const refreshTimeChange = (item) => {
-      searchObj.meta.refreshInterval = item.value;
-      searchObj.meta.refreshIntervalLabel = item.label;
-      btnRefreshInterval.value = false;
-    };
 
     watch(
       () => searchObj.data.stream.selectedStreamFields,
@@ -858,25 +1072,229 @@ export default defineComponent({
       { excludeMatchAll: true },
     );
 
+    const orgId = useOrgId();
+    const savedViewsList = useQuery(() => ({
+      ...savedViewsQuery(orgId.value),
+      enabled: !!orgId.value,
+    }));
+    const tracesSavedViews = computed(() =>
+      (savedViewsList.data.value ?? []).filter((view) => view.view_type === "traces"),
+    );
+    const savedViewsLoading = computed(() => savedViewsList.isLoading.value);
+    const { favoriteIds, favoriteViews, toggleFavorite, removeFavorite, pruneFavorites } =
+      useFavoriteSavedViews("traces");
+    // Only a successful fetch is the complete list; pruning on error would drop every favourite.
+    watch(
+      () => savedViewsList.data.value,
+      (views) => {
+        if (savedViewsList.isSuccess.value && views) {
+          pruneFavorites(views.map((view) => view.view_id));
+        }
+      },
+      { immediate: true },
+    );
+    const sortedTracesSavedViews = computed(() =>
+      sortSavedViews(tracesSavedViews.value, favoriteIds.value),
+    );
+    const createSavedView = useMutation(() => createSavedViewMutation(orgId.value));
+    const updateSavedView = useMutation(() => updateSavedViewMutation(orgId.value));
+    const deleteSavedView = useMutation(() => deleteSavedViewMutation(orgId.value));
+    const isSavingView = createSavedView.isPending;
+    const saveViewDialogOpen = ref(false);
+    const newViewName = ref("");
+    const { confirm } = useConfirmDialog();
+
+    const buildSavedViewData = () => {
+      const { datetime, stream } = searchObj.data;
+      return {
+        version: 1,
+        stream: { label: stream.selectedStream.label, value: stream.selectedStream.value },
+        editorValue: searchObj.data.editorValue,
+        datetime: {
+          type: datetime.type,
+          relativeTimePeriod: datetime.relativeTimePeriod,
+          startTime: datetime.startTime,
+          endTime: datetime.endTime,
+        },
+        searchMode: searchObj.meta.searchMode,
+        sortBy: searchObj.meta.resultGrid.sortBy,
+        sortOrder: searchObj.meta.resultGrid.sortOrder,
+        selectedFields: [...stream.selectedFields],
+      };
+    };
+
+    const errorDetail = (err) => err?.response?.data?.message ?? err?.message ?? "";
+
+    const openSaveViewDialog = () => {
+      newViewName.value = "";
+      saveViewDialogOpen.value = true;
+    };
+
+    const savedViewsDialogOpen = ref(false);
+    const openSavedViewsDialog = () => {
+      savedViewsList.refetch();
+      savedViewsDialogOpen.value = true;
+    };
+
+    const saveAsNewView = async () => {
+      const viewName = newViewName.value.trim();
+      if (!viewName) {
+        toast({ message: t("logs.searchBar.provideValidViewName"), variant: "warning" });
+        return;
+      }
+      try {
+        await createSavedView.mutateAsync({
+          view_name: viewName,
+          view_type: "traces",
+          data: buildSavedViewData(),
+        });
+        saveViewDialogOpen.value = false;
+        toast({ message: t("search.viewCreatedSuccessfully"), variant: "success" });
+      } catch (err) {
+        toast({
+          message: t("search.errorCreatingSavedViewDetail", { detail: errorDetail(err) }),
+          variant: "error",
+        });
+      }
+    };
+
+    const updateSavedViewFromCurrent = async (view) => {
+      try {
+        await updateSavedView.mutateAsync({
+          viewId: view.view_id,
+          view: { view_name: view.view_name, data: buildSavedViewData() },
+        });
+        toast({ message: t("search.viewUpdatedSuccessfully"), variant: "success" });
+      } catch (err) {
+        toast({
+          message: t("search.errorUpdatingSavedViewDetail", { detail: errorDetail(err) }),
+          variant: "error",
+        });
+      }
+    };
+
+    const savedViewsDropdownOpen = ref(false);
+    const quickUpdateSavedView = (view) => {
+      savedViewsDropdownOpen.value = false;
+      return updateSavedViewFromCurrent(view);
+    };
+
+    const confirmUpdateSavedView = async (view) => {
+      savedViewsDialogOpen.value = false;
+      const confirmed = await confirm({
+        title: t("search.updateSavedView"),
+        message: t("search.updateSavedViewConfirm"),
+      });
+      if (confirmed) await updateSavedViewFromCurrent(view);
+    };
+
+    const deleteTracesSavedView = async (view) => {
+      savedViewsDialogOpen.value = false;
+      const confirmed = await confirm({
+        title: t("search.deleteSavedView"),
+        message: t("search.deleteSavedViewConfirm"),
+      });
+      if (!confirmed) return;
+      try {
+        await deleteSavedView.mutateAsync(view.view_id);
+        removeFavorite(view.view_id);
+        toast({ message: t("search.viewDeletedSuccessfully"), variant: "success" });
+      } catch (err) {
+        toast({
+          message: t("search.errorDeletingSavedViewDetail", { detail: errorDetail(err) }),
+          variant: "error",
+        });
+      }
+    };
+
+    let applySavedViewSeq = 0;
+    const applySavedView = async (view) => {
+      const seq = ++applySavedViewSeq;
+      try {
+        // Uncached on purpose, as in logs: applying must use the server's current copy.
+        const res = await savedViewsService.getViewDetail(orgId.value, view.view_id);
+        if (seq !== applySavedViewSeq) return;
+        emit("apply-saved-view", res.data.data);
+      } catch (err) {
+        if (seq !== applySavedViewSeq) return;
+        toast({ message: t("search.errorWhileApplyingSavedView"), variant: "error" });
+      }
+    };
+
     // Responsive toolbar — shared composable tracks available left-section width
     const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+    const { lgUp } = useBreakpoint();
+    const { isPinned, togglePin } = useToolbarPins("traces");
 
-    // Traces-specific breakpoints (actual content widths + 60px buffer to fire before clipping):
-    //   Toggle items with text: ~682px total → hide at 750 (682+68 buffer)
-    //   After toggle icon-only (~459px) + reset text: hide reset text at 540
-    const shouldHideToggleText = computed(() => availableLeftWidth.value < 750);
-    const shouldHideResetText = computed(() => availableLeftWidth.value < 540);
+    const isSearchMode = computed(
+      () =>
+        searchObj.meta.searchMode !== "service-graph" &&
+        searchObj.meta.searchMode !== "services-catalog",
+    );
+
+    // Approximate rendered widths of the Traces left-section items, used only to decide whether the pinned group fits.
+    const TOOLBAR_ITEM_GAP = 6;
+    const METRICS_PINNED_WIDTH = 72 + TOOLBAR_ITEM_GAP;
+    const SAVED_VIEWS_GROUP_WIDTH = 87 + TOOLBAR_ITEM_GAP;
+    const TOGGLE_WIDTH = { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } };
+    const DRILL_DOWN_WIDTH = { text: 97, icon: 36 };
+    const RESET_WIDTH = { text: 72, icon: 36 };
+    const MORE_WIDTH = 70;
+
+    const metricsPinned = computed(() => isSearchMode.value && isPinned("histogram"));
+    const savedViewsPinned = computed(() => isSearchMode.value && isPinned("savedViews"));
+    const pinnedGroupWidth = computed(
+      () =>
+        (metricsPinned.value ? METRICS_PINNED_WIDTH : 0) +
+        (savedViewsPinned.value ? SAVED_VIEWS_GROUP_WIDTH : 0),
+    );
+
+    // Traces-specific breakpoints, raised by the pinned group so labels shrink before it falls back into More.
+    const shouldHideToggleText = computed(
+      () => availableLeftWidth.value < 750 + pinnedGroupWidth.value,
+    );
+    const shouldHideResetText = computed(
+      () => availableLeftWidth.value < 540 + pinnedGroupWidth.value,
+    );
+
+    // Only while Index renders SearchResult with its header, since the click is routed to it.
+    const showDrillDown = computed(
+      () =>
+        isSearchMode.value &&
+        !searchObj.loadingStream &&
+        !searchObj.loading &&
+        searchObj.data.stream.streamLists.length > 0 &&
+        !!searchObj.data.stream.selectedStream?.value &&
+        !searchObj.data.errorMsg?.trim()?.length &&
+        !!searchObj.searchApplied,
+    );
+
+    const leftBaseWidth = computed(() => {
+      const textKey = shouldHideToggleText.value ? "icon" : "text";
+      const toggle = config.isEnterprise == "true" ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
+      const widths = [toggle[textKey], MORE_WIDTH];
+      if (showDrillDown.value) widths.push(DRILL_DOWN_WIDTH[textKey]);
+      if (isSearchMode.value) widths.push(RESET_WIDTH[shouldHideResetText.value ? "icon" : "text"]);
+      return widths.reduce((sum, w) => sum + w, 0) + (widths.length - 1) * TOOLBAR_ITEM_GAP;
+    });
+
+    // Below lg the bar wraps and availableLeftWidth reads ~0, so pinned items need no budget there.
+    const pinnedFit = computed(() => {
+      if (!lgUp.value) return { metrics: metricsPinned.value, savedViews: savedViewsPinned.value };
+      let budget = availableLeftWidth.value - leftBaseWidth.value;
+      const metrics = metricsPinned.value && budget >= METRICS_PINNED_WIDTH;
+      if (metrics) budget -= METRICS_PINNED_WIDTH;
+      return { metrics, savedViews: savedViewsPinned.value && budget >= SAVED_VIEWS_GROUP_WIDTH };
+    });
+    const showPinnedMetrics = computed(() => pinnedFit.value.metrics);
+    const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
 
     return {
       t,
-      raw,
       router,
       store,
       searchObj,
       queryEditorRef,
-      btnRefreshInterval,
-      refreshTimes: searchObj.config.refreshTimes,
-      refreshTimeChange,
       onQueryEditorFocus,
       onQueryEditorBlur,
       updateQueryValue,
@@ -906,6 +1324,31 @@ export default defineComponent({
       toolbarRightRef,
       shouldHideToggleText,
       shouldHideResetText,
+      showDrillDown,
+      isSearchMode,
+      isPinned,
+      togglePin,
+      showPinnedMetrics,
+      showPinnedSavedViews,
+      tracesSavedViews,
+      isSavingView,
+      saveViewDialogOpen,
+      newViewName,
+      openSaveViewDialog,
+      savedViewsDialogOpen,
+      openSavedViewsDialog,
+      saveAsNewView,
+      updateSavedViewFromCurrent,
+      deleteTracesSavedView,
+      applySavedView,
+      savedViewsLoading,
+      favoriteIds,
+      favoriteViews,
+      toggleFavorite,
+      sortedTracesSavedViews,
+      savedViewsDropdownOpen,
+      quickUpdateSavedView,
+      confirmUpdateSavedView,
     };
   },
   computed: {

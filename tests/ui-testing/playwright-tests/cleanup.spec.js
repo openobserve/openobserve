@@ -90,6 +90,20 @@ test.describe("Pre-Test Cleanup", () => {
     // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
     await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
+    // The logs coverage specs for #15086 each seed their own log stream, suffixed per run
+    // so parallel workers cannot collide — which also means nothing ever reuses them.
+    // logs-highlighting, logs-default-columns and logs-search-around-multistream.
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^e2e_hl_filters_/,
+        /^e2e_svc_cols_/,
+        /^e2e_svc_none_/,
+        /^e2e_sa_one_/,
+        /^e2e_sa_two_/,
+      ],
+      ['default'],
+    );
+
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -208,6 +222,7 @@ test.describe("Pre-Test Cleanup", () => {
       /^fn_export_/,                 // single, bulk and narrow-viewport export fixtures
       /^fn_clash_/,                  // seeded functions used to provoke a name clash
       /^fn_regr_nonobj_/,            // non-object entry repaired by the inline fixers
+      /^fn_regr_reject_/,            // rejections that cannot be fixed inline (#15069)
       /^fn_bundle_/,                 // pipeline-function-bundling.spec.js (bundled functions and their _N copies)
       /^ui_auto_pfb_/                // pipeline-function-bundling-rbac.spec.js (enterprise shard)
     ];

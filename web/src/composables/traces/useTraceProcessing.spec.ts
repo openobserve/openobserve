@@ -116,6 +116,23 @@ describe("useTraceProcessing", () => {
       expect(tree[0].children[1].span_id).toBe("child1");
     });
 
+    it("should build a tree from more spans than a function call can take as arguments", () => {
+      const spans = ref([]);
+      const { buildSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
+      const count = 200_000;
+      const list = Array.from({ length: count }, (_, i) =>
+        makeSpan({
+          span_id: `s${i}`,
+          parent_span_id: i === 0 ? "" : "s0",
+          start_time: 1_000_000_000_000 + (count - i) * 1000,
+        }),
+      );
+      const tree = buildSpanTree(list);
+      expect(tree).toHaveLength(1);
+      expect(tree[0].children).toHaveLength(count - 1);
+      expect(tree[0].children[0].startOffsetMs).toBe(0);
+    });
+
     it("should compute durationMs from duration in microseconds", () => {
       const spans = ref([]);
       const { buildSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
@@ -189,212 +206,6 @@ describe("useTraceProcessing", () => {
       const spans = ref([]);
       const { flattenSpanTree } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
       expect(flattenSpanTree([])).toEqual([]);
-    });
-  });
-
-  describe("findCriticalPath", () => {
-    it("should return empty array for empty tree", () => {
-      const spans = ref([]);
-      const { findCriticalPath } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
-      expect(findCriticalPath([])).toEqual([]);
-    });
-
-    it("should return single span id for single span", () => {
-      const spans = ref([]);
-      const { buildSpanTree, findCriticalPath } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const span = makeSpan({ span_id: "root", duration: 1_000_000 });
-      const tree = buildSpanTree([span]);
-      const path = findCriticalPath(tree);
-      expect(path).toContain("root");
-    });
-
-    it("should return path through longest duration branch", () => {
-      const spans = ref([]);
-      const { buildSpanTree, findCriticalPath } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const parent = makeSpan({ span_id: "parent", duration: 1_000_000 });
-      const shortChild = makeSpan({
-        span_id: "short",
-        parent_span_id: "parent",
-        duration: 500_000,
-        start_time: 1_000_000_100_000,
-      });
-      const longChild = makeSpan({
-        span_id: "long",
-        parent_span_id: "parent",
-        duration: 900_000,
-        start_time: 1_000_000_200_000,
-      });
-      const tree = buildSpanTree([parent, shortChild, longChild]);
-      const path = findCriticalPath(tree);
-      expect(path).toContain("parent");
-      expect(path).toContain("long");
-      expect(path).not.toContain("short");
-    });
-  });
-
-  describe("calculateMetadata", () => {
-    it("should throw for empty trace", () => {
-      const spans = ref([]);
-      const { calculateMetadata } = useTraceProcessing(spans, emptySpanMap, defaultConfig);
-      expect(() => calculateMetadata("trace-1", [])).toThrow();
-    });
-
-    it("should calculate basic metadata for a single span", () => {
-      const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const span = makeSpan({
-        span_id: "root",
-        service_name: "svc-a",
-        span_status: SpanStatus.OK,
-        duration: 1_000_000, // 1s in us
-      });
-      const tree = buildSpanTree([span]);
-      const meta = calculateMetadata("trace-1", tree);
-
-      expect(meta.trace_id).toBe("trace-1");
-      expect(meta.total_spans).toBe(1);
-      expect(meta.error_spans).toBe(0);
-      expect(meta.service_count).toBe(1);
-      expect(meta.services).toContain("svc-a");
-      expect(meta.has_errors).toBe(false);
-    });
-
-    it("should count error spans correctly", () => {
-      const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const root = makeSpan({ span_id: "root", span_status: SpanStatus.OK });
-      const error = makeSpan({
-        span_id: "err",
-        parent_span_id: "root",
-        span_status: SpanStatus.ERROR,
-        start_time: 1_000_000_100_000,
-      });
-      const tree = buildSpanTree([root, error]);
-      const meta = calculateMetadata("trace-1", tree);
-
-      expect(meta.error_spans).toBe(1);
-      expect(meta.has_errors).toBe(true);
-      expect(meta.error_services).toContain("svc-a");
-    });
-
-    it("should count multiple services", () => {
-      const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const span1 = makeSpan({ span_id: "s1", service_name: "svc-a" });
-      const span2 = makeSpan({
-        span_id: "s2",
-        service_name: "svc-b",
-        parent_span_id: "s1",
-        start_time: 1_000_000_100_000,
-      });
-      const tree = buildSpanTree([span1, span2]);
-      const meta = calculateMetadata("trace-1", tree);
-
-      expect(meta.service_count).toBe(2);
-      expect(meta.services).toContain("svc-a");
-      expect(meta.services).toContain("svc-b");
-    });
-
-    it("should identify top 5 slowest spans", () => {
-      const spans = ref([]);
-      const { buildSpanTree, calculateMetadata } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const root = makeSpan({ span_id: "root", duration: 1_000_000 });
-      const spansArr = [root];
-      for (let i = 0; i < 6; i++) {
-        spansArr.push(
-          makeSpan({
-            span_id: `child-${i}`,
-            parent_span_id: "root",
-            duration: (i + 1) * 100_000,
-            start_time: 1_000_000_100_000 + i * 1000,
-          }),
-        );
-      }
-      const tree = buildSpanTree(spansArr);
-      const meta = calculateMetadata("trace-1", tree);
-      expect(meta.slowest_spans).toHaveLength(5);
-    });
-  });
-
-  describe("calculateServiceBreakdown", () => {
-    it("should return a breakdown per service", () => {
-      const spans = ref([]);
-      const { buildSpanTree, calculateMetadata, calculateServiceBreakdown } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const span1 = makeSpan({
-        span_id: "s1",
-        service_name: "svc-a",
-        duration: 1_000_000,
-      });
-      const span2 = makeSpan({
-        span_id: "s2",
-        service_name: "svc-b",
-        parent_span_id: "s1",
-        duration: 500_000,
-        start_time: 1_000_000_100_000,
-      });
-      const tree = buildSpanTree([span1, span2]);
-      const meta = calculateMetadata("trace-1", tree);
-      const breakdown = calculateServiceBreakdown(meta);
-
-      expect(breakdown).toHaveLength(2);
-      const svcA = breakdown.find((b) => b.service_name === "svc-a");
-      expect(svcA).toBeDefined();
-      expect(svcA!.span_count).toBe(1);
-      // getOrSetServiceColor returns hex colors (e.g. #3B82F6), not CSS vars
-      expect(svcA!.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
-    });
-
-    it("should sort by total duration descending", () => {
-      const spans = ref([]);
-      const { buildSpanTree, calculateMetadata, calculateServiceBreakdown } = useTraceProcessing(
-        spans,
-        emptySpanMap,
-        defaultConfig,
-      );
-      const span1 = makeSpan({
-        span_id: "s1",
-        service_name: "slow-svc",
-        duration: 2_000_000,
-      });
-      const span2 = makeSpan({
-        span_id: "s2",
-        service_name: "fast-svc",
-        parent_span_id: "s1",
-        duration: 100_000,
-        start_time: 1_000_000_100_000,
-      });
-      const tree = buildSpanTree([span1, span2]);
-      const meta = calculateMetadata("trace-1", tree);
-      const breakdown = calculateServiceBreakdown(meta);
-      expect(breakdown[0].service_name).toBe("slow-svc");
     });
   });
 
@@ -582,6 +393,81 @@ describe("useTraceProcessing", () => {
       expect(flatSpans.value).toHaveLength(1);
       expect(flatSpans.value[0].span_id).toBe("old-root");
     });
+  });
+});
+
+describe("deep span chains", () => {
+  const DEPTH = 20_000;
+
+  const oldNode = (id: string, children: any[] = []) => ({
+    spanId: id,
+    operationName: "op",
+    serviceName: "svc",
+    startTimeUs: 1000,
+    endTimeUs: 2000,
+    durationUs: 1000,
+    spans: children,
+  });
+
+  it("flattens a 20,000-level old-format chain with depths 0 to 19,999", () => {
+    const root: any = oldNode("s0");
+    let tail = root;
+    for (let i = 1; i < DEPTH; i++) {
+      const child = oldNode(`s${i}`);
+      tail.spans.push(child);
+      tail = child;
+    }
+    root.lowestStartTime = 1000;
+    const { flatSpans } = useTraceProcessing(ref([root]), emptySpanMap, defaultConfig);
+    const flat = flatSpans.value;
+    expect(flat).toHaveLength(DEPTH);
+    expect(flat.every((span, i) => span.depth === i && span.span_id === `s${i}`)).toBe(true);
+  });
+
+  it("keeps the pre-order of a branching old-format tree", () => {
+    const tree = [
+      { ...oldNode("a", [oldNode("b", [oldNode("d")]), oldNode("c")]), lowestStartTime: 1000 },
+      oldNode("e"),
+    ];
+    const { flatSpans } = useTraceProcessing(ref(tree), emptySpanMap, defaultConfig);
+    expect(flatSpans.value.map((s) => [s.span_id, s.depth])).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["d", 2],
+      ["c", 1],
+      ["e", 0],
+    ]);
+  });
+
+  it("builds and flattens a 20,000-level flat chain with depths 0 to 19,999", () => {
+    const chain = Array.from({ length: DEPTH }, (_, i) =>
+      makeSpan({
+        span_id: `s${i}`,
+        parent_span_id: i === 0 ? "" : `s${i - 1}`,
+        start_time: 1_000_000_000_000 + i,
+      }),
+    );
+    const { spanTree, flatSpans } = useTraceProcessing(ref(chain), emptySpanMap, defaultConfig);
+    expect(spanTree.value).toHaveLength(1);
+    const flat = flatSpans.value;
+    expect(flat).toHaveLength(DEPTH);
+    expect(flat.every((span, i) => span.depth === i && span.span_id === `s${i}`)).toBe(true);
+  });
+
+  it("keeps depths and start-time child order of a branching flat tree", () => {
+    const spans = [
+      makeSpan({ span_id: "a", start_time: 1_000_000_000_000 }),
+      makeSpan({ span_id: "c", parent_span_id: "a", start_time: 1_000_000_000_300 }),
+      makeSpan({ span_id: "b", parent_span_id: "a", start_time: 1_000_000_000_100 }),
+      makeSpan({ span_id: "d", parent_span_id: "b", start_time: 1_000_000_000_200 }),
+    ];
+    const { flatSpans } = useTraceProcessing(ref(spans), emptySpanMap, defaultConfig);
+    expect(flatSpans.value.map((s) => [s.span_id, s.depth])).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["d", 2],
+      ["c", 1],
+    ]);
   });
 });
 

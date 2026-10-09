@@ -155,12 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <h2
                 v-if="isSectionHeader(item)"
                 class="flex h-full items-end"
-                :title="item.title"
                 :data-test="`dashboard-section-header-${item.id}`"
               >
                 <!-- truncate has to sit on an inline child: on the flex parent the text
                      is an anonymous flex item and never picks up the ellipsis. -->
-                <span class="truncate">{{ item.title }}</span>
+                <OTruncatedText>{{ item.title }}</OTruncatedText>
               </h2>
               <!-- Off-screen panels render this lightweight placeholder; the
                    real panel mounts only when it comes near the viewport.
@@ -345,6 +344,7 @@ import "gridstack/dist/gridstack.min.css";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -432,6 +432,7 @@ export default defineComponent({
     ViewPanel,
     TabList,
     ODialog,
+    OTruncatedText,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();
@@ -1185,6 +1186,22 @@ export default defineComponent({
           await nextTick();
           await refreshGridStack();
         }
+      },
+    );
+
+    watch(
+      () => ({
+        tabId: selectedTabId.value,
+        ids: panels.value
+          .map((panel: any) => panel.id)
+          .sort()
+          .join(","),
+      }),
+      async (next, previous) => {
+        // A panel joining a built grid never becomes a widget; tab switches and empty grids refresh above.
+        if (!previous?.ids || next.ids === previous.ids || next.tabId !== previous.tabId) return;
+        await nextTick();
+        await refreshGridStack();
       },
     );
 

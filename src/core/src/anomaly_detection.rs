@@ -139,6 +139,10 @@ const ALERT_DIRECTIONS: [&str; 3] = ["both", "above", "below"];
 /// Each window bucket is re-fetched as look-back on every run, so the window is capped in time.
 const MAX_ALERT_WINDOW_SECONDS: i64 = 86_400;
 
+/// Longest destination response body kept in the alert-history error column.
+#[cfg(feature = "enterprise")]
+const REJECTION_BODY_MAX_CHARS: usize = 512;
+
 #[cfg(feature = "enterprise")]
 type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
 
@@ -1438,7 +1442,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         if !outcome.claim_lost && !outcome.ineligible {
             let record = AnomalyRunRecord {
                 status: anomaly_run_status(&outcome),
-                error: None,
+                error: outcome.notify_error.clone(),
                 success_response: Some(
                     serde_json::json!({ "anomalies_found": outcome.anomaly_count }).to_string(),
                 ),
@@ -1474,6 +1478,8 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
             "message": message,
             "claim_lost": outcome.claim_lost,
             "ineligible": outcome.ineligible,
+            "notify_failed": outcome.notify_failed,
+            "notify_error": outcome.notify_error,
             "anomaly_id": anomaly_id,
             "anomalies_found": result.anomaly_count,
             "points_scored": result.data_points_processed,
@@ -3119,8 +3125,10 @@ fn anomaly_alert_payload(
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit. Returns `Ok(true)` only when the webhook was actually
-/// sent; a skip returns `Ok(false)` so the caller never arms a cooldown on nothing.
+/// that recovery messages inherit. Returns `Ok(true)` only when the webhook accepted the
+/// send (2xx); a skip returns `Ok(false)` and a non-2xx answer is a `DestinationRejected`
+/// error, so the caller never arms a cooldown, or records a run as delivered, on a send
+/// nobody actually received, and the history row can name the rejection.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
@@ -3161,10 +3169,13 @@ pub async fn send_anomaly_alert(
     let payload = anomaly_alert_payload(&ctx, &message, &link);
 
     // SSRF protection: validate the URL (incl. DNS) before sending and build the
-    // client through `build_safe_client` so redirects + connect-time resolution
+    // client through `build_safe_destination_client` so redirects + connect-time resolution
     // are re-validated.
     if let Err(e) =
-        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&endpoint.url).await
+        common::utils::ssrf_guard::SsrfGuard::validate_destination_url_with_config_async(
+            &endpoint.url,
+        )
+        .await
     {
         return Err(anyhow::anyhow!("Webhook URL blocked by SSRF guard: {e}"));
     }
@@ -3173,7 +3184,7 @@ pub async fn send_anomaly_alert(
     } else {
         reqwest::Client::builder()
     };
-    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_destination_client(builder)?;
 
     let mut req = client.post(&endpoint.url);
 
@@ -3192,6 +3203,26 @@ pub async fn send_anomaly_alert(
         .await?;
 
     let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        log::warn!(
+            "[anomaly_detection {}] destination '{}' rejected the alert: status={}, body={}",
+            anomaly_id,
+            destination_id,
+            status,
+            body
+        );
+        // The body lands in the alert-history error column, so a long HTML error page is cut.
+        let body = body.chars().take(REJECTION_BODY_MAX_CHARS).collect();
+        return Err(
+            o2_enterprise::enterprise::anomaly_detection::query_executor::DestinationRejected {
+                status: status.as_u16(),
+                body,
+            }
+            .into(),
+        );
+    }
+
     log::info!(
         "[anomaly_detection {}] alert sent to '{}': status={}",
         anomaly_id,
@@ -6482,5 +6513,61 @@ mod tests {
         );
         // An untagged request yields no role group at all, which is the bug this pins.
         assert_ne!(RoleGroup::from(SearchEventType::UI), RoleGroup::Background);
+    }
+
+    #[test]
+    fn red_insights_templates_pass_create_validation() {
+        use crate::traces::red_insights::{RedSignal, StreamColumns, template};
+
+        for has_parent in [true, false] {
+            let cols = StreamColumns {
+                has_parent,
+                has_status: true,
+                has_duration: true,
+            };
+            for (stream, service) in [
+                ("default", "checkout"),
+                ("a\"b", "o'brien"),
+                ("t/x", "api/v1"),
+            ] {
+                for signal in RedSignal::ALL {
+                    let req = template(stream, service, signal, &cols)
+                        .expect("every signal is eligible here")
+                        .into_request("default");
+                    validate_config_request(&req)
+                        .unwrap_or_else(|e| panic!("{signal:?} on {stream}/{service}: {e}"));
+                    config::meta::alerts::tags::normalize_tags(&req.tags).unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn red_insights_skips_exactly_the_rate_detectors_g4_rejects() {
+        use crate::traces::red_insights::{RedSignal, StreamColumns, template};
+
+        let cols = StreamColumns {
+            has_parent: true,
+            has_status: true,
+            has_duration: true,
+        };
+        for word in ERROR_VOCABULARY {
+            let stream = format!("app-{word}");
+            assert!(
+                template(&stream, "svc", RedSignal::Rate, &cols).is_none(),
+                "{stream}"
+            );
+            let mut req = template("default", "svc", RedSignal::Rate, &cols)
+                .unwrap()
+                .into_request("default");
+            req.stream_name = stream.clone();
+            assert!(validate_config_request(&req).is_err(), "{stream}");
+            for signal in [RedSignal::ErrorRatio, RedSignal::P95Latency] {
+                let req = template(&stream, "svc", signal, &cols)
+                    .unwrap()
+                    .into_request("default");
+                validate_config_request(&req).unwrap_or_else(|e| panic!("{signal:?}: {e}"));
+            }
+        }
     }
 }

@@ -97,6 +97,7 @@ use crate::{
         openobserve_api_search::promql::labels_get,
         openobserve_api_search::promql::label_values,
         openobserve_api_search::promql::format_query_get,
+        openobserve_api_search::promql::parse_tree,
         enrichment_table::save_enrichment_table,
         enrichment_table::save_enrichment_table_from_url,
         rum::ingest::log,
@@ -114,6 +115,10 @@ use crate::{
         openobserve_api_search::search::saved_view::get_view,
         openobserve_api_search::search::saved_view::get_views,
         openobserve_api_search::search::saved_view::update_view,
+        openobserve_api_management::request::query_history::record,
+        openobserve_api_management::request::query_history::list,
+        openobserve_api_management::request::query_history::star,
+        openobserve_api_management::request::query_history::delete,
         openobserve_api_management::request::folders::delete_folder,
         openobserve_api_management::request::folders::create_folder,
         openobserve_api_management::request::folders::list_folders,
@@ -276,6 +281,7 @@ use crate::{
         openobserve_api_management::request::alerts::deduplication::preview_semantic_groups_diff,
         openobserve_api_management::request::alerts::deduplication::save_semantic_groups,
         openobserve_api_management::request::alerts::dedup_stats::get_dedup_summary,
+        openobserve_api_management::request::metrics_usage::get_metric_usage,
         openobserve_api_management::request::slos::list_slos,
         openobserve_api_management::request::slos::get_slo,
         openobserve_api_management::request::slos::create_slo,
@@ -324,6 +330,7 @@ use crate::{
         rum_analytics::get_named_event,
         rum_analytics::update_named_event,
         rum_analytics::delete_named_event,
+        rum_analytics::deleted_event_names,
         rum_analytics::named_event_funnels,
         rum_analytics::list_funnels,
         rum_analytics::create_funnel,
@@ -470,6 +477,9 @@ use crate::{
             meta::saved_view::DeleteViewResponse,
             meta::saved_view::CreateViewResponse,
             meta::saved_view::UpdateViewRequest,
+            openobserve_api_management::request::query_history::QueryHistoryRequest,
+            openobserve_api_management::request::query_history::QueryHistoryStarRequest,
+            openobserve_api_management::request::query_history::QueryHistoryEntry,
             meta::user::UpdateUser,
             meta::user::UserRoleRequest,
             meta::user::PostUserRequest,
@@ -546,6 +556,8 @@ use crate::{
             openobserve_core::rum_pa::NamedEventList,
             openobserve_core::rum_pa::SavedFunnelList,
             openobserve_core::rum_pa::FunnelRefList,
+            openobserve_core::rum_pa::NamedEventRef,
+            openobserve_core::rum_pa::NamedEventRefList,
             openobserve_core::rum_pa::Current,
             openobserve_core::rum_pa::RumPaErrorBody,
          ),
@@ -558,6 +570,7 @@ use crate::{
         (name = "Dashboards", description = "Dashboard operations"),
         (name = "Search", description = "Search/Query operations"),
         (name = "Saved Views", description = "Collection of saved search views for easy retrieval"),
+        (name = "Query History", description = "The caller's own query history"),
         (name = "Alerts", description = "Alerts retrieval & management operations"),
         (name = "Incidents", description = "Alert incident correlation & management operations"),
         (name = "AI", description = "AI agent chat analysis and SRE agent operations (enterprise)"),
@@ -874,6 +887,25 @@ mod tests {
             }
         }
         assert!(missing.is_empty(), "{missing:#?}");
+    }
+
+    #[test]
+    fn query_history_paths_are_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = spec.get("paths").unwrap();
+        for (path, method) in [
+            ("/api/{org_id}/query_history", "post"),
+            ("/api/{org_id}/query_history", "get"),
+            ("/api/{org_id}/query_history/{id}", "patch"),
+            ("/api/{org_id}/query_history/{id}", "delete"),
+        ] {
+            let op = paths
+                .get(path)
+                .and_then(|p| p.get(method))
+                .unwrap_or_else(|| panic!("{method} {path} is not documented"));
+            assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
+            assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
     }
 
     #[test]
