@@ -23,6 +23,7 @@
 
 import {
   DEFAULT_TEXT_SIZE,
+  isBannerIcon,
   isHexColor,
   isTextSize,
   type BannerTextSize,
@@ -58,6 +59,22 @@ export interface BannerDraft {
   /** Background hex per theme mode; empty means the variant's own fill. */
   colorLight: string;
   colorDark: string;
+  /** One of `BANNER_ICONS`; empty keeps the severity's icon. */
+  icon: string;
+  /** The saved style this banner's look was copied from, for labelling only. */
+  styleId: string;
+}
+
+/** A saved look the editor copies into a banner; editing it later leaves existing banners alone. */
+export interface BannerStyle {
+  id: string;
+  name: string;
+  /** The severity a banner with this style behaves as, for ordering and hiding promotions. */
+  base: BannerVariantName;
+  icon: string;
+  textSize: BannerTextSize;
+  colorLight: string;
+  colorDark: string;
 }
 
 export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
@@ -79,7 +96,14 @@ export function emptyDraft(): BannerDraft {
     textSize: DEFAULT_TEXT_SIZE,
     colorLight: "",
     colorDark: "",
+    icon: "",
+    styleId: "",
   };
+}
+
+/** A fresh dismissal key, so a new or duplicated banner is never dismissed along with another. */
+export function newBannerId(prefix = "banner"): string {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 const DURATION_UNIT_MS: Record<string, number> = {
@@ -161,6 +185,8 @@ interface AuthoredBanner {
   orgs?: unknown;
   text_size?: unknown;
   colors?: { light?: unknown; dark?: unknown } | null;
+  icon?: unknown;
+  style?: unknown;
 }
 
 function str(value: unknown): string {
@@ -219,6 +245,9 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
     if (isHexColor(colors.dark)) draft.colorDark = colors.dark.toUpperCase();
   }
 
+  if (isBannerIcon(banner.icon)) draft.icon = banner.icon;
+  draft.styleId = str(banner.style);
+
   return draft;
 }
 
@@ -240,7 +269,13 @@ export function rawBanners(parsed: unknown): unknown[] {
 export function indexedDraftsFromConfig(parsed: unknown): IndexedDraft[] {
   return rawBanners(parsed).flatMap((banner, index) =>
     typeof banner === "object" && banner !== null && str((banner as AuthoredBanner).message).trim()
-      ? [{ index, draft: draftFromAuthored(banner as AuthoredBanner), raw: banner }]
+      ? [
+          {
+            index,
+            draft: draftFromAuthored(banner as AuthoredBanner),
+            raw: banner,
+          },
+        ]
       : [],
   );
 }
@@ -256,18 +291,16 @@ export function draftsFromConfig(parsed: unknown): BannerDraft[] {
  * Defaults are omitted rather than written out, so the stored config stays the
  * short document a person would have written by hand.
  */
-export function authoredFromDraft(
-  draft: BannerDraft,
-  nowMs: number = Date.now(),
-): Record<string, unknown> {
+export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
   const banner: Record<string, unknown> = { message: draft.message.trim() };
 
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
 
-  // Stored as an absolute end, because a stored `duration` re-anchors at "now" on every later PUT.
-  const durationMs = draft.schedule === "duration" ? parseDurationMs(draft.duration) : null;
-  if (durationMs) banner.ends_at = formatRfc3339(new Date(nowMs + durationMs));
+  // The server pins this to an absolute `ends_at` on save, so later saves cannot restart it.
+  if (draft.schedule === "duration" && parseDurationMs(draft.duration)) {
+    banner.duration = draft.duration.trim();
+  }
   if (draft.schedule === "window") {
     if (draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
     if (draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
@@ -288,7 +321,45 @@ export function authoredFromDraft(
   if (isHexColor(draft.colorDark)) colors.dark = draft.colorDark.toUpperCase();
   if (Object.keys(colors).length) banner.colors = colors;
 
+  if (draft.icon) banner.icon = draft.icon;
+  if (draft.styleId) banner.style = draft.styleId;
+
   return banner;
+}
+
+export function stylesFromConfig(parsed: unknown): BannerStyle[] {
+  const styles = (parsed as { styles?: unknown } | null)?.styles;
+  if (!Array.isArray(styles)) return [];
+
+  return styles
+    .filter((style): style is Record<string, any> => typeof style === "object" && style !== null)
+    .filter((style) => str(style.id) && str(style.name))
+    .map((style) => ({
+      id: str(style.id),
+      name: str(style.name),
+      base: VARIANTS.includes(style.base) ? style.base : "info",
+      icon: isBannerIcon(style.icon) ? style.icon : "",
+      textSize: isTextSize(style.text_size) ? style.text_size : DEFAULT_TEXT_SIZE,
+      colorLight: isHexColor(style.colors?.light) ? style.colors.light.toUpperCase() : "",
+      colorDark: isHexColor(style.colors?.dark) ? style.colors.dark.toUpperCase() : "",
+    }));
+}
+
+export function authoredFromStyle(style: BannerStyle): Record<string, unknown> {
+  const authored: Record<string, unknown> = {
+    id: style.id,
+    name: style.name.trim(),
+    base: style.base,
+  };
+  if (style.icon) authored.icon = style.icon;
+  if (style.textSize !== DEFAULT_TEXT_SIZE) authored.text_size = style.textSize;
+
+  const colors: Record<string, string> = {};
+  if (isHexColor(style.colorLight)) colors.light = style.colorLight.toUpperCase();
+  if (isHexColor(style.colorDark)) colors.dark = style.colorDark.toUpperCase();
+  if (Object.keys(colors).length) authored.colors = colors;
+
+  return authored;
 }
 
 export interface PreviewBanner {
@@ -298,6 +369,7 @@ export interface PreviewBanner {
   cta: { text: string; url: string } | null;
   text_size: BannerTextSize;
   colors: { light: string; dark: string };
+  icon: string;
 }
 
 export function previewFromDraft(draft: BannerDraft): PreviewBanner {
@@ -311,5 +383,6 @@ export function previewFromDraft(draft: BannerDraft): PreviewBanner {
         : null,
     text_size: draft.textSize,
     colors: { light: draft.colorLight, dark: draft.colorDark },
+    icon: draft.icon,
   };
 }

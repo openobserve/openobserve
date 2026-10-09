@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-table__title tw:font-[600]" data-test="announcement-banners-title">
           {{ t("announcements.list.title") }}
         </div>
-        <div class="announcement-list-subtitle">{{ t("announcements.list.subtitle") }}</div>
+        <div class="announcement-list-subtitle">
+          {{ t("announcements.list.subtitle") }}
+        </div>
       </div>
       <q-btn
         no-caps
@@ -44,7 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <section class="announcement-list-section">
-        <div class="announcement-list-section-title">{{ t("announcements.list.liveNow") }}</div>
+        <div class="announcement-list-section-title">
+          {{ t("announcements.list.liveNow") }}
+        </div>
         <div class="announcement-list-live" data-test="announcement-banners-preview">
           <AnnouncementBannerStrip
             v-for="(banner, position) in liveBanners"
@@ -64,7 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
 
       <section class="announcement-list-section">
-        <div class="announcement-list-section-title">{{ t("announcements.list.allBanners") }}</div>
+        <div class="announcement-list-section-title">
+          {{ t("announcements.list.allBanners") }}
+        </div>
 
         <div
           v-if="!rows.length"
@@ -72,8 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="announcement-banners-list-empty"
         >
           <q-icon name="campaign" size="2.5rem" class="announcement-list-empty-icon" />
-          <div class="announcement-list-empty-title">{{ t("announcements.list.emptyTitle") }}</div>
-          <div class="announcement-list-empty-hint">{{ t("announcements.list.emptyHint") }}</div>
+          <div class="announcement-list-empty-title">
+            {{ t("announcements.list.emptyTitle") }}
+          </div>
+          <div class="announcement-list-empty-hint">
+            {{ t("announcements.list.emptyHint") }}
+          </div>
           <q-btn
             no-caps
             flat
@@ -113,7 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="announcement-list-dot"
                   :class="`announcement-list-dot--${props.row.draft.variant}`"
                 />
-                {{ t(`announcements.variants.${props.row.draft.variant}`) }}
+                {{
+                  styleNames.get(props.row.draft.styleId) ??
+                  t(`announcements.variants.${props.row.draft.variant}`)
+                }}
               </span>
             </q-td>
           </template>
@@ -181,7 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="announcement-list-delete-body"
             data-test="announcement-banners-delete-message"
           >
-            {{ t("announcements.list.deleteMessage", { message: pendingDeleteExcerpt }) }}
+            {{
+              t("announcements.list.deleteMessage", {
+                message: pendingDeleteExcerpt,
+              })
+            }}
           </div>
         </q-card-section>
         <q-card-actions align="right" class="tw:gap-2">
@@ -215,7 +232,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AnnouncementBannerStrip from "@/components/announcements/AnnouncementBannerStrip.vue";
-import { useAnnouncementDraftPreview } from "@/composables/useAnnouncementDraftPreview";
+import { notifyAnnouncementsChanged } from "@/composables/useAnnouncementBanners";
 import announcements from "@/services/announcements";
 import { presetFor, type ThemeMode } from "@/utils/announcementAppearance";
 import { renderBannerMarkdown } from "@/utils/announcementMarkdown";
@@ -233,6 +250,7 @@ import {
 import {
   indexedDraftsFromConfig,
   previewFromDraft,
+  stylesFromConfig,
   type BannerDraft,
   type IndexedDraft,
 } from "./announcementDrafts";
@@ -250,11 +268,11 @@ interface ListRow {
 
 const { t } = useI18n();
 const q = useQuasar();
-const { notifyConfigChanged } = useAnnouncementDraftPreview();
 const router = useRouter();
 const store = useStore();
 
 const entries = ref<IndexedDraft[]>([]);
+const styleNames = ref(new Map<string, string>());
 const isLoaded = ref(false);
 const errorMessage = ref("");
 const pendingDelete = ref<number | null>(null);
@@ -381,6 +399,9 @@ const load = async () => {
   try {
     const response = await announcements.getConfig(metaOrg.value);
     entries.value = indexedDraftsFromConfig(response?.data);
+    styleNames.value = new Map(
+      stylesFromConfig(response?.data).map((style) => [style.id, style.name]),
+    );
     nowMs.value = Date.now();
     errorMessage.value = "";
   } catch (error: any) {
@@ -399,13 +420,21 @@ const confirmDelete = async () => {
   try {
     const latest = (await announcements.getConfig(metaOrg.value))?.data;
     if (!isUnchangedAt(latest, index, original)) {
-      q.notify({ type: "negative", message: t("announcements.list.conflict"), timeout: 5000 });
+      q.notify({
+        type: "negative",
+        message: t("announcements.list.conflict"),
+        timeout: 5000,
+      });
       await load();
       return;
     }
     await announcements.setConfig(metaOrg.value, removeBanner(latest, index));
-    notifyConfigChanged();
-    q.notify({ type: "positive", message: t("announcements.list.deleted"), timeout: 2000 });
+    notifyAnnouncementsChanged();
+    q.notify({
+      type: "positive",
+      message: t("announcements.list.deleted"),
+      timeout: 2000,
+    });
     await load();
   } catch (error: any) {
     q.notify({

@@ -16,42 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <AnnouncementBannerStrip
-    v-for="banner in shown"
+    v-for="banner in banners"
     :key="banner.id"
     :banner="banner"
     :mode="mode"
-    :draft-tag="banner.id === DRAFT_ID ? t('announcements.editor.draftTag') : ''"
     @dismiss="dismiss(banner.id)"
   />
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, onMounted } from "vue";
 import { useStore } from "vuex";
 
-import { useAnnouncementBanners, type Banner } from "@/composables/useAnnouncementBanners";
-import { useAnnouncementDraftPreview } from "@/composables/useAnnouncementDraftPreview";
+import { useAnnouncementBanners } from "@/composables/useAnnouncementBanners";
 import type { ThemeMode } from "@/utils/announcementAppearance";
-import { orderBanners } from "@/utils/announcementOrder";
 import AnnouncementBannerStrip from "./AnnouncementBannerStrip.vue";
 
-const DRAFT_ID = "draft-preview";
-
-const { t } = useI18n();
 const store = useStore();
-const { banners, dismiss, start, refresh } = useAnnouncementBanners();
-const { draft, replaces, configVersion } = useAnnouncementDraftPreview();
+const { banners, dismiss, start } = useAnnouncementBanners();
 
 const mode = computed<ThemeMode>(() => (store.state.theme === "dark" ? "dark" : "light"));
 
-// The editor's draft takes its real place in the stack, standing in for the banner it edits.
-const shown = computed<Banner[]>(() => {
-  if (!draft.value) return banners.value;
-  const live = banners.value.filter((banner) => banner.message !== replaces.value);
-  return orderBanners([...live, { ...(draft.value as Banner), id: DRAFT_ID }]);
-});
-
 onMounted(start);
-watch(configVersion, () => void refresh());
 </script>

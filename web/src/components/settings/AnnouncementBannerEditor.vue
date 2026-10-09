@@ -98,160 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("announcements.editor.messageSection") }} *
           </div>
           <AnnouncementMessageField v-model="form.message" :error="errors.message" />
-        </section>
-
-        <section class="announcement-editor-section">
-          <div class="announcement-editor-section-title">
-            {{ t("announcements.editor.severitySection") }}
-          </div>
-          <q-btn-toggle
-            :model-value="form.variant"
-            class="announcement-editor-toggle"
-            toggle-color="primary"
-            no-caps
-            unelevated
-            :options="variantOptions"
-            data-test="announcement-editor-variant"
-            @update:model-value="setVariant"
-          />
-          <span class="announcement-editor-hint" data-test="announcement-editor-variant-help">
-            {{ t(`announcements.variantHelp.${form.variant}`) }}
-          </span>
-        </section>
-
-        <section class="announcement-editor-section">
-          <div class="announcement-editor-section-title">
-            {{ t("announcements.editor.audienceSection") }}
-          </div>
-          <div class="announcement-editor-radios">
-            <q-radio
-              v-model="audience"
-              val="all"
-              :label="t('announcements.editor.audienceAll')"
-              data-test="announcement-editor-audience-all"
-            />
-            <q-radio
-              v-model="audience"
-              val="some"
-              :label="t('announcements.editor.audienceSome')"
-              data-test="announcement-editor-audience-some"
-            />
-          </div>
-          <q-select
-            v-if="audience === 'some'"
-            v-model="form.orgs"
-            class="showLabelOnTop no-case"
-            stack-label
-            borderless
-            dense
-            hide-bottom-space
-            multiple
-            use-chips
-            emit-value
-            map-options
-            :label="t('announcements.editor.orgs')"
-            :options="orgOptions"
-            :error="!!errors.orgs"
-            :error-message="errors.orgs"
-            data-test="announcement-editor-orgs"
-          />
-          <q-toggle
-            v-model="form.dismissible"
-            class="announcement-editor-switch"
-            :label="t('announcements.editor.dismissible')"
-            data-test="announcement-editor-dismissible"
-          />
-          <q-toggle
-            v-if="!isNew && form.dismissible"
-            v-model="resetDismissals"
-            class="announcement-editor-switch"
-            :label="t('announcements.editor.resetDismissals')"
-            data-test="announcement-editor-reset-dismissals"
-          />
-        </section>
-
-        <section class="announcement-editor-section">
-          <div class="announcement-editor-section-title">
-            {{ t("announcements.editor.scheduleSection") }}
-          </div>
-          <q-btn-toggle
-            v-model="form.schedule"
-            class="announcement-editor-toggle"
-            toggle-color="primary"
-            no-caps
-            unelevated
-            :options="scheduleOptions"
-            data-test="announcement-editor-schedule"
-          />
-          <div v-if="form.schedule === 'duration'" class="announcement-editor-field">
-            <q-input
-              v-model="form.duration"
-              class="showLabelOnTop announcement-editor-narrow"
-              stack-label
-              borderless
-              dense
-              hide-bottom-space
-              :label="t('announcements.editor.duration')"
-              :placeholder="t('announcements.editor.durationPlaceholder')"
-              :error="!!errors.duration"
-              :error-message="errors.duration"
-              data-test="announcement-editor-duration"
-            />
-            <span class="announcement-editor-hint">
-              {{ t("announcements.editor.durationHelp") }}
-            </span>
-          </div>
-          <div v-if="form.schedule === 'window'" class="announcement-editor-field">
-            <div class="announcement-editor-grid">
-              <q-input
-                v-model="form.startsAt"
-                type="datetime-local"
-                class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
-                hide-bottom-space
-                :label="t('announcements.editor.startsAt')"
-                :error="!!errors.startsAt"
-                :error-message="errors.startsAt"
-                data-test="announcement-editor-starts-at"
-              />
-              <q-input
-                v-model="form.endsAt"
-                type="datetime-local"
-                class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
-                hide-bottom-space
-                :label="t('announcements.editor.endsAt')"
-                :error="!!errors.endsAt"
-                :error-message="errors.endsAt"
-                data-test="announcement-editor-ends-at"
-              />
-            </div>
-            <span class="announcement-editor-hint">
-              {{ t("announcements.editor.timezoneHint", { zone: timeZone }) }}
-            </span>
-          </div>
-        </section>
-
-        <section class="announcement-editor-section">
-          <div class="announcement-editor-section-title">
-            {{ t("announcements.editor.appearanceSection") }}
-          </div>
-          <AnnouncementAppearanceField
-            v-model:text-size="form.textSize"
-            v-model:color-light="form.colorLight"
-            v-model:color-dark="form.colorDark"
-            :errors="errors"
-          />
-        </section>
-
-        <section class="announcement-editor-section">
-          <div class="announcement-editor-section-title">
-            {{ t("announcements.editor.ctaSection") }}
-          </div>
           <q-toggle
             v-model="form.hasCta"
             class="announcement-editor-switch"
@@ -288,16 +134,284 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </section>
+
+        <section class="announcement-editor-section">
+          <div class="announcement-editor-section-title">
+            {{ t("announcements.editor.styleSection") }}
+          </div>
+          <q-btn-toggle
+            :model-value="styleChoice"
+            class="announcement-editor-toggle"
+            toggle-color="primary"
+            no-caps
+            unelevated
+            :options="styleOptions"
+            data-test="announcement-editor-variant"
+            @update:model-value="chooseStyle"
+          />
+          <span class="announcement-editor-hint" data-test="announcement-editor-variant-help">
+            {{
+              selectedStyle
+                ? t("announcements.editor.styleBehavesAs", {
+                    severity: t(`announcements.variants.${selectedStyle.base}`),
+                  })
+                : t(`announcements.variantHelp.${form.variant}`)
+            }}
+          </span>
+          <AnnouncementAppearanceField
+            v-model:text-size="form.textSize"
+            v-model:color-light="form.colorLight"
+            v-model:color-dark="form.colorDark"
+            v-model:icon="form.icon"
+            :errors="errors"
+          />
+          <div class="announcement-editor-style-actions">
+            <q-btn
+              no-caps
+              flat
+              dense
+              icon="bookmark_add"
+              class="o2-secondary-button"
+              :label="t('announcements.editor.saveAsStyle')"
+              data-test="announcement-editor-save-style"
+              @click="openSaveStyle"
+            />
+            <q-btn
+              v-if="selectedStyle"
+              no-caps
+              flat
+              dense
+              icon="delete"
+              color="negative"
+              :label="
+                t('announcements.editor.deleteStyle', {
+                  name: selectedStyle.name,
+                })
+              "
+              data-test="announcement-editor-delete-style"
+              @click="deleteStyleOpen = true"
+            />
+          </div>
+        </section>
+
+        <section class="announcement-editor-section">
+          <div class="announcement-editor-section-title">
+            {{ t("announcements.editor.whoWhenSection") }}
+          </div>
+          <div class="announcement-editor-radios">
+            <q-radio
+              v-model="audience"
+              val="all"
+              :label="t('announcements.editor.audienceAll')"
+              data-test="announcement-editor-audience-all"
+            />
+            <q-radio
+              v-model="audience"
+              val="some"
+              :label="t('announcements.editor.audienceSome')"
+              data-test="announcement-editor-audience-some"
+            />
+          </div>
+          <q-select
+            v-if="audience === 'some'"
+            v-model="form.orgs"
+            class="showLabelOnTop no-case"
+            stack-label
+            borderless
+            dense
+            hide-bottom-space
+            multiple
+            use-chips
+            emit-value
+            map-options
+            :label="t('announcements.editor.orgs')"
+            :options="orgOptions"
+            :error="!!errors.orgs"
+            :error-message="errors.orgs"
+            data-test="announcement-editor-orgs"
+          />
+
+          <span class="announcement-editor-label">{{
+            t("announcements.editor.scheduleLabel")
+          }}</span>
+          <q-btn-toggle
+            v-model="form.schedule"
+            class="announcement-editor-toggle"
+            toggle-color="primary"
+            no-caps
+            unelevated
+            :options="scheduleOptions"
+            data-test="announcement-editor-schedule"
+          />
+          <div v-if="form.schedule === 'duration'" class="announcement-editor-field">
+            <div class="announcement-editor-duration-row">
+              <q-input
+                v-model="form.duration"
+                class="showLabelOnTop announcement-editor-narrow"
+                stack-label
+                borderless
+                dense
+                hide-bottom-space
+                :label="t('announcements.editor.duration')"
+                :placeholder="t('announcements.editor.durationPlaceholder')"
+                :error="!!errors.duration"
+                :error-message="errors.duration"
+                data-test="announcement-editor-duration"
+              />
+              <q-btn
+                v-for="span in DURATION_PICKS"
+                :key="span"
+                no-caps
+                dense
+                unelevated
+                :outline="form.duration !== span"
+                color="primary"
+                :label="span"
+                :data-test="`announcement-editor-duration-${span}`"
+                @click="form.duration = span"
+              />
+            </div>
+            <span class="announcement-editor-hint">{{ durationHint }}</span>
+          </div>
+          <div v-if="form.schedule === 'window'" class="announcement-editor-field">
+            <div class="announcement-editor-grid">
+              <q-input
+                v-model="form.startsAt"
+                type="datetime-local"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                dense
+                hide-bottom-space
+                :label="t('announcements.editor.startsAt')"
+                :error="!!errors.startsAt"
+                :error-message="errors.startsAt"
+                data-test="announcement-editor-starts-at"
+              />
+              <q-input
+                v-model="form.endsAt"
+                type="datetime-local"
+                class="showLabelOnTop"
+                stack-label
+                borderless
+                dense
+                hide-bottom-space
+                :label="t('announcements.editor.endsAt')"
+                :error="!!errors.endsAt"
+                :error-message="errors.endsAt"
+                data-test="announcement-editor-ends-at"
+              />
+            </div>
+            <span class="announcement-editor-hint">
+              {{ t("announcements.editor.timezoneHint", { zone: timeZone }) }}
+            </span>
+          </div>
+
+          <q-toggle
+            v-model="form.dismissible"
+            class="announcement-editor-switch"
+            :label="t('announcements.editor.dismissible')"
+            data-test="announcement-editor-dismissible"
+          />
+          <q-toggle
+            v-if="!isNew && form.dismissible"
+            v-model="resetDismissals"
+            class="announcement-editor-switch"
+            :label="t('announcements.editor.resetDismissals')"
+            data-test="announcement-editor-reset-dismissals"
+          />
+        </section>
       </div>
 
       <div class="announcement-editor-preview">
-        <AnnouncementBannerPreview
-          v-model:in-app="previewInApp"
-          :banner="previewBanner"
-          :others="otherLiveBanners"
-        />
+        <AnnouncementBannerPreview :banner="previewBanner" :hidden="hiddenByCritical" />
       </div>
     </div>
+
+    <q-dialog v-model="saveStyleOpen" data-test="announcement-editor-save-style-dialog">
+      <q-card class="announcement-editor-leave-card">
+        <q-card-section>
+          <div class="text-h6">
+            {{ t("announcements.editor.saveStyleTitle") }}
+          </div>
+          <div class="announcement-editor-hint">
+            {{
+              t("announcements.editor.saveStyleHint", {
+                severity: t(`announcements.variants.${form.variant}`),
+              })
+            }}
+          </div>
+          <q-input
+            v-model="styleName"
+            class="showLabelOnTop tw:mt-3"
+            stack-label
+            borderless
+            dense
+            hide-bottom-space
+            autofocus
+            :label="t('announcements.editor.styleName')"
+            :placeholder="t('announcements.editor.styleNamePlaceholder')"
+            :error="!!styleError"
+            :error-message="styleError"
+            data-test="announcement-editor-style-name"
+          />
+        </q-card-section>
+        <q-card-actions align="right" class="tw:gap-2">
+          <q-btn
+            v-close-popup
+            no-caps
+            flat
+            class="o2-secondary-button"
+            :label="t('announcements.editor.cancel')"
+          />
+          <q-btn
+            no-caps
+            flat
+            class="o2-primary-button no-border"
+            :label="t('announcements.editor.saveStyle')"
+            :disable="!styleName.trim()"
+            :loading="isSaving"
+            data-test="announcement-editor-save-style-confirm"
+            @click="saveStyle"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="deleteStyleOpen" data-test="announcement-editor-delete-style-dialog">
+      <q-card class="announcement-editor-leave-card">
+        <q-card-section>
+          <div class="text-h6">
+            {{
+              t("announcements.editor.deleteStyleTitle", {
+                name: selectedStyle?.name ?? "",
+              })
+            }}
+          </div>
+          <div class="announcement-editor-hint">
+            {{ t("announcements.editor.deleteStyleHint") }}
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" class="tw:gap-2">
+          <q-btn
+            v-close-popup
+            no-caps
+            flat
+            class="o2-secondary-button"
+            :label="t('announcements.editor.cancel')"
+          />
+          <q-btn
+            no-caps
+            unelevated
+            color="negative"
+            :label="t('announcements.list.delete')"
+            :loading="isSaving"
+            data-test="announcement-editor-delete-style-confirm"
+            @click="deleteStyle"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <q-dialog v-model="leaveDialogOpen" data-test="announcement-editor-leave-dialog">
       <q-card class="announcement-editor-leave-card">
@@ -337,19 +451,21 @@ import { useQuasar } from "quasar";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import type { Banner } from "@/composables/useAnnouncementBanners";
-import { useAnnouncementDraftPreview } from "@/composables/useAnnouncementDraftPreview";
+import { notifyAnnouncementsChanged } from "@/composables/useAnnouncementBanners";
 import announcements from "@/services/announcements";
+import { DEFAULT_TEXT_SIZE, isBannerIcon, materialIconName } from "@/utils/announcementAppearance";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import AnnouncementAppearanceField from "./AnnouncementAppearanceField.vue";
 import AnnouncementBannerPreview from "./AnnouncementBannerPreview.vue";
 import AnnouncementMessageField from "./AnnouncementMessageField.vue";
 import {
+  addStyle,
   formatStamp,
-  isShowingNow,
+  isHiddenByCritical,
   isUnchangedAt,
   listStatuses,
   parseIndexQuery,
+  removeStyle,
   saveIntent,
   upsertBanner,
 } from "./announcementConfig";
@@ -357,8 +473,12 @@ import {
   VARIANTS,
   emptyDraft,
   indexedDraftsFromConfig,
+  newBannerId,
+  parseDurationMs,
   previewFromDraft,
+  stylesFromConfig,
   type BannerDraft,
+  type BannerStyle,
   type IndexedDraft,
 } from "./announcementDrafts";
 import { CTA_TEXT_MAX, validateBanner, type BannerErrors } from "./announcementValidation";
@@ -370,6 +490,9 @@ const VARIANT_ICONS: Record<string, string> = {
   promo: "campaign",
 };
 
+const STYLE_CHOICE_PREFIX = "style:";
+const DURATION_PICKS = ["1h", "4h", "1d", "1w"];
+
 class BannerConflictError extends Error {}
 
 const { t } = useI18n();
@@ -377,8 +500,6 @@ const q = useQuasar();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
-
-const { setDraft, notifyConfigChanged } = useAnnouncementDraftPreview();
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -397,14 +518,25 @@ const resetDismissals = ref(false);
 const leaveDialogOpen = ref(false);
 const pendingLeave = ref("");
 const formRef = ref<HTMLElement | null>(null);
-const previewInApp = ref(true);
+const styles = ref<BannerStyle[]>([]);
+const saveStyleOpen = ref(false);
+const deleteStyleOpen = ref(false);
+const styleName = ref("");
+const styleError = ref("");
 let leaveConfirmed = false;
 
 const metaOrg = computed(() => store.state.zoConfig?.meta_org);
 
 const isNew = computed(() => editIndex.value == null);
 
-const isDirty = computed(() => isLoaded.value && JSON.stringify(form) !== savedSnapshot.value);
+const snapshot = () =>
+  JSON.stringify({
+    form,
+    audience: audience.value,
+    reset: resetDismissals.value,
+  });
+
+const isDirty = computed(() => isLoaded.value && snapshot() !== savedSnapshot.value);
 
 const editedEntry = computed(() => entries.value.find((entry) => entry.index === editIndex.value));
 
@@ -430,14 +562,26 @@ const orgOptions = computed(() =>
   })),
 );
 
-const variantOptions = computed(() =>
-  VARIANTS.map((variant) => ({
+const selectedStyle = computed(() => styles.value.find((style) => style.id === form.styleId));
+
+const styleChoice = computed(() =>
+  selectedStyle.value ? `${STYLE_CHOICE_PREFIX}${selectedStyle.value.id}` : form.variant,
+);
+
+const styleOptions = computed(() => [
+  ...VARIANTS.map((variant) => ({
     label: t(`announcements.variants.${variant}`),
     icon: VARIANT_ICONS[variant],
     value: variant,
     attrs: { "data-test": `announcement-editor-variant-${variant}` },
   })),
-);
+  ...styles.value.map((style) => ({
+    label: style.name,
+    icon: isBannerIcon(style.icon) ? materialIconName(style.icon) : VARIANT_ICONS[style.base],
+    value: `${STYLE_CHOICE_PREFIX}${style.id}`,
+    attrs: { "data-test": `announcement-editor-style-${style.id}` },
+  })),
+]);
 
 const scheduleOptions = computed(() =>
   (["always", "duration", "window"] as const).map((schedule) => ({
@@ -449,11 +593,21 @@ const scheduleOptions = computed(() =>
 
 const previewBanner = computed(() => previewFromDraft(form));
 
-const otherLiveBanners = computed(() => {
-  const now = Date.now();
-  return entries.value
-    .filter((entry) => entry.index !== editIndex.value && isShowingNow(entry.draft, now))
-    .map((entry) => previewFromDraft(entry.draft));
+const hiddenByCritical = computed(() =>
+  isHiddenByCritical(
+    { ...form, orgs: audience.value === "some" ? form.orgs : [] },
+    entries.value.filter((entry) => entry.index !== editIndex.value).map((entry) => entry.draft),
+    Date.now(),
+  ),
+);
+
+const durationHint = computed(() => {
+  const ms = parseDurationMs(form.duration ?? "");
+  return ms
+    ? t("announcements.editor.durationEnds", {
+        time: formatStamp(new Date(Date.now() + ms).toISOString()),
+      })
+    : t("announcements.editor.durationHelp");
 });
 
 const serverMessage = (error: any, fallback: string) =>
@@ -468,10 +622,48 @@ const validate = (): BannerErrors => {
 };
 
 const setVariant = (variant: BannerVariantName) => {
-  form.variant = variant;
   // An outage notice should stay up; the author can still turn dismissal back on.
-  if (variant === "critical") form.dismissible = false;
+  if (variant === "critical" && form.variant !== "critical") form.dismissible = false;
+  form.variant = variant;
 };
+
+const chooseStyle = (choice: string) => {
+  const style = styles.value.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice);
+  if (style) {
+    setVariant(style.base);
+    Object.assign(form, {
+      icon: style.icon,
+      textSize: style.textSize,
+      colorLight: style.colorLight,
+      colorDark: style.colorDark,
+      styleId: style.id,
+    });
+    return;
+  }
+  setVariant(choice as BannerVariantName);
+  Object.assign(form, {
+    icon: "",
+    textSize: DEFAULT_TEXT_SIZE,
+    colorLight: "",
+    colorDark: "",
+    styleId: "",
+  });
+};
+
+// A banner restyled after picking a saved style no longer matches it, so stop labelling it with that name.
+watch(
+  () => [form.icon, form.textSize, form.colorLight, form.colorDark],
+  () => {
+    const style = selectedStyle.value;
+    if (!style) return;
+    const same =
+      form.icon === style.icon &&
+      form.textSize === style.textSize &&
+      form.colorLight.toUpperCase() === style.colorLight &&
+      form.colorDark.toUpperCase() === style.colorDark;
+    if (!same) form.styleId = "";
+  },
+);
 
 const goToList = () => {
   router.push({
@@ -492,13 +684,14 @@ const seedForm = (draft: BannerDraft) => {
   resetDismissals.value = false;
   errors.value = {};
   saveAttempted.value = false;
-  savedSnapshot.value = JSON.stringify(form);
+  savedSnapshot.value = snapshot();
 };
 
 const load = async () => {
   try {
     const response = await announcements.getConfig(metaOrg.value);
     entries.value = indexedDraftsFromConfig(response?.data);
+    styles.value = stylesFromConfig(response?.data);
   } catch (error: any) {
     errorMessage.value = serverMessage(error, t("announcements.list.loadFailed"));
     return;
@@ -510,7 +703,11 @@ const load = async () => {
   const found = entries.value.find((entry) => entry.index === source);
 
   if (source != null && !found) {
-    q.notify({ type: "negative", message: t("announcements.editor.notFound"), timeout: 3000 });
+    q.notify({
+      type: "negative",
+      message: t("announcements.editor.notFound"),
+      timeout: 3000,
+    });
     leaveConfirmed = true;
     goToList();
     return;
@@ -518,7 +715,9 @@ const load = async () => {
 
   editIndex.value = index != null && found ? index : null;
   // A copy gets a fresh dismissal key, so dismissing one never hides the other.
-  seedForm(found ? { ...found.draft, id: index != null ? found.draft.id : "" } : emptyDraft());
+  seedForm(
+    found ? { ...found.draft, id: index != null ? found.draft.id : newBannerId() } : emptyDraft(),
+  );
   isLoaded.value = true;
 };
 
@@ -531,7 +730,9 @@ const reload = async () => {
 
 const savedMessage = () => {
   if (intent.value === "schedule") {
-    return t("announcements.editor.savedScheduled", { time: formatStamp(form.startsAt, true) });
+    return t("announcements.editor.savedScheduled", {
+      time: formatStamp(form.startsAt, true),
+    });
   }
   if (intent.value !== "publish") return t("announcements.editor.saved");
   const count = audience.value === "some" ? form.orgs.length : 0;
@@ -543,7 +744,10 @@ const savedMessage = () => {
 const draftToSave = (): BannerDraft => ({
   ...form,
   orgs: audience.value === "some" ? [...form.orgs] : [],
-  id: resetDismissals.value && form.dismissible ? `banner-${Date.now().toString(36)}` : form.id,
+  id:
+    (resetDismissals.value && form.dismissible) || (isNew.value && !form.id)
+      ? newBannerId()
+      : form.id,
 });
 
 const write = async () => {
@@ -572,7 +776,7 @@ const save = async () => {
   hasConflict.value = false;
   try {
     await write();
-    notifyConfigChanged();
+    notifyAnnouncementsChanged();
     q.notify({ type: "positive", message: savedMessage(), timeout: 3000 });
     leaveConfirmed = true;
     goToList();
@@ -600,25 +804,69 @@ watch(
   { deep: true },
 );
 
-const draftForTopBar = (): Banner => ({
-  id: "draft-preview",
-  message: form.message.trim() || t("announcements.editor.previewEmpty"),
-  variant: form.variant,
-  dismissible: false,
-  text_size: form.textSize,
-  colors: { light: form.colorLight, dark: form.colorDark },
-  cta: form.hasCta && form.ctaText.trim() ? { text: form.ctaText.trim(), url: "" } : undefined,
-});
+const openSaveStyle = () => {
+  styleName.value = "";
+  styleError.value = "";
+  saveStyleOpen.value = true;
+};
 
-// The real top bar shows the draft too, so its width, theme and neighbours are exactly what users get.
-watch(
-  [previewInApp, isLoaded, () => ({ ...form })],
-  () => {
-    const show = previewInApp.value && isLoaded.value;
-    setDraft(show ? draftForTopBar() : null, editedEntry.value?.draft.message ?? null);
-  },
-  { immediate: true, deep: true },
-);
+/** Writes only the saved styles, re-reading first so banners saved elsewhere meanwhile survive. */
+const writeStyles = async (change: (latest: unknown) => unknown) => {
+  isSaving.value = true;
+  try {
+    const latest = (await announcements.getConfig(metaOrg.value))?.data;
+    const next = change(latest);
+    await announcements.setConfig(metaOrg.value, next);
+    styles.value = stylesFromConfig(next);
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const saveStyle = async () => {
+  const style: BannerStyle = {
+    id: newBannerId("style"),
+    name: styleName.value.trim(),
+    base: form.variant,
+    icon: form.icon,
+    textSize: form.textSize,
+    colorLight: form.colorLight.toUpperCase(),
+    colorDark: form.colorDark.toUpperCase(),
+  };
+  try {
+    await writeStyles((latest) => addStyle(latest, style));
+    form.styleId = style.id;
+    saveStyleOpen.value = false;
+    q.notify({
+      type: "positive",
+      message: t("announcements.editor.styleSaved", { name: style.name }),
+      timeout: 3000,
+    });
+  } catch (error: any) {
+    styleError.value = serverMessage(error, t("announcements.editor.saveFailed"));
+  }
+};
+
+const deleteStyle = async () => {
+  const style = selectedStyle.value;
+  if (!style) return;
+  try {
+    await writeStyles((latest) => removeStyle(latest, style.id));
+    form.styleId = "";
+    q.notify({
+      type: "positive",
+      message: t("announcements.editor.styleDeleted", { name: style.name }),
+      timeout: 3000,
+    });
+  } catch (error: any) {
+    q.notify({
+      type: "negative",
+      message: serverMessage(error, t("announcements.editor.saveFailed")),
+    });
+  } finally {
+    deleteStyleOpen.value = false;
+  }
+};
 
 onBeforeRouteLeave((to, _from, next) => {
   if (leaveConfirmed || !isDirty.value) return next();
@@ -634,10 +882,19 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnload);
-  setDraft(null);
 });
 
-defineExpose({ form, errors, save, isDirty, audience, resetDismissals, saveLabel });
+defineExpose({
+  form,
+  errors,
+  save,
+  isDirty,
+  audience,
+  resetDismissals,
+  saveLabel,
+  chooseStyle,
+  styles,
+});
 </script>
 
 <style scoped lang="scss">
@@ -790,6 +1047,25 @@ defineExpose({ form, errors, save, isDirty, audience, resetDismissals, saveLabel
 
 .announcement-editor-narrow {
   max-width: 12rem;
+}
+
+.announcement-editor-label {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.announcement-editor-duration-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.announcement-editor-style-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 @media (max-width: 1023px) {

@@ -382,8 +382,6 @@ export default defineComponent({
         showManagementTabs.value = true;
       }
     }
-    // A 250px tab rail leaves no room for the page itself on a phone.
-    if (q.screen?.lt?.sm) controlManagementTabs();
     const regexIcon = computed(()=>{
       return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
     })

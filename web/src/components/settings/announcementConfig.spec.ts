@@ -16,15 +16,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addStyle,
   bannerStatus,
   formatSpan,
   formatStamp,
+  isHiddenByCritical,
   isShowingNow,
   isUnchangedAt,
   listStatuses,
   parseIndexQuery,
   remainingMs,
   removeBanner,
+  removeStyle,
   saveIntent,
   upsertBanner,
 } from "./announcementConfig";
@@ -77,7 +80,7 @@ describe("upsertBanner", () => {
   };
 
   it("replaces the banner at the index and leaves the others byte-for-byte", () => {
-    const next = upsertBanner(stored, 1, draft({ message: "edited", variant: "critical" }), NOW);
+    const next = upsertBanner(stored, 1, draft({ message: "edited", variant: "critical" }));
 
     expect(next.banners).toEqual([
       { message: "first", duration: "1h" },
@@ -87,35 +90,34 @@ describe("upsertBanner", () => {
   });
 
   it("appends a new banner", () => {
-    const next = upsertBanner(stored, null, draft({ message: "new" }), NOW);
+    const next = upsertBanner(stored, null, draft({ message: "new" }));
 
     expect(next.banners).toHaveLength(3);
     expect(next.banners[2]).toEqual({ message: "new" });
   });
 
   it("appends when the index no longer exists", () => {
-    expect(upsertBanner(stored, 9, draft({ message: "late" }), NOW).banners).toHaveLength(3);
+    expect(upsertBanner(stored, 9, draft({ message: "late" })).banners).toHaveLength(3);
   });
 
-  it("stores a picked duration as an absolute end", () => {
+  it("sends a picked duration as typed", () => {
     const next = upsertBanner(
       { banners: [] },
       null,
       draft({ schedule: "duration", duration: "30m" }),
-      NOW,
     );
-    const saved = next.banners[0] as Record<string, string>;
 
-    expect(saved.duration).toBeUndefined();
-    expect(new Date(saved.ends_at).getTime()).toBe(NOW + 30 * 60_000);
+    expect(next.banners[0]).toEqual({ message: "m", duration: "30m" });
   });
 
   it("starts a list when the config has none", () => {
-    expect(upsertBanner(null, null, draft(), NOW)).toEqual({ banners: [{ message: "m" }] });
+    expect(upsertBanner(null, null, draft())).toEqual({
+      banners: [{ message: "m" }],
+    });
   });
 
   it("does not mutate the loaded config", () => {
-    upsertBanner(stored, 0, draft({ message: "x" }), NOW);
+    upsertBanner(stored, 0, draft({ message: "x" }));
 
     expect(stored.banners[0]).toEqual({ message: "first", duration: "1h" });
   });
@@ -163,7 +165,11 @@ describe("listStatuses", () => {
   it("leaves a promo alone when the critical banner is not live", () => {
     const statuses = listStatuses(
       [
-        entry(0, { variant: "critical", schedule: "window", endsAt: "2026-08-12T11:00" }),
+        entry(0, {
+          variant: "critical",
+          schedule: "window",
+          endsAt: "2026-08-12T11:00",
+        }),
         entry(1, { variant: "promo" }),
       ],
       NOW,
@@ -177,7 +183,11 @@ describe("listStatuses", () => {
     const statuses = listStatuses(
       [
         entry(0, { variant: "critical" }),
-        entry(1, { variant: "promo", schedule: "window", startsAt: "2026-08-13T00:00" }),
+        entry(1, {
+          variant: "promo",
+          schedule: "window",
+          startsAt: "2026-08-13T00:00",
+        }),
       ],
       NOW,
     );
@@ -240,5 +250,62 @@ describe("isUnchangedAt", () => {
   it("rejects an entry that changed or no longer exists", () => {
     expect(isUnchangedAt(latest, 1, { message: "b", variant: "warning" })).toBe(false);
     expect(isUnchangedAt(latest, 2, { message: "c" })).toBe(false);
+  });
+});
+
+describe("isHiddenByCritical", () => {
+  const NOW_MS = Date.now();
+  const critical = (orgs: string[]) => ({
+    ...emptyDraft(),
+    variant: "critical" as const,
+    orgs,
+  });
+  const promo = (orgs: string[]) => ({
+    ...emptyDraft(),
+    variant: "promo" as const,
+    orgs,
+  });
+
+  it("hides a promotion only where a live critical banner also shows", () => {
+    expect(isHiddenByCritical(promo([]), [critical([])], NOW_MS)).toBe(true);
+    expect(isHiddenByCritical(promo(["a"]), [critical(["a", "b"])], NOW_MS)).toBe(true);
+    expect(isHiddenByCritical(promo(["a", "c"]), [critical(["a"])], NOW_MS)).toBe(false);
+    expect(isHiddenByCritical(promo([]), [critical(["a"])], NOW_MS)).toBe(false);
+  });
+});
+
+describe("saved styles", () => {
+  const style = {
+    id: "s1",
+    name: "Release",
+    base: "promo" as const,
+    icon: "rocket-launch",
+    textSize: "large" as const,
+    colorLight: "",
+    colorDark: "",
+  };
+
+  it("adds and removes a style, leaving banners and other keys alone", () => {
+    const source = { banners: [{ message: "m" }], future: 1 };
+    const added = addStyle(source, style);
+
+    expect(added).toEqual({
+      banners: [{ message: "m" }],
+      future: 1,
+      styles: [
+        {
+          id: "s1",
+          name: "Release",
+          base: "promo",
+          icon: "rocket-launch",
+          text_size: "large",
+        },
+      ],
+    });
+    expect(removeStyle(added, "s1")).toEqual({
+      banners: [{ message: "m" }],
+      future: 1,
+      styles: [],
+    });
   });
 });

@@ -39,13 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </span>
 
-      <span v-if="draftTag" class="announcement-bar-actions">
-        <span class="announcement-bar-draft-tag">{{ draftTag }}</span>
-        <span v-if="banner.cta" class="announcement-bar-link" aria-hidden="true">
-          {{ banner.cta.text }}
-        </span>
-      </span>
-      <span v-else-if="banner.cta || dismissible" class="announcement-bar-actions">
+      <span v-if="banner.cta || dismissible" class="announcement-bar-actions">
         <component
           :is="preview ? 'span' : 'a'"
           v-if="banner.cta"
@@ -84,7 +78,9 @@ import { useI18n } from "vue-i18n";
 import {
   DEFAULT_TEXT_SIZE,
   bannerColorVars,
+  isBannerIcon,
   isTextSize,
+  materialIconName,
   type BannerColors,
   type ThemeMode,
 } from "@/utils/announcementAppearance";
@@ -99,6 +95,7 @@ interface StripBanner {
   cta?: { text: string; url: string } | null;
   text_size?: string;
   colors?: BannerColors | null;
+  icon?: string | null;
 }
 
 const props = withDefaults(
@@ -107,9 +104,8 @@ const props = withDefaults(
     mode: ThemeMode;
     preview?: boolean;
     placeholder?: string;
-    draftTag?: string;
   }>(),
-  { preview: false, placeholder: "", draftTag: "" },
+  { preview: false, placeholder: "" },
 );
 
 const emit = defineEmits<{ (_e: "dismiss"): void }>();
@@ -128,7 +124,6 @@ const dismissible = computed(() => props.banner.dismissible !== false);
 const colorVars = computed(() => bannerColorVars(props.banner.colors, props.mode));
 
 const testId = computed(() => {
-  if (props.draftTag) return "announcement-banner-draft-preview";
   return props.preview
     ? `announcement-preview-bar-${variant.value}`
     : `announcement-banner-${variant.value}`;
@@ -148,6 +143,7 @@ const ctaAttrs = computed(() =>
 );
 
 const icon = computed(() => {
+  if (isBannerIcon(props.banner.icon)) return materialIconName(props.banner.icon);
   switch (variant.value) {
     case "critical":
       return "error";
@@ -204,14 +200,6 @@ const icon = computed(() => {
   font-style: italic;
   font-weight: 400;
   opacity: 0.75;
-}
-
-.announcement-bar-draft-tag {
-  padding: 0 0.375rem;
-  border: 1px solid currentColor;
-  border-radius: 0.25rem;
-  font-size: 0.75em;
-  font-weight: 700;
 }
 
 .announcement-bar-actions {

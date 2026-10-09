@@ -180,34 +180,35 @@ describe("authoredFromDraft", () => {
     expect(authoredFromDraft(draft)).toEqual({ message: "Just this" });
   });
 
-  it("stores a duration as an absolute end so a later save cannot restart it", () => {
-    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "2h" };
-    const now = new Date(2026, 7, 12, 2, 0, 30).getTime();
+  it("sends a duration as typed, for the server to pin to an absolute end", () => {
+    const draft = {
+      ...emptyDraft(),
+      message: "m",
+      schedule: "duration" as const,
+      duration: "2h",
+    };
 
-    const authored = authoredFromDraft(draft, now);
-
-    expect(authored).not.toHaveProperty("duration");
-    expect(authored).not.toHaveProperty("starts_at");
-    expect(authored.ends_at).toMatch(/^2026-08-12T04:00:30[+-]\d{2}:\d{2}$/);
-    expect(new Date(authored.ends_at as string).getTime()).toBe(now + 2 * 3_600_000);
+    expect(authoredFromDraft(draft)).toEqual({ message: "m", duration: "2h" });
   });
 
-  it("reopens a saved duration as an end-only window", () => {
-    const now = new Date(2026, 7, 12, 2, 0).getTime();
-    const authored = authoredFromDraft(
-      { ...emptyDraft(), message: "m", schedule: "duration", duration: "90m" },
-      now,
-    );
-
-    const draft = draftFromAuthored(authored);
+  it("reopens a server-pinned duration as an end-only window", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      ends_at: "2026-08-12T03:30:00Z",
+    });
 
     expect(draft.schedule).toBe("window");
     expect(draft.startsAt).toBe("");
-    expect(draft.endsAt).toBe("2026-08-12T03:30");
+    expect(draft.endsAt).toBe(toLocalInput("2026-08-12T03:30:00Z"));
   });
 
   it("writes nothing for an unparseable duration", () => {
-    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "x" };
+    const draft = {
+      ...emptyDraft(),
+      message: "m",
+      schedule: "duration" as const,
+      duration: "x",
+    };
 
     expect(authoredFromDraft(draft)).toEqual({ message: "m" });
   });
@@ -271,7 +272,11 @@ describe("authoredFromDraft appearance", () => {
   });
 
   it("drops a colour that is not a hex rather than sending it", () => {
-    const authored = authoredFromDraft({ ...emptyDraft(), message: "m", colorDark: "blue" });
+    const authored = authoredFromDraft({
+      ...emptyDraft(),
+      message: "m",
+      colorDark: "blue",
+    });
 
     expect(authored).not.toHaveProperty("colors");
   });
@@ -286,14 +291,22 @@ describe("the form/JSON round trip", () => {
     const config = {
       banners: [
         { message: "Outage", variant: "critical", dismissible: false },
-        { message: "Webinar", variant: "promo", cta: { text: "Join", url: "https://x.dev" } },
+        {
+          message: "Webinar",
+          variant: "promo",
+          cta: { text: "Join", url: "https://x.dev" },
+        },
         { message: "Scoped", orgs: ["acme"] },
         {
           message: "Styled",
           text_size: "large",
           colors: { light: "#1D4ED8", dark: "#93C5FD" },
         },
-        { message: "Dark only", text_size: "small", colors: { dark: "#14532D" } },
+        {
+          message: "Dark only",
+          text_size: "small",
+          colors: { dark: "#14532D" },
+        },
       ],
     };
 

@@ -17,9 +17,11 @@ import { isEqual } from "lodash-es";
 
 import {
   authoredFromDraft,
+  authoredFromStyle,
   parseDurationMs,
   rawBanners,
   type BannerDraft,
+  type BannerStyle,
   type IndexedDraft,
 } from "./announcementDrafts";
 
@@ -35,7 +37,9 @@ export type ListStatus = BannerStatus | "hidden";
 /** What saving the draft does right now, which names the save button and the toast. */
 export type SaveIntent = "publish" | "schedule" | "save";
 
-export type AnnouncementConfig = Record<string, unknown> & { banners: unknown[] };
+export type AnnouncementConfig = Record<string, unknown> & {
+  banners: unknown[];
+};
 
 function instantMs(value: string): number | null {
   if (!value) return null;
@@ -66,16 +70,29 @@ export function isShowingNow(draft: BannerDraft, nowMs: number): boolean {
   return status === "live" || status === "always";
 }
 
-/** Each entry's list status; promos are hidden while any critical banner is showing. */
+/** A showing promotion every one of whose organizations also sees a live critical banner. */
+export function isHiddenByCritical(
+  draft: BannerDraft,
+  others: BannerDraft[],
+  nowMs: number,
+): boolean {
+  if (draft.variant !== "promo" || !isShowingNow(draft, nowMs)) return false;
+
+  const critical = others.filter((d) => d.variant === "critical" && isShowingNow(d, nowMs));
+  if (critical.some((d) => !d.orgs.length)) return true;
+  if (!critical.length || !draft.orgs.length) return false;
+
+  const covered = new Set(critical.flatMap((d) => d.orgs));
+  return draft.orgs.every((org) => covered.has(org));
+}
+
+/** Each entry's list status, with promotions a critical banner hides from all their orgs marked hidden. */
 export function listStatuses(entries: IndexedDraft[], nowMs: number): Map<number, ListStatus> {
-  const criticalLive = entries.some(
-    ({ draft }) => draft.variant === "critical" && isShowingNow(draft, nowMs),
-  );
   return new Map(
     entries.map(({ index, draft }) => {
-      const status = bannerStatus(draft, nowMs);
-      const hidden = criticalLive && draft.variant === "promo" && isShowingNow(draft, nowMs);
-      return [index, hidden ? "hidden" : status];
+      const others = entries.filter((entry) => entry.index !== index).map((entry) => entry.draft);
+      const hidden = isHiddenByCritical(draft, others, nowMs);
+      return [index, hidden ? "hidden" : bannerStatus(draft, nowMs)];
     }),
   );
 }
@@ -132,10 +149,9 @@ export function upsertBanner(
   source: unknown,
   index: number | null,
   draft: BannerDraft,
-  nowMs: number = Date.now(),
 ): AnnouncementConfig {
   const banners = [...rawBanners(source)];
-  const authored = authoredFromDraft(draft, nowMs);
+  const authored = authoredFromDraft(draft);
 
   if (index == null || index < 0 || index >= banners.length) {
     banners.push(authored);
@@ -151,6 +167,26 @@ export function removeBanner(source: unknown, index: number): AnnouncementConfig
     source,
     rawBanners(source).filter((_, position) => position !== index),
   );
+}
+
+function rawStyles(source: unknown): unknown[] {
+  const styles = (source as { styles?: unknown } | null)?.styles;
+  return Array.isArray(styles) ? styles : [];
+}
+
+/** The config with `style` appended to its saved styles; banners and other keys pass through. */
+export function addStyle(source: unknown, style: BannerStyle): AnnouncementConfig {
+  return {
+    ...withBanners(source, rawBanners(source)),
+    styles: [...rawStyles(source), authoredFromStyle(style)],
+  };
+}
+
+export function removeStyle(source: unknown, id: string): AnnouncementConfig {
+  return {
+    ...withBanners(source, rawBanners(source)),
+    styles: rawStyles(source).filter((style) => (style as { id?: unknown })?.id !== id),
+  };
 }
 
 /** The stored index named by a route query value, or null when it is absent or not an integer. */

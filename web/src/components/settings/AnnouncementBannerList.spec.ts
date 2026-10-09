@@ -60,8 +60,17 @@ const STORED = {
     { message: "Webinar **today**", variant: "promo" },
     { message: "Outage", variant: "critical", orgs: ["a", "b"] },
     { message: "Later", starts_at: iso(2 * HOUR), ends_at: iso(3 * HOUR) },
-    { message: "Over", ends_at: iso(-HOUR), colors: { light: "#DBEAFE", dark: "#1E3A8A" } },
-    { message: "Window", starts_at: iso(-HOUR), ends_at: iso(HOUR), text_size: "small" },
+    {
+      message: "Over",
+      ends_at: iso(-HOUR),
+      colors: { light: "#DBEAFE", dark: "#1E3A8A" },
+    },
+    {
+      message: "Window",
+      starts_at: iso(-HOUR),
+      ends_at: iso(HOUR),
+      text_size: "small",
+    },
   ],
 };
 
@@ -86,7 +95,7 @@ describe("AnnouncementBannerList", () => {
     const status = (index: number) =>
       wrapper.get(`[data-test="announcement-banners-row-status-${index}"]`).text();
 
-    expect(status(0)).toBe("Live · hidden by a critical banner");
+    expect(status(0)).toBe("Live");
     expect(status(1)).toBe("Live");
     expect(status(2)).toBe("Scheduled");
     expect(status(3)).toBe("Ended");
@@ -99,7 +108,7 @@ describe("AnnouncementBannerList", () => {
     expect(rows[0].audience).toBe("All orgs");
     expect(rows[1].audience).toBe("2 orgs");
     expect(rows[0].appearance).toBe("Medium · Severity colour");
-    expect(rows[0].schedule).toBe("No end date");
+    expect(rows[0].schedule).toBe("Until turned off");
     expect(rows[4].schedule).toMatch(/ → .+ \S+$/);
     expect(rows[3].appearance).toBe("Medium · Blue");
     expect(rows[4].appearance).toBe("Small · Severity colour");
@@ -143,8 +152,14 @@ describe("AnnouncementBannerList", () => {
     await wrapper.get('[data-test="announcement-banners-row-edit-2"]').trigger("click");
     await wrapper.get('[data-test="announcement-banners-row-duplicate-3"]').trigger("click");
 
-    expect(push.mock.calls[0][0].query).toEqual({ org_identifier: "_meta", index: "2" });
-    expect(push.mock.calls[1][0].query).toEqual({ org_identifier: "_meta", duplicate: "3" });
+    expect(push.mock.calls[0][0].query).toEqual({
+      org_identifier: "_meta",
+      index: "2",
+    });
+    expect(push.mock.calls[1][0].query).toEqual({
+      org_identifier: "_meta",
+      duplicate: "3",
+    });
   });
 
   it("confirms with a destructive button quoting the message", async () => {
@@ -170,7 +185,9 @@ describe("AnnouncementBannerList", () => {
     expect((wrapper.vm as any).pendingDelete).toBe(1);
     await (wrapper.vm as any).confirmDelete();
 
-    const saved = setConfig.mock.calls[0][1] as { banners: { message: string }[] };
+    const saved = setConfig.mock.calls[0][1] as {
+      banners: { message: string }[];
+    };
     expect(saved.banners.map((banner) => banner.message)).toEqual([
       "Webinar **today**",
       "Later",
@@ -204,19 +221,26 @@ describe("AnnouncementBannerList", () => {
   });
 
   it("surfaces the server's delete error verbatim", async () => {
-    setConfig.mockRejectedValue({ response: { data: { message: "config locked by peer" } } });
+    setConfig.mockRejectedValue({
+      response: { data: { message: "config locked by peer" } },
+    });
     const wrapper = await mountList();
     (wrapper.vm as any).pendingDelete = 0;
 
     await (wrapper.vm as any).confirmDelete();
 
     expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "negative", message: "config locked by peer" }),
+      expect.objectContaining({
+        type: "negative",
+        message: "config locked by peer",
+      }),
     );
   });
 
   it("shows the load error inline", async () => {
-    getConfig.mockRejectedValue({ response: { data: { message: "forbidden" } } });
+    getConfig.mockRejectedValue({
+      response: { data: { message: "forbidden" } },
+    });
     const wrapper = await mountList();
 
     expect(wrapper.get('[data-test="announcement-banners-error"]').text()).toContain("forbidden");

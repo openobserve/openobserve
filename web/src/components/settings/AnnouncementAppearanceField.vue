@@ -30,6 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="announcement-appearance-field">
+      <span class="announcement-appearance-label">{{ t("announcements.editor.icon") }}</span>
+      <q-btn-toggle
+        v-model="icon"
+        class="announcement-appearance-toggle"
+        toggle-color="primary"
+        no-caps
+        unelevated
+        :options="iconOptions"
+        data-test="announcement-editor-icon"
+      />
+    </div>
+
+    <div class="announcement-appearance-field">
       <span class="announcement-appearance-label">{{ t("announcements.editor.background") }}</span>
       <div
         class="announcement-appearance-swatches"
@@ -51,7 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :style="
             swatch.preset
-              ? { '--swatch-light': swatch.preset.light, '--swatch-dark': swatch.preset.dark }
+              ? {
+                  '--swatch-light': swatch.preset.light,
+                  '--swatch-dark': swatch.preset.dark,
+                }
               : undefined
           "
           :tabindex="focusKey === swatch.key ? 0 : -1"
@@ -105,13 +121,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import {
+  BANNER_ICONS,
   COLOR_PRESETS,
   TEXT_SIZES,
   isHexColor,
+  materialIconName,
   presetFor,
   type BannerTextSize,
   type ThemeMode,
@@ -122,6 +140,7 @@ defineProps<{ errors: { colorLight?: string; colorDark?: string } }>();
 const textSize = defineModel<BannerTextSize>("textSize", { required: true });
 const colorLight = defineModel<string>("colorLight", { required: true });
 const colorDark = defineModel<string>("colorDark", { required: true });
+const icon = defineModel<string>("icon", { required: true });
 
 const SEVERITY_CHOICE = "severity";
 const CUSTOM_CHOICE = "custom";
@@ -137,12 +156,28 @@ const textSizeOptions = computed(() =>
   })),
 );
 
+const iconOptions = computed(() => [
+  {
+    label: t("announcements.editor.iconDefault"),
+    value: "",
+    attrs: { "data-test": "announcement-editor-icon-default" },
+  },
+  ...BANNER_ICONS.map((name) => ({
+    icon: materialIconName(name),
+    value: name,
+    attrs: {
+      "aria-label": name,
+      title: name,
+      "data-test": `announcement-editor-icon-${name}`,
+    },
+  })),
+]);
+
+const choiceFor = (light: string, dark: string) =>
+  !light && !dark ? SEVERITY_CHOICE : (presetFor(light, dark)?.key ?? CUSTOM_CHOICE);
+
 // A ref rather than derived from the hexes, so picking Custom on a preset pair does not snap back.
-const choice = ref(
-  !colorLight.value && !colorDark.value
-    ? SEVERITY_CHOICE
-    : (presetFor(colorLight.value, colorDark.value)?.key ?? CUSTOM_CHOICE),
-);
+const choice = ref(choiceFor(colorLight.value, colorDark.value));
 
 const swatches = computed(() => [
   {
@@ -157,7 +192,12 @@ const swatches = computed(() => [
     label: t(`announcements.editor.colorPresets.${preset.key}`),
     preset,
   })),
-  { key: CUSTOM_CHOICE, testId: "custom", label: t("announcements.editor.custom"), preset: null },
+  {
+    key: CUSTOM_CHOICE,
+    testId: "custom",
+    label: t("announcements.editor.custom"),
+    preset: null,
+  },
 ]);
 
 const swatchRefs: HTMLButtonElement[] = [];
@@ -165,8 +205,20 @@ const swatchRefs: HTMLButtonElement[] = [];
 // Roving tabindex: the group is one Tab stop and arrow keys move between swatches.
 const focusKey = ref(choice.value);
 
+// Colours set from outside (a saved style) re-light the matching swatch unless Custom is open.
+watch([colorLight, colorDark], ([light, dark]) => {
+  if (choice.value === CUSTOM_CHOICE && (light || dark)) return;
+  choice.value = choiceFor(light, dark);
+  focusKey.value = choice.value;
+});
+
 const onSwatchKeydown = (event: KeyboardEvent) => {
-  const steps: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  const steps: Record<string, number> = {
+    ArrowRight: 1,
+    ArrowDown: 1,
+    ArrowLeft: -1,
+    ArrowUp: -1,
+  };
   const keys = swatches.value.map((swatch) => swatch.key);
   const current = keys.indexOf(focusKey.value);
   let next: number;

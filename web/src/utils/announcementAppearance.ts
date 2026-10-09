@@ -33,6 +33,22 @@ export const TEXT_SIZES: BannerTextSize[] = ["small", "medium", "large"];
 
 export const DEFAULT_TEXT_SIZE: BannerTextSize = "medium";
 
+/** Mirrors `BANNER_ICONS` on the server, which rejects anything else. */
+export const BANNER_ICONS = [
+  "info",
+  "warning",
+  "error",
+  "campaign",
+  "build",
+  "schedule",
+  "rocket-launch",
+  "lightbulb",
+  "security",
+  "update",
+] as const;
+
+export type BannerIcon = (typeof BANNER_ICONS)[number];
+
 export const LIGHT_TEXT = "#FFFFFF";
 
 export const DARK_TEXT = "#171717";
@@ -53,6 +69,15 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export function isHexColor(value: unknown): value is string {
   return typeof value === "string" && HEX_COLOR.test(value);
+}
+
+export function isBannerIcon(value: unknown): value is BannerIcon {
+  return BANNER_ICONS.includes(value as BannerIcon);
+}
+
+/** The Material icon name Quasar's `q-icon` expects; the stored names are kebab-case. */
+export function materialIconName(icon: BannerIcon): string {
+  return icon.replace(/-/g, "_");
 }
 
 export function isTextSize(value: unknown): value is BannerTextSize {
@@ -107,5 +132,8 @@ export function bannerColorVars(
 ): Record<string, string> | undefined {
   const background = backgroundFor(colors, mode);
   if (!background) return undefined;
-  return { "--announcement-bg": background, "--announcement-fg": textColorFor(background) };
+  return {
+    "--announcement-bg": background,
+    "--announcement-fg": textColorFor(background),
+  };
 }
