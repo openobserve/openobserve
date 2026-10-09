@@ -27,7 +27,8 @@
       "alertsPagination.spec.js",
       "alertTemplatesPagination.spec.js",
       "alertDestinationsPagination.spec.js",
-      "alerts-destinations-usage.spec.js"
+      "alerts-destinations-usage.spec.js",
+      "alerts-save-query-mode.spec.js"
     ],
     "disabled": [
       {
@@ -386,7 +387,12 @@
       "metrics-explorer-stream-cache.spec.js",
       "metrics-promql-time-shift.spec.js",
       "metrics-explorer-detail-view.spec.js",
-      "metrics-query-history.spec.js"
+      "metrics-query-history.spec.js",
+      "metrics-explorer-create-alert.spec.js",
+      "metrics-explorer-drilldown.spec.js",
+      "metrics-explorer-used-in.spec.js",
+      "metrics-promql-builder-roundtrip.spec.js",
+      "metrics-promql-formula.spec.js"
     ],
     "disabled": [],
     "paths": [

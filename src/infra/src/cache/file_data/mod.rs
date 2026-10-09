@@ -474,7 +474,7 @@ pub async fn get_ranges_opts(
 ///
 /// metrics_cache:
 /// metrics_results/default/2025/04/08/06/
-/// 17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb
+/// v2_17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb
 /// log_cache:
 /// results/default/logs/default/16042959487540176184_30_zo_sql_key/
 /// 1744081170000000_1744081170000000_1_0.json
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_file_data_get_file_time() {
-        let file = "metrics_results/default/2025/04/08/06/17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb";
+        let file = "metrics_results/default/2025/04/08/06/v2_17caf18281f2a17c76a803a9cd59a207_1744091424000000_1744091426789749_1744089728661252.pb";
         let time = get_file_time(file);
         assert_eq!(time, Some(2025040806));
 

@@ -122,7 +122,7 @@ export class LogsPage {
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
-        this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input-field"]';
+        this.savedViewSearchInput = '[data-test="logs-saved-views-dialog-search-field"]';
         // Matches both ConfirmDialog.vue (data-test="confirm-dialog") and SearchBar's inline
         // ODialog (data-test="search-bar-confirm-dialog") via substring selector.
         this.confirmButton = '[data-test*="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -133,7 +133,7 @@ export class LogsPage {
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
-        this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
+        this.savedViewsListDialogEl = '[data-test="logs-saved-views-dialog"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
         this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
         this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
@@ -3349,7 +3349,7 @@ export class LogsPage {
     async clickSaveViewButton() {
         // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
         // Close any open menus/dialogs first, then open the menu and click the item.
-        const listDialog = this.page.locator('[data-test="saved-views-list-dialog"]');
+        const listDialog = this.page.locator(this.savedViewsListDialogEl);
         const isListOpen = await listDialog.isVisible({ timeout: 500 }).catch(() => false);
         if (isListOpen) {
             await listDialog.locator('[data-test="o-dialog-close-btn"]').click();
@@ -3460,17 +3460,23 @@ export class LogsPage {
         return await searchInput.fill(text);
     }
 
+    // The `-apply-` prefix keeps the favourites pane (`-favorites-apply-`) out of the match.
+    savedViewApplyLocator(name) {
+        if (typeof name !== 'string') {
+            throw new TypeError(`savedViewApplyLocator expects the exact view name, got ${name}`);
+        }
+        return this.page.locator(`[data-test^="logs-saved-views-dialog-apply-"][data-test-view-name="${LogsPage.escapeCssAttrValue(name)}"]`);
+    }
+
     async clickSavedViewByTitle(title) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(title).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         return await element.click({ force: true });
     }
 
     async clickDeleteButton() {
-        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{view_id}-saved-view-btn"
-        // Click the first visible delete button in the saved views area
-        const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
+        const deleteBtn = this.page.locator('[data-test="logs-saved-views-dialog-table"] [data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         return await deleteBtn.click();
     }
@@ -3523,13 +3529,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(text).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.savedViewApplyLocator(text).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -3552,7 +3558,7 @@ export class LogsPage {
     async clickDeleteSavedViewButton(savedViewName) {
         // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
         // reach hidden state so the re-open sequence doesn't race the close animation.
-        await this.page.locator('[data-test="saved-views-list-dialog"]')
+        await this.page.locator(this.savedViewsListDialogEl)
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
 
@@ -3574,8 +3580,8 @@ export class LogsPage {
         // The delete button data-test uses view_id (a UUID), not the view name, so we
         // can't build the exact selector. Instead scope to the main saved-views table
         // (not favorites) — after filtering by name there is exactly one visible row.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.scrollIntoViewIfNeeded();
         await deleteBtn.click();
@@ -4082,7 +4088,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${label}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(label).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click({ force: true });
     }
@@ -8878,9 +8884,7 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickSavedViewByName(name) {
-        // SearchBar.vue uses data-test="logs-search-bar-apply-${value}-saved-view-btn" for the apply button.
-        // The previously used `logs-search-saved-view-item-${name}` does not exist in the DOM.
-        const savedView = this.page.locator(`[data-test="logs-search-bar-apply-${name}-saved-view-btn"]`).first();
+        const savedView = this.savedViewApplyLocator(name).first();
         await savedView.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         await savedView.click({ force: true });
@@ -8954,8 +8958,8 @@ export class LogsPage {
      */
     async clickDeleteSavedViewByName(name) {
         // data-test uses view_id (UUID), not name — scope to main table after filtering.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);

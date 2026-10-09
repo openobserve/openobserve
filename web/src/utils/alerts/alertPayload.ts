@@ -41,6 +41,7 @@ export interface PayloadFormData {
     promql_condition?: any;
     sql: string;
     vrl_function?: string | null;
+    multi_time_range?: any[] | null;
     /**
      * The SLO burn/budget condition. The backend enforces
      * `query_type == "slo"` IFF this is present, in BOTH directions, so a
@@ -126,6 +127,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   payload.context_attributes = {} as any;
 
   payload.query_condition.type = payload.is_real_time ? "custom" : formData.query_condition.type;
+  // Compare-with-Past windows only run with SQL; never send them for another type.
+  if (payload.query_condition.type !== "sql") payload.query_condition.multi_time_range = [];
 
   formData.context_attributes.forEach((attr: any) => {
     if (attr.key?.trim() && attr.value?.trim()) payload.context_attributes[attr.key] = attr.value;
@@ -211,10 +214,6 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
     payload.query_condition.promql_condition = null;
-  }
-
-  if (getSelectedTab.value === "promql") {
-    payload.query_condition.sql = "";
   }
 
   // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
@@ -309,7 +308,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   ) {
     delete (payload.trigger_condition as any).warning_threshold;
   }
-  if (getSelectedTab.value !== "promql") {
+  // Forecast mode has no warning value: its condition is the horizon in days.
+  if (getSelectedTab.value !== "promql" || (formData as any)._ui?.forecast) {
     delete (payload.query_condition as any).promql_warning_value;
   }
   // Realtime alerts carry no warning family at all (D12) — and the form hides

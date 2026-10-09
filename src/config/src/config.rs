@@ -94,7 +94,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 95: add band settings to anomaly_detection_config.
 // 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
 // 97: create query_history.
-pub const DB_SCHEMA_VERSION: u64 = 97;
+// 98: key alert_dedup_state by (org_id, fingerprint).
+pub const DB_SCHEMA_VERSION: u64 = 98;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -411,6 +412,9 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+static STORED_EXT_AUTH_SALT: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+/// Installs older than the stored salt hash with this value: rotating it breaks their logins.
+pub const LEGACY_EXT_AUTH_SALT: &str = "openobserve";
 
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
@@ -574,6 +578,30 @@ pub fn cache_stored_grpc_token(token: &str) {
 
 pub fn get_stored_grpc_token() -> String {
     STORED_GRPC_TOKEN.load().to_string()
+}
+
+/// Caches the ext auth salt stored in the meta db; empty means none is stored.
+pub fn cache_stored_ext_auth_salt(salt: &str) {
+    STORED_EXT_AUTH_SALT.store(Arc::new(salt.to_owned()));
+}
+
+pub fn get_stored_ext_auth_salt() -> String {
+    STORED_EXT_AUTH_SALT.load().to_string()
+}
+
+pub fn get_ext_auth_salt() -> String {
+    select_ext_auth_salt(
+        &get_config().auth.ext_auth_salt,
+        &get_stored_ext_auth_salt(),
+    )
+}
+
+fn select_ext_auth_salt(env_salt: &str, stored_salt: &str) -> String {
+    [env_salt, stored_salt]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .unwrap_or(LEGACY_EXT_AUTH_SALT)
+        .to_string()
 }
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
@@ -1487,8 +1515,8 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
-    /// Secret for presigned and ext-token logins; a new install refuses to start with the default.
-    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
+    /// Empty: a new install generates one and stores it in the meta db.
+    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "")]
     pub ext_auth_salt: String,
     #[env_config(
         name = "ZO_ALERT_CHART_SIGNING_KEY",
@@ -1737,12 +1765,6 @@ pub struct Search {
         help = "Enable pushdown filter"
     )]
     pub feature_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
-        default = false,
-        help = "Enable pushdown filter for metrics queries"
-    )]
-    pub feature_metrics_pushdown_filter_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
@@ -3435,6 +3457,12 @@ pub struct Prometheus {
     /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
     #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
     pub native_histogram_max_buckets: usize,
+    #[env_config(
+        name = "ZO_METRICS_STALENESS_MARKERS_ENABLED",
+        default = true,
+        help = "Store Prometheus staleness markers and end a series at its marker in PromQL. Off drops markers on ingest and ignores stored ones on read. Upgrade every node with this off before turning it on."
+    )]
+    pub staleness_markers_enabled: bool,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
@@ -6360,5 +6388,12 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn test_select_ext_auth_salt_prefers_env_then_stored_then_legacy() {
+        assert_eq!(select_ext_auth_salt("env", "stored"), "env");
+        assert_eq!(select_ext_auth_salt("", "stored"), "stored");
+        assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
     }
 }

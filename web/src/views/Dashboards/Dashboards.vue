@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-name="{ row, value }">
-              <span class="inline-flex items-center gap-1">
+              <span class="flex min-w-0 items-center gap-1">
                 <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
@@ -225,11 +225,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
                 />
-                <span
+                <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
-                  :title="value"
-                  >{{ value }}</span
+                  >{{ value }}</OTruncatedText
                 >
                 <!-- At-a-glance indicator: shows which dashboard is the org
                      home dashboard without an interactive icon on every row. -->
@@ -251,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
+              <span class="text-text-body">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />
@@ -270,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="truncate">{{ row.folder }}</span>
+                <OTruncatedText>{{ row.folder }}</OTruncatedText>
               </button>
             </template>
             <template #cell-actions="{ row }">
@@ -602,6 +601,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -648,6 +648,7 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    OTruncatedText,
     OUserCell,
     OTimeCell,
     OPageLayout,

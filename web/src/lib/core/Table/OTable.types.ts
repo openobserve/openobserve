@@ -5,6 +5,7 @@ import type { I18nText } from "@/types/i18n";
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
 import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 
 // ─── Row rail / row tone ─────────────────────────────────────────
 /**
@@ -77,6 +78,28 @@ export interface OTableCellActionsContext {
 
 export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
   Symbol("OTableCellActions");
+
+// ─── Cut-off cell tooltip context ────────────────────────────────
+/** A body cell reports hover; OTable shows one shared tooltip, only when that cell's text is cut. */
+export interface OTableOverflowTooltipContext {
+  /** `toolbarSide` reports where the cell's hover toolbar sits, so the tooltip opens on the other side. */
+  enter: (cell: HTMLElement, toolbarSide?: () => TooltipSide | null) => void;
+  leave: () => void;
+}
+
+export const OTableOverflowTooltipKey: InjectionKey<OTableOverflowTooltipContext> =
+  Symbol("OTableOverflowTooltip");
+
+/** The shared tooltip's state, read only inside its own component so a change never re-renders the table. */
+export interface OTableOverflowTooltipState {
+  anchor: Ref<HTMLElement | null>;
+  text: Ref<string>;
+  side: Ref<TooltipSide>;
+  onOpenChange: (open: boolean) => void;
+}
+
+/** Marks an element inside a cell that clips its own text (slot wrapper, copy value). */
+export const TABLE_CELL_CLIP_ATTR = "data-o2-cell-clip";
 
 // ─── Shared column size constants ────────────────────────────────
 /**
@@ -179,6 +202,8 @@ export interface OTableColumnMeta {
    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
+  /** `false` keeps this column out of the table's cut-off tooltip; set it on columns that hold secrets. */
+  cellOverflowTooltip?: boolean;
   /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
   formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
@@ -444,6 +469,8 @@ export interface OTableProps<TData = any> {
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;
+  /** Short rows (`--table-row-height-compact`) with no cell padding, for small list dialogs; overrides `dense`. */
+  compact?: boolean;
   bordered?: boolean;
   /**
    * Draws the outer frame (border) around the whole table region. Default true.
@@ -453,11 +480,15 @@ export interface OTableProps<TData = any> {
   frame?: boolean;
   /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
   toolbarBordered?: boolean;
+  /** Draws the hairline above the built-in pager (default true); set false when the table sits flush in a dialog. */
+  paginationBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
   /** Wrap cell content */
   wrap?: boolean;
+  /** Show the shared full-text tooltip on cut body cells (default true); turn off where Wrap or row expansion is the reveal. */
+  cellOverflowTooltip?: boolean;
   /**
    * When true, cells render their natural width and the table scrolls
    * horizontally if the total content overflows the container. Switches

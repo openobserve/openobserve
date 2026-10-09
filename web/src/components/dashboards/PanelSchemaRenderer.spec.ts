@@ -164,7 +164,12 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
+import { FORECAST_MIN_DAYS, forecastAlertFromChart } from "@/utils/alerts/forecastAlert";
 import { getPanelDataForPageKey } from "@/composables/dashboard/useDashboardPanel";
+import {
+  alertCreationDialog,
+  closeAlertCreationDialog,
+} from "@/composables/alerts/useAlertCreation";
 
 describe("PanelSchemaRenderer", () => {
   let wrapper: any;
@@ -553,6 +558,63 @@ describe("PanelSchemaRenderer", () => {
 
       expect(wrapper.vm.noData).toBe("No Data");
       expect(wrapper.vm.tableRendererData).toEqual({ rows: [], columns: [] });
+    });
+
+    it("shows No Data for a custom_chart with no rows instead of an error", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("clears a stale custom_chart error when switching to another chart type", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "Error executing code", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(true);
+
+      await wrapper.setProps({ panelSchema: { ...defaultProps.panelSchema, type: "bar" } });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
     // Guard must not over-trigger: with rows present the table keeps serving
@@ -2017,6 +2079,158 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuValue).toBe(75);
     });
 
+    it("hides the chart tooltip when the alert menu opens, from a series or from empty chart area", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      const dispatchAction = vi.fn();
+      wrapper.vm.chartRendererRef = { chart: { dispatchAction } };
+      wrapper.vm.panelData = { options: { series: [{ name: "a", _panelQueryIndex: 0 }] } };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0, dataIndex: 1 });
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+
+      expect(dispatchAction).toHaveBeenCalledTimes(2);
+      expect(dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
+    });
+
+    it("keeps the chart tooltip on a right-click when alert creation is off", () => {
+      wrapper = createWrapper({ allowAlertCreation: false });
+      const dispatchAction = vi.fn();
+      wrapper.vm.chartRendererRef = { chart: { dispatchAction } };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+
+      expect(dispatchAction).not.toHaveBeenCalled();
+    });
+
+    it("resolves the clicked series to its panel query and role", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary" },
+            { name: "b (1 day ago)", _panelQueryIndex: 1, _seriesRole: "shifted" },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 1 });
+
+      expect(wrapper.vm.contextMenuData).toMatchObject({
+        value: 3,
+        panelQueryIndex: 1,
+        seriesRole: "shifted",
+      });
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 4 });
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBeUndefined();
+    });
+
+    it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", null],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.7, seriesIndex: 1, dataIndex: 3 });
+
+      expect(wrapper.vm.contextMenuData).toMatchObject({
+        seriesRole: "forecast",
+        forecastPoint: {
+          rangeEndValue: 0.45,
+          startTime: 160,
+          startValue: 0.5,
+          endValue: 0.7,
+          clickedTime: 280,
+        },
+      });
+    });
+
+    it("measures a forecast line from the range end, past the points that close the seam", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _fitStartIndex: 1,
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", 0.4],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.7, seriesIndex: 1, dataIndex: 3 });
+
+      expect(wrapper.vm.contextMenuData.forecastPoint).toMatchObject({
+        startTime: 160,
+        startValue: 0.5,
+        endValue: 0.7,
+      });
+    });
+
+    it("measures a right-click on a seam point from the range end, at the shortest horizon", () => {
+      wrapper = createWrapper({ allowAlertCreation: true });
+      wrapper.vm.panelData = {
+        options: {
+          series: [
+            { name: "a", _panelQueryIndex: 0, _seriesRole: "primary", data: [] },
+            {
+              name: "a (forecast)",
+              _panelQueryIndex: 0,
+              _seriesRole: "forecast",
+              _timestamps: [100, 160, 220, 280],
+              _fitStartIndex: 1,
+              _rangeEndValue: 0.45,
+              data: [
+                ["x0", 0.4],
+                ["x1", 0.5],
+                ["x2", 0.6],
+                ["x3", 0.7],
+              ],
+            },
+          ],
+        },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 0.4, seriesIndex: 1, dataIndex: 0 });
+
+      const point = wrapper.vm.contextMenuData.forecastPoint;
+      expect(point).toMatchObject({ startTime: 160, startValue: 0.5, clickedTime: 100 });
+      // The clicked value is the target, as on any forecast point; H from before the range end clamps.
+      expect(wrapper.vm.contextMenuData.value).toBe(0.4);
+      expect(
+        forecastAlertFromChart({ ...point, U: "x", T: 0.4, rangeSeconds: 3600 }),
+      ).toMatchObject({ direction: "falls", H: FORECAST_MIN_DAYS });
+    });
+
     it("should hide context menu", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
 
@@ -2533,6 +2747,182 @@ describe("PanelSchemaRenderer", () => {
       const { data, metadata } = lastConversion();
       expect(data.map((d: any) => d.result[0].metric.q)).toEqual(["B", "B1d"]);
       expect(metadata.queries.map((m: any) => m.panelQueryIndex)).toEqual([1, 1]);
+    });
+  });
+
+  describe("the saved hide flag", () => {
+    const entry = (name: string) => ({ resultType: "matrix", result: [{ metric: { q: name } }] });
+    const metaEntry = (panelQueryIndex: number, gapMs = 0) => ({
+      panelQueryIndex,
+      timeRangeGap: { seconds: gapMs, periodAsStr: gapMs ? "1 day ago" : "" },
+    });
+
+    it("hides a query saved with config.hide on a dashboard, outside the editor", async () => {
+      const loaded = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: loaded,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000)] }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-saved-hide",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { hide: true } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      loaded.value = [entry("A"), entry("B"), entry("A1d")];
+      await flushPromises();
+
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      expect(call[1].map((d: any) => d.result[0].metric.q)).toEqual(["A", "A1d"]);
+      expect(call[6].queries.map((m: any) => m.panelQueryIndex)).toEqual([0, 0]);
+    });
+
+    it("right-click on empty chart area alerts on the formula, not its saved-hidden inputs", async () => {
+      closeAlertCreationDialog();
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m])))";
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: ref([entry("A"), entry("B"), entry("F")]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [
+            { ...metaEntry(0), query: "sum(rate(errors[1m]))" },
+            { ...metaEntry(1), query: "sum(rate(requests[1m]))" },
+            { ...metaEntry(2), query: combined },
+          ],
+        }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 1 }], [{ step: 1 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          id: "panel-formula",
+          type: "line",
+          queryType: "promql",
+          queries: [
+            {
+              query: "sum(rate(errors[1m]))",
+              fields: { stream: "errors", stream_type: "metrics" },
+              config: { ref: "A", hide: true },
+            },
+            {
+              query: "sum(rate(requests[1m]))",
+              fields: { stream: "requests", stream_type: "metrics" },
+              config: { ref: "B", hide: true },
+            },
+            { query: "", fields: { stream_type: "metrics" }, config: { formula: "A / B" } },
+          ],
+          config: {},
+        },
+      });
+      await flushPromises();
+
+      wrapper.vm.handleCreateAlert({ condition: "above", threshold: 1 });
+
+      const prefill = alertCreationDialog.value?.prefill;
+      expect(prefill?.promql).toBe(combined);
+      expect(prefill?.queryChoices).toBeUndefined();
+      expect(prefill?.streamCandidates?.map((c: any) => c.name)).toEqual(["errors", "requests"]);
+    });
+
+    it("in the editor, follows the editor's live hide state over the applied panel's", async () => {
+      const loaded = ref<any[]>([]);
+      vi.mocked(usePanelDataLoader).mockReturnValue({
+        data: loaded,
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [metaEntry(0), metaEntry(1), metaEntry(0, 86_400_000)] }),
+        resultMetaData: ref([[{ step: 1 }], [{ step: 2 }], [{ step: 3 }]]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      wrapper = mount(PanelSchemaRenderer, {
+        props: {
+          ...defaultProps,
+          panelSchema: {
+            id: "panel-saved-hide",
+            type: "line",
+            queryType: "promql",
+            queries: [
+              { query: "a", fields: {}, config: { time_shift: [{ offSet: "1d" }] } },
+              { query: "b", fields: {}, config: { hide: true } },
+            ],
+            config: {},
+          },
+        },
+        global: {
+          plugins: [i18n, store],
+          provide: {
+            hoveredSeriesState: { value: null },
+            dashboardPanelDataPageKey: "saved-hide-editor",
+            variablesAndPanelsDataLoadingState: {
+              panels: {},
+              variablesData: {},
+              searchRequestTraceIds: {},
+            },
+          },
+          mocks: { $t: (key: string) => key },
+          stubs: {
+            ChartRenderer: { template: '<div data-test="chart-renderer"></div>' },
+            AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
+            LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
+          },
+        },
+      });
+      await flushPromises();
+      getPanelDataForPageKey("saved-hide-editor").layout.hiddenQueries = [0];
+      loaded.value = [entry("A"), entry("B"), entry("A1d")];
+      await flushPromises();
+
+      const call = vi.mocked(convertPanelData).mock.calls.at(-1)!;
+      expect(call[1].map((d: any) => d.result[0].metric.q)).toEqual(["B"]);
+      expect(call[6].queries.map((m: any) => m.panelQueryIndex)).toEqual([1]);
     });
   });
   // A chunk conversion landing after the final one must not overwrite it.

@@ -128,13 +128,13 @@
         >
           {{ scoreNote(score) }}
         </span>
-        <span
+        <OTruncatedText
           v-else-if="score.reasoning"
-          class="text-text-secondary text-2xs line-clamp-2 min-w-0 flex-1"
-          :title="score.reasoning"
+          :lines="2"
+          class="text-text-secondary text-2xs flex-1"
         >
           {{ raw(score.reasoning) }}
-        </span>
+        </OTruncatedText>
       </div>
     </div>
   </div>
@@ -147,6 +147,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useAnalyzingMessage from "@/composables/useAnalyzingMessage";
 import type {
   PlaygroundCell,

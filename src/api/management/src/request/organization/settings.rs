@@ -164,8 +164,6 @@ pub async fn create(
     {
         field_found = true;
         for mapping in &mut mappings {
-            use o2_openfga::authorizer::groups::get_all_groups;
-
             if openobserve_core::organization::get_org(&mapping.org_id)
                 .await
                 .is_none()
@@ -192,26 +190,11 @@ pub async fn create(
                     mapping.base_role, mapping.org_id
                 ));
             }
-            if let Some(group) = mapping.user_group.as_ref() {
-                let all_groups = match get_all_groups(&mapping.org_id, None).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "error getting all groups for {} when updating domain org mappings : {e}",
-                            mapping.org_id
-                        );
-                        return MetaHttpResponse::bad_request(format!(
-                            "error getting groups for org {} : {e}",
-                            mapping.org_id
-                        ));
-                    }
-                };
-                if !all_groups.contains(&group) {
-                    return MetaHttpResponse::bad_request(format!(
-                        "custom group {group} not found in org {}",
-                        mapping.org_id
-                    ));
+            if let Some(mut claim) = mapping.role_claim_name.as_mut() {
+                if claim.trim().is_empty() {
+                    return MetaHttpResponse::bad_request("role claim name must not be empty");
                 }
+                *claim = claim.trim().to_string();
             }
 
             mapping.domain = mapping.domain.to_lowercase();

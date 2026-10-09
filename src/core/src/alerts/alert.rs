@@ -1443,18 +1443,18 @@ pub async fn list_v2<C: ConnectionTrait>(
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(f, a)| {
-            // Include the alert if all alerts are permitted.
-            is_all_permitted
-                // Include the alert if the alert is permitted with the old OpenFGA identifier.
-                || permissions.contains(&format!("alert:{}", a.name))
-                || permissions.contains(&format!("alert:{}/{}", f.folder_id, a.id.as_ref().unwrap()))
-                // Include the alert if the alert is permitted with the new OpenFGA identifier.
-                || a.id
-                    .is_some_and(|id| permissions.contains(&format!("alert:{id}")))
-        })
+        .filter(|(f, a)| is_all_permitted || is_alert_permitted(f, a, &permissions))
         .collect_vec();
     Ok(alerts)
+}
+
+/// Whether an individual grant in `permissions` covers `alert`, by its old or new OpenFGA id.
+pub(crate) fn is_alert_permitted(folder: &Folder, alert: &Alert, permissions: &[String]) -> bool {
+    permissions.contains(&format!("alert:{}", alert.name))
+        || alert.id.is_some_and(|id| {
+            permissions.contains(&format!("alert:{}/{id}", folder.folder_id))
+                || permissions.contains(&format!("alert:{id}"))
+        })
 }
 
 /// Deletes an alert by its KSUID primary key, unconditionally.
@@ -2150,6 +2150,18 @@ pub fn manual_trigger_row(alert: &Alert) -> Map<String, Value> {
     row
 }
 
+/// Puts an incident notification failure, which the destination send never saw, before its errors.
+pub(crate) fn with_incident_notify_error(
+    error_message: String,
+    incident_error: Option<String>,
+) -> String {
+    match incident_error {
+        None => error_message,
+        Some(incident_error) if error_message.trim().is_empty() => incident_error,
+        Some(incident_error) => format!("{incident_error}; {error_message}"),
+    }
+}
+
 /// Triggers an alert.
 /// ExistingAlertRepeated is suppressed by design and notifies nobody, so treating it as
 /// "notified" would skip every destination and leave the trigger silent.
@@ -2179,7 +2191,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_notified = if alert.creates_incident
+    let (incident_notified, incident_notify_error) = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
@@ -2197,35 +2209,38 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                (
+                    incident_path_notified(&correlated.outcome),
+                    correlated.notify_error,
+                )
             }
             Ok(None) => {
                 log::debug!(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                false
+                (false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                false
+                (false, None)
             }
         }
     } else {
-        false
+        (false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_notified = false;
+    let (incident_notified, incident_notify_error) = (false, None);
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_id_{trace_id}");
@@ -2259,9 +2274,9 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             None,
         )
         .await?;
-    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
+    let err_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((success_message, err_message))
+    Ok((outcome.success_message, err_message))
 }
 
 pub async fn trigger_by_name(
@@ -2281,7 +2296,7 @@ pub async fn trigger_by_name(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_notified = if alert.creates_incident
+    let (incident_notified, incident_notify_error) = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
@@ -2299,35 +2314,38 @@ pub async fn trigger_by_name(
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                (
+                    incident_path_notified(&correlated.outcome),
+                    correlated.notify_error,
+                )
             }
             Ok(None) => {
                 log::debug!(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                false
+                (false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                false
+                (false, None)
             }
         }
     } else {
-        false
+        (false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_notified = false;
+    let (incident_notified, incident_notify_error) = (false, None);
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_name_{trace_id}");
@@ -2354,9 +2372,9 @@ pub async fn trigger_by_name(
             None,
         )
         .await?;
-    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
+    let err_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((success_message, err_message))
+    Ok((outcome.success_message, err_message))
 }
 
 /// Per-destination result of one notification attempt.
@@ -4827,6 +4845,22 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_with_incident_notify_error() {
+        assert_eq!(
+            with_incident_notify_error("dest err".to_string(), None),
+            "dest err"
+        );
+        assert_eq!(
+            with_incident_notify_error(" ".to_string(), Some("slack: 500".to_string())),
+            "slack: 500"
+        );
+        assert_eq!(
+            with_incident_notify_error("wf err".to_string(), Some("slack: 500".to_string())),
+            "slack: 500; wf err"
+        );
+    }
+
     /// Calls the production predicate, not a copy of it: a resolve updates the record the firing
     /// opened, so the firing body must have somewhere to carry the correlation key.
     #[test]
@@ -7236,6 +7270,137 @@ mod tests {
         );
 
         assert_eq!(out[0].as_str().unwrap(), "Stream: default Type: metrics");
+    }
+
+    /// A forecast alert as the web form saves it: per series, `value` is days until 0.9.
+    fn forecast_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "disk-full".into();
+        alert.org_id = "default".into();
+        alert.stream_name = "node_filesystem_avail_bytes".into();
+        alert.stream_type = config::meta::stream::StreamType::Metrics;
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_condition = Some(config::meta::alerts::Condition {
+            column: "value".into(),
+            operator: config::meta::alerts::Operator::LessThanEquals,
+            value: json!(7),
+            ignore_case: false,
+        });
+        alert.query_condition.promql = Some(
+            "((disk_used) >= 0.9) * 0 or clamp_min(ceil((0.9 - (disk_used)) / (deriv((disk_used)[2d:15m]) > 0) / 8640 - 1e-6) / 10, 0) or ((disk_used) * 0 + 36500)".into(),
+        );
+        alert.query_condition.promql_multi_alert = true;
+        alert.trigger_condition.threshold = 1;
+        alert.trigger_condition.operator = config::meta::alerts::Operator::GreaterThanEquals;
+        alert.row_template = "reaches 0.9 in {value} days".into();
+        alert
+    }
+
+    fn forecast_row(device: &str, days: f64) -> Map<String, Value> {
+        let mut row = Map::new();
+        row.insert("device".to_string(), json!(device));
+        row.insert("_timestamp".to_string(), json!(1_700_000_000_000_000_i64));
+        row.insert("value".to_string(), json!(days));
+        row
+    }
+
+    fn firing_devices(rows: &[Map<String, Value>]) -> Vec<String> {
+        let classification = config::meta::alerts::grouping::classify_promql_series(
+            rows,
+            config::meta::alerts::Operator::LessThanEquals,
+            7.0,
+            None,
+            100,
+        );
+        let mut firing: Vec<String> = classification
+            .groups
+            .into_iter()
+            .filter(|group| group.level.is_some())
+            .map(|group| group.labels["device"].clone())
+            .collect();
+        firing.sort();
+        firing
+    }
+
+    #[tokio::test]
+    async fn a_forecast_alert_fires_per_series_and_says_when_it_crosses() {
+        let alert = forecast_alert_fixture();
+        // Rising, 6.96 days out, already past 0.9, and moving away.
+        let rows = vec![
+            forecast_row("a", 5.0),
+            forecast_row("b", 7.0),
+            forecast_row("c", 0.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&rows), ["a", "b", "c"]);
+
+        // Next evaluation: a's trend reversed and c stopped reporting.
+        let next = vec![
+            forecast_row("a", 36500.0),
+            forecast_row("b", 7.0),
+            forecast_row("d", 36500.0),
+        ];
+        assert_eq!(firing_devices(&next), ["b"]);
+
+        let fired = &rows[..3];
+        let rows_tpl = process_row_template(
+            "default",
+            &alert.row_template,
+            &alert,
+            RowTemplateType::String,
+            fired,
+        );
+        let lines = [
+            "reaches 0.9 in 5 days",
+            "reaches 0.9 in 7 days",
+            "reaches 0.9 in 0 days",
+        ];
+        assert_eq!(rows_tpl, lines.map(|line| Value::String(line.into())));
+
+        let custom = process_dest_template(
+            "default",
+            "{rows}",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+        for line in lines {
+            assert!(custom.contains(line), "{custom}");
+        }
+
+        let ctx = build_notification_context(
+            "default",
+            &alert,
+            fired,
+            &rows_tpl,
+            default_template_options(),
+            None,
+        )
+        .await;
+        let spec = crate::alerts::notifications::default_template::compiled_default_content();
+        let content = resolve_content(&spec, &ctx, ChannelFormat::Webhook.channel_family());
+        let Ok(RenderedMessage::Http { body }) = render(ChannelFormat::Webhook, &content, &ctx)
+        else {
+            panic!("expected a webhook body");
+        };
+        // The default template ignores the row template: each fired series is its labels and days.
+        let body: Value = serde_json::from_str(&body).unwrap();
+        let rows: Vec<(&str, f64)> = body["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row["device"].as_str().unwrap(),
+                    row["value"].as_f64().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(rows, [("a", 5.0), ("b", 7.0), ("c", 0.0)]);
     }
 
     // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────

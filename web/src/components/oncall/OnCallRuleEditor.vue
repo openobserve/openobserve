@@ -355,7 +355,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ raw(priorityLabel(signal.last_priority)) }}
           </OTag>
-          <span class="text-text-body min-w-0 flex-1 truncate text-sm">{{ titleOf(signal) }}</span>
+          <OTruncatedText class="text-text-body flex-1 text-sm">{{
+            titleOf(signal)
+          }}</OTruncatedText>
           <OTimeCell v-if="signal.last_seen_at" :value="signal.last_seen_at" unit="us" />
           <OText variant="meta" class="shrink-0">{{ outcomeOf(signal) }}</OText>
         </span>
@@ -408,6 +410,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

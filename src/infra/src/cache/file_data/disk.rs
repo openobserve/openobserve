@@ -106,6 +106,9 @@ pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
 
 pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
 
+/// File-name prefix of the current metrics result format; its `_` makes pre-v2 parsers reject it.
+pub const METRICS_RESULT_CACHE_FILE_PREFIX: &str = "v2_";
+
 const RESULT_CACHE_MAX_ENTRIES_PER_KEY: usize = 10;
 
 static METRICS_RESULT_CACHE_EVICT_HOOK: OnceLock<fn(Vec<String>)> = OnceLock::new();
@@ -573,9 +576,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
             }
         }
         let root_dir = tokio::fs::canonicalize(&root_dir).await.unwrap();
-        if let Err(e) = load(&root_dir, &root_dir).await {
+        let mut legacy_metrics = Vec::new();
+        if let Err(e) = load(&root_dir, &root_dir, &mut legacy_metrics).await {
             log::error!("load disk cache error: {e}");
         }
+        // off the scan path so a large legacy cache does not delay LOADING_FROM_DISK_DONE
+        tokio::spawn(remove_legacy_metrics_files(legacy_metrics));
         log::info!(
             "Loading disk cache done, total files: {}",
             LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
@@ -1079,7 +1085,11 @@ pub async fn remove_result_cache_metas(file_keys: &[String]) {
 }
 
 #[async_recursion]
-async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
+async fn load(
+    root_dir: &PathBuf,
+    scan_dir: &PathBuf,
+    legacy_metrics: &mut Vec<PathBuf>,
+) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
     let mut metrics_cache: Vec<String> = Vec::new();
     loop {
@@ -1102,7 +1112,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                 };
                 if ft.is_dir() {
-                    if let Err(e) = load(root_dir, &fp).await {
+                    if let Err(e) = load(root_dir, &fp, legacy_metrics).await {
                         log::error!("load disk cache error: {e}");
                     }
                 } else {
@@ -1136,6 +1146,11 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
                     if !get_config().disk_cache.multi_dir.is_empty() {
                         file_key = file_key.split('/').skip(1).collect::<Vec<_>>().join("/");
+                    }
+                    // legacy names may mix organizations' results, so they are never indexed
+                    if is_legacy_metrics_result_file(&file_key) {
+                        legacy_metrics.push(fp);
+                        continue;
                     }
                     // check file already exists
                     if exist(&file_key).await {
@@ -1427,6 +1442,26 @@ fn split_cache_key<'a>(file: &'a str, prefix: &str) -> Option<(String, String, S
         query_key,
         filename,
     ))
+}
+
+fn is_legacy_metrics_result_file(file_key: &str) -> bool {
+    file_key.starts_with("metrics_results/")
+        && !file_key
+            .rsplit('/')
+            .next()
+            .unwrap_or_default()
+            .starts_with(METRICS_RESULT_CACHE_FILE_PREFIX)
+}
+
+async fn remove_legacy_metrics_files(files: Vec<PathBuf>) {
+    for fp in files {
+        if let Err(e) = tokio::fs::remove_file(&fp).await {
+            log::warn!(
+                "Failed to remove legacy metrics cache file: {}, error: {e}",
+                fp.display()
+            );
+        }
+    }
 }
 
 fn last_modified(metadata: &std::fs::Metadata) -> chrono::DateTime<chrono::Utc> {
@@ -2426,5 +2461,57 @@ mod tests {
         let cfg = config::get_config();
         let max = cfg.disk_cache.bucket_num.max(1);
         assert!(idx < max);
+    }
+
+    #[test]
+    fn test_is_legacy_metrics_result_file() {
+        let dir = "metrics_results/default/2025/04/08/06";
+        let name = "17caf18281f2a17c76a803a9cd59a207_1_2_3.pb";
+        assert!(is_legacy_metrics_result_file(&format!("{dir}/{name}")));
+        assert!(!is_legacy_metrics_result_file(&format!(
+            "{dir}/{METRICS_RESULT_CACHE_FILE_PREFIX}{name}"
+        )));
+        assert!(!is_legacy_metrics_result_file(
+            "results/default/logs/default/16042959487540176184_30_zo_sql_key/1_2_1_0.json"
+        ));
+        assert!(!is_legacy_metrics_result_file(
+            "files/default/logs/disk/2025/04/08/06/7315292721030106704.parquet"
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_load_drops_legacy_metrics_result_files() {
+        // multi_dir strips the first path segment from scanned keys
+        if !get_config().disk_cache.multi_dir.is_empty() {
+            return;
+        }
+        // remove() is a no-op with the disk cache off, so the scanned key would stay indexed
+        if !get_config().disk_cache.enabled {
+            return;
+        }
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tokio::fs::canonicalize(tmp.path()).await.unwrap();
+        let dir = "metrics_results/legacy_scan_org/2025/04/08/06";
+        let name = "17caf18281f2a17c76a803a9cd59a207_1_2_3.pb";
+        let legacy_key = format!("{dir}/{name}");
+        let current_key = format!("{dir}/{METRICS_RESULT_CACHE_FILE_PREFIX}{name}");
+        std::fs::create_dir_all(root.join(dir)).unwrap();
+        std::fs::write(root.join(&legacy_key), b"x").unwrap();
+        std::fs::write(root.join(&current_key), b"x").unwrap();
+
+        let mut legacy = Vec::new();
+        load(&root, &root, &mut legacy).await.unwrap();
+        assert_eq!(legacy, vec![root.join(&legacy_key)]);
+        remove_legacy_metrics_files(legacy).await;
+
+        assert!(!root.join(&legacy_key).exists());
+        assert!(root.join(&current_key).exists());
+        let mut listed = METRICS_RESULT_CACHE.write().await;
+        assert!(listed.contains(&current_key));
+        assert!(!listed.contains(&legacy_key));
+        listed.retain(|key| key != &current_key);
+        drop(listed);
+        assert!(!exist(&legacy_key).await);
+        remove(&current_key).await.unwrap();
     }
 }

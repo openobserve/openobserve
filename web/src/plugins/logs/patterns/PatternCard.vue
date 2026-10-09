@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Status -->
     <div class="flex w-20 flex-shrink-0 items-center gap-1.5">
       <span class="h-2 w-2 shrink-0 rounded-full bg-current" :class="severityClass" />
-      <span
-        class="truncate text-xs font-medium"
+      <OTruncatedText
+        class="text-xs font-medium"
         :class="severityClass"
         :data-test="`pattern-card-${index}-status`"
       >
         {{ statusLabel }}
-      </span>
+      </OTruncatedText>
     </div>
 
     <!-- Service -->
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`pattern-card-${index}-service`"
     >
       <template v-if="pattern.service">
-        <span class="text-text-secondary truncate text-xs">{{ pattern.service }}</span>
+        <OTruncatedText class="text-text-secondary text-xs">{{ pattern.service }}</OTruncatedText>
         <span
           v-if="pattern.service_other_count > 0"
           class="text-2xs text-text-secondary bg-card-glass-solid border-border-default rounded-default shrink-0 border border-solid px-1"
@@ -151,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PatternVolumeCell from "./PatternVolumeCell.vue";
 import {
   tokenizeTemplate,

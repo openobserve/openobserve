@@ -322,7 +322,8 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: COL.url,
-        meta: { align: "left" },
+        // An endpoint URL can carry a key or password, so it never shows on hover.
+        meta: { align: "left", cellOverflowTooltip: false },
       },
       {
         id: "method",

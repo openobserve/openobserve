@@ -337,7 +337,14 @@ describe("PanelContainer", () => {
 
       const header = wrapper.find('[data-test="dashboard-panel-header"]');
       expect(header.text()).toBe("Test Panel");
-      expect(header.attributes("title")).toBe("Test Panel");
+    });
+
+    it("should give the panel title an overflow-only tooltip instead of a native title", () => {
+      wrapper = createWrapper();
+
+      const header = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(header.attributes("title")).toBeUndefined();
+      expect(header.findComponent({ name: "OTooltip" }).props("overflowOnly")).toBe(true);
     });
 
     it("should show description tooltip on hover when description exists", async () => {
@@ -855,6 +862,121 @@ describe("PanelContainer", () => {
       expect(prefill.name).toBe("Alert_from_My_Panel");
     });
 
+    it("uses the executed query, and lets the user pick between two queries", async () => {
+      const twoQueries = {
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: 'avg(disk_used{host=~"$host"})',
+            fields: { stream: "disk_used", stream_type: "metrics" },
+          },
+          {
+            query: "sum(rate(io_ops[$__rate_interval]))",
+            tabName: "IO",
+            fields: { stream: "io_ops", stream_type: "metrics" },
+          },
+        ],
+      };
+      const metaData = {
+        queries: [
+          { query: 'avg(disk_used{host=~"a"})', panelQueryIndex: 0 },
+          { query: "sum(rate(io_ops[1m]))", panelQueryIndex: 1 },
+        ],
+      };
+      wrapper = createWrapper({ data: twoQueries });
+      await wrapper.vm.metaDataValue(metaData);
+
+      const first = wrapper.vm.buildPanelAlertPrefill();
+      expect(first.promql).toBe('avg(disk_used{host=~"a"})');
+      expect(first.queryChoices.map((c: any) => c.query)).toEqual([
+        'avg(disk_used{host=~"a"})',
+        "sum(rate(io_ops[1m]))",
+      ]);
+
+      const second = wrapper.vm.buildPanelAlertPrefill({ queryIndex: 1 });
+      expect(second.promql).toBe("sum(rate(io_ops[1m]))");
+      expect(second.streamName).toBe("io_ops");
+      expect(second.queryIndex).toBe(1);
+    });
+
+    describe("with a formula and hidden inputs", () => {
+      const combined = "(sum(rate(errors[1m]))) / (sum(rate(requests[1m]))) * 100";
+      const formulaPanel = (hideA: boolean) => ({
+        ...mockPanelData,
+        queryType: "promql",
+        queries: [
+          {
+            query: "sum(rate(errors[$__rate_interval]))",
+            fields: { stream: "errors", stream_type: "metrics" },
+            config: { ref: "A", hide: hideA },
+          },
+          {
+            query: "sum(rate(requests[$__rate_interval]))",
+            fields: { stream: "requests", stream_type: "metrics" },
+            config: { ref: "B", hide: true },
+          },
+          {
+            query: "",
+            tabName: "Ratio",
+            fields: { stream_type: "metrics" },
+            config: { formula: "A / B * 100" },
+          },
+        ],
+      });
+      const metaData = {
+        queries: [
+          { query: "sum(rate(errors[1m]))", panelQueryIndex: 0 },
+          { query: "sum(rate(requests[1m]))", panelQueryIndex: 1, notSent: true },
+          { query: combined, panelQueryIndex: 2 },
+        ],
+      };
+
+      it("alerts on the formula, its only visible query, with its inputs' metrics", async () => {
+        wrapper = createWrapper({ data: formulaPanel(true) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.promql).toBe(combined);
+        expect(prefill.queryChoices).toBeUndefined();
+        expect(prefill.streamCandidates.map((c: any) => c.name)).toEqual(["errors", "requests"]);
+      });
+
+      it("keeps the action for a formula whose inputs carry no stream pick", () => {
+        const panel = formulaPanel(true);
+        panel.queries.forEach((query: any) => (query.fields.stream = ""));
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeNull();
+      });
+
+      it("disables the action when every query is hidden", () => {
+        const panel = formulaPanel(true);
+        panel.queries[2].config.hide = true;
+        wrapper = createWrapper({ data: panel });
+        expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+      });
+
+      it("offers only the visible queries in the picker", async () => {
+        wrapper = createWrapper({ data: formulaPanel(false) });
+        await wrapper.vm.metaDataValue(metaData);
+
+        const prefill = wrapper.vm.buildPanelAlertPrefill();
+        expect(prefill.queryChoices.map((c: any) => c.index)).toEqual([0, 2]);
+        expect(prefill.promql).toBe("sum(rate(errors[1m]))");
+        expect(wrapper.vm.buildPanelAlertPrefill({ queryIndex: 2 }).promql).toBe(combined);
+      });
+    });
+
+    it("offers no query choice for a single-query panel", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
+        },
+      });
+      expect(wrapper.vm.buildPanelAlertPrefill().queryChoices).toBeUndefined();
+    });
+
     it("disables the action when the panel has no queries", async () => {
       wrapper = createWrapper({ data: { ...mockPanelData, queries: [] } });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
@@ -867,6 +989,19 @@ describe("PanelContainer", () => {
       };
       wrapper = createWrapper({ data: panelWithoutStream });
       expect(wrapper.vm.alertDisabledReason).toBeTruthy();
+    });
+
+    it("enables the action when only a later query has a stream", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          queries: [
+            { query: "SELECT 1", fields: {} },
+            { query: "SELECT * FROM test", fields: { stream: "test-stream" } },
+          ],
+        },
+      });
+      expect(wrapper.vm.alertDisabledReason).toBeNull();
     });
 
     it("enables the action for a panel with a query and a stream", async () => {
@@ -1813,7 +1948,9 @@ describe("PanelContainer", () => {
       // attribute nothing in web/src consumed, so the caveat reached no user.
       const tooltip = wrapper.findComponent({ name: "OTag" }).findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.props("content")).toBe("As of the last stream-list refresh.");
+      expect(tooltip.props("content")).toContain("As of the last stream-list refresh.");
+      // The label rides the tooltip too, since a narrow panel bar shows only the icon.
+      expect(tooltip.props("content")).toContain("3 days");
     });
 
     it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {
@@ -2041,6 +2178,24 @@ describe("PanelContainer", () => {
         viewOnly: true,
       });
       expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
+    });
+
+    it("a curated TILE wraps its title and keeps two lines; a plain tile stays one line", () => {
+      wrapper = createWrapper({
+        data: { ...eligible(), type: "metric", title: "Deployments not ready" },
+        viewOnly: true,
+      });
+      const curated = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(curated).toEqual(expect.arrayContaining(["line-clamp-2", "min-h-[2lh]"]));
+      wrapper.unmount();
+
+      wrapper = createWrapper({
+        data: { ...mockPanelData, type: "metric", title: "Deployments not ready", config: {} },
+        viewOnly: true,
+      });
+      const plain = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(plain).not.toContain("line-clamp-2");
+      expect(plain).toContain("truncate");
     });
 
     it("gives the title the full bar — nothing between it and the flex spacer", () => {

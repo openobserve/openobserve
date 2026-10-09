@@ -338,7 +338,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
       }
     });
 
-    test('Paths all and pages render, clicks-only is an empty state, and From lists pages (ENT#2800)', {
+    test('Paths all and pages render, clicks-only keeps the page anchor and ends at Left the app, and From lists pages (ENT#2800)', {
       tag: TAGS,
     }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -353,10 +353,19 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.expectFlowRendered();
         for (const next of app.next) await expect(pa.pathsTopTable).toContainText(next, { timeout: 30000 });
 
+        // A page anchor stays in a clicks-only path (#15141); with no click captured, every session leaves right after it.
         await pa.setPathsInclude('clicks');
-        await expect(pa.pathsEmpty).toBeVisible({ timeout: 30000 });
-        await expect(pa.pathsEmpty).toContainText('No sessions reached');
-        await expect(pa.pathsEmpty).toContainText('in this range');
+        await pa.expectFlowRendered();
+        // One combined check, so a table that is empty while it reloads cannot satisfy the absence on its own.
+        await expect.poll(async () => {
+          const text = await pa.pathsTopText();
+          return text.includes('Left the app') && !app.next.some((k) => text.includes(k));
+        }, { timeout: 30000, message: 'Clicks only ends the page anchor at Left the app and lists no other page' }).toBe(true);
+        await expect(pa.pathsTopRow(0)).toContainText(app.landing);
+        await expect(pa.pathsTopRow(0)).toContainText('Left the app');
+        await expect(pa.topPathSessionsBtn(0)).toHaveText(new RegExp(`^${app.landingSessions} sessions$`));
+        await expect(pa.pathsTopRow(1)).toHaveCount(0);
+        await expect(pa.pathsEmpty).toHaveCount(0);
         await pa.expectNoPanelError('rum-analytics-paths');
 
         const options = await pa.pathsAnchorOptionLabels();

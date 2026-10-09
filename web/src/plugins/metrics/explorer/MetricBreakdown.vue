@@ -37,6 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
+      <MetricOverlayKey
+        v-if="showOverlayKey"
+        class="mb-1.5 md:hidden"
+        :period="compare?.periodAsStr ?? null"
+        :period-empty="focused.periodEmpty"
+        :forecast="!!focused.forecastDrawn"
+        data-test="metrics-breakdown-overlay-key-phone"
+      />
       <MetricChartTile
         ref="focusedTile"
         :class="heatmap ? 'min-h-60' : 'h-60'"
@@ -47,6 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :time-range="timeRange"
         :run-query="heatmap ? runHeatmapQuery : runQuery"
         legend
+        allow-alert-creation
+        :compare="compare"
+        :forecast="forecast"
+        :step-seconds="stepSeconds"
         data-test="metrics-breakdown-chart"
         @results="focused = $event"
       >
@@ -60,6 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-breakdown-topk"
             >{{ t("metrics.explorer.detail.breakdown.topk", { count: TOPK }) }}</OTag
           >
+          <MetricOverlayKey
+            v-if="showOverlayKey"
+            class="shrink-0 max-md:hidden"
+            :period="compare?.periodAsStr ?? null"
+            :period-empty="focused.periodEmpty"
+            :forecast="!!focused.forecastDrawn"
+            data-test="metrics-breakdown-overlay-key"
+          />
           <div class="flex-1" />
           <!-- Only once the chart has drawn: the panel's decimals come from its values. -->
           <OButton
@@ -372,8 +392,13 @@ import {
 import { getInstanceByDom, type ECharts } from "echarts/core";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import MetricChartTile, { type TileQuery } from "./MetricChartTile.vue";
+import MetricChartTile, {
+  type TileCompare,
+  type TileForecast,
+  type TileQuery,
+} from "./MetricChartTile.vue";
 import MetricCardChart from "./MetricCardChart.vue";
+import MetricOverlayKey from "./MetricOverlayKey.vue";
 import AddToDashboard from "../AddToDashboard.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -414,10 +439,11 @@ import {
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { labelFiltersToSql } from "@/utils/metrics/labelFilterSql";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
-import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
+import type { LabelFilter, QueryWindow } from "@/composables/metrics/useMetricsExplorerGrid";
 
 interface BreakdownVariant {
-  queries: TileQuery[];
+  /** `builder` names the stream a query reads when it is not the card's own. */
+  queries: Array<TileQuery & { builder?: { metric: string } }>;
   chartType: string;
   unit: string;
   bucketUnit?: string | null;
@@ -502,6 +528,7 @@ export default defineComponent({
   components: {
     MetricChartTile,
     MetricCardChart,
+    MetricOverlayKey,
     AddToDashboard,
     PanelBar,
     OButton,
@@ -536,10 +563,17 @@ export default defineComponent({
     /** Runs one PromQL query on the detail view's scheduler slot. */
     runQuery: {
       type: Function as PropType<
-        (expr: string, signal: AbortSignal, opts?: { maxSeries?: number }) => Promise<any>
+        (
+          expr: string,
+          signal: AbortSignal,
+          opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
+        ) => Promise<any>
       >,
       required: true,
     },
+    compare: { type: Object as PropType<TileCompare | null>, default: null },
+    forecast: { type: Object as PropType<TileForecast | null>, default: null },
+    stepSeconds: { type: Number, default: 0 },
   },
   emits: ["update:selectedLabel", "add-filter"],
   setup(props, { emit }) {
@@ -771,7 +805,9 @@ export default defineComponent({
             label,
             topk,
           );
-      return expr ? [{ expr, legendTemplate: `{${label}}` }] : [];
+      const stream =
+        (follows.value && props.variant!.queries[0]?.builder?.metric) || props.card.name;
+      return expr ? [{ expr, legendTemplate: `{${label}}`, stream }] : [];
     };
 
     /** `null` until the label's counts answer: only they know whether to cap at top 10. */
@@ -799,7 +835,15 @@ export default defineComponent({
     );
 
     /** The focused chart's fetched series: the table summarises them rather than querying again. */
-    const focused = ref<{ status: string; results: any[] }>({ status: "idle", results: [] });
+    const focused = ref<{
+      status: string;
+      results: any[];
+      periodEmpty?: boolean;
+      forecastDrawn?: boolean;
+    }>({
+      status: "idle",
+      results: [],
+    });
     const statsLoading = computed(
       () => focused.value.status === "idle" || focused.value.status === "loading",
     );
@@ -857,6 +901,9 @@ export default defineComponent({
     const heatmapRowClass = (row: BreakdownRow) =>
       row.value === selectedValue.value ? "bg-table-row-selected-bg" : "";
 
+    const showOverlayKey = computed(
+      () => !heatmap.value && (!!props.compare || !!focused.value.forecastDrawn),
+    );
     const focusedTitle = computed(() => {
       const label = activeLabel.value;
       if (!label) return "";
@@ -1101,6 +1148,7 @@ export default defineComponent({
       raw,
       titleOf,
       focusedTitle,
+      showOverlayKey,
       heatmap,
       heatmapQueries,
       runHeatmapQuery,

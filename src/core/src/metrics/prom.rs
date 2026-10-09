@@ -382,6 +382,7 @@ pub async fn remote_write(
 
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
+        let schema = metric_schema_map.get(&metric_name);
 
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
@@ -393,13 +394,13 @@ pub async fn remote_write(
             let has_writable = event
                 .samples
                 .iter()
-                .any(|s| super::sanitize_metric_value(s.value).is_some());
+                .any(|s| sample_cell(s.value, schema).is_some());
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
             }
             for sample in &event.samples {
-                if let Some(value) = super::sanitize_metric_value(sample.value) {
+                if let Some(value) = sample_cell(sample.value, schema) {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
@@ -424,9 +425,7 @@ pub async fn remote_write(
         let can_move_labels = event.histograms.is_empty();
         for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
-            // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
-            // writer so the two ingestion paths cannot drift apart on this.
-            let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
+            let Some(sample_val) = sample_cell(sample.value, schema) else {
                 continue;
             };
 
@@ -1090,14 +1089,23 @@ fn finish_identity_columns(json_data: &mut [PendingRecord]) {
     }
 }
 
+/// A sample's `value` cell, `None` for no row; a marker needs the `value` column samples create.
+fn sample_cell(value: f64, schema: Option<&SchemaCache>) -> Option<Option<f64>> {
+    let cell = super::sanitize_metric_value(value).row_value()?;
+    (cell.is_some() || ingest::has_value_column(schema)).then_some(cell)
+}
+
+/// `value: None` is a stale marker, written as a NULL `value`.
 fn build_metric_record(
     mut record: json::Map<String, json::Value>,
-    value: f64,
+    value: Option<f64>,
     timestamp: i64,
 ) -> json::Map<String, json::Value> {
     record.insert(
         VALUE_LABEL.to_string(),
-        json::Number::from_f64(value).map_or(json::Value::Null, json::Value::Number),
+        value
+            .and_then(json::Number::from_f64)
+            .map_or(json::Value::Null, json::Value::Number),
     );
     record.insert(
         TIMESTAMP_COL_NAME.to_string(),
@@ -1172,7 +1180,7 @@ async fn buffer_native_histograms(
         }
         let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
         for (suffix, le, value) in records {
-            let Some(value) = super::sanitize_metric_value(value) else {
+            let Some(value) = super::sanitize_metric_value(value).value() else {
                 continue;
             };
             let idx = CLASSIC_HISTOGRAM_SUFFIXES
@@ -1183,7 +1191,7 @@ async fn buffer_native_histograms(
             if let Some(le) = le {
                 hist_labels.insert(BUCKET_LABEL.to_string(), json::Value::String(le));
             }
-            let record = build_metric_record(hist_labels.clone(), value, timestamp);
+            let record = build_metric_record(hist_labels.clone(), Some(value), timestamp);
             buffer_metric_record(
                 stream_name,
                 json::Value::Object(record),
@@ -1325,10 +1333,7 @@ mod tests {
                 let parser::Expr::VectorSelector(selector) = parser::parse(&promql).unwrap() else {
                     panic!("expected a vector selector");
                 };
-                // The parser retains escape text, so SQL must preserve Matcher.value verbatim.
-                let encoded = serde_json::to_string(value).unwrap();
-                let parsed_value = &encoded[1..encoded.len() - 1];
-                assert_eq!(selector.matchers.matchers[0].value, parsed_value);
+                assert_eq!(selector.matchers.matchers[0].value, value);
                 for (sql, projection) in [
                     (
                         metadata_sql("up", &["job"], &schema, Some(&selector)),
@@ -1345,10 +1350,7 @@ mod tests {
                         let mut literals = 0;
                         let _ = visit_expressions_mut(&mut statements, |expr| {
                             if let Expr::Value(literal) = expr {
-                                assert_eq!(
-                                    literal.value,
-                                    Value::SingleQuotedString(parsed_value.into())
-                                );
+                                assert_eq!(literal.value, Value::SingleQuotedString(value.into()));
                                 literal.value = Value::SingleQuotedString(String::new());
                                 literals += 1;
                             }
@@ -1385,9 +1387,9 @@ mod tests {
 
         for (op, pattern, matching) in [
             ("=", "x' OR '1'='1", "x' OR '1'='1"),
-            ("!=", r"worker's\path", r"worker's\\path"),
-            ("=~", r"worker\\path's.*", r"worker\\path'suffix"),
-            ("!~", r"worker\\path's.*", r"worker\\path'suffix"),
+            ("!=", r"worker's\path", r"worker's\path"),
+            ("=~", r"worker\\path's.*", r"worker\path'suffix"),
+            ("!~", r"worker\\path's.*", r"worker\path'suffix"),
         ] {
             let ctx = SessionContext::new();
             ctx.register_udf(REGEX_MATCH_UDF.clone());
@@ -1795,10 +1797,53 @@ mod tests {
         for (name, value) in &label_pairs {
             labels.insert(name.clone(), json::Value::String(value.clone()));
         }
-        let record = build_metric_record(labels, 1.5, 1_700_000_000_000_000);
+        let record = build_metric_record(labels, Some(1.5), 1_700_000_000_000_000);
         assert_eq!(
             crate::metrics::signature_of_series_labels(&label_pairs),
             crate::metrics::signature_without_labels(&record, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_sample_cell_keeps_a_stale_marker_only_for_a_stream_with_a_value_column() {
+        use datafusion::arrow::datatypes::{DataType, Field};
+
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let with_value = SchemaCache::new(Schema::new(vec![
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+        ]));
+        let without_value = SchemaCache::new(Schema::new(vec![Field::new(
+            NAME_LABEL,
+            DataType::Utf8,
+            true,
+        )]));
+
+        assert_eq!(sample_cell(stale, Some(&with_value)), Some(None));
+        // a first batch made only of markers: no stream yet, so no row and no schema
+        assert_eq!(sample_cell(stale, None), None);
+        assert_eq!(sample_cell(stale, Some(&without_value)), None);
+        assert_eq!(sample_cell(1.5, None), Some(Some(1.5)));
+        assert_eq!(sample_cell(f64::NAN, Some(&with_value)), None);
+    }
+
+    #[test]
+    fn test_stale_sample_writes_a_null_value_row_in_its_own_series() {
+        let mut labels = json::Map::new();
+        labels.insert(NAME_LABEL.to_string(), json::json!("up"));
+        labels.insert("instance".to_string(), json::json!("a"));
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let value = super::super::sanitize_metric_value(stale)
+            .row_value()
+            .expect("a stale marker writes a row");
+
+        let marker = build_metric_record(labels.clone(), value, 6);
+        let sample = build_metric_record(labels, Some(1.0), 5);
+
+        assert_eq!(marker.get(VALUE_LABEL), Some(&json::Value::Null));
+        assert_eq!(
+            crate::metrics::signature_without_labels(&marker, &[VALUE_LABEL]),
+            crate::metrics::signature_without_labels(&sample, &[VALUE_LABEL])
         );
     }
 
@@ -1807,7 +1852,7 @@ mod tests {
         let mut labels = json::Map::new();
         labels.insert(NAME_LABEL.to_string(), json::json!("http_requests"));
         labels.insert(HASH_LABEL.to_string(), json::json!("sent by the client"));
-        let record = build_metric_record(labels, 1.0, 5);
+        let record = build_metric_record(labels, Some(1.0), 5);
         let recomputed = crate::metrics::signature_without_labels(&record, &[VALUE_LABEL]);
         let mut json_data = vec![(record.clone(), 5_i64, None), (record, 5_i64, Some(7_u64))];
 

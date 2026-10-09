@@ -67,6 +67,8 @@ export class RolesPage {
         // pane instead of the overview.
         this.railSummaryItem = page.locator('[data-test="edit-role-module-rail-overview"]');
         this.railNoMatch = page.locator('[data-test="edit-role-module-rail-no-match"]');
+        // "All Modules" — pinned under Role Overview; one row per module, each its module-wide grant.
+        this.railAllModules = page.locator('[data-test="edit-role-module-rail-all-modules"]');
 
         // ---------- module pane ----------
         this.pane = page.locator('[data-test="edit-role-module-pane"]');
@@ -212,6 +214,12 @@ export class RolesPage {
             `[data-test^="edit-role-permissions-table-body-row-"][data-test$="-col-${action}-checkbox"] [role="checkbox"]`,
         );
     }
+    /** The select-all box in an action column header, offered only in the All Modules view. */
+    bulkCheckbox(action) {
+        return this.page.locator(
+            `[data-test="edit-role-module-pane-bulk-${action}"] [role="checkbox"]`,
+        );
+    }
     openEntity(nodeName) {
         return this.page.locator(`[data-test="edit-role-module-pane-open-${nodeName}"]`);
     }
@@ -330,6 +338,11 @@ export class RolesPage {
 
     async openModule(moduleKey) {
         await this.railItem(moduleKey).click();
+        await expect(this.pane).toBeVisible({ timeout: 15000 });
+    }
+
+    async openAllModules() {
+        await this.railAllModules.click();
         await expect(this.pane).toBeVisible({ timeout: 15000 });
     }
 

@@ -60,6 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-activity-table"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-activity-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #toolbar>
           <DbmTableToolbar
             v-model:search="search"
@@ -163,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-query="{ row }">
           <DbmQueryCell
             :text="raw(row.query ?? '')"
-            :title-attr="row.query ?? ''"
             :db-system="row.db_system"
             :meta-items="[
               { key: 'instance', label: raw(row.db_instance ?? '') },
@@ -242,13 +249,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-user="{ row }">
-          <span class="text-text-body block truncate text-xs">{{
-            raw(row.session_user ?? "—")
-          }}</span>
+          <span class="text-text-body text-xs">{{ raw(row.session_user ?? "—") }}</span>
         </template>
 
         <template #cell-application="{ row }">
-          <span class="text-text-body block truncate font-mono text-xs">
+          <span class="text-text-body font-mono text-xs">
             {{ raw(row.session_app ?? "—") }}
           </span>
         </template>
