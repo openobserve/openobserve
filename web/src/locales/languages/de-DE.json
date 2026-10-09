@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Zeichnet Trace-Stichproben in diesem Diagramm für alle, die das Dashboard öffnen. Betrachter können sie weiterhin über die Panel-Kopfzeile ausblenden."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Ohne Speichern verlassen?",
-      "leaveDraftKept": "Ihr Entwurf wird 7 Tage lang in diesem Browser aufbewahrt. Sie können ihn fortsetzen, wenn Sie dieses Panel das nächste Mal öffnen.",
-      "leaveChangesLost": "Ihre Änderungen an diesem Panel gehen verloren.",
-      "keepEditing": "Weiter bearbeiten",
-      "leave": "Verlassen",
-      "discarded": "Panel verworfen",
-      "undo": "Rückgängig",
-      "offer": "Sie haben ein ungespeichertes Panel von {time}: {title}.",
-      "untitled": "Unbenanntes Panel",
-      "conflict": "Dieses Dashboard hat sich seit Ihrem Entwurf geändert.",
-      "resume": "Fortsetzen",
-      "discard": "Verwerfen"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

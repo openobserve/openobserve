@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Rysuje próbki trace na tym wykresie dla wszystkich, którzy otworzą pulpit. Przeglądający nadal mogą je ukryć w nagłówku panelu."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Wyjść bez zapisywania?",
-      "leaveDraftKept": "Twój szkic jest przechowywany w tej przeglądarce przez 7 dni. Możesz go wznowić przy następnym otwarciu tego panelu.",
-      "leaveChangesLost": "Zmiany wprowadzone w tym panelu zostaną utracone.",
-      "keepEditing": "Kontynuuj edycję",
-      "leave": "Wyjdź",
-      "discarded": "Panel odrzucony",
-      "undo": "Cofnij",
-      "offer": "Masz niezapisany panel z {time}: {title}.",
-      "untitled": "Panel bez tytułu",
-      "conflict": "Ten pulpit zmienił się od czasu utworzenia szkicu.",
-      "resume": "Wznów",
-      "discard": "Odrzuć"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

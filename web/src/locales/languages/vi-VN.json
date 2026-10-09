@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Vẽ mẫu trace trên biểu đồ này cho tất cả những ai mở bảng điều khiển. Người xem vẫn có thể ẩn chúng từ tiêu đề panel."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Rời đi mà không lưu?",
-      "leaveDraftKept": "Bản nháp của bạn được lưu trên trình duyệt này trong 7 ngày. Bạn có thể tiếp tục nó vào lần tới khi bạn mở bảng này.",
-      "leaveChangesLost": "Các thay đổi của bạn đối với bảng này sẽ bị mất.",
-      "keepEditing": "Tiếp tục chỉnh sửa",
-      "leave": "Rời đi",
-      "discarded": "Đã hủy bảng",
-      "undo": "Hoàn tác",
-      "offer": "Bạn có một bảng chưa lưu từ {time}: {title}.",
-      "untitled": "Bảng chưa có tiêu đề",
-      "conflict": "Bảng điều khiển này đã thay đổi kể từ bản nháp của bạn.",
-      "resume": "Tiếp tục",
-      "discard": "Hủy bỏ"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

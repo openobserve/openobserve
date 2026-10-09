@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Bu grafikte, gösterge panosunu açan herkes için iz örneklerini çizer. Görüntüleyenler bunları yine de panel başlığından gizleyebilir."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Kaydetmeden ayrılsın mı?",
-      "leaveDraftKept": "Taslağınız bu tarayıcıda 7 gün boyunca saklanır. Bu paneli bir sonraki açışınızda kaldığınız yerden devam edebilirsiniz.",
-      "leaveChangesLost": "Bu panelde yaptığınız değişiklikler kaybolur.",
-      "keepEditing": "Düzenlemeye devam et",
-      "leave": "Ayrıl",
-      "discarded": "Panel atıldı",
-      "undo": "Geri al",
-      "offer": "{time} zamanından kaydedilmemiş bir paneliniz var: {title}.",
-      "untitled": "Başlıksız panel",
-      "conflict": "Bu gösterge paneli taslağınızdan beri değişti.",
-      "resume": "Devam et",
-      "discard": "At"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

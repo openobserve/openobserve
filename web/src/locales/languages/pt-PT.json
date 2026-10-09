@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Desenha amostras de rastros neste gráfico para todos que abrirem o painel. Os visualizadores ainda podem ocultá-las no cabeçalho do painel."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Sair sem salvar?",
-      "leaveDraftKept": "Seu rascunho é mantido neste navegador por 7 dias. Você pode retomá-lo na próxima vez que abrir este painel.",
-      "leaveChangesLost": "Suas alterações neste painel serão perdidas.",
-      "keepEditing": "Continuar editando",
-      "leave": "Sair",
-      "discarded": "Painel descartado",
-      "undo": "Desfazer",
-      "offer": "Você tem um painel não salvo de {time}: {title}.",
-      "untitled": "Painel sem título",
-      "conflict": "Este dashboard foi alterado desde o seu rascunho.",
-      "resume": "Retomar",
-      "discard": "Descartar"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

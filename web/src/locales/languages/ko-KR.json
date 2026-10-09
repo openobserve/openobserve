@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "대시보드를 여는 모든 사람을 위해 이 차트에 트레이스 샘플을 그립니다. 뷰어는 패널 헤더에서 여전히 숨길 수 있습니다."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "저장하지 않고 나가시겠습니까?",
-      "leaveDraftKept": "임시 저장본은 이 브라우저에 7일 동안 보관됩니다. 다음에 이 패널을 열 때 이어서 작업할 수 있습니다.",
-      "leaveChangesLost": "이 패널에 대한 변경 사항이 손실됩니다.",
-      "keepEditing": "계속 편집",
-      "leave": "나가기",
-      "discarded": "패널을 버렸습니다",
-      "undo": "실행 취소",
-      "offer": "{time}에 저장하지 않은 패널이 있습니다: {title}.",
-      "untitled": "제목 없는 패널",
-      "conflict": "임시 저장본을 만든 이후 이 대시보드가 변경되었습니다.",
-      "resume": "이어서 작업",
-      "discard": "버리기"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

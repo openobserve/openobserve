@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "在打开该仪表盘的所有人的图表上绘制追踪样本。查看者仍可从面板标题栏隐藏它们。"
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "不保存就离开？",
-      "leaveDraftKept": "您的草稿会在此浏览器中保留 7 天。下次打开此面板时可以继续。",
-      "leaveChangesLost": "您对此面板的修改将会丢失。",
-      "keepEditing": "继续编辑",
-      "leave": "离开",
-      "discarded": "面板已丢弃",
-      "undo": "撤销",
-      "offer": "您有一个来自 {time} 的未保存面板：{title}。",
-      "untitled": "未命名面板",
-      "conflict": "自您的草稿以来，此仪表盘已发生变化。",
-      "resume": "继续",
-      "discard": "丢弃"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

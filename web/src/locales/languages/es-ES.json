@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Dibuja muestras de trazas en este gráfico para todos los que abran el dashboard. Los visores aún pueden ocultarlas desde el encabezado del panel."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "¿Salir sin guardar?",
-      "leaveDraftKept": "Tu borrador se conserva en este navegador durante 7 días. Puedes retomarlo la próxima vez que abras este panel.",
-      "leaveChangesLost": "Se perderán los cambios realizados en este panel.",
-      "keepEditing": "Seguir editando",
-      "leave": "Salir",
-      "discarded": "Panel descartado",
-      "undo": "Deshacer",
-      "offer": "Tienes un panel sin guardar de {time}: {title}.",
-      "untitled": "Panel sin título",
-      "conflict": "Este dashboard cambió desde tu borrador.",
-      "resume": "Retomar",
-      "discard": "Descartar"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

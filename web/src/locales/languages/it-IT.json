@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Disegna campioni di traccia su questo grafico per tutti coloro che aprono la dashboard. I visualizzatori possono comunque nasconderli dall'intestazione del pannello."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Uscire senza salvare?",
-      "leaveDraftKept": "La tua bozza viene conservata su questo browser per 7 giorni. Puoi riprenderla la prossima volta che apri questo pannello.",
-      "leaveChangesLost": "Le modifiche a questo pannello andranno perse.",
-      "keepEditing": "Continua a modificare",
-      "leave": "Esci",
-      "discarded": "Pannello scartato",
-      "undo": "Annulla",
-      "offer": "Hai un pannello non salvato del {time}: {title}.",
-      "untitled": "Pannello senza titolo",
-      "conflict": "Questa dashboard è cambiata rispetto alla tua bozza.",
-      "resume": "Riprendi",
-      "discard": "Scarta"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

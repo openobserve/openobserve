@@ -6788,20 +6788,6 @@
     "showExemplarsHelp": "為所有開啟儀表板的人在此圖表上繪製追蹤樣本。檢視者仍可從面板標題隱藏它們。"
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "要離開而不儲存嗎？",
-      "leaveDraftKept": "你的草稿會保留在此瀏覽器 7 天。下次開啟此面板時可以繼續編輯。",
-      "leaveChangesLost": "你對此面板的變更將會遺失。",
-      "keepEditing": "繼續編輯",
-      "leave": "離開",
-      "discarded": "面板已捨棄",
-      "undo": "復原",
-      "offer": "你有未儲存的面板，來自 {time}：{title}。",
-      "untitled": "未命名面板",
-      "conflict": "此儀表板在你的草稿之後已有變更。",
-      "resume": "繼續",
-      "discard": "捨棄"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

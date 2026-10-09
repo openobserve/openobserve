@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Tekent trace-voorbeelden op deze grafiek voor iedereen die het dashboard opent. Kijkers kunnen ze nog steeds verbergen via de paneelheader."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Vertrekken zonder op te slaan?",
-      "leaveDraftKept": "Je concept wordt 7 dagen in deze browser bewaard. Je kunt het hervatten de volgende keer dat je dit paneel opent.",
-      "leaveChangesLost": "Je wijzigingen aan dit paneel gaan verloren.",
-      "keepEditing": "Doorgaan met bewerken",
-      "leave": "Vertrekken",
-      "discarded": "Paneel verwijderd",
-      "undo": "Ongedaan maken",
-      "offer": "Je hebt een niet-opgeslagen paneel van {time}: {title}.",
-      "untitled": "Naamloos paneel",
-      "conflict": "Dit dashboard is gewijzigd sinds je concept.",
-      "resume": "Hervatten",
-      "discard": "Verwijderen"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

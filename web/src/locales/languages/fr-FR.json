@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Dessine les échantillons de traces sur ce graphique pour toute personne qui ouvre le tableau de bord. Les spectateurs peuvent toujours les masquer depuis l'en-tête du panneau."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Quitter sans enregistrer ?",
-      "leaveDraftKept": "Votre brouillon est conservé dans ce navigateur pendant 7 jours. Vous pouvez le reprendre la prochaine fois que vous ouvrez ce panneau.",
-      "leaveChangesLost": "Vos modifications de ce panneau seront perdues.",
-      "keepEditing": "Continuer la modification",
-      "leave": "Quitter",
-      "discarded": "Panneau abandonné",
-      "undo": "Annuler",
-      "offer": "Vous avez un panneau non enregistré datant de {time} : {title}.",
-      "untitled": "Panneau sans titre",
-      "conflict": "Ce tableau de bord a changé depuis votre brouillon.",
-      "resume": "Reprendre",
-      "discard": "Abandonner"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",

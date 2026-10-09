@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "このダッシュボードを開くすべてのユーザーに対して、このグラフにトレースサンプルを描画します。閲覧者はパネルヘッダーから非表示にできます。"
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "保存せずに離れますか？",
-      "leaveDraftKept": "下書きはこのブラウザに 7 日間保持されます。次にこのパネルを開いたときに再開できます。",
-      "leaveChangesLost": "このパネルへの変更は失われます。",
-      "keepEditing": "編集を続ける",
-      "leave": "離れる",
-      "discarded": "パネルを破棄しました",
-      "undo": "元に戻す",
-      "offer": "{time} 時点の未保存のパネルがあります: {title}。",
-      "untitled": "無題のパネル",
-      "conflict": "このダッシュボードは下書き以降に変更されています。",
-      "resume": "再開",
-      "discard": "破棄"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
