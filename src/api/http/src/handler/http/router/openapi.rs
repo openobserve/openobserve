@@ -168,7 +168,6 @@ use crate::{
         openobserve_api_management::request::alerts::clone_alert,
         openobserve_api_management::request::alerts::generate_sql,
         openobserve_api_management::request::alerts::move_alerts,
-        openobserve_api_management::request::authz::stream_access_audit::stream_access_audit,
         openobserve_api_management::request::alerts::list_alert_tags,
         openobserve_api_management::request::alerts::history::get_alert_history,
         openobserve_api_management::request::alerts::incidents::list_incidents,
@@ -907,17 +906,6 @@ mod tests {
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
         }
-    }
-
-    #[test]
-    fn stream_access_audit_is_rate_limited_and_hidden_from_mcp() {
-        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
-        let op = spec
-            .pointer("/paths/~1api~1v2~1{org_id}~1background_objects~1stream_access_audit/get")
-            .expect("the stream access audit is documented");
-        assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
-        assert_eq!(op["x-o2-ratelimit"]["operation"], "list");
-        assert_eq!(op["x-o2-mcp"]["enabled"], false);
     }
 
     #[test]

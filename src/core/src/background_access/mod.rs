@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
-pub mod audit;
 pub mod placeholders;
 
 use std::collections::HashMap;
+#[cfg(feature = "enterprise")]
+use std::collections::HashSet;
 
 use config::meta::{
     alerts::{QueryCondition, QueryType, alert::Alert},
@@ -26,33 +26,64 @@ use config::meta::{
 };
 use placeholders::{QueryLanguage, panel_query_sources};
 #[cfg(feature = "enterprise")]
-use {axum::response::Response, config::meta::pipeline::Pipeline};
+use {
+    axum::response::Response,
+    config::meta::{
+        dashboards::{Dashboard, reports::Report, v8::Panel},
+        pipeline::Pipeline,
+    },
+    serde_json::Value,
+};
 
 use crate::authz::QuerySource;
-
 #[cfg(feature = "enterprise")]
-#[derive(Debug, thiserror::Error)]
-pub enum ReportSourceError {
-    #[error("dashboard {folder}/{dashboard_id} of the report not found")]
-    DashboardMissing {
-        folder: String,
-        dashboard_id: String,
-    },
-    #[error(transparent)]
-    Load(#[from] anyhow::Error),
+use crate::authz::StreamAccessChecker;
+
+/// Why a report save, enable or run was refused.
+#[cfg(feature = "enterprise")]
+pub enum ReportRefusal {
+    Forbidden(Response),
+    /// A dashboard the report renders could not be read; the caller answers as its own read would.
+    DashboardLoad(anyhow::Error),
+}
+
+/// One enabled report's view of a dashboard: the tab it asks for and its variable values.
+#[cfg(feature = "enterprise")]
+struct RenderingReport {
+    tab: Option<String>,
+    variables: Vec<(String, String)>,
+}
+
+/// What an edit changed that a report could read differently; panels are keyed `(tab, panel)`.
+#[cfg(feature = "enterprise")]
+#[derive(Default)]
+struct QueryEdits {
+    panels: HashSet<(String, String)>,
+    tabs: bool,
+    variables: bool,
 }
 
 #[cfg(feature = "enterprise")]
-impl From<ReportSourceError> for Response {
-    fn from(error: ReportSourceError) -> Self {
-        use common::meta::http::HttpResponse as MetaHttpResponse;
-
-        match error {
-            ReportSourceError::DashboardMissing { .. } => {
-                MetaHttpResponse::not_found(error.to_string())
-            }
-            ReportSourceError::Load(e) => MetaHttpResponse::internal_error(e.to_string()),
+impl QueryEdits {
+    fn between(stored: &Value, edited: &Value) -> Self {
+        let before = panels_by_key(stored);
+        let panels = panels_by_key(edited)
+            .into_iter()
+            .filter(|(key, panel)| {
+                let reads = panel_reads(panel);
+                !reads.is_null() && before.get(key).map(|old| panel_reads(old)) != Some(reads)
+            })
+            .map(|(key, _)| key)
+            .collect();
+        Self {
+            panels,
+            tabs: tab_ids(stored) != tab_ids(edited),
+            variables: stored.get("variables") != edited.get("variables"),
         }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.panels.is_empty() && !self.tabs && !self.variables
     }
 }
 
@@ -182,33 +213,20 @@ pub fn slo_sources(slo: &Slo) -> Vec<QuerySource> {
     sources
 }
 
+/// What a report renders: the panels of `tab` (else the first tab) and the variable queries.
 pub fn dashboard_sources(
     org_id: &str,
     dashboard: &serde_json::Value,
+    tab: Option<&str>,
     variables: &[(String, String)],
 ) -> Vec<QuerySource> {
     let values = variable_values(dashboard, variables);
+    let (_, panels) = rendered_tab(dashboard, tab);
     let mut sources = Vec::new();
-    for panel in dashboard_panels(dashboard) {
+    for panel in panels {
         sources.extend(panel_sources(org_id, panel, &values));
     }
-    let list = dashboard
-        .pointer("/variables/list")
-        .and_then(|v| v.as_array())
-        .into_iter()
-        .flatten();
-    for variable in list {
-        if variable.get("type").and_then(|t| t.as_str()) != Some("query_values") {
-            continue;
-        }
-        let Some(data) = variable.get("query_data") else {
-            continue;
-        };
-        let stream_type = json_stream_type(data, StreamType::Logs);
-        if let Some(source) = named_stream_source(org_id, data, stream_type, &values) {
-            sources.push(source);
-        }
-    }
+    sources.extend(variable_sources(org_id, dashboard, &values));
     sources
 }
 
@@ -320,120 +338,113 @@ pub fn dashboard_json(
         .filter(|body| !body.is_null())
 }
 
+/// Checks the dashboards before their queries, so an unreadable one names nothing it holds.
 #[cfg(feature = "enterprise")]
-pub async fn report_sources(
+pub async fn guard_report(
     org_id: &str,
-    report: &config::meta::dashboards::reports::Report,
-) -> Result<Vec<QuerySource>, ReportSourceError> {
-    let mut sources = Vec::new();
-    for dashboard in &report.dashboards {
-        sources.push(QuerySource::Dashboard {
+    user_id: &str,
+    report: &Report,
+) -> Result<(), ReportRefusal> {
+    if !rbac_enforced().await {
+        return Ok(());
+    }
+    let dashboards: Vec<QuerySource> = report
+        .dashboards
+        .iter()
+        .map(|dashboard| QuerySource::Dashboard {
             org_id: org_id.to_string(),
             folder: dashboard.folder.clone(),
             dashboard_id: dashboard.dashboard.clone(),
-        });
-        let variables: Vec<(String, String)> = dashboard
-            .variables
-            .iter()
-            .map(|v| (v.key.clone(), v.value.clone()))
-            .collect();
-        let stored = infra::table::dashboards::get_from_folder_rw(
+        })
+        .collect();
+    guard_write(org_id, user_id, &dashboards)
+        .await
+        .map_err(ReportRefusal::Forbidden)?;
+    let mut sources = Vec::new();
+    for dashboard in &report.dashboards {
+        let stored = infra::table::dashboards::get_from_folder(
             org_id,
             &dashboard.folder,
             &dashboard.dashboard,
         )
         .await
-        .map_err(anyhow::Error::from)?
-        .ok_or_else(|| ReportSourceError::DashboardMissing {
-            folder: dashboard.folder.clone(),
-            dashboard_id: dashboard.dashboard.clone(),
-        })?;
-        let json = dashboard_json(&stored).ok_or_else(|| unusable_dashboard(&stored))?;
-        sources.extend(dashboard_sources(org_id, &json, &variables));
-    }
-    Ok(sources)
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn enabled_report_variables(
-    org_id: &str,
-    dashboard_id: &str,
-) -> Result<Vec<Vec<(String, String)>>, anyhow::Error> {
-    use config::meta::dashboards::reports::ReportListFilters;
-
-    let filters = ReportListFilters {
-        dashboard: Some(dashboard_id.to_string()),
-        folder: None,
-        destination_less: None,
-        name_substring: None,
-    };
-    let rows = crate::dashboards::reports::list(org_id, filters, None)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let mut out = Vec::new();
-    for row in rows.into_iter().filter(|row| row.report_enabled) {
-        let (_, report) = crate::dashboards::reports::get_by_id_rw(org_id, &row.report_id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        for dashboard in report
-            .dashboards
+        .map_err(|e| ReportRefusal::DashboardLoad(e.into()))?;
+        // a missing dashboard renders nothing, and the save answers it as it always has
+        let Some(json) = stored.as_ref().and_then(dashboard_json) else {
+            continue;
+        };
+        let variables: Vec<(String, String)> = dashboard
+            .variables
             .iter()
-            .filter(|d| d.dashboard == dashboard_id)
-        {
-            out.push(
-                dashboard
-                    .variables
-                    .iter()
-                    .map(|v| (v.key.clone(), v.value.clone()))
-                    .collect(),
-            );
-        }
+            .map(|v| (v.key.clone(), v.value.clone()))
+            .collect();
+        let tab = dashboard.tabs.first().map(String::as_str);
+        sources.extend(dashboard_sources(org_id, &json, tab, &variables));
     }
-    Ok(out)
+    guard_write(org_id, user_id, &sources)
+        .await
+        .map_err(ReportRefusal::Forbidden)
 }
 
-/// Free when no enabled report renders the dashboard; `edited` is one panel unless whole.
+/// Runs after the update's own existence and hash checks, which answer first as they always have.
 #[cfg(feature = "enterprise")]
-pub async fn guard_dashboard_edit(
+pub async fn guard_dashboard_update(
     org_id: &str,
     user_id: &str,
+    folder_id: &str,
     dashboard_id: &str,
-    edited: &serde_json::Value,
-    whole_dashboard: bool,
+    edited: &Dashboard,
+    hash: Option<&str>,
 ) -> Result<(), Response> {
-    use common::meta::http::HttpResponse as MetaHttpResponse;
-
     if !rbac_enforced().await {
         return Ok(());
     }
-    let reports = enabled_report_variables(org_id, dashboard_id)
-        .await
-        .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
-    if reports.is_empty() {
+    let stored = stored_dashboard(org_id, folder_id, dashboard_id).await?;
+    crate::dashboards::check_update_hash(&stored, hash).map_err(Response::from)?;
+    guard_stored_edit(org_id, user_id, dashboard_id, &stored, edited).await
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn guard_panel_add(
+    org_id: &str,
+    user_id: &str,
+    folder_id: &str,
+    dashboard_id: &str,
+    hash: &str,
+    tab_id: Option<&str>,
+    panel: &Panel,
+) -> Result<(), Response> {
+    if !rbac_enforced().await {
         return Ok(());
     }
-    let stored = if whole_dashboard {
-        serde_json::Value::Null
-    } else {
-        let Some((_, dashboard)) = infra::table::dashboards::get_by_id_rw(org_id, dashboard_id)
-            .await
-            .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?
-        else {
-            return Err(MetaHttpResponse::not_found("Dashboard not found"));
-        };
-        dashboard_json(&dashboard)
-            .ok_or_else(|| MetaHttpResponse::internal_error(unusable_dashboard(&dashboard)))?
-    };
-    let mut sources = Vec::new();
-    for variables in &reports {
-        if whole_dashboard {
-            sources.extend(dashboard_sources(org_id, edited, variables));
-        } else {
-            let values = variable_values(&stored, variables);
-            sources.extend(panel_sources(org_id, edited, &values));
-        }
+    let stored = stored_dashboard(org_id, folder_id, dashboard_id).await?;
+    let mut edited = stored.clone();
+    crate::dashboards::insert_panel(&mut edited, tab_id, panel.clone()).map_err(Response::from)?;
+    crate::dashboards::check_update_hash(&stored, Some(hash)).map_err(Response::from)?;
+    guard_stored_edit(org_id, user_id, dashboard_id, &stored, &edited).await
+}
+
+#[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
+pub async fn guard_panel_update(
+    org_id: &str,
+    user_id: &str,
+    folder_id: &str,
+    dashboard_id: &str,
+    panel_id: &str,
+    hash: &str,
+    tab_id: Option<&str>,
+    panel: &Panel,
+) -> Result<(), Response> {
+    if !rbac_enforced().await {
+        return Ok(());
     }
-    guard_write(org_id, user_id, &sources).await
+    let stored = stored_dashboard(org_id, folder_id, dashboard_id).await?;
+    let mut edited = stored.clone();
+    crate::dashboards::replace_panel(&mut edited, panel_id, tab_id, panel.clone())
+        .map_err(Response::from)?;
+    crate::dashboards::check_update_hash(&stored, Some(hash)).map_err(Response::from)?;
+    guard_stored_edit(org_id, user_id, dashboard_id, &stored, &edited).await
 }
 
 /// The source is the first node, as `Pipeline::validate` rebuilds it; the body's own is discarded.
@@ -488,7 +499,7 @@ pub async fn stored_alert_sources(
 
     use crate::alerts::alert::AlertError;
 
-    let client = infra::db::get_orm_client_rw().await;
+    let client = infra::db::get_orm_client_ro().await;
     if let Ok(ksuid) = svix_ksuid::Ksuid::from_str(id) {
         match crate::alerts::alert::get_by_id(client, org_id, ksuid).await {
             Ok((_, alert)) => return Ok(Some(alert_sources(org_id, &alert))),
@@ -528,32 +539,22 @@ pub async fn anomaly_update_sources(
     )))
 }
 
-/// Reads the primary, which the enable or update about to run writes to.
+/// `None` when no SLO has this id.
 #[cfg(feature = "enterprise")]
-pub async fn stored_slo(org_id: &str, slo_id: &str) -> Result<Option<Slo>, anyhow::Error> {
-    let client = infra::db::get_orm_client_rw().await;
-    Ok(infra::table::slos::get(client, org_id, slo_id).await?)
+pub async fn stored_slo_sources(
+    org_id: &str,
+    slo_id: &str,
+) -> Result<Option<Vec<QuerySource>>, anyhow::Error> {
+    let client = infra::db::get_orm_client_ro().await;
+    Ok(infra::table::slos::get(client, org_id, slo_id)
+        .await?
+        .map(|slo| slo_sources(&slo)))
 }
 
-/// Off or lifted RBAC skips every save-time check, so a failed source load refuses nothing.
+/// Off or lifted RBAC skips every save-time check, so no source is ever loaded for it.
 #[cfg(feature = "enterprise")]
 pub async fn rbac_enforced() -> bool {
     crate::authz::active_checker().enforces_rbac().await
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
-    let checker = crate::authz::active_checker();
-    checker.is_root(user_id).await || checker.is_root_or_admin(org_id, user_id).await
-}
-
-/// Only a Root or Admin caller may give a new object an owner other than themself.
-#[cfg(feature = "enterprise")]
-pub async fn create_owner(org_id: &str, caller: &str, body_owner: Option<&str>) -> String {
-    match body_owner.filter(|owner| !owner.is_empty()) {
-        Some(owner) if owner != caller && is_org_admin(org_id, caller).await => owner.to_string(),
-        _ => caller.to_string(),
-    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -570,39 +571,39 @@ pub async fn guard_write(
         .map_err(|denied| crate::authz::stream_access_forbidden(org_id, &denied))
 }
 
-/// A failed load refuses the write: an unread object must never skip its check.
+/// `load` runs only under RBAC; a failed load checks nothing, so the action's own read answers.
 #[cfg(feature = "enterprise")]
 pub async fn guard_loaded(
     org_id: &str,
     user_id: &str,
-    loaded: Result<Option<Vec<QuerySource>>, anyhow::Error>,
+    load: impl Future<Output = Result<Option<Vec<QuerySource>>, anyhow::Error>>,
 ) -> Result<(), Response> {
-    use common::meta::http::HttpResponse as MetaHttpResponse;
-
-    if !rbac_enforced().await {
-        return Ok(());
-    }
-    match loaded {
-        Ok(Some(sources)) => guard_write(org_id, user_id, &sources).await,
-        Ok(None) => Ok(()),
-        Err(e) => Err(MetaHttpResponse::internal_error(e.to_string())),
-    }
+    guard_loaded_with(
+        crate::authz::active_checker().as_ref(),
+        org_id,
+        user_id,
+        load,
+    )
+    .await
 }
 
-/// The bulk form of [`guard_loaded`]: a failed load is reported as that id's error.
+/// The bulk form of [`guard_loaded`].
 #[cfg(feature = "enterprise")]
 pub async fn loaded_denial_message(
     org_id: &str,
     user_id: &str,
-    loaded: Result<Option<Vec<QuerySource>>, anyhow::Error>,
+    load: impl Future<Output = Result<Option<Vec<QuerySource>>, anyhow::Error>>,
 ) -> Option<String> {
     if !rbac_enforced().await {
         return None;
     }
-    match loaded {
+    match load.await {
         Ok(Some(sources)) => denial_message(org_id, user_id, &sources).await,
         Ok(None) => None,
-        Err(e) => Some(e.to_string()),
+        Err(e) => {
+            log::warn!("[background_access] {org_id}: source load failed, left to the action: {e}");
+            None
+        }
     }
 }
 
@@ -723,28 +724,303 @@ async fn stored_function(
 }
 
 #[cfg(feature = "enterprise")]
-fn unusable_dashboard(dashboard: &config::meta::dashboards::Dashboard) -> anyhow::Error {
-    anyhow::anyhow!(
-        "dashboard {} has no v{} body",
-        dashboard.dashboard_id().unwrap_or_default(),
-        dashboard.version
-    )
+async fn guard_loaded_with(
+    checker: &dyn StreamAccessChecker,
+    org_id: &str,
+    user_id: &str,
+    load: impl Future<Output = Result<Option<Vec<QuerySource>>, anyhow::Error>>,
+) -> Result<(), Response> {
+    if !checker.enforces_rbac().await {
+        return Ok(());
+    }
+    match load.await {
+        Ok(Some(sources)) => crate::authz::authorize_with(checker, user_id, &sources)
+            .await
+            .map_err(|denied| crate::authz::stream_access_forbidden(org_id, &denied)),
+        Ok(None) => Ok(()),
+        Err(e) => {
+            log::warn!("[background_access] {org_id}: source load failed, left to the action: {e}");
+            Ok(())
+        }
+    }
 }
 
-fn dashboard_panels(dashboard: &serde_json::Value) -> Vec<&serde_json::Value> {
-    let tabbed = dashboard
+/// Read as the edit's own first read does, so a failure answers what that read would.
+#[cfg(feature = "enterprise")]
+async fn stored_dashboard(
+    org_id: &str,
+    folder_id: &str,
+    dashboard_id: &str,
+) -> Result<Dashboard, Response> {
+    use crate::dashboards::DashboardError;
+
+    infra::table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+        .await
+        .map_err(|e| Response::from(DashboardError::from(e)))?
+        .ok_or_else(|| Response::from(DashboardError::DashboardNotFound))
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_stored_edit(
+    org_id: &str,
+    user_id: &str,
+    dashboard_id: &str,
+    stored: &Dashboard,
+    edited: &Dashboard,
+) -> Result<(), Response> {
+    let Some(edited) = dashboard_json(edited) else {
+        return Ok(());
+    };
+    let stored = dashboard_json(stored).unwrap_or(Value::Null);
+    guard_edit(org_id, user_id, &stored, &edited, || {
+        rendering_reports(org_id, dashboard_id)
+    })
+    .await
+}
+
+/// `reports` runs only when the edit changed something a report could read differently.
+#[cfg(feature = "enterprise")]
+async fn guard_edit<F, Fut>(
+    org_id: &str,
+    user_id: &str,
+    stored: &Value,
+    edited: &Value,
+    reports: F,
+) -> Result<(), Response>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Vec<RenderingReport>>,
+{
+    let edits = QueryEdits::between(stored, edited);
+    if edits.is_empty() {
+        return Ok(());
+    }
+    let reports = reports().await;
+    let sources = edit_sources(org_id, stored, edited, &edits, &reports);
+    guard_write(org_id, user_id, &sources).await
+}
+
+/// A failed lookup checks nothing: the edit itself reads no report.
+#[cfg(feature = "enterprise")]
+async fn rendering_reports(org_id: &str, dashboard_id: &str) -> Vec<RenderingReport> {
+    use config::meta::dashboards::reports::ReportListFilters;
+
+    let filters = ReportListFilters {
+        dashboard: Some(dashboard_id.to_string()),
+        folder: None,
+        destination_less: None,
+        name_substring: None,
+    };
+    let rows = match crate::dashboards::reports::list(org_id, filters, None).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[background_access] {org_id}/{dashboard_id}: report lookup failed: {e}");
+            return Vec::new();
+        }
+    };
+    let mut out = Vec::new();
+    for row in rows.into_iter().filter(|row| row.report_enabled) {
+        let report = match crate::dashboards::reports::get_by_id(org_id, &row.report_id).await {
+            Ok((_, report)) => report,
+            Err(e) => {
+                log::warn!(
+                    "[background_access] {org_id}/{}: report read failed: {e}",
+                    row.report_id
+                );
+                continue;
+            }
+        };
+        for dashboard in report
+            .dashboards
+            .into_iter()
+            .filter(|d| d.dashboard == dashboard_id)
+        {
+            out.push(RenderingReport {
+                tab: dashboard.tabs.into_iter().next(),
+                variables: dashboard
+                    .variables
+                    .into_iter()
+                    .map(|v| (v.key, v.value))
+                    .collect(),
+            });
+        }
+    }
+    out
+}
+
+/// Only what each report renders after the edit and reads differently than before it.
+#[cfg(feature = "enterprise")]
+fn edit_sources(
+    org_id: &str,
+    stored: &Value,
+    edited: &Value,
+    edits: &QueryEdits,
+    reports: &[RenderingReport],
+) -> Vec<QuerySource> {
+    let before = panels_by_key(stored);
+    let mut sources = Vec::new();
+    for report in reports {
+        let tab = report.tab.as_deref();
+        let new_values = variable_values(edited, &report.variables);
+        let old_values = variable_values(stored, &report.variables);
+        let (new_tab, panels) = rendered_tab(edited, tab);
+        let moved = new_tab != rendered_tab(stored, tab).0;
+        for panel in panels {
+            let key = (new_tab.clone(), panel_id(panel));
+            let reads = panel_sources(org_id, panel, &new_values);
+            let changed = moved
+                || edits.panels.contains(&key)
+                || (edits.variables
+                    && before
+                        .get(&key)
+                        .map(|old| panel_sources(org_id, old, &old_values))
+                        != Some(reads.clone()));
+            if changed {
+                sources.extend(reads);
+            }
+        }
+        if edits.variables {
+            let old = variable_sources(org_id, stored, &old_values);
+            sources.extend(
+                variable_sources(org_id, edited, &new_values)
+                    .into_iter()
+                    .filter(|source| !old.contains(source)),
+            );
+        }
+    }
+    sources
+}
+
+/// The tab a report shows: the one it names, else the first, as the dashboard page falls back.
+fn rendered_tab<'a>(
+    dashboard: &'a serde_json::Value,
+    tab: Option<&str>,
+) -> (String, Vec<&'a serde_json::Value>) {
+    let panels_of = |holder: &'a serde_json::Value| -> Vec<&'a serde_json::Value> {
+        holder
+            .get("panels")
+            .and_then(|p| p.as_array())
+            .map(|p| p.iter().collect())
+            .unwrap_or_default()
+    };
+    let tabs = dashboard
+        .get("tabs")
+        .and_then(|t| t.as_array())
+        .filter(|tabs| !tabs.is_empty());
+    let Some(tabs) = tabs else {
+        return (String::new(), panels_of(dashboard));
+    };
+    let chosen = tab
+        .and_then(|id| tabs.iter().find(|t| tab_id(t) == id))
+        .unwrap_or(&tabs[0]);
+    (tab_id(chosen), panels_of(chosen))
+}
+
+fn variable_sources(
+    org_id: &str,
+    dashboard: &serde_json::Value,
+    values: &HashMap<String, String>,
+) -> Vec<QuerySource> {
+    let list = dashboard
+        .pointer("/variables/list")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten();
+    let mut sources = Vec::new();
+    for variable in list {
+        if variable.get("type").and_then(|t| t.as_str()) != Some("query_values") {
+            continue;
+        }
+        let Some(data) = variable.get("query_data") else {
+            continue;
+        };
+        let stream_type = json_stream_type(data, StreamType::Logs);
+        if let Some(source) = named_stream_source(org_id, data, stream_type, values) {
+            sources.push(source);
+        }
+    }
+    sources
+}
+
+#[cfg(feature = "enterprise")]
+fn panels_by_key(dashboard: &Value) -> HashMap<(String, String), &Value> {
+    let mut out = HashMap::new();
+    let tabs = dashboard
         .get("tabs")
         .and_then(|t| t.as_array())
         .into_iter()
-        .flatten()
-        .filter_map(|tab| tab.get("panels").and_then(|p| p.as_array()))
         .flatten();
+    for tab in tabs {
+        let id = tab_id(tab);
+        let panels = tab
+            .get("panels")
+            .and_then(|p| p.as_array())
+            .into_iter()
+            .flatten();
+        for panel in panels {
+            out.insert((id.clone(), panel_id(panel)), panel);
+        }
+    }
     let flat = dashboard
         .get("panels")
         .and_then(|p| p.as_array())
         .into_iter()
         .flatten();
-    tabbed.chain(flat).collect()
+    for panel in flat {
+        out.insert((String::new(), panel_id(panel)), panel);
+    }
+    out
+}
+
+/// Every field [`panel_sources`] reads, so equal values read the same streams.
+#[cfg(feature = "enterprise")]
+fn panel_reads(panel: &Value) -> Value {
+    let queries: Vec<Value> = panel
+        .get("queries")
+        .and_then(|q| q.as_array())
+        .into_iter()
+        .flatten()
+        .map(|query| {
+            serde_json::json!([
+                query.get("query"),
+                query.get("vrlFunctionQuery"),
+                query.pointer("/fields/stream"),
+                query.pointer("/fields/stream_type"),
+                query.get("joins"),
+            ])
+        })
+        .collect();
+    if queries.is_empty() {
+        return Value::Null;
+    }
+    serde_json::json!([panel.get("queryType"), queries])
+}
+
+#[cfg(feature = "enterprise")]
+fn tab_ids(dashboard: &Value) -> Vec<String> {
+    dashboard
+        .get("tabs")
+        .and_then(|t| t.as_array())
+        .into_iter()
+        .flatten()
+        .map(tab_id)
+        .collect()
+}
+
+fn tab_id(tab: &serde_json::Value) -> String {
+    tab.get("tabId")
+        .and_then(|t| t.as_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
+#[cfg(feature = "enterprise")]
+fn panel_id(panel: &Value) -> String {
+    panel
+        .get("id")
+        .and_then(|t| t.as_str())
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn json_stream_type(value: &serde_json::Value, fallback: StreamType) -> StreamType {
@@ -960,7 +1236,7 @@ mod tests {
             ]}],
         });
 
-        let with_defaults = dashboard_sources("o1", &dashboard, &[]);
+        let with_defaults = dashboard_sources("o1", &dashboard, None, &[]);
         assert_eq!(
             resolved_names(&with_defaults),
             vec![
@@ -974,6 +1250,7 @@ mod tests {
         let with_report = dashboard_sources(
             "o1",
             &dashboard,
+            None,
             &[("target".to_string(), "report_stream".to_string())],
         );
         assert_eq!(
@@ -1053,49 +1330,194 @@ mod tests {
     fn v1_dashboards_keep_panels_at_the_top_level() {
         let dashboard = json!({"panels": [{"queries": [{"query": "SELECT * FROM flat"}]}]});
         assert_eq!(
-            resolved_names(&dashboard_sources("o1", &dashboard, &[])),
+            resolved_names(&dashboard_sources("o1", &dashboard, None, &[])),
             vec!["o1/logs/flat"]
+        );
+    }
+
+    #[test]
+    fn a_report_reads_only_its_tab_or_the_first_when_its_tab_is_gone() {
+        let dashboard = json!({"tabs": [
+            {"tabId": "t1", "panels": [{"queries": [{"query": "SELECT * FROM first"}]}]},
+            {"tabId": "t2", "panels": [{"queries": [{"query": "SELECT * FROM second"}]}]},
+        ]});
+        let names = |tab| resolved_names(&dashboard_sources("o1", &dashboard, tab, &[]));
+        assert_eq!(names(Some("t2")), vec!["o1/logs/second"]);
+        assert_eq!(names(Some("gone")), vec!["o1/logs/first"]);
+        assert_eq!(names(None), vec!["o1/logs/first"]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    struct RbacOff;
+
+    #[cfg(feature = "enterprise")]
+    #[async_trait::async_trait]
+    impl crate::authz::StreamAccessChecker for RbacOff {
+        async fn enforces_rbac(&self) -> bool {
+            false
+        }
+
+        async fn is_root(&self, _: &str) -> bool {
+            false
+        }
+
+        async fn is_root_or_admin(&self, _: &str, _: &str) -> bool {
+            false
+        }
+
+        async fn can_read_stream(&self, _: &str, _: &crate::authz::TypedStream) -> bool {
+            false
+        }
+
+        async fn can_use_cipher_key(&self, _: &str, _: &str, _: &str) -> bool {
+            false
+        }
+
+        async fn can_read_dashboard(&self, _: &str, _: &str, _: &str, _: &str) -> bool {
+            false
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn rbac_off_never_loads_the_sources() {
+        let load = async { panic!("RBAC off must not load any source") };
+        assert!(
+            guard_loaded_with(&RbacOff, "o1", "u@example.com", load)
+                .await
+                .is_ok()
         );
     }
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
-    async fn a_failed_load_refuses_and_a_missing_object_checks_nothing() {
+    async fn a_failed_or_empty_load_is_left_to_the_action() {
         crate::authz::fake_checker();
-        let failed = || Err(anyhow::anyhow!("replica unavailable"));
-        let resp = guard_loaded("o1", "u@example.com", failed())
+        let user = format!("{}@example.com", config::ider::uuid());
+        let failed = async { Err(anyhow::anyhow!("replica unavailable")) };
+        assert!(guard_loaded("o1", &user, failed).await.is_ok());
+        let failed = async { Err(anyhow::anyhow!("replica unavailable")) };
+        assert_eq!(loaded_denial_message("o1", &user, failed).await, None);
+        assert!(guard_loaded("o1", &user, async { Ok(None) }).await.is_ok());
+
+        let secret = vec![QuerySource::Stream {
+            org_id: "o1".to_string(),
+            stream_type: StreamType::Logs,
+            name: "secret".to_string(),
+        }];
+        let resp = guard_loaded("o1", &user, async { Ok(Some(secret)) })
             .await
             .unwrap_err();
-        assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(
-            loaded_denial_message("o1", "u@example.com", failed()).await,
-            Some("replica unavailable".to_string())
-        );
-        assert!(guard_loaded("o1", "u@example.com", Ok(None)).await.is_ok());
-        assert_eq!(
-            loaded_denial_message("o1", "u@example.com", Ok(None)).await,
-            None
-        );
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    async fn message(resp: Response) -> String {
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        body["message"].as_str().unwrap_or_default().to_string()
     }
 
     #[cfg(feature = "enterprise")]
-    #[test]
-    fn a_missing_report_dashboard_answers_404_and_a_failed_load_500() {
-        use axum::http::StatusCode;
+    fn two_tabs(first: &str, second: &str) -> serde_json::Value {
+        json!({
+            "title": "d",
+            "tabs": [
+                {"tabId": "t1", "name": "one", "panels": [
+                    {"id": "p1", "title": "a", "queryType": "sql",
+                     "queries": [{"query": format!("SELECT * FROM {first}")}]},
+                ]},
+                {"tabId": "t2", "name": "two", "panels": [
+                    {"id": "p2", "title": "b", "queryType": "sql",
+                     "queries": [{"query": format!("SELECT * FROM {second}")}]},
+                ]},
+            ],
+        })
+    }
 
-        let missing = ReportSourceError::DashboardMissing {
-            folder: "f1".to_string(),
-            dashboard_id: "d1".to_string(),
-        };
-        assert_eq!(
-            missing.to_string(),
-            "dashboard f1/d1 of the report not found"
+    #[cfg(feature = "enterprise")]
+    fn rendering(tab: &str) -> Vec<RenderingReport> {
+        vec![RenderingReport {
+            tab: Some(tab.to_string()),
+            variables: Vec::new(),
+        }]
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn a_rename_or_layout_edit_looks_up_no_report_and_checks_nothing() {
+        crate::authz::fake_checker();
+        let user = format!("{}@example.com", config::ider::uuid());
+        let stored = two_tabs("secret", "secret");
+        let mut edited = stored.clone();
+        edited["title"] = json!("renamed");
+        edited["tabs"][0]["name"] = json!("renamed tab");
+        edited["tabs"][0]["panels"][0]["title"] = json!("renamed panel");
+        edited["tabs"][0]["panels"][0]["layout"] = json!({"x": 4, "y": 2, "w": 10, "h": 8, "i": 1});
+        let no_lookup =
+            || async { panic!("an edit that reads nothing new must not look up reports") };
+        assert!(
+            guard_edit("o1", &user, &stored, &edited, no_lookup)
+                .await
+                .is_ok()
         );
-        assert_eq!(Response::from(missing).status(), StatusCode::NOT_FOUND);
-        let failed = ReportSourceError::Load(anyhow::anyhow!("primary unavailable"));
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn a_changed_query_counts_only_in_a_tab_some_report_renders() {
+        crate::authz::fake_checker();
+        let user = format!("{}@example.com", config::ider::uuid());
+        let stored = two_tabs("first", "second");
+
+        let hidden_edit = two_tabs("first", "secret");
+        let reports = || async { rendering("t1") };
+        assert!(
+            guard_edit("o1", &user, &stored, &hidden_edit, reports)
+                .await
+                .is_ok()
+        );
+
+        let rendered_edit = two_tabs("secret", "second");
+        let reports = || async { rendering("t1") };
+        let resp = guard_edit("o1", &user, &stored, &rendered_edit, reports)
+            .await
+            .unwrap_err();
         assert_eq!(
-            Response::from(failed).status(),
-            StatusCode::INTERNAL_SERVER_ERROR
+            message(resp).await,
+            "Unauthorized Access: no read permission on logs/secret"
+        );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn an_unreadable_report_dashboard_is_refused_without_its_panels() {
+        use config::meta::dashboards::reports::ReportDashboard;
+
+        crate::authz::fake_checker();
+        let user = format!("{}@example.com", config::ider::uuid());
+        let report = Report {
+            dashboards: vec![ReportDashboard {
+                dashboard: "d1".to_string(),
+                folder: "f1".to_string(),
+                tabs: vec!["t1".to_string()],
+                variables: Vec::new(),
+                timerange: Default::default(),
+                report_type: Default::default(),
+                email_attachment_type: Default::default(),
+                attachment_dimensions: None,
+            }],
+            ..Default::default()
+        };
+        let Err(ReportRefusal::Forbidden(resp)) = guard_report("o1", &user, &report).await else {
+            panic!("an unreadable dashboard must be refused before it is read");
+        };
+        assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        assert_eq!(
+            message(resp).await,
+            "Unauthorized Access: dashboards: f1/d1"
         );
     }
 

@@ -116,10 +116,6 @@ pub async fn save_pipeline(
 ) -> Response {
     pipeline.name = pipeline.name.trim().to_lowercase();
     pipeline.org = org_id;
-    #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_pipeline(&user_email.user_id, &pipeline).await {
-        return resp;
-    }
 
     let overwrite = query
         .get("overwrite")
@@ -127,6 +123,10 @@ pub async fn save_pipeline(
         .unwrap_or_default();
     if !overwrite {
         pipeline.id = ider::generate();
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_pipeline(&user_email.user_id, &pipeline).await {
+        return resp;
     }
     let pipeline_id = pipeline.id.to_string();
     let pipeline_name = pipeline.name.clone();
@@ -533,14 +533,15 @@ pub async fn enable_pipeline(
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
     #[cfg(feature = "enterprise")]
-    if enable {
-        let guarded = match pipeline::get_user_pipeline(&org_id, &pipeline_id).await {
-            Ok(stored) => guard_pipeline(&user_email.user_id, &stored).await,
-            Err(e) => Err(Response::from(e)),
-        };
-        if let Err(resp) = guarded {
-            return resp;
-        }
+    if enable
+        && let Err(resp) = openobserve_core::background_access::guard_loaded(
+            &org_id,
+            &user_email.user_id,
+            stored_pipeline_sources(&org_id, &pipeline_id),
+        )
+        .await
+    {
+        return resp;
     }
 
     let starts_from_now = query
@@ -654,27 +655,41 @@ pub async fn enable_pipeline_bulk(
     })
 }
 
+/// A body the save's own validation refuses is left to it, so it answers its 400 first.
 #[cfg(feature = "enterprise")]
 async fn guard_pipeline(user_id: &str, pipeline: &Pipeline) -> Result<(), Response> {
-    if !openobserve_core::background_access::rbac_enforced().await {
-        return Ok(());
-    }
-    let sources = openobserve_core::background_access::pipeline_sources(pipeline)
-        .await
-        .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
-    openobserve_core::background_access::guard_write(&pipeline.org, user_id, &sources).await
+    let sources = async {
+        if !pipeline::passes_validation(pipeline) {
+            return Ok(None);
+        }
+        openobserve_core::background_access::pipeline_sources(pipeline)
+            .await
+            .map(Some)
+    };
+    openobserve_core::background_access::guard_loaded(&pipeline.org, user_id, sources).await
 }
 
-/// A pipeline that cannot be read is reported as that id's error, never enabled unchecked.
 #[cfg(feature = "enterprise")]
 async fn enable_denial(org_id: &str, user_id: &str, id: &str) -> Option<String> {
-    let loaded = match pipeline::get_user_pipeline(org_id, id).await {
-        Ok(stored) => openobserve_core::background_access::pipeline_sources(&stored)
-            .await
-            .map(Some),
-        Err(e) => Err(anyhow::anyhow!(e.to_string())),
-    };
-    openobserve_core::background_access::loaded_denial_message(org_id, user_id, loaded).await
+    openobserve_core::background_access::loaded_denial_message(
+        org_id,
+        user_id,
+        stored_pipeline_sources(org_id, id),
+    )
+    .await
+}
+
+#[cfg(feature = "enterprise")]
+async fn stored_pipeline_sources(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<Vec<openobserve_core::authz::QuerySource>>, anyhow::Error> {
+    let stored = pipeline::get_user_pipeline(org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    openobserve_core::background_access::pipeline_sources(&stored)
+        .await
+        .map(Some)
 }
 
 #[cfg(test)]
@@ -773,17 +788,29 @@ mod tests {
             format!("{}@example.com", config::ider::uuid())
         }
 
-        fn pipeline(org: &str, source_org: &str, stream: &str) -> Pipeline {
-            let mut pipeline: Pipeline = serde_json::from_value(json!({
-                "name": "p1",
-                "source": {
-                    "source_type": "realtime",
-                    "org_id": source_org,
+        fn node(id: &str, org: &str, stream: &str, io_type: &str) -> serde_json::Value {
+            json!({
+                "id": id,
+                "data": {
+                    "node_type": "stream",
+                    "org_id": org,
                     "stream_name": stream,
                     "stream_type": "logs"
                 },
-                "nodes": [],
-                "edges": []
+                "position": {"x": 0.0, "y": 0.0},
+                "io_type": io_type
+            })
+        }
+
+        fn pipeline(org: &str, source_org: &str, stream: &str) -> Pipeline {
+            let mut pipeline: Pipeline = serde_json::from_value(json!({
+                "pipeline_id": "p1_id",
+                "name": "p1",
+                "nodes": [
+                    node("n1", source_org, stream, "input"),
+                    node("n2", "", "p_out", "output")
+                ],
+                "edges": [{"id": "e1", "source": "n1", "target": "n2"}]
             }))
             .unwrap();
             pipeline.org = org.to_string();
@@ -791,22 +818,10 @@ mod tests {
         }
 
         fn first_node_pipeline(source: serde_json::Value, input: &str) -> Pipeline {
-            let node = |id: &str, stream: &str, io_type: &str| {
-                json!({
-                    "id": id,
-                    "data": {
-                        "node_type": "stream",
-                        "org_id": "",
-                        "stream_name": stream,
-                        "stream_type": "logs"
-                    },
-                    "position": {"x": 0.0, "y": 0.0},
-                    "io_type": io_type
-                })
-            };
             let mut body = json!({
+                "pipeline_id": "p1_id",
                 "name": "p1",
-                "nodes": [node("n1", input, "input"), node("n2", "fp_out", "output")],
+                "nodes": [node("n1", "", input, "input"), node("n2", "", "fp_out", "output")],
                 "edges": [{"id": "e1", "source": "n1", "target": "n2"}]
             });
             if !source.is_null() {
@@ -841,6 +856,20 @@ mod tests {
             assert_eq!(
                 message(resp).await,
                 "Unauthorized Access: no read permission on logs/secret"
+            );
+        }
+
+        #[tokio::test]
+        async fn a_body_its_save_refuses_is_left_to_that_400() {
+            fake_checker();
+            let caller = user();
+            let mut invalid = pipeline("sp_org1", "", "secret");
+            invalid.edges.clear();
+            assert!(guard_pipeline(&caller, &invalid).await.is_ok());
+            assert!(
+                guard_pipeline(&caller, &pipeline("sp_org1", "", "secret"))
+                    .await
+                    .is_err()
             );
         }
 

@@ -188,6 +188,9 @@ pub async fn update(
     };
 
     let mut model = to_model(slo, now)?;
+    if slo.owner.is_none() {
+        model.owner = Set(existing.owner.clone());
+    }
     model.created_at = Set(existing.created_at);
     model.updated_at = Set(now);
     model.last_edited_by = Set(editor.map(str::to_string));
@@ -1345,6 +1348,32 @@ mod tests {
                 .definition_generation,
             1
         );
+    }
+
+    #[tokio::test]
+    async fn an_update_moves_the_owner_only_when_it_names_one() {
+        let db = db().await;
+        let owned = Slo {
+            owner: Some("alice".into()),
+            ..slo()
+        };
+        create(&db, &owned, 1_000, Some("alice")).await.unwrap();
+
+        let unnamed = Slo {
+            owner: None,
+            ..slo()
+        };
+        update(&db, &unnamed, 2_000, Some("bob")).await.unwrap();
+        let stored = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(stored.owner.as_deref(), Some("alice"));
+
+        let named = Slo {
+            owner: Some("carol".into()),
+            ..slo()
+        };
+        update(&db, &named, 3_000, Some("bob")).await.unwrap();
+        let stored = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(stored.owner.as_deref(), Some("carol"));
     }
 }
 

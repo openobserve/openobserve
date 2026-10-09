@@ -31,7 +31,7 @@ use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 #[cfg(feature = "enterprise")]
-use openobserve_core::background_access::{create_owner, guard_write, slo_sources, stored_slo};
+use openobserve_core::background_access::{guard_loaded, guard_write, slo_sources};
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -164,21 +164,17 @@ pub async fn create_slo(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
-    #[cfg(not(feature = "enterprise"))]
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
-    }
-    #[cfg(feature = "enterprise")]
-    {
-        slo.owner = Some(create_owner(&slo.org, &user_email.user_id, slo.owner.as_deref()).await);
-        if let Err(resp) = guard_write(&slo.org, &user_email.user_id, &slo_sources(&slo)).await {
-            return resp;
-        }
     }
     if slo.name.is_empty() || slo.name.len() > 256 {
         return MetaHttpResponse::bad_request(
             "name must be non empty and less than 256 characters",
         );
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_slo(&slo, &user_email.user_id).await {
+        return resp;
     }
 
     match slo_service::create(&mut slo).await {
@@ -246,22 +242,21 @@ pub async fn update_slo(
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
+    #[cfg(not(feature = "enterprise"))]
+    let editor = slo.owner.clone();
+    // only a named owner moves ownership; an omitted one keeps the stored owner
     #[cfg(feature = "enterprise")]
     {
-        // an update never changes the stored owner
-        match stored_slo(&slo.org, &slo.id).await {
-            Ok(Some(stored)) => {
-                slo.owner = stored.owner.or_else(|| Some(user_email.user_id.clone()));
-            }
-            Ok(None) => {}
-            Err(e) => return internal(e),
-        }
-        if let Err(resp) = guard_write(&slo.org, &user_email.user_id, &slo_sources(&slo)).await {
-            return resp;
-        }
+        slo.owner = slo.owner.take().filter(|owner| !owner.is_empty());
+    }
+    #[cfg(feature = "enterprise")]
+    let editor = Some(user_email.user_id.clone());
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_slo(&slo, &user_email.user_id).await {
+        return resp;
     }
 
-    match slo_service::update(&mut slo).await {
+    match slo_service::update(&mut slo, editor.as_deref()).await {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO updated")
                 .with_id(slo.id.clone())
@@ -441,15 +436,15 @@ pub async fn enable_slo(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
-    if q.value {
-        // a missing SLO checks nothing: set_enabled reads the same primary and answers 404
-        let sources = match stored_slo(&org_id, &slo_id).await {
-            Ok(stored) => stored.as_ref().map(slo_sources).unwrap_or_default(),
-            Err(e) => return internal(e),
-        };
-        if let Err(resp) = guard_write(&org_id, &user_email.user_id, &sources).await {
-            return resp;
-        }
+    if q.value
+        && let Err(resp) = guard_loaded(
+            &org_id,
+            &user_email.user_id,
+            openobserve_core::background_access::stored_slo_sources(&org_id, &slo_id),
+        )
+        .await
+    {
+        return resp;
     }
     match slo_service::set_enabled(&org_id, &slo_id, q.value).await {
         Ok(true) => MetaHttpResponse::json(MetaHttpResponse::message(
@@ -576,6 +571,16 @@ pub async fn preview_alert_sli(
         }
         Err(e) => internal(anyhow::anyhow!(e.to_string())),
     }
+}
+
+/// The save's own checks answer first, so a bad body is never reported as a refused read.
+#[cfg(feature = "enterprise")]
+async fn guard_slo(slo: &Slo, user_id: &str) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
+    slo_service::validate(slo).await.map_err(save_error)?;
+    guard_write(&slo.org, user_id, &slo_sources(slo)).await
 }
 
 fn not_found() -> Response {

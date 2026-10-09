@@ -146,8 +146,15 @@ pub async fn update_dashboard(
 
     set_dashboard_owner_if_empty(&mut dashboard, &user_email.user_id);
     #[cfg(feature = "enterprise")]
-    if let Err(resp) =
-        guard_whole_edit(&org_id, &user_email.user_id, &dashboard_id, &dashboard).await
+    if let Err(resp) = openobserve_core::background_access::guard_dashboard_update(
+        &org_id,
+        &user_email.user_id,
+        &folder,
+        &dashboard_id,
+        &dashboard,
+        hash,
+    )
+    .await
     {
         return resp;
     }
@@ -524,12 +531,6 @@ pub async fn add_panel(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    #[cfg(feature = "enterprise")]
-    if let Err(resp) =
-        guard_panel_edit(&org_id, &user_email.user_id, &dashboard_id, &req_body.panel).await
-    {
-        return resp;
-    }
     let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
@@ -537,6 +538,20 @@ pub async fn add_panel(
             return MetaHttpResponse::bad_request("hash query parameter is required");
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_panel_add(
+        &org_id,
+        &user_email.user_id,
+        &folder,
+        &dashboard_id,
+        hash,
+        req_body.tab_id.as_deref(),
+        &req_body.panel,
+    )
+    .await
+    {
+        return resp;
+    }
 
     match dashboards::add_panel_to_dashboard(
         &org_id,
@@ -597,12 +612,6 @@ pub async fn update_panel(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    #[cfg(feature = "enterprise")]
-    if let Err(resp) =
-        guard_panel_edit(&org_id, &user_email.user_id, &dashboard_id, &req_body.panel).await
-    {
-        return resp;
-    }
     let folder = common::utils::http::get_folder(&query);
     let hash = match query.get("hash") {
         Some(h) => h.as_str(),
@@ -610,6 +619,21 @@ pub async fn update_panel(
             return MetaHttpResponse::bad_request("hash query parameter is required");
         }
     };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = openobserve_core::background_access::guard_panel_update(
+        &org_id,
+        &user_email.user_id,
+        &folder,
+        &dashboard_id,
+        &panel_id,
+        hash,
+        req_body.tab_id.as_deref(),
+        &req_body.panel,
+    )
+    .await
+    {
+        return resp;
+    }
 
     match dashboards::update_panel_in_dashboard(
         &org_id,
@@ -711,48 +735,6 @@ pub fn is_overwrite(query_str: &str) -> bool {
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     }
-}
-
-#[cfg(feature = "enterprise")]
-async fn guard_whole_edit(
-    org_id: &str,
-    user_id: &str,
-    dashboard_id: &str,
-    dashboard: &Dashboard,
-) -> Result<(), Response> {
-    let Some(edited) = openobserve_core::background_access::dashboard_json(dashboard) else {
-        return Err(MetaHttpResponse::bad_request(format!(
-            "dashboard body has no v{} content",
-            dashboard.version
-        )));
-    };
-    openobserve_core::background_access::guard_dashboard_edit(
-        org_id,
-        user_id,
-        dashboard_id,
-        &edited,
-        true,
-    )
-    .await
-}
-
-#[cfg(feature = "enterprise")]
-async fn guard_panel_edit(
-    org_id: &str,
-    user_id: &str,
-    dashboard_id: &str,
-    panel: &config::meta::dashboards::v8::Panel,
-) -> Result<(), Response> {
-    let edited =
-        serde_json::to_value(panel).map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
-    openobserve_core::background_access::guard_dashboard_edit(
-        org_id,
-        user_id,
-        dashboard_id,
-        &edited,
-        false,
-    )
-    .await
 }
 
 /// Tries to get the user ID from the request headers.

@@ -89,6 +89,13 @@ fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
     }
 }
 
+/// Whether `pipeline` has an ID and passes the `validate()` its save and update run, on a copy.
+pub fn passes_validation(pipeline: &Pipeline) -> bool {
+    let mut copy = pipeline.clone();
+    default_source_org(&mut copy);
+    !copy.id.is_empty() && copy.validate().is_ok()
+}
+
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
     // check if id is missing

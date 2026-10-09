@@ -291,7 +291,6 @@ pub async fn clone_composite(
     name: Option<String>,
     folder_id: Option<String>,
     editor: String,
-    owner: Option<String>,
 ) -> Result<composite_entity::Model, CompositeServiceError> {
     ensure_mutation_allowed()?;
     let current = get_composite(org, id)
@@ -319,7 +318,7 @@ pub async fn clone_composite(
             .tags
             .and_then(|tags| serde_json::from_value(tags).ok())
             .unwrap_or_default(),
-        owner: owner.or(current.owner),
+        owner: current.owner,
         last_edited_by: Some(editor),
         pending_period_sec: current.pending_period_sec,
     })

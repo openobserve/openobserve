@@ -85,7 +85,7 @@ pub enum QuerySource {
 }
 
 #[cfg(any(feature = "enterprise", test))]
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypedStream {
     pub org_id: String,
     pub stream_type: StreamType,
@@ -117,8 +117,7 @@ pub enum Denial {
         org_id: String,
         source: String,
         error: String,
-        /// An uncompilable VRL may later read another org's enrichment table, so no admin skips
-        /// it.
+        /// An uncompilable VRL may read another org's enrichment table, so no admin skips it.
         from_vrl: bool,
     },
 }
@@ -1313,36 +1312,8 @@ mod tests {
                 "background_access/placeholders.rs",
                 include_str!("background_access/placeholders.rs"),
             ),
-            (
-                "background_access/audit.rs",
-                include_str!("background_access/audit.rs"),
-            ),
         ] {
             assert!(!text.contains(needle), "{file} uses the untyped resolver");
-        }
-    }
-
-    #[test]
-    fn committed_code_names_no_advisory() {
-        let patterns = [concat!("GHSA", "-"), concat!("CVE", "-")];
-        for (file, text) in [
-            ("authz.rs", include_str!("authz.rs")),
-            (
-                "background_access/mod.rs",
-                include_str!("background_access/mod.rs"),
-            ),
-            (
-                "background_access/placeholders.rs",
-                include_str!("background_access/placeholders.rs"),
-            ),
-            (
-                "background_access/audit.rs",
-                include_str!("background_access/audit.rs"),
-            ),
-        ] {
-            for pattern in patterns {
-                assert!(!text.contains(pattern), "{file} names an advisory");
-            }
         }
     }
 

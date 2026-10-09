@@ -758,7 +758,8 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
     Ok(())
 }
 
-pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
+/// `editor` is recorded as the last editor; an omitted `slo.owner` keeps the stored one.
+pub async fn update(slo: &mut Slo, editor: Option<&str>) -> Result<(), SloError> {
     let db = get_orm_client_rw().await;
 
     validate(slo).await?;
@@ -775,7 +776,7 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
     slo.groups_reserved = groups;
 
     let now = now_micros() / 1_000_000;
-    let effect = match slos_table::update(db, slo, now, slo.owner.as_deref()).await {
+    let effect = match slos_table::update(db, slo, now, editor).await {
         Ok(e) => e,
         Err(e) if is_duplicate_name(&e) => {
             return Err(SloError::DuplicateName(slo.name.clone()));

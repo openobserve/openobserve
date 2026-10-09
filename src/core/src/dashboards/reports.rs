@@ -135,9 +135,21 @@ pub async fn save(
     org_id: &str,
     folder_id: &str,
     name: &str,
-    mut report: Report,
+    report: Report,
     create: bool,
 ) -> Result<(), ReportError> {
+    let report = prepare_save(org_id, folder_id, name, report, create).await?;
+    write_save(org_id, folder_id, report, create).await
+}
+
+/// Runs every check [`save`] makes and returns the report it would write.
+pub async fn prepare_save(
+    org_id: &str,
+    folder_id: &str,
+    name: &str,
+    mut report: Report,
+    create: bool,
+) -> Result<Report, ReportError> {
     bind_to_path_org(&mut report, org_id)?;
 
     let conn = get_orm_client_rw().await;
@@ -238,7 +250,17 @@ pub async fn save(
     if try_join_all(tasks).await.is_err() {
         return Err(ReportError::DashboardTabNotFound);
     }
+    Ok(report)
+}
 
+/// Writes a report [`prepare_save`] accepted.
+pub async fn write_save(
+    org_id: &str,
+    folder_id: &str,
+    report: Report,
+    create: bool,
+) -> Result<(), ReportError> {
+    let conn = get_orm_client_rw().await;
     if create {
         let report_id = db::dashboards::reports::create(conn, folder_id, report)
             .await
@@ -270,12 +292,12 @@ pub async fn get(org_id: &str, folder_id: &str, name: &str) -> Result<Report, Re
 }
 
 pub async fn get_by_id(org_id: &str, report_id: &str) -> Result<(Folder, Report), ReportError> {
-    get_by_id_on(get_orm_client_ro().await, org_id, report_id).await
-}
-
-/// [`get_by_id`] on the primary, for a check that must see the report the write acts on.
-pub async fn get_by_id_rw(org_id: &str, report_id: &str) -> Result<(Folder, Report), ReportError> {
-    get_by_id_on(get_orm_client_rw().await, org_id, report_id).await
+    let conn = get_orm_client_ro().await;
+    match table::reports::get_by_id(conn, report_id).await {
+        Ok(Some((folder, report))) if report.org_id == org_id => Ok((folder, report)),
+        Ok(_) => Err(ReportError::ReportNotFound),
+        Err(e) => Err(ReportError::DbError(anyhow::anyhow!(e))),
+    }
 }
 
 pub async fn list(
@@ -371,11 +393,6 @@ pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), Re
 
 pub async fn trigger_by_id(org_id: &str, report_id: &str) -> Result<(), ReportError> {
     let (_, report) = get_by_id(org_id, report_id).await?;
-    trigger_loaded(&report).await
-}
-
-/// Sends `report` as given, so a caller that checked one snapshot runs that same snapshot.
-pub async fn trigger_loaded(report: &Report) -> Result<(), ReportError> {
     report.send_subscribers().await?;
     Ok(())
 }
@@ -389,42 +406,23 @@ pub async fn enable(
     let conn = get_orm_client_rw().await;
 
     // TODO: The "get" and "update" operations should be in a transaction.
-    let report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
+    let mut report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
         Ok(report) => report,
         _ => {
             return Err(ReportError::ReportNotFound);
         }
     };
-    enable_loaded_in(folder_id, report, value).await
-}
-
-pub async fn enable_by_id(org_id: &str, report_id: &str, value: bool) -> Result<(), ReportError> {
-    let (_, report) = get_by_id(org_id, report_id).await?;
-    enable_loaded(report_id, report, value).await
-}
-
-/// Saves `report` as given with `enabled` set, so a caller that checked one snapshot enables it.
-pub async fn enable_loaded(
-    report_id: &str,
-    mut report: Report,
-    value: bool,
-) -> Result<(), ReportError> {
-    let conn = get_orm_client_rw().await;
     report.enabled = value;
-    db::dashboards::reports::update_by_id(conn, report_id, None, report)
+    db::dashboards::reports::update(conn, folder_id, None, report)
         .await
         .map_err(ReportError::DbError)
 }
 
-/// [`enable_loaded`] for a report addressed by folder and name, as the v1 routes address it.
-pub async fn enable_loaded_in(
-    folder_id: &str,
-    mut report: Report,
-    value: bool,
-) -> Result<(), ReportError> {
+pub async fn enable_by_id(org_id: &str, report_id: &str, value: bool) -> Result<(), ReportError> {
     let conn = get_orm_client_rw().await;
+    let (_, mut report) = get_by_id(org_id, report_id).await?;
     report.enabled = value;
-    db::dashboards::reports::update(conn, folder_id, None, report)
+    db::dashboards::reports::update_by_id(conn, report_id, None, report)
         .await
         .map_err(ReportError::DbError)
 }
@@ -433,11 +431,20 @@ pub async fn update_by_id(
     org_id: &str,
     report_id: &str,
     new_folder_id: Option<&str>,
-    mut report: Report,
+    report: Report,
 ) -> Result<(), ReportError> {
+    let (curr_folder, report) = prepare_update_by_id(org_id, report_id, report).await?;
+    write_update_by_id(org_id, report_id, new_folder_id, curr_folder, report).await
+}
+
+/// Runs every check [`update_by_id`] makes; returns the current folder and the report to write.
+pub async fn prepare_update_by_id(
+    org_id: &str,
+    report_id: &str,
+    mut report: Report,
+) -> Result<(Folder, Report), ReportError> {
     bind_to_path_org(&mut report, org_id)?;
 
-    let conn = get_orm_client_rw().await;
     let cfg = get_config();
 
     if cfg.common.report_server_url.is_empty() {
@@ -483,7 +490,18 @@ pub async fn update_by_id(
     let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
     report.owner = old_report.owner;
     report.updated_at = Some(datetime_now());
+    Ok((curr_folder, report))
+}
 
+/// Writes an update [`prepare_update_by_id`] accepted.
+pub async fn write_update_by_id(
+    org_id: &str,
+    report_id: &str,
+    new_folder_id: Option<&str>,
+    curr_folder: Folder,
+    report: Report,
+) -> Result<(), ReportError> {
+    let conn = get_orm_client_rw().await;
     db::dashboards::reports::update_by_id(conn, report_id, new_folder_id, report)
         .await
         .map_err(ReportError::DbError)?;
@@ -1045,18 +1063,6 @@ async fn ensure_dashboards_readable(
 /// An empty slice passes trivially; callers reject zero dashboards earlier.
 fn all_dashboards_readable(results: &[bool]) -> bool {
     results.iter().all(|readable| *readable)
-}
-
-async fn get_by_id_on(
-    conn: &sea_orm::DatabaseConnection,
-    org_id: &str,
-    report_id: &str,
-) -> Result<(Folder, Report), ReportError> {
-    match table::reports::get_by_id(conn, report_id).await {
-        Ok(Some((folder, report))) if report.org_id == org_id => Ok((folder, report)),
-        Ok(_) => Err(ReportError::ReportNotFound),
-        Err(e) => Err(ReportError::DbError(anyhow::anyhow!(e))),
-    }
 }
 
 /// Anchors a report to the org it was addressed to, rejecting a body that names a different one.

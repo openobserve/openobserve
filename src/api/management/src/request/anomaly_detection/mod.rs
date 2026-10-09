@@ -28,7 +28,7 @@ use openobserve_core::auth::UserEmail;
 use openobserve_core::auth::check_folder_write_permissions;
 #[cfg(feature = "enterprise")]
 use openobserve_core::background_access::{
-    anomaly_sources, anomaly_update_sources, create_owner, guard_loaded, guard_write,
+    anomaly_sources, anomaly_update_sources, guard_loaded, guard_write, rbac_enforced,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -133,8 +133,78 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
 
 #[cfg(feature = "enterprise")]
 async fn guard_stored(org_id: &str, anomaly_id: &str, user_id: &str) -> Option<Response> {
-    let loaded = anomaly_update_sources(org_id, anomaly_id, None).await;
-    guard_loaded(org_id, user_id, loaded).await.err()
+    guard_loaded(
+        org_id,
+        user_id,
+        anomaly_update_sources(org_id, anomaly_id, None),
+    )
+    .await
+    .err()
+}
+
+/// The create's own checks answer first, so a bad body is never reported as a refused read.
+#[cfg(feature = "enterprise")]
+async fn guard_create(
+    org_id: &str,
+    user_id: &str,
+    req: &CreateAnomalyConfigRequest,
+) -> Result<(), Response> {
+    if !rbac_enforced().await {
+        return Ok(());
+    }
+    anomaly_service::check_create_config(org_id, req)
+        .await
+        .map_err(create_error)?;
+    let sources = anomaly_sources(
+        org_id,
+        &req.stream_type,
+        &req.stream_name,
+        req.custom_sql.as_deref(),
+    );
+    guard_write(org_id, user_id, &sources).await
+}
+
+/// The update's own checks answer first, so a bad body is never reported as a refused read.
+#[cfg(feature = "enterprise")]
+async fn guard_update(
+    org_id: &str,
+    anomaly_id: &str,
+    user_id: &str,
+    req: &UpdateAnomalyConfigRequest,
+) -> Result<(), Response> {
+    if !rbac_enforced().await {
+        return Ok(());
+    }
+    anomaly_service::check_update_config(org_id, anomaly_id, req)
+        .await
+        .map_err(update_error)?;
+    let sources = anomaly_update_sources(org_id, anomaly_id, req.custom_sql.as_deref());
+    guard_loaded(org_id, user_id, sources).await
+}
+
+fn create_error(e: anyhow::Error) -> Response {
+    tracing::error!("Failed to create anomaly config: {}", e);
+    let status = if e.to_string().contains("validation error") {
+        StatusCode::BAD_REQUEST
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
+}
+
+fn update_error(e: anyhow::Error) -> Response {
+    // Before "not found": the rejected payload is caller-controlled and can contain it.
+    if e.to_string().contains("validation error") {
+        return MetaHttpResponse::error(StatusCode::BAD_REQUEST.as_u16(), e.to_string())
+            .into_response();
+    }
+    if e.to_string().contains("not found") {
+        return MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), e.to_string())
+            .into_response();
+    }
+    tracing::error!("Failed to update anomaly config: {}", e);
+    MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+        .into_response()
 }
 
 /// Falls back to `fallback` when `owner` is absent or empty.
@@ -180,20 +250,7 @@ pub async fn create_config(
     if let Some(resp) = disabled_response() {
         return resp;
     }
-    #[cfg(feature = "enterprise")]
-    {
-        let requested = resolve_owner(req.owner, &user_email.user_id);
-        req.owner = Some(create_owner(&org_id, &user_email.user_id, requested.as_deref()).await);
-        let sources = anomaly_sources(
-            &org_id,
-            &req.stream_type,
-            &req.stream_name,
-            req.custom_sql.as_deref(),
-        );
-        if let Err(resp) = guard_write(&org_id, &user_email.user_id, &sources).await {
-            return resp;
-        }
-    }
+    req.owner = resolve_owner(req.owner, &user_email.user_id);
     // The route gate resolves `?folder=`; this body folder is what actually gets written.
     #[cfg(feature = "enterprise")]
     if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
@@ -202,17 +259,13 @@ pub async fn create_config(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_create(&org_id, &user_email.user_id, &req).await {
+        return resp;
+    }
     match anomaly_service::create_config(&org_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
-        Err(e) => {
-            tracing::error!("Failed to create anomaly config: {}", e);
-            let status = if e.to_string().contains("validation error") {
-                StatusCode::BAD_REQUEST
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
-            MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
-        }
+        Err(e) => create_error(e),
     }
 }
 
@@ -252,15 +305,8 @@ pub async fn update_config(
     if let Some(resp) = disabled_response() {
         return resp;
     }
-    #[cfg(feature = "enterprise")]
-    {
-        // an update never changes the stored owner
-        req.owner = None;
-        let loaded = anomaly_update_sources(&org_id, &anomaly_id, req.custom_sql.as_deref()).await;
-        if let Err(resp) = guard_loaded(&org_id, &user_email.user_id, loaded).await {
-            return resp;
-        }
-    }
+    // only a named owner moves ownership; an omitted or empty one keeps the stored owner
+    req.owner = req.owner.filter(|owner| !owner.is_empty());
     // An update carrying a folder_id is also a move, so the destination needs its own check.
     #[cfg(feature = "enterprise")]
     if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
@@ -269,20 +315,13 @@ pub async fn update_config(
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_update(&org_id, &anomaly_id, &user_email.user_id, &req).await {
+        return resp;
+    }
     match anomaly_service::update_config(&org_id, &anomaly_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
-        // Before "not found": the rejected payload is caller-controlled and can contain it.
-        Err(e) if e.to_string().contains("validation error") => {
-            MetaHttpResponse::error(StatusCode::BAD_REQUEST.as_u16(), e.to_string()).into_response()
-        }
-        Err(e) if e.to_string().contains("not found") => {
-            MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), e.to_string()).into_response()
-        }
-        Err(e) => {
-            tracing::error!("Failed to update anomaly config: {}", e);
-            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
-                .into_response()
-        }
+        Err(e) => update_error(e),
     }
 }
 
@@ -575,5 +614,89 @@ mod tests {
             "fallback@example.com",
         );
         assert_eq!(result, Some("custom@example.com".to_string()));
+    }
+
+    mod stream_access {
+        use axum::{Json, body::to_bytes, extract::Path, http::StatusCode, response::Response};
+        use openobserve_api_common::extractors::Headers;
+        use openobserve_core::{auth::UserEmail, authz::fake_checker};
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, IntoActiveModel, Schema};
+        use serde_json::json;
+
+        use super::super::*;
+
+        fn denied_user() -> Headers<UserEmail> {
+            Headers(UserEmail {
+                user_id: format!("{}@example.com", config::ider::uuid()),
+            })
+        }
+
+        async fn status_and_message(resp: Response) -> (StatusCode, String) {
+            let status = resp.status();
+            let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or_default();
+            (
+                status,
+                body["message"].as_str().unwrap_or_default().to_string(),
+            )
+        }
+
+        async fn stored_config(org: &str, id: &str) {
+            use infra::table::entity::anomaly_detection_config::{Entity, Model};
+
+            let db = infra::db::get_orm_client_rw().await;
+            let backend = db.get_database_backend();
+            let create = Schema::new(backend)
+                .create_table_from_entity(Entity)
+                .if_not_exists()
+                .take();
+            db.execute(backend.build(&create)).await.unwrap();
+            let model: Model = serde_json::from_value(json!({
+                "anomaly_id": id, "org_id": org, "stream_name": "secret",
+                "stream_type": "logs", "enabled": true, "name": "a1",
+                "query_mode": "filters", "filters": [], "detection_function": "count(*)",
+                "histogram_interval": "5m", "schedule_interval": "1h",
+                "detection_window_seconds": 3600, "training_window_days": 7,
+                "retrain_interval_days": 7, "threshold": 97, "seasonality": "none",
+                "is_trained": false, "current_model_version": 0, "rcf_num_trees": 50,
+                "rcf_tree_size": 256, "rcf_shingle_size": 8, "alert_enabled": false,
+                "folder_id": "f1", "status": 0, "retries": 0, "last_updated": 0,
+                "created_at": 1000, "updated_at": 1000
+            }))
+            .unwrap();
+            model.into_active_model().insert(db).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn an_invalid_create_from_a_denied_user_gets_the_validation_400() {
+            fake_checker();
+            let req: CreateAnomalyConfigRequest = serde_json::from_value(json!({
+                "name": "a1", "stream_name": "secret", "stream_type": "logs",
+                "query_mode": "bogus", "detection_function": "count(*)",
+                "histogram_interval": "5m", "schedule_interval": "1h",
+                "detection_window_seconds": 3600
+            }))
+            .unwrap();
+            let resp = create_config(Path("ad_org1".to_string()), denied_user(), Json(req)).await;
+            let (status, message) = status_and_message(resp).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(message.contains("validation error"), "{message}");
+        }
+
+        #[tokio::test]
+        async fn an_invalid_update_from_a_denied_user_gets_the_validation_400() {
+            fake_checker();
+            let id = config::ider::uuid();
+            stored_config("ad_org1", &id).await;
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("0m".to_string()),
+                ..Default::default()
+            };
+            let resp =
+                update_config(Path(("ad_org1".to_string(), id)), denied_user(), Json(req)).await;
+            let (status, message) = status_and_message(resp).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert!(message.contains("validation error"), "{message}");
+        }
     }
 }

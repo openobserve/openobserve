@@ -21,7 +21,6 @@ use config::meta::{
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
-    sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
 
@@ -510,12 +509,16 @@ pub async fn get(id: &str) -> Result<Option<OnlineEvalJob>, errors::Error> {
 }
 
 pub async fn get_by_org(id: &str, org_id: &str) -> Result<Option<OnlineEvalJob>, errors::Error> {
-    get_by_org_on(get_orm_client_ro().await, id, org_id).await
-}
+    let client = get_orm_client_ro().await;
 
-/// [`get_by_org`] on the primary, for a check that must see the row the write acts on.
-pub async fn get_by_org_rw(id: &str, org_id: &str) -> Result<Option<OnlineEvalJob>, errors::Error> {
-    get_by_org_on(get_orm_client_rw().await, id, org_id).await
+    let record = Entity::find()
+        .filter(Column::Id.eq(id))
+        .filter(Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+        .map(OnlineEvalJob::from);
+
+    Ok(record)
 }
 
 pub async fn get_all_by_org(org_id: &str) -> Result<Vec<OnlineEvalJob>, errors::Error> {
@@ -662,47 +665,6 @@ pub async fn update_status(
     Entity::update(update).exec(client).await?;
 
     Ok(())
-}
-
-/// Sets status and pipeline_id only while the row still has `checked`'s version, status and source.
-pub async fn update_status_if_unchanged(
-    checked: &OnlineEvalJob,
-    status: &str,
-    pipeline_id: Option<&str>,
-    updated_at: i64,
-) -> Result<bool, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let result = Entity::update_many()
-        .col_expr(Column::Status, Expr::value(status))
-        .col_expr(
-            Column::PipelineId,
-            Expr::value(pipeline_id.map(str::to_string)),
-        )
-        .col_expr(Column::UpdatedAt, Expr::value(updated_at))
-        .filter(Column::Id.eq(&checked.id))
-        .filter(Column::OrgId.eq(&checked.org_id))
-        .filter(Column::Version.eq(checked.version))
-        .filter(Column::Status.eq(&checked.status))
-        .filter(Column::Stream.eq(&checked.stream))
-        .filter(Column::StreamType.eq(&checked.stream_type))
-        .exec(client)
-        .await?;
-    Ok(result.rows_affected > 0)
-}
-
-async fn get_by_org_on(
-    client: &sea_orm::DatabaseConnection,
-    id: &str,
-    org_id: &str,
-) -> Result<Option<OnlineEvalJob>, errors::Error> {
-    let record = Entity::find()
-        .filter(Column::Id.eq(id))
-        .filter(Column::OrgId.eq(org_id))
-        .one(client)
-        .await?
-        .map(OnlineEvalJob::from);
-
-    Ok(record)
 }
 
 #[cfg(test)]
@@ -1116,59 +1078,5 @@ mod tests {
         assert!(!is_valid_transition("archived", "active"));
         assert!(!is_valid_transition("archived", "paused"));
         assert!(!is_valid_transition("draft", "paused"));
-    }
-
-    #[tokio::test]
-    async fn a_status_change_is_refused_once_the_primary_row_left_the_checked_snapshot() {
-        create_table().await.unwrap();
-        let checked = OnlineEvalJob::from(Model {
-            id: "status-cas-job".to_string(),
-            org_id: "status_cas_org".to_string(),
-            status: "paused".to_string(),
-            ..make_model()
-        });
-        delete(&checked.id).await.unwrap();
-        add(&checked).await.unwrap();
-
-        // An edit built on a stale replica read can write a new stream without a new version.
-        let moved = OnlineEvalJob {
-            stream: "other-stream".to_string(),
-            ..checked.clone()
-        };
-        update(&moved).await.unwrap();
-        assert!(
-            !update_status_if_unchanged(&checked, "active", Some("p1"), 3000)
-                .await
-                .unwrap()
-        );
-
-        let bumped = OnlineEvalJob {
-            version: checked.version + 1,
-            ..checked.clone()
-        };
-        update(&bumped).await.unwrap();
-        assert!(
-            !update_status_if_unchanged(&checked, "active", Some("p1"), 3000)
-                .await
-                .unwrap()
-        );
-        let row = get_by_org_rw(&checked.id, &checked.org_id)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!((row.status.as_str(), row.pipeline_id), ("paused", None));
-
-        assert!(
-            update_status_if_unchanged(&bumped, "active", Some("p1"), 3000)
-                .await
-                .unwrap()
-        );
-        let row = get_by_org_rw(&checked.id, &checked.org_id)
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(row.status, "active");
-        assert_eq!(row.pipeline_id.as_deref(), Some("p1"));
-        delete(&checked.id).await.unwrap();
     }
 }

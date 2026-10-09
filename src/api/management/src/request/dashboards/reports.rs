@@ -29,7 +29,7 @@ use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 #[cfg(feature = "enterprise")]
-use openobserve_core::background_access::{create_owner, guard_write, report_sources};
+use openobserve_core::background_access::{ReportRefusal, guard_report, rbac_enforced};
 use openobserve_core::{
     auth::UserEmail,
     dashboards::reports::{self, ReportError},
@@ -90,17 +90,26 @@ pub async fn create_report(
     axum::Json(report): axum::Json<Report>,
 ) -> Response {
     let mut report = report;
-    #[cfg(not(feature = "enterprise"))]
     if report.owner.is_empty() {
-        report.owner = user_email.user_id;
+        report.owner = user_email.user_id.clone();
     }
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = force_owner_and_guard(&org_id, &user_email.user_id, &mut report).await {
-        return resp;
-    }
-    match reports::save(&org_id, DEFAULT_FOLDER, "", report, true).await {
+    let saved = save_checked(
+        &org_id,
+        &user_email.user_id,
+        (DEFAULT_FOLDER, ""),
+        report,
+        true,
+        MetaHttpResponse::bad_request,
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let saved = reports::save(&org_id, DEFAULT_FOLDER, "", report, true)
+        .await
+        .map_err(MetaHttpResponse::bad_request);
+    match saved {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(resp) => resp,
     }
 }
 
@@ -144,14 +153,24 @@ pub async fn update_report(
     axum::Json(report): axum::Json<Report>,
 ) -> Response {
     let mut report = report;
+    report.last_edited_by = user_email.user_id.clone();
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_report(&org_id, &user_email.user_id, &report).await {
-        return resp;
-    }
-    report.last_edited_by = user_email.user_id;
-    match reports::save(&org_id, DEFAULT_FOLDER, &name, report, false).await {
+    let saved = save_checked(
+        &org_id,
+        &user_email.user_id,
+        (DEFAULT_FOLDER, &name),
+        report,
+        false,
+        MetaHttpResponse::bad_request,
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let saved = reports::save(&org_id, DEFAULT_FOLDER, &name, report, false)
+        .await
+        .map_err(MetaHttpResponse::bad_request);
+    match saved {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(resp) => resp,
     }
 }
 
@@ -451,19 +470,20 @@ pub async fn enable_report(
         None => false,
     };
     #[cfg(feature = "enterprise")]
-    let enabled = if enable {
-        match guarded_named_report(&org_id, &user_email.user_id, &name).await {
-            Ok(stored) => reports::enable_loaded_in(DEFAULT_FOLDER, stored, enable).await,
-            Err(resp) => return resp,
-        }
-    } else {
-        reports::enable(&org_id, DEFAULT_FOLDER, &name, enable).await
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let enabled = reports::enable(&org_id, DEFAULT_FOLDER, &name, enable).await;
+    if enable
+        && let Err(resp) = guard_stored_report(
+            &org_id,
+            &user_email.user_id,
+            reports::get(&org_id, DEFAULT_FOLDER, &name),
+            report_error_response,
+        )
+        .await
+    {
+        return resp;
+    }
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
-    match enabled {
+    match reports::enable(&org_id, DEFAULT_FOLDER, &name, enable).await {
         Ok(_) => MetaHttpResponse::json(resp),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
@@ -506,13 +526,17 @@ pub async fn trigger_report(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
-    let triggered = match guarded_named_report(&org_id, &user_email.user_id, &name).await {
-        Ok(stored) => reports::trigger_loaded(&stored).await,
-        Err(resp) => return resp,
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let triggered = reports::trigger(&org_id, DEFAULT_FOLDER, &name).await;
-    match triggered {
+    if let Err(resp) = guard_stored_report(
+        &org_id,
+        &user_email.user_id,
+        reports::get(&org_id, DEFAULT_FOLDER, &name),
+        report_error_response,
+    )
+    .await
+    {
+        return resp;
+    }
+    match reports::trigger(&org_id, DEFAULT_FOLDER, &name).await {
         Ok(_) => MetaHttpResponse::ok("Report triggered"),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
@@ -554,17 +578,26 @@ pub async fn create_report_v2(
     axum::Json(mut report): axum::Json<Report>,
 ) -> Response {
     let folder_id = get_folder(uri.query().unwrap_or(""));
-    #[cfg(not(feature = "enterprise"))]
     if report.owner.is_empty() {
-        report.owner = user_email.user_id;
+        report.owner = user_email.user_id.clone();
     }
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = force_owner_and_guard(&org_id, &user_email.user_id, &mut report).await {
-        return resp;
-    }
-    match reports::save(&org_id, &folder_id, "", report, true).await {
+    let saved = save_checked(
+        &org_id,
+        &user_email.user_id,
+        (&folder_id, ""),
+        report,
+        true,
+        Response::from,
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let saved = reports::save(&org_id, &folder_id, "", report, true)
+        .await
+        .map_err(Response::from);
+    match saved {
         Ok(_) => MetaHttpResponse::ok("Report saved"),
-        Err(e) => e.into(),
+        Err(resp) => resp,
     }
 }
 
@@ -756,13 +789,15 @@ pub async fn update_report_v2(
     }
 
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_report(&org_id, &user_id, &report).await {
-        return resp;
-    }
-
-    match reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report).await {
+    let updated =
+        update_checked(&org_id, &user_id, &report_id, new_folder.as_deref(), report).await;
+    #[cfg(not(feature = "enterprise"))]
+    let updated = reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report)
+        .await
+        .map_err(Response::from);
+    match updated {
         Ok(_) => MetaHttpResponse::ok("Report updated"),
-        Err(e) => e.into(),
+        Err(resp) => resp,
     }
 }
 
@@ -898,17 +933,18 @@ pub async fn enable_report_v2(
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
     #[cfg(feature = "enterprise")]
-    let enabled = if enable {
-        match guarded_report_by_id(&org_id, &user_email.user_id, &report_id).await {
-            Ok(stored) => reports::enable_loaded(&report_id, stored, enable).await,
-            Err(resp) => return resp,
-        }
-    } else {
-        reports::enable_by_id(&org_id, &report_id, enable).await
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let enabled = reports::enable_by_id(&org_id, &report_id, enable).await;
-    match enabled {
+    if enable
+        && let Err(resp) = guard_stored_report(
+            &org_id,
+            &user_email.user_id,
+            report_by_id(&org_id, &report_id),
+            Response::from,
+        )
+        .await
+    {
+        return resp;
+    }
+    match reports::enable_by_id(&org_id, &report_id, enable).await {
         Ok(_) => {
             let mut resp = HashMap::new();
             resp.insert("enabled", enable);
@@ -944,13 +980,17 @@ pub async fn trigger_report_v2(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
-    let triggered = match guarded_report_by_id(&org_id, &user_email.user_id, &report_id).await {
-        Ok(stored) => reports::trigger_loaded(&stored).await,
-        Err(resp) => return resp,
-    };
-    #[cfg(not(feature = "enterprise"))]
-    let triggered = reports::trigger_by_id(&org_id, &report_id).await;
-    match triggered {
+    if let Err(resp) = guard_stored_report(
+        &org_id,
+        &user_email.user_id,
+        report_by_id(&org_id, &report_id),
+        Response::from,
+    )
+    .await
+    {
+        return resp;
+    }
+    match reports::trigger_by_id(&org_id, &report_id).await {
         Ok(_) => MetaHttpResponse::ok("Report triggered"),
         Err(e) => e.into(),
     }
@@ -1031,49 +1071,86 @@ pub async fn move_reports(
     }
 }
 
+/// Saves as `reports::save` does, refusing between its checks and its write.
 #[cfg(feature = "enterprise")]
-async fn force_owner_and_guard(
+async fn save_checked(
     org_id: &str,
     user_id: &str,
-    report: &mut Report,
+    (folder_id, name): (&str, &str),
+    report: Report,
+    create: bool,
+    answer: fn(ReportError) -> Response,
 ) -> Result<(), Response> {
-    report.owner = create_owner(org_id, user_id, Some(report.owner.as_str())).await;
-    guard_report(org_id, user_id, report).await
-}
-
-#[cfg(feature = "enterprise")]
-async fn guard_report(org_id: &str, user_id: &str, report: &Report) -> Result<(), Response> {
-    if !openobserve_core::background_access::rbac_enforced().await {
-        return Ok(());
-    }
-    let sources = report_sources(org_id, report)
+    let report = reports::prepare_save(org_id, folder_id, name, report, create)
         .await
-        .map_err(Response::from)?;
-    guard_write(org_id, user_id, &sources).await
-}
-
-/// The returned primary snapshot is the one the v1 caller enables or runs; a failed read refuses.
-#[cfg(feature = "enterprise")]
-async fn guarded_named_report(org_id: &str, user_id: &str, name: &str) -> Result<Report, Response> {
-    let stored = reports::get(org_id, DEFAULT_FOLDER, name)
+        .map_err(answer)?;
+    guard_saved_report(org_id, user_id, &report, answer).await?;
+    reports::write_save(org_id, folder_id, report, create)
         .await
-        .map_err(report_error_response)?;
-    guard_report(org_id, user_id, &stored).await?;
-    Ok(stored)
+        .map_err(answer)
 }
 
-/// The returned snapshot is the one the caller enables or runs, so no other read can slip past.
+/// Updates as `reports::update_by_id` does, refusing between its checks and its write.
 #[cfg(feature = "enterprise")]
-async fn guarded_report_by_id(
+async fn update_checked(
     org_id: &str,
     user_id: &str,
     report_id: &str,
-) -> Result<Report, Response> {
-    let (_, stored) = reports::get_by_id_rw(org_id, report_id)
+    new_folder: Option<&str>,
+    report: Report,
+) -> Result<(), Response> {
+    let (curr_folder, report) = reports::prepare_update_by_id(org_id, report_id, report)
         .await
         .map_err(Response::from)?;
-    guard_report(org_id, user_id, &stored).await?;
-    Ok(stored)
+    guard_saved_report(org_id, user_id, &report, Response::from).await?;
+    reports::write_update_by_id(org_id, report_id, new_folder, curr_folder, report)
+        .await
+        .map_err(Response::from)
+}
+
+/// A disabled report renders only once enabled or triggered, and both of those are checked.
+#[cfg(feature = "enterprise")]
+async fn guard_saved_report(
+    org_id: &str,
+    user_id: &str,
+    report: &Report,
+    answer: fn(ReportError) -> Response,
+) -> Result<(), Response> {
+    if !report.enabled {
+        return Ok(());
+    }
+    match guard_report(org_id, user_id, report).await {
+        Ok(()) => Ok(()),
+        Err(ReportRefusal::Forbidden(resp)) => Err(resp),
+        // the save's own dashboard read answers a failed read this way
+        Err(ReportRefusal::DashboardLoad(_)) => Err(answer(ReportError::DashboardTabNotFound)),
+    }
+}
+
+/// `load` is the action's own first read, run only under RBAC; it fails as the action would.
+#[cfg(feature = "enterprise")]
+async fn guard_stored_report(
+    org_id: &str,
+    user_id: &str,
+    load: impl Future<Output = Result<Report, ReportError>>,
+    answer: fn(ReportError) -> Response,
+) -> Result<(), Response> {
+    if !rbac_enforced().await {
+        return Ok(());
+    }
+    let stored = load.await.map_err(answer)?;
+    match guard_report(org_id, user_id, &stored).await {
+        Err(ReportRefusal::Forbidden(resp)) => Err(resp),
+        // enabling or running reads no dashboard itself, so a failed read refuses nothing
+        Ok(()) | Err(ReportRefusal::DashboardLoad(_)) => Ok(()),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn report_by_id(org_id: &str, report_id: &str) -> Result<Report, ReportError> {
+    reports::get_by_id(org_id, report_id)
+        .await
+        .map(|(_, report)| report)
 }
 
 #[cfg(feature = "enterprise")]

@@ -117,16 +117,17 @@ pub async fn get_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<Dashboard>, errors::Error> {
-    get_from_folder_on(get_orm_client_ro().await, org_id, folder_id, dashboard_id).await
-}
+    let client = get_orm_client_ro().await;
+    let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
+        .await?
+        .and_then(|(_folder, maybe_dash)| maybe_dash);
 
-/// [get_from_folder] on the primary, for a check that must see the latest write.
-pub async fn get_from_folder_rw(
-    org_id: &str,
-    folder_id: &str,
-    dashboard_id: &str,
-) -> Result<Option<Dashboard>, errors::Error> {
-    get_from_folder_on(get_orm_client_rw().await, org_id, folder_id, dashboard_id).await
+    if let Some(model) = model {
+        let dash = model.try_into()?;
+        Ok(Some(dash))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Gets a dashboard by it's dashboard ID.
@@ -138,15 +139,13 @@ pub async fn get_by_id(
     org_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
-    get_by_id_on(get_orm_client_ro().await, org_id, dashboard_id).await
-}
-
-/// [get_by_id] on the primary, for a check that must see the latest write.
-pub async fn get_by_id_rw(
-    org_id: &str,
-    dashboard_id: &str,
-) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
-    get_by_id_on(get_orm_client_rw().await, org_id, dashboard_id).await
+    let client = get_orm_client_ro().await;
+    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    let folder = folder_m.into();
+    let dash = dash_m.try_into()?;
+    Ok(Some((folder, dash)))
 }
 
 /// Lists dashboards.
@@ -378,37 +377,6 @@ pub async fn get_model_from_folder<C: ConnectionTrait>(
         .await?;
 
     Ok(Some((folder, maybe_dashboard)))
-}
-
-async fn get_from_folder_on(
-    client: &DatabaseConnection,
-    org_id: &str,
-    folder_id: &str,
-    dashboard_id: &str,
-) -> Result<Option<Dashboard>, errors::Error> {
-    let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
-        .await?
-        .and_then(|(_folder, maybe_dash)| maybe_dash);
-
-    if let Some(model) = model {
-        let dash = model.try_into()?;
-        Ok(Some(dash))
-    } else {
-        Ok(None)
-    }
-}
-
-async fn get_by_id_on(
-    client: &DatabaseConnection,
-    org_id: &str,
-    dashboard_id: &str,
-) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
-    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
-        return Ok(None);
-    };
-    let folder = folder_m.into();
-    let dash = dash_m.try_into()?;
-    Ok(Some((folder, dash)))
 }
 
 /// Tries to get a dashboard ORM entity and its parent folder ORM entity by the

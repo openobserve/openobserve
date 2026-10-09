@@ -339,18 +339,16 @@ pub async fn enable_backfill(
     Query(query): Query<std::collections::HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
-        return response;
-    }
-
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
-    if enable
-        && let Err(response) =
-            ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
-    {
+    let ensured = if enable {
+        ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
+    } else {
+        ensure_user_pipeline(&org_id, &pipeline_id).await
+    };
+    if let Err(response) = ensured {
         return response;
     }
 
@@ -680,16 +678,18 @@ async fn ensure_readable_pipeline(
     pipeline_id: &str,
     user_id: &str,
 ) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return ensure_user_pipeline(org_id, pipeline_id).await;
+    }
     let pipeline = openobserve_core::pipeline::get_user_pipeline(org_id, pipeline_id)
         .await
         .map_err(Response::from)?;
-    if !openobserve_core::background_access::rbac_enforced().await {
-        return Ok(());
-    }
-    let sources = openobserve_core::background_access::pipeline_sources(&pipeline)
-        .await
-        .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
-    openobserve_core::background_access::guard_write(org_id, user_id, &sources).await
+    let sources = async {
+        openobserve_core::background_access::pipeline_sources(&pipeline)
+            .await
+            .map(Some)
+    };
+    openobserve_core::background_access::guard_loaded(org_id, user_id, sources).await
 }
 
 #[cfg(test)]
