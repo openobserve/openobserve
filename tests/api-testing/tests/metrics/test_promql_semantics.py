@@ -1,4 +1,26 @@
-"""PromQL result shapes and smoothing aliases, verified end to end."""
+"""PromQL result shapes the spec fixes, verified end to end.
+
+Three regressions found by A/B testing against Thanos (openobserve#14607,
+#14609, #14610, consolidated in o2-enterprise#2661):
+
+* ``absent_over_time(missing[5m])`` returned NO series. The spec says one series
+  with value 1 — which is exactly the idiom missing-data alerts are built on, so
+  such an alert could never fire.
+* ``scalar(v)`` returned its argument unchanged instead of reducing it, so a
+  query that should yield a scalar yielded a vector.
+* An instant query on a range selector or subquery returned a vector (one value
+  per series) instead of a matrix (every raw sample).
+
+A fourth group came from the same sweep: ``sort``, ``sort_desc``,
+``present_over_time`` and the ``@`` modifier were reported as unimplemented and
+now evaluate. They are pinned here because nothing else covers them — an
+"unsupported function" error is a silent regression for a dashboard that uses
+one. ``double_exponential_smoothing`` is still unimplemented and is
+deliberately NOT asserted.
+
+Each assertion is on ``resultType``/series count, not on the numbers, so the
+tests stay stable whatever else the instance holds.
+"""
 from __future__ import annotations
 
 import logging
