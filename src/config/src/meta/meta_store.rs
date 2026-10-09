@@ -19,7 +19,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::str::redact_dsn;
 
-const SUPPORTED: &str = "sqlite, nats, postgres, postgresql";
+const SUPPORTED: [(&str, MetaStore); 4] = [
+    ("sqlite", MetaStore::Sqlite),
+    ("nats", MetaStore::Nats),
+    ("postgres", MetaStore::PostgreSQL),
+    ("postgresql", MetaStore::PostgreSQL),
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -34,21 +39,20 @@ impl FromStr for MetaStore {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let lowered = s.to_lowercase();
-        match lowered.as_str() {
-            "sqlite" => Ok(Self::Sqlite),
-            "nats" => Ok(Self::Nats),
-            "postgres" | "postgresql" => Ok(Self::PostgreSQL),
-            // backends this enum shipped and dropped: their operators need migration advice
-            _ if lowered.starts_with("mysql") || lowered.starts_with("etcd") => Err(format!(
-                "invalid value: {}, this backend is no longer supported; valid values are: \
-                 {SUPPORTED}",
-                redact_dsn(s)
-            )),
-            _ => Err(format!(
-                "invalid value: {}, valid values are: {SUPPORTED}",
-                redact_dsn(s)
-            )),
+        if let Some((_, store)) = SUPPORTED.iter().find(|(name, _)| *name == lowered) {
+            return Ok(*store);
         }
+        let valid = SUPPORTED.map(|(name, _)| name).join(", ");
+        // backends this enum shipped and dropped: their operators need migration advice
+        let removed = if lowered.starts_with("mysql") || lowered.starts_with("etcd") {
+            " this backend is no longer supported;"
+        } else {
+            ""
+        };
+        Err(format!(
+            "invalid value: {},{removed} valid values are: {valid}",
+            redact_dsn(s)
+        ))
     }
 }
 
