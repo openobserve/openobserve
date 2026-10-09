@@ -46,13 +46,22 @@ test.describe("Logs VRL-derived field in quick mode", () => {
   }, async () => {
     // The control side: without it, a sidebar that rendered no toggles at all would pass.
     await pm.logsPage.searchFieldByName(SCHEMA_FIELD);
-    await pm.logsPage.expectInterestingFieldButtonOffered(SCHEMA_FIELD);
-    testLogger.info(`Precondition: schema field "${SCHEMA_FIELD}" offers the toggle`);
+    const schemaToggles = await pm.logsPage.countInterestingFieldButtons(SCHEMA_FIELD);
+    testLogger.info(`Schema field "${SCHEMA_FIELD}" offers ${schemaToggles} interesting toggles`);
+    expect(
+      schemaToggles,
+      `Precondition: the schema field "${SCHEMA_FIELD}" must offer the interesting-field toggle`
+    ).toBeGreaterThan(0);
 
     // The VRL field is listed — extractFields() reads it off the hits — but it is not
     // schema-backed, so it must not be offerable as an interesting field.
     await pm.logsPage.searchFieldByName(VRL_FIELD);
-    await pm.logsPage.expectNoInterestingFieldButton(VRL_FIELD);
+    const vrlToggles = await pm.logsPage.countInterestingFieldButtons(VRL_FIELD);
+    testLogger.info(`VRL field "${VRL_FIELD}" offers ${vrlToggles} interesting toggles`);
+    expect(
+      vrlToggles,
+      'Bug #2859: a VRL-derived field cannot be in the quick-mode SELECT, so it must not render the ⓘ toggle'
+    ).toBe(0);
 
     testLogger.info(`PASSED: VRL field "${VRL_FIELD}" carries no interesting-field toggle`);
   });
@@ -72,6 +81,10 @@ test.describe("Logs VRL-derived field in quick mode", () => {
     await pm.logsPage.expectResultsGridSettledWithRows();
 
     const interestingFields = await pm.logsPage.getInterestingFieldList();
+    expect(
+      Array.isArray(interestingFields),
+      'interestingFieldList must be readable from Vue state'
+    ).toBe(true);
     expect(
       interestingFields,
       `"${VRL_FIELD}" must be pruned from interestingFieldList, got: ${interestingFields?.join(',')}`

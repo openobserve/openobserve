@@ -13319,16 +13319,6 @@ export class LogsPage {
         return await this.page.locator(this.interestingFieldBtn(field)).count();
     }
 
-    async expectInterestingFieldButtonOffered(field) {
-        const count = await this.countInterestingFieldButtons(field);
-        expect(count, `Field "${field}" must offer the interesting-field toggle`).toBeGreaterThan(0);
-    }
-
-    async expectNoInterestingFieldButton(field) {
-        const count = await this.countInterestingFieldButtons(field);
-        expect(count, `Field "${field}" must not offer the interesting-field toggle`).toBe(0);
-    }
-
     /**
      * Push `field` straight into searchObj.data.stream.interestingFieldList, which is
      * how a list persisted by a build that still starred the field comes back. Throws
