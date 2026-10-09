@@ -9250,6 +9250,62 @@
         "title": "ステータスの修正:",
         "item": "{name}（{status}）",
         "shorterThanSlice": "SLO のスライスより短いため、補正された分はありません"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "ダウンタイム自体について宛先に知らせます: 開始時、終了前、終了時。",
+        "destinations": "宛先",
+        "lead": "終了前のリマインダー",
+        "leadHelp": "例: 10m または 1h。1 分からウィンドウの長さまで。",
+        "regionNote": "スーパークラスターでは、ダウンタイムを作成したリージョンが送信します。この設定より前に作成されたダウンタイムはすべてのリージョンから送信されます。",
+        "tab": "通知",
+        "events": {
+          "started": "開始時",
+          "startedHelp": "各ウィンドウの開始時に 1 通送信します。",
+          "ending_soon": "終了前",
+          "ending_soonHelp": "終了前のリマインダーです。アラートが再び通知を始めても驚かずに済みます。",
+          "ended": "終了時",
+          "endedHelp": "各ウィンドウの終了時に 1 通送信します。",
+          "cancelled": "キャンセル時",
+          "cancelledHelp": "誰かがダウンタイムを終了または中止したときにすぐ送信します。",
+          "extended": "延長時",
+          "extendedHelp": "新しい終了時刻とともにすぐ送信します。"
+        },
+        "validation": {
+          "tooMany": "通知できる宛先は最大 {max} 件です。",
+          "eventRequired": "イベントを 1 つ以上選ぶか、宛先を削除してください。",
+          "leadInvalid": "リマインダーは終了の 1 分前からウィンドウの長さ前までの間に設定してください。"
+        },
+        "summary": {
+          "none": "独自の通知は送信しません。",
+          "sentence": "{destinations} に通知: {events}。",
+          "started": "開始時",
+          "endingSoon": "終了の {lead} 前",
+          "ended": "終了時",
+          "cancelled": "キャンセル時",
+          "extended": "延長時"
+        },
+        "log": {
+          "time": "時刻",
+          "event": "イベント",
+          "destinations": "宛先",
+          "result": "結果",
+          "ok": "送信済み",
+          "pending": "送信中",
+          "empty": "まだ通知は送信されていません",
+          "events": {
+            "started": "開始",
+            "ending_soon": "まもなく終了",
+            "ended": "終了",
+            "cancelled": "キャンセル",
+            "extended": "延長"
+          }
+        },
+        "test": {
+          "send": "テスト送信",
+          "sent": "{count} 件の宛先にテストを送信しました | {count} 件の宛先にテストを送信しました",
+          "failed": "テストは {names} に届きませんでした。"
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} 件のワークフロー | {count} 件のワークフロー",
     "countAnomalyDetection": "{count} 件の異常検知器 | {count} 件の異常検知器",
     "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
-    "sectionOtherConsumers": "その他の使用元"
+    "sectionOtherConsumers": "その他の使用元",
+    "countDowntime": "{count} 件のダウンタイム | {count} 件のダウンタイム"
   },
   "alert_library": {
     "header": "アラートライブラリ",

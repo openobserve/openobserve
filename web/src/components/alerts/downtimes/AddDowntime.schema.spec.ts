@@ -116,3 +116,52 @@ describe("AddDowntime schema", () => {
     expect(errorsOf(v)).toEqual({});
   });
 });
+
+describe("AddDowntime schema, notifications", () => {
+  const notifying = (patch: Partial<DowntimeFormValues["notifications"]>) => {
+    const v = valid();
+    v.notifications = {
+      ...v.notifications,
+      destinations: ["slack-oncall"],
+      ending_soon: true,
+      ended: true,
+      ...patch,
+    };
+    return v;
+  };
+
+  it("accepts a destination with events and a lead inside the window", () => {
+    expect(errorsOf(notifying({}))).toEqual({});
+  });
+
+  it("checks nothing while no destination is picked", () => {
+    const v = valid();
+    v.notifications.lead = "nonsense";
+    v.notifications.ending_soon = true;
+    expect(errorsOf(v)).toEqual({});
+  });
+
+  it("needs an event once a destination is picked", () => {
+    expect(errorsOf(notifying({ ending_soon: false, ended: false }))["notifications.started"]).toBe(
+      "Choose at least one event, or remove the destinations.",
+    );
+  });
+
+  it("refuses a lead shorter than a minute or longer than the window", () => {
+    const message = "The reminder must come between 1 minute and the window length before the end.";
+    expect(errorsOf(notifying({ lead: "0m" }))["notifications.lead"]).toBe(message);
+    expect(errorsOf(notifying({ lead: "2h" }))["notifications.lead"]).toBe(message);
+    expect(errorsOf(notifying({ lead: "2h", ending_soon: false }))).toEqual({});
+  });
+
+  it("refuses more than ten destinations", () => {
+    const destinations = Array.from({ length: 11 }, (_, i) => `d${i}`);
+    expect(errorsOf(notifying({ destinations }))["notifications.destinations"]).toBe(
+      "At most 10 destinations can be notified.",
+    );
+  });
+
+  it("opens the schedule tab for a notification error", () => {
+    expect(tabForPath(["notifications", "lead"])).toBe("schedule");
+  });
+});

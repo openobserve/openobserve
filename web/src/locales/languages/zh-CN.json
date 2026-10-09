@@ -9250,6 +9250,62 @@
         "title": "状态修正：",
         "item": "{name}（{status}）",
         "shorterThanSlice": "短于 SLO 的切片，未校正任何分钟"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "向目标告知停机本身：开始时、结束前和结束时。",
+        "destinations": "目标",
+        "lead": "结束前提醒",
+        "leadHelp": "例如 10m 或 1h，介于 1 分钟和窗口长度之间。",
+        "regionNote": "在超级集群中，由创建停机的区域发送。此设置之前创建的停机会从每个区域发送。",
+        "tab": "通知",
+        "events": {
+          "started": "开始时",
+          "startedHelp": "每个窗口开始时发送一条消息。",
+          "ending_soon": "结束前",
+          "ending_soonHelp": "结束前的提醒，告警再次通知时不会让人意外。",
+          "ended": "结束时",
+          "endedHelp": "每个窗口结束时发送一条消息。",
+          "cancelled": "取消时",
+          "cancelledHelp": "有人结束或取消停机时立即发送。",
+          "extended": "延长时",
+          "extendedHelp": "带着新的结束时间立即发送。"
+        },
+        "validation": {
+          "tooMany": "最多可通知 {max} 个目标。",
+          "eventRequired": "请至少选择一个事件，或移除目标。",
+          "leadInvalid": "提醒必须在结束前 1 分钟到窗口长度之间。"
+        },
+        "summary": {
+          "none": "不发送自己的通知。",
+          "sentence": "通知 {destinations}：{events}。",
+          "started": "开始时",
+          "endingSoon": "结束前 {lead}",
+          "ended": "结束时",
+          "cancelled": "取消时",
+          "extended": "延长时"
+        },
+        "log": {
+          "time": "时间",
+          "event": "事件",
+          "destinations": "目标",
+          "result": "结果",
+          "ok": "已发送",
+          "pending": "发送中",
+          "empty": "尚未发送通知",
+          "events": {
+            "started": "已开始",
+            "ending_soon": "即将结束",
+            "ended": "已结束",
+            "cancelled": "已取消",
+            "extended": "已延长"
+          }
+        },
+        "test": {
+          "send": "发送测试",
+          "sent": "已向 {count} 个目标发送测试 | 已向 {count} 个目标发送测试",
+          "failed": "测试未送达 {names}。"
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} 个工作流 | {count} 个工作流",
     "countAnomalyDetection": "{count} 个异常检测器 | {count} 个异常检测器",
     "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
-    "sectionOtherConsumers": "还被以下使用"
+    "sectionOtherConsumers": "还被以下使用",
+    "countDowntime": "{count} 个停机 | {count} 个停机"
   },
   "alert_library": {
     "header": "告警库",

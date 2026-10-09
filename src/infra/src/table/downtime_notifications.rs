@@ -17,7 +17,7 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    sea_query::OnConflict,
+    sea_query::{Expr, OnConflict},
 };
 
 use super::entity::downtime_notifications::{ActiveModel, Column, Entity, Model};
@@ -69,6 +69,11 @@ pub async fn list_for_downtime(
     list_for_downtime_with(client, org, downtime_id, limit).await
 }
 
+pub async fn set_result(id: &str, result: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    set_result_with(client, id, result).await
+}
+
 pub async fn delete_for_downtime(org: &str, downtime_id: &str) -> Result<u64, errors::Error> {
     let client = get_orm_client_rw().await;
     delete_for_downtime_with(client, org, downtime_id).await
@@ -87,6 +92,19 @@ pub async fn insert_if_absent_with<C: ConnectionTrait>(
         .exec_without_returning(conn)
         .await?;
     Ok(inserted > 0)
+}
+
+pub async fn set_result_with<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+    result: &str,
+) -> Result<(), errors::Error> {
+    Entity::update_many()
+        .col_expr(Column::Result, Expr::value(result))
+        .filter(Column::Id.eq(id))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 pub async fn list_for_downtime_with<C: ConnectionTrait>(
@@ -188,6 +206,23 @@ mod tests {
         let rows = list_for_downtime_with(&db, "acme", "d1", 10).await.unwrap();
         assert_eq!(ids(&rows), ["n4", "n3", "n1"]);
         assert_eq!(rows[2], first);
+    }
+
+    #[tokio::test]
+    async fn set_result_records_the_outcome_on_the_claimed_row_only() {
+        let db = db().await;
+        for r in [
+            record("n1", "d1", 10, "start"),
+            record("n2", "d1", 20, "start"),
+        ] {
+            insert_if_absent_with(&db, &r).await.unwrap();
+        }
+        set_result_with(&db, "n1", "slack: timed out")
+            .await
+            .unwrap();
+        let rows = list_for_downtime_with(&db, "acme", "d1", 10).await.unwrap();
+        assert_eq!(rows[0].result, None);
+        assert_eq!(rows[1].result.as_deref(), Some("slack: timed out"));
     }
 
     #[tokio::test]

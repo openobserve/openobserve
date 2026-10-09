@@ -38,6 +38,8 @@ pub enum DestinationConsumer {
     AnomalyDetection,
     #[cfg(feature = "enterprise")]
     IncidentIntegration,
+    #[cfg(feature = "enterprise")]
+    Downtime,
 }
 
 impl DestinationConsumer {
@@ -56,6 +58,8 @@ impl DestinationConsumer {
             Self::AnomalyDetection => ("anomaly detection config", "anomaly detection configs"),
             #[cfg(feature = "enterprise")]
             Self::IncidentIntegration => ("incident integration", "incident integrations"),
+            #[cfg(feature = "enterprise")]
+            Self::Downtime => ("downtime", "downtimes"),
         };
         format!("{count} {}", if count == 1 { one } else { many })
     }
@@ -198,6 +202,8 @@ async fn usage_for(
         DestinationConsumer::AnomalyDetection => anomaly_detection_usage(org_id).await,
         #[cfg(feature = "enterprise")]
         DestinationConsumer::IncidentIntegration => incident_integration_usage(org_id).await,
+        #[cfg(feature = "enterprise")]
+        DestinationConsumer::Downtime => downtime_usage(org_id).await,
     }
 }
 
@@ -399,6 +405,41 @@ async fn incident_integration_usage(org_id: &str) -> Result<Vec<DestinationUse>,
         }
     }
     Ok(uses)
+}
+
+#[cfg(feature = "enterprise")]
+async fn downtime_usage(org_id: &str) -> Result<Vec<DestinationUse>, DestinationError> {
+    let cached = db::downtimes::list_cached(org_id);
+    let stored = infra::table::downtimes::list(org_id, None).await?;
+    let ids: std::collections::HashSet<&str> = cached.iter().map(|d| d.id.as_str()).collect();
+    let rows = cached
+        .iter()
+        .chain(stored.iter().filter(|d| !ids.contains(d.id.as_str())));
+    Ok(downtime_uses(rows))
+}
+
+#[cfg(feature = "enterprise")]
+fn downtime_uses<'a>(
+    rows: impl Iterator<Item = &'a config::meta::downtimes::Downtime>,
+) -> Vec<DestinationUse> {
+    let mut uses = Vec::new();
+    for row in rows {
+        let names = row
+            .notifications
+            .as_ref()
+            .map(|n| n.destinations.clone())
+            .unwrap_or_default();
+        for destination_name in unique_names(names) {
+            uses.push(DestinationUse {
+                consumer: DestinationConsumer::Downtime,
+                id: row.id.clone(),
+                name: row.name.clone(),
+                folder_id: Some(row.folder_id.clone()),
+                destination_name,
+            });
+        }
+    }
+    uses
 }
 
 #[cfg(test)]
@@ -877,6 +918,79 @@ mod tests {
         assert_eq!(uses.len(), 1);
         assert_eq!(uses[0].consumer, DestinationConsumer::IncidentIntegration);
         assert_eq!(uses[0].destination_name, name);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_downtime_arm_names_the_downtime_in_the_refusal() {
+        use config::meta::downtimes::{
+            Downtime, DowntimeNotifications, DowntimeSchedule, NotificationEvents, Repeat,
+        };
+
+        let row = |id: &str, name: &str, destinations: &[&str]| Downtime {
+            id: id.to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: name.to_string(),
+            reason: None,
+            condition: None,
+            targets: vec![],
+            schedule: DowntimeSchedule {
+                repeat: Repeat::None,
+                starts_at: 1,
+                ends_at: Some(2),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: 60,
+                weekdays: vec![],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: true,
+            notifications: Some(DowntimeNotifications {
+                destinations: destinations.iter().map(|d| d.to_string()).collect(),
+                events: NotificationEvents {
+                    ended: true,
+                    ..Default::default()
+                },
+                ending_soon_lead_secs: 600,
+                continues: None,
+            }),
+            origin_region: None,
+            version: 0,
+            created_by: "lin".to_string(),
+            created_at: 1,
+            updated_by: "lin".to_string(),
+            updated_at: 1,
+        };
+        let rows = [
+            row("d1", "Nightly deploy", &["pagerduty", "pagerduty", "slack"]),
+            row("d2", "DB failover", &["slack"]),
+            Downtime {
+                notifications: None,
+                ..row("d3", "Quiet", &[])
+            },
+        ];
+        let uses = downtime_uses(rows.iter());
+        let pagerduty: Vec<DestinationUse> = uses
+            .into_iter()
+            .filter(|u| u.destination_name == "pagerduty")
+            .collect();
+        assert_eq!(pagerduty.len(), 1);
+        assert_eq!(pagerduty[0].consumer, DestinationConsumer::Downtime);
+        assert_eq!(pagerduty[0].folder_id.as_deref(), Some("default"));
+        assert_eq!(
+            usage_message("pagerduty", &pagerduty),
+            "'pagerduty' is used by 1 downtime (Nightly deploy)"
+        );
+        let slack: Vec<DestinationUse> = downtime_uses(rows.iter())
+            .into_iter()
+            .filter(|u| u.destination_name == "slack")
+            .collect();
+        assert_eq!(
+            usage_message("slack", &slack),
+            "'slack' is used by 2 downtimes (Nightly deploy, DB failover)"
+        );
     }
 
     #[test]

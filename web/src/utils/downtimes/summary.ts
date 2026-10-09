@@ -17,19 +17,30 @@ import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 import type {
   DimensionCondition,
+  DowntimeNotifications,
   DowntimeRequest,
   DowntimeSchedule,
   DowntimeTarget,
+  NotificationEvent,
   TargetModule,
 } from "@/services/downtimes";
 import { conditionSummary, sortedTargets, type FolderNameFn } from "./targetSummary";
 import { formatDuration, formatWindowTime } from "./schedule";
+import { NOTIFICATION_EVENTS } from "./downtimeForm";
 
 const NOUN_KEYS: Record<TargetModule, I18nKey> = {
   alerts: "alerts.downtimes.sentence.nouns.alerts",
   anomaly_detections: "alerts.downtimes.sentence.nouns.anomaly_detections",
   synthetics: "alerts.downtimes.sentence.nouns.synthetics",
   slos: "alerts.downtimes.sentence.nouns.slos",
+};
+
+const NOTIFY_EVENT_KEYS: Record<NotificationEvent, I18nKey> = {
+  started: "alerts.downtimes.notify.summary.started",
+  ending_soon: "alerts.downtimes.notify.summary.endingSoon",
+  ended: "alerts.downtimes.notify.summary.ended",
+  cancelled: "alerts.downtimes.notify.summary.cancelled",
+  extended: "alerts.downtimes.notify.summary.extended",
 };
 
 const weekdayList = (days: number[], locale?: string): string => {
@@ -132,4 +143,16 @@ export function summarySentence(
     ? t("alerts.downtimes.sentence.stopNotifying", { when, targets: who.join(", ") })
     : t("alerts.downtimes.sentence.nothingMuted", { when });
   return raw(`${muted} ${sloClause(request.targets, conditionText, t, folderName)}`);
+}
+
+export function notifySentence(n: DowntimeNotifications | undefined, t: TranslateFn): I18nText {
+  if (!n || n.destinations.length === 0) return t("alerts.downtimes.notify.summary.none");
+  const lead = formatDuration(n.ending_soon_lead_secs, t);
+  const events = NOTIFICATION_EVENTS.filter((e) => n.events[e]).map((e) =>
+    t(NOTIFY_EVENT_KEYS[e], { lead }),
+  );
+  return t("alerts.downtimes.notify.summary.sentence", {
+    destinations: n.destinations.join(", "),
+    events: events.join(", "),
+  });
 }

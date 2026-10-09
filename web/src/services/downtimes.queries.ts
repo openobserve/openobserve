@@ -15,6 +15,8 @@
 
 import { keepPreviousData, mutationOptions, queryOptions } from "@tanstack/vue-query";
 import downtimes from "./downtimes";
+import destination from "./alert_destination";
+import template from "./alert_templates";
 import type {
   DowntimeDetail,
   DowntimeListItem,
@@ -35,6 +37,21 @@ import { syntheticsKeys } from "./synthetics.querykeys";
 import { sloKeys } from "./slos.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
+import {
+  downtimeVariables,
+  isEmailDestination,
+  renderDowntimeTemplate,
+  templateNameFor,
+  testRequestFor,
+  type TestDestination,
+} from "@/utils/downtimes/notifyTest";
+
+export interface DowntimeTestResult {
+  destination: string;
+  ok: boolean;
+  unsupported?: boolean;
+  error?: string;
+}
 
 /** The API caps an org at 500 downtimes, so one page holds the whole list. */
 export const DOWNTIME_LIST_PAGE_SIZE = 500;
@@ -200,4 +217,48 @@ export const moveDowntimesMutation = (org: string) =>
     mutationFn: (vars: { ids: string[]; dstFolderId: string; folder?: string }) =>
       downtimes.move(org, vars.ids, vars.dstFolderId, vars.folder),
     meta: { invalidates: [downtimeKeys.all(org)], silentError: true },
+  });
+
+const templateBody = async (org: string, name: string): Promise<string> =>
+  String(
+    (await template.get_by_name({ org_identifier: org, template_name: name })).data?.body ?? "",
+  );
+
+const sendTestTo = async (
+  org: string,
+  dest: TestDestination,
+  variables: Record<string, string>,
+): Promise<DowntimeTestResult> => {
+  try {
+    const own = dest.template ? await templateBody(org, dest.template).catch(() => "") : "";
+    const name = templateNameFor(dest, own);
+    const body = name === dest.template ? own : await templateBody(org, name);
+    const escape = isEmailDestination(dest) ? "html" : "json";
+    const request = testRequestFor(dest, renderDowntimeTemplate(body, variables, escape));
+    if (!request) return { destination: dest.name, ok: false, unsupported: true };
+    const res = (await destination.test({ org_identifier: org, data: request })).data;
+    return { destination: dest.name, ok: !!res?.success, error: res?.error ?? undefined };
+  } catch (err: any) {
+    return {
+      destination: dest.name,
+      ok: false,
+      error: err?.response?.data?.message ?? err?.message,
+    };
+  }
+};
+
+export const sendDowntimeTestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: {
+      downtime: DowntimeDetail;
+      destinations: TestDestination[];
+      url: string;
+    }): Promise<DowntimeTestResult[]> => {
+      const d = vars.downtime;
+      const window = d.current_window ??
+        d.next_window ?? { start: d.schedule.starts_at, end: d.schedule.ends_at ?? 0 };
+      const variables = downtimeVariables(d, window, vars.url);
+      return Promise.all(vars.destinations.map((dest) => sendTestTo(org, dest, variables)));
+    },
+    meta: { silentError: true },
   });

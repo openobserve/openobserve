@@ -9250,6 +9250,62 @@
         "title": "Correzioni di stato:",
         "item": "{name} ({status})",
         "shorterThanSlice": "più breve dell'intervallo dello SLO, nessun minuto corretto"
+      },
+      "notify": {
+        "title": "Notifica",
+        "caption": "Avvisa le destinazioni sul fermo stesso: quando inizia, prima che finisca e quando finisce.",
+        "destinations": "Destinazioni",
+        "lead": "Promemoria prima della fine",
+        "leadHelp": "Ad esempio 10m o 1h, tra 1 minuto e la durata della finestra.",
+        "regionNote": "In un super cluster invia la regione in cui il fermo è stato creato. Un fermo creato prima di questa impostazione invia da ogni regione.",
+        "tab": "Notifiche",
+        "events": {
+          "started": "Quando inizia",
+          "startedHelp": "Un messaggio all'inizio di ogni finestra.",
+          "ending_soon": "Prima che finisca",
+          "ending_soonHelp": "Un promemoria prima della fine, così nessuno è sorpreso quando gli avvisi notificano di nuovo.",
+          "ended": "Quando finisce",
+          "endedHelp": "Un messaggio alla chiusura di ogni finestra.",
+          "cancelled": "Quando viene annullato",
+          "cancelledHelp": "Inviato subito quando qualcuno termina o annulla il fermo.",
+          "extended": "Quando viene esteso",
+          "extendedHelp": "Inviato subito con la nuova fine."
+        },
+        "validation": {
+          "tooMany": "Si possono notificare al massimo {max} destinazioni.",
+          "eventRequired": "Scegli almeno un evento, oppure rimuovi le destinazioni.",
+          "leadInvalid": "Il promemoria deve arrivare tra 1 minuto e la durata della finestra prima della fine."
+        },
+        "summary": {
+          "none": "Non invia notifiche proprie.",
+          "sentence": "Notifica {destinations}: {events}.",
+          "started": "quando inizia",
+          "endingSoon": "{lead} prima che finisca",
+          "ended": "quando finisce",
+          "cancelled": "quando viene annullato",
+          "extended": "quando viene esteso"
+        },
+        "log": {
+          "time": "Ora",
+          "event": "Evento",
+          "destinations": "Destinazioni",
+          "result": "Risultato",
+          "ok": "Inviata",
+          "pending": "Invio in corso",
+          "empty": "Nessuna notifica ancora inviata",
+          "events": {
+            "started": "Iniziato",
+            "ending_soon": "Sta per finire",
+            "ended": "Terminato",
+            "cancelled": "Annullato",
+            "extended": "Esteso"
+          }
+        },
+        "test": {
+          "send": "Invia test",
+          "sent": "Test inviato a {count} destinazione | Test inviato a {count} destinazioni",
+          "failed": "Il test non ha raggiunto {names}."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} workflow | {count} workflow",
     "countAnomalyDetection": "{count} rilevatore di anomalie | {count} rilevatori di anomalie",
     "countIncidentIntegration": "{count} integrazione di incidenti | {count} integrazioni di incidenti",
-    "sectionOtherConsumers": "Utilizzato anche da"
+    "sectionOtherConsumers": "Utilizzato anche da",
+    "countDowntime": "{count} fermo | {count} fermi"
   },
   "alert_library": {
     "header": "Libreria di avvisi",

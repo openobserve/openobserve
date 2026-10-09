@@ -30,6 +30,7 @@ use svix_ksuid::KsuidLike;
 
 use super::{
     entity::{
+        downtime_notifications as notifications,
         downtimes::{ActiveModel, Column, Entity, Model},
         folders,
     },
@@ -42,6 +43,7 @@ use crate::{
 
 /// A delete retries its compare-and-swap this often before it gives up on a busy row.
 const TOMBSTONE_ATTEMPTS: usize = 8;
+const DELETE_CHUNK: usize = 500;
 
 /// The version of a stored row, soft-deleted or not, for ordering replicated writes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -365,15 +367,32 @@ pub async fn delete_ended_before_with<C: ConnectionTrait>(
     conn: &C,
     cutoff: i64,
 ) -> Result<u64, errors::Error> {
-    let res = Entity::delete_many()
-        .filter(
-            Condition::any()
-                .add(ended_before(cutoff))
-                .add(Column::DeletedAt.lt(cutoff)),
-        )
-        .exec(conn)
+    let expired = || {
+        Condition::any()
+            .add(ended_before(cutoff))
+            .add(Column::DeletedAt.lt(cutoff))
+    };
+    let ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(expired())
+        .into_tuple()
+        .all(conn)
         .await?;
-    Ok(res.rows_affected)
+    let mut removed = 0;
+    for chunk in ids.chunks(DELETE_CHUNK) {
+        notifications::Entity::delete_many()
+            .filter(notifications::Column::DowntimeId.is_in(chunk.to_vec()))
+            .exec(conn)
+            .await?;
+        removed += Entity::delete_many()
+            .filter(expired())
+            .filter(Column::Id.is_in(chunk.to_vec()))
+            .exec(conn)
+            .await?
+            .rows_affected;
+    }
+    Ok(removed)
 }
 
 pub async fn list_ended_before_with<C: ConnectionTrait>(
@@ -425,6 +444,10 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(
         .into_iter()
         .map(|m| m.id)
         .collect();
+    notifications::Entity::delete_many()
+        .filter(notifications::Column::Org.eq(org))
+        .exec(conn)
+        .await?;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(conn)
@@ -514,7 +537,11 @@ fn to_active_model(d: &Downtime, folder_pk: String) -> Result<ActiveModel, error
         cancelled_at: Set(d.cancelled_at),
         cancelled_by: Set(d.cancelled_by.clone()),
         deleted_at: Set(None),
-        notifications: Set(d.notifications.clone()),
+        notifications: Set(d
+            .notifications
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()?),
         origin_region: Set(d.origin_region.clone()),
         version: Set(d.version),
         created_by: Set(d.created_by.clone()),
@@ -552,7 +579,12 @@ fn from_model(m: Model, folder_id: String) -> Result<Downtime, errors::Error> {
         cancelled_at: m.cancelled_at,
         cancelled_by: m.cancelled_by,
         show_banner: m.show_banner,
-        notifications: m.notifications,
+        // An unreadable notification setting must not drop the row, which would stop the muting.
+        notifications: m.notifications.and_then(|v| {
+            serde_json::from_value(v)
+                .inspect_err(|e| log::warn!("[DOWNTIMES] ignoring unreadable notifications: {e}"))
+                .ok()
+        }),
         origin_region: m.origin_region,
         version: m.version,
         created_by: m.created_by,
@@ -622,6 +654,9 @@ mod tests {
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
+        crate::table::migration::create_downtime_notifications_for_test(&db)
+            .await
+            .unwrap();
         for (pk, org, slug, folder_type) in [
             ("pk-default", "acme", "default", FolderType::Downtimes),
             ("pk-planned", "acme", "planned", FolderType::Downtimes),
@@ -688,6 +723,34 @@ mod tests {
 
     fn ids(rows: &[Downtime]) -> Vec<&str> {
         let mut ids: Vec<&str> = rows.iter().map(|d| d.id.as_str()).collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    async fn log_sent(db: &DatabaseConnection, org: &str, downtime_id: &str) {
+        let record = super::super::downtime_notifications::DowntimeNotification {
+            id: new_id(),
+            org: org.to_string(),
+            downtime_id: downtime_id.to_string(),
+            window_start: 1,
+            event: "started".to_string(),
+            sent_at: 1,
+            destinations: serde_json::json!(["slack"]),
+            result: Some("ok".to_string()),
+        };
+        super::super::downtime_notifications::insert_if_absent_with(db, &record)
+            .await
+            .unwrap();
+    }
+
+    async fn logged(db: &DatabaseConnection) -> Vec<String> {
+        let mut ids: Vec<String> = notifications::Entity::find()
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| m.downtime_id)
+            .collect();
         ids.sort_unstable();
         ids
     }
@@ -1058,11 +1121,16 @@ mod tests {
                 .unwrap();
         }
 
+        for id in ["ended_once", "deleted_long_ago", "open_weekly"] {
+            log_sent(&db, "acme", id).await;
+        }
+
         let ended = list_ended_before_with(&db, cutoff).await.unwrap();
         let mut listed = ids(&ended);
         listed.sort_unstable();
         assert_eq!(listed, ["cancelled", "ended_once", "ended_weekly"]);
         assert_eq!(delete_ended_before_with(&db, cutoff).await.unwrap(), 4);
+        assert_eq!(logged(&db).await, ["open_weekly"]);
         assert!(
             Entity::find_by_id("deleted_long_ago")
                 .one(&db)
@@ -1098,8 +1166,12 @@ mod tests {
         foreign.org = "other".to_string();
         put_with(&db, &foreign).await.unwrap();
 
+        log_sent(&db, "acme", "d1").await;
+        log_sent(&db, "other", "d2").await;
+
         assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), ["d1"]);
         assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
+        assert_eq!(logged(&db).await, ["d2"]);
     }
 
     /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.

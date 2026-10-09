@@ -176,6 +176,15 @@ pub fn list_cached(org: &str) -> Arc<Vec<Downtime>> {
         .unwrap_or_default()
 }
 
+pub fn all_cached() -> Vec<Arc<Vec<Downtime>>> {
+    DOWNTIMES
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .values()
+        .cloned()
+        .collect()
+}
+
 /// The OpenFGA object of a downtime, parented by its folder so folder grants reach it.
 pub fn ownership(downtime: &Downtime) -> Authz {
     Authz {
@@ -199,15 +208,6 @@ async fn on_put(org: String, _id: String) -> Result<(), anyhow::Error> {
 async fn on_delete(org: String, id: String) -> Result<(), anyhow::Error> {
     remove_cached(&org, &id);
     Ok(())
-}
-
-fn all_cached() -> Vec<Arc<Vec<Downtime>>> {
-    DOWNTIMES
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .values()
-        .cloned()
-        .collect()
 }
 
 /// `(org, tuple)` for every row, each parented by the folder it is filed in.

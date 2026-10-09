@@ -20,6 +20,8 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::meta::folder::DEFAULT_FOLDER;
 
+pub const DEFAULT_ENDING_SOON_LEAD_SECS: i64 = 600;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct Downtime {
     pub id: String,
@@ -42,7 +44,7 @@ pub struct Downtime {
     #[serde(default = "default_true")]
     pub show_banner: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub notifications: Option<serde_json::Value>,
+    pub notifications: Option<DowntimeNotifications>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin_region: Option<String>,
     #[serde(default)]
@@ -227,6 +229,95 @@ pub struct DowntimeRequest {
     pub schedule: DowntimeSchedule,
     #[serde(default = "default_true")]
     pub show_banner: bool,
+    #[serde(default)]
+    pub notifications: Option<DowntimeNotifications>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct DowntimeNotifications {
+    #[serde(default)]
+    pub destinations: Vec<String>,
+    #[serde(default)]
+    pub events: NotificationEvents,
+    #[serde(default = "default_ending_soon_lead_secs")]
+    pub ending_soon_lead_secs: i64,
+    /// The id of the recurring downtime whose window this extension follow-up continues.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues: Option<String>,
+}
+
+impl Default for DowntimeNotifications {
+    fn default() -> Self {
+        Self {
+            destinations: vec![],
+            events: NotificationEvents::default(),
+            ending_soon_lead_secs: DEFAULT_ENDING_SOON_LEAD_SECS,
+            continues: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NotificationEvents {
+    #[serde(default)]
+    pub started: bool,
+    #[serde(default)]
+    pub ending_soon: bool,
+    #[serde(default)]
+    pub ended: bool,
+    #[serde(default)]
+    pub cancelled: bool,
+    #[serde(default)]
+    pub extended: bool,
+}
+
+impl NotificationEvents {
+    pub fn any(&self) -> bool {
+        self.started || self.ending_soon || self.ended || self.cancelled || self.extended
+    }
+
+    pub fn wants(&self, event: NotificationEvent) -> bool {
+        match event {
+            NotificationEvent::Started => self.started,
+            NotificationEvent::EndingSoon => self.ending_soon,
+            NotificationEvent::Ended => self.ended,
+            NotificationEvent::Cancelled => self.cancelled,
+            NotificationEvent::Extended => self.extended,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationEvent {
+    Started,
+    EndingSoon,
+    Ended,
+    Cancelled,
+    Extended,
+}
+
+impl NotificationEvent {
+    /// Stored in `downtime_notifications.event`; never rename.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Started => "started",
+            Self::EndingSoon => "ending_soon",
+            Self::Ended => "ended",
+            Self::Cancelled => "cancelled",
+            Self::Extended => "extended",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct DowntimeNotificationLogEntry {
+    pub window_start: i64,
+    pub event: String,
+    pub sent_at: i64,
+    pub destinations: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -404,6 +495,7 @@ pub struct DowntimeDetail {
     #[serde(flatten)]
     pub item: DowntimeListItem,
     pub affected: AffectedItems,
+    pub notification_log: Vec<DowntimeNotificationLogEntry>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -453,6 +545,10 @@ pub fn default_folder() -> String {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_ending_soon_lead_secs() -> i64 {
+    DEFAULT_ENDING_SOON_LEAD_SECS
 }
 
 #[cfg(test)]
@@ -550,6 +646,17 @@ mod tests {
             cancelled_at: Some(5),
             cancelled_by: Some("lin".to_string()),
             show_banner: false,
+            notifications: Some(DowntimeNotifications {
+                destinations: vec!["slack-oncall".to_string()],
+                events: NotificationEvents {
+                    started: true,
+                    ending_soon: true,
+                    ..Default::default()
+                },
+                ending_soon_lead_secs: 300,
+                continues: None,
+            }),
+            origin_region: Some("us-east".to_string()),
             ..minimal()
         }
     }
@@ -642,6 +749,48 @@ mod tests {
         assert_eq!(quick.folder_id, DEFAULT_FOLDER);
         assert!(!quick.show_banner);
         assert!(quick.schedule.weekdays.is_empty());
+    }
+
+    #[test]
+    fn notifications_take_their_defaults_and_keep_their_wire_names() {
+        let n: DowntimeNotifications =
+            serde_json::from_str(r#"{ "destinations": ["slack"] }"#).unwrap();
+        assert_eq!(n.ending_soon_lead_secs, DEFAULT_ENDING_SOON_LEAD_SECS);
+        assert!(!n.events.any());
+
+        let json = serde_json::to_value(full()).unwrap();
+        assert_eq!(json["notifications"]["destinations"][0], "slack-oncall");
+        assert_eq!(json["notifications"]["events"]["ending_soon"], true);
+        assert_eq!(json["notifications"]["ending_soon_lead_secs"], 300);
+        assert_eq!(json["origin_region"], "us-east");
+        assert!(json["notifications"].get("continues").is_none());
+        let linked: DowntimeNotifications =
+            serde_json::from_str(r#"{ "destinations": [], "continues": "2f9K" }"#).unwrap();
+        assert_eq!(linked.continues.as_deref(), Some("2f9K"));
+
+        let req: DowntimeRequest = serde_json::from_str(
+            r#"{ "targets": [], "schedule": { "repeat": "none", "starts_at": 1, "ends_at": 2,
+                 "timezone": "UTC", "duration_secs": 60 },
+                 "notifications": { "destinations": ["pd"], "events": { "ended": true } } }"#,
+        )
+        .unwrap();
+        let n = req.notifications.unwrap();
+        assert!(n.events.wants(NotificationEvent::Ended));
+        assert!(!n.events.wants(NotificationEvent::Started));
+    }
+
+    #[test]
+    fn notification_events_are_stored_by_their_snake_case_names() {
+        for (event, name) in [
+            (NotificationEvent::Started, "started"),
+            (NotificationEvent::EndingSoon, "ending_soon"),
+            (NotificationEvent::Ended, "ended"),
+            (NotificationEvent::Cancelled, "cancelled"),
+            (NotificationEvent::Extended, "extended"),
+        ] {
+            assert_eq!(event.as_str(), name);
+            assert_eq!(serde_json::to_value(event).unwrap(), name);
+        }
     }
 
     #[test]

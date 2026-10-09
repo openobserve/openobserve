@@ -9250,6 +9250,62 @@
         "title": "상태 수정:",
         "item": "{name} ({status})",
         "shorterThanSlice": "SLO 슬라이스보다 짧아 보정된 시간이 없습니다"
+      },
+      "notify": {
+        "title": "알림",
+        "caption": "다운타임 자체를 대상에 알립니다: 시작할 때, 끝나기 전, 끝날 때.",
+        "destinations": "대상",
+        "lead": "종료 전 미리 알림",
+        "leadHelp": "예: 10m 또는 1h, 1분에서 기간 길이 사이.",
+        "regionNote": "슈퍼 클러스터에서는 다운타임을 만든 리전이 보냅니다. 이 설정 이전에 만든 다운타임은 모든 리전에서 보냅니다.",
+        "tab": "알림",
+        "events": {
+          "started": "시작할 때",
+          "startedHelp": "각 기간이 시작될 때 메시지 하나를 보냅니다.",
+          "ending_soon": "끝나기 전",
+          "ending_soonHelp": "종료 전 미리 알림으로, 알림이 다시 울려도 놀라지 않게 합니다.",
+          "ended": "끝날 때",
+          "endedHelp": "각 기간이 끝날 때 메시지 하나를 보냅니다.",
+          "cancelled": "취소될 때",
+          "cancelledHelp": "누군가 다운타임을 끝내거나 취소하면 즉시 보냅니다.",
+          "extended": "연장될 때",
+          "extendedHelp": "새 종료 시간과 함께 즉시 보냅니다."
+        },
+        "validation": {
+          "tooMany": "최대 {max}개의 대상에 알릴 수 있습니다.",
+          "eventRequired": "이벤트를 하나 이상 선택하거나 대상을 제거하세요.",
+          "leadInvalid": "미리 알림은 종료 1분 전부터 기간 길이 전 사이여야 합니다."
+        },
+        "summary": {
+          "none": "자체 알림을 보내지 않습니다.",
+          "sentence": "{destinations}에 알림: {events}.",
+          "started": "시작할 때",
+          "endingSoon": "종료 {lead} 전",
+          "ended": "끝날 때",
+          "cancelled": "취소될 때",
+          "extended": "연장될 때"
+        },
+        "log": {
+          "time": "시간",
+          "event": "이벤트",
+          "destinations": "대상",
+          "result": "결과",
+          "ok": "전송됨",
+          "pending": "전송 중",
+          "empty": "아직 보낸 알림이 없습니다",
+          "events": {
+            "started": "시작됨",
+            "ending_soon": "곧 종료",
+            "ended": "종료됨",
+            "cancelled": "취소됨",
+            "extended": "연장됨"
+          }
+        },
+        "test": {
+          "send": "테스트 보내기",
+          "sent": "{count}개 대상에 테스트를 보냈습니다 | {count}개 대상에 테스트를 보냈습니다",
+          "failed": "테스트가 {names}에 도달하지 못했습니다."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count}개의 워크플로우 | {count}개의 워크플로우",
     "countAnomalyDetection": "{count}개의 이상 탐지기 | {count}개의 이상 탐지기",
     "countIncidentIntegration": "{count}개의 인시던트 통합 | {count}개의 인시던트 통합",
-    "sectionOtherConsumers": "다음에서도 사용"
+    "sectionOtherConsumers": "다음에서도 사용",
+    "countDowntime": "{count}개의 다운타임 | {count}개의 다운타임"
   },
   "alert_library": {
     "header": "알림 라이브러리",

@@ -9,6 +9,7 @@ import downtimes from "@/services/downtimes";
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 import { isoWeekday, utcMicrosToLocal } from "@/utils/downtimes/schedule";
+import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -22,6 +23,13 @@ vi.mock("@/services/downtimes", () => ({
     preview: vi.fn(),
     resources: vi.fn(),
     values: vi.fn(() => Promise.resolve({ data: { values: [], partial: false } })),
+  },
+}));
+
+vi.mock("@/services/alert_destination", () => ({
+  default: {
+    list: vi.fn(() => Promise.resolve({ data: [{ name: "slack-oncall", type: "http" }] })),
+    test: vi.fn(),
   },
 }));
 
@@ -198,6 +206,35 @@ describe("AddDowntime", () => {
     );
     expect(wrapper.text()).toContain("payments-api-errors");
     expect(vi.mocked(downtimes.preview).mock.calls.length).toBe(calls);
+    wrapper.unmount();
+  });
+
+  it("notifies nobody until a destination is picked", async () => {
+    const { wrapper } = await mountPage();
+    const section = wrapper.get('[data-test="downtime-notify"]');
+    expect(section.text()).toContain("Notify");
+    expect(section.text()).toContain("Before it ends");
+    expect(wrapper.find('[data-test="downtime-notify-lead"]').exists()).toBe(false);
+    await save(wrapper);
+    await dialogButton("primary");
+    const [, body] = vi.mocked(downtimes.create).mock.calls[0];
+    expect(body.notifications).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("turns on the reminder and the end with the first destination and saves them", async () => {
+    const { wrapper } = await mountPage();
+    wrapper.findComponent(AlertDestinationsField).vm.$emit("update:destinations", ["slack-oncall"]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="downtime-notify-lead"]').exists()).toBe(true);
+    await save(wrapper);
+    await dialogButton("primary");
+    const [, body] = vi.mocked(downtimes.create).mock.calls[0];
+    expect(body.notifications).toEqual({
+      destinations: ["slack-oncall"],
+      events: { started: false, ending_soon: true, ended: true, cancelled: false, extended: false },
+      ending_soon_lead_secs: 600,
+    });
     wrapper.unmount();
   });
 

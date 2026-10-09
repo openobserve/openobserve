@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-show="activeTab === 'schedule'"
                 ref="schedulePane"
                 data-tab-pane="schedule"
-                class="flex flex-col gap-3"
+                class="flex flex-col gap-5"
               >
                 <OBanner
                   v-if="scheduleNudged"
@@ -188,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-downtime-check-schedule"
                 />
                 <DowntimeScheduleFields />
+                <DowntimeNotifySection />
               </div>
 
               <div
@@ -389,6 +390,7 @@ import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelect
 import DowntimeConditionSection from "./DowntimeConditionSection.vue";
 import DowntimeTargetCard from "./DowntimeTargetCard.vue";
 import DowntimeScheduleFields from "./DowntimeScheduleFields.vue";
+import DowntimeNotifySection from "./DowntimeNotifySection.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
 import { browserTimezone } from "@/utils/timezoneAliases";

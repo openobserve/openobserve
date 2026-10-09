@@ -9250,6 +9250,62 @@
         "title": "Korekty statusu:",
         "item": "{name} ({status})",
         "shorterThanSlice": "krótszy niż przedział SLO, nie skorygowano żadnych minut"
+      },
+      "notify": {
+        "title": "Powiadamiaj",
+        "caption": "Informuj miejsca docelowe o samym przestoju: gdy się zaczyna, przed końcem i gdy się kończy.",
+        "destinations": "Miejsca docelowe",
+        "lead": "Przypomnij przed końcem",
+        "leadHelp": "Na przykład 10m lub 1h, od 1 minuty do długości okna.",
+        "regionNote": "W superklastrze wysyła region, w którym utworzono przestój. Przestój utworzony przed tym ustawieniem wysyła z każdego regionu.",
+        "tab": "Powiadomienia",
+        "events": {
+          "started": "Gdy się zaczyna",
+          "startedHelp": "Jedna wiadomość na początku każdego okna.",
+          "ending_soon": "Przed końcem",
+          "ending_soonHelp": "Przypomnienie przed końcem, aby nikogo nie zaskoczyły ponowne powiadomienia alertów.",
+          "ended": "Gdy się kończy",
+          "endedHelp": "Jedna wiadomość na zakończenie każdego okna.",
+          "cancelled": "Gdy zostanie anulowany",
+          "cancelledHelp": "Wysyłane od razu, gdy ktoś zakończy lub odwoła przestój.",
+          "extended": "Gdy zostanie przedłużony",
+          "extendedHelp": "Wysyłane od razu z nowym końcem."
+        },
+        "validation": {
+          "tooMany": "Można powiadomić najwyżej {max} miejsc docelowych.",
+          "eventRequired": "Wybierz co najmniej jedno zdarzenie albo usuń miejsca docelowe.",
+          "leadInvalid": "Przypomnienie musi przyjść od 1 minuty do długości okna przed końcem."
+        },
+        "summary": {
+          "none": "Nie wysyła własnych powiadomień.",
+          "sentence": "Powiadamia {destinations}: {events}.",
+          "started": "gdy się zaczyna",
+          "endingSoon": "{lead} przed końcem",
+          "ended": "gdy się kończy",
+          "cancelled": "gdy zostanie anulowany",
+          "extended": "gdy zostanie przedłużony"
+        },
+        "log": {
+          "time": "Czas",
+          "event": "Zdarzenie",
+          "destinations": "Miejsca docelowe",
+          "result": "Wynik",
+          "ok": "Wysłano",
+          "pending": "Wysyłanie",
+          "empty": "Nie wysłano jeszcze żadnych powiadomień",
+          "events": {
+            "started": "Rozpoczęty",
+            "ending_soon": "Wkrótce się kończy",
+            "ended": "Zakończony",
+            "cancelled": "Anulowany",
+            "extended": "Przedłużony"
+          }
+        },
+        "test": {
+          "send": "Wyślij test",
+          "sent": "Test wysłano do {count} miejsca docelowego | Test wysłano do {count} miejsc docelowych",
+          "failed": "Test nie dotarł do {names}."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} przepływ pracy | {count} przepływy pracy",
     "countAnomalyDetection": "{count} detektor anomalii | {count} detektory anomalii",
     "countIncidentIntegration": "{count} integracja incydentów | {count} integracje incydentów",
-    "sectionOtherConsumers": "Używane również przez"
+    "sectionOtherConsumers": "Używane również przez",
+    "countDowntime": "{count} przestój | {count} przestoje"
   },
   "alert_library": {
     "header": "Biblioteka alertów",

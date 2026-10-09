@@ -101,8 +101,12 @@ async fn apply_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<
         return Ok(None);
     }
     let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
-    let coverage_changed = before.is_some_and(|before| !before.same_coverage(downtime));
-    table::downtimes::put_with(conn, downtime).await?;
+    let mut downtime = downtime.clone();
+    if let Some(before) = &before {
+        downtime.origin_region = before.origin_region.clone();
+    }
+    let coverage_changed = before.is_some_and(|before| !before.same_coverage(&downtime));
+    table::downtimes::put_with(conn, &downtime).await?;
     Ok(Some(coverage_changed))
 }
 
@@ -400,5 +404,23 @@ mod tests {
                 .map(|d| d.updated_at),
             Some(20)
         );
+    }
+
+    #[tokio::test]
+    async fn a_put_from_another_region_keeps_the_origin_region() {
+        let db = db().await;
+        let mut created = downtime(10);
+        created.origin_region = Some("us-east".to_string());
+        apply_put(&db, &created).await.unwrap();
+
+        let mut edited = downtime(20);
+        edited.origin_region = Some("eu-west".to_string());
+        apply_put(&db, &edited).await.unwrap();
+        let stored = table::downtimes::get_with(&db, "acme", "d1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.origin_region.as_deref(), Some("us-east"));
+        assert_eq!(stored.updated_at, 20);
     }
 }

@@ -9250,6 +9250,62 @@
         "title": "Hiệu chỉnh trạng thái:",
         "item": "{name} ({status})",
         "shorterThanSlice": "ngắn hơn lát cắt của SLO, không có phút nào được hiệu chỉnh"
+      },
+      "notify": {
+        "title": "Thông báo",
+        "caption": "Báo cho các đích về chính thời gian ngừng: khi bắt đầu, trước khi kết thúc và khi kết thúc.",
+        "destinations": "Đích",
+        "lead": "Nhắc trước khi kết thúc",
+        "leadHelp": "Ví dụ 10m hoặc 1h, từ 1 phút đến độ dài cửa sổ.",
+        "regionNote": "Trong siêu cụm, khu vực tạo thời gian ngừng sẽ gửi. Thời gian ngừng tạo trước khi có cài đặt này gửi từ mọi khu vực.",
+        "tab": "Thông báo",
+        "events": {
+          "started": "Khi bắt đầu",
+          "startedHelp": "Một tin nhắn khi mỗi cửa sổ bắt đầu.",
+          "ending_soon": "Trước khi kết thúc",
+          "ending_soonHelp": "Lời nhắc trước khi kết thúc để không ai bất ngờ khi cảnh báo thông báo trở lại.",
+          "ended": "Khi kết thúc",
+          "endedHelp": "Một tin nhắn khi mỗi cửa sổ đóng.",
+          "cancelled": "Khi bị hủy",
+          "cancelledHelp": "Gửi ngay khi ai đó kết thúc hoặc hủy thời gian ngừng.",
+          "extended": "Khi được gia hạn",
+          "extendedHelp": "Gửi ngay cùng thời điểm kết thúc mới."
+        },
+        "validation": {
+          "tooMany": "Có thể thông báo tối đa {max} đích.",
+          "eventRequired": "Chọn ít nhất một sự kiện hoặc xóa các đích.",
+          "leadInvalid": "Lời nhắc phải đến trong khoảng từ 1 phút đến độ dài cửa sổ trước khi kết thúc."
+        },
+        "summary": {
+          "none": "Không gửi thông báo riêng.",
+          "sentence": "Thông báo cho {destinations}: {events}.",
+          "started": "khi bắt đầu",
+          "endingSoon": "{lead} trước khi kết thúc",
+          "ended": "khi kết thúc",
+          "cancelled": "khi bị hủy",
+          "extended": "khi được gia hạn"
+        },
+        "log": {
+          "time": "Thời gian",
+          "event": "Sự kiện",
+          "destinations": "Đích",
+          "result": "Kết quả",
+          "ok": "Đã gửi",
+          "pending": "Đang gửi",
+          "empty": "Chưa gửi thông báo nào",
+          "events": {
+            "started": "Đã bắt đầu",
+            "ending_soon": "Sắp kết thúc",
+            "ended": "Đã kết thúc",
+            "cancelled": "Đã hủy",
+            "extended": "Đã gia hạn"
+          }
+        },
+        "test": {
+          "send": "Gửi thử",
+          "sent": "Đã gửi thử đến {count} đích | Đã gửi thử đến {count} đích",
+          "failed": "Bản thử không đến được {names}."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} quy trình làm việc | {count} quy trình làm việc",
     "countAnomalyDetection": "{count} bộ phát hiện bất thường | {count} bộ phát hiện bất thường",
     "countIncidentIntegration": "{count} tích hợp sự cố | {count} tích hợp sự cố",
-    "sectionOtherConsumers": "Cũng được sử dụng bởi"
+    "sectionOtherConsumers": "Cũng được sử dụng bởi",
+    "countDowntime": "{count} thời gian ngừng | {count} thời gian ngừng"
   },
   "alert_library": {
     "header": "Thư viện cảnh báo",

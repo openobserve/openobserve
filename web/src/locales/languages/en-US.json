@@ -4222,7 +4222,7 @@
       "transTypeLabel": "Language",
       "transTypePlaceholder": "Choose a language",
       "paramsLabel": "Parameters",
-      "paramsHint": "Comma-separated argument names. Defaults to \u201crow\u201d.",
+      "paramsHint": "Comma-separated argument names. Defaults to “row”.",
       "overrideExisting": "Replace the existing function instead",
       "nameInputRequired": "Enter a function name",
       "nameInputInvalid": "Use letters, numbers and underscores, starting with a letter or underscore",
@@ -4233,7 +4233,7 @@
       "overridden": "Function - {index}: \"{name}\" overridden",
       "createFailed": "Function - {index}: \"{name}\" failed - {reason}",
       "rejectedBody": "Correct the definition and import again.",
-      "rejectedLanguage": "Function - {index}: \"{name}\" was rejected. If it is a JavaScript function, set the language \u2014 a definition with no language is read as VRL.",
+      "rejectedLanguage": "Function - {index}: \"{name}\" was rejected. If it is a JavaScript function, set the language — a definition with no language is read as VRL.",
       "jsonStringEmpty": "JSON string is empty",
       "invalidJsonFormat": "Invalid JSON format",
       "importSuccess": "Imported {count} function | Imported {count} functions",
@@ -9250,6 +9250,62 @@
         "title": "Status corrections:",
         "item": "{name} ({status})",
         "shorterThanSlice": "shorter than the SLO's slice, no minutes corrected"
+      },
+      "notify": {
+        "title": "Notify",
+        "caption": "Tell destinations about the downtime itself: when it starts, before it ends and when it ends.",
+        "destinations": "Destinations",
+        "lead": "Remind before the end",
+        "leadHelp": "For example 10m or 1h, between 1 minute and the window length.",
+        "regionNote": "In a super cluster, the region where the downtime was created sends these. A downtime created before this setting existed sends from every region.",
+        "tab": "Notifications",
+        "events": {
+          "started": "When it starts",
+          "startedHelp": "One message as each window begins.",
+          "ending_soon": "Before it ends",
+          "ending_soonHelp": "A reminder ahead of the end, so nobody is surprised when alerts notify again.",
+          "ended": "When it ends",
+          "endedHelp": "One message as each window closes.",
+          "cancelled": "When it is cancelled",
+          "cancelledHelp": "Sent at once when someone ends or calls off the downtime.",
+          "extended": "When it is extended",
+          "extendedHelp": "Sent at once with the new end."
+        },
+        "validation": {
+          "tooMany": "At most {max} destinations can be notified.",
+          "eventRequired": "Choose at least one event, or remove the destinations.",
+          "leadInvalid": "The reminder must come between 1 minute and the window length before the end."
+        },
+        "summary": {
+          "none": "Sends no notifications of its own.",
+          "sentence": "Notifies {destinations}: {events}.",
+          "started": "when it starts",
+          "endingSoon": "{lead} before it ends",
+          "ended": "when it ends",
+          "cancelled": "when it is cancelled",
+          "extended": "when it is extended"
+        },
+        "log": {
+          "time": "Time",
+          "event": "Event",
+          "destinations": "Destinations",
+          "result": "Result",
+          "ok": "Sent",
+          "pending": "Sending",
+          "empty": "No notifications sent yet",
+          "events": {
+            "started": "Started",
+            "ending_soon": "Ending soon",
+            "ended": "Ended",
+            "cancelled": "Cancelled",
+            "extended": "Extended"
+          }
+        },
+        "test": {
+          "send": "Send test",
+          "sent": "Test sent to {count} destination | Test sent to {count} destinations",
+          "failed": "The test did not reach {names}."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} workflow | {count} workflows",
     "countAnomalyDetection": "{count} anomaly detector | {count} anomaly detectors",
     "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
-    "sectionOtherConsumers": "Also used by"
+    "sectionOtherConsumers": "Also used by",
+    "countDowntime": "{count} downtime | {count} downtimes"
   },
   "alert_library": {
     "header": "Alert Library",

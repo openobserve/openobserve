@@ -5487,7 +5487,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -9245,6 +9250,62 @@
         "title": "狀態修正：",
         "item": "{name}（{status}）",
         "shorterThanSlice": "短於 SLO 的切片，未校正任何分鐘"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "向目標告知停機本身：開始時、結束前和結束時。",
+        "destinations": "目標",
+        "lead": "結束前提醒",
+        "leadHelp": "例如 10m 或 1h，介於 1 分鐘和視窗長度之間。",
+        "regionNote": "在超級叢集中，由建立停機的區域傳送。此設定之前建立的停機會從每個區域傳送。",
+        "tab": "通知",
+        "events": {
+          "started": "開始時",
+          "startedHelp": "每個視窗開始時傳送一則訊息。",
+          "ending_soon": "結束前",
+          "ending_soonHelp": "結束前的提醒，警示再次通知時不會讓人意外。",
+          "ended": "結束時",
+          "endedHelp": "每個視窗結束時傳送一則訊息。",
+          "cancelled": "取消時",
+          "cancelledHelp": "有人結束或取消停機時立即傳送。",
+          "extended": "延長時",
+          "extendedHelp": "帶著新的結束時間立即傳送。"
+        },
+        "validation": {
+          "tooMany": "最多可通知 {max} 個目標。",
+          "eventRequired": "請至少選擇一個事件，或移除目標。",
+          "leadInvalid": "提醒必須在結束前 1 分鐘到視窗長度之間。"
+        },
+        "summary": {
+          "none": "不傳送自己的通知。",
+          "sentence": "通知 {destinations}：{events}。",
+          "started": "開始時",
+          "endingSoon": "結束前 {lead}",
+          "ended": "結束時",
+          "cancelled": "取消時",
+          "extended": "延長時"
+        },
+        "log": {
+          "time": "時間",
+          "event": "事件",
+          "destinations": "目標",
+          "result": "結果",
+          "ok": "已傳送",
+          "pending": "傳送中",
+          "empty": "尚未傳送通知",
+          "events": {
+            "started": "已開始",
+            "ending_soon": "即將結束",
+            "ended": "已結束",
+            "cancelled": "已取消",
+            "extended": "已延長"
+          }
+        },
+        "test": {
+          "send": "傳送測試",
+          "sent": "已向 {count} 個目標傳送測試 | 已向 {count} 個目標傳送測試",
+          "failed": "測試未送達 {names}。"
+        }
       }
     }
   },
@@ -9283,7 +9344,8 @@
     "countWorkflow": "{count} 個工作流程 | {count} 個工作流程",
     "countAnomalyDetection": "{count} 個異常偵測器 | {count} 個異常偵測器",
     "countIncidentIntegration": "{count} 個事件整合 | {count} 個事件整合",
-    "sectionOtherConsumers": "也用於"
+    "sectionOtherConsumers": "也用於",
+    "countDowntime": "{count} 個停機 | {count} 個停機"
   },
   "alert_library": {
     "header": "警示庫",

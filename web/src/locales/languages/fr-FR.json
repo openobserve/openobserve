@@ -9250,6 +9250,62 @@
         "title": "Corrections de statut :",
         "item": "{name} ({status})",
         "shorterThanSlice": "plus court que l'intervalle du SLO, aucune minute corrigée"
+      },
+      "notify": {
+        "title": "Notifier",
+        "caption": "Informer les destinations de l'arrêt planifié lui-même : à son début, avant sa fin et à sa fin.",
+        "destinations": "Destinations",
+        "lead": "Rappeler avant la fin",
+        "leadHelp": "Par exemple 10m ou 1h, entre 1 minute et la durée de la fenêtre.",
+        "regionNote": "Dans un super cluster, la région où l'arrêt planifié a été créé envoie ces messages. Un arrêt créé avant ce réglage envoie depuis chaque région.",
+        "tab": "Notifications",
+        "events": {
+          "started": "À son début",
+          "startedHelp": "Un message au début de chaque fenêtre.",
+          "ending_soon": "Avant sa fin",
+          "ending_soonHelp": "Un rappel avant la fin, pour que personne ne soit surpris quand les alertes notifient de nouveau.",
+          "ended": "À sa fin",
+          "endedHelp": "Un message à la fermeture de chaque fenêtre.",
+          "cancelled": "À son annulation",
+          "cancelledHelp": "Envoyé aussitôt quand quelqu'un termine ou annule l'arrêt planifié.",
+          "extended": "À sa prolongation",
+          "extendedHelp": "Envoyé aussitôt avec la nouvelle fin."
+        },
+        "validation": {
+          "tooMany": "Au plus {max} destinations peuvent être notifiées.",
+          "eventRequired": "Choisissez au moins un événement, ou retirez les destinations.",
+          "leadInvalid": "Le rappel doit arriver entre 1 minute et la durée de la fenêtre avant la fin."
+        },
+        "summary": {
+          "none": "N'envoie aucune notification propre.",
+          "sentence": "Notifie {destinations} : {events}.",
+          "started": "à son début",
+          "endingSoon": "{lead} avant sa fin",
+          "ended": "à sa fin",
+          "cancelled": "à son annulation",
+          "extended": "à sa prolongation"
+        },
+        "log": {
+          "time": "Heure",
+          "event": "Événement",
+          "destinations": "Destinations",
+          "result": "Résultat",
+          "ok": "Envoyé",
+          "pending": "Envoi en cours",
+          "empty": "Aucune notification envoyée pour l'instant",
+          "events": {
+            "started": "Commencé",
+            "ending_soon": "Se termine bientôt",
+            "ended": "Terminé",
+            "cancelled": "Annulé",
+            "extended": "Prolongé"
+          }
+        },
+        "test": {
+          "send": "Envoyer un test",
+          "sent": "Test envoyé à {count} destination | Test envoyé à {count} destinations",
+          "failed": "Le test n'a pas atteint {names}."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} workflow | {count} workflows",
     "countAnomalyDetection": "{count} détecteur d'anomalies | {count} détecteurs d'anomalies",
     "countIncidentIntegration": "{count} intégration d'incident | {count} intégrations d'incident",
-    "sectionOtherConsumers": "Aussi utilisé par"
+    "sectionOtherConsumers": "Aussi utilisé par",
+    "countDowntime": "{count} arrêt planifié | {count} arrêts planifiés"
   },
   "alert_library": {
     "header": "Bibliothèque d'alertes",

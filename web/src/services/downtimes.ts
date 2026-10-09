@@ -52,6 +52,26 @@ export interface DowntimeSchedule {
   weekdays: number[];
 }
 
+export type NotificationEvent = "started" | "ending_soon" | "ended" | "cancelled" | "extended";
+
+export type NotificationEvents = Record<NotificationEvent, boolean>;
+
+export interface DowntimeNotifications {
+  destinations: string[];
+  events: NotificationEvents;
+  ending_soon_lead_secs: number;
+  /** Set by the server on an extension follow-up: the id of the downtime it continues. */
+  continues?: string;
+}
+
+export interface DowntimeNotificationLogEntry {
+  window_start: number;
+  event: NotificationEvent;
+  sent_at: number;
+  destinations: string[];
+  result?: string;
+}
+
 export interface Downtime {
   id: string;
   org: string;
@@ -64,6 +84,8 @@ export interface Downtime {
   cancelled_at?: number;
   cancelled_by?: string;
   show_banner: boolean;
+  notifications?: DowntimeNotifications;
+  origin_region?: string;
   created_by: string;
   created_at: number;
   updated_by: string;
@@ -117,6 +139,7 @@ export interface DowntimeAffected {
 
 export interface DowntimeDetail extends DowntimeListItem {
   affected: DowntimeAffected;
+  notification_log?: DowntimeNotificationLogEntry[];
 }
 
 export interface DowntimeRequest {
@@ -127,6 +150,7 @@ export interface DowntimeRequest {
   targets: DowntimeTarget[];
   schedule: DowntimeSchedule;
   show_banner: boolean;
+  notifications?: DowntimeNotifications;
 }
 
 /** Exactly one of the two. */

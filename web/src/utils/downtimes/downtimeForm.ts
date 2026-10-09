@@ -17,10 +17,12 @@ import type { I18nKey, TranslateFn } from "@/types/i18n";
 import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 import type {
   Downtime,
+  DowntimeNotifications,
   DowntimeRequest,
   DowntimeSchedule,
   DowntimeTarget,
   IncidentMode,
+  NotificationEvent,
   Repeat,
   SloCorrectionMode,
   TargetModule,
@@ -58,6 +60,17 @@ const AUTO_NAME_ALL_KEYS = {
   slos: "alerts.downtimes.autoName.all.slos",
 } as const satisfies Record<TargetModule, I18nKey>;
 
+export const NOTIFICATION_EVENTS: NotificationEvent[] = [
+  "started",
+  "ending_soon",
+  "ended",
+  "cancelled",
+  "extended",
+];
+
+export const DEFAULT_LEAD_SECS = 600;
+export const MAX_NOTIFY_DESTINATIONS = 10;
+
 export interface TargetFormValues {
   folders: string[];
   tags_open: boolean;
@@ -80,6 +93,11 @@ export interface ScheduleFormValues {
   timezone: string;
 }
 
+export interface NotifyFormValues extends Record<NotificationEvent, boolean> {
+  destinations: string[];
+  lead: string;
+}
+
 export interface DowntimeFormValues extends Record<string, unknown> {
   name: string;
   folder_id: string;
@@ -90,6 +108,7 @@ export interface DowntimeFormValues extends Record<string, unknown> {
   schedule: ScheduleFormValues;
   reason: string;
   show_banner: boolean;
+  notifications: NotifyFormValues;
 }
 
 /** What a row action already knows, read from the create page's query string. */
@@ -122,6 +141,16 @@ export function nextFullHourMs(nowMs: number, timezone: string): number {
   return Math.ceil(nowMs / HOUR_MS) * HOUR_MS;
 }
 
+const emptyNotify = (): NotifyFormValues => ({
+  destinations: [],
+  started: false,
+  ending_soon: false,
+  ended: false,
+  cancelled: false,
+  extended: false,
+  lead: durationInput(DEFAULT_LEAD_SECS),
+});
+
 /** A new downtime: once, from the next full hour for one hour, in the viewer's zone. */
 export function defaultDowntimeValues(nowMs: number, timezone: string): DowntimeFormValues {
   const nextHour = nextFullHourMs(nowMs, timezone);
@@ -152,6 +181,7 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
     },
     reason: "",
     show_banner: true,
+    notifications: emptyNotify(),
   };
 }
 
@@ -177,6 +207,13 @@ export function scheduleForRepeat(
   const weekdays =
     repeat === "weekly" && s.weekdays.length === 0 ? [isoWeekday(today)] : [...s.weekdays];
   return { ...s, repeat, start_date: today, weekdays };
+}
+
+export function notifyAfterPick(prev: NotifyFormValues, destinations: string[]): NotifyFormValues {
+  const first = prev.destinations.length === 0 && destinations.length > 0;
+  const anyOn = NOTIFICATION_EVENTS.some((e) => prev[e]);
+  if (!first || anyOn) return { ...prev, destinations };
+  return { ...prev, destinations, ending_soon: true, ended: true };
 }
 
 /** A row action pre-fills one module, all folders unless it passed some, and its ids. */
@@ -270,6 +307,21 @@ export function buildSchedule(s: ScheduleFormValues): DowntimeSchedule {
   };
 }
 
+export function buildNotifications(n: NotifyFormValues): DowntimeNotifications | undefined {
+  if (n.destinations.length === 0) return undefined;
+  return {
+    destinations: [...n.destinations],
+    events: {
+      started: n.started,
+      ending_soon: n.ending_soon,
+      ended: n.ended,
+      cancelled: n.cancelled,
+      extended: n.extended,
+    },
+    ending_soon_lead_secs: parseDuration(n.lead) ?? DEFAULT_LEAD_SECS,
+  };
+}
+
 /** The request body, with explicit keys: schema-only helpers never reach the API. */
 export function buildDowntimeRequest(values: DowntimeFormValues): DowntimeRequest {
   const body: DowntimeRequest = {
@@ -284,8 +336,23 @@ export function buildDowntimeRequest(values: DowntimeFormValues): DowntimeReques
   if (reason) body.reason = reason;
   const condition = buildCondition(values);
   if (condition) body.condition = condition;
+  const notifications = buildNotifications(values.notifications);
+  if (notifications) body.notifications = notifications;
   return body;
 }
+
+const notifyValues = (n: DowntimeNotifications | undefined): NotifyFormValues => {
+  if (!n) return emptyNotify();
+  return {
+    destinations: [...n.destinations],
+    started: !!n.events.started,
+    ending_soon: !!n.events.ending_soon,
+    ended: !!n.events.ended,
+    cancelled: !!n.events.cancelled,
+    extended: !!n.events.extended,
+    lead: durationInput(n.ending_soon_lead_secs),
+  };
+};
 
 const scheduleValues = (s: DowntimeSchedule): ScheduleFormValues => {
   const start = utcMicrosToLocal(s.starts_at, s.timezone);
@@ -335,6 +402,7 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
     schedule: scheduleValues(d.schedule),
     reason: d.reason ?? "",
     show_banner: d.show_banner,
+    notifications: notifyValues(d.notifications),
   };
 }
 

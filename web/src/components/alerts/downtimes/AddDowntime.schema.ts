@@ -20,8 +20,11 @@ import { builderToCondition } from "@/utils/downtimes/conditionBridge";
 import { conditionError } from "@/utils/downtimes/conditionRules";
 import {
   ALL_FOLDERS,
+  MAX_NOTIFY_DESTINATIONS,
+  NOTIFICATION_EVENTS,
   hasIdentity,
   type DowntimeFormValues,
+  type NotifyFormValues,
   type ScheduleFormValues,
 } from "@/utils/downtimes/downtimeForm";
 import {
@@ -52,6 +55,16 @@ const targetSchema = z.object({
   ids: z.array(z.string()),
   slo_mode: z.enum(["exclude", "count_as_good"]),
   incident_mode: z.enum(["muted", "none"]),
+});
+
+const notifySchema = z.object({
+  destinations: z.array(z.string()),
+  started: z.boolean(),
+  ending_soon: z.boolean(),
+  ended: z.boolean(),
+  cancelled: z.boolean(),
+  extended: z.boolean(),
+  lead: z.string(),
 });
 
 const scheduleSchema = z.object({
@@ -187,6 +200,40 @@ const recurringIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
   return issues;
 };
 
+const windowSecs = (s: ScheduleFormValues): number | null => {
+  if (s.repeat !== "none") return parseDuration(s.duration);
+  const start = localToUtcMicros(s.start_date, s.start_time, s.timezone);
+  const end = localToUtcMicros(s.end_date, s.end_time, s.timezone);
+  return start === null || end === null ? null : (end - start) / 1_000_000;
+};
+
+const notifyIssues = (n: NotifyFormValues, s: ScheduleFormValues, t: TranslateFn): Issue[] => {
+  if (n.destinations.length === 0) return [];
+  const issues: Issue[] = [];
+  if (n.destinations.length > MAX_NOTIFY_DESTINATIONS) {
+    issues.push({
+      path: ["notifications", "destinations"],
+      message: t("alerts.downtimes.notify.validation.tooMany", { max: MAX_NOTIFY_DESTINATIONS }),
+    });
+  }
+  if (!NOTIFICATION_EVENTS.some((e) => n[e])) {
+    issues.push({
+      path: ["notifications", "started"],
+      message: t("alerts.downtimes.notify.validation.eventRequired"),
+    });
+  }
+  const lead = parseDuration(n.lead);
+  const window = windowSecs(s);
+  const outside = lead === null || lead < MIN_DURATION_SECS || (window !== null && lead > window);
+  if (n.ending_soon && outside) {
+    issues.push({
+      path: ["notifications", "lead"],
+      message: t("alerts.downtimes.notify.validation.leadInvalid"),
+    });
+  }
+  return issues;
+};
+
 const scheduleIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
   if (!s.timezone) {
     return [
@@ -217,6 +264,7 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
       schedule: scheduleSchema,
       reason: z.string(),
       show_banner: z.boolean(),
+      notifications: notifySchema,
     })
     .superRefine((raw, zctx) => {
       const v = raw as DowntimeFormValues;
@@ -224,6 +272,7 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
         ...targetIssues(v, t, ctx),
         ...conditionIssues(v, t),
         ...scheduleIssues(v.schedule, t),
+        ...notifyIssues(v.notifications, v.schedule, t),
       ];
       for (const issue of issues) zctx.addIssue({ code: "custom", ...issue });
     });
@@ -233,7 +282,7 @@ export function tabForPath(
   path: readonly (string | number)[],
 ): "targets" | "schedule" | "advanced" {
   const head = String(path[0] ?? "");
-  if (head === "schedule") return "schedule";
+  if (head === "schedule" || head === "notifications") return "schedule";
   if (head === "reason" || head === "show_banner") return "advanced";
   return "targets";
 }

@@ -9250,6 +9250,62 @@
         "title": "Statuskorrekturen:",
         "item": "{name} ({status})",
         "shorterThanSlice": "kürzer als das Intervall des SLO, keine Minuten korrigiert"
+      },
+      "notify": {
+        "title": "Benachrichtigen",
+        "caption": "Ziele über die Ausfallzeit selbst informieren: wenn sie beginnt, bevor sie endet und wenn sie endet.",
+        "destinations": "Ziele",
+        "lead": "Vor dem Ende erinnern",
+        "leadHelp": "Zum Beispiel 10m oder 1h, zwischen 1 Minute und der Fensterlänge.",
+        "regionNote": "In einem Super-Cluster sendet die Region, in der die Ausfallzeit erstellt wurde. Eine Ausfallzeit, die vor dieser Einstellung erstellt wurde, sendet aus jeder Region.",
+        "tab": "Benachrichtigungen",
+        "events": {
+          "started": "Wenn sie beginnt",
+          "startedHelp": "Eine Nachricht, wenn jedes Fenster beginnt.",
+          "ending_soon": "Bevor sie endet",
+          "ending_soonHelp": "Eine Erinnerung vor dem Ende, damit niemand überrascht ist, wenn Alarme wieder benachrichtigen.",
+          "ended": "Wenn sie endet",
+          "endedHelp": "Eine Nachricht, wenn jedes Fenster endet.",
+          "cancelled": "Wenn sie abgebrochen wird",
+          "cancelledHelp": "Wird sofort gesendet, wenn jemand die Ausfallzeit beendet oder absagt.",
+          "extended": "Wenn sie verlängert wird",
+          "extendedHelp": "Wird sofort mit dem neuen Ende gesendet."
+        },
+        "validation": {
+          "tooMany": "Höchstens {max} Ziele können benachrichtigt werden.",
+          "eventRequired": "Wählen Sie mindestens ein Ereignis oder entfernen Sie die Ziele.",
+          "leadInvalid": "Die Erinnerung muss zwischen 1 Minute und der Fensterlänge vor dem Ende kommen."
+        },
+        "summary": {
+          "none": "Sendet keine eigenen Benachrichtigungen.",
+          "sentence": "Benachrichtigt {destinations}: {events}.",
+          "started": "wenn sie beginnt",
+          "endingSoon": "{lead} vor dem Ende",
+          "ended": "wenn sie endet",
+          "cancelled": "wenn sie abgebrochen wird",
+          "extended": "wenn sie verlängert wird"
+        },
+        "log": {
+          "time": "Zeit",
+          "event": "Ereignis",
+          "destinations": "Ziele",
+          "result": "Ergebnis",
+          "ok": "Gesendet",
+          "pending": "Wird gesendet",
+          "empty": "Noch keine Benachrichtigungen gesendet",
+          "events": {
+            "started": "Begonnen",
+            "ending_soon": "Endet bald",
+            "ended": "Beendet",
+            "cancelled": "Abgebrochen",
+            "extended": "Verlängert"
+          }
+        },
+        "test": {
+          "send": "Test senden",
+          "sent": "Test an {count} Ziel gesendet | Test an {count} Ziele gesendet",
+          "failed": "Der Test hat {names} nicht erreicht."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} Workflow | {count} Workflows",
     "countAnomalyDetection": "{count} Anomalie-Detektor | {count} Anomalie-Detektoren",
     "countIncidentIntegration": "{count} Vorfall-Integration | {count} Vorfall-Integrationen",
-    "sectionOtherConsumers": "Wird auch verwendet von"
+    "sectionOtherConsumers": "Wird auch verwendet von",
+    "countDowntime": "{count} Ausfallzeit | {count} Ausfallzeiten"
   },
   "alert_library": {
     "header": "Alarm-Bibliothek",

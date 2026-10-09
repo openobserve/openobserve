@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { DowntimeRequest } from "@/services/downtimes";
-import { completePairs, summarySentence } from "./summary";
+import { completePairs, notifySentence, summarySentence } from "./summary";
 
 const flow1: DowntimeRequest = {
   folder_id: "planned-maintenance",
@@ -94,5 +94,46 @@ describe("summarySentence", () => {
       "alerts with service=payments stop notifying.",
     );
     expect(completePairs({ type: "pair", key: "host", operator: "=", value: "" })).toBeNull();
+  });
+});
+
+describe("notifySentence", () => {
+  it("says a row without destinations notifies nobody", () => {
+    expect(notifySentence(undefined, gt)).toBe("Sends no notifications of its own.");
+    expect(
+      notifySentence(
+        {
+          destinations: [],
+          events: {
+            started: true,
+            ending_soon: false,
+            ended: false,
+            cancelled: false,
+            extended: false,
+          },
+          ending_soon_lead_secs: 600,
+        },
+        gt,
+      ),
+    ).toBe("Sends no notifications of its own.");
+  });
+
+  it("lists the destinations and the events in order, with the lead", () => {
+    expect(
+      notifySentence(
+        {
+          destinations: ["slack-oncall", "pd"],
+          events: {
+            started: false,
+            ending_soon: true,
+            ended: true,
+            cancelled: true,
+            extended: false,
+          },
+          ending_soon_lead_secs: 600,
+        },
+        gt,
+      ),
+    ).toBe("Notifies slack-oncall, pd: 10 min before it ends, when it ends, when it is cancelled.");
   });
 });

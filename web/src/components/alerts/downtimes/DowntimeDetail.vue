@@ -96,6 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.downtimes.detail.suppressed', { count: suppressedTotal })"
           data-test="downtime-detail-tab-suppressed"
         />
+        <OTab
+          name="notifications"
+          :label="t('alerts.downtimes.notify.tab')"
+          data-test="downtime-detail-tab-notifications"
+        />
       </OTabs>
     </template>
 
@@ -234,6 +239,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
+      <template v-else-if="activeTab === 'notifications'">
+        <section class="flex flex-col gap-2" data-test="downtime-detail-notifications">
+          <div class="flex items-center gap-2">
+            <span class="text-text-secondary min-w-0 flex-1 text-xs">
+              {{ notifySentence(downtime.notifications, t) }}
+            </span>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-left="send"
+              :disabled="testDestinations.length === 0"
+              :loading="testMutation.isPending.value"
+              data-test="downtime-detail-send-test"
+              @click="sendTest"
+            >
+              {{ t("alerts.downtimes.notify.test.send") }}
+            </OButton>
+          </div>
+          <OTable
+            :data="notificationRows"
+            :columns="notificationColumns"
+            row-key="key"
+            :fill-height="false"
+            :show-global-filter="false"
+            :page-size="20"
+            :page-size-options="[20, 50]"
+            data-test="downtime-detail-notifications-table"
+          >
+            <template #cell-sent_at="{ row }">
+              <OTimeCell :value="row.sent_at" unit="us" :timezone="viewerZone" />
+            </template>
+            <template #cell-result="{ row }">
+              <span :class="row.failed ? 'text-status-error-text' : 'text-text-body'">
+                {{ row.result }}
+              </span>
+            </template>
+            <template #empty>
+              <div data-test="downtime-detail-notifications-empty">
+                <OEmptyState
+                  size="block"
+                  illustration="history"
+                  :title="t('alerts.downtimes.notify.log.empty')"
+                />
+              </div>
+            </template>
+          </OTable>
+        </section>
+      </template>
+
       <template v-else>
         <OTable
           :data="suppressedRows"
@@ -305,7 +359,16 @@ import {
   downtimeDetailQuery,
   quickMuteMutation,
 } from "@/services/downtimes.queries";
-import type { PreviewMatch, TargetModule } from "@/services/downtimes";
+import type {
+  DowntimeNotificationLogEntry,
+  NotificationEvent,
+  PreviewMatch,
+  TargetModule,
+} from "@/services/downtimes";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { sendDowntimeTestMutation } from "@/services/downtimes.queries";
+import { notifySentence } from "@/utils/downtimes/summary";
+import type { TestDestination } from "@/utils/downtimes/notifyTest";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
@@ -346,7 +409,7 @@ import { isEditable } from "@/utils/downtimes/listOrder";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
 import { browserTimezone } from "@/utils/timezoneAliases";
 
-type DetailTab = "overview" | "affected" | "suppressed";
+type DetailTab = "overview" | "affected" | "suppressed" | "notifications";
 
 const HOUR_MICROS = 3600 * 1_000_000;
 const HISTORY_DAYS = 90;
@@ -541,6 +604,95 @@ const suppressedColumns = computed<OTableColumnDef[]>(() => [
   },
   { id: "status", accessorKey: "status", header: t("alerts.downtimes.columns.status"), size: 140 },
 ]);
+
+const EVENT_LABEL_KEYS = {
+  started: "alerts.downtimes.notify.log.events.started",
+  ending_soon: "alerts.downtimes.notify.log.events.ending_soon",
+  ended: "alerts.downtimes.notify.log.events.ended",
+  cancelled: "alerts.downtimes.notify.log.events.cancelled",
+  extended: "alerts.downtimes.notify.log.events.extended",
+} as const satisfies Record<NotificationEvent, I18nKey>;
+
+const RESULT_OK = "ok";
+
+const resultText = (entry: DowntimeNotificationLogEntry): I18nText => {
+  if (entry.result === undefined || entry.result === null) {
+    return t("alerts.downtimes.notify.log.pending");
+  }
+  return entry.result === RESULT_OK ? t("alerts.downtimes.notify.log.ok") : raw(entry.result);
+};
+
+const notificationRows = computed(() =>
+  (downtime.value?.notification_log ?? []).map((entry, index) => ({
+    key: `${entry.sent_at}-${entry.event}-${index}`,
+    sent_at: entry.sent_at,
+    event: EVENT_LABEL_KEYS[entry.event] ? t(EVENT_LABEL_KEYS[entry.event]) : raw(entry.event),
+    destinations: raw(entry.destinations.join(", ")),
+    result: resultText(entry),
+    failed: !!entry.result && entry.result !== RESULT_OK,
+  })),
+);
+
+const notificationColumns = computed<OTableColumnDef[]>(() => [
+  {
+    id: "sent_at",
+    accessorKey: "sent_at",
+    header: t("alerts.downtimes.notify.log.time"),
+    cell: " ",
+    sortable: true,
+    size: 200,
+  },
+  { id: "event", accessorKey: "event", header: t("alerts.downtimes.notify.log.event"), size: 160 },
+  {
+    id: "destinations",
+    accessorKey: "destinations",
+    header: t("alerts.downtimes.notify.log.destinations"),
+    size: 240,
+  },
+  {
+    id: "result",
+    accessorKey: "result",
+    header: t("alerts.downtimes.notify.log.result"),
+    cell: " ",
+    size: 320,
+    meta: { flex: true },
+  },
+]);
+
+const testMutation = useMutation(() => sendDowntimeTestMutation(orgId.value));
+const alertDestinations = useQuery(() =>
+  Object.assign(destinationsQuery(orgId.value, "alert"), {
+    enabled: !!orgId.value && !!downtime.value?.notifications?.destinations.length,
+  }),
+);
+const testDestinations = computed<TestDestination[]>(() => {
+  const names = downtime.value?.notifications?.destinations ?? [];
+  const known: TestDestination[] = alertDestinations.data.value ?? [];
+  return names.flatMap((name) => known.filter((d) => d.name === name));
+});
+
+const sendTest = async () => {
+  const d = downtime.value;
+  if (!d) return;
+  const href = router.resolve({ name: "downtimes", query: orgQuery() }).href;
+  const results = await testMutation.mutateAsync({
+    downtime: d,
+    destinations: testDestinations.value,
+    url: `${window.location.origin}${href}`,
+  });
+  const failed = results.filter((r) => !r.ok).map((r) => r.destination);
+  if (failed.length === 0) {
+    toast({
+      variant: "success",
+      message: t("alerts.downtimes.notify.test.sent", { count: results.length }, results.length),
+    });
+    return;
+  }
+  toast({
+    variant: "error",
+    message: t("alerts.downtimes.notify.test.failed", { names: failed.join(", ") }),
+  });
+};
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 const orgQuery = () => ({ org_identifier: orgId.value });

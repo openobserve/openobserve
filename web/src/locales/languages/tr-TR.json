@@ -9250,6 +9250,62 @@
         "title": "Durum düzeltmeleri:",
         "item": "{name} ({status})",
         "shorterThanSlice": "SLO diliminden kısa, hiçbir dakika düzeltilmedi"
+      },
+      "notify": {
+        "title": "Bildir",
+        "caption": "Hedeflere kesinti süresinin kendisini bildirin: başladığında, bitmeden önce ve bittiğinde.",
+        "destinations": "Hedefler",
+        "lead": "Bitişten önce hatırlat",
+        "leadHelp": "Örneğin 10m veya 1h, 1 dakika ile pencere uzunluğu arasında.",
+        "regionNote": "Süper kümede, kesinti süresinin oluşturulduğu bölge gönderir. Bu ayardan önce oluşturulan bir kesinti süresi her bölgeden gönderir.",
+        "tab": "Bildirimler",
+        "events": {
+          "started": "Başladığında",
+          "startedHelp": "Her pencere başlarken bir ileti.",
+          "ending_soon": "Bitmeden önce",
+          "ending_soonHelp": "Bitişten önce bir hatırlatma; uyarılar yeniden bildirim gönderdiğinde kimse şaşırmaz.",
+          "ended": "Bittiğinde",
+          "endedHelp": "Her pencere kapanırken bir ileti.",
+          "cancelled": "İptal edildiğinde",
+          "cancelledHelp": "Biri kesinti süresini bitirdiğinde veya iptal ettiğinde hemen gönderilir.",
+          "extended": "Uzatıldığında",
+          "extendedHelp": "Yeni bitişle birlikte hemen gönderilir."
+        },
+        "validation": {
+          "tooMany": "En fazla {max} hedef bildirilebilir.",
+          "eventRequired": "En az bir olay seçin veya hedefleri kaldırın.",
+          "leadInvalid": "Hatırlatma, bitişten 1 dakika ile pencere uzunluğu kadar önce arasında gelmelidir."
+        },
+        "summary": {
+          "none": "Kendi bildirimini göndermez.",
+          "sentence": "{destinations} hedeflerini bildirir: {events}.",
+          "started": "başladığında",
+          "endingSoon": "bitişten {lead} önce",
+          "ended": "bittiğinde",
+          "cancelled": "iptal edildiğinde",
+          "extended": "uzatıldığında"
+        },
+        "log": {
+          "time": "Zaman",
+          "event": "Olay",
+          "destinations": "Hedefler",
+          "result": "Sonuç",
+          "ok": "Gönderildi",
+          "pending": "Gönderiliyor",
+          "empty": "Henüz bildirim gönderilmedi",
+          "events": {
+            "started": "Başladı",
+            "ending_soon": "Yakında bitiyor",
+            "ended": "Bitti",
+            "cancelled": "İptal edildi",
+            "extended": "Uzatıldı"
+          }
+        },
+        "test": {
+          "send": "Test gönder",
+          "sent": "Test {count} hedefe gönderildi | Test {count} hedefe gönderildi",
+          "failed": "Test {names} hedefine ulaşmadı."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} iş akışı | {count} iş akışı",
     "countAnomalyDetection": "{count} anomali dedektörü | {count} anomali dedektörü",
     "countIncidentIntegration": "{count} olay entegrasyonu | {count} olay entegrasyonu",
-    "sectionOtherConsumers": "Ayrıca kullananlar"
+    "sectionOtherConsumers": "Ayrıca kullananlar",
+    "countDowntime": "{count} kesinti süresi | {count} kesinti süresi"
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",

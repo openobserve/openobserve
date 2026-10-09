@@ -19,6 +19,7 @@ mod access;
 pub mod inventory;
 pub mod listing;
 pub mod matching;
+pub mod notify;
 pub mod resources;
 pub mod values;
 
@@ -32,10 +33,10 @@ use config::{
     meta::{
         downtimes::{
             AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
-            DowntimeRequest, DowntimeSchedule, DowntimeStatus, DowntimeWindow,
-            ExtendDowntimeRequest, ExtendDowntimeResponse, MoveDowntimesRequest, PreviewMatch,
-            PreviewRequest, PreviewResponse, Repeat, ResourcesRequest, ResourcesResponse,
-            TargetModule, ValuesRequest, ValuesResponse,
+            DowntimeNotifications, DowntimeRequest, DowntimeSchedule, DowntimeStatus,
+            DowntimeWindow, ExtendDowntimeRequest, ExtendDowntimeResponse, MoveDowntimesRequest,
+            NotificationEvent, PreviewMatch, PreviewRequest, PreviewResponse, Repeat,
+            ResourcesRequest, ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -44,14 +45,20 @@ use config::{
 use o2_enterprise::enterprise::{
     announcements::meta::{Banner, BannerCount, BannerCta, BannerVariant},
     common::config::get_config as get_o2_config,
-    downtimes::{MAX_NAME_LEN, banner_message, generated_name, schedule, scope, validate},
+    downtimes::{
+        MAX_NAME_LEN, MAX_NOTIFY_DESTINATIONS, banner_message, generated_name, schedule, scope,
+        validate, validate_notifications,
+    },
     oncall::routing::normalize_value,
 };
 use serde::Serialize;
 use utoipa::ToSchema;
 
 pub use self::listing::{ListQuery, ListResponse};
-use self::matching::{Inventory, Matches, Visibility};
+use self::{
+    matching::{Inventory, Matches, Visibility},
+    notify::DueEvent,
+};
 
 /// Match counts are recomputed at most this often per downtime.
 const MATCH_COUNTS_TTL: Duration = Duration::from_secs(60);
@@ -62,7 +69,6 @@ const MAX_MOVE_IDS: usize = 100;
 const MICROS_PER_SEC: i64 = 1_000_000;
 /// Appended to the name of the one-time row that extends a recurring one.
 const EXTENDED_SUFFIX: &str = " (extended)";
-
 /// The order modules are listed in on a combined banner.
 const MODULE_ORDER: [TargetModule; 4] = [
     TargetModule::Alerts,
@@ -191,6 +197,7 @@ pub async fn get(org: &str, user_id: &str, id: &str) -> Result<DowntimeDetail, D
     Ok(DowntimeDetail {
         item: list_item(&row, &counts_of(&matches), now_micros()),
         affected: affected(&matches, &visibility),
+        notification_log: notify::log_for(org, id).await?,
     })
 }
 
@@ -203,7 +210,9 @@ pub async fn create(
     let folder_id = resolve_folder(org, &req.folder_id).await?;
     let req = checked_request(org, user_id, req).await?;
     check_room(org)?;
-    let downtime = created(org, folder_id, &req, user_id, now_micros());
+    let mut downtime = created(org, folder_id, &req, user_id, now_micros());
+    downtime.notifications = with_continues(req.notifications.clone(), None);
+    downtime.origin_region = origin_region();
     db::downtimes::set(&downtime).await?;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
     remeasure_slos(None, &downtime).await;
@@ -221,7 +230,13 @@ pub async fn update(
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
     let req = checked_request(org, user_id, req).await?;
-    let after = edited(&before, req, user_id, now_micros());
+    let continues = before
+        .notifications
+        .as_ref()
+        .and_then(|n| n.continues.clone());
+    let notifications = with_continues(req.notifications.clone(), continues);
+    let mut after = edited(&before, req, user_id, now_micros());
+    after.notifications = notifications;
     set_if_unchanged(&after, before.updated_at).await?;
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.id).await;
@@ -238,8 +253,15 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     if before.cancelled_at.is_some() {
         return Ok(before);
     }
-    let after = cancelled(&before, user_id, now_micros());
+    let now = now_micros();
+    let after = cancelled(&before, user_id, now);
     set_if_unchanged(&after, before.updated_at).await?;
+    if let Some(window) = cancelled_window(&before, now) {
+        notify::deliver_in_background(
+            after.clone(),
+            DueEvent::of_window(NotificationEvent::Cancelled, window),
+        );
+    }
     remeasure_slos(Some(&before), &after).await;
     Ok(after)
 }
@@ -261,6 +283,7 @@ pub async fn extend(
         let after = extended_once(&before, new_end, user_id, now);
         checked_request(org, user_id, request_of(&after)).await?;
         set_if_unchanged(&after, before.updated_at).await?;
+        notify::deliver_in_background(after.clone(), extended_event(window.start, new_end));
         remeasure_slos(Some(&before), &after).await;
         return Ok(ExtendDowntimeResponse {
             downtime: after,
@@ -287,6 +310,7 @@ pub async fn extend(
         return Err(changed_meanwhile());
     }
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&follow_up)).await;
+    notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
     remeasure_slos(None, &follow_up).await;
     Ok(ExtendDowntimeResponse {
         created_id: Some(follow_up.id.clone()),
@@ -424,6 +448,20 @@ pub async fn listable_folders(org: &str, user_id: &str, folders: Vec<Folder>) ->
         .collect()
 }
 
+/// Replicated rows answer this, so every region sees that a follow-up continues `parent`'s window.
+pub fn continues_window(follow_up: &Downtime, parent: &Downtime, window_end: i64, at: i64) -> bool {
+    let continues = follow_up
+        .notifications
+        .as_ref()
+        .and_then(|n| n.continues.as_deref());
+    follow_up.org == parent.org
+        && continues == Some(parent.id.as_str())
+        && schedule::window_at(&follow_up.schedule, window_end).is_some()
+        && follow_up
+            .cancelled_at
+            .is_none_or(|cancelled| cancelled > at)
+}
+
 /// A concurrent edit, cancel or delete since `expected_updated_at` makes this write a 409.
 async fn set_if_unchanged(
     downtime: &Downtime,
@@ -503,6 +541,7 @@ fn check_preview(
             weekdays: vec![],
         },
         show_banner: false,
+        notifications: None,
     };
     validate(&placeholder, groups).map_err(DowntimeError::BadRequest)
 }
@@ -554,6 +593,11 @@ async fn checked_request(
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
     span_as_duration(&mut req.schedule);
+    if let Some(notifications) = &req.notifications {
+        let known = existing_destinations(org, notifications).await?;
+        validate_notifications(notifications, &req.schedule, |name| known.contains(name))
+            .map_err(DowntimeError::BadRequest)?;
+    }
     req.condition = req.condition.as_ref().map(normalized_condition);
     for target in &mut req.targets {
         target.tags = config::meta::alerts::tags::normalize_tags(&target.tags)
@@ -562,6 +606,32 @@ async fn checked_request(
     let inventory = inventory::load(org).await?;
     access::check_targets(org, user_id, &req.targets, &inventory).await?;
     Ok(req)
+}
+
+async fn existing_destinations(
+    org: &str,
+    notifications: &DowntimeNotifications,
+) -> Result<HashSet<String>, DowntimeError> {
+    let mut known = HashSet::new();
+    for name in notifications
+        .destinations
+        .iter()
+        .take(MAX_NOTIFY_DESTINATIONS)
+    {
+        match db::alerts::destinations::get(org, name).await {
+            Ok(dest)
+                if matches!(
+                    dest.module,
+                    config::meta::destinations::Module::Alert { .. }
+                ) =>
+            {
+                known.insert(name.clone());
+            }
+            Ok(_) | Err(db::alerts::destinations::DestinationError::NotFound) => {}
+            Err(e) => return Err(DowntimeError::Internal(e.to_string())),
+        }
+    }
+    Ok(known)
 }
 
 /// Pair values are stored the way ownership rules are, so evaluation needs no case folding.
@@ -678,6 +748,65 @@ fn request_of(row: &Downtime) -> DowntimeRequest {
         targets: row.targets.clone(),
         schedule: row.schedule.clone(),
         show_banner: row.show_banner,
+        notifications: row.notifications.clone(),
+    }
+}
+
+fn origin_region() -> Option<String> {
+    Some(notify::this_region()).filter(|region| !region.is_empty())
+}
+
+fn cancelled_window(row: &Downtime, now: i64) -> Option<DowntimeWindow> {
+    schedule::window_at(&row.schedule, now)
+        .map(|w| DowntimeWindow {
+            start: w.start,
+            end: now,
+        })
+        .or_else(|| schedule::next_window(&row.schedule, now))
+}
+
+/// Each extension is its own event, so it is keyed by its new end rather than the window start.
+fn extended_event(start: i64, new_end: i64) -> DueEvent {
+    DueEvent {
+        event: NotificationEvent::Extended,
+        window: DowntimeWindow {
+            start,
+            end: new_end,
+        },
+        key: new_end,
+    }
+}
+
+/// Always set, even without destinations, because `continues` is what links it to its parent.
+fn follow_up_notifications(parent: &Downtime, window_secs: i64) -> DowntimeNotifications {
+    let own = parent.notifications.clone().unwrap_or_default();
+    let mut events = own.events;
+    events.started = false;
+    let destinations = if events.any() {
+        own.destinations
+    } else {
+        vec![]
+    };
+    DowntimeNotifications {
+        destinations,
+        events,
+        ending_soon_lead_secs: own.ending_soon_lead_secs.min(window_secs),
+        continues: Some(parent.id.clone()),
+    }
+}
+
+/// A request never sets `continues`; an edit keeps the one the row was created with.
+fn with_continues(
+    requested: Option<DowntimeNotifications>,
+    continues: Option<String>,
+) -> Option<DowntimeNotifications> {
+    match (requested, continues) {
+        (Some(n), continues) => Some(DowntimeNotifications { continues, ..n }),
+        (None, Some(continues)) => Some(DowntimeNotifications {
+            continues: Some(continues),
+            ..Default::default()
+        }),
+        (None, None) => None,
     }
 }
 
@@ -732,15 +861,19 @@ fn extended_once(before: &Downtime, new_end: i64, user_id: &str, now: i64) -> Do
 }
 
 /// A one-time row from `start` to `end` that covers what `parent` covers, in its folder.
-fn follow_up(parent: &Downtime, start: i64, end: i64, user_id: &str, now: i64) -> Downtime {
+fn follow_up_name(parent: &Downtime) -> String {
     let base: String = parent
         .name
         .chars()
         .take(MAX_NAME_LEN - EXTENDED_SUFFIX.chars().count())
         .collect();
+    format!("{}{EXTENDED_SUFFIX}", base.trim_end())
+}
+
+fn follow_up(parent: &Downtime, start: i64, end: i64, user_id: &str, now: i64) -> Downtime {
     Downtime {
         id: infra::table::downtimes::new_id(),
-        name: format!("{}{EXTENDED_SUFFIX}", base.trim_end()),
+        name: follow_up_name(parent),
         schedule: DowntimeSchedule {
             repeat: Repeat::None,
             starts_at: start,
@@ -752,8 +885,11 @@ fn follow_up(parent: &Downtime, start: i64, end: i64, user_id: &str, now: i64) -
         },
         cancelled_at: None,
         cancelled_by: None,
-        notifications: None,
-        origin_region: None,
+        notifications: Some(follow_up_notifications(
+            parent,
+            (end - start) / MICROS_PER_SEC,
+        )),
+        origin_region: parent.origin_region.clone(),
         version: 1,
         created_by: user_id.to_string(),
         created_at: now,
@@ -1003,7 +1139,9 @@ fn affected(matches: &Matches, visibility: &Visibility) -> AffectedItems {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::downtimes::{DowntimeTarget, LogicalOp, PairOperator, TargetFolders};
+    use config::meta::downtimes::{
+        DowntimeTarget, LogicalOp, NotificationEvents, PairOperator, TargetFolders,
+    };
 
     use super::{matching::ModuleMatch, *};
 
@@ -1109,6 +1247,7 @@ mod tests {
             targets: d.targets.clone(),
             schedule: d.schedule.clone(),
             show_banner: false,
+            notifications: None,
         };
         assert_eq!(name_of(&req, 0), "All alerts · once 1 Jan");
         let named = DowntimeRequest {
@@ -1460,6 +1599,187 @@ mod tests {
         assert!(next.name.ends_with(EXTENDED_SUFFIX));
     }
 
+    fn notifying(mut d: Downtime, events: NotificationEvents, lead: i64) -> Downtime {
+        d.notifications = Some(DowntimeNotifications {
+            destinations: vec!["slack".to_string()],
+            events,
+            ending_soon_lead_secs: lead,
+            continues: None,
+        });
+        d
+    }
+
+    #[test]
+    fn a_cancel_reports_the_window_it_cut_short_or_the_one_it_called_off() {
+        let d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert_eq!(
+            cancelled_window(&d, 11 * HOUR),
+            Some(window(10 * HOUR, 11 * HOUR))
+        );
+        assert_eq!(
+            cancelled_window(&d, 9 * HOUR),
+            Some(window(10 * HOUR, 12 * HOUR))
+        );
+        let nightly = daily("02:00", 3_600);
+        assert_eq!(
+            cancelled_window(&nightly, 5 * HOUR),
+            Some(window(26 * HOUR, 27 * HOUR))
+        );
+    }
+
+    #[test]
+    fn every_extension_is_keyed_by_its_new_end_so_a_second_one_also_sends() {
+        let first = extended_event(10 * HOUR, 13 * HOUR);
+        let second = extended_event(10 * HOUR, 14 * HOUR);
+        assert_eq!(first.event, NotificationEvent::Extended);
+        assert_eq!(first.window, window(10 * HOUR, 13 * HOUR));
+        assert_ne!(first.key, second.key);
+    }
+
+    #[test]
+    fn a_follow_up_keeps_the_destinations_but_not_the_start_and_fits_the_reminder() {
+        let all = NotificationEvents {
+            started: true,
+            ending_soon: true,
+            ended: true,
+            cancelled: true,
+            extended: true,
+        };
+        let parent = notifying(daily("02:00", 3_600), all, 1_800);
+        let next = follow_up(&parent, 3 * HOUR, 3 * HOUR + 600 * 1_000_000, "ops", 0);
+        let n = next.notifications.clone().unwrap();
+        assert_eq!(n.destinations, ["slack"]);
+        assert!(!n.events.started);
+        assert!(n.events.ending_soon && n.events.ended);
+        assert_eq!(n.ending_soon_lead_secs, 600);
+        assert_eq!(n.continues.as_deref(), Some("d1"));
+        assert_eq!(
+            validate_notifications(&n, &request_of(&next).schedule, |_| true),
+            Ok(())
+        );
+
+        let start_only = NotificationEvents {
+            started: true,
+            ..Default::default()
+        };
+        let quiet = notifying(daily("02:00", 3_600), start_only, 600);
+        for parent in [quiet, daily("02:00", 3_600)] {
+            let next = follow_up(&parent, 3 * HOUR, 4 * HOUR, "ops", 0);
+            let n = next.notifications.clone().unwrap();
+            assert!(n.destinations.is_empty());
+            assert_eq!(n.continues.as_deref(), Some("d1"));
+            assert_eq!(
+                validate_notifications(&n, &request_of(&next).schedule, |_| false),
+                Ok(())
+            );
+        }
+    }
+
+    #[test]
+    fn a_follow_up_continues_its_parents_window_in_every_region() {
+        let mut parent = daily("02:00", 3_600);
+        parent.origin_region = Some("us-east".to_string());
+        let next = follow_up(&parent, 3 * HOUR, 5 * HOUR, "ops", 0);
+        assert_eq!(next.origin_region.as_deref(), Some("us-east"));
+        assert!(continues_window(&next, &parent, 3 * HOUR, 3 * HOUR));
+        assert!(!continues_window(&next, &parent, 27 * HOUR, 27 * HOUR));
+        assert!(!continues_window(&parent, &parent, 3 * HOUR, 3 * HOUR));
+        let mut cancelled = next.clone();
+        cancelled.cancelled_at = Some(2 * HOUR + HOUR / 2);
+        assert!(!continues_window(&cancelled, &parent, 3 * HOUR, 3 * HOUR));
+        assert!(continues_window(
+            &cancelled,
+            &parent,
+            3 * HOUR,
+            2 * HOUR + HOUR / 4
+        ));
+        let mut unrelated = next.clone();
+        unrelated.notifications.as_mut().unwrap().continues = None;
+        assert!(!continues_window(&unrelated, &parent, 3 * HOUR, 3 * HOUR));
+        let mut ended = next.clone();
+        ended.schedule.ends_at = Some(3 * HOUR);
+        assert!(!continues_window(&ended, &parent, 3 * HOUR, 3 * HOUR));
+    }
+
+    #[test]
+    fn a_follow_up_edited_into_a_rule_inactive_at_the_parents_end_does_not_continue_it() {
+        let parent = daily("02:00", 3_600);
+        let next = follow_up(&parent, 3 * HOUR, 5 * HOUR, "ops", 0);
+        assert!(continues_window(&next, &parent, 3 * HOUR, 3 * HOUR));
+        let recurring = Downtime {
+            schedule: DowntimeSchedule {
+                repeat: Repeat::Daily,
+                start_time_local: Some("04:00".to_string()),
+                duration_secs: 3_600,
+                ..next.schedule.clone()
+            },
+            ..next.clone()
+        };
+        assert!(!continues_window(&recurring, &parent, 3 * HOUR, 3 * HOUR));
+        let covering = Downtime {
+            schedule: DowntimeSchedule {
+                start_time_local: Some("03:00".to_string()),
+                ..recurring.schedule.clone()
+            },
+            ..recurring
+        };
+        assert!(continues_window(&covering, &parent, 3 * HOUR, 3 * HOUR));
+    }
+
+    #[test]
+    fn a_renamed_or_moved_follow_up_still_continues_its_parent() {
+        let parent = daily("02:00", 3_600);
+        let next = follow_up(&parent, 3 * HOUR, 5 * HOUR, "ops", 0);
+        let renamed = Downtime {
+            name: "Payments cutover, second hour".to_string(),
+            ..next.clone()
+        };
+        assert!(continues_window(&renamed, &parent, 3 * HOUR, 3 * HOUR));
+        let moved = Downtime {
+            folder_id: "planned".to_string(),
+            ..next.clone()
+        };
+        assert!(continues_window(&moved, &parent, 3 * HOUR, 3 * HOUR));
+        let lookalike = Downtime {
+            id: "other".to_string(),
+            notifications: None,
+            ..next
+        };
+        assert!(!continues_window(&lookalike, &parent, 3 * HOUR, 3 * HOUR));
+    }
+
+    #[test]
+    fn a_request_cannot_set_continues_and_an_edit_keeps_it() {
+        let asked = DowntimeNotifications {
+            continues: Some("someone-else".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            with_continues(Some(asked.clone()), None).unwrap().continues,
+            None
+        );
+        let kept = with_continues(Some(asked), Some("d1".to_string())).unwrap();
+        assert_eq!(kept.continues.as_deref(), Some("d1"));
+        let cleared = with_continues(None, Some("d1".to_string())).unwrap();
+        assert!(cleared.destinations.is_empty());
+        assert_eq!(cleared.continues.as_deref(), Some("d1"));
+        assert_eq!(with_continues(None, None), None);
+    }
+
+    #[test]
+    fn an_edit_request_carries_the_notifications() {
+        let events = NotificationEvents {
+            ended: true,
+            ..Default::default()
+        };
+        let d = notifying(
+            row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR),
+            events,
+            600,
+        );
+        assert_eq!(request_of(&d).notifications, d.notifications);
+    }
+
     fn folder(id: &str) -> Folder {
         Folder {
             folder_id: id.to_string(),
@@ -1639,6 +1959,7 @@ mod tests {
             targets: vec![],
             schedule: row(vec![TargetModule::Alerts], 0, HOUR).schedule,
             show_banner: false,
+            notifications: None,
         };
         let new = created("acme", "default".to_string(), &req, "lin", 5);
         assert_eq!(new.version, 1);

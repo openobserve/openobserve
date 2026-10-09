@@ -38,6 +38,8 @@ mod cloud;
 mod compactor;
 pub mod config_watcher;
 mod db_monitoring;
+#[cfg(feature = "enterprise")]
+mod downtimes;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
@@ -1343,6 +1345,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Nothing else notices a lost escalation timer: the thing that would have is the timer.
     #[cfg(feature = "enterprise")]
     oncall_maintenance::run();
+    #[cfg(feature = "enterprise")]
+    downtimes::run();
     // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
     // failure window where ingestion succeeded but QueueItem status did not.
     #[cfg(feature = "enterprise")]

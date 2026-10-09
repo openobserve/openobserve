@@ -9250,6 +9250,62 @@
         "title": "Correcciones de estado:",
         "item": "{name} ({status})",
         "shorterThanSlice": "más corto que el intervalo del SLO, no se corrigió ningún minuto"
+      },
+      "notify": {
+        "title": "Notificar",
+        "caption": "Informa a los destinos sobre el propio periodo de inactividad: cuando empieza, antes de que termine y cuando termina.",
+        "destinations": "Destinos",
+        "lead": "Recordar antes del final",
+        "leadHelp": "Por ejemplo 10m o 1h, entre 1 minuto y la duración de la ventana.",
+        "regionNote": "En un superclúster, envía la región donde se creó el periodo de inactividad. Uno creado antes de existir este ajuste envía desde todas las regiones.",
+        "tab": "Notificaciones",
+        "events": {
+          "started": "Cuando empieza",
+          "startedHelp": "Un mensaje al comenzar cada ventana.",
+          "ending_soon": "Antes de que termine",
+          "ending_soonHelp": "Un recordatorio antes del final, para que nadie se sorprenda cuando las alertas vuelvan a notificar.",
+          "ended": "Cuando termina",
+          "endedHelp": "Un mensaje al cerrarse cada ventana.",
+          "cancelled": "Cuando se cancela",
+          "cancelledHelp": "Se envía en el acto cuando alguien termina o anula el periodo de inactividad.",
+          "extended": "Cuando se amplía",
+          "extendedHelp": "Se envía en el acto con el nuevo final."
+        },
+        "validation": {
+          "tooMany": "Se pueden notificar como máximo {max} destinos.",
+          "eventRequired": "Elige al menos un evento o quita los destinos.",
+          "leadInvalid": "El recordatorio debe llegar entre 1 minuto y la duración de la ventana antes del final."
+        },
+        "summary": {
+          "none": "No envía notificaciones propias.",
+          "sentence": "Notifica a {destinations}: {events}.",
+          "started": "cuando empieza",
+          "endingSoon": "{lead} antes de que termine",
+          "ended": "cuando termina",
+          "cancelled": "cuando se cancela",
+          "extended": "cuando se amplía"
+        },
+        "log": {
+          "time": "Hora",
+          "event": "Evento",
+          "destinations": "Destinos",
+          "result": "Resultado",
+          "ok": "Enviado",
+          "pending": "Enviando",
+          "empty": "Aún no se ha enviado ninguna notificación",
+          "events": {
+            "started": "Iniciado",
+            "ending_soon": "Termina pronto",
+            "ended": "Terminado",
+            "cancelled": "Cancelado",
+            "extended": "Ampliado"
+          }
+        },
+        "test": {
+          "send": "Enviar prueba",
+          "sent": "Prueba enviada a {count} destino | Prueba enviada a {count} destinos",
+          "failed": "La prueba no llegó a {names}."
+        }
       }
     }
   },
@@ -9288,7 +9344,8 @@
     "countWorkflow": "{count} flujo de trabajo | {count} flujos de trabajo",
     "countAnomalyDetection": "{count} detector de anomalías | {count} detectores de anomalías",
     "countIncidentIntegration": "{count} integración de incidentes | {count} integraciones de incidentes",
-    "sectionOtherConsumers": "También usado por"
+    "sectionOtherConsumers": "También usado por",
+    "countDowntime": "{count} periodo de inactividad | {count} periodos de inactividad"
   },
   "alert_library": {
     "header": "Biblioteca de alertas",

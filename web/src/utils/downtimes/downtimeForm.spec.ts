@@ -9,6 +9,8 @@ import {
   applyPrefill,
   buildDowntimeAutoName,
   buildDowntimeRequest,
+  buildNotifications,
+  notifyAfterPick,
   defaultDowntimeValues,
   downtimeToFormValues,
   exclusiveAllFolders,
@@ -241,5 +243,76 @@ describe("generated name", () => {
     expect(
       buildDowntimeAutoName(defaultDowntimeValues(NOW, "UTC"), gt, undefined, undefined, "en-US"),
     ).toBe("All alerts · once Thu 17 Sep");
+  });
+});
+
+describe("notifications in the form", () => {
+  it("start with no destination and send none", () => {
+    const values = defaultDowntimeValues(NOW, "UTC");
+    expect(values.notifications.destinations).toEqual([]);
+    expect(values.notifications.lead).toBe("10m");
+    expect(buildDowntimeRequest(values).notifications).toBeUndefined();
+  });
+
+  it("turn on the reminder and the end when the first destination is picked", () => {
+    const values = defaultDowntimeValues(NOW, "UTC");
+    const picked = notifyAfterPick(values.notifications, ["slack-oncall"]);
+    expect(picked).toMatchObject({
+      destinations: ["slack-oncall"],
+      started: false,
+      ending_soon: true,
+      ended: true,
+      cancelled: false,
+      extended: false,
+    });
+    const second = notifyAfterPick({ ...picked, ending_soon: false }, ["slack-oncall", "pd"]);
+    expect(second.ending_soon).toBe(false);
+    const chosen = notifyAfterPick({ ...values.notifications, started: true }, ["pd"]);
+    expect(chosen.ending_soon).toBe(false);
+  });
+
+  it("build the request with every event and the lead in seconds", () => {
+    const values = defaultDowntimeValues(NOW, "UTC");
+    values.notifications = {
+      ...notifyAfterPick(values.notifications, ["slack-oncall"]),
+      cancelled: true,
+      lead: "15m",
+    };
+    expect(buildNotifications(values.notifications)).toEqual({
+      destinations: ["slack-oncall"],
+      events: { started: false, ending_soon: true, ended: true, cancelled: true, extended: false },
+      ending_soon_lead_secs: 900,
+    });
+    const body = buildDowntimeRequest(values);
+    expect(body.notifications?.destinations).toEqual(["slack-oncall"]);
+  });
+
+  it("round-trip through a saved row", () => {
+    const saved: Downtime = {
+      ...flow1,
+      notifications: {
+        destinations: ["pd"],
+        events: {
+          started: true,
+          ending_soon: false,
+          ended: true,
+          cancelled: false,
+          extended: true,
+        },
+        ending_soon_lead_secs: 3600,
+      },
+    };
+    const values = downtimeToFormValues(saved);
+    expect(values.notifications).toEqual({
+      destinations: ["pd"],
+      started: true,
+      ending_soon: false,
+      ended: true,
+      cancelled: false,
+      extended: true,
+      lead: "1h",
+    });
+    expect(buildDowntimeRequest(values).notifications).toEqual(saved.notifications);
+    expect(downtimeToFormValues(flow1).notifications.destinations).toEqual([]);
   });
 });

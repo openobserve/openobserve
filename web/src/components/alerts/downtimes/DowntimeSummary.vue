@@ -51,6 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :content="t('alerts.downtimes.summaryPane.largeMatch', { modules: largeModuleNames })"
     />
 
+    <p class="text-text-body text-xs" data-test="downtime-summary-notify">{{ notifyText }}</p>
+
     <div class="flex flex-col gap-1" data-test="downtime-summary-what-happens">
       <span class="text-text-heading text-xs font-semibold">
         {{ t("alerts.downtimes.summaryPane.whatHappens") }}
@@ -69,13 +71,13 @@ import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { DowntimeRequest, TargetModule } from "@/services/downtimes";
 import { currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
-import { summarySentence } from "@/utils/downtimes/summary";
+import { notifySentence, summarySentence } from "@/utils/downtimes/summary";
 import { MODULE_LABEL_KEYS, type FolderNameFn } from "@/utils/downtimes/targetSummary";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 const props = withDefaults(
   defineProps<{
-    request: Pick<DowntimeRequest, "condition" | "targets" | "schedule">;
+    request: Pick<DowntimeRequest, "condition" | "targets" | "schedule" | "notifications">;
     folderLabel: I18nText;
     folderName?: FolderNameFn;
     /** Modules whose match is more than half of their items. */
@@ -87,6 +89,8 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 
 const sentence = computed(() => summarySentence(props.request, t, props.folderName));
+
+const notifyText = computed(() => notifySentence(props.request.notifications, t));
 
 const window = computed(() => currentOrNextWindow(props.request.schedule, Date.now() * 1000));
 
