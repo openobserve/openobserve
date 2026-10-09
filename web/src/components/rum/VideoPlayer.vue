@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :failed-from-ms="failedFromMs"
         :timeline-ms="timelineMs"
         :single-snapshot="singleSnapshot"
+        :multi-tab-hint="anchorMovedForTabs"
         :retry-attempt="retryAttempt"
         @retry="emit('retry')"
       />
@@ -143,6 +144,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="px-1">/</div>
             <div data-test="video-player-duration">{{ playerState.duration }}</div>
           </div>
+          <span
+            v-if="showingLabel"
+            class="border-border-default text-text-body ms-3 max-w-64 truncate rounded-full border px-2 text-xs"
+            :title="shownSwitch?.href"
+            data-test="video-player-showing"
+          >
+            {{ t("rum.sessionReplayShowing", { page: showingLabel }) }}
+          </span>
           <ReplayStatusChip
             class="ms-3"
             :load-state="loadState"
@@ -187,6 +196,7 @@ import {
   onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
+import { useToast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -252,6 +262,7 @@ const props = defineProps({
   skipInactivity: { type: Boolean as PropType<boolean | undefined>, default: undefined },
   intent: { type: String as PropType<ReplayIntent>, default: "pause" },
   watermark: { type: Number, default: Number.POSITIVE_INFINITY },
+  anchorMovedForTabs: { type: Boolean, default: false },
 });
 
 const emit = defineEmits<{
@@ -265,9 +276,12 @@ const emit = defineEmits<{
   "playback-state": [state: PlaybackState];
   "loaded-end-change": [sessionMs: number];
   "segments-taken": [count: number];
+  "tab-notice": [text: string];
 }>();
 
 const { t } = useI18nTyped();
+
+const { toast } = useToast();
 
 const store = useStore();
 
@@ -298,6 +312,7 @@ const multiTab = ref(false);
 // A later batch may carry no Meta record, so the page URL for resolving relative links must outlive one batch.
 let runPageHref: string | undefined;
 let convertedSegmentCount = 0;
+let lastSwitchToastAt = 0;
 let segmentWork: Promise<unknown> = Promise.resolve();
 // rrweb's controller restarts at 0 on play() after a finish, so every resume after one must go through goto.
 let finished = false;
@@ -428,6 +443,69 @@ const playerState = ref({
   height: 0,
   actualTime: 0,
 });
+
+const playheadAbsMs = computed(() => playerState.value.startTime + playerState.value.actualTime);
+
+const switchAtPlayhead = computed(() => {
+  let found: ReplaySwitch | null = null;
+  for (const entry of replaySwitches.value) {
+    if (entry.at > playheadAbsMs.value) break;
+    found = entry;
+  }
+  return found;
+});
+
+const shownSwitch = computed(() => {
+  let found: ReplaySwitch | null = null;
+  for (const entry of replaySwitches.value) {
+    if (entry.at > playheadAbsMs.value) break;
+    if (entry.reason !== "missing") found = entry;
+  }
+  return found;
+});
+
+const pageLabel = (href: string | undefined) => {
+  if (!href) return "";
+  try {
+    const url = new URL(href);
+    return url.host ? `${url.host}${url.pathname}` : href;
+  } catch {
+    return href;
+  }
+};
+
+const showingLabel = computed(() => (multiTab.value ? pageLabel(shownSwitch.value?.href) : ""));
+
+const tabNotice = computed(() => {
+  if (switchAtPlayhead.value?.reason === "missing") return t("rum.sessionReplayMissingTab");
+  const viewId = shownSwitch.value?.viewId;
+  const now = playheadAbsMs.value;
+  const gap = staleSpans.value.find(
+    (span) => span.viewId === viewId && span.from <= now && (span.to === null || now < span.to),
+  );
+  return gap
+    ? t("rum.sessionReplayTabGap", { time: formatReplayTime(gap.from - sessionStart.value) })
+    : "";
+});
+
+// A forward move larger than real playback can produce is a seek, and a seek must not announce a switch.
+watch(playheadAbsMs, (now, previous) => {
+  if (!multiTab.value || mode.value !== "playing" || previous === undefined) return;
+  if (!(now > previous) || now - previous > 2000 * speedValue.value) return;
+  const crossed = replaySwitches.value.find(
+    (entry) =>
+      entry.at > previous && entry.at <= now && !entry.fromEnded && entry.reason !== "missing",
+  );
+  if (!crossed || Date.now() - lastSwitchToastAt < 10_000) return;
+  lastSwitchToastAt = Date.now();
+  toast({
+    variant: "info",
+    message: t("rum.sessionReplayNowShowingTab", { page: pageLabel(crossed.href) }),
+    timeout: 3000,
+  });
+});
+
+watch(tabNotice, (text) => emit("tab-notice", text), { immediate: true });
 
 onBeforeMount(async () => {
   await importVideoPlayer();
