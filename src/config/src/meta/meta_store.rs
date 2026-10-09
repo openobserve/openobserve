@@ -34,6 +34,7 @@ pub enum MetaStore {
     PostgreSQL,
 }
 
+/// Strict and case-insensitive; an unknown value is an error, unlike the lenient `From<&str>`.
 impl FromStr for MetaStore {
     type Err = String;
 
@@ -56,7 +57,7 @@ impl FromStr for MetaStore {
     }
 }
 
-// stays lenient: callers also probe other settings through it, e.g. ZO_QUEUE_STORE=memory
+/// Lenient: an unknown value is `Sqlite`, since callers also probe e.g. ZO_QUEUE_STORE=memory.
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
         s.parse().unwrap_or(Self::Sqlite)

@@ -4078,10 +4078,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check queue store
     check_queue_store_config(cfg)?;
 
-    // check cluster coordinator
     check_cluster_coordinator_config(cfg)?;
-
-    // check meta store
     check_meta_store_config(cfg)?;
 
     // check meta partition mode
