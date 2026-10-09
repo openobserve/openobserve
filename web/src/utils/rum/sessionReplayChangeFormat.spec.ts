@@ -27,6 +27,7 @@ const ADD_NODE = 1;
 const REMOVE_NODE = 2;
 const ATTRIBUTE = 3;
 const TEXT = 4;
+const SIZE = 5;
 const SCROLL_POSITION = 6;
 const ADD_STYLESHEET = 7;
 const ATTACHED_STYLESHEETS = 8;
@@ -524,6 +525,10 @@ describe("sessionReplayChangeFormat", () => {
     const change = (timestamp: number, data: any[]) => ({ type: 12, timestamp, data });
     const textOf = (node: any): string =>
       node.type === 3 ? node.textContent : (node.childNodes ?? []).map(textOf).join("");
+    const nodeWithId = (node: any, id: number): any =>
+      node.id === id
+        ? node
+        : (node.childNodes ?? []).map((c: any) => nodeWithId(c, id)).find(Boolean);
 
     it("returns null before the first full snapshot", () => {
       expect(createRecordConverter().snapshot()).toBeNull();
@@ -562,6 +567,8 @@ describe("sessionReplayChangeFormat", () => {
       const first = converter.snapshot()!;
       converter.convert(change(1100, [[TEXT, [4, "two"]]]));
       expect(textOf(first.node)).toBe("one");
+      converter.convert(change(1200, [[ATTRIBUTE, [3, ["id", "b"]]]]));
+      expect(nodeWithId(first.node, 3).attributes.id).toBe("a");
     });
 
     it("forgets a removed subtree so later changes to its ids are ignored", () => {
@@ -580,6 +587,71 @@ describe("sessionReplayChangeFormat", () => {
       converter.convert(change(1100, [[TEXT, [4, "two"]]]));
       expect(v1).toBeGreaterThan(v0);
       expect(converter.version()).toBeGreaterThan(v1);
+    });
+
+    it("keeps version() unchanged across passthrough records", () => {
+      const converter = createRecordConverter();
+      converter.convert(base());
+      const v = converter.version();
+      converter.convert({ type: 4, timestamp: 1200, data: { width: 1, height: 1 } });
+      converter.convert({
+        type: 3,
+        timestamp: 1300,
+        data: { source: 2, type: 2, id: 3, x: 1, y: 1 },
+      });
+      expect(converter.version()).toBe(v);
+    });
+
+    it("reflects size changes as rr_width and rr_height", () => {
+      const converter = createRecordConverter();
+      converter.convert(base());
+      converter.convert(change(1100, [[SIZE, [3, 120, 80]]]));
+      expect(nodeWithId(converter.snapshot()!.node, 3).attributes).toMatchObject({
+        rr_width: "120px",
+        rr_height: "80px",
+      });
+    });
+
+    it("reflects media playback state changes as rr_mediaState", () => {
+      const converter = createRecordConverter();
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "VIDEO"]]]));
+      converter.convert(change(1100, [[MEDIA_PLAYBACK_STATE, [1, 1]]]));
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.rr_mediaState).toBe("paused");
+      converter.convert(change(1200, [[MEDIA_PLAYBACK_STATE, [1, 0]]]));
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.rr_mediaState).toBe("played");
+    });
+
+    it("reflects an attached stylesheet as _cssText on the element", () => {
+      const converter = createRecordConverter();
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "LINK"]]]));
+      converter.convert(
+        change(1100, [
+          [ADD_STYLESHEET, [".x{color:red}"]],
+          [ATTACHED_STYLESHEETS, [1, 0]],
+        ]),
+      );
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes._cssText).toBe(".x{color:red}");
+    });
+
+    it("reflects a checkbox isChecked input as the checked attribute", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "INPUT", ["type", "checkbox"]]]]),
+      );
+      converter.convert({ type: 3, timestamp: 1100, data: { source: 5, id: 1, isChecked: true } });
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes.checked).toBe(true);
+      converter.convert({ type: 3, timestamp: 1200, data: { source: 5, id: 1, isChecked: false } });
+      expect(nodeWithId(converter.snapshot()!.node, 1).attributes).not.toHaveProperty("checked");
+    });
+
+    it("removes rr_scrollTop when a scroll returns to 0", () => {
+      const converter = createRecordConverter();
+      converter.convert(base());
+      converter.convert(change(1100, [[SCROLL_POSITION, [3, 0, 25]]]));
+      converter.convert(change(1200, [[SCROLL_POSITION, [3, 0, 0]]]));
+      expect(nodeWithId(converter.snapshot()!.node, 3).attributes).not.toHaveProperty(
+        "rr_scrollTop",
+      );
     });
   });
 });
