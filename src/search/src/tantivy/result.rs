@@ -29,9 +29,9 @@ pub enum TantivyMultiResultBuilder {
         pruner: SimpleSelectPruner,
     },
     Histogram(Vec<Vec<u64>>),
-    MultiHistogram(Vec<Vec<(i64, String, u64)>>),
-    TopN(Vec<(Vec<String>, u64)>),
-    Distinct(HashSet<String>),
+    MultiHistogram(Vec<Vec<(i64, Option<String>, u64)>>),
+    TopN(Vec<(Vec<Option<String>>, u64)>),
+    Distinct(HashSet<Option<String>>),
 }
 
 impl TantivyMultiResultBuilder {
@@ -96,7 +96,7 @@ impl TantivyMultiResultBuilder {
     }
 
     // simple multi histogram
-    pub fn add_multi_histogram(&mut self, multi_histogram: Vec<(i64, String, u64)>) {
+    pub fn add_multi_histogram(&mut self, multi_histogram: Vec<(i64, Option<String>, u64)>) {
         match self {
             Self::MultiHistogram(a) => {
                 if !multi_histogram.is_empty() {
@@ -108,7 +108,7 @@ impl TantivyMultiResultBuilder {
     }
 
     // simple top-n
-    pub fn add_top_n(&mut self, top_n: Vec<(Vec<String>, u64)>) {
+    pub fn add_top_n(&mut self, top_n: Vec<(Vec<Option<String>>, u64)>) {
         match self {
             Self::TopN(a) => a.extend(top_n),
             _ => unreachable!("unsupported tantivy multi result"),
@@ -116,7 +116,7 @@ impl TantivyMultiResultBuilder {
     }
 
     // simple distinct
-    pub fn add_distinct(&mut self, distinct: HashSet<String>) {
+    pub fn add_distinct(&mut self, distinct: HashSet<Option<String>>) {
         match self {
             Self::Distinct(a) => a.extend(distinct),
             _ => unreachable!("unsupported tantivy multi result"),
@@ -166,7 +166,8 @@ impl TantivyMultiResultBuilder {
             }
             Self::MultiHistogram(results) => {
                 // Merge: flatten all per-file results into a single Vec
-                let merged: Vec<(i64, String, u64)> = results.into_iter().flatten().collect();
+                let merged: Vec<(i64, Option<String>, u64)> =
+                    results.into_iter().flatten().collect();
                 TantivyMultiResult::MultiHistogram(merged)
             }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
@@ -181,9 +182,9 @@ pub enum TantivyMultiResult {
     Count(u64),
     SimpleSelect(u64),
     Histogram(Vec<u64>),
-    MultiHistogram(Vec<(i64, String, u64)>),
-    TopN(Vec<(Vec<String>, u64)>),
-    Distinct(HashSet<String>),
+    MultiHistogram(Vec<(i64, Option<String>, u64)>),
+    TopN(Vec<(Vec<Option<String>>, u64)>),
+    Distinct(HashSet<Option<String>>),
 }
 
 impl Display for TantivyMultiResult {
@@ -219,21 +220,21 @@ impl TantivyMultiResult {
         }
     }
 
-    pub fn multi_histogram(self) -> Vec<(i64, String, u64)> {
+    pub fn multi_histogram(self) -> Vec<(i64, Option<String>, u64)> {
         match self {
             Self::MultiHistogram(a) => a,
             _ => vec![],
         }
     }
 
-    pub fn top_n(self) -> Vec<(Vec<String>, u64)> {
+    pub fn top_n(self) -> Vec<(Vec<Option<String>>, u64)> {
         match self {
             Self::TopN(a) => a,
             _ => vec![],
         }
     }
 
-    pub fn distinct(self) -> HashSet<String> {
+    pub fn distinct(self) -> HashSet<Option<String>> {
         match self {
             Self::Distinct(a) => a,
             _ => HashSet::new(),
@@ -360,10 +361,13 @@ mod tests {
         let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
 
         let top_n1 = vec![
-            (vec!["term1".to_string()], 100),
-            (vec!["term2".to_string()], 50),
+            (vec![Some("term1".to_string())], 100),
+            (vec![Some("term2".to_string())], 50),
         ];
-        let top_n2 = vec![(vec!["term3".to_string(), "sub1".to_string()], 75)];
+        let top_n2 = vec![(
+            vec![Some("term3".to_string()), Some("sub1".to_string())],
+            75,
+        )];
 
         builder.add_top_n(top_n1);
         builder.add_top_n(top_n2);
@@ -371,9 +375,12 @@ mod tests {
         match &builder {
             TantivyMultiResultBuilder::TopN(results) => {
                 assert_eq!(results.len(), 3);
-                assert_eq!(results[0].0, vec!["term1".to_string()]);
+                assert_eq!(results[0].0, vec![Some("term1".to_string())]);
                 assert_eq!(results[0].1, 100);
-                assert_eq!(results[2].0, vec!["term3".to_string(), "sub1".to_string()]);
+                assert_eq!(
+                    results[2].0,
+                    vec![Some("term3".to_string()), Some("sub1".to_string())]
+                );
                 assert_eq!(results[2].1, 75);
             }
             _ => panic!("Expected TopN variant"),
@@ -385,12 +392,12 @@ mod tests {
         let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
 
         let mut distinct1 = HashSet::new();
-        distinct1.insert("value1".to_string());
-        distinct1.insert("value2".to_string());
+        distinct1.insert(Some("value1".to_string()));
+        distinct1.insert(Some("value2".to_string()));
 
         let mut distinct2 = HashSet::new();
-        distinct2.insert("value2".to_string()); // Duplicate
-        distinct2.insert("value3".to_string());
+        distinct2.insert(Some("value2".to_string())); // Duplicate
+        distinct2.insert(Some("value3".to_string()));
 
         builder.add_distinct(distinct1);
         builder.add_distinct(distinct2);
@@ -398,9 +405,9 @@ mod tests {
         match &builder {
             TantivyMultiResultBuilder::Distinct(results) => {
                 assert_eq!(results.len(), 3); // Should deduplicate
-                assert!(results.contains("value1"));
-                assert!(results.contains("value2"));
-                assert!(results.contains("value3"));
+                assert!(results.contains(&Some("value1".to_string())));
+                assert!(results.contains(&Some("value2".to_string())));
+                assert!(results.contains(&Some("value3".to_string())));
             }
             _ => panic!("Expected Distinct variant"),
         }
@@ -460,12 +467,12 @@ mod tests {
 
         // Test TopN build
         let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
-        builder.add_top_n(vec![(vec!["term1".to_string()], 100)]);
+        builder.add_top_n(vec![(vec![Some("term1".to_string())], 100)]);
         let result = builder.build("test", &mut HashMap::new());
         match result {
             TantivyMultiResult::TopN(top_n) => {
                 assert_eq!(top_n.len(), 1);
-                assert_eq!(top_n[0].0, vec!["term1".to_string()]);
+                assert_eq!(top_n[0].0, vec![Some("term1".to_string())]);
                 assert_eq!(top_n[0].1, 100);
             }
             _ => panic!("Expected TopN result"),
@@ -474,13 +481,13 @@ mod tests {
         // Test Distinct build
         let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
         let mut distinct = HashSet::new();
-        distinct.insert("value1".to_string());
+        distinct.insert(Some("value1".to_string()));
         builder.add_distinct(distinct);
         let result = builder.build("test", &mut HashMap::new());
         match result {
             TantivyMultiResult::Distinct(dist) => {
                 assert_eq!(dist.len(), 1);
-                assert!(dist.contains("value1"));
+                assert!(dist.contains(&Some("value1".to_string())));
             }
             _ => panic!("Expected Distinct result"),
         }
@@ -501,11 +508,11 @@ mod tests {
         let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
         assert_eq!(result.num_rows(), 0);
 
-        let result = TantivyMultiResult::TopN(vec![(vec!["term".to_string()], 50)]);
+        let result = TantivyMultiResult::TopN(vec![(vec![Some("term".to_string())], 50)]);
         assert_eq!(result.num_rows(), 0);
 
         let mut distinct = HashSet::new();
-        distinct.insert("value".to_string());
+        distinct.insert(Some("value".to_string()));
         let result = TantivyMultiResult::Distinct(distinct);
         assert_eq!(result.num_rows(), 0);
     }
@@ -527,8 +534,11 @@ mod tests {
     #[test]
     fn test_tantivy_multi_result_top_n() {
         let top_n_data = vec![
-            (vec!["term1".to_string()], 100),
-            (vec!["term2".to_string(), "sub1".to_string()], 50),
+            (vec![Some("term1".to_string())], 100),
+            (
+                vec![Some("term2".to_string()), Some("sub1".to_string())],
+                50,
+            ),
         ];
         let result = TantivyMultiResult::TopN(top_n_data.clone());
 
@@ -544,8 +554,8 @@ mod tests {
     #[test]
     fn test_tantivy_multi_result_distinct() {
         let mut distinct_data = HashSet::new();
-        distinct_data.insert("value1".to_string());
-        distinct_data.insert("value2".to_string());
+        distinct_data.insert(Some("value1".to_string()));
+        distinct_data.insert(Some("value2".to_string()));
         let result = TantivyMultiResult::Distinct(distinct_data.clone());
 
         let extracted = result.distinct();
@@ -576,15 +586,17 @@ mod tests {
         assert_eq!(format!("{result}"), "histogram hits: 60");
 
         // Test TopN display
-        let result =
-            TantivyMultiResult::TopN(vec![(vec!["a".to_string()], 1), (vec!["b".to_string()], 2)]);
+        let result = TantivyMultiResult::TopN(vec![
+            (vec![Some("a".to_string())], 1),
+            (vec![Some("b".to_string())], 2),
+        ]);
         assert_eq!(format!("{result}"), "top_n hits: 2");
 
         // Test Distinct display
         let mut distinct = HashSet::new();
-        distinct.insert("val1".to_string());
-        distinct.insert("val2".to_string());
-        distinct.insert("val3".to_string());
+        distinct.insert(Some("val1".to_string()));
+        distinct.insert(Some("val2".to_string()));
+        distinct.insert(Some("val3".to_string()));
         let result = TantivyMultiResult::Distinct(distinct);
         assert_eq!(format!("{result}"), "distinct hits: 3");
     }

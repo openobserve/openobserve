@@ -174,8 +174,8 @@ impl<K: OrdKey> GroupCounts<K> {
 }
 
 pub struct TopNSegmentCollector<K: OrdKey> {
-    /// None when any field's column is missing from this segment (legacy index file)
-    cols: Option<Vec<StrColumn>>,
+    // Schema-present fields with no column contain only NULL values.
+    cols: Option<Vec<Option<StrColumn>>>,
     k: usize,
     max_groups: usize,
     ascend: bool,
@@ -185,7 +185,7 @@ pub struct TopNSegmentCollector<K: OrdKey> {
 }
 
 impl<K: OrdKey> Collector for TopNCollector<K> {
-    type Fruit = Vec<(Vec<String>, u64)>;
+    type Fruit = Vec<(Vec<Option<String>>, u64)>;
     type Child = TopNSegmentCollector<K>;
 
     fn for_segment(
@@ -198,13 +198,18 @@ impl<K: OrdKey> Collector for TopNCollector<K> {
             .fields
             .iter()
             .map(|field| fast_fields.str(field))
-            .collect::<tantivy::Result<Option<Vec<_>>>>()?;
+            .collect::<tantivy::Result<Vec<_>>>()?;
+        let cols = self
+            .fields
+            .iter()
+            .all(|field| segment.schema().get_field(field).is_ok())
+            .then_some(cols);
         let counts = match &cols {
             Some(cols) => {
                 let mut dims = [1usize; MAX_SIMPLE_TOPN_FIELDS];
                 let mut space = Some(1usize);
                 for (dim, col) in dims.iter_mut().zip(cols.iter()) {
-                    *dim = col.num_terms();
+                    *dim = col.as_ref().map_or(0, |col| col.num_terms()) + 1;
                     space = space.and_then(|s| s.checked_mul(*dim));
                 }
                 match space {
@@ -234,7 +239,7 @@ impl<K: OrdKey> Collector for TopNCollector<K> {
 
     fn merge_fruits(
         &self,
-        mut segment_fruits: Vec<Vec<(Vec<String>, u64)>>,
+        mut segment_fruits: Vec<Vec<(Vec<Option<String>>, u64)>>,
     ) -> tantivy::Result<Self::Fruit> {
         debug_assert!(
             segment_fruits.len() <= 1,
@@ -245,19 +250,19 @@ impl<K: OrdKey> Collector for TopNCollector<K> {
 }
 
 impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
-    type Fruit = Vec<(Vec<String>, u64)>;
+    type Fruit = Vec<(Vec<Option<String>>, u64)>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {
         let Some(cols) = &self.cols else {
             return;
         };
-        // columns are single-valued; a doc missing any field forms no group
+        // Zero represents NULL; dictionary ordinals are shifted to keep empty strings distinct.
         let mut ords = [0u64; MAX_SIMPLE_TOPN_FIELDS];
         for (ord, col) in ords.iter_mut().zip(cols.iter()) {
-            match col.ords().first(doc) {
-                Some(o) => *ord = o,
-                None => return,
-            }
+            *ord = col
+                .as_ref()
+                .and_then(|col| col.ords().first(doc))
+                .map_or(0, |ord| ord + 1);
         }
         self.counts.add(&ords[..cols.len()]);
     }
@@ -278,30 +283,31 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
         };
         let num_fields = cols.len();
         for (buf, col) in ord_bufs.iter_mut().zip(cols.iter()) {
-            // first_vals only writes present slots, so reset stale values to None first —
-            // unless the column is Full cardinality and writes every slot anyway
-            if col.ords().get_cardinality() != Cardinality::Full {
+            if col
+                .as_ref()
+                .is_none_or(|col| col.ords().get_cardinality() != Cardinality::Full)
+            {
                 buf.clear();
             }
             buf.resize(docs.len(), None);
-            col.ords().first_vals(docs, buf);
+            if let Some(col) = col {
+                col.ords().first_vals(docs, buf);
+            }
         }
         // `K::CAPACITY == 1` is const per monomorphization: for the single-field key the
         // ordinal is the dense index / packed key itself, so the field loops compile away
         match counts {
             GroupCounts::Dense { counts, dims } => {
                 if K::CAPACITY == 1 {
-                    for ord in ord_bufs[0].iter().flatten() {
-                        counts[*ord as usize] += 1;
+                    for ord in &ord_bufs[0] {
+                        counts[ord.map_or(0, |ord| ord + 1) as usize] += 1;
                     }
                 } else {
-                    'doc: for d in 0..docs.len() {
+                    for d in 0..docs.len() {
                         let mut index = 0usize;
                         for i in (0..num_fields).rev() {
-                            match ord_bufs[i][d] {
-                                Some(ord) => index = index * dims[i] + ord as usize,
-                                None => continue 'doc,
-                            }
+                            index =
+                                index * dims[i] + ord_bufs[i][d].map_or(0, |ord| ord + 1) as usize;
                         }
                         counts[index] += 1;
                     }
@@ -309,17 +315,16 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
             }
             GroupCounts::Sparse(counts) => {
                 if K::CAPACITY == 1 {
-                    for ord in ord_bufs[0].iter().flatten() {
-                        *counts.entry(K::pack(&[*ord])).or_insert(0) += 1;
+                    for ord in &ord_bufs[0] {
+                        *counts
+                            .entry(K::pack(&[ord.map_or(0, |ord| ord + 1)]))
+                            .or_insert(0) += 1;
                     }
                 } else {
                     let mut ords = [0u64; MAX_SIMPLE_TOPN_FIELDS];
-                    'doc: for d in 0..docs.len() {
+                    for d in 0..docs.len() {
                         for i in 0..num_fields {
-                            match ord_bufs[i][d] {
-                                Some(ord) => ords[i] = ord,
-                                None => continue 'doc,
-                            }
+                            ords[i] = ord_bufs[i][d].map_or(0, |ord| ord + 1);
                         }
                         let key = K::pack(&ords[..num_fields]);
                         *counts.entry(key).or_insert(0) += 1;
@@ -395,16 +400,32 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
         let maps = cols
             .iter()
             .enumerate()
-            .map(|(i, col)| resolve_ords(col, top.iter().map(|(key, _)| key.unpack(i)).collect()))
+            .map(|(i, col)| {
+                col.as_ref()
+                    .map(|col| {
+                        resolve_ords(
+                            col,
+                            top.iter()
+                                .filter_map(|(key, _)| key.unpack(i).checked_sub(1))
+                                .collect(),
+                        )
+                    })
+                    .unwrap_or_default()
+            })
             .collect::<Vec<_>>();
 
         let mut out = Vec::with_capacity(top.len());
         'next_group: for (key, count) in top {
             let mut row = Vec::with_capacity(cols.len());
             for (i, map) in maps.iter().enumerate() {
-                match map.get(&key.unpack(i)) {
-                    Some(s) => row.push(s.clone()),
-                    None => continue 'next_group,
+                let ord = key.unpack(i);
+                if ord == 0 {
+                    row.push(None);
+                } else {
+                    match map.get(&(ord - 1)) {
+                        Some(s) => row.push(Some(s.clone())),
+                        None => continue 'next_group,
+                    }
                 }
             }
             out.push((row, count as u64));
@@ -520,6 +541,70 @@ mod tests {
     }
 
     #[test]
+    fn test_topn_null_and_empty_collection_paths() {
+        let mut schema = SchemaBuilder::new();
+        let f0 = schema.add_text_field("f0", TextOptions::default().set_fast(None));
+        let f1 = schema.add_text_field("f1", TextOptions::default().set_fast(None));
+        schema.add_text_field("all_null", TextOptions::default().set_fast(None));
+        let index = Index::create_in_ram(schema.build());
+        let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
+        for values in [
+            (None, None),
+            (Some(""), None),
+            (None, Some("")),
+            (Some("0"), Some("false")),
+            (None, None),
+        ] {
+            let mut document = doc!();
+            if let Some(value) = values.0 {
+                document.add_text(f0, value);
+            }
+            if let Some(value) = values.1 {
+                document.add_text(f1, value);
+            }
+            writer.add_document(document).unwrap();
+        }
+        writer.commit().unwrap();
+        let searcher = index.reader().unwrap().searcher();
+        for dense_limit in [0, usize::MAX] {
+            let collector = TopNCollector::<u128>::new(
+                vec!["f0".into(), "f1".into(), "all_null".into()],
+                10,
+                false,
+            )
+            .with_dense_limit(dense_limit);
+            let expected = vec![
+                (vec![None, None, None], 2),
+                (vec![None, Some("".into()), None], 1),
+                (vec![Some("".into()), None, None], 1),
+                (vec![Some("0".into()), Some("false".into()), None], 1),
+            ];
+            for block in [false, true] {
+                let mut segment = collector
+                    .for_segment(0, searcher.segment_reader(0))
+                    .unwrap();
+                if block {
+                    segment.collect_block(&[0, 1]);
+                    segment.collect_block(&[2, 3, 4]);
+                } else {
+                    for doc in 0..5 {
+                        segment.collect(doc, 0.0);
+                    }
+                }
+                let mut result = segment.harvest();
+                result.sort_unstable();
+                assert_eq!(result, expected);
+            }
+            let all_null = TopNCollector::<u32>::new(vec!["all_null".into()], 10, false)
+                .with_dense_limit(dense_limit);
+            assert_eq!(
+                searcher.search(&AllQuery, &all_null).unwrap(),
+                vec![(vec![None], 5)]
+            );
+        }
+    }
+
+    #[test]
     fn test_topn_collector() {
         let mut schema_builder = SchemaBuilder::new();
         let opts = TextOptions::default().set_fast(None);
@@ -548,12 +633,12 @@ mod tests {
         writer
             .add_document(doc!(f0 => "b", f1 => "x", f2 => "1"))
             .unwrap();
-        // missing f1 -> does not form a group for queries that include f1
         writer.add_document(doc!(f0 => "c", f2 => "1")).unwrap();
         writer.commit().unwrap();
 
         let searcher = index.reader().unwrap().searcher();
-        let row = |strs: &[&str], count: u64| (strs.iter().map(|s| s.to_string()).collect(), count);
+        let row =
+            |strs: &[&str], count: u64| (strs.iter().map(|s| Some(s.to_string())).collect(), count);
 
         fn run<K: OrdKey>(
             searcher: &tantivy::Searcher,
@@ -562,7 +647,7 @@ mod tests {
             max_groups: usize,
             ascend: bool,
             dense_limit: usize,
-        ) -> Vec<(Vec<String>, u64)> {
+        ) -> Vec<(Vec<Option<String>>, u64)> {
             let fields: Vec<String> = fields.iter().map(|s| s.to_string()).collect();
             searcher
                 .search(
@@ -606,13 +691,13 @@ mod tests {
             res.sort_unstable();
             assert_eq!(res, vec![row(&["a"], 5), row(&["b"], 1), row(&["c"], 1)]);
 
-            // two fields, counts merged across segments, missing-field doc excluded
             assert_eq!(
                 search(&["f0", "f1"], 10, 10, false),
                 vec![
                     row(&["a", "x"], 3),
                     row(&["a", "y"], 2),
-                    row(&["b", "x"], 1)
+                    row(&["b", "x"], 1),
+                    (vec![Some("c".to_string()), None], 1)
                 ]
             );
             // ascend keeps the smallest counts
@@ -623,7 +708,7 @@ mod tests {
                 vec![row(&["a", "x"], 3)]
             );
             // max_groups above the distinct count keeps everything even when k is small
-            assert_eq!(search(&["f0", "f1"], 1, 10, false).len(), 3);
+            assert_eq!(search(&["f0", "f1"], 1, 10, false).len(), 4);
 
             // three fields via the u128 key
             assert_eq!(
@@ -632,7 +717,8 @@ mod tests {
                     row(&["a", "x", "1"], 3),
                     row(&["a", "y", "1"], 1),
                     row(&["a", "y", "2"], 1),
-                    row(&["b", "x", "1"], 1)
+                    row(&["b", "x", "1"], 1),
+                    (vec![Some("c".to_string()), None, Some("1".to_string())], 1)
                 ]
             );
         }
