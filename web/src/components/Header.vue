@@ -356,6 +356,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <ODropdownSeparator />
 
+              <template v-if="showMyOncall">
+                <ODropdownItem data-test="header-my-oncall" @select="goToMyOncall">
+                  <template #icon-left>
+                    <OIcon size="xs" name="person" class="padding-none" />
+                  </template>
+                  {{ t("oncall.mineTitle") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+              </template>
+
               <!-- A menuitem cannot hold menuitems, so the list is the row's sibling inside one positioned wrapper. -->
               <div class="relative" role="none">
                 <ODropdownItem
@@ -472,6 +482,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import { isGateOpen, useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 
 import { getImageURL } from "@/utils/zincutils";
 import { chartColor } from "@/utils/chartTheme";
@@ -750,6 +761,20 @@ export default defineComponent({
       showEnterpriseDialog.value = true;
     };
 
+    const navGateContext = useNavGateContext();
+    // Same gate and route check the nav flyout applies to the On-Call entries.
+    const showMyOncall = computed(
+      () => isGateOpen(navGateContext.value, "oncall") && props.router.hasRoute("onCallMine"),
+    );
+
+    const goToMyOncall = () => {
+      // eslint-disable-next-line vue/no-mutating-props -- vue-router's push navigates; the rule mistakes it for Array#push.
+      props.router.push({
+        name: "onCallMine",
+        query: { org_identifier: props.store.state.selectedOrganization.identifier },
+      });
+    };
+
     return {
       isDark,
       t,
@@ -780,6 +805,8 @@ export default defineComponent({
       handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
+      showMyOncall,
+      goToMyOncall,
     };
   },
 });

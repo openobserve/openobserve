@@ -1040,9 +1040,6 @@ const unavailable = ref(false);
 const search = ref("");
 const teamFilter = ref("all");
 const priorityFilter = ref("all");
-/// `?mine=1` opens the list already narrowed. It is what the retired
-/// `oncall/me` page now redirects to, so a bookmark from before still lands on
-/// the answer instead of a stub that told everybody they were on no team.
 const mineOnly = ref(false);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);

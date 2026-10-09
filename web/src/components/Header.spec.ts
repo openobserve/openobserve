@@ -148,6 +148,7 @@ describe("Header Component", () => {
     mockRouter = {
       replace: vi.fn(),
       push: vi.fn(),
+      hasRoute: vi.fn(() => true),
     };
 
     mockConfig = {
@@ -1443,6 +1444,60 @@ describe("Header Component", () => {
       await nextTick();
       expect(list(w).exists()).toBe(true);
       expect(activeTest()).toBe("language-dropdown-item-en-us");
+    });
+  });
+
+  describe("My on-call item (U1)", () => {
+    const mountMenu = (oncall_enabled: boolean, hasRoute: boolean) => {
+      const store = {
+        ...mockStore,
+        state: { ...mockStore.state, zoConfig: { ...mockStore.state.zoConfig, oncall_enabled } },
+      };
+      const router = { ...mockRouter, hasRoute: vi.fn(() => hasRoute) };
+      return mount(Header, {
+        props: { ...defaultProps, store, router },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            ThemeSwitcher: true,
+            OrganizationSelector: true,
+            EnterpriseUpgradeDialog: true,
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            ODropdownItem: {
+              emits: ["select"],
+              template:
+                '<div role="menuitem" @click="$emit(\'select\', $event)"><slot name="icon-left" /><slot /></div>',
+            },
+          },
+        },
+      });
+    };
+
+    it("renders before Language when on-call is on and routes to My on-call in the current org", async () => {
+      const w = mountMenu(true, true);
+      const item = w.find('[data-test="header-my-oncall"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toBe("My on-call");
+      const tests = w.findAll("[data-test]").map((el: any) => el.attributes("data-test"));
+      expect(tests.indexOf("header-my-oncall")).toBeLessThan(
+        tests.indexOf("header-language-submenu-trigger"),
+      );
+      await item.trigger("click");
+      expect(w.props("router").push).toHaveBeenCalledWith({
+        name: "onCallMine",
+        query: { org_identifier: "test-org" },
+      });
+      w.unmount();
+    });
+
+    it.each([
+      ["on-call is off", false, true],
+      ["the build has no on-call routes", true, false],
+    ])("is absent when %s", (_case, oncallEnabled, hasRoute) => {
+      const w = mountMenu(oncallEnabled, hasRoute);
+      expect(w.find('[data-test="header-my-oncall"]').exists()).toBe(false);
+      w.unmount();
     });
   });
 
