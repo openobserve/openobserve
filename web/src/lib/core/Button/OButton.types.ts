@@ -57,7 +57,9 @@ export type ButtonVariant =
   | "outline-primary"
   // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
   // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
-  | "dashed";
+  | "dashed"
+  // Table-cell content that is itself the action: no chrome, full cell width, stacked lines.
+  | "cell";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

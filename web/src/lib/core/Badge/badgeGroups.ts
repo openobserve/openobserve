@@ -1709,14 +1709,11 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     class: "!bg-transparent !p-0 !ring-0",
+    // Keys are the Quality API `status` values (`no_data` normalises to `nodata`).
     values: {
+      attention: { variant: "error-soft", labelKey: "components.badge.qualityStatus.attention" },
       healthy: { variant: "success-soft", labelKey: "components.badge.qualityStatus.healthy" },
-      warn: { variant: "warning-soft", labelKey: "components.badge.qualityStatus.warn" },
-      unhealthy: { variant: "error-soft", labelKey: "components.badge.qualityStatus.unhealthy" },
-      nothreshold: {
-        variant: "default-soft",
-        labelKey: "components.badge.qualityStatus.nothreshold",
-      },
+      unset: { variant: "default-soft", labelKey: "components.badge.qualityStatus.unset" },
       nodata: { variant: "default-soft", labelKey: "components.badge.qualityStatus.nodata" },
     },
     fallback: { variant: "default-soft" },

@@ -6,7 +6,9 @@
 // (at your option) any later version.
 
 import http from "@/services/http";
+import { b64EncodeUnicode } from "@/utils/formatters";
 import analytics from "./product_analytics";
+import search from "./search";
 
 export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
@@ -254,6 +256,99 @@ export interface ManualEvalJobResult {
   tasksCreated: number;
 }
 
+export type QualityStatus = "attention" | "healthy" | "unset" | "no_data";
+
+export interface QualityScopeCounts {
+  span: number;
+  trace: number;
+  session: number;
+}
+
+/** One row of the Quality list API. Times are microseconds. */
+export interface QualityConfigSummary {
+  configId: string;
+  name: string;
+  dataType: ScoreDataType;
+  status: QualityStatus;
+  total: number;
+  unhealthy: number | null;
+  average: number | null;
+  lastScoredAt: number | null;
+  scopeCounts: QualityScopeCounts;
+  topValue: { key: string | boolean; count: number } | null;
+}
+
+export interface QualityAgentParams {
+  agent_id?: string;
+  agent_name?: string;
+  agent_env?: string;
+  agent_version?: string;
+}
+
+export interface QualityListParams extends QualityAgentParams {
+  start_time: number;
+  end_time: number;
+  scope?: EvalTargetScope;
+}
+
+export interface QualityScoresParams extends QualityListParams {
+  unhealthy_only?: boolean;
+  bucket_from?: number;
+  bucket_to?: number;
+  value?: string;
+  from?: number;
+  size?: number;
+}
+
+/** Numeric buckets key on their index; boolean and categorical buckets key on the value. */
+export interface QualityDistributionBucket {
+  key: number | string | boolean;
+  lower?: number;
+  upper?: number;
+  count: number;
+  unhealthy: number | null;
+}
+
+export interface QualityScore {
+  id: string;
+  timestamp: number;
+  refTimestamp: number;
+  sourceType: string;
+  targetScope: EvalTargetScope;
+  targetId: string | null;
+  spanId: string | null;
+  traceId: string | null;
+  sessionId: string | null;
+  sourceStream: string | null;
+  sourceStreamType: string | null;
+  value: number | string | boolean | null;
+  unhealthy: boolean | null;
+  reasoning: string | null;
+  evaluatorTraceId: string | null;
+  taskId: string | null;
+  inputPreview: string | null;
+  outputPreview: string | null;
+}
+
+export interface QualityScorePage {
+  average: number | null;
+  distribution: QualityDistributionBucket[];
+  list: QualityScore[];
+  total: number;
+  from: number;
+  size: number;
+}
+
+// The API rejects unknown and malformed params, so empty optionals are dropped and times are whole microseconds.
+const qualityQuery = (params: QualityListParams | QualityScoresParams) => {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = key === "start_time" || key === "end_time" ? Math.floor(value as number) : value;
+  }
+  return out;
+};
+
 const unwrapList = <T>(response: any, key = "list"): T[] => {
   const data = response?.data;
   if (Array.isArray(data)) return data;
@@ -354,6 +449,49 @@ const onlineEvalsService = {
       payload: LlmJudgeSchemaPreviewPayload,
     ): Promise<LlmJudgeSchemaPreviewResult> =>
       (await http().post(`/api/${orgId}/scorers/llm_judge/output_schema`, payload)).data,
+  },
+
+  quality: {
+    list: async (orgId: string, params: QualityListParams): Promise<QualityConfigSummary[]> =>
+      unwrapList<QualityConfigSummary>(
+        await http().get(`/api/${orgId}/score_configs/quality`, { params: qualityQuery(params) }),
+      ),
+    scores: async (
+      orgId: string,
+      entityId: string,
+      params: QualityScoresParams,
+    ): Promise<QualityScorePage> =>
+      (
+        await http().get(`/api/${orgId}/score_configs/${encodeURIComponent(entityId)}/quality`, {
+          params: qualityQuery(params),
+        })
+      ).data,
+    /** Evaluator runs that ended in error or timeout, counted on `_evaluator`. */
+    failedRuns: async (
+      orgId: string,
+      params: { startTime: number; endTime: number; agentWhere: string | null; base64: boolean },
+    ): Promise<number> => {
+      const where = ["attributes_status IN ('error', 'timeout')", params.agentWhere]
+        .filter(Boolean)
+        .map((clause) => `(${clause})`)
+        .join(" AND ");
+      const sql = `SELECT COUNT(*) AS failed_runs FROM "_evaluator" WHERE ${where}`;
+      const response = await search.search({
+        org_identifier: orgId,
+        query: {
+          query: {
+            sql: params.base64 ? b64EncodeUnicode(sql) : sql,
+            start_time: Math.floor(params.startTime),
+            end_time: Math.floor(params.endTime),
+            from: 0,
+            size: 1,
+          },
+          ...(params.base64 ? { encoding: "base64" } : {}),
+        },
+        page_type: "traces",
+      });
+      return Number(response?.data?.hits?.[0]?.failed_runs ?? 0);
+    },
   },
 
   jobs: {

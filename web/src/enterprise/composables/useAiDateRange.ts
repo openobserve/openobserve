@@ -1,18 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Shared date-range state for the AI Observability module. LLM Insights,
-// LLM Sessions, and Quality all bind to the same singleton ref so picking
-// "Past 1h" on one page lands on the others (incl. across reloads — the
-// state is mirrored to a single localStorage key).
-//
-// Each page keeps its own picker component:
-//   • LLM Insights / Sessions use `<date-time>` (default-type/-absolute/-relative)
-//   • Quality uses `<DateTimePickerDashboard>` (v-model with the same shape)
-//
-// The composable normalizes both to one shape, so a write from either
-// surface is visible to the others on next mount (and reactively while
-// they're all mounted in the same shell — the singleton ref makes the
-// state reactive across components).
+// Shared date range for LLM Insights and LLM Sessions, mirrored to one localStorage key; Quality keeps its own range in the URL.
 
 import { ref, watch } from "vue";
 

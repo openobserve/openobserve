@@ -26,6 +26,13 @@ describe("OButton", () => {
 
   // --- Props ---
 
+  it("cell variant keeps a visible focus ring and the control radius", () => {
+    const classes = mount(OButton, { props: { variant: "cell" } }).classes();
+    expect(classes).toContain("focus-visible:ring-3");
+    expect(classes).toContain("rounded-default");
+    expect(classes).toContain("h-auto!");
+  });
+
   it('defaults to type="button"', () => {
     const wrapper = mount(OButton);
     expect(wrapper.attributes("type")).toBe("button");

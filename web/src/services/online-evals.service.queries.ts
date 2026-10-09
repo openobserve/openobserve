@@ -14,9 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import onlineEvalsService from "./online-evals.service";
+import onlineEvalsService, {
+  type QualityConfigSummary,
+  type QualityListParams,
+  type QualityScorePage,
+  type QualityScoresParams,
+} from "./online-evals.service";
 import { onlineEvalKeys } from "./online-evals.service.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
+import { quantizeRange, stableFilters } from "@/composables/query/queryClient";
 
 /** One entry serves both Settings › LLM Providers and Online Evals, so it takes the shorter of the two tiers. */
 export const providersQuery = (org: string) =>
@@ -46,6 +52,40 @@ export const evalJobsQuery = (org: string) =>
     queryFn: (): Promise<any[]> => onlineEvalsService.jobs.list(org),
     staleTime: MEDIUM_STALE_TIME,
   });
+
+// The page derives its window from `Date.now()`, so each key rounds it to the minute; the request keeps the exact range.
+const quantizedKey = (params: QualityScoresParams) => {
+  const { start, end } = quantizeRange(params.start_time, params.end_time);
+  const key: Record<string, unknown> = { ...params, start_time: start, end_time: end };
+  return stableFilters(key);
+};
+
+export const qualityListQuery = (org: string, params: QualityListParams) =>
+  queryOptions({
+    queryKey: onlineEvalKeys.qualityList(org, quantizedKey(params)),
+    queryFn: (): Promise<QualityConfigSummary[]> => onlineEvalsService.quality.list(org, params),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+export const qualityScoresQuery = (org: string, entityId: string, params: QualityScoresParams) =>
+  queryOptions({
+    queryKey: onlineEvalKeys.qualityScores(org, entityId, quantizedKey(params)),
+    queryFn: (): Promise<QualityScorePage> =>
+      onlineEvalsService.quality.scores(org, entityId, params),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+export const qualityFailedRunsQuery = (
+  org: string,
+  params: { startTime: number; endTime: number; agentWhere: string | null; base64: boolean },
+) => {
+  const { start, end } = quantizeRange(params.startTime, params.endTime);
+  return queryOptions({
+    queryKey: onlineEvalKeys.qualityFailedRuns(org, start, end, params.agentWhere),
+    queryFn: (): Promise<number> => onlineEvalsService.quality.failedRuns(org, params),
+    staleTime: MEDIUM_STALE_TIME,
+  });
+};
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 //

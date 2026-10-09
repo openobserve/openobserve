@@ -1,416 +1,354 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
-  <div
-    class="quality-page flex min-h-0 flex-1 flex-col gap-3.5 pt-3.5 pb-4"
-    data-test="quality-page"
-  >
-    <div class="px-page-edge flex items-center">
-      <div class="w-[17rem] flex-shrink-0">
-        <!-- While the agent list is loading we swap the select for a skeleton
-             of the same height so the control reads as "loading" (and can't be
-             opened on an empty list) instead of showing an empty dropdown. -->
-        <OSkeleton
-          type="text"
-          v-if="agentsLoading"
-          data-test="quality-agent-filter-skeleton"
-          class="h-8.5 w-full"
-        />
-        <OSelect
-          v-else
-          v-model="agentModel"
-          :label="t('onlineEvals.quality.agentLabel')"
-          label-position="inside"
-          :placeholder="t('onlineEvals.quality.agentPlaceholder')"
-          :options="agentOptions || []"
-          labelKey="label"
-          valueKey="value"
-          class="rounded-default"
-          data-test="quality-agent-filter"
-        />
-      </div>
-    </div>
-
-    <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
-    <KpiCardRow
-      v-else
-      gap="gap-2 max-lg:gap-1.5"
-      class="quality-page__kpis px-page-edge"
-      :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
+  <div class="flex min-h-0 min-w-0 flex-1 flex-col" data-test="quality-page">
+    <!-- With a config open the page header is the detail header, as on the other detail pages. -->
+    <OPageHeader
+      class="border-border-default shrink-0 border-b"
+      :title="header.title"
+      :subtitle="header.subtitle"
+      :icon="configId ? undefined : 'star-rate'"
+      :back="
+        configId
+          ? {
+              label: t('onlineEvals.quality.detail.back'),
+              onClick: closeConfig,
+              dataTest: 'quality-detail-back',
+            }
+          : undefined
+      "
+      title-data-test="quality-page-title"
     >
-      <QualityKpiCard
-        v-for="kpi in visibleKpis"
-        :key="kpi.id"
-        :kpi="kpi"
-        :delta="deltaByKpi[kpi.id] ?? null"
-        :clickable="kpi.id === 'scorerFailures' && (kpi.value ?? 0) > 0"
-        @activate="openScorerFailures"
-      />
-    </KpiCardRow>
-
-    <!-- Tier 2: the configs table is the persistent view; selecting a
-         row opens the detail in a right-side ODrawer (70% width). The user
-         keeps full context of the list behind the drawer. -->
-    <div class="quality-page__tier2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3">
-      <QualityScoreConfigsTable
-        :rows="configRows"
-        :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
-        @select="selectConfig"
-        @refresh="refreshAll(true)"
-      />
-    </div>
-
-    <ODrawer
-      bleed
-      v-model:open="detailDrawerOpen"
-      side="right"
-      :width="70"
-      :title="raw(selectedConfig?.name || '')"
-      data-test="quality-config-detail-drawer"
-    >
-      <!-- Type badge + version pulled out of the inner panel header so
-           the drawer chrome owns the entire identification block;
-           the inner panel no longer renders its own title row. -->
-      <template #header-right>
-        <OTag
-          v-if="
-            detailDataType === 'numeric' ||
-            detailDataType === 'categorical' ||
-            detailDataType === 'boolean'
-          "
-          type="evalDataType"
-          :value="detailDataType"
-          :label="raw(shortType(detailDataType))"
-          size="xs"
-          data-test="quality-detail-type-badge"
-        />
-        <span
-          v-if="selectedConfig?.version"
-          class="qpd-version text-2xs text-text-secondary ms-1.5 [font-variant-numeric:tabular-nums]"
-          data-test="quality-detail-version-badge"
-          >{{ t("onlineEvals.versionPrefix") }}{{ selectedConfig.version }}</span
-        >
+      <template v-if="configId" #title-trail>
+        <div class="flex shrink-0 items-center gap-1.5" data-test="quality-detail-tags">
+          <OTag v-if="header.dataType" type="evalDataType" :value="header.dataType" />
+          <OTag
+            v-if="header.version != null"
+            variant="default-soft"
+            shape="rounded"
+            :label="raw(`v${header.version}`)"
+          />
+        </div>
       </template>
+      <template #actions>
+        <OButton
+          v-if="configId"
+          variant="outline"
+          size="sm"
+          data-test="quality-detail-edit-config"
+          @click="openEditConfig"
+        >
+          {{ t("onlineEvals.quality.detail.editConfig") }}
+        </OButton>
+        <slot name="header-actions" />
+      </template>
+    </OPageHeader>
 
-      <QualityDetailPanel
-        v-if="selectedConfig"
+    <section
+      class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
+      data-test="quality-body"
+    >
+      <!-- Env, Agent and Version scope the list and the detail alike; the detail adds its scope toggle. -->
+      <div
+        class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2"
+        data-test="quality-scope-bar"
+      >
+        <slot name="filters" />
+        <OToggleGroup
+          v-if="configId && scopeOptions.length > 2"
+          :model-value="scope"
+          mobile-dropdown
+          class="ms-auto"
+          data-test="quality-detail-scope"
+          @update:model-value="
+            (value) => updateQuery({ scope: value === 'all' ? undefined : (value as string) })
+          "
+        >
+          <OToggleGroupItem
+            v-for="option in scopeOptions"
+            :key="option.value"
+            :value="option.value"
+            size="sm"
+            :data-test="`quality-detail-scope-${option.value}`"
+          >
+            {{ option.label }}
+            <span class="font-semibold tabular-nums">{{ option.count }}</span>
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+      <QualityConfigDetail
+        v-if="configId"
+        :config-id="configId"
+        :row="selectedRow"
         :config="selectedConfig"
-        :data-type="detailDataType"
-        :kpis="detailKpis"
-        :has-scores="detailHasScores"
-        :is-loading="isDetailLoading || isChartsLoading"
-        :numeric-trend="numericTrend"
-        :numeric-distribution="numericDistribution"
-        :numeric-threshold="numericThreshold"
-        :numeric-range="numericRange"
-        :boolean-agg="booleanAgg"
-        :boolean-trend="booleanTrend"
-        :boolean-trend-series="booleanTrendSeries"
-        :categorical-rows="categoricalRows"
-        :scope="detailScope"
-        :runs="qualityRuns"
-        :runs-counts="runsCounts"
-        :runs-filter="runsFilter"
-        :runs-current-page="runsCurrentPage"
-        :runs-page-size="runsPageSize"
-        :runs-total-count="runsTotalCount"
-        :runs-loading="isRunsLoading"
-        :runs-error="runsError"
-        @update:scope="detailScope = $event"
-        @open-run="openEvaluationRun"
-        @runs-filter-change="setRunsFilter"
-        @runs-pagination-change="setRunsPagination"
-        @back="clearSelection"
+        :scope="scope"
+        :only="only"
+        :date-window="dateWindow"
+        :agent-params="agentParams"
+        :enabled="enabled"
+        :initial-page="restoredPage"
+        :initial-score-id="restoredScoreId"
+        @back="closeConfig"
+        @update:only="(value) => updateQuery({ only: value === 'all' ? undefined : value })"
+        @status="(status) => (detailStatus = status)"
+        @position="updatePosition"
       />
-    </ODrawer>
+      <QualityConfigsTable
+        v-else
+        v-model:tile-filter="tileFilter"
+        :rows="visibleRows"
+        :tiles="tiles"
+        :failed-runs="failedRuns"
+        :loading="listQuery.isPending.value || configsLoading"
+        :forbidden="listStatus === 403"
+        :load-error="!!listQuery.error.value && listStatus !== 403"
+        @open="openConfig"
+        @retry="retryList"
+      />
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef, watch } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { computed, ref, toRef, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import type { ScoreConfig } from "@/services/online-evals.service";
-import { useQualityData, type DateWindow } from "./composables/useQualityData";
-import { useQualityScoreConfigs, type ScoreConfigRow } from "./composables/useQualityScoreConfigs";
-import { useQualityConfigDetail } from "./composables/useQualityConfigDetail";
-import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
-import { useQualityRuns, type QualityRunRow } from "./composables/useQualityRuns";
-import QualityKpiCard from "./quality/QualityKpiCard.vue";
-import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
-import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
-import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { useOrgId } from "@/composables/query/useOrgId";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type {
+  EvalTargetScope,
+  QualityAgentParams,
+  ScoreConfig,
+} from "@/services/online-evals.service";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { useQualityList, type DateWindow } from "./composables/useQualityList";
+import { dataTypeOf, entityId } from "./utils/evalEntity";
+import { thresholdForConfig } from "./utils/scoreThreshold";
+import { parseTabFromRoute } from "./utils/routeSync";
 import {
-  buildEvaluatorAgentFilterWhere,
-  combineWhere,
-  type AgentFilterSelection,
-} from "./utils/agentFilterSql";
-import type { QualityScope } from "./utils/qualityScope";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+  QUALITY_SCOPES,
+  scoreConfigLink,
+  type QualityOnly,
+  type QualityRow,
+  type QualityScope,
+} from "./utils/qualityFormat";
+import QualityConfigsTable from "./quality/QualityConfigsTable.vue";
+import QualityConfigDetail from "./quality/QualityConfigDetail.vue";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
-  // Date window is owned by OnlineEvals (so the picker + refresh button live
-  // in the embedded OPageHeader). Quality just consumes it as a reactive
-  // input to its data loaders.
+  configsLoading: boolean;
   dateWindow: DateWindow;
-  agentFilter?: AgentFilterSelection | null;
-  // Agent filter dropdown — state stays in OnlineEvals (it owns the agent
-  // list + derives `agentFilter`); QualityPage just renders the control and
-  // emits the selected key back via v-model.
-  agentKey?: string;
-  agentOptions?: { label: I18nText; value: string }[];
-  // True while OnlineEvals is still fetching the score-configs list. Until that
-  // resolves `scoreConfigs` is empty, so the table would otherwise flash "No
-  // Data" before its own skeleton kicks in. OR-ing this into the table's
-  // loading flag keeps the skeleton up from the very first paint.
-  configsLoading?: boolean;
-  // True during the agent-list fetch (first phase of the parent's reload).
-  // Drives the agent-dropdown skeleton plus the KPI/table skeletons so the
-  // whole page reads as "loading" from the start of a reload, not just once
-  // the data queries begin.
-  agentsLoading?: boolean;
+  agentParams: QualityAgentParams;
+  /** Agents the cascade selects; null while every level is "All". */
+  evaluatorAgents: GenAiAgentListItem[] | null;
+  /** False until the agent list first loads, so a deep-linked agent is applied before the first request. */
+  enabled: boolean;
 }>();
 
 const emit = defineEmits<{
-  /** Re-read the score-configs list, which this page receives as a prop. */
-  (e: "reload-configs"): void;
-  (e: "update:agentKey", value: string): void;
-  // Fired once after mount so the parent can run the agents-first reload. The
-  // parent owns every reload trigger (mount / refresh / date / agent) — this
-  // page no longer self-loads on mount or on prop changes.
-  (e: "ready"): void;
+  /** Oldest data time and fetch state of the reads on screen, for the header's last-refreshed label. */
+  (e: "status", status: { updatedAt: number | null; fetching: boolean }): void;
 }>();
-
-const agentModel = computed<string>({
-  get: () => props.agentKey ?? "",
-  set: (value) => emit("update:agentKey", value),
-});
 
 const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
+const orgId = useOrgId();
 
-const dateWindowRef = toRef(props, "dateWindow");
-const agentFilterRef = toRef(props, "agentFilter");
+const { listQuery, failedRunsQuery, failedRuns, rows, visibleRows, tiles, tileFilter, listStatus } =
+  useQualityList({
+    scoreConfigs: toRef(props, "scoreConfigs"),
+    dateWindow: toRef(props, "dateWindow"),
+    agentParams: toRef(props, "agentParams"),
+    evaluatorAgents: toRef(props, "evaluatorAgents"),
+    enabled: toRef(props, "enabled"),
+  });
 
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef, agentFilterRef);
+// The detail view lives in the URL, so a reload or a shared link opens the same view.
+const configId = computed(() => (typeof route.query.config === "string" ? route.query.config : ""));
+const selectedRow = computed<QualityRow | null>(
+  () => rows.value.find((row) => row.configId === configId.value) ?? null,
+);
+const selectedConfig = computed<ScoreConfig | null>(
+  () => props.scoreConfigs.find((config) => entityId(config) === configId.value) ?? null,
+);
 
-// Placeholder KPIs can be hidden here without touching the render loop — add
-// their ids to this set to filter them out of the v-for.
-const HIDDEN_KPI_IDS = new Set<string>();
-const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
-
-const scoreConfigsRef = toRef(props, "scoreConfigs");
-const {
-  rows: configRows,
-  isLoading: isConfigsLoading,
-  refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, t, agentFilterRef);
-
-const selectedConfigId = ref<string | null>(routeConfigId());
-const detailScope = ref<QualityScope>("all");
-
-const selectedConfig = computed<ScoreConfig | null>(() => {
-  const id = selectedConfigId.value;
-  if (!id) return null;
-  return props.scoreConfigs.find((c) => String(c.id) === id) ?? null;
+// URL values the controls cannot show (a scope without scores, Unhealthy without a threshold) fall back to All.
+const scope = computed<QualityScope>(() => {
+  const value = route.query.scope as EvalTargetScope;
+  if (!QUALITY_SCOPES.includes(value)) return "all";
+  const counts = selectedRow.value?.scopeCounts;
+  return counts && !counts[value] ? "all" : value;
+});
+const only = computed<QualityOnly>(() => {
+  if (route.query.only !== "unhealthy") return "all";
+  const row = selectedRow.value;
+  const config = selectedConfig.value;
+  if (row) return row.unhealthy === null ? "all" : "unhealthy";
+  return config && !thresholdForConfig(config).label ? "all" : "unhealthy";
 });
 
-const {
-  isLoading: isDetailLoading,
-  dataType: detailDataType,
-  kpis: detailKpis,
-  hasScores: detailHasScores,
-  booleanAgg,
-  categoricalRows,
-  refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
-
-const {
-  isLoading: isChartsLoading,
-  numericTrend,
-  numericDistribution,
-  booleanTrend,
-  booleanTrendSeries,
-  refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
-
-const {
-  runs: qualityRuns,
-  counts: runsCounts,
-  activeFilter: runsFilter,
-  currentPage: runsCurrentPage,
-  pageSize: runsPageSize,
-  totalCount: runsTotalCount,
-  isLoading: isRunsLoading,
-  error: runsError,
-  refresh: refreshRuns,
-  setFilter: setRunsFilter,
-  setPagination: setRunsPagination,
-  resolveEvaluatorSpanId,
-} = useQualityRuns(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
-
-const numericThreshold = computed(() => {
-  const cfg = selectedConfig.value;
-  if (!cfg) return null;
-  const ht: any = (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
-  if (!ht || ht.value == null || !ht.direction) return null;
+/** The module title on the list; the config's name, description, type and version on the detail. */
+const header = computed(() => {
+  if (!configId.value) {
+    return {
+      title: t("aiObservability.nav.quality"),
+      subtitle: t("aiObservability.subtitle.quality"),
+      dataType: null,
+      version: null,
+    };
+  }
+  const row = selectedRow.value;
+  const config = selectedConfig.value;
   return {
-    value: Number(ht.value),
-    direction: ht.direction === "gte" ? "gte" : "lte",
-  } as const;
+    title: raw(row?.name ?? config?.name ?? configId.value),
+    subtitle: raw(row?.description || config?.description || ""),
+    dataType: row?.dataType ?? (config ? dataTypeOf(config) : null),
+    version: row?.version ?? config?.version ?? null,
+  };
 });
 
-const numericRange = computed(() => {
-  const cfg = selectedConfig.value;
-  if (!cfg) return null;
-  const r: any = (cfg as any).numericRange ?? (cfg as any).numeric_range;
-  if (!r || r.min == null || r.max == null) return null;
-  return { min: Number(r.min), max: Number(r.max) };
+/** All, then each scope with scores; the toggle shows only when there are two or more. */
+const scopeOptions = computed(() => {
+  const counts = selectedRow.value?.scopeCounts;
+  if (!counts) return [];
+  return [
+    {
+      value: "all",
+      label: t("onlineEvals.quality.scopes.all"),
+      count: selectedRow.value?.total ?? 0,
+    },
+    ...QUALITY_SCOPES.filter((value) => counts[value] > 0).map((value) => ({
+      value,
+      label: t(`onlineEvals.quality.scopes.${value}`),
+      count: counts[value],
+    })),
+  ];
 });
 
-async function refreshAll(reloadConfigs = false) {
-  // The score-configs list arrives as a prop, so refreshing only the derived
-  // aggregates leaves it untouched — and each of those bails out early when the
-  // list is empty, which is why the button appeared to do nothing at all. Ask
-  // the parent to re-read the list first, then recompute from it.
-  // Only a user refresh asks; mount, date and agent reloads reuse the list the parent holds.
-  if (reloadConfigs) emit("reload-configs");
-  await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
-}
-
-function openScorerFailures() {
-  const filter = combineWhere(
-    "attributes_status IN ('error', 'timeout')",
-    buildEvaluatorAgentFilterWhere(props.agentFilter ?? null),
-  );
+function openEditConfig() {
   router
-    .push({
-      name: "traces",
-      query: {
-        stream: "_evaluator",
-        query: b64EncodeUnicode(filter ?? "attributes_status IN ('error', 'timeout')"),
-        from: props.dateWindow.startUs,
-        to: props.dateWindow.endUs,
-        org_identifier: route.query.org_identifier,
-      },
-    })
+    .push(scoreConfigLink(String(route.name), orgId.value, configId.value, "update"))
     .catch(() => {});
 }
 
-const isAnyLoading = computed(
-  () =>
-    isLoading.value ||
-    isConfigsLoading.value ||
-    isDetailLoading.value ||
-    isChartsLoading.value ||
-    isRunsLoading.value,
+// Patches the route does not show yet, so two replaces in one tick do not drop each other's keys.
+let pendingPatch: Record<string, string | undefined> = {};
+watch(
+  () => route.query,
+  () => (pendingPatch = {}),
 );
 
-// Surface refresh + an aggregated loading flag so OnlineEvals can drive the
-// Refresh button it now renders in the embedded OPageHeader actions slot.
-defineExpose({ refreshAll, isAnyLoading });
-
-/** Show the KPI skeleton whenever the KPI queries are running — on the initial
- * load AND on every refresh — matching the rest of the app (e.g. LLM Insights),
- * so a refresh gives clear feedback instead of leaving the cards frozen. Also
- * shown during the agent-list fetch (the phase before the KPI query starts) so
- * the page reads as loading from the very start of a reload. */
-const showKpiSkeleton = computed(() => isLoading.value || !!props.agentsLoading);
-
-// The parent (OnlineEvals) owns every reload trigger — mount, refresh button,
-// date-time change, and agent change — and calls `refreshAll()` / `refreshConfigs()`
-// via the exposed handle. This page only signals readiness; it does NOT watch
-// `dateWindow`/`agentFilter` (doing so re-introduced the duplicate fetches that
-// fired once from here and again from the parent's reload).
-onMounted(() => {
-  emit("ready");
-});
-
-// The score-configs list arrives asynchronously from the parent's `loadAll()`,
-// often AFTER the initial reload has run against an empty list. Re-run just the
-// table aggregate when it lands so the rows populate.
-watch(scoreConfigsRef, () => {
-  void refreshConfigs();
-});
-
-// URL ↔ selection
-function routeConfigId(): string | null {
-  const v = route.query.config;
-  return typeof v === "string" && v.length > 0 ? v : null;
+function updateQuery(patch: Record<string, string | undefined>, push = false) {
+  pendingPatch = { ...pendingPatch, ...patch };
+  const query: Record<string, any> = { ...route.query, ...pendingPatch };
+  for (const key of Object.keys(pendingPatch))
+    if (pendingPatch[key] === undefined) delete query[key];
+  if (!push && sameQuery(query, route.query)) return;
+  const location = { name: route.name as string, query };
+  (push ? router.push(location) : router.replace(location)).catch(() => {});
 }
+
+const sameQuery = (a: Record<string, unknown>, b: Record<string, unknown>) =>
+  JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+
+// The scores page (1-based) and selected score live in the URL, so Back from a link reopens the same score.
+const restoredPage = computed(() => {
+  const value = Number(route.query.page);
+  return Number.isInteger(value) && value > 1 ? value - 1 : 0;
+});
+const restoredScoreId = computed(() =>
+  typeof route.query.score === "string" && route.query.score ? route.query.score : null,
+);
+
+function updatePosition(position: { page: number; scoreId: string | null }) {
+  updateQuery({
+    page: position.page > 0 ? String(position.page + 1) : undefined,
+    score: position.scoreId ?? undefined,
+  });
+}
+
+function openConfig(row: QualityRow, onlyValue: QualityOnly) {
+  updateQuery(
+    {
+      config: row.configId,
+      scope: undefined,
+      only: onlyValue === "all" ? undefined : onlyValue,
+      page: undefined,
+      score: undefined,
+    },
+    true,
+  );
+}
+
+// "All configs" steps back when the entry before is the list, so it matches the browser Back button, even after a round trip through a link.
+function previousIsList() {
+  const back = window.history.state?.back;
+  if (typeof back !== "string") return false;
+  const previous = router.resolve(back);
+  return (
+    previous.name === route.name &&
+    parseTabFromRoute(previous.query.tab) === "quality" &&
+    !previous.query.config
+  );
+}
+
+function closeConfig() {
+  if (previousIsList()) {
+    router.back();
+    return;
+  }
+  updateQuery({
+    config: undefined,
+    scope: undefined,
+    only: undefined,
+    page: undefined,
+    score: undefined,
+  });
+}
+
+function retryList() {
+  void listQuery.refetch();
+}
+
+const detailStatus = ref<{ updatedAt: number; fetching: boolean } | null>(null);
+watch(configId, (id) => {
+  if (!id) detailStatus.value = null;
+});
 
 watch(
-  () => route.query.config,
   () => {
-    const id = routeConfigId();
-    if (id !== selectedConfigId.value) {
-      detailScope.value = "all";
-      selectedConfigId.value = id;
-    }
+    const times = [listQuery.dataUpdatedAt.value, failedRunsQuery.dataUpdatedAt.value];
+    if (configId.value && detailStatus.value) times.push(detailStatus.value.updatedAt);
+    const loaded = times.filter((time) => time > 0);
+    return {
+      updatedAt: loaded.length ? Math.min(...loaded) : null,
+      fetching:
+        listQuery.isFetching.value ||
+        failedRunsQuery.isFetching.value ||
+        (!!configId.value && !!detailStatus.value?.fetching),
+    };
   },
+  (status) => emit("status", status),
+  { immediate: true, deep: true },
 );
-
-function selectConfig(row: ScoreConfigRow) {
-  // Reset before changing the config so its composable watcher never runs a
-  // request for the new config with the previous config's narrow scope.
-  detailScope.value = "all";
-  selectedConfigId.value = String(row.config.id);
-  const query: Record<string, any> = {
-    ...route.query,
-    config: selectedConfigId.value,
-  };
-  router.push({ name: route.name as string, query }).catch(() => {});
-}
-
-function clearSelection() {
-  selectedConfigId.value = null;
-  const query: Record<string, any> = { ...route.query };
-  delete query.config;
-  router.replace({ name: route.name as string, query }).catch(() => {});
-}
-
-async function openEvaluationRun(run: QualityRunRow) {
-  if (!run.evaluatorTraceId) return;
-  const evaluatorSpanId = await resolveEvaluatorSpanId(run);
-  const timestampUs = run.timestampMs > 0 ? run.timestampMs * 1000 : 0;
-  const query: Record<string, any> = {
-    stream: "_evaluator",
-    trace_id: run.evaluatorTraceId,
-    from: timestampUs ? Math.max(0, timestampUs - 60_000_000) : props.dateWindow.startUs,
-    to: timestampUs ? timestampUs + 3_600_000_000 : props.dateWindow.endUs,
-    org_identifier: route.query.org_identifier,
-  };
-  if (evaluatorSpanId) query.span_id = evaluatorSpanId;
-  router
-    .push({
-      name: "traceDetails",
-      query,
-    })
-    .catch(() => {});
-}
-
-// ODrawer drives its `:open` via the presence of a selected config. Opening
-// is owned by selectConfig() (from a row click); closing the drawer
-// (backdrop click, Esc, header ×) routes through clearSelection so the
-// `?config=` query param drops in sync.
-const detailDrawerOpen = computed<boolean>({
-  get: () => selectedConfigId.value != null,
-  set: (open) => {
-    if (!open) clearSelection();
-  },
-});
-// Used by the drawer header's #header-right slot — same mapping the
-// detail panel used for its in-panel badge so type/version chrome looks
-// identical, just relocated into the drawer header.
-function shortType(type: string): string {
-  if (type === "numeric") return t("onlineEvals.quality.dataTypes.numericShort");
-  if (type === "categorical") return t("onlineEvals.quality.dataTypes.categoricalShort");
-  if (type === "boolean") return t("onlineEvals.quality.dataTypes.booleanShort");
-  return "—";
-}
 </script>

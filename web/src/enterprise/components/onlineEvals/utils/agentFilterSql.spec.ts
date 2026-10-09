@@ -3,7 +3,6 @@ import {
   agentFilterKey,
   agentFilterLabel,
   buildEvaluatorAgentFilterWhere,
-  buildScoresAgentFilterWhere,
   combineWhere,
   type AgentFilterSelection,
 } from "./agentFilterSql";
@@ -16,30 +15,6 @@ const agentWithId: AgentFilterSelection = {
 };
 
 describe("agentFilterSql", () => {
-  it("filters _llm_scores inline on agent_id", () => {
-    const sql = buildScoresAgentFilterWhere(agentWithId);
-
-    expect(sql).toBe("agent_id = 'agent-123'");
-  });
-
-  it("falls back to agent_name when id is missing", () => {
-    const sql = buildScoresAgentFilterWhere({ ...agentWithId, id: null });
-
-    expect(sql).toBe("agent_name = 'support-agent'");
-  });
-
-  it("adds agent_version and agent_env clauses when the variant carries them", () => {
-    const sql = buildScoresAgentFilterWhere({
-      ...agentWithId,
-      env: "production",
-      version: "1.3.0",
-    });
-
-    expect(sql).toBe(
-      "agent_id = 'agent-123' AND agent_version = '1.3.0' AND agent_env = 'production'",
-    );
-  });
-
   it("filters _evaluator inline on attributes_target_agent_id", () => {
     const sql = buildEvaluatorAgentFilterWhere(agentWithId);
 
@@ -53,14 +28,9 @@ describe("agentFilterSql", () => {
   });
 
   it("escapes agent values", () => {
-    const sql = buildScoresAgentFilterWhere({
-      name: "agent'one",
-      id: null,
-      source_stream: 'prod"traces',
-      source_stream_type: 'traces"prod',
-    });
+    const sql = buildEvaluatorAgentFilterWhere({ name: "agent'one", id: null });
 
-    expect(sql).toBe("agent_name = 'agent''one'");
+    expect(sql).toBe("attributes_target_agent_name = 'agent''one'");
   });
 
   it("keys identity by source stream and id-or-name", () => {

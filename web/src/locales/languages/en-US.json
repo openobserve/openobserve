@@ -13347,143 +13347,104 @@
     },
     "quality": {
       "allAgents": "All Agents",
-      "agentLabel": "Agent",
-      "agentPlaceholder": "All agents",
-      "kpisAriaLabel": "Tier 1 KPIs",
-      "dataTypes": {
-        "numericShort": "Num",
-        "categoricalShort": "Cat",
-        "booleanShort": "Bool"
+      "overview": {
+        "relativeTime": {
+          "daysAgo": "{day}d ago"
+        }
       },
+      "healthyIf": "Healthy if {rule}",
+      "setThreshold": "Set a healthy threshold",
+      "noScoresInWindow": "No scores in this window",
+      "outOf": "{count} out of {total}",
+      "scopeCount": "{scope} {count}",
       "scopes": {
-        "filterLabel": "Score scope",
-        "filterHint": "Compare this Score Config across evaluation target scopes.",
         "all": "All",
         "span": "Span",
         "trace": "Trace",
         "session": "Session"
       },
-      "kpis": {
-        "scoreResults": {
-          "title": "Score Results"
-        },
-        "evaluationCost": {
-          "title": "Evaluation Cost"
-        },
-        "scorerSuccess": {
-          "title": "Scorer Success"
-        },
-        "scorerFailures": {
-          "title": "Scorer Failures"
-        },
-        "latencyP95": {
-          "title": "Scorer Latency p95"
-        },
-        "vsPrev": "vs prev",
-        "noPriorData": "no prior data",
-        "noData": "—"
+      "scopeNouns": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
       },
-      "detail": {
-        "loading": "Loading per-config breakdown…",
-        "noData": "No scores yet for this config in this window.",
-        "empty": {
-          "title": "Waiting for your first scores",
-          "titleScoped": "No {scope} scores in this window",
-          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs.",
-          "descriptionScoped": "No {scope} scores have landed for this config in the selected time range. Choose another scope or widen the time range."
-        },
-        "trendTitle": "Trend",
-        "distributionTitle": "Score distribution",
-        "categoryDistributionTitle": "Category distribution",
-        "healthyRateTitle": "Healthy rate over time",
-        "trueRateTitle": "True rate over time",
-        "trueFalseTitle": "True vs False",
-        "legendAvg": "Avg",
-        "legendThreshold": "threshold {'{'}direction{'}'} {'{'}value{'}'}",
-        "markLineHealthy": "healthy {direction} {value}",
-        "healthyThreshold": "Healthy {threshold}",
-        "legendHealthy": "healthy",
-        "legendUnhealthy": "unhealthy",
-        "legendHealthyRate": "Healthy rate",
-        "legendTrueRate": "True rate",
-        "legendTrueCount": "true ({count})",
-        "legendFalseCount": "false ({count})",
-        "kpis": {
-          "average": "Average",
-          "p50": "P50",
-          "p95": "P95",
-          "unhealthy": "Unhealthy",
-          "healthy": "Healthy",
-          "trueRate": "True rate",
-          "falseRate": "False rate",
-          "coverage": "Coverage",
-          "targetsScored": "Targets scored"
-        },
-        "health": {
-          "title": "Health status",
-          "noThreshold": "No healthy threshold is configured. Scores cannot be classified as healthy or degrading yet.",
-          "thresholdOnly": "Healthy if {threshold}",
-          "summary": "{percent}% below threshold · Healthy if {threshold}"
-        },
-        "ofScoreResults": "of {count} score results",
-        "range": "Range {min}–{max}"
+      "tiles": {
+        "attention": "Configs needing attention",
+        "ofTotal": "of {total}",
+        "attentionNote": "Show them",
+        "attentionTooltip": "Configs with at least one unhealthy score",
+        "withoutResult": "Configs without a result",
+        "withoutResultTooltip": "Configs with no scores in this time range, or without a healthy threshold. Click to show them.",
+        "noScores": "{count} got no scores | {count} got no scores",
+        "noThreshold": "{count} has no threshold | {count} have no threshold",
+        "allGiveResult": "Every config gives a result",
+        "failedRuns": "{count} failed run | {count} failed runs",
+        "evalJobs": "Eval Jobs"
       },
-      "runs": {
-        "title": "Evaluation scores",
-        "hint": "Scores and reasoning come from _llm_scores. Select a run to open its evaluator trace for further investigation.",
-        "filterLabel": "Filter evaluation scores",
-        "noThresholdHint": "Set a healthy threshold on this Score Config to classify and highlight unhealthy scores.",
-        "noReasoning": "No reasoning recorded",
-        "unknownAgent": "Unknown agent",
-        "unknownScope": "Unknown scope",
-        "queryError": "Evaluation scores could not be refreshed. The last successful page is still shown.",
-        "empty": "No evaluation scores in this time range.",
-        "emptyUnhealthy": "No unhealthy scores in this time range.",
-        "filters": {
-          "all": "All scores",
-          "unhealthy": "Unhealthy"
-        },
-        "health": {
-          "healthy": "Healthy",
-          "unhealthy": "Unhealthy"
-        },
-        "columns": {
-          "time": "Evaluated",
-          "result": "Score",
-          "reasoning": "Reasoning",
-          "target": "Target",
-          "agent": "Agent"
-        }
-      },
-      "overview": {
+      "table": {
         "searchPlaceholder": "Filter configs…",
-        "relativeTime": {
-          "daysAgo": "{day}d ago",
-          "monthsAgo": "{month}mo ago"
-        },
-        "status": {
-          "healthy": "Healthy",
-          "unhealthy": "Needs attention",
-          "noThreshold": "Threshold not set",
-          "noData": "No score data"
-        },
-        "health": {
-          "thresholdSummary": "{percent}% below · Healthy if {threshold}",
-          "noThresholdHint": "Set a healthy threshold",
-          "noDataHint": "No scores in this window"
-        },
+        "openUnhealthy": "Open the unhealthy scores",
+        "configLink": "Config",
+        "averageRange": "average, {min} to {max}",
+        "mostCommon": "most common · {count} of {total}",
         "columns": {
-          "health": "Health",
           "scoreConfig": "Score Config",
-          "type": "Type",
-          "quality": "Quality",
-          "totalScores": "Total Scores",
-          "scopeMix": "Scope Mix",
-          "volumeTrend": "Volume Trend",
+          "health": "Health",
+          "typicalScore": "Typical score",
+          "unhealthy": "Unhealthy",
+          "scores": "Scores",
           "updated": "Updated"
         }
       },
-      "averageWithHealthyRate": "Average · {rate}% healthy"
+      "detail": {
+        "back": "All configs",
+        "backToAll": "Back to all configs",
+        "editConfig": "Edit config",
+        "notFound": "Score Config not found",
+        "notFoundDescription": "It may have been deleted, or the link points to an old config.",
+        "emptyTitle": "Waiting for your first scores",
+        "emptyTitleScoped": "No {scope} scores in this window",
+        "emptyDescription": "No scores landed for this config in the selected time range. They appear here once a scorer that uses it runs.",
+        "distributionNumeric": "Score distribution",
+        "distributionValues": "Value distribution",
+        "averageValue": "average {value}",
+        "legendHealthy": "Healthy",
+        "legendUnhealthy": "Unhealthy",
+        "legendScores": "Scores",
+        "chartTooltip": "{count} scores, {unhealthy} unhealthy",
+        "chartTooltipCount": "{count} scores",
+        "filterRange": "{from} to {to}",
+        "clearFilter": "Clear filter"
+      },
+      "review": {
+        "title": "Evaluation scores",
+        "all": "All",
+        "unhealthy": "Unhealthy",
+        "unhealthyDisabled": "Set a healthy threshold to classify scores",
+        "inputNotCaptured": "Input not captured",
+        "outputNotCaptured": "Output not captured",
+        "noMatch": "No scores match this filter"
+      },
+      "pane": {
+        "noneSelected": "No score selected",
+        "healthy": "Healthy",
+        "unhealthy": "Unhealthy",
+        "noThreshold": "No healthy threshold set",
+        "previous": "Previous score",
+        "next": "Next score",
+        "reasoning": "Reasoning",
+        "noReasoning": "No reasoning recorded",
+        "fullTextUnavailable": "Full text not available",
+        "open": {
+          "span": "Open span",
+          "trace": "Open trace",
+          "session": "Open session"
+        },
+        "evaluatorTrace": "Evaluator trace",
+        "addToDataset": "Add to dataset",
+        "datasetSession": "Datasets take a single trace or span. Open the session to add one of its traces.",
+        "datasetNoStream": "This score has no source stream to add from."
+      }
     },
     "singular": {
       "jobs": "Eval Job",
@@ -14179,22 +14140,18 @@
       }
     },
     "importCount": "Import ({count})",
-    "count": "Count",
     "failedToDeriveSchema": "Failed to derive schema",
     "failedToImportScoreConfig": "Failed to import score config",
     "failedToImportScorer": "Failed to import scorer",
     "failedToFetchCatalog": "Failed to fetch catalog ({status})",
     "failedToLoadCatalog": "Failed to load catalog",
     "failedToRunScorerTest": "Failed to run scorer test",
-    "healthyRate": "Healthy rate",
     "invalidJsonFormat": "Invalid JSON format",
     "jsonIsEmpty": "JSON is empty",
     "scorerTestFailed": "Scorer test failed",
     "scorerTestSampleContext": "France country profile: Paris is the capital city.",
     "scorerTestSampleInput": "The capital of France is Paris, located on the Seine river.",
     "scorerTestSampleOutput": "Paris is the capital of France.",
-    "topCategory": "Top category",
-    "trueRate": "True rate",
     "unknownError": "Unknown error",
     "import": {
       "createdSuccessfully": "\"{name}\" created successfully",
@@ -16314,6 +16271,7 @@
       "evalTemplates": "Online Evals — Templates",
       "scorers": "Online Evals — Scorers",
       "evalJobs": "Online Evals — Jobs",
+      "quality": "Online Evals — Quality",
       "scoreConfigs": "Online Evals — Score Configs",
       "actions": "Actions",
       "llmProviders": "LLM Providers",
@@ -16417,6 +16375,7 @@
       "evalTemplatesRefresh": "Refresh list",
       "scorersRefresh": "Refresh list",
       "evalJobsRefresh": "Refresh list",
+      "qualityBack": "Back to all configs",
       "scoreConfigsRefresh": "Refresh list",
       "actionsRefresh": "Refresh list",
       "llmProvidersRefresh": "Refresh list",
@@ -16628,11 +16587,10 @@
         "high": "High"
       },
       "qualityStatus": {
-        "nothreshold": "No Threshold",
-        "nodata": "No Data",
+        "attention": "Needs attention",
         "healthy": "Healthy",
-        "warn": "Warn",
-        "unhealthy": "Unhealthy"
+        "unset": "Threshold not set",
+        "nodata": "No score data"
       },
       "rumEventType": {
         "longtask": "Long Task",

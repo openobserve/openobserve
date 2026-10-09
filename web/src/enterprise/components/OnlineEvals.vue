@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
       </div>
 
       <OPageHeader
-        v-if="hideTabBar && embeddedHeader"
+        v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
         :title="raw(embeddedHeader.title)"
         :subtitle="raw(embeddedHeader.subtitle)"
         :icon="embeddedHeader.icon"
@@ -132,16 +132,25 @@ the Free Software Foundation, either version 3 of the License, or
             {{ addButtonLabel }}
           </OButton>
         </template>
-        <template v-else-if="activeTab === 'quality'" #actions>
-          <!-- Agent filter is rendered inside QualityPage (right-aligned, above
-               the KPIs) so it sits within the content container alongside the
-               data it filters — only the date picker + refresh stay here. -->
-          <!-- Last-refreshed indicator + labeled primary Refresh button, matching
-               the other AI pages' AiPageShell header. -->
+      </OPageHeader>
+
+      <!-- Quality draws its own page header, so an open config can take it over as the detail header. -->
+      <QualityPage
+        v-if="activeTab === 'quality'"
+        :score-configs="scoreConfigs"
+        :configs-loading="isLoading"
+        :date-window="qualityDateWindow"
+        :agent-params="qualityAgentParams"
+        :evaluator-agents="qualityEvaluatorAgents"
+        :enabled="qualityScopeReady"
+        @status="(status) => (qualityStatus = status)"
+      >
+        <template #header-actions>
+          <!-- Last-refreshed indicator + labeled primary Refresh button, matching the other AI pages. -->
           <AiLastRefreshed
             class="me-1 max-lg:hidden"
-            :last-run-at="qualityLastRunAt"
-            :loading="qualityRefreshing"
+            :last-run-at="qualityStatus.updatedAt"
+            :loading="qualityBusy"
             data-test="quality-last-refreshed"
           />
           <DateTimePickerDashboard
@@ -155,17 +164,29 @@ the Free Software Foundation, either version 3 of the License, or
             variant="primary"
             size="sm-toolbar"
             icon-left="refresh"
-            :disabled="qualityRefreshing"
-            :loading="qualityRefreshing"
+            :disabled="qualityBusy"
+            :loading="qualityBusy"
             data-test="quality-refresh-btn"
             @click="onQualityRefresh"
           >
             {{ t("common.refresh") }}
           </OButton>
         </template>
-      </OPageHeader>
+        <template #filters>
+          <AgentScopeCascade
+            prefix="quality"
+            :envs="qualityEnvs"
+            :agent-names="qualityAgentNames"
+            :versions="qualityVersions"
+            v-model:selected-env="qualitySelectedEnv"
+            v-model:selected-agent-name="qualitySelectedAgentName"
+            v-model:selected-version="qualitySelectedVersion"
+          />
+        </template>
+      </QualityPage>
 
       <section
+        v-else
         class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <OTabs
@@ -187,22 +208,8 @@ the Free Software Foundation, either version 3 of the License, or
         </OTabs>
 
         <div class="online-evals__body flex min-h-0 flex-1">
-          <QualityPage
-            v-if="activeTab === 'quality'"
-            ref="qualityPageRef"
-            :agent-key="qualityAgentKey"
-            :agent-options="qualityAgentOptions"
-            :agents-loading="qualityAgentsLoading"
-            :date-window="qualityDateWindow"
-            :agent-filter="selectedQualityAgent"
-            :score-configs="scoreConfigs"
-            :configs-loading="isLoading"
-            @update:agent-key="onQualityAgentChange"
-            @ready="reloadQuality()"
-            @reload-configs="reloadLists()"
-          />
           <ScoreConfigList
-            v-else-if="activeTab === 'scoreConfigs'"
+            v-if="activeTab === 'scoreConfigs'"
             :forbidden="scoreConfigsForbidden"
             :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
@@ -382,7 +389,7 @@ import {
   setJobActiveMutation,
   deleteEvalEntityMutation,
 } from "@/services/online-evals.service.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, type Query } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -434,19 +441,24 @@ import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefre
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import type { DateWindow } from "./onlineEvals/composables/useQualityData";
-import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
+import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
+import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import type { DateWindow } from "./onlineEvals/composables/useQualityList";
+import {
+  DEFAULT_QUALITY_RANGE,
+  agentParamsFor,
+  qualityRangeFromQuery,
+  qualityRangeQuery,
+  selectedAgents,
+} from "./onlineEvals/utils/qualityFormat";
+import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
+import { resolveAiDateWindow, type AiDateState } from "@/enterprise/composables/useAiDateRange";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
+import { traceDetailsKeys } from "@/services/search.querykeys";
 import { downloadFile } from "@/utils/dom";
 import type { I18nKey } from "@/types/i18n";
-import {
-  ALL_AGENTS_VALUE,
-  agentFilterKey,
-  agentFilterLabel,
-  type AgentFilterSelection,
-} from "./onlineEvals/utils/agentFilterSql";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
   exportScoreConfigFileName,
@@ -649,218 +661,177 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
   activeTab.value === "scorers" ? "scorer" : "scoreConfig",
 );
 
-// ── Quality tab: date picker + refresh state ─────────────────────────────
-// The picker + refresh button live in the embedded OPageHeader's #actions
-// slot (matching LLM Insights / Sessions). QualityPage consumes
-// `qualityDateWindow` as a prop and exposes `refreshAll` + `isAnyLoading` for
-// the Refresh button below.
-//
-// Date state is the shared `useAiDateRange()` ref — the same singleton
-// driving LLM Insights and Sessions — so picking a window on one page
-// lands on the other two (incl. across reloads via localStorage).
-const { state: qualitySelectedDate } = useAiDateRange();
-
-// Seed the window from the *persisted* AI date range (relative or absolute),
-// resolved synchronously, so QualityPage's initial onMounted refresh queries
-// the correct window from the very first paint. Fall back to the 15m default
-// only if the persisted state can't be resolved.
-const initialQualityWindow = resolveAiDateWindow(qualitySelectedDate.value);
-const qualityDateWindow = ref<DateWindow>(
-  initialQualityWindow
-    ? {
-        startUs: initialQualityWindow.startTime,
-        endUs: initialQualityWindow.endTime,
-      }
-    : {
-        startUs: (Date.now() - 15 * 60 * 1000) * 1000,
-        endUs: Date.now() * 1000,
-      },
+// ── Quality tab: its own range (default Past 24 Hours, kept in the URL); LLM Insights and Sessions keep the shared AI range.
+const qualitySelectedDate = ref<AiDateState>(
+  qualityRangeFromQuery(route.query) ?? { ...DEFAULT_QUALITY_RANGE },
 );
-const qualityAgents = ref<AgentFilterSelection[]>([]);
-const qualityAgentKey = ref(ALL_AGENTS_VALUE);
+const initialQualityWindow =
+  resolveAiDateWindow(qualitySelectedDate.value) ?? resolveAiDateWindow(DEFAULT_QUALITY_RANGE)!;
+const qualityDateWindow = ref<DateWindow>({
+  startUs: initialQualityWindow.startTime,
+  endUs: initialQualityWindow.endTime,
+});
 const qualityDatePickerRef = ref<{
   getConsumableDateTime: () => { startTime: number; endTime: number };
 } | null>(null);
-const qualityPageRef = ref<{
-  refreshAll: (reloadConfigs?: boolean) => Promise<void>;
-  isAnyLoading: boolean;
-} | null>(null);
 
-const qualityAgentOptions = computed(() => [
-  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
-  ...qualityAgents.value.map((agent) => ({
-    label: raw(agentFilterLabel(agent)),
-    value: agentFilterKey(agent),
-  })),
-]);
-
-const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
-  if (qualityAgentKey.value === ALL_AGENTS_VALUE) return null;
-  return (
-    qualityAgents.value.find((agent) => agentFilterKey(agent) === qualityAgentKey.value) ?? null
-  );
+// Env, Agent and Version start at "All"; the selection is local to the page and mirrored in the URL.
+const {
+  agents: qualityAgents,
+  loadAgents: loadQualityAgentList,
+  envs: qualityEnvs,
+  agentNames: qualityAgentNames,
+  versions: qualityVersions,
+  selectedEnv: qualitySelectedEnv,
+  selectedAgentName: qualitySelectedAgentName,
+  selectedVersion: qualitySelectedVersion,
+} = useAgentScope({
+  filterMode: ref<"stream" | "agent">("agent"),
+  activeStream: ref(""),
+  orgId: () => orgId.value,
+  getWindow: () => ({
+    start: qualityDateWindow.value.startUs,
+    end: qualityDateWindow.value.endUs,
+  }),
+  cascade: true,
+  allOption: true,
+  t,
 });
 
-// True while the agent list is being fetched (the FIRST phase of reloadQuality,
-// before any quality data loader runs). QualityPage uses this to skeleton the
-// agent dropdown + the KPI/table so the page reads as "loading" from the very
-// start of a reload instead of looking idle until the data queries kick in.
-const qualityAgentsLoading = ref(false);
+const qualityAgentParams = computed(() =>
+  agentParamsFor(
+    qualityAgents.value,
+    qualitySelectedEnv.value,
+    qualitySelectedAgentName.value,
+    qualitySelectedVersion.value,
+  ),
+);
 
-async function loadQualityAgents(force = false) {
-  const { startUs, endUs } = qualityDateWindow.value;
-  if (!orgId.value || !startUs || !endUs) return;
-  qualityAgentsLoading.value = true;
-  try {
-    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
-    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
-    if (force) {
-      await queryClient.invalidateQueries({
-        queryKey: options.queryKey,
-        exact: true,
-        refetchType: "none",
-      });
-    }
-    const response = await queryClient.fetchQuery(options);
-    qualityAgents.value = response.agents;
-    const urlAgentName = qualityAgentNameFromUrl();
-    const urlAgent = urlAgentName
-      ? qualityAgents.value.find((agent) => agent.name === urlAgentName)
-      : null;
-    if (urlAgent) qualityAgentKey.value = agentFilterKey(urlAgent);
-    if (
-      qualityAgentKey.value !== ALL_AGENTS_VALUE &&
-      !qualityAgents.value.some((agent) => agentFilterKey(agent) === qualityAgentKey.value)
-    ) {
-      qualityAgentKey.value = ALL_AGENTS_VALUE;
-    }
-    if (urlAgentName && !urlAgent) syncQualityAgentUrl();
-  } catch (err) {
-    console.warn("Failed to load GenAI agents", err);
-    qualityAgents.value = [];
-    qualityAgentKey.value = ALL_AGENTS_VALUE;
-  } finally {
-    qualityAgentsLoading.value = false;
-  }
+// Quality queries wait for the first agent list, so a deep-linked agent applies before the first request.
+const qualityScopeReady = ref(false);
+const qualityRefreshing = ref(false);
+const qualityStatus = ref<{ updatedAt: number | null; fetching: boolean }>({
+  updatedAt: null,
+  fetching: false,
+});
+const qualityBusy = computed(() => qualityRefreshing.value || qualityStatus.value.fetching);
+
+// `?env=&type=agent&agent=&version=`, the same keys LLM Insights writes; old `?type=agent&agent=` links still apply.
+function applyQualityScopeFromUrl() {
+  const { env, type, agent, version } = route.query;
+  if (typeof env === "string") qualitySelectedEnv.value = env;
+  if (type === "agent" && typeof agent === "string") qualitySelectedAgentName.value = agent;
+  if (typeof version === "string") qualitySelectedVersion.value = version;
 }
 
-// Same `?type=agent&agent=<name>` convention LLM Insights uses, so links carry the agent between the two pages.
-function qualityAgentNameFromUrl(): string | null {
-  return route.query.type === "agent" && typeof route.query.agent === "string"
-    ? route.query.agent
-    : null;
-}
-
-function syncQualityAgentUrl() {
+// One writer for the scope levels and the range, so two replaces in one tick cannot drop each other's keys.
+function syncQualityUrl() {
+  // The route, not activeTab, decides: a link away from Quality may not have reached activeTab yet.
+  if (parseTabFromRoute(route.query.tab) !== "quality") return;
   const query: Record<string, any> = { ...route.query };
-  const name = selectedQualityAgent.value?.name;
-  if (name) {
-    query.type = "agent";
-    query.agent = name;
-  } else {
-    delete query.agent;
-    if (query.type === "agent") delete query.type;
+  const params: Record<string, string | undefined> = {
+    env: qualitySelectedEnv.value,
+    agent: qualitySelectedAgentName.value,
+    version: qualitySelectedVersion.value,
+    ...qualityRangeQuery(qualitySelectedDate.value),
+  };
+  for (const [key, value] of Object.entries(params)) {
+    if (value && value !== ALL_AGENTS_VALUE) query[key] = value;
+    else delete query[key];
   }
+  if (query.agent) query.type = "agent";
+  else if (query.type === "agent") delete query.type;
+  // Unchanged URLs are left alone, so this cannot race the page's own page and score replace.
+  const sorted = (q: Record<string, unknown>) => JSON.stringify(Object.entries(q).sort());
+  if (sorted(query) === sorted(route.query)) return;
   router.replace({ query }).catch(() => {});
 }
 
+async function loadQualityAgents(force = false) {
+  const { startUs, endUs } = qualityDateWindow.value;
+  if (!orgId.value) return;
+  // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: genAiAgentsQuery(orgId.value, startUs, endUs).queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  await loadQualityAgentList(startUs, endUs);
+  if (!qualityScopeReady.value) {
+    applyQualityScopeFromUrl();
+    qualityScopeReady.value = true;
+    syncQualityUrl();
+  }
+}
+
 function syncQualityDateWindow() {
-  const picker = qualityDatePickerRef.value;
-  if (!picker) return;
-  const dt = picker.getConsumableDateTime();
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
-    qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
-  }
+  const picked = qualityDatePickerRef.value?.getConsumableDateTime();
+  const resolved =
+    picked && typeof picked.startTime === "number" && typeof picked.endTime === "number"
+      ? picked
+      : resolveAiDateWindow(qualitySelectedDate.value);
+  if (resolved) qualityDateWindow.value = { startUs: resolved.startTime, endUs: resolved.endTime };
 }
 
-// ── Quality reload orchestration ─────────────────────────────────────────
-// ONE path drives every quality fetch. Exactly three triggers reload
-// everything (agent list + KPIs + table + charts):
-//   1. The Quality page mounts            → @ready
-//   2. The user clicks Refresh            → onQualityRefresh
-//   3. The date-time window changes       → watch(qualitySelectedDate)
-// All three run the SAME sequence: re-anchor the window from the picker, load
-// the agent list FIRST, then load the quality data — so the agent filter is
-// always populated before the data it scopes is fetched.
-//
-// Changing the agent filter is a data-only reload (the agent list itself is
-// unchanged) and is handled separately by onQualityAgentChange below.
-const qualityReloading = ref(false);
-
-async function reloadQuality(userRefresh = false) {
-  qualityReloading.value = true;
-  try {
-    // On the @ready trigger this runs from QualityPage's onMounted; wait a
-    // tick so the parent's `qualityPageRef` is guaranteed assigned before we
-    // call into it.
-    await nextTick();
-    syncQualityDateWindow();
-    await loadQualityAgents(userRefresh);
-    // The agent key may have changed; let the `agent-filter` prop reach QualityPage before it queries.
-    await nextTick();
-    await qualityPageRef.value?.refreshAll?.(userRefresh);
-  } finally {
-    qualityReloading.value = false;
-  }
-}
-
-// Trigger 2 — Refresh button. Re-anchors relative ranges ("Past 15 minutes")
-// to "now" via the shared reload path.
-function onQualityRefresh() {
-  void reloadQuality(true);
-}
-
-// Trigger 3 — date-time change. DateTimePickerDashboard's inner DateTime emits
-// `update:modelValue` ONCE on mount (its onMounted calls saveDate → on:date-change),
-// re-anchoring qualitySelectedDate to the same window it already holds. That echo
-// would fire a second full reloadQuality on top of the @ready one, double-hitting
-// every quality API. The picker remounts every time the quality tab is (re-)entered
-// (it lives in the tab-scoped header slot), so this echo recurs on each entry — not
-// just first load. `qualityDateEchoPending` is armed on entry (see watch(activeTab))
-// and here swallows exactly the next (mount) change; genuine user date changes reload.
-let qualityDateEchoPending = true;
 watch(qualitySelectedDate, () => {
-  if (qualityDateEchoPending) {
-    qualityDateEchoPending = false;
-    return;
-  }
-  void reloadQuality();
+  syncQualityDateWindow();
+  if (qualityScopeReady.value) syncQualityUrl();
 });
 
-// Org switch — reset the agent filter and reload from scratch.
-watch(orgId, () => {
-  qualityAgentKey.value = ALL_AGENTS_VALUE;
-  syncQualityAgentUrl();
-  void reloadQuality();
-});
-
-// User picked a different agent — only the data needs refetching; the agent
-// list is unchanged. Driven explicitly from the dropdown's update event (not a
-// watch on the key) so the programmatic reset inside loadQualityAgents()
-// during reloadQuality() never double-fires a data reload.
-async function onQualityAgentChange(key: string) {
-  qualityAgentKey.value = key;
-  syncQualityAgentUrl();
-  // `selectedQualityAgent` → the `agent-filter` prop → the child's
-  // `agentFilterRef` only update on the next render tick. Wait for it so
-  // `refreshAll()` queries the newly selected agent, not the previous one.
-  await nextTick();
-  await qualityPageRef.value?.refreshAll?.();
-}
-
-// Aggregated "is a quality reload in flight" — covers the agent-load phase
-// plus every in-flight QualityPage loader, so the Refresh button spins from
-// click to settle.
-const qualityRefreshing = computed(
-  () => qualityReloading.value || (qualityPageRef.value?.isAnyLoading ?? false),
+watch(
+  () => [activeTab.value, orgId.value, qualityDateWindow.value] as const,
+  ([tab]) => {
+    if (tab === "quality" && !qualityRefreshing.value) void loadQualityAgents();
+  },
+  { immediate: true },
 );
 
-// Last-refresh timestamp for the header's ORefreshButton — stamped when a
-// reload settles (true → false), mirroring the Sessions / LLM Insights pages.
-const qualityLastRunAt = ref<number | null>(null);
-watch(qualityRefreshing, (isLoading, wasLoading) => {
-  if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
-});
+// The config key is watched too: Back to the list restores an entry written before a later Env/Agent/Version change.
+watch(
+  [qualitySelectedEnv, qualitySelectedAgentName, qualitySelectedVersion, () => route.query.config],
+  () => {
+    if (qualityScopeReady.value) syncQualityUrl();
+  },
+);
+
+const qualityEvaluatorAgents = computed(() =>
+  selectedAgents(
+    qualityAgents.value,
+    qualitySelectedEnv.value,
+    qualitySelectedAgentName.value,
+    qualitySelectedVersion.value,
+  ),
+);
+
+// Refresh moves a relative range to now and forces every read on the Quality view.
+async function onQualityRefresh() {
+  if (qualityRefreshing.value) return;
+  qualityRefreshing.value = true;
+  const startedAt = Date.now();
+  try {
+    syncQualityDateWindow();
+    await Promise.all([reloadLists(true), loadQualityAgents(true)]);
+    // Once the moved window has reached the keys, expire every quality read the Refresh has not already fetched; the active ones refetch.
+    await nextTick();
+    const notRefreshed = (query: Query) =>
+      query.state.dataUpdatedAt < startedAt && query.state.fetchStatus !== "fetching";
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: onlineEvalKeys.quality(orgId.value),
+        predicate: notRefreshed,
+      }),
+      // The score pane's full text comes from the trace.
+      queryClient.invalidateQueries({
+        queryKey: traceDetailsKeys.all(orgId.value),
+        predicate: notRefreshed,
+      }),
+    ]);
+  } finally {
+    qualityRefreshing.value = false;
+  }
+}
 
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
@@ -888,10 +859,6 @@ const deleteDialogMessage = computed(() =>
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
-  // Re-arm the date-picker mount-echo guard: entering quality remounts the
-  // picker, which emits `update:modelValue` once on mount. @ready already owns
-  // the entry reload, so that echo must be swallowed to avoid a double fetch.
-  if (next === "quality") qualityDateEchoPending = true;
   if (route.query.tab !== next) {
     router.replace({ query: { ...route.query, tab: next } }).catch(() => {});
   }

@@ -189,6 +189,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.onlineEvals",
     pages: [
       "shortcuts.pages.evalTemplates",
+      "shortcuts.pages.quality",
       "shortcuts.pages.scorers",
       "shortcuts.pages.evalJobs",
       "shortcuts.pages.scoreConfigs",
@@ -969,6 +970,16 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.evalTemplatesRefresh",
       },
+    ],
+  },
+
+  // ── Online Evals — Quality ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.quality",
+    scope: "quality",
+    visible: onlineEvals,
+    shortcuts: [
+      { id: "qualityBack", key: "escape", descriptionKey: "shortcuts.actions.qualityBack" },
     ],
   },
 

@@ -28,4 +28,12 @@ export const onlineEvalKeys = {
   scoreConfigs: (org: string) => orgKey(org, "onlineEvals", "scoreConfigs"),
   scorers: (org: string) => orgKey(org, "onlineEvals", "scorers"),
   jobs: (org: string) => orgKey(org, "onlineEvals", "jobs"),
+  /** Every read on the Quality page, so its Refresh can force them together. */
+  quality: (org: string) => orgKey(org, "onlineEvals", "quality"),
+  qualityList: (org: string, params: Record<string, unknown>) =>
+    orgKey(org, "onlineEvals", "quality", "list", params),
+  qualityScores: (org: string, entityId: string, params: Record<string, unknown>) =>
+    orgKey(org, "onlineEvals", "quality", "scores", entityId, params),
+  qualityFailedRuns: (org: string, start: number, end: number, agentWhere: string | null) =>
+    orgKey(org, "onlineEvals", "quality", "failedRuns", start, end, agentWhere),
 };
