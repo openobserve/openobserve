@@ -29,6 +29,7 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   striped?: boolean;
   rowClassFn?: string | ((row: any) => string);
@@ -273,6 +274,7 @@ function onRowMouseleave() {
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
