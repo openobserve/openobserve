@@ -29,6 +29,13 @@
  * about it, so it is pinned by pytest in the enterprise repo at
  * `tests/api-testing/tests/rbac/functions/functions/test_import_export_rbac.py`
  * rather than through a browser.
+ *
+ * The filtering half of that premise is NOT unconditional: it needs
+ * `O2_OPENFGA_LIST_ONLY_PERMITTED`, which defaults to FALSE. With it off,
+ * `list_objects_for_user` returns None and the route returns every function in the
+ * org whatever the per-object grants say -- so the export bundles the "hidden" one
+ * and the first test below fails. The enterprise `Pipelines-RBAC` shard sets the
+ * flag; a default deployment does not, and there this file's scenario cannot arise.
  */
 
 const { test, expect } = require('../baseFixtures.js');
