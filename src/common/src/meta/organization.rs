@@ -467,10 +467,6 @@ fn default_usage_stream_enabled() -> bool {
     false
 }
 
-fn default_red_insights_enabled() -> bool {
-    true
-}
-
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
@@ -551,7 +547,7 @@ pub struct OrganizationSetting {
     pub max_series_per_query: Option<usize>,
     #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
-    #[serde(default = "default_red_insights_enabled")]
+    #[serde(default)]
     pub red_insights_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
@@ -592,7 +588,7 @@ impl Default for OrganizationSetting {
             dark_mode_theme_color,
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
-            red_insights_enabled: default_red_insights_enabled(),
+            red_insights_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
@@ -1653,15 +1649,11 @@ mod tests {
     }
 
     #[test]
-    fn test_red_insights_enabled_defaults_on_and_round_trips() {
-        assert!(OrganizationSetting::default().red_insights_enabled);
+    fn test_red_insights_enabled_defaults_off_and_round_trips() {
+        assert!(!OrganizationSetting::default().red_insights_enabled);
         let legacy: OrganizationSetting =
             serde_json::from_str(r#"{"scrape_interval": 15}"#).unwrap();
-        assert!(legacy.red_insights_enabled);
-        let off: OrganizationSetting =
-            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": false}"#)
-                .unwrap();
-        assert!(!off.red_insights_enabled);
+        assert!(!legacy.red_insights_enabled);
         let on: OrganizationSetting =
             serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": true}"#)
                 .unwrap();
