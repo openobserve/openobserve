@@ -31,6 +31,22 @@ pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
+/// Every stream name O2 writes itself; web/src/utils/internalStreams.ts must list the same names.
+pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
+    USAGE_STREAM,
+    AUDIT_STREAM,
+    STATS_STREAM,
+    TRIGGERS_STREAM,
+    ERROR_STREAM,
+    DATA_RETENTION_USAGE_STREAM,
+    "cloud_events",
+    "_agent_signals",
+    super::redaction::REDACTION_EVIDENCE_STREAM,
+    super::evaluator::EVALUATOR_STREAM,
+    super::llm_scores::LLM_SCORES_STREAM,
+    super::llm_experiments::LLM_EXPERIMENT_STREAM,
+    "_anomalies",
+];
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
 /// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
@@ -1469,6 +1485,67 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Search), "Search");
         assert_eq!(format!("{}", UsageEvent::Functions), "Functions");
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
+    }
+
+    /// Quoted names inside the `INTERNAL_STREAM_NAMES` array literal of a TypeScript source.
+    fn ts_internal_stream_names(source: &str) -> Vec<String> {
+        let start = source
+            .find("INTERNAL_STREAM_NAMES")
+            .expect("INTERNAL_STREAM_NAMES missing from internalStreams.ts");
+        let rest = &source[start..];
+        let assign = rest
+            .find('=')
+            .expect("INTERNAL_STREAM_NAMES is not assigned");
+        let open = rest[assign..]
+            .find('[')
+            .expect("INTERNAL_STREAM_NAMES has no array literal")
+            + assign;
+        let close = rest[open..].find(']').expect("unterminated array literal") + open;
+        rest[open + 1..close]
+            .lines()
+            .map(|line| line.split("//").next().unwrap_or(""))
+            .flat_map(|line| line.split(','))
+            .map(|item| {
+                item.trim()
+                    .trim_matches(|c| c == '"' || c == '\'' || c == '`')
+            })
+            .filter(|item| !item.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn test_internal_stream_names_match_web_list() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../web/src/utils/internalStreams.ts");
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let mut web = ts_internal_stream_names(&source);
+        web.sort();
+        let mut rust = INTERNAL_STREAM_NAMES.map(str::to_string).to_vec();
+        rust.sort();
+        assert_eq!(web, rust);
+    }
+
+    #[test]
+    fn test_ts_internal_stream_names_parses_quotes_and_comments() {
+        let source = "export const INTERNAL_STREAM_NAMES: readonly string[] = [\n  \"usage\", // billing\n  'audit',\n] as const;\nconst OTHER = [\"x\"];";
+        assert_eq!(ts_internal_stream_names(source), vec!["usage", "audit"]);
+    }
+
+    #[test]
+    fn test_internal_stream_names_leave_is_internal_stream_unchanged() {
+        assert_eq!(INTERNAL_STREAM_NAMES.len(), 13);
+        for name in [
+            ERROR_STREAM,
+            STATS_STREAM,
+            TRIGGERS_STREAM,
+            USAGE_STREAM,
+            "cloud_events",
+        ] {
+            assert!(INTERNAL_STREAM_NAMES.contains(&name));
+            assert!(!is_internal_stream(name), "{name} must stay discoverable");
+        }
     }
 
     #[test]

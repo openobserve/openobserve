@@ -632,7 +632,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         settings_batch.push((item_key.to_string(), Arc::new(settings)));
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(
+        infra::schema::insert_latest(
+            &mut w,
             item_key.to_string(),
             SchemaCache::new(latest_schema.clone()),
         );

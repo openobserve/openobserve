@@ -197,7 +197,7 @@ async fn refresh_local_stream_cache(org_id: &str, stream_name: &str, stream_type
         ));
     }
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), SchemaCache::new(schema));
+    infra::schema::insert_latest(&mut w, cache_key.clone(), SchemaCache::new(schema));
     drop(w);
     infra::schema::put_stream_settings(cache_key, Arc::new(settings)).await;
 }
@@ -839,7 +839,7 @@ pub async fn handle_diff_schema(
     // update node cache
     let final_schema = SchemaCache::new(final_schema);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.insert(cache_key.clone(), final_schema.clone());
+    infra::schema::insert_latest(&mut w, cache_key.clone(), final_schema.clone());
     drop(w);
     let need_original = stream_setting.store_original_data;
     let index_original_data = stream_setting.index_original_data;

@@ -1734,26 +1734,33 @@ async fn write_traces_by_stream(
     user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        // for cloud, we want to sent event when user creates a new stream
-        #[cfg(feature = "cloud")]
-        if get_stream(org_id, &traces_stream_name, StreamType::Traces)
-            .await
-            .is_none()
-        {
-            let org = super::organization::get_org(org_id).await.unwrap();
+        if !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await {
+            // for cloud, we want to sent event when user creates a new stream
+            #[cfg(feature = "cloud")]
+            if get_stream(org_id, &traces_stream_name, StreamType::Traces)
+                .await
+                .is_none()
+            {
+                let org = super::organization::get_org(org_id).await.unwrap();
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: None,
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(traces_stream_name.clone()),
-                },
-            )
-            .await;
+                super::self_reporting::cloud_events::enqueue_cloud_event(
+                    super::self_reporting::cloud_events::CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: None,
+                        event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                        subscription_type: None,
+                        stream_name: Some(traces_stream_name.clone()),
+                    },
+                )
+                .await;
+            }
+            super::onboarding::on_user_stream_created(
+                org_id,
+                StreamType::Traces,
+                &traces_stream_name,
+            );
         }
 
         let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {

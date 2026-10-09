@@ -191,6 +191,11 @@ struct ConfigResponse<'a> {
     histogram_enabled: bool,
     timechart_enabled: bool,
     max_query_range: i64,
+    cluster_name: String,
+    /// Hours back the ingester accepts a record's timestamp.
+    ingest_allowed_upto: i64,
+    /// Hours ahead the ingester accepts a record's timestamp.
+    ingest_allowed_in_future: i64,
     ai_enabled: bool,
     /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
     /// recovery window at all — deletion is immediate and permanent, which is what
@@ -588,6 +593,9 @@ pub async fn zo_config(
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
+        cluster_name: cfg.common.cluster_name.clone(),
+        ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
+        ingest_allowed_in_future: cfg.limit.ingest_allowed_in_future,
         ai_enabled,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
@@ -2432,6 +2440,24 @@ mod tests {
         assert_eq!(
             consume_login_state(Some(&state), Some("abd")).await,
             Err("invalid state in request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_ingest_window_and_cluster_name() {
+        let cfg = get_config();
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["cluster_name"], cfg.common.cluster_name.as_str());
+        assert_eq!(json["ingest_allowed_upto"], cfg.limit.ingest_allowed_upto);
+        assert_eq!(
+            json["ingest_allowed_in_future"],
+            cfg.limit.ingest_allowed_in_future
         );
     }
 }

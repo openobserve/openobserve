@@ -35,7 +35,7 @@ use ingestion_common::IngestUser;
 use serde::{Deserialize, Serialize};
 
 use crate::service::{
-    ingestion::{check_ingestion_allowed, get_thread_id},
+    ingestion::{check_ingestion_allowed, get_thread_id, rejections::RejectionOrg},
     logs::hec::{HecParseError, parse_body, preflight_records, preflight_streams},
 };
 
@@ -312,8 +312,13 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
     metrics::HEC_AUTH_TOTAL
         .with_label_values(&["success", &org_id])
         .inc();
-    req.extensions_mut().insert(HecAuth { org_id, token_id });
-    next.run(req).await
+    req.extensions_mut().insert(HecAuth {
+        org_id: org_id.clone(),
+        token_id,
+    });
+    let mut response = next.run(req).await;
+    response.extensions_mut().insert(RejectionOrg(org_id));
+    response
 }
 
 /// Cap the body on the wire, outside decompression, with the Splunk 413 triple.
