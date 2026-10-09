@@ -11,6 +11,7 @@ import {
   parseDuration,
   recentWindows,
   scheduleSentence,
+  scheduleWithBounds,
   utcMicrosToLocal,
 } from "./schedule";
 
@@ -184,5 +185,38 @@ describe("recentWindows", () => {
     };
     expect(recentWindows(once, micros("2026-09-17T00:00:00Z"), 3)).toHaveLength(1);
     expect(recentWindows(once, micros("2026-09-01T00:00:00Z"), 3)).toEqual([]);
+  });
+});
+
+describe("scheduleWithBounds", () => {
+  it("tells recurring rules apart by their first and last day", () => {
+    const daily: DowntimeSchedule = { ...weekly, repeat: "daily", weekdays: [] };
+    const forever = scheduleWithBounds(daily, gt, "en-US");
+    const nextMonthOneDay = scheduleWithBounds(
+      {
+        ...daily,
+        starts_at: micros("2026-10-13T22:00:00Z"),
+        ends_at: micros("2026-10-14T21:59:00Z"),
+      },
+      gt,
+      "en-US",
+    );
+    expect(forever).toBe(
+      "Daily · 02:00 for 1 h 30 min · Europe/Berlin, from Mon, Sep 14, 2026 with no end date",
+    );
+    expect(nextMonthOneDay).toBe(
+      "Daily · 02:00 for 1 h 30 min · Europe/Berlin, from Wed, Oct 14, 2026 until Wed, Oct 14, 2026",
+    );
+  });
+
+  it("adds nothing to a one-time window, whose dates are already in the sentence", () => {
+    const once: DowntimeSchedule = {
+      ...weekly,
+      repeat: "none",
+      starts_at: micros("2026-09-17T14:10:00Z"),
+      ends_at: micros("2026-09-17T16:10:00Z"),
+      weekdays: [],
+    };
+    expect(scheduleWithBounds(once, gt, "en-US")).toBe(scheduleSentence(once, gt, "en-US"));
   });
 });

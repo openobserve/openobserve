@@ -8873,7 +8873,9 @@
         "windowRange": "{start} ～ {end} {zone}",
         "onceSentence": "1 回 · {start} ～ {end} · {zone}",
         "dailySentence": "毎日 · {time}、{duration} 間 · {zone}",
-        "weeklySentence": "毎週 {days} · {time}、{duration} 間 · {zone}"
+        "weeklySentence": "毎週 {days} · {time}、{duration} 間 · {zone}",
+        "fromNoEnd": "{schedule}、{start} から（終了日なし）",
+        "fromUntil": "{schedule}、{start} から {until} まで"
       },
       "validation": {
         "conditionRequired": "条件を追加するか、条件ブロックを削除してください。",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "開始時刻を HH:MM 形式で入力してください。",
         "durationInvalid": "90m や 1h 30m のような期間を入力してください。",
         "weekdaysRequired": "少なくとも1日を選択してください。",
-        "untilAfterStart": "繰り返しの終了は最初の日以降である必要があります。"
+        "untilAfterStart": "繰り返しの終了は最初の日以降である必要があります。",
+        "startDateRequired": "初日を選択してください。"
       },
       "title": "ダウンタイム",
       "subtitle": "アラート、異常検知、合成モニタリングのチェックは実行したまま、その通知のみを停止するスケジュールされたウィンドウ",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "ダウンタイムをキャンセル",
         "message": "通知はすぐに再開されます。ダウンタイムは履歴として一覧に残ります。",
-        "bulkMessage": "{count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。 | {count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。"
+        "bulkMessage": "{count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。 | {count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。",
+        "confirm": "ダウンタイムをキャンセル",
+        "keep": "ダウンタイムを維持"
       },
       "confirmDelete": {
         "title": "ダウンタイムを削除",
@@ -9023,7 +9028,8 @@
         "cancel": "キャンセル",
         "save": "保存",
         "activeBanner": "このダウンタイムは有効です。編集は次回の評価時に反映され、SLO モードの変更はすでに開始されたウィンドウを再測定します。",
-        "noModule": "「適用対象」でモジュールを選択してください。"
+        "noModule": "「適用対象」でモジュールを選択してください。",
+        "checkSchedule": "スケジュールを確認してから、もう一度保存してください。"
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "1 回",
         "onceOn": "1 回 {date}",
         "daily": "毎日",
-        "weekly": "毎週"
+        "weekly": "毎週",
+        "all": {
+          "alerts": "すべてのアラート",
+          "anomaly_detections": "すべての異常検知",
+          "synthetics": "すべての合成モニタリングチェック",
+          "slos": "すべての SLO"
+        }
       },
       "condition": {
         "none": "ディメンション条件なし",
@@ -9090,7 +9102,8 @@
         "timezone": "タイムゾーン",
         "noWindow": "今後 8 日間に開始する時間枠はありません。",
         "nextWindow": "次のウィンドウ: {window}。ウィンドウは日付をまたぐことがあります。",
-        "nextWindowWithUtc": "次のウィンドウ: {window} ({utc})。ウィンドウは日付をまたぐことがあります。"
+        "nextWindowWithUtc": "次のウィンドウ: {window} ({utc})。ウィンドウは日付をまたぐことがあります。",
+        "startsOn": "開始日"
       },
       "preview": {
         "title": "プレビュー",
@@ -9114,7 +9127,14 @@
         "matchedNow": "本日 {matched}",
         "outro": "ウィンドウ内では、それらすべてについて通知、オンコールページ、ワークフローが停止します。",
         "cancel": "キャンセル",
-        "confirm": "すべてミュート"
+        "confirm": "すべてミュート",
+        "titleOne": {
+          "alerts": "この組織のすべてのアラートをミュートしますか？",
+          "anomaly_detections": "この組織のすべての異常検知をミュートしますか？",
+          "synthetics": "この組織のすべての合成モニタリングチェックをミュートしますか？",
+          "slos": "この組織のすべての SLO をミュートしますか？"
+        },
+        "window": "期間: {window}"
       },
       "summaryPane": {
         "title": "サマリー",

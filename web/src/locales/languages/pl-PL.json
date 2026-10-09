@@ -8873,7 +8873,9 @@
         "windowRange": "od {start} do {end} {zone}",
         "onceSentence": "Jednorazowo · od {start} do {end} · {zone}",
         "dailySentence": "Codziennie · {time} przez {duration} · {zone}",
-        "weeklySentence": "Co tydzień w {days} · {time} przez {duration} · {zone}"
+        "weeklySentence": "Co tydzień w {days} · {time} przez {duration} · {zone}",
+        "fromNoEnd": "{schedule}, od {start} bez daty końcowej",
+        "fromUntil": "{schedule}, od {start} do {until}"
       },
       "validation": {
         "conditionRequired": "Dodaj warunek lub usuń blok warunku.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Podaj godzinę rozpoczęcia w formacie HH:MM.",
         "durationInvalid": "Podaj czas trwania, np. 90m lub 1h 30m.",
         "weekdaysRequired": "Wybierz co najmniej jeden dzień.",
-        "untilAfterStart": "Data „powtarzaj do” musi przypadać na pierwszy dzień lub później."
+        "untilAfterStart": "Data „powtarzaj do” musi przypadać na pierwszy dzień lub później.",
+        "startDateRequired": "Wybierz pierwszy dzień."
       },
       "title": "Okna serwisowe",
       "subtitle": "Zaplanowane okna, w których alerty, wykrywanie anomalii i kontrole syntetyczne nadal działają, ale ich powiadomienia są wstrzymywane",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Anuluj przestój",
         "message": "Powiadomienia zostaną wznowione natychmiast. Przestój pozostaje na liście w celach historycznych.",
-        "bulkMessage": "Anulować {count} przestój? Powiadomienia zostaną wznowione natychmiast. | Anulować {count} przestojów? Powiadomienia zostaną wznowione natychmiast."
+        "bulkMessage": "Anulować {count} przestój? Powiadomienia zostaną wznowione natychmiast. | Anulować {count} przestojów? Powiadomienia zostaną wznowione natychmiast.",
+        "confirm": "Anuluj przestój | Anuluj przestoje",
+        "keep": "Zachowaj przestój | Zachowaj przestoje"
       },
       "confirmDelete": {
         "title": "Usuń przestój",
@@ -9023,7 +9028,8 @@
         "cancel": "Anuluj",
         "save": "Zapisz",
         "activeBanner": "Ten przestój jest aktywny. Zmiana zacznie obowiązywać przy następnej ewaluacji, a zmiana trybu SLO ponownie zmierzy okna, które już się rozpoczęły.",
-        "noModule": "Wybierz moduł w polu Dotyczy."
+        "noModule": "Wybierz moduł w polu Dotyczy.",
+        "checkSchedule": "Sprawdź harmonogram, a następnie zapisz ponownie."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "jednorazowo",
         "onceOn": "jednorazowo {date}",
         "daily": "codziennie",
-        "weekly": "co tydzień"
+        "weekly": "co tydzień",
+        "all": {
+          "alerts": "Wszystkie alerty",
+          "anomaly_detections": "Wszystkie wykrywania anomalii",
+          "synthetics": "Wszystkie testy syntetyczne",
+          "slos": "Wszystkie SLO"
+        }
       },
       "condition": {
         "none": "Brak warunku wymiaru",
@@ -9090,7 +9102,8 @@
         "timezone": "Strefa czasowa",
         "noWindow": "Żadne okno nie rozpoczyna się w ciągu najbliższych 8 dni.",
         "nextWindow": "Następne okno: {window}. Okno może przekraczać północ.",
-        "nextWindowWithUtc": "Następne okno: {window} ({utc}). Okno może przekraczać północ."
+        "nextWindowWithUtc": "Następne okno: {window} ({utc}). Okno może przekraczać północ.",
+        "startsOn": "Rozpoczyna się dnia"
       },
       "preview": {
         "title": "Podgląd",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} dzisiaj",
         "outro": "Powiadomienia, wezwania dyżurne i przepływy pracy zostają wstrzymane dla nich wszystkich w obrębie okna.",
         "cancel": "Anuluj",
-        "confirm": "Wycisz wszystko"
+        "confirm": "Wycisz wszystko",
+        "titleOne": {
+          "alerts": "Wyciszyć każdy alert w tej organizacji?",
+          "anomaly_detections": "Wyciszyć każde wykrywanie anomalii w tej organizacji?",
+          "synthetics": "Wyciszyć każdy test syntetyczny w tej organizacji?",
+          "slos": "Wyciszyć każde SLO w tej organizacji?"
+        },
+        "window": "Okno: {window}"
       },
       "summaryPane": {
         "title": "Podsumowanie",

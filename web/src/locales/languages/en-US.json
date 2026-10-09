@@ -8873,7 +8873,9 @@
         "windowRange": "{start} to {end} {zone}",
         "onceSentence": "Once · {start} to {end} · {zone}",
         "dailySentence": "Daily · {time} for {duration} · {zone}",
-        "weeklySentence": "Weekly on {days} · {time} for {duration} · {zone}"
+        "weeklySentence": "Weekly on {days} · {time} for {duration} · {zone}",
+        "fromNoEnd": "{schedule}, from {start} with no end date",
+        "fromUntil": "{schedule}, from {start} until {until}"
       },
       "validation": {
         "conditionRequired": "Add a condition, or remove the condition block.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Enter a start time as HH:MM.",
         "durationInvalid": "Enter a duration such as 90m or 1h 30m.",
         "weekdaysRequired": "Choose at least one day.",
-        "untilAfterStart": "Repeat until must be on or after the first day."
+        "untilAfterStart": "Repeat until must be on or after the first day.",
+        "startDateRequired": "Choose the first day."
       },
       "title": "Downtimes",
       "subtitle": "Scheduled windows that keep alerts, anomaly detections and synthetics checks running but stop their notifications",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Cancel downtime",
         "message": "Notifications resume at once. The downtime stays in the list for history.",
-        "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once."
+        "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once.",
+        "confirm": "Cancel downtime | Cancel downtimes",
+        "keep": "Keep downtime | Keep downtimes"
       },
       "confirmDelete": {
         "title": "Delete downtime",
@@ -9023,7 +9028,8 @@
         "cancel": "Cancel",
         "save": "Save",
         "activeBanner": "This downtime is active. An edit takes effect at the next evaluation, and a change to the SLO mode re-measures the windows that already started.",
-        "noModule": "Choose a module in Applies to."
+        "noModule": "Choose a module in Applies to.",
+        "checkSchedule": "Check the schedule, then save again."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "once",
         "onceOn": "once {date}",
         "daily": "daily",
-        "weekly": "weekly"
+        "weekly": "weekly",
+        "all": {
+          "alerts": "All alerts",
+          "anomaly_detections": "All anomaly detections",
+          "synthetics": "All synthetics checks",
+          "slos": "All SLOs"
+        }
       },
       "condition": {
         "none": "No dimension condition",
@@ -9090,7 +9102,8 @@
         "timezone": "Timezone",
         "noWindow": "No window starts in the next 8 days.",
         "nextWindow": "Next window: {window}. A window can cross midnight.",
-        "nextWindowWithUtc": "Next window: {window} ({utc}). A window can cross midnight."
+        "nextWindowWithUtc": "Next window: {window} ({utc}). A window can cross midnight.",
+        "startsOn": "Starts on"
       },
       "preview": {
         "title": "Preview",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} today",
         "outro": "Notifications, on-call pages and workflows stop for all of them inside the window.",
         "cancel": "Cancel",
-        "confirm": "Mute all"
+        "confirm": "Mute all",
+        "titleOne": {
+          "alerts": "Mute every alert in this org?",
+          "anomaly_detections": "Mute every anomaly detection in this org?",
+          "synthetics": "Mute every synthetics check in this org?",
+          "slos": "Mute every SLO in this org?"
+        },
+        "window": "Window: {window}"
       },
       "summaryPane": {
         "title": "Summary",

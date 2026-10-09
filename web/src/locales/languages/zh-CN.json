@@ -8873,7 +8873,9 @@
         "windowRange": "{start} 至 {end} {zone}",
         "onceSentence": "一次 · {start} 至 {end} · {zone}",
         "dailySentence": "每天 · {time} 持续 {duration} · {zone}",
-        "weeklySentence": "每周 {days} · {time} 持续 {duration} · {zone}"
+        "weeklySentence": "每周 {days} · {time} 持续 {duration} · {zone}",
+        "fromNoEnd": "{schedule}，自 {start} 起，无结束日期",
+        "fromUntil": "{schedule}，自 {start} 至 {until}"
       },
       "validation": {
         "conditionRequired": "请添加条件，或移除条件块。",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "请按 HH:MM 格式输入开始时间。",
         "durationInvalid": "请输入时长，例如 90m 或 1h 30m。",
         "weekdaysRequired": "请至少选择一天。",
-        "untilAfterStart": "重复截止日期必须不早于第一天。"
+        "untilAfterStart": "重复截止日期必须不早于第一天。",
+        "startDateRequired": "请选择第一天。"
       },
       "title": "停机时间",
       "subtitle": "按计划执行的时间窗口，在此期间告警、异常检测和合成监控检查继续运行，但停止发送通知",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "取消静默时段",
         "message": "通知将立即恢复。该静默时段会保留在列表中作为历史记录。",
-        "bulkMessage": "取消 {count} 个静默时段？通知将立即恢复。 | 取消 {count} 个静默时段？通知将立即恢复。"
+        "bulkMessage": "取消 {count} 个静默时段？通知将立即恢复。 | 取消 {count} 个静默时段？通知将立即恢复。",
+        "confirm": "取消静默时段",
+        "keep": "保留静默时段"
       },
       "confirmDelete": {
         "title": "删除静默时段",
@@ -9023,7 +9028,8 @@
         "cancel": "取消",
         "save": "保存",
         "activeBanner": "此静默时段已生效。编辑将在下次评估时生效，而更改 SLO 模式会重新计算已开始的窗口。",
-        "noModule": "请在“适用于”中选择一个模块。"
+        "noModule": "请在“适用于”中选择一个模块。",
+        "checkSchedule": "请检查计划，然后再次保存。"
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "单次",
         "onceOn": "单次 {date}",
         "daily": "每天",
-        "weekly": "每周"
+        "weekly": "每周",
+        "all": {
+          "alerts": "所有告警",
+          "anomaly_detections": "所有异常检测",
+          "synthetics": "所有合成监控检查",
+          "slos": "所有 SLO"
+        }
       },
       "condition": {
         "none": "无维度条件",
@@ -9090,7 +9102,8 @@
         "timezone": "时区",
         "noWindow": "未来 8 天内没有窗口开始。",
         "nextWindow": "下一个窗口：{window}。窗口可以跨越午夜。",
-        "nextWindowWithUtc": "下一个窗口：{window}（{utc}）。窗口可以跨越午夜。"
+        "nextWindowWithUtc": "下一个窗口：{window}（{utc}）。窗口可以跨越午夜。",
+        "startsOn": "开始日期"
       },
       "preview": {
         "title": "预览",
@@ -9114,7 +9127,14 @@
         "matchedNow": "今天 {matched}",
         "outro": "在窗口内，所有这些的通知、值班呼叫和工作流都会停止。",
         "cancel": "取消",
-        "confirm": "全部静默"
+        "confirm": "全部静默",
+        "titleOne": {
+          "alerts": "静默此组织中的每条告警？",
+          "anomaly_detections": "静默此组织中的每个异常检测？",
+          "synthetics": "静默此组织中的每个合成监控检查？",
+          "slos": "静默此组织中的每个 SLO？"
+        },
+        "window": "时间窗口：{window}"
       },
       "summaryPane": {
         "title": "摘要",

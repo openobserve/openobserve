@@ -93,7 +93,8 @@ const addDays = (ymd: string, days: number): string => {
   return new Date(Date.UTC(y, m - 1, d) + days * DAY_MS).toISOString().slice(0, 10);
 };
 
-const isoWeekday = (ymd: string): number => {
+/** The ISO weekday (Monday 1 to Sunday 7) of a `yyyy-MM-dd` date. */
+export const isoWeekday = (ymd: string): number => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay() || 7;
 };
@@ -204,4 +205,26 @@ export function scheduleSentence(s: DowntimeSchedule, t: TranslateFn, locale?: s
   return s.repeat === "daily"
     ? t("alerts.downtimes.schedule.dailySentence", params)
     : t("alerts.downtimes.schedule.weeklySentence", params);
+}
+
+/** A `yyyy-MM-dd` day with weekday and year, e.g. `Thu, Sep 17, 2026` in en-US. */
+export function formatDay(ymd: string, locale?: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+/** The schedule sentence plus, for a recurring row, its first day and its last day or no end. */
+export function scheduleWithBounds(s: DowntimeSchedule, t: TranslateFn, locale?: string): I18nText {
+  const schedule = scheduleSentence(s, t, locale);
+  if (s.repeat === "none") return schedule;
+  const start = formatDay(utcMicrosToLocal(s.starts_at, s.timezone).date, locale);
+  if (!s.ends_at) return t("alerts.downtimes.schedule.fromNoEnd", { schedule, start });
+  const until = formatDay(utcMicrosToLocal(s.ends_at, s.timezone).date, locale);
+  return t("alerts.downtimes.schedule.fromUntil", { schedule, start, until });
 }

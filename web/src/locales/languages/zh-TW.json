@@ -8868,7 +8868,9 @@
         "windowRange": "{start} 至 {end} {zone}",
         "onceSentence": "單次 · {start} 至 {end} · {zone}",
         "dailySentence": "每日 · {time}，持續 {duration} · {zone}",
-        "weeklySentence": "每週於 {days} · {time}，持續 {duration} · {zone}"
+        "weeklySentence": "每週於 {days} · {time}，持續 {duration} · {zone}",
+        "fromNoEnd": "{schedule}，自 {start} 起，無結束日期",
+        "fromUntil": "{schedule}，自 {start} 至 {until}"
       },
       "validation": {
         "conditionRequired": "請新增條件，或移除條件區塊。",
@@ -8896,7 +8898,8 @@
         "startTimeRequired": "以 HH:MM 格式輸入開始時間。",
         "durationInvalid": "輸入持續時間，例如 90m 或 1h 30m。",
         "weekdaysRequired": "至少選擇一天。",
-        "untilAfterStart": "重複截止日必須不早於第一天。"
+        "untilAfterStart": "重複截止日必須不早於第一天。",
+        "startDateRequired": "請選擇第一天。"
       },
       "title": "停機時段",
       "subtitle": "排程時段可讓警示、異常偵測與合成監控檢查繼續執行，但停止其通知",
@@ -8969,7 +8972,9 @@
       "confirmCancel": {
         "title": "取消停機時段",
         "message": "通知會立即恢復。停機時段會保留在清單中以供記錄。",
-        "bulkMessage": "取消 {count} 個停機時段？通知會立即恢復。 | 取消 {count} 個停機時段？通知會立即恢復。"
+        "bulkMessage": "取消 {count} 個停機時段？通知會立即恢復。 | 取消 {count} 個停機時段？通知會立即恢復。",
+        "confirm": "取消停機時段",
+        "keep": "保留停機時段"
       },
       "confirmDelete": {
         "title": "刪除停機時段",
@@ -9018,7 +9023,8 @@
         "cancel": "取消",
         "save": "儲存",
         "activeBanner": "此停機時段已生效。編輯會在下一次評估時生效，而變更 SLO 模式會重新計算已開始的視窗。",
-        "noModule": "請在「適用於」中選擇模組。"
+        "noModule": "請在「適用於」中選擇模組。",
+        "checkSchedule": "請檢查排程，然後再次儲存。"
       },
       "sentence": {
         "nouns": {
@@ -9044,7 +9050,13 @@
         "once": "單次",
         "onceOn": "單次 {date}",
         "daily": "每日",
-        "weekly": "每週"
+        "weekly": "每週",
+        "all": {
+          "alerts": "所有警示",
+          "anomaly_detections": "所有異常偵測",
+          "synthetics": "所有合成監控檢查",
+          "slos": "所有 SLO"
+        }
       },
       "condition": {
         "none": "無維度條件",
@@ -9085,7 +9097,8 @@
         "timezone": "時區",
         "noWindow": "未來 8 天內沒有時間範圍開始。",
         "nextWindow": "下個時段：{window}。時段可跨午夜。",
-        "nextWindowWithUtc": "下個時段：{window}（{utc}）。時段可跨午夜。"
+        "nextWindowWithUtc": "下個時段：{window}（{utc}）。時段可跨午夜。",
+        "startsOn": "開始日期"
       },
       "preview": {
         "title": "預覽",
@@ -9109,7 +9122,14 @@
         "matchedNow": "今天 {matched}",
         "outro": "在時段內，上述所有項目的通知、值班呼叫與工作流程都會停止。",
         "cancel": "取消",
-        "confirm": "全部靜音"
+        "confirm": "全部靜音",
+        "titleOne": {
+          "alerts": "要將此組織中的每個警示靜音嗎？",
+          "anomaly_detections": "要將此組織中的每個異常偵測靜音嗎？",
+          "synthetics": "要將此組織中的每個合成監控檢查靜音嗎？",
+          "slos": "要將此組織中的每個 SLO 靜音嗎？"
+        },
+        "window": "時間窗口：{window}"
       },
       "summaryPane": {
         "title": "摘要",

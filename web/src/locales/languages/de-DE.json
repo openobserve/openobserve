@@ -8873,7 +8873,9 @@
         "windowRange": "{start} bis {end} {zone}",
         "onceSentence": "Einmalig · {start} bis {end} · {zone}",
         "dailySentence": "Täglich · {time} für {duration} · {zone}",
-        "weeklySentence": "Wöchentlich am {days} · {time} für {duration} · {zone}"
+        "weeklySentence": "Wöchentlich am {days} · {time} für {duration} · {zone}",
+        "fromNoEnd": "{schedule}, ab {start} ohne Enddatum",
+        "fromUntil": "{schedule}, von {start} bis {until}"
       },
       "validation": {
         "conditionRequired": "Fügen Sie eine Bedingung hinzu oder entfernen Sie den Bedingungsblock.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Geben Sie eine Startzeit im Format HH:MM ein.",
         "durationInvalid": "Geben Sie eine Dauer wie 90m oder 1h 30m ein.",
         "weekdaysRequired": "Wählen Sie mindestens einen Tag.",
-        "untilAfterStart": "Wiederholen bis muss am oder nach dem ersten Tag liegen."
+        "untilAfterStart": "Wiederholen bis muss am oder nach dem ersten Tag liegen.",
+        "startDateRequired": "Wählen Sie den ersten Tag."
       },
       "title": "Wartungsfenster",
       "subtitle": "Geplante Zeitfenster, in denen Warnmeldungen, Anomalieerkennungen und Synthetics-Prüfungen weiterlaufen, aber keine Benachrichtigungen senden",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Wartungsfenster abbrechen",
         "message": "Benachrichtigungen werden sofort wieder aufgenommen. Das Wartungsfenster bleibt für den Verlauf in der Liste.",
-        "bulkMessage": "{count} Wartungsfenster abbrechen? Benachrichtigungen werden sofort wieder aufgenommen. | {count} Wartungsfenster abbrechen? Benachrichtigungen werden sofort wieder aufgenommen."
+        "bulkMessage": "{count} Wartungsfenster abbrechen? Benachrichtigungen werden sofort wieder aufgenommen. | {count} Wartungsfenster abbrechen? Benachrichtigungen werden sofort wieder aufgenommen.",
+        "confirm": "Wartungsfenster abbrechen | Wartungsfenster abbrechen",
+        "keep": "Wartungsfenster behalten | Wartungsfenster behalten"
       },
       "confirmDelete": {
         "title": "Wartungsfenster löschen",
@@ -9023,7 +9028,8 @@
         "cancel": "Abbrechen",
         "save": "Speichern",
         "activeBanner": "Dieses Wartungsfenster ist aktiv. Eine Bearbeitung wird bei der nächsten Auswertung wirksam, und eine Änderung des SLO-Modus bewertet die bereits begonnenen Fenster neu.",
-        "noModule": "Wählen Sie ein Modul unter „Gilt für“."
+        "noModule": "Wählen Sie ein Modul unter „Gilt für“.",
+        "checkSchedule": "Prüfen Sie den Zeitplan und speichern Sie dann erneut."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "einmalig",
         "onceOn": "einmalig {date}",
         "daily": "täglich",
-        "weekly": "wöchentlich"
+        "weekly": "wöchentlich",
+        "all": {
+          "alerts": "Alle Warnmeldungen",
+          "anomaly_detections": "Alle Anomalieerkennungen",
+          "synthetics": "Alle Synthetics-Prüfungen",
+          "slos": "Alle SLOs"
+        }
       },
       "condition": {
         "none": "Keine Dimensionsbedingung",
@@ -9090,7 +9102,8 @@
         "timezone": "Zeitzone",
         "noWindow": "In den nächsten 8 Tagen beginnt kein Zeitfenster.",
         "nextWindow": "Nächstes Fenster: {window}. Ein Fenster kann über Mitternacht hinausgehen.",
-        "nextWindowWithUtc": "Nächstes Fenster: {window} ({utc}). Ein Fenster kann über Mitternacht hinausgehen."
+        "nextWindowWithUtc": "Nächstes Fenster: {window} ({utc}). Ein Fenster kann über Mitternacht hinausgehen.",
+        "startsOn": "Beginnt am"
       },
       "preview": {
         "title": "Vorschau",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} heute",
         "outro": "Benachrichtigungen, On-Call-Alarmierungen und Workflows stoppen für alle von ihnen innerhalb des Fensters.",
         "cancel": "Abbrechen",
-        "confirm": "Alle stummschalten"
+        "confirm": "Alle stummschalten",
+        "titleOne": {
+          "alerts": "Jede Warnmeldung in dieser Organisation stummschalten?",
+          "anomaly_detections": "Jede Anomalieerkennung in dieser Organisation stummschalten?",
+          "synthetics": "Jede Synthetics-Prüfung in dieser Organisation stummschalten?",
+          "slos": "Jedes SLO in dieser Organisation stummschalten?"
+        },
+        "window": "Zeitfenster: {window}"
       },
       "summaryPane": {
         "title": "Zusammenfassung",

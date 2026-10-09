@@ -8873,7 +8873,9 @@
         "windowRange": "{start} à {end} {zone}",
         "onceSentence": "Une fois · {start} à {end} · {zone}",
         "dailySentence": "Tous les jours · {time} pendant {duration} · {zone}",
-        "weeklySentence": "Chaque semaine le {days} · {time} pendant {duration} · {zone}"
+        "weeklySentence": "Chaque semaine le {days} · {time} pendant {duration} · {zone}",
+        "fromNoEnd": "{schedule}, à partir du {start} sans date de fin",
+        "fromUntil": "{schedule}, du {start} au {until}"
       },
       "validation": {
         "conditionRequired": "Ajoutez une condition ou supprimez le bloc de conditions.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Saisissez une heure de début au format HH:MM.",
         "durationInvalid": "Saisissez une durée telle que 90m ou 1h 30m.",
         "weekdaysRequired": "Choisissez au moins un jour.",
-        "untilAfterStart": "« Répéter jusqu'au » doit être au premier jour ou après."
+        "untilAfterStart": "« Répéter jusqu'au » doit être au premier jour ou après.",
+        "startDateRequired": "Choisissez le premier jour."
       },
       "title": "Plages de maintenance",
       "subtitle": "Fenêtres planifiées qui laissent s'exécuter les alertes, les détections d'anomalies et les contrôles synthétiques, mais suspendent leurs notifications",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Annuler l'indisponibilité",
         "message": "Les notifications reprennent immédiatement. L'indisponibilité reste dans la liste pour l'historique.",
-        "bulkMessage": "Annuler {count} indisponibilité ? Les notifications reprennent immédiatement. | Annuler {count} indisponibilités ? Les notifications reprennent immédiatement."
+        "bulkMessage": "Annuler {count} indisponibilité ? Les notifications reprennent immédiatement. | Annuler {count} indisponibilités ? Les notifications reprennent immédiatement.",
+        "confirm": "Annuler l'indisponibilité | Annuler les indisponibilités",
+        "keep": "Conserver l'indisponibilité | Conserver les indisponibilités"
       },
       "confirmDelete": {
         "title": "Supprimer l'indisponibilité",
@@ -9023,7 +9028,8 @@
         "cancel": "Annuler",
         "save": "Enregistrer",
         "activeBanner": "Cette indisponibilité est active. Une modification prend effet à la prochaine évaluation, et un changement du mode SLO recalcule les fenêtres déjà commencées.",
-        "noModule": "Choisissez un module dans S'applique à."
+        "noModule": "Choisissez un module dans S'applique à.",
+        "checkSchedule": "Vérifiez la planification, puis enregistrez à nouveau."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "une fois",
         "onceOn": "une fois {date}",
         "daily": "quotidien",
-        "weekly": "hebdomadaire"
+        "weekly": "hebdomadaire",
+        "all": {
+          "alerts": "Toutes les alertes",
+          "anomaly_detections": "Toutes les détections d'anomalies",
+          "synthetics": "Toutes les vérifications synthétiques",
+          "slos": "Tous les SLO"
+        }
       },
       "condition": {
         "none": "Aucune condition de dimension",
@@ -9090,7 +9102,8 @@
         "timezone": "Fuseau horaire",
         "noWindow": "Aucune fenêtre ne débute dans les 8 prochains jours.",
         "nextWindow": "Prochaine fenêtre : {window}. Une fenêtre peut passer minuit.",
-        "nextWindowWithUtc": "Prochaine fenêtre : {window} ({utc}). Une fenêtre peut passer minuit."
+        "nextWindowWithUtc": "Prochaine fenêtre : {window} ({utc}). Une fenêtre peut passer minuit.",
+        "startsOn": "Débute le"
       },
       "preview": {
         "title": "Aperçu",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} aujourd'hui",
         "outro": "Les notifications, les pages d'astreinte et les workflows s'arrêtent pour tous pendant la fenêtre.",
         "cancel": "Annuler",
-        "confirm": "Tout mettre en sourdine"
+        "confirm": "Tout mettre en sourdine",
+        "titleOne": {
+          "alerts": "Mettre en sourdine toutes les alertes de cette organisation ?",
+          "anomaly_detections": "Mettre en sourdine toutes les détections d'anomalies de cette organisation ?",
+          "synthetics": "Mettre en sourdine toutes les vérifications synthétiques de cette organisation ?",
+          "slos": "Mettre en sourdine tous les SLO de cette organisation ?"
+        },
+        "window": "Fenêtre : {window}"
       },
       "summaryPane": {
         "title": "Résumé",

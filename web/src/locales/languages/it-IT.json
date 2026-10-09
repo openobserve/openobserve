@@ -8873,7 +8873,9 @@
         "windowRange": "da {start} a {end} {zone}",
         "onceSentence": "Una tantum · da {start} a {end} · {zone}",
         "dailySentence": "Giornaliero · {time} per {duration} · {zone}",
-        "weeklySentence": "Settimanale il {days} · {time} per {duration} · {zone}"
+        "weeklySentence": "Settimanale il {days} · {time} per {duration} · {zone}",
+        "fromNoEnd": "{schedule}, dal {start} senza data di fine",
+        "fromUntil": "{schedule}, dal {start} al {until}"
       },
       "validation": {
         "conditionRequired": "Aggiungi una condizione o rimuovi il blocco condizione.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Inserisci un'ora di inizio nel formato HH:MM.",
         "durationInvalid": "Inserisci una durata come 90m o 1h 30m.",
         "weekdaysRequired": "Scegli almeno un giorno.",
-        "untilAfterStart": "La ripetizione fino a deve essere uguale o successiva al primo giorno."
+        "untilAfterStart": "La ripetizione fino a deve essere uguale o successiva al primo giorno.",
+        "startDateRequired": "Scegli il primo giorno."
       },
       "title": "Periodi di inattività",
       "subtitle": "Finestre pianificate che mantengono in esecuzione avvisi, rilevamento delle anomalie e controlli Synthetics, ma ne sospendono le notifiche",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Annulla downtime",
         "message": "Le notifiche riprendono immediatamente. Il downtime resta nell'elenco per lo storico.",
-        "bulkMessage": "Annullare {count} downtime? Le notifiche riprendono immediatamente. | Annullare {count} downtime? Le notifiche riprendono immediatamente."
+        "bulkMessage": "Annullare {count} downtime? Le notifiche riprendono immediatamente. | Annullare {count} downtime? Le notifiche riprendono immediatamente.",
+        "confirm": "Annulla downtime | Annulla downtime",
+        "keep": "Mantieni downtime | Mantieni downtime"
       },
       "confirmDelete": {
         "title": "Elimina downtime",
@@ -9023,7 +9028,8 @@
         "cancel": "Annulla",
         "save": "Salva",
         "activeBanner": "Questo downtime è attivo. Una modifica ha effetto alla prossima valutazione e un cambiamento della modalità SLO rimisura le finestre già avviate.",
-        "noModule": "Scegli un modulo in Si applica a."
+        "noModule": "Scegli un modulo in Si applica a.",
+        "checkSchedule": "Controlla la pianificazione, poi salva di nuovo."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "una volta",
         "onceOn": "una volta {date}",
         "daily": "giornaliero",
-        "weekly": "settimanale"
+        "weekly": "settimanale",
+        "all": {
+          "alerts": "Tutti gli avvisi",
+          "anomaly_detections": "Tutti i rilevamenti di anomalie",
+          "synthetics": "Tutti i controlli Synthetics",
+          "slos": "Tutti gli SLO"
+        }
       },
       "condition": {
         "none": "Nessuna condizione di dimensione",
@@ -9090,7 +9102,8 @@
         "timezone": "Fuso orario",
         "noWindow": "Nessuna finestra inizia nei prossimi 8 giorni.",
         "nextWindow": "Prossima finestra: {window}. Una finestra può attraversare la mezzanotte.",
-        "nextWindowWithUtc": "Prossima finestra: {window} ({utc}). Una finestra può attraversare la mezzanotte."
+        "nextWindowWithUtc": "Prossima finestra: {window} ({utc}). Una finestra può attraversare la mezzanotte.",
+        "startsOn": "Inizia il"
       },
       "preview": {
         "title": "Anteprima",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} oggi",
         "outro": "Le notifiche, le pagine di reperibilità e i workflow si interrompono per tutti questi elementi all'interno della finestra.",
         "cancel": "Annulla",
-        "confirm": "Silenzia tutto"
+        "confirm": "Silenzia tutto",
+        "titleOne": {
+          "alerts": "Silenziare ogni avviso in questa organizzazione?",
+          "anomaly_detections": "Silenziare ogni rilevamento di anomalie in questa organizzazione?",
+          "synthetics": "Silenziare ogni controllo Synthetics in questa organizzazione?",
+          "slos": "Silenziare ogni SLO in questa organizzazione?"
+        },
+        "window": "Finestra: {window}"
       },
       "summaryPane": {
         "title": "Riepilogo",

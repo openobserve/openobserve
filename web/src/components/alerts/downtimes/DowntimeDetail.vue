@@ -278,6 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
       :message="t('alerts.downtimes.confirmCancel.message')"
+      :ok-label="t('alerts.downtimes.confirmCancel.confirm', { count: 1 }, 1)"
+      :cancel-label="t('alerts.downtimes.confirmCancel.keep', { count: 1 }, 1)"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
     />

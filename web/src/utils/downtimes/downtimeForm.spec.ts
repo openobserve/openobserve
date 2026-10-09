@@ -1,15 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
+import { gt } from "@/types/i18n";
 import type { Downtime } from "@/services/downtimes";
 import { conditionToBuilder } from "./conditionBridge";
 import {
   ALL_FOLDERS,
   applyPrefill,
+  buildDowntimeAutoName,
   buildDowntimeRequest,
   defaultDowntimeValues,
   downtimeToFormValues,
   exclusiveAllFolders,
+  nextFullHourMs,
+  scheduleForRepeat,
   unnarrowedModules,
   type DowntimeFormValues,
 } from "./downtimeForm";
@@ -182,5 +186,60 @@ describe("prefill and the mute-all rule", () => {
       value: "x",
     });
     expect(unnarrowedModules(values)).toEqual([]);
+  });
+});
+
+describe("schedule defaults", () => {
+  it("starts on the next full hour of the form's timezone, not of UTC", () => {
+    const values = defaultDowntimeValues(NOW, "Asia/Kolkata");
+    expect(values.schedule.start_date).toBe("2026-09-17");
+    expect(values.schedule.start_time).toBe("18:00");
+    expect(values.schedule.end_time).toBe("19:00");
+    expect(nextFullHourMs(NOW, "UTC")).toBe(Date.parse("2026-09-17T13:00:00Z"));
+    expect(nextFullHourMs(Date.parse("2026-09-17T13:00:00Z"), "UTC")).toBe(
+      Date.parse("2026-09-17T13:00:00Z"),
+    );
+  });
+
+  it("starts on :00 across a thirty-minute DST step", () => {
+    const lordHowe = Date.parse("2026-10-03T15:15:00Z");
+    const start = nextFullHourMs(lordHowe, "Australia/Lord_Howe");
+    expect(start).toBe(Date.parse("2026-10-03T16:00:00Z"));
+    expect(defaultDowntimeValues(lordHowe, "Australia/Lord_Howe").schedule.start_time).toBe(
+      "03:00",
+    );
+    expect(nextFullHourMs(Date.parse("2026-09-17T12:20:00Z"), "Asia/Kathmandu")).toBe(
+      Date.parse("2026-09-17T13:15:00Z"),
+    );
+  });
+
+  it("picks today's weekday in the form's timezone when the repeat becomes weekly", () => {
+    const late = Date.parse("2026-09-17T23:30:00Z");
+    const s = { ...defaultDowntimeValues(late, "Asia/Tokyo").schedule };
+    const weekly = scheduleForRepeat(s, "weekly", late);
+    expect(weekly.start_date).toBe("2026-09-18");
+    expect(weekly.weekdays).toEqual([5]);
+    expect(scheduleForRepeat({ ...s, weekdays: [1, 3] }, "weekly", late).weekdays).toEqual([1, 3]);
+  });
+
+  it("resets the start date on a repeat change, recurring from today and once on the next hour", () => {
+    const s = { ...defaultDowntimeValues(NOW, "UTC").schedule, start_date: "2026-12-01" };
+    expect(scheduleForRepeat(s, "daily", NOW).start_date).toBe("2026-09-17");
+    const once = scheduleForRepeat({ ...s, repeat: "daily" }, "none", NOW);
+    expect(once).toMatchObject({
+      repeat: "none",
+      start_date: "2026-09-17",
+      start_time: "13:00",
+      end_date: "2026-09-17",
+      end_time: "14:00",
+    });
+  });
+});
+
+describe("generated name", () => {
+  it("names an unnarrowed module the way the server does", () => {
+    expect(
+      buildDowntimeAutoName(defaultDowntimeValues(NOW, "UTC"), gt, undefined, undefined, "en-US"),
+    ).toBe("All alerts · once Thu 17 Sep");
   });
 });

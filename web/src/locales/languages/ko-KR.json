@@ -8873,7 +8873,9 @@
         "windowRange": "{start} ~ {end} {zone}",
         "onceSentence": "1회 · {start} ~ {end} · {zone}",
         "dailySentence": "매일 · {time}, {duration} 동안 · {zone}",
-        "weeklySentence": "매주 {days} · {time}, {duration} 동안 · {zone}"
+        "weeklySentence": "매주 {days} · {time}, {duration} 동안 · {zone}",
+        "fromNoEnd": "{schedule}, {start}부터 (종료일 없음)",
+        "fromUntil": "{schedule}, {start}부터 {until}까지"
       },
       "validation": {
         "conditionRequired": "조건을 추가하거나 조건 블록을 제거하세요.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "시작 시간을 HH:MM 형식으로 입력하세요.",
         "durationInvalid": "90m 또는 1h 30m과 같은 기간을 입력하세요.",
         "weekdaysRequired": "요일을 하나 이상 선택하세요.",
-        "untilAfterStart": "반복 종료일은 첫 날짜 이후여야 합니다."
+        "untilAfterStart": "반복 종료일은 첫 날짜 이후여야 합니다.",
+        "startDateRequired": "첫날을 선택하세요."
       },
       "title": "다운타임",
       "subtitle": "알림, 이상 탐지, Synthetics 검사는 계속 실행하되 알림 전송을 중지하는 예약된 기간",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "다운타임 취소",
         "message": "알림이 즉시 재개됩니다. 다운타임은 이력용으로 목록에 남습니다.",
-        "bulkMessage": "{count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다. | {count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다."
+        "bulkMessage": "{count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다. | {count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다.",
+        "confirm": "다운타임 취소",
+        "keep": "다운타임 유지"
       },
       "confirmDelete": {
         "title": "다운타임 삭제",
@@ -9023,7 +9028,8 @@
         "cancel": "취소",
         "save": "저장",
         "activeBanner": "이 다운타임은 활성 상태입니다. 편집은 다음 평가 시 적용되며, SLO 모드를 변경하면 이미 시작된 기간이 다시 측정됩니다.",
-        "noModule": "'적용 대상'에서 모듈을 선택하세요."
+        "noModule": "'적용 대상'에서 모듈을 선택하세요.",
+        "checkSchedule": "일정을 확인한 후 다시 저장하세요."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "1회",
         "onceOn": "{date}에 1회",
         "daily": "매일",
-        "weekly": "매주"
+        "weekly": "매주",
+        "all": {
+          "alerts": "모든 알림",
+          "anomaly_detections": "모든 이상 탐지",
+          "synthetics": "모든 Synthetics 검사",
+          "slos": "모든 SLO"
+        }
       },
       "condition": {
         "none": "차원 조건 없음",
@@ -9090,7 +9102,8 @@
         "timezone": "시간대",
         "noWindow": "앞으로 8일 내에 시작되는 기간이 없습니다.",
         "nextWindow": "다음 기간: {window}. 기간은 자정을 넘을 수 있습니다.",
-        "nextWindowWithUtc": "다음 기간: {window} ({utc}). 기간은 자정을 넘을 수 있습니다."
+        "nextWindowWithUtc": "다음 기간: {window} ({utc}). 기간은 자정을 넘을 수 있습니다.",
+        "startsOn": "시작일"
       },
       "preview": {
         "title": "미리보기",
@@ -9114,7 +9127,14 @@
         "matchedNow": "오늘 {matched}",
         "outro": "기간 내에 이들 모두에 대한 알림, 온콜 호출 및 워크플로우가 중지됩니다.",
         "cancel": "취소",
-        "confirm": "모두 음소거"
+        "confirm": "모두 음소거",
+        "titleOne": {
+          "alerts": "이 조직의 모든 알림을 음소거할까요?",
+          "anomaly_detections": "이 조직의 모든 이상 탐지를 음소거할까요?",
+          "synthetics": "이 조직의 모든 Synthetics 검사를 음소거할까요?",
+          "slos": "이 조직의 모든 SLO를 음소거할까요?"
+        },
+        "window": "기간: {window}"
       },
       "summaryPane": {
         "title": "요약",

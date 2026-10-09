@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="confirm-dialog"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
-    :secondary-button-label="cancelLabel || t('confirmDialog.cancel')"
+    :secondary-button-label="cancelLabelComputed"
     :primary-button-label="okLabelComputed"
     :primary-button-color="okColor"
     @click:secondary="onCancel"
@@ -68,6 +68,8 @@ export default defineComponent({
       return props.okLabel || t("confirmDialog.ok");
     });
 
+    const cancelLabelComputed = computed(() => props.cancelLabel || t("confirmDialog.cancel"));
+
     const onCancel = () => {
       open.value = false;
       emit("update:cancel");
@@ -82,6 +84,7 @@ export default defineComponent({
       t,
       open,
       okLabelComputed,
+      cancelLabelComputed,
       onCancel,
       onConfirm,
     };

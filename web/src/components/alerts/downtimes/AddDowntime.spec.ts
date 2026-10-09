@@ -8,6 +8,7 @@ import AddDowntime from "./AddDowntime.vue";
 import downtimes from "@/services/downtimes";
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
+import { isoWeekday, utcMicrosToLocal } from "@/utils/downtimes/schedule";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -82,6 +83,12 @@ const save = async (wrapper: ReturnType<typeof mount>) => {
   await flushPromises();
 };
 
+// The first Save on a new downtime stops on an unseen schedule, so these open it first.
+const seeSchedule = async (wrapper: ReturnType<typeof mount>) => {
+  await wrapper.get('[data-test="add-downtime-tab-schedule"]').trigger("click");
+  await flushPromises();
+};
+
 describe("AddDowntime", () => {
   beforeEach(() => {
     queryClient.clear();
@@ -112,8 +119,10 @@ describe("AddDowntime", () => {
     const { wrapper } = await mountPage();
     await new Promise((resolve) => setTimeout(resolve, 350));
     await flushPromises();
+    await seeSchedule(wrapper);
     await save(wrapper);
     expect(downtimes.create).not.toHaveBeenCalled();
+    expect(dialog()?.textContent).toContain("Mute every alert in this org?");
     expect(dialog()?.textContent).toContain("Every alert in this organization");
     expect(dialog()?.textContent).toContain("12 alerts today");
     expect(dialog()?.textContent).toContain("Mute all");
@@ -122,6 +131,7 @@ describe("AddDowntime", () => {
 
   it("saves nothing when the dialog is cancelled", async () => {
     const { wrapper } = await mountPage();
+    await seeSchedule(wrapper);
     await save(wrapper);
     await dialogButton("secondary");
     expect(downtimes.create).not.toHaveBeenCalled();
@@ -131,6 +141,7 @@ describe("AddDowntime", () => {
 
   it("creates the downtime once Mute all is confirmed", async () => {
     const { wrapper } = await mountPage();
+    await seeSchedule(wrapper);
     await save(wrapper);
     await dialogButton("primary");
     expect(downtimes.create).toHaveBeenCalledTimes(1);
@@ -156,6 +167,7 @@ describe("AddDowntime", () => {
     const folders = vi.mocked(downtimes.preview).mock.calls.map((call) => call[2]);
     expect(folders.length).toBeGreaterThan(0);
     expect(folders.every((f) => f === "payments")).toBe(true);
+    await seeSchedule(wrapper);
     await save(wrapper);
     await dialogButton("primary");
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
@@ -170,6 +182,69 @@ describe("AddDowntime", () => {
     await save(wrapper);
     expect(downtimes.create).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("Choose a dimension for every row.");
+    wrapper.unmount();
+  });
+
+  it("saves nothing on two Enters in the name field", async () => {
+    const { wrapper } = await mountPage();
+    await seeSchedule(wrapper);
+    await wrapper.get('[data-test="add-downtime-name-trigger"]').trigger("click");
+    await wrapper.get('[data-test="add-downtime-name-input"]').setValue("Deploy");
+    await wrapper.get('[data-test="add-downtime-name-input"]').trigger("keydown.enter");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    (document.activeElement as HTMLElement | null)?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    await flushPromises();
+    expect(dialog()).toBeNull();
+    expect(downtimes.create).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("focuses Cancel in the mute-all dialog, so Enter there saves nothing", async () => {
+    const { wrapper } = await mountPage();
+    await seeSchedule(wrapper);
+    await save(wrapper);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+    const cancel = dialog()!.querySelector('[data-test="o-dialog-secondary-btn"]');
+    expect(document.activeElement).toBe(cancel);
+    wrapper.unmount();
+  });
+
+  it("shows the unseen schedule on the first Save and its window in the dialog", async () => {
+    const { wrapper } = await mountPage();
+    await save(wrapper);
+    expect(dialog()).toBeNull();
+    expect(downtimes.create).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="add-downtime-check-schedule"]').exists()).toBe(true);
+    expect(wrapper.get('[data-tab-pane="schedule"]').isVisible()).toBe(true);
+    await save(wrapper);
+    expect(
+      dialog()?.querySelector('[data-test="add-downtime-mute-all-window"]')?.textContent,
+    ).toMatch(/^\s*Window: Once · /);
+    wrapper.unmount();
+  });
+
+  it("titles a new downtime with its generated name as soon as it has a target", async () => {
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="add-downtime-name-value"]').text()).toMatch(
+      /^All alerts · once /,
+    );
+    wrapper.unmount();
+  });
+
+  it("picks today's weekday and shows Starts on when the repeat becomes weekly", async () => {
+    const { wrapper } = await mountPage();
+    await seeSchedule(wrapper);
+    await wrapper.get('[data-test="downtime-schedule-repeat-weekly"]').trigger("click");
+    await flushPromises();
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const today = utcMicrosToLocal(Date.now() * 1000, zone).date;
+    const day = wrapper.get(`[data-test="downtime-schedule-weekday-${isoWeekday(today)}"]`);
+    expect(day.attributes("data-state")).toBe("on");
+    expect(wrapper.find('[data-test="downtime-schedule-starts-on"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });

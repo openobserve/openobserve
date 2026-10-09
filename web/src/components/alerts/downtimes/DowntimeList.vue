@@ -443,6 +443,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           : t('alerts.downtimes.confirmCancel.message')
       "
+      :ok-label="
+        t(
+          'alerts.downtimes.confirmCancel.confirm',
+          { count: pendingCancel.length },
+          pendingCancel.length,
+        )
+      "
+      :cancel-label="
+        t(
+          'alerts.downtimes.confirmCancel.keep',
+          { count: pendingCancel.length },
+          pendingCancel.length,
+        )
+      "
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
     />

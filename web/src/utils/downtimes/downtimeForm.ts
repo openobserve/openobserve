@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { TranslateFn } from "@/types/i18n";
+import type { I18nKey, TranslateFn } from "@/types/i18n";
 import type { V2Group } from "@/utils/alerts/alertDataTransforms";
 import type {
   Downtime,
@@ -35,6 +35,7 @@ import { MODULE_ORDER, type FolderNameFn } from "./targetSummary";
 import {
   durationInput,
   formatWindowTime,
+  isoWeekday,
   localToUtcMicros,
   parseDuration,
   utcMicrosToLocal,
@@ -43,6 +44,19 @@ import { canonicalTimezone } from "@/utils/timezoneAliases";
 
 /** The "All folders" option inside the Folders select. */
 export const ALL_FOLDERS = "__all__";
+
+const HOUR_MS = 3_600_000;
+const QUARTER_MS = 900_000;
+// Four hours of quarter steps covers an hour plus the largest DST jump.
+const MAX_HOUR_SEARCH_STEPS = 16;
+
+// The server names an unnarrowed module the same way, so the title shows what Save stores.
+const AUTO_NAME_ALL_KEYS = {
+  alerts: "alerts.downtimes.autoName.all.alerts",
+  anomaly_detections: "alerts.downtimes.autoName.all.anomaly_detections",
+  synthetics: "alerts.downtimes.autoName.all.synthetics",
+  slos: "alerts.downtimes.autoName.all.slos",
+} as const satisfies Record<TargetModule, I18nKey>;
 
 export interface TargetFormValues {
   folders: string[];
@@ -98,11 +112,21 @@ const emptyTarget = (): TargetFormValues => ({
 
 export const hasIdentity = (module: TargetModule): boolean => module !== "synthetics";
 
+/** The next full hour on the wall clock of `timezone`, so a zone at a half-hour offset or DST step still starts on :00. */
+export function nextFullHourMs(nowMs: number, timezone: string): number {
+  // Every UTC offset and DST step is a multiple of 15 minutes, so a full local hour falls on a 15-minute UTC boundary.
+  let at = Math.ceil(nowMs / QUARTER_MS) * QUARTER_MS;
+  for (let step = 0; step < MAX_HOUR_SEARCH_STEPS; step += 1, at += QUARTER_MS) {
+    if (utcMicrosToLocal(at * 1000, timezone).time.endsWith(":00")) return at;
+  }
+  return Math.ceil(nowMs / HOUR_MS) * HOUR_MS;
+}
+
 /** A new downtime: once, from the next full hour for one hour, in the viewer's zone. */
 export function defaultDowntimeValues(nowMs: number, timezone: string): DowntimeFormValues {
-  const nextHour = Math.ceil(nowMs / 3_600_000) * 3_600_000;
+  const nextHour = nextFullHourMs(nowMs, timezone);
   const start = utcMicrosToLocal(nextHour * 1000, timezone);
-  const end = utcMicrosToLocal((nextHour + 3_600_000) * 1000, timezone);
+  const end = utcMicrosToLocal((nextHour + HOUR_MS) * 1000, timezone);
   return {
     name: "",
     folder_id: "default",
@@ -129,6 +153,30 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
     reason: "",
     show_banner: true,
   };
+}
+
+/** The schedule after the user picks another repeat: once on the next full hour, recurring from today, weekly on today's weekday. */
+export function scheduleForRepeat(
+  s: ScheduleFormValues,
+  repeat: Repeat,
+  nowMs: number,
+): ScheduleFormValues {
+  const timezone = s.timezone || "UTC";
+  if (repeat === "none") {
+    const once = defaultDowntimeValues(nowMs, timezone).schedule;
+    return {
+      ...s,
+      repeat,
+      start_date: once.start_date,
+      start_time: once.start_time,
+      end_date: once.end_date,
+      end_time: once.end_time,
+    };
+  }
+  const today = utcMicrosToLocal(nowMs * 1000, timezone).date;
+  const weekdays =
+    repeat === "weekly" && s.weekdays.length === 0 ? [isoWeekday(today)] : [...s.weekdays];
+  return { ...s, repeat, start_date: today, weekdays };
 }
 
 /** A row action pre-fills one module, all folders unless it passed some, and its ids. */
@@ -313,7 +361,7 @@ const autoNameSubject = (
     const id = first.folders.folder_ids[0];
     return folderName?.(first.module, id) ?? id;
   }
-  return "";
+  return t(AUTO_NAME_ALL_KEYS[first.module]);
 };
 
 const autoNameWhen = (s: ScheduleFormValues, t: TranslateFn, locale?: string): string => {

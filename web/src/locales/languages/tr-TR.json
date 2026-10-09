@@ -8873,7 +8873,9 @@
         "windowRange": "{start} - {end} {zone}",
         "onceSentence": "Bir kez · {start} - {end} · {zone}",
         "dailySentence": "Günlük · {time}, {duration} boyunca · {zone}",
-        "weeklySentence": "Haftalık {days} · {time}, {duration} boyunca · {zone}"
+        "weeklySentence": "Haftalık {days} · {time}, {duration} boyunca · {zone}",
+        "fromNoEnd": "{schedule}, {start} tarihinden itibaren, bitiş tarihi yok",
+        "fromUntil": "{schedule}, {start} ile {until} arasında"
       },
       "validation": {
         "conditionRequired": "Bir koşul ekleyin veya koşul bloğunu kaldırın.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Başlangıç saatini SS:DD olarak girin.",
         "durationInvalid": "90dk veya 1sa 30dk gibi bir süre girin.",
         "weekdaysRequired": "En az bir gün seçin.",
-        "untilAfterStart": "Yineleme bitişi, ilk gün veya sonrasında olmalıdır."
+        "untilAfterStart": "Yineleme bitişi, ilk gün veya sonrasında olmalıdır.",
+        "startDateRequired": "İlk günü seçin."
       },
       "title": "Kesintiler",
       "subtitle": "Uyarıları, anomali algılamalarını ve sentetik kontrolleri çalışır durumda tutan ancak bildirimlerini durduran planlanmış pencereler",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Kesinti süresini iptal et",
         "message": "Bildirimler hemen devam eder. Kesinti süresi geçmiş için listede kalır.",
-        "bulkMessage": "{count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder. | {count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder."
+        "bulkMessage": "{count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder. | {count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder.",
+        "confirm": "Kesinti süresini iptal et | Kesinti sürelerini iptal et",
+        "keep": "Kesinti süresini koru | Kesinti sürelerini koru"
       },
       "confirmDelete": {
         "title": "Kesinti süresini sil",
@@ -9023,7 +9028,8 @@
         "cancel": "İptal",
         "save": "Kaydet",
         "activeBanner": "Bu kesinti süresi etkin. Bir düzenleme bir sonraki değerlendirmede geçerli olur ve SLO modundaki bir değişiklik başlamış olan pencereleri yeniden ölçer.",
-        "noModule": "Şunlara uygulanır bölümünden bir modül seçin."
+        "noModule": "Şunlara uygulanır bölümünden bir modül seçin.",
+        "checkSchedule": "Zamanlamayı kontrol edin, ardından yeniden kaydedin."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "bir kez",
         "onceOn": "bir kez {date}",
         "daily": "günlük",
-        "weekly": "haftalık"
+        "weekly": "haftalık",
+        "all": {
+          "alerts": "Tüm uyarılar",
+          "anomaly_detections": "Tüm anomali tespitleri",
+          "synthetics": "Tüm sentetik kontroller",
+          "slos": "Tüm SLO'lar"
+        }
       },
       "condition": {
         "none": "Boyut koşulu yok",
@@ -9090,7 +9102,8 @@
         "timezone": "Saat dilimi",
         "noWindow": "Önümüzdeki 8 gün içinde başlayan bir zaman aralığı yok.",
         "nextWindow": "Sonraki pencere: {window}. Bir pencere gece yarısını geçebilir.",
-        "nextWindowWithUtc": "Sonraki pencere: {window} ({utc}). Bir pencere gece yarısını geçebilir."
+        "nextWindowWithUtc": "Sonraki pencere: {window} ({utc}). Bir pencere gece yarısını geçebilir.",
+        "startsOn": "Başlangıç tarihi"
       },
       "preview": {
         "title": "Önizleme",
@@ -9114,7 +9127,14 @@
         "matchedNow": "bugün {matched}",
         "outro": "Pencere içinde hepsi için bildirimler, nöbet çağrıları ve iş akışları durur.",
         "cancel": "İptal",
-        "confirm": "Tümünü sessize al"
+        "confirm": "Tümünü sessize al",
+        "titleOne": {
+          "alerts": "Bu organizasyondaki her uyarı sessize alınsın mı?",
+          "anomaly_detections": "Bu organizasyondaki her anomali tespiti sessize alınsın mı?",
+          "synthetics": "Bu organizasyondaki her sentetik kontrol sessize alınsın mı?",
+          "slos": "Bu organizasyondaki her SLO sessize alınsın mı?"
+        },
+        "window": "Pencere: {window}"
       },
       "summaryPane": {
         "title": "Özet",

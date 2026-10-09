@@ -8873,7 +8873,9 @@
         "windowRange": "{start} a {end} {zone}",
         "onceSentence": "Una vez · {start} a {end} · {zone}",
         "dailySentence": "Diario · {time} durante {duration} · {zone}",
-        "weeklySentence": "Semanal los {days} · {time} durante {duration} · {zone}"
+        "weeklySentence": "Semanal los {days} · {time} durante {duration} · {zone}",
+        "fromNoEnd": "{schedule}, desde el {start} sin fecha de fin",
+        "fromUntil": "{schedule}, desde el {start} hasta el {until}"
       },
       "validation": {
         "conditionRequired": "Añade una condición o elimina el bloque de condiciones.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Introduce una hora de inicio como HH:MM.",
         "durationInvalid": "Introduce una duración como 90m o 1h 30m.",
         "weekdaysRequired": "Elige al menos un día.",
-        "untilAfterStart": "Repetir hasta debe ser el primer día o posterior."
+        "untilAfterStart": "Repetir hasta debe ser el primer día o posterior.",
+        "startDateRequired": "Elija el primer día."
       },
       "title": "Tiempos de inactividad",
       "subtitle": "Ventanas programadas que mantienen en ejecución las alertas, las detecciones de anomalías y las comprobaciones de sintéticos, pero detienen sus notificaciones",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Cancelar periodo de inactividad",
         "message": "Las notificaciones se reanudan de inmediato. El periodo de inactividad permanece en la lista como historial.",
-        "bulkMessage": "¿Cancelar {count} periodo de inactividad? Las notificaciones se reanudan de inmediato. | ¿Cancelar {count} periodos de inactividad? Las notificaciones se reanudan de inmediato."
+        "bulkMessage": "¿Cancelar {count} periodo de inactividad? Las notificaciones se reanudan de inmediato. | ¿Cancelar {count} periodos de inactividad? Las notificaciones se reanudan de inmediato.",
+        "confirm": "Cancelar periodo de inactividad | Cancelar periodos de inactividad",
+        "keep": "Mantener periodo de inactividad | Mantener periodos de inactividad"
       },
       "confirmDelete": {
         "title": "Eliminar periodo de inactividad",
@@ -9023,7 +9028,8 @@
         "cancel": "Cancelar",
         "save": "Guardar",
         "activeBanner": "Este periodo de inactividad está activo. Una edición surte efecto en la próxima evaluación, y un cambio en el modo de SLO vuelve a medir las ventanas que ya comenzaron.",
-        "noModule": "Elige un módulo en «Se aplica a»."
+        "noModule": "Elige un módulo en «Se aplica a».",
+        "checkSchedule": "Revise la programación y vuelva a guardar."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "una vez",
         "onceOn": "una vez el {date}",
         "daily": "diario",
-        "weekly": "semanal"
+        "weekly": "semanal",
+        "all": {
+          "alerts": "Todas las alertas",
+          "anomaly_detections": "Todas las detecciones de anomalías",
+          "synthetics": "Todas las comprobaciones de Sintéticos",
+          "slos": "Todos los SLO"
+        }
       },
       "condition": {
         "none": "Sin condición de dimensión",
@@ -9090,7 +9102,8 @@
         "timezone": "Zona horaria",
         "noWindow": "Ninguna ventana comienza en los próximos 8 días.",
         "nextWindow": "Próxima ventana: {window}. Una ventana puede cruzar la medianoche.",
-        "nextWindowWithUtc": "Próxima ventana: {window} ({utc}). Una ventana puede cruzar la medianoche."
+        "nextWindowWithUtc": "Próxima ventana: {window} ({utc}). Una ventana puede cruzar la medianoche.",
+        "startsOn": "Comienza el"
       },
       "preview": {
         "title": "Vista previa",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} hoy",
         "outro": "Las notificaciones, los avisos de guardia y los flujos de trabajo se detienen para todos ellos dentro de la ventana.",
         "cancel": "Cancelar",
-        "confirm": "Silenciar todo"
+        "confirm": "Silenciar todo",
+        "titleOne": {
+          "alerts": "¿Silenciar todas las alertas de esta organización?",
+          "anomaly_detections": "¿Silenciar todas las detecciones de anomalías de esta organización?",
+          "synthetics": "¿Silenciar todas las comprobaciones de Sintéticos de esta organización?",
+          "slos": "¿Silenciar todos los SLO de esta organización?"
+        },
+        "window": "Ventana: {window}"
       },
       "summaryPane": {
         "title": "Resumen",

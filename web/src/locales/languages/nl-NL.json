@@ -8873,7 +8873,9 @@
         "windowRange": "{start} tot {end} {zone}",
         "onceSentence": "Eenmalig · {start} tot {end} · {zone}",
         "dailySentence": "Dagelijks · {time} gedurende {duration} · {zone}",
-        "weeklySentence": "Wekelijks op {days} · {time} gedurende {duration} · {zone}"
+        "weeklySentence": "Wekelijks op {days} · {time} gedurende {duration} · {zone}",
+        "fromNoEnd": "{schedule}, vanaf {start} zonder einddatum",
+        "fromUntil": "{schedule}, van {start} tot en met {until}"
       },
       "validation": {
         "conditionRequired": "Voeg een voorwaarde toe of verwijder het voorwaardeblok.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Voer een starttijd in als HH:MM.",
         "durationInvalid": "Voer een duur in zoals 90m of 1h 30m.",
         "weekdaysRequired": "Kies minstens één dag.",
-        "untilAfterStart": "Herhalen tot moet op of na de eerste dag vallen."
+        "untilAfterStart": "Herhalen tot moet op of na de eerste dag vallen.",
+        "startDateRequired": "Kies de eerste dag."
       },
       "title": "Downtimes",
       "subtitle": "Geplande vensters waarin alarmen, anomaliedetecties en Synthetics-checks blijven draaien, maar hun meldingen worden gestopt",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Downtime annuleren",
         "message": "Meldingen worden direct hervat. De downtime blijft in de lijst voor de geschiedenis.",
-        "bulkMessage": "{count} downtime annuleren? Meldingen worden direct hervat. | {count} downtimes annuleren? Meldingen worden direct hervat."
+        "bulkMessage": "{count} downtime annuleren? Meldingen worden direct hervat. | {count} downtimes annuleren? Meldingen worden direct hervat.",
+        "confirm": "Downtime annuleren | Downtimes annuleren",
+        "keep": "Downtime behouden | Downtimes behouden"
       },
       "confirmDelete": {
         "title": "Downtime verwijderen",
@@ -9023,7 +9028,8 @@
         "cancel": "Annuleren",
         "save": "Opslaan",
         "activeBanner": "Deze downtime is actief. Een bewerking wordt van kracht bij de volgende evaluatie, en een wijziging van de SLO-modus herberekent de vensters die al zijn gestart.",
-        "noModule": "Kies een module bij Van toepassing op."
+        "noModule": "Kies een module bij Van toepassing op.",
+        "checkSchedule": "Controleer het schema en sla daarna opnieuw op."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "eenmalig",
         "onceOn": "eenmalig {date}",
         "daily": "dagelijks",
-        "weekly": "wekelijks"
+        "weekly": "wekelijks",
+        "all": {
+          "alerts": "Alle alarmen",
+          "anomaly_detections": "Alle anomaliedetecties",
+          "synthetics": "Alle synthetics-checks",
+          "slos": "Alle SLO's"
+        }
       },
       "condition": {
         "none": "Geen dimensievoorwaarde",
@@ -9090,7 +9102,8 @@
         "timezone": "Tijdzone",
         "noWindow": "Geen enkel venster start in de komende 8 dagen.",
         "nextWindow": "Volgend venster: {window}. Een venster kan over middernacht heen vallen.",
-        "nextWindowWithUtc": "Volgend venster: {window} ({utc}). Een venster kan over middernacht heen vallen."
+        "nextWindowWithUtc": "Volgend venster: {window} ({utc}). Een venster kan over middernacht heen vallen.",
+        "startsOn": "Begint op"
       },
       "preview": {
         "title": "Voorbeeld",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} vandaag",
         "outro": "Meldingen, piketoproepen en workflows stoppen voor al deze items binnen het venster.",
         "cancel": "Annuleren",
-        "confirm": "Alles dempen"
+        "confirm": "Alles dempen",
+        "titleOne": {
+          "alerts": "Elk alarm in deze organisatie dempen?",
+          "anomaly_detections": "Elke anomaliedetectie in deze organisatie dempen?",
+          "synthetics": "Elke synthetics-check in deze organisatie dempen?",
+          "slos": "Elke SLO in deze organisatie dempen?"
+        },
+        "window": "Venster: {window}"
       },
       "summaryPane": {
         "title": "Samenvatting",

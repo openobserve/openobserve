@@ -16,7 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-5" data-test="downtime-schedule">
-    <OFormToggleGroup name="schedule.repeat" data-test="downtime-schedule-repeat">
+    <OFormToggleGroup
+      name="schedule.repeat"
+      data-test="downtime-schedule-repeat"
+      @update:model-value="onRepeatChange"
+    >
       <OToggleGroupItem value="none" size="sm" data-test="downtime-schedule-repeat-none">
         {{ t("alerts.downtimes.scheduleForm.once") }}
       </OToggleGroupItem>
@@ -78,6 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ day.label }}
         </OToggleGroupItem>
       </OFormToggleGroup>
+      <OFormDate
+        name="schedule.start_date"
+        :label="t('alerts.downtimes.scheduleForm.startsOn')"
+        required
+        data-test="downtime-schedule-starts-on"
+      />
       <div class="flex flex-wrap items-start gap-3 max-md:flex-col">
         <OFormTime
           name="schedule.start_time"
@@ -125,7 +135,12 @@ import { computed, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { buildSchedule, type DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
+import {
+  buildSchedule,
+  scheduleForRepeat,
+  type DowntimeFormValues,
+} from "@/utils/downtimes/downtimeForm";
+import type { Repeat } from "@/services/downtimes";
 import { ISO_WEEKDAYS, currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -140,6 +155,15 @@ const { timezoneOptions } = useTimezoneOptions();
 
 const schedule = form.useStore((s: { values: DowntimeFormValues }) => s.values.schedule);
 const repeat = computed(() => schedule.value?.repeat);
+
+const REPEATS: readonly Repeat[] = ["none", "daily", "weekly"];
+
+// Only a user pick resets the dates; a loaded row sets the repeat without passing through here.
+const onRepeatChange = (next: unknown) => {
+  const picked = REPEATS.find((r) => r === next);
+  if (!picked || !schedule.value) return;
+  form.setFieldValue("schedule", scheduleForRepeat(schedule.value, picked, Date.now()));
+};
 
 const weekdayFormat = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" });
 // 2024-01-01 is a Monday, so ISO day n is 2024-01-0n.

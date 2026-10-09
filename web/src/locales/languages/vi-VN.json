@@ -8873,7 +8873,9 @@
         "windowRange": "{start} đến {end} {zone}",
         "onceSentence": "Một lần · {start} đến {end} · {zone}",
         "dailySentence": "Hàng ngày · {time} trong {duration} · {zone}",
-        "weeklySentence": "Hàng tuần vào {days} · {time} trong {duration} · {zone}"
+        "weeklySentence": "Hàng tuần vào {days} · {time} trong {duration} · {zone}",
+        "fromNoEnd": "{schedule}, từ {start}, không có ngày kết thúc",
+        "fromUntil": "{schedule}, từ {start} đến {until}"
       },
       "validation": {
         "conditionRequired": "Thêm điều kiện hoặc xóa khối điều kiện.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Nhập giờ bắt đầu theo định dạng HH:MM.",
         "durationInvalid": "Nhập thời lượng, ví dụ 90m hoặc 1h 30m.",
         "weekdaysRequired": "Chọn ít nhất một ngày.",
-        "untilAfterStart": "Lặp lại đến phải bằng hoặc sau ngày đầu tiên."
+        "untilAfterStart": "Lặp lại đến phải bằng hoặc sau ngày đầu tiên.",
+        "startDateRequired": "Chọn ngày đầu tiên."
       },
       "title": "Thời gian ngừng",
       "subtitle": "Các khoảng thời gian đã lên lịch giữ cho cảnh báo, phát hiện bất thường và kiểm tra Synthetics vẫn chạy nhưng dừng thông báo của chúng",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Hủy khoảng ngừng",
         "message": "Thông báo sẽ tiếp tục ngay lập tức. Khoảng ngừng vẫn ở trong danh sách để lưu lịch sử.",
-        "bulkMessage": "Hủy {count} khoảng ngừng? Thông báo sẽ tiếp tục ngay lập tức. | Hủy {count} khoảng ngừng? Thông báo sẽ tiếp tục ngay lập tức."
+        "bulkMessage": "Hủy {count} khoảng ngừng? Thông báo sẽ tiếp tục ngay lập tức. | Hủy {count} khoảng ngừng? Thông báo sẽ tiếp tục ngay lập tức.",
+        "confirm": "Hủy khoảng ngừng",
+        "keep": "Giữ khoảng ngừng"
       },
       "confirmDelete": {
         "title": "Xóa khoảng ngừng",
@@ -9023,7 +9028,8 @@
         "cancel": "Hủy",
         "save": "Lưu",
         "activeBanner": "Khoảng ngừng này đang hoạt động. Chỉnh sửa sẽ có hiệu lực ở lần đánh giá tiếp theo, và thay đổi chế độ SLO sẽ đo lại các cửa sổ đã bắt đầu.",
-        "noModule": "Chọn một mô-đun trong Áp dụng cho."
+        "noModule": "Chọn một mô-đun trong Áp dụng cho.",
+        "checkSchedule": "Kiểm tra lịch, sau đó lưu lại."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "một lần",
         "onceOn": "một lần {date}",
         "daily": "hàng ngày",
-        "weekly": "hàng tuần"
+        "weekly": "hàng tuần",
+        "all": {
+          "alerts": "Tất cả cảnh báo",
+          "anomaly_detections": "Tất cả phát hiện bất thường",
+          "synthetics": "Tất cả kiểm tra Synthetics",
+          "slos": "Tất cả SLO"
+        }
       },
       "condition": {
         "none": "Không có điều kiện theo chiều",
@@ -9090,7 +9102,8 @@
         "timezone": "Múi giờ",
         "noWindow": "Không có khoảng thời gian nào bắt đầu trong 8 ngày tới.",
         "nextWindow": "Cửa sổ tiếp theo: {window}. Một cửa sổ có thể kéo dài qua nửa đêm.",
-        "nextWindowWithUtc": "Cửa sổ tiếp theo: {window} ({utc}). Một cửa sổ có thể kéo dài qua nửa đêm."
+        "nextWindowWithUtc": "Cửa sổ tiếp theo: {window} ({utc}). Một cửa sổ có thể kéo dài qua nửa đêm.",
+        "startsOn": "Bắt đầu vào ngày"
       },
       "preview": {
         "title": "Xem trước",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} hôm nay",
         "outro": "Thông báo, cuộc gọi trực và quy trình làm việc đều dừng cho tất cả chúng trong cửa sổ này.",
         "cancel": "Hủy",
-        "confirm": "Tắt thông báo tất cả"
+        "confirm": "Tắt thông báo tất cả",
+        "titleOne": {
+          "alerts": "Tắt thông báo mọi cảnh báo trong tổ chức này?",
+          "anomaly_detections": "Tắt thông báo mọi phát hiện bất thường trong tổ chức này?",
+          "synthetics": "Tắt thông báo mọi kiểm tra Synthetics trong tổ chức này?",
+          "slos": "Tắt thông báo mọi SLO trong tổ chức này?"
+        },
+        "window": "Khoảng thời gian: {window}"
       },
       "summaryPane": {
         "title": "Tóm tắt",

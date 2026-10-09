@@ -28,6 +28,7 @@ import {
   MAX_DURATION_SECS,
   MIN_DURATION_SECS,
   isHhMm,
+  isYmd,
   localToUtcMicros,
   parseDuration,
 } from "@/utils/downtimes/schedule";
@@ -152,6 +153,12 @@ const onceIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
 
 const recurringIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
   const issues: Issue[] = [];
+  if (!isYmd(s.start_date)) {
+    issues.push({
+      path: ["schedule", "start_date"],
+      message: t("alerts.downtimes.validation.startDateRequired"),
+    });
+  }
   if (!isHhMm(s.start_time)) {
     issues.push({
       path: ["schedule", "start_time"],

@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t('common.inlineEdit.autoHint')
                   : t('alerts.downtimes.form.renameHint')
               "
+              :submit-on-enter="false"
               data-test="add-downtime-name"
               @update:model-value="autoName.markManual"
               @commit="autoName.onCommit"
@@ -173,7 +174,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
 
-              <div v-show="activeTab === 'schedule'" data-tab-pane="schedule">
+              <div
+                v-show="activeTab === 'schedule'"
+                ref="schedulePane"
+                data-tab-pane="schedule"
+                class="flex flex-col gap-3"
+              >
+                <OBanner
+                  v-if="scheduleNudged"
+                  variant="info"
+                  dense
+                  :content="t('alerts.downtimes.form.checkSchedule')"
+                  data-test="add-downtime-check-schedule"
+                />
                 <DowntimeScheduleFields />
               </div>
 
@@ -280,11 +293,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="muteAllOpen"
       size="sm"
-      :title="t('alerts.downtimes.muteAllDialog.title')"
+      :title="muteAllTitle"
       :primary-button-label="t('alerts.downtimes.muteAllDialog.confirm')"
       primary-button-variant="destructive"
       :primary-button-loading="saveMutation.isPending.value"
       :secondary-button-label="t('alerts.downtimes.muteAllDialog.cancel')"
+      initial-focus="secondary"
       data-test="add-downtime-mute-all-dialog"
       @click:primary="confirmMuteAll"
       @click:secondary="muteAllOpen = false"
@@ -299,6 +313,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </li>
         </ul>
+        <p v-if="pendingWindow" class="text-text-body" data-test="add-downtime-mute-all-window">
+          {{ t("alerts.downtimes.muteAllDialog.window", { window: pendingWindow }) }}
+        </p>
         <p class="text-text-secondary text-xs">{{ t("alerts.downtimes.muteAllDialog.outro") }}</p>
       </div>
     </ODialog>
@@ -326,6 +343,7 @@ import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { conditionError } from "@/utils/downtimes/conditionRules";
+import { scheduleWithBounds } from "@/utils/downtimes/schedule";
 import {
   applyPrefill,
   buildCondition,
@@ -455,6 +473,13 @@ const MUTE_ALL_EVERY_KEYS = {
   slos: "alerts.downtimes.muteAllDialog.every.slos",
 } as const satisfies Record<TargetModule, I18nKey>;
 
+const MUTE_ALL_TITLE_KEYS = {
+  alerts: "alerts.downtimes.muteAllDialog.titleOne.alerts",
+  anomaly_detections: "alerts.downtimes.muteAllDialog.titleOne.anomaly_detections",
+  synthetics: "alerts.downtimes.muteAllDialog.titleOne.synthetics",
+  slos: "alerts.downtimes.muteAllDialog.titleOne.slos",
+} as const satisfies Record<TargetModule, I18nKey>;
+
 const MATCHED_KEYS = {
   alerts: "alerts.downtimes.matched.alerts",
   anomaly_detections: "alerts.downtimes.matched.anomalies",
@@ -490,6 +515,19 @@ const muteAllOpen = ref(false);
 const pendingSave = ref<DowntimeFormValues | null>(null);
 const muteAllModules = computed(() =>
   pendingSave.value ? unnarrowedModules(pendingSave.value) : [],
+);
+
+const muteAllTitle = computed<I18nText>(() => {
+  const [only, ...rest] = muteAllModules.value;
+  return only && rest.length === 0
+    ? t(MUTE_ALL_TITLE_KEYS[only])
+    : t("alerts.downtimes.muteAllDialog.title");
+});
+
+const pendingWindow = computed<I18nText | null>(() =>
+  pendingSave.value
+    ? scheduleWithBounds(buildDowntimeRequest(pendingSave.value).schedule, t)
+    : null,
 );
 
 const onSubmit = async (submitted: DowntimeFormValues) => {
@@ -605,10 +643,29 @@ const tabs = computed<{ key: DowntimeTab; label: I18nText; icon: IconName; requi
   ],
 );
 
+// A new downtime is not saved on a schedule the user never looked at, so the first Save shows it.
+const scheduleSeen = ref(isEdit.value);
+const scheduleNudged = ref(false);
+const schedulePane = ref<HTMLElement | null>(null);
+watch(activeTab, (tab) => {
+  if (tab === "schedule") scheduleSeen.value = true;
+});
+
+const showSchedule = () => {
+  activeTab.value = "schedule";
+  scheduleNudged.value = true;
+  void nextTick(() => schedulePane.value?.scrollIntoView?.({ block: "start" }));
+};
+
 // A failed submit opens the tab that owns the first error, then brings it into view.
-const onSaveClick = () => {
+const onSaveClick = (event: MouseEvent) => {
   const result = schema.safeParse(form.state.values);
-  if (result.success) return;
+  if (result.success) {
+    if (scheduleSeen.value) return;
+    event.preventDefault();
+    showSchedule();
+    return;
+  }
   activeTab.value = tabForPath((result.error.issues[0]?.path ?? []) as (string | number)[]);
   void nextTick(() => scrollToFirstError());
 };
@@ -661,8 +718,12 @@ const largeModules = computed(() =>
   }),
 );
 
+// Before the preview answers, an unnarrowed module matches its whole list.
 const matchedText = (m: TargetModule): I18nText | null => {
-  const count = matchCounts.value[m];
+  const listed = itemsByModule[m].query.isSuccess.value
+    ? itemsByModule[m].items.value.length
+    : null;
+  const count = matchCounts.value[m] ?? listed;
   return count === null ? null : t(MATCHED_KEYS[m], { count }, count);
 };
 

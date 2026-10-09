@@ -107,4 +107,12 @@ describe("AddDowntime schema", () => {
     expect(tabForPath(["targets", "alerts", "folders"])).toBe("targets");
     expect(tabForPath(["modules"])).toBe("targets");
   });
+
+  it("needs the first day of a recurring schedule", () => {
+    const v = valid();
+    v.schedule = { ...v.schedule, repeat: "daily", start_date: "" };
+    expect(errorsOf(v)["schedule.start_date"]).toBe("Choose the first day.");
+    v.schedule.start_date = "2026-09-17";
+    expect(errorsOf(v)).toEqual({});
+  });
 });

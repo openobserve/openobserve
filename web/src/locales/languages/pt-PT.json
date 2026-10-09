@@ -8873,7 +8873,9 @@
         "windowRange": "{start} a {end} {zone}",
         "onceSentence": "Uma vez · {start} a {end} · {zone}",
         "dailySentence": "Diariamente · {time} por {duration} · {zone}",
-        "weeklySentence": "Semanalmente em {days} · {time} por {duration} · {zone}"
+        "weeklySentence": "Semanalmente em {days} · {time} por {duration} · {zone}",
+        "fromNoEnd": "{schedule}, a partir de {start} sem data de fim",
+        "fromUntil": "{schedule}, de {start} até {until}"
       },
       "validation": {
         "conditionRequired": "Adicione uma condição ou remova o bloco de condição.",
@@ -8901,7 +8903,8 @@
         "startTimeRequired": "Insira um horário de início no formato HH:MM.",
         "durationInvalid": "Insira uma duração como 90m ou 1h 30m.",
         "weekdaysRequired": "Escolha pelo menos um dia.",
-        "untilAfterStart": "Repetir até deve ser no primeiro dia ou depois dele."
+        "untilAfterStart": "Repetir até deve ser no primeiro dia ou depois dele.",
+        "startDateRequired": "Escolha o primeiro dia."
       },
       "title": "Inatividades",
       "subtitle": "Janelas agendadas que mantêm alertas, detecções de anomalias e verificações sintéticas em execução, mas interrompem suas notificações",
@@ -8974,7 +8977,9 @@
       "confirmCancel": {
         "title": "Cancelar downtime",
         "message": "As notificações são retomadas imediatamente. O downtime permanece na lista para histórico.",
-        "bulkMessage": "Cancelar {count} downtime? As notificações são retomadas imediatamente. | Cancelar {count} downtimes? As notificações são retomadas imediatamente."
+        "bulkMessage": "Cancelar {count} downtime? As notificações são retomadas imediatamente. | Cancelar {count} downtimes? As notificações são retomadas imediatamente.",
+        "confirm": "Cancelar downtime | Cancelar downtimes",
+        "keep": "Manter downtime | Manter downtimes"
       },
       "confirmDelete": {
         "title": "Excluir downtime",
@@ -9023,7 +9028,8 @@
         "cancel": "Cancelar",
         "save": "Salvar",
         "activeBanner": "Este downtime está ativo. Uma edição entra em vigor na próxima avaliação, e uma alteração no modo do SLO faz uma nova medição das janelas que já começaram.",
-        "noModule": "Escolha um módulo em Aplica-se a."
+        "noModule": "Escolha um módulo em Aplica-se a.",
+        "checkSchedule": "Verifique o agendamento e guarde novamente."
       },
       "sentence": {
         "nouns": {
@@ -9049,7 +9055,13 @@
         "once": "uma vez",
         "onceOn": "uma vez em {date}",
         "daily": "diariamente",
-        "weekly": "semanalmente"
+        "weekly": "semanalmente",
+        "all": {
+          "alerts": "Todos os alertas",
+          "anomaly_detections": "Todas as deteções de anomalias",
+          "synthetics": "Todas as verificações de sintéticos",
+          "slos": "Todos os SLO"
+        }
       },
       "condition": {
         "none": "Nenhuma condição de dimensão",
@@ -9090,7 +9102,8 @@
         "timezone": "Fuso horário",
         "noWindow": "Nenhuma janela começa nos próximos 8 dias.",
         "nextWindow": "Próxima janela: {window}. Uma janela pode atravessar a meia-noite.",
-        "nextWindowWithUtc": "Próxima janela: {window} ({utc}). Uma janela pode atravessar a meia-noite."
+        "nextWindowWithUtc": "Próxima janela: {window} ({utc}). Uma janela pode atravessar a meia-noite.",
+        "startsOn": "Começa a"
       },
       "preview": {
         "title": "Pré-visualização",
@@ -9114,7 +9127,14 @@
         "matchedNow": "{matched} hoje",
         "outro": "Notificações, acionamentos de plantão e fluxos de trabalho param para todos eles dentro da janela.",
         "cancel": "Cancelar",
-        "confirm": "Silenciar tudo"
+        "confirm": "Silenciar tudo",
+        "titleOne": {
+          "alerts": "Silenciar todos os alertas desta organização?",
+          "anomaly_detections": "Silenciar todas as deteções de anomalias desta organização?",
+          "synthetics": "Silenciar todas as verificações de sintéticos desta organização?",
+          "slos": "Silenciar todos os SLO desta organização?"
+        },
+        "window": "Janela: {window}"
       },
       "summaryPane": {
         "title": "Resumo",
