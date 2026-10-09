@@ -210,7 +210,14 @@ class PipelineImportExportPage {
 
   /** Assert a toast surfaced with the given text. */
   async expectToast(text) {
-    await expect(this.toastMessage.first()).toContainText(text, { timeout: 15000 });
+    // Not `.first()`: a restricted user's page raises its own "Some sections couldn't
+    // load because you don't have the required permissions" toast as it mounts — its
+    // /settings and /alerts/destinations reads answer 403 — and that one is first, so
+    // `.first()` asserts against page noise instead of the toast under test. Match the
+    // toast carrying the text, wherever it sits in the stack.
+    await expect(this.toastMessage.filter({ hasText: text }).first()).toBeVisible({
+      timeout: 15000,
+    });
   }
 
   // ==================== Internal helpers ====================
