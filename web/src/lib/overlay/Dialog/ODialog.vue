@@ -125,8 +125,12 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
+// Escape pressed inside an open dropdown or select belongs to that popup, not the dialog.
+const ESCAPE_OWNED_BY_POPUP = "[data-reka-popper-content-wrapper]";
+
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  if (props.persistent || target?.closest(ESCAPE_OWNED_BY_POPUP)) {
     e.preventDefault();
     return;
   }

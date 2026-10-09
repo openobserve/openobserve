@@ -109,13 +109,27 @@ pub async fn list_eval_jobs(
 )]
 pub async fn create_eval_job(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<EvalJobRequestBody>,
 ) -> Response {
     let job = match infra::table::online_eval_jobs::OnlineEvalJob::try_from(body) {
         Ok(job) => job,
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
-    match eval_jobs::create_job(&org_id, job).await {
+    #[cfg(feature = "enterprise")]
+    let job = match eval_jobs::prepare_new_job(&org_id, job).await {
+        Ok(job) => job,
+        Err(err) => return err.into(),
+    };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    let created = eval_jobs::insert_job(&org_id, job).await;
+    #[cfg(not(feature = "enterprise"))]
+    let created = eval_jobs::create_job(&org_id, job).await;
+    match created {
         Ok(j) => {
             let resp: EvalJobResponseBody = j.into();
             MetaHttpResponse::json(resp)
@@ -182,13 +196,27 @@ pub async fn get_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Res
 )]
 pub async fn update_eval_job(
     Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     axum::Json(body): axum::Json<EvalJobRequestBody>,
 ) -> Response {
     let job = match infra::table::online_eval_jobs::OnlineEvalJob::try_from(body) {
         Ok(job) => job,
         Err(err) => return MetaHttpResponse::bad_request(err),
     };
-    match eval_jobs::update_job(&org_id, &job_id, job).await {
+    #[cfg(feature = "enterprise")]
+    let job = match eval_jobs::prepare_job_update(&org_id, &job_id, job).await {
+        Ok(job) => job,
+        Err(err) => return err.into(),
+    };
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_job(&org_id, &user_email.user_id, &job).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    let updated = eval_jobs::store_job_update(job).await;
+    #[cfg(not(feature = "enterprise"))]
+    let updated = eval_jobs::update_job(&org_id, &job_id, job).await;
+    match updated {
         Ok(j) => {
             let resp: EvalJobResponseBody = j.into();
             MetaHttpResponse::json(resp)
@@ -249,7 +277,14 @@ pub async fn delete_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> 
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "activate"})),
     ),
 )]
-pub async fn activate_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Response {
+pub async fn activate_eval_job(
+    Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_activation(&org_id, &user_email.user_id, &job_id).await {
+        return resp;
+    }
     match eval_jobs::transition_status(&org_id, &job_id, "active").await {
         Ok(j) => {
             let resp: EvalJobStatusActionResponseBody = j.into();
@@ -315,7 +350,14 @@ pub async fn pause_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> R
         ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "resume"})),
     ),
 )]
-pub async fn resume_eval_job(Path((org_id, job_id)): Path<(String, String)>) -> Response {
+pub async fn resume_eval_job(
+    Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_activation(&org_id, &user_email.user_id, &job_id).await {
+        return resp;
+    }
     match eval_jobs::transition_status(&org_id, &job_id, "active").await {
         Ok(j) => {
             let resp: EvalJobStatusActionResponseBody = j.into();
@@ -387,6 +429,10 @@ pub async fn manual_eval_job(
     axum::Json(body): axum::Json<ManualEvalJobRequestBody>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
+    if let Err(resp) = guard_manual(&org_id, &user_email.user_id, &job_id, &body).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
     let author = Some(user_email.user_id);
     #[cfg(not(feature = "enterprise"))]
     let author = None;
@@ -395,6 +441,55 @@ pub async fn manual_eval_job(
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(err) => err.into(),
     }
+}
+
+#[cfg(feature = "enterprise")]
+async fn guard_job(
+    org_id: &str,
+    user_id: &str,
+    job: &infra::table::online_eval_jobs::OnlineEvalJob,
+) -> Result<(), Response> {
+    let sources = openobserve_core::background_access::eval_job_sources(
+        org_id,
+        &job.stream_type,
+        &job.stream,
+    );
+    openobserve_core::background_access::guard_write(org_id, user_id, &sources).await
+}
+
+/// The transition's own read and checks answer first, so a bad job is never reported as refused.
+#[cfg(feature = "enterprise")]
+async fn guard_activation(org_id: &str, user_id: &str, job_id: &str) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
+    let job = eval_jobs::get_job(org_id, job_id)
+        .await
+        .map_err(Response::from)?;
+    eval_jobs::check_transition(org_id, &job, "active")
+        .await
+        .map_err(Response::from)?;
+    guard_job(org_id, user_id, &job).await
+}
+
+/// The evaluation's own read and checks answer first, so a bad request is never refused.
+#[cfg(feature = "enterprise")]
+async fn guard_manual(
+    org_id: &str,
+    user_id: &str,
+    job_id: &str,
+    body: &ManualEvalJobRequestBody,
+) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
+    let job = eval_jobs::get_job(org_id, job_id)
+        .await
+        .map_err(Response::from)?;
+    eval_jobs::check_manual_evaluate(org_id, &job, body)
+        .await
+        .map_err(Response::from)?;
+    guard_job(org_id, user_id, &job).await
 }
 
 #[cfg(test)]
@@ -442,5 +537,75 @@ mod tests {
         let err = EvalJobError::TaskPublish("queue publish timed out".to_string());
         let resp: Response = err.into();
         assert_eq!(resp.status().as_u16(), 500);
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn stored_archived_job(id: &str) -> infra::table::online_eval_jobs::OnlineEvalJob {
+        use infra::table::online_eval_jobs::{self as jobs, OnlineEvalJob};
+
+        jobs::create_table().await.unwrap();
+        let job = OnlineEvalJob::from(infra::table::entity::online_eval_jobs::Model {
+            id: id.to_string(),
+            org_id: "activate_plain_org".to_string(),
+            name: "plain".to_string(),
+            description: None,
+            stream: "plain_spans".to_string(),
+            stream_type: "traces".to_string(),
+            target_scope: "trace".to_string(),
+            filter_condition: serde_json::json!({}),
+            scorers: serde_json::json!([]),
+            input_mapping: None,
+            span_selectors: None,
+            span_selector_bindings: None,
+            trace_config: None,
+            session_config: None,
+            sampling_mode: "all".to_string(),
+            sampling_value: serde_json::json!(1),
+            status: "archived".to_string(),
+            version: 1,
+            pipeline_id: None,
+            created_at: 1,
+            updated_at: 1,
+        });
+        jobs::delete(&job.id).await.unwrap();
+        jobs::add(&job).await.unwrap();
+        job
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn denied_user() -> openobserve_api_common::extractors::Headers<UserEmail> {
+        openobserve_api_common::extractors::Headers(UserEmail {
+            user_id: format!("{}@example.com", config::ider::uuid()),
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_invalid_activation_from_a_denied_user_gets_the_transition_400() {
+        openobserve_core::authz::fake_checker();
+        let job = stored_archived_job("activate-plain-job").await;
+        let resp =
+            activate_eval_job(Path((job.org_id.clone(), job.id.clone())), denied_user()).await;
+        assert_eq!(resp.status().as_u16(), 400);
+
+        let denied = guard_job(&job.org_id, "nobody@example.com", &job)
+            .await
+            .unwrap_err();
+        assert_eq!(denied.status().as_u16(), 403);
+        infra::table::online_eval_jobs::delete(&job.id)
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_invalid_resume_from_a_denied_user_gets_the_transition_400() {
+        openobserve_core::authz::fake_checker();
+        let job = stored_archived_job("resume-plain-job").await;
+        let resp = resume_eval_job(Path((job.org_id.clone(), job.id.clone())), denied_user()).await;
+        assert_eq!(resp.status().as_u16(), 400);
+        infra::table::online_eval_jobs::delete(&job.id)
+            .await
+            .unwrap();
     }
 }

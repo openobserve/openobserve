@@ -22,6 +22,8 @@ pub mod alerts;
 pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
+#[cfg(any(feature = "enterprise", test))]
+pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;

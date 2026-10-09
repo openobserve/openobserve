@@ -101,3 +101,4 @@ zip.workspace = true
 
 [dev-dependencies]
 cron.workspace = true
+openobserve-core = { workspace = true, features = ["test-utils"] }

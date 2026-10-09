@@ -146,7 +146,7 @@ const REJECTION_BODY_MAX_CHARS: usize = 512;
 #[cfg(feature = "enterprise")]
 type ValueColumnCache = HashMap<(String, String), (Option<String>, Instant)>;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
     pub description: Option<String>,
@@ -231,7 +231,7 @@ where
     serde::Deserialize::deserialize(deserializer).map(Some)
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct UpdateAnomalyConfigRequest {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -636,14 +636,7 @@ pub async fn create_config(
     org_id: &str,
     mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
-    validate_config_request(&req).map_err(validation_error)?;
-
-    // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
-    // means the same thing on both. Kept typed, not stringified, so the API
-    // layer can downcast it to a 400.
-    let normalized_tags =
-        config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)?;
+    let normalized_tags = checked_create_body(&mut req)?;
 
     let db = get_orm_client_rw().await;
 
@@ -651,14 +644,8 @@ pub async fn create_config(
     let now_us = Utc::now().timestamp_micros();
 
     // Resolve the folder name to the FK (folders.id PK), consistent with the alerts table.
-    let folder_name = req
-        .folder_id
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("default");
-    let folder_pk = resolve_folder_pk(org_id, folder_name)
-        .await
-        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
+    let folder_name = create_folder_name(&req);
+    let folder_pk = folder_pk(org_id, folder_name).await?;
 
     let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
 
@@ -823,6 +810,33 @@ pub async fn create_config(
     Ok(val)
 }
 
+/// Runs [`create_config`]'s checks on a copy without writing, so a caller can answer them first.
+pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
+    let mut req = req.clone();
+    checked_create_body(&mut req)?;
+    folder_pk(org_id, create_folder_name(&req))
+        .await
+        .map(|_| ())
+}
+
+/// Runs [`update_config`]'s checks on a copy without writing, so a caller can answer them first.
+pub async fn check_update_config(
+    org_id: &str,
+    anomaly_id: &str,
+    req: &UpdateAnomalyConfigRequest,
+) -> Result<()> {
+    let existing = config_to_update(get_orm_client_rw().await, org_id, anomaly_id).await?;
+    let mut req = req.clone();
+    checked_update_body(&mut req, &existing)?;
+    if let Some(folder) = req.folder_id.as_deref() {
+        folder_pk(org_id, folder).await?;
+    }
+    if let Some(tags) = req.tags.as_deref() {
+        config::meta::alerts::tags::normalize_tags(tags).map_err(anyhow::Error::new)?;
+    }
+    Ok(())
+}
+
 /// Update an existing anomaly detection configuration
 pub async fn update_config(
     org_id: &str,
@@ -833,38 +847,13 @@ pub async fn update_config(
 
     // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
-    let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
-
-    // Normalized before the gates, as create does: `{}` and `null` persist as `[]`, so a gate
-    // comparing the raw value would read them as a change and re-litigate a grandfathered row
-    // over an edit that leaves the stored filters exactly as they were. Kept after the fetch
-    // so a request against a missing config still answers 404 rather than 400.
-    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+    let existing = config_to_update(db, org_id, anomaly_id).await?;
+    checked_update_body(&mut req, &existing)?;
 
     let previous = existing.clone();
     // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
     let mut retryable_change = false;
-
-    validated_intervals(&req, &existing).map_err(validation_error)?;
-    validated_detection_window(&req, &existing).map_err(validation_error)?;
-    validated_detection_function(&req, &existing).map_err(validation_error)?;
-    validated_custom_sql(&req, &existing).map_err(validation_error)?;
-    validated_denominator(&req, &existing).map_err(validation_error)?;
-    validated_budget_update(
-        req.percentile,
-        req.alert_budget_per_day,
-        existing.alert_budget_per_day,
-        existing.threshold,
-    )
-    .map_err(validation_error)?;
-    if let Some(days) = req.retrain_interval_days {
-        validate_retrain_interval_days(days).map_err(validation_error)?;
-    }
-    validated_band_settings(&req, &existing).map_err(validation_error)?;
 
     let mut active_model = existing.into_active_model();
 
@@ -1000,10 +989,7 @@ pub async fn update_config(
         ));
     }
     if let Some(folder_id_str) = req.folder_id {
-        let pk = resolve_folder_pk(org_id, &folder_id_str)
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_id_str))?;
-        active_model.folder_id = Set(pk);
+        active_model.folder_id = Set(folder_pk(org_id, &folder_id_str).await?);
     }
     if let Some(owner) = req.owner {
         active_model.owner = Set(Some(owner));
@@ -1911,6 +1897,65 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
         return e;
     }
     anyhow::anyhow!("validation error: {e}")
+}
+
+/// Normalizes and validates a create body; returns its normalized tags.
+fn checked_create_body(req: &mut CreateAnomalyConfigRequest) -> Result<Vec<String>> {
+    req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+    validate_config_request(req).map_err(validation_error)?;
+
+    // Feature 2 (PT-7): normalized as the alerts path does, kept typed so the API answers 400.
+    config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)
+}
+
+fn create_folder_name(req: &CreateAnomalyConfigRequest) -> &str {
+    req.folder_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("default")
+}
+
+async fn folder_pk(org_id: &str, folder_name: &str) -> Result<String> {
+    resolve_folder_pk(org_id, folder_name)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))
+}
+
+async fn config_to_update(
+    db: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    anomaly_id: &str,
+) -> Result<infra::table::entity::anomaly_detection_config::Model> {
+    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("Config not found"))
+}
+
+/// The update's gates, run against the stored config before anything is written.
+fn checked_update_body(
+    req: &mut UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    // Before the gates so `{}` and `null` read as the stored `[]`; after the fetch so 404 wins.
+    req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
+
+    validated_intervals(req, existing).map_err(validation_error)?;
+    validated_detection_window(req, existing).map_err(validation_error)?;
+    validated_detection_function(req, existing).map_err(validation_error)?;
+    validated_custom_sql(req, existing).map_err(validation_error)?;
+    validated_denominator(req, existing).map_err(validation_error)?;
+    validated_budget_update(
+        req.percentile,
+        req.alert_budget_per_day,
+        existing.alert_budget_per_day,
+        existing.threshold,
+    )
+    .map_err(validation_error)?;
+    if let Some(days) = req.retrain_interval_days {
+        validate_retrain_interval_days(days).map_err(validation_error)?;
+    }
+    validated_band_settings(req, existing).map_err(validation_error)
 }
 
 /// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.

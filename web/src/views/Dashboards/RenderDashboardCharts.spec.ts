@@ -18,6 +18,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesManager";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -486,6 +487,116 @@ describe("RenderDashboardCharts", () => {
         expect(namesFor("overview")).toEqual(["cluster", "pod", "always"]);
         expect(namesFor("workloads")).toEqual(["cluster", "pod", "always"]);
       });
+    });
+  });
+
+  describe("variable commits", () => {
+    const chainDashboard = () => ({
+      ...defaultProps.dashboardData,
+      variables: {
+        showDynamicFilters: false,
+        list: [
+          { name: "env", type: "custom", scope: "global", value: "prod", options: [] },
+          {
+            name: "service",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "service", filter: [{ filter: "env=$env" }] },
+          },
+          {
+            name: "pod",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "pod", filter: [{ filter: "service=$service" }] },
+          },
+        ],
+      },
+    });
+
+    const mountWith = (provide: Record<string, any> = {}) =>
+      shallowMount(RenderDashboardCharts, {
+        props: { ...defaultProps, dashboardData: chainDashboard() },
+        global: {
+          plugins: [i18n, store, router],
+          provide,
+          mocks: {
+            $t: (key) => key,
+            $route: { params: {}, query: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: { ODialog: ODialogStub },
+        },
+      });
+
+    const loaded = (v: any, value: any) => {
+      v.value = value;
+      v.isLoading = false;
+      v.isVariableLoadingPending = false;
+      v.isVariablePartialLoaded = true;
+    };
+
+    it("first load commits once, after the whole variable chain has loaded", async () => {
+      wrapper = mountWith();
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const commits = vi.fn();
+      manager.onAutoCommit(commits);
+      const [env, service, pod] = manager.variablesData.global;
+
+      loaded(env, "prod");
+      loaded(service, "api");
+      pod.isVariableLoadingPending = true;
+      await flushPromises();
+      expect(commits).not.toHaveBeenCalled();
+      expect(manager.committedVariablesData.global[1].value).not.toBe("api");
+
+      loaded(pod, "api-1");
+      await flushPromises();
+      expect(commits).toHaveBeenCalledTimes(1);
+      expect(manager.committedVariablesData.global.map((v: any) => v.value)).toEqual([
+        "prod",
+        "api",
+        "api-1",
+      ]);
+    });
+
+    it("follows the dashboard's Auto Run state", async () => {
+      const autoRun = ref(true);
+      wrapper = mountWith({ dashboardAutoRun: autoRun });
+      const manager = wrapper.vm.getVariablesManager();
+      expect(manager.isLiveMode.value).toBe(true);
+
+      autoRun.value = false;
+      await flushPromises();
+      expect(manager.isLiveMode.value).toBe(false);
+    });
+
+    it("an Auto Run apply drops a panel's own refresh snapshot", async () => {
+      wrapper = mountWith({ dashboardAutoRun: ref(true) });
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const [env, service, pod] = manager.variablesData.global;
+      loaded(env, "prod");
+      loaded(service, "api");
+      loaded(pod, "api-1");
+      await flushPromises();
+      const podFor = (panelId: string) =>
+        wrapper.vm.getMergedVariablesForPanel(panelId).values.find((v: any) => v.name === "pod")
+          ?.value;
+
+      await wrapper.vm.refreshPanelRequest("panel-1");
+      expect(podFor("panel-1")).toBe("api-1");
+
+      manager.updateVariableValue("pod", "global", undefined, undefined, "api-2");
+      await new Promise((r) => setTimeout(r, LIVE_COMMIT_DEBOUNCE_MS + 20));
+      await flushPromises();
+
+      expect(podFor("panel-1")).toBe("api-2");
+    });
+
+    it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {
+      wrapper = mountWith();
+      expect(wrapper.vm.getVariablesManager().isLiveMode.value).toBe(false);
     });
   });
 
