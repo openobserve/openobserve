@@ -50,14 +50,15 @@ pub async fn ingest_rejections_middleware(request: Request, next: Next) -> Respo
 
 async fn record_rejections(request: Request, next: Next, sink: &impl RejectionSink) -> Response {
     let method = request.method().clone();
-    let path = request.uri().path().to_string();
-    let original_path = request
+    let uri = request.uri().clone();
+    let original_uri = request
         .extensions()
         .get::<OriginalUri>()
-        .map(|uri| uri.0.path().to_string());
+        .map(|uri| uri.0.clone());
     let response = next.run(request).await;
     if response.status().is_client_error() {
-        record_if_rejected(sink, &method, &path, original_path.as_deref(), &response);
+        let original_path = original_uri.as_ref().map(|uri| uri.path());
+        record_if_rejected(sink, &method, uri.path(), original_path, &response);
     }
     response
 }

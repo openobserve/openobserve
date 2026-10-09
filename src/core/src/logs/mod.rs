@@ -274,7 +274,9 @@ async fn write_logs_by_stream(
             continue; // skip
         }
 
-        if !infra::schema::exists(org_id, StreamType::Logs, &stream_name).await {
+        if crate::ingestion::checks_for_new_stream(org_id)
+            && !infra::schema::exists(org_id, StreamType::Logs, &stream_name).await
+        {
             // for cloud, we want to sent event when user creates a new stream
             #[cfg(feature = "cloud")]
             if get_stream(org_id, &stream_name, StreamType::Logs)

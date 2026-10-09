@@ -1734,7 +1734,9 @@ async fn write_traces_by_stream(
     user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        if !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await {
+        if crate::ingestion::checks_for_new_stream(org_id)
+            && !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await
+        {
             // for cloud, we want to sent event when user creates a new stream
             #[cfg(feature = "cloud")]
             if get_stream(org_id, &traces_stream_name, StreamType::Traces)

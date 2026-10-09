@@ -140,7 +140,7 @@ impl<K: RejectionKv> Recorder<K> {
         if self.has_user_data(org_id, now_us) {
             let answer = RecentRejections::default();
             self.cache_read(org_id, &answer, now_us);
-            return (answer, Some(self.spawn_clear(org_id)));
+            return (answer, self.clear_once(org_id));
         }
         match self.kv.get(org_id).await {
             Ok(value) => {
@@ -166,14 +166,12 @@ impl<K: RejectionKv> Recorder<K> {
     pub fn on_user_stream_created(self: &Arc<Self>, org_id: &str) -> Option<JoinHandle<()>> {
         self.no_data.lock().pop(org_id);
         self.read_cache.lock().pop(org_id);
-        if self.cleared.contains(org_id) || !self.cleared.insert(org_id.to_string()) {
-            return None;
-        }
-        Some(self.spawn_clear(org_id))
+        self.clear_once(org_id)
     }
 
     pub async fn clear(&self, org_id: &str) {
         self.read_cache.lock().pop(org_id);
+        self.cleared.remove(org_id);
         self.clear_key(org_id).await;
     }
 
@@ -188,6 +186,14 @@ impl<K: RejectionKv> Recorder<K> {
             Ok(_) => {}
             Err(e) => log::warn!("[INGEST_REJECTIONS] clear {org_id}: {e}"),
         }
+    }
+
+    /// Clears the key once per node: an org with data reads as untracked, and late entries expire.
+    fn clear_once(self: &Arc<Self>, org_id: &str) -> Option<JoinHandle<()>> {
+        if self.cleared.contains(org_id) || !self.cleared.insert(org_id.to_string()) {
+            return None;
+        }
+        Some(self.spawn_clear(org_id))
     }
 
     fn spawn_clear(self: &Arc<Self>, org_id: &str) -> JoinHandle<()> {
@@ -727,7 +733,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_a_burst_of_reads_for_an_org_with_data_clears_once_per_read_ttl() {
+    async fn test_a_burst_of_reads_for_an_org_with_data_clears_once_and_never_again() {
         let kv = CountingKv::default();
         let now = now_micros();
         kv.seed(ORG, &[rejection(RejectionReason::MalformedBody, now)]);
@@ -741,12 +747,61 @@ mod tests {
                 clear.await.unwrap();
             }
         }
-        assert_eq!(clears, 1, "one clear per org per read TTL");
+        assert_eq!(clears, 1);
         assert_eq!(recorder.kv.calls(), (1, 0, 1));
 
-        let (_, clear) = recorder.read(ORG, now + READ_TTL_US).await;
-        clear.unwrap().await.unwrap();
-        assert_eq!(recorder.kv.calls(), (2, 0, 1), "no delete for an empty key");
+        let (answer, clear) = recorder.read(ORG, now + READ_TTL_US).await;
+        assert_eq!(answer, RecentRejections::default());
+        assert!(clear.is_none());
+        assert_eq!(recorder.kv.calls(), (1, 0, 1));
+    }
+
+    #[tokio::test]
+    async fn test_reads_for_an_org_with_data_across_many_read_ttls_make_one_get() {
+        let kv = CountingKv::default();
+        let now = now_micros();
+        kv.seed(ORG, &[rejection(RejectionReason::MalformedBody, now)]);
+        let recorder = recorder(kv, has_streams);
+        for org in [ORG, "org_with_data_without_key"] {
+            for i in 0..20 {
+                let (answer, clear) = recorder.read(org, now + i * READ_TTL_US).await;
+                assert_eq!(answer, RecentRejections::default());
+                if let Some(clear) = clear {
+                    clear.await.unwrap();
+                }
+            }
+        }
+        assert_eq!(
+            recorder.kv.calls(),
+            (2, 0, 1),
+            "one get per org, and a delete only for the key that held entries"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_a_read_after_the_first_stream_cleared_the_key_makes_no_kv_call() {
+        let kv = CountingKv::default();
+        let now = now_micros();
+        kv.seed(ORG, &[rejection(RejectionReason::MalformedBody, now)]);
+        let recorder = recorder(kv, has_streams);
+        recorder.on_user_stream_created(ORG).unwrap().await.unwrap();
+        assert_eq!(recorder.kv.calls(), (1, 0, 1));
+        let (answer, clear) = recorder.read(ORG, now).await;
+        assert_eq!(answer, RecentRejections::default());
+        assert!(clear.is_none());
+        assert_eq!(recorder.kv.calls(), (1, 0, 1));
+    }
+
+    #[tokio::test]
+    async fn test_org_delete_forgets_the_once_per_node_clear() {
+        let kv = CountingKv::default();
+        let now = now_micros();
+        let recorder = recorder(kv, has_streams);
+        recorder.on_user_stream_created(ORG).unwrap().await.unwrap();
+        recorder.clear(ORG).await;
+        assert_eq!(recorder.kv.calls(), (2, 0, 0));
+        recorder.read(ORG, now).await.1.unwrap().await.unwrap();
+        assert_eq!(recorder.kv.calls(), (3, 0, 0));
     }
 
     #[tokio::test]
