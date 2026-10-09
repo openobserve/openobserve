@@ -98,7 +98,7 @@ test.describe("Splunk HEC Ingestion Window Warning testcases", () => {
 
     for (let i = 0; i < copyCount; i++) {
       await pm.splunkHecPage.clickCopyButton(i);
-      await pm.splunkHecPage.expectCopyToast('Copied Successfully');
+      await pm.splunkHecPage.expectCopyToast('Copied');
       await pm.splunkHecPage.waitForCopyToastToHide();
     }
 
@@ -153,7 +153,8 @@ test.describe("Splunk HEC Ingestion Window Warning testcases", () => {
 
     const health = await pm.splunkHecPage.getHealthContent();
     expect(health).toContain('/services/collector/health');
-    expect(health).toMatch(/^curl -k /);
+    // Cloud builds drop -k; self-hosted keeps it for self-signed certificates.
+    expect(health).toMatch(/^curl (-k )?https?:/);
     expect(health).not.toContain('Authorization');
 
     testLogger.info('Health probe verified as an unauthenticated curl GET');

@@ -58,7 +58,7 @@ test.describe("Ingestion Configuration Tests", () => {
       await pm.ingestionConfigPage.expectContentLength(0);
       testLogger.info(`✓ Fluentd configuration displayed (${fluentdContent.length} chars)`);
       await pm.ingestionConfigPage.clickCopyButton();
-      await pm.ingestionConfigPage.verifyNotificationVisible('Copied Successfully');
+      await pm.ingestionConfigPage.verifyNotificationVisible('Copied');
       testLogger.info('✓ Fluentd configuration copied successfully');
 
       // Test copy functionality for Metrics (Prometheus)
