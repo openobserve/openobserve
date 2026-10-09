@@ -239,9 +239,9 @@
               class="border-border-default rounded-default border p-3"
             >
               <div class="flex items-center justify-between gap-3">
-                <div class="text-text-heading min-w-0 truncate text-xs font-semibold">
+                <OTruncatedText as="div" class="text-text-heading text-xs font-semibold">
                   {{ raw(score.dimension) }}
-                </div>
+                </OTruncatedText>
                 <div class="flex shrink-0 items-center gap-2">
                   <span
                     class="border-border-default text-text-body rounded-default border px-2 py-1 text-xs font-semibold tabular-nums"
@@ -315,6 +315,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
 import { durationLabel } from "./experimentRowContent";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   experimentScoreSummaryValue,
   experimentScoreValue,

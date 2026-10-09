@@ -106,9 +106,6 @@ fn compile_js_function_inner(
         return Err(std::io::Error::other("JavaScript function cannot be empty"));
     }
 
-    // Phase 1 + Phase 2 Security: Comprehensive pattern blocking
-    // Use centrally-defined security patterns from o2-enterprise
-    // These patterns are statically initialized and reused across all compilations
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::auth::js_security;
@@ -429,12 +426,16 @@ fn cached_js_context(org_id: &str, function: &str) -> Result<Context, String> {
     })
 }
 
-/// Records what the context just used holds, then evicts least recently used ones over budget.
+/// Records what the just-used context holds, or drops it for a queued job, then evicts over budget.
 fn account_js_context(org_id: &str, function: &str, context: &Context) {
     let heap_bytes = usize::try_from(context.runtime().memory_usage().malloc_size).unwrap_or(0);
+    // Nothing ever runs the job queue, so a context left with a job would only keep growing.
+    let job_pending = context.runtime().is_job_pending();
     JS_CONTEXTS.with(|cache| {
         let mut cache = cache.borrow_mut();
-        if let Some(entry) = cache
+        if job_pending {
+            cache.retain(|c| !(c.org_id == org_id && c.function == function));
+        } else if let Some(entry) = cache
             .iter_mut()
             .find(|c| c.org_id == org_id && c.function == function)
         {
@@ -898,10 +899,6 @@ for (var i = 0; i < filtered.length; i++) {
         assert_eq!(output_array[1]["value"], 80);
     }
 
-    // ============================================================================
-    // Phase 2 Security Hardening Tests
-    // ============================================================================
-
     #[test]
     fn test_security_block_globalthis() {
         let func = r#"globalThis.escape = function() { return "hacked"; };"#;
@@ -1169,6 +1166,46 @@ for (var i = 0; i < filtered.length; i++) {
             });
             let bound = (JS_CONTEXT_CACHE_BUDGET_BYTES + JS_MEMORY_LIMIT_BYTES) as i64;
             assert!(held <= bound, "after {} functions: {held} > {bound}", i + 1);
+        }
+    }
+
+    #[test]
+    fn test_org_context_is_reused_and_not_seen_by_another_org() {
+        let f = compile_js_function(
+            "Math.calls = (Math.calls || 0) + 1; row.calls = Math.calls;",
+            "org_a",
+        )
+        .unwrap();
+        let calls = |org: &str| {
+            let (out, err) = apply_js_fn(&f, json!({}), org, &[]);
+            assert!(err.is_none(), "{org}: {err:?}");
+            out["calls"].clone()
+        };
+        assert_eq!(calls("reuse_a"), json!(1));
+        assert_eq!(
+            calls("reuse_b"),
+            json!(1),
+            "org B must not see org A's changes"
+        );
+        assert_eq!(calls("reuse_a"), json!(2), "org A's context must be reused");
+    }
+
+    #[test]
+    fn test_context_left_with_a_queued_job_is_not_reused() {
+        let f = compile_js_function(
+            "Promise.resolve().then(function () {}); \
+             Math.calls = (Math.calls || 0) + 1; row.calls = Math.calls;",
+            "jobs_org",
+        )
+        .unwrap();
+        for _ in 0..2 {
+            let (out, err) = apply_js_fn(&f, json!({}), "jobs_org", &[]);
+            assert!(err.is_none(), "{err:?}");
+            assert_eq!(
+                out["calls"],
+                json!(1),
+                "the next call must get a fresh context"
+            );
         }
     }
 }

@@ -35,7 +35,6 @@ import {
   useLocalLogFilterField,
   useLocalTraceFilterField,
   useLocalInterestingFields,
-  useLocalSavedView,
   useLocalUserInfo,
   useLocalTimezone,
   useLocalWrapContent,
@@ -240,20 +239,6 @@ describe("useLocalInterestingFields", () => {
     useLocalInterestingFields("val");
 
     expect(localStorageMock.getItem).toHaveBeenCalledWith("interestingFields");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// useLocalSavedView
-// ---------------------------------------------------------------------------
-
-describe("useLocalSavedView", () => {
-  it("reads from localStorage with key 'savedViews'", () => {
-    localStorageMock.getItem.mockReturnValue(null);
-
-    useLocalSavedView("val");
-
-    expect(localStorageMock.getItem).toHaveBeenCalledWith("savedViews");
   });
 });
 

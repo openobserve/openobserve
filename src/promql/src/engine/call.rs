@@ -86,7 +86,7 @@ impl Engine {
                 _ => value,
             }
         } else {
-            self.call_builtin(func_name, args).await?
+            self.call_builtin(func_name, args, func.name).await?
         };
 
         log::info!(
@@ -98,7 +98,12 @@ impl Engine {
         Ok(result)
     }
 
-    async fn call_builtin(&mut self, func_name: Func, args: &FunctionArgs) -> Result<Value> {
+    async fn call_builtin(
+        &mut self,
+        func_name: Func,
+        args: &FunctionArgs,
+        original_name: &str,
+    ) -> Result<Value> {
         match func_name {
             Func::Absent | Func::AbsentOverTime => {
                 self.ensure_args_len(args, 1, "Invalid args, expected one argument")?;
@@ -170,12 +175,13 @@ impl Engine {
                 functions::histogram_quantiles(input, &label, &phis, &self.eval_ctx)
             }
             Func::HoltWinters => {
-                let err =
-                    "Invalid args, expected holt_winters(v range-vector, sf scalar, tf scalar)";
-                self.ensure_args_len(args, 3, err)?;
+                let err = format!(
+                    "Invalid args, expected {original_name}(v range-vector, sf scalar, tf scalar)"
+                );
+                self.ensure_args_len(args, 3, &err)?;
                 let (input, pinned) = self.call_range_arg(args, 0).await?;
-                let scaling_factor = self.call_scalar_arg(args, 1, err).await?;
-                let trend_factor = self.call_scalar_arg(args, 2, err).await?;
+                let scaling_factor = self.call_scalar_arg(args, 1, &err).await?;
+                let trend_factor = self.call_scalar_arg(args, 2, &err).await?;
 
                 functions::holt_winters(input, scaling_factor, trend_factor, &self.eval_ctx, pinned)
             }
@@ -559,7 +565,8 @@ mod tests {
                 .map(|expr| Box::new(crate::parse(expr).unwrap()))
                 .collect(),
         };
-        let Value::Matrix(series) = engine.call_builtin(Func::Abs, &args).await.unwrap() else {
+        let Value::Matrix(series) = engine.call_builtin(Func::Abs, &args, "abs").await.unwrap()
+        else {
             panic!("expected absolute values");
         };
         assert_eq!(series[0].samples[0].value, 5.0);
@@ -574,14 +581,14 @@ mod tests {
             Func::Year,
         ] {
             assert!(matches!(
-                engine.call_builtin(func, &args).await,
+                engine.call_builtin(func, &args, "test").await,
                 Err(DataFusionError::NotImplemented(message))
                     if message == "Invalid args passed to the function"
             ));
         }
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
         assert!(matches!(
-            engine.call_builtin(Func::Abs, &FunctionArgs { args: vec![] }).await,
+            engine.call_builtin(Func::Abs, &FunctionArgs { args: vec![] }, "abs").await,
             Err(DataFusionError::NotImplemented(message)) if message == "Missing argument 0"
         ));
     }
@@ -604,7 +611,7 @@ mod tests {
         };
         for (func, name) in [(Func::MinOf, "min_of("), (Func::MaxOf, "max_of(")] {
             let err = engine
-                .call_builtin(func, &args)
+                .call_builtin(func, &args, "test")
                 .await
                 .unwrap_err()
                 .to_string();
@@ -669,7 +676,9 @@ mod tests {
                     .map(|expr| Box::new(crate::parse(expr).unwrap()))
                     .collect(),
             };
-            let result = engine.call_builtin(Func::LabelJoin, &args).await;
+            let result = engine
+                .call_builtin(Func::LabelJoin, &args, "label_join")
+                .await;
             assert!(
                 matches!(result, Err(DataFusionError::NotImplemented(message)) if message == expected)
             );
@@ -1004,6 +1013,42 @@ mod tests {
             .into_iter()
             .map(|((_, timestamp), bits)| (timestamp, f64::from_bits(bits)))
             .collect()
+    }
+
+    #[tokio::test]
+    async fn smoothing_diagnostics_name_the_called_function() {
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        for name in ["holt_winters", "double_exponential_smoothing"] {
+            let PromExpr::Call(mut call) =
+                crate::parse(&format!("{name}(vector(1)[5m:1m], 0.5, 0.3)")).unwrap()
+            else {
+                panic!("Expected smoothing call");
+            };
+            let expected =
+                format!("Invalid args, expected {name}(v range-vector, sf scalar, tf scalar)");
+            call.args.args.pop();
+            let error = engine.call_expr(&call.func, &call.args).await.unwrap_err();
+            assert!(
+                matches!(error, DataFusionError::NotImplemented(message) if message == expected)
+            );
+            call.args.args.push(Box::new(PromExpr::StringLiteral(
+                promql_parser::parser::StringLiteral {
+                    val: "invalid".into(),
+                },
+            )));
+            let error = engine.call_expr(&call.func, &call.args).await.unwrap_err();
+            assert!(
+                matches!(error, DataFusionError::NotImplemented(message) if message == expected)
+            );
+        }
     }
 
     #[tokio::test]

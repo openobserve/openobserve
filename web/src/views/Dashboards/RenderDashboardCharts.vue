@@ -165,12 +165,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <h2
                 v-if="isSectionHeader(item)"
                 class="flex h-full items-end"
-                :title="item.title"
                 :data-test="`dashboard-section-header-${item.id}`"
               >
                 <!-- truncate has to sit on an inline child: on the flex parent the text
                      is an anonymous flex item and never picks up the ellipsis. -->
-                <span class="truncate">{{ item.title }}</span>
+                <OTruncatedText>{{ item.title }}</OTruncatedText>
               </h2>
               <!-- Off-screen panels render this lightweight placeholder; the
                    real panel mounts only when it comes near the viewport.
@@ -358,6 +357,7 @@ import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRe
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 import type { LayoutMode } from "@/components/dashboards/layoutMode";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -451,6 +451,7 @@ export default defineComponent({
     ViewPanel,
     TabList,
     ODialog,
+    OTruncatedText,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();

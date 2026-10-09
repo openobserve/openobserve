@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 // OButton has no list-row size; these overrides live here only until the ODropdown rebuild.
 const ROW_CLASS = "h-auto! justify-start! py-2! text-start whitespace-normal!";
@@ -45,20 +46,20 @@ const emit = defineEmits<{ select: [] }>();
     @click="emit('select')"
   >
     <span class="flex min-w-0 flex-1 flex-col">
-      <span
-        class="truncate text-sm"
+      <OTruncatedText
+        class="text-sm"
         :class="{ 'text-text-body': !disabled }"
         data-test="synthetics-subtest-row-title"
-        >{{ title }}</span
+        >{{ title }}</OTruncatedText
       >
-      <span
+      <OTruncatedText
         v-if="subtitle"
-        class="truncate text-xs font-normal"
+        class="text-xs font-normal"
         :class="{ 'text-text-secondary': !disabled }"
         data-test="synthetics-subtest-row-subtitle"
       >
         {{ subtitle }}
-      </span>
+      </OTruncatedText>
     </span>
   </OButton>
 </template>

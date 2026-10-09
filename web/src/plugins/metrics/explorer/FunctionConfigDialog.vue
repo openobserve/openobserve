@@ -39,12 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header>
       <div class="flex min-w-0 flex-col">
         <div class="flex min-w-0 items-center gap-2">
-          <span
-            class="truncate font-mono text-sm font-semibold"
-            :title="card.name"
-            data-test="metrics-fn-metric"
-            >{{ card.name }}</span
-          >
+          <OTruncatedText class="font-mono text-sm font-semibold" data-test="metrics-fn-metric">{{
+            card.name
+          }}</OTruncatedText>
           <!-- The registry's metricType group — same badge the card footer shows. -->
           <OTag
             type="metricType"
@@ -54,12 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Keep classes in sync with ODialog's built-in subTitle. -->
-        <span
-          class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+        <OTruncatedText
+          class="text-dialog-content-text mt-0.5 block text-sm opacity-70"
           data-test="metrics-fn-subtitle"
         >
           {{ t("metrics.explorer.fn.subtitle") }}
-        </span>
+        </OTruncatedText>
       </div>
     </template>
 
@@ -101,13 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-fn-radio-${variant.id}`"
         />
 
-        <div
-          class="text-3xs text-text-secondary truncate font-mono"
-          :title="exprOf(variant)"
+        <OTruncatedText
+          as="div"
+          class="text-3xs text-text-secondary font-mono"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}
-        </div>
+        </OTruncatedText>
 
         <div class="relative h-30">
           <div
@@ -238,6 +235,7 @@ import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { parseSearchError } from "@/utils/query/searchError";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { hasSamples, type FnOverride } from "@/composables/metrics/useMetricsExplorerGrid";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type TileStatus = "idle" | "loading" | "done" | "error" | "unavailable";
 
@@ -262,6 +260,7 @@ const sameNumbers = (a: number[] | null, b: number[] | null) => {
 export default defineComponent({
   name: "FunctionConfigDialog",
   components: {
+    OTruncatedText,
     MetricCardChart,
     ODialog,
     OButton,
