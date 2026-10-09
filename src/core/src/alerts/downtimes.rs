@@ -54,6 +54,17 @@ pub fn any_since(org: &str, module: config::meta::downtimes::TargetModule, since
         )
 }
 
+/// Whether the org keeps any row targeting `module`, so a mute recorded under it can still linger.
+#[cfg(feature = "enterprise")]
+pub fn any_row(org: &str, module: config::meta::downtimes::TargetModule) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && db::downtimes::list_cached(org).iter().any(|row| {
+            o2_enterprise::enterprise::downtimes::scope::target_for(&row.targets, module).is_some()
+        })
+}
+
 #[cfg(feature = "enterprise")]
 pub fn active_for_alert(
     org: &str,

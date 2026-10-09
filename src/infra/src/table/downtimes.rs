@@ -350,13 +350,37 @@ pub async fn insert_if_parent_unchanged_with<C: ConnectionTrait + TransactionTra
     let unchanged = parent.one(&txn).await?.is_some_and(|p| {
         p.updated_at == expected_updated_at && p.cancelled_at.is_none() && p.deleted_at.is_none()
     });
-    if !unchanged {
+    if !unchanged || continued_with(&txn, row, parent_id).await? {
         txn.rollback().await?;
         return Ok(false);
     }
     put_with(&txn, row).await?;
     txn.commit().await?;
     Ok(true)
+}
+
+/// Whether a live follow-up already continues the parent from `row`'s start; the parent lock
+/// serializes this.
+async fn continued_with<C: ConnectionTrait>(
+    conn: &C,
+    row: &Downtime,
+    parent_id: &str,
+) -> Result<bool, errors::Error> {
+    let siblings = Entity::find()
+        .filter(Column::Org.eq(&row.org))
+        .filter(Column::StartsAt.eq(row.schedule.starts_at))
+        .filter(Column::CancelledAt.is_null())
+        .filter(Column::DeletedAt.is_null())
+        .all(conn)
+        .await?;
+    Ok(siblings.into_iter().any(|m| {
+        m.notifications
+            .and_then(|v| {
+                v.get("continues")
+                    .and_then(|c| c.as_str().map(str::to_string))
+            })
+            .is_some_and(|continues| continues == parent_id)
+    }))
 }
 
 /// Local delete: tombstones the row as the next version; the tombstone, `None` for no row.
@@ -1165,7 +1189,11 @@ mod tests {
         let db = db().await;
         let parent = downtime("p1", Repeat::Daily, None);
         put_with(&db, &parent).await.unwrap();
-        let follow_up = downtime("f1", Repeat::None, Some(11 * DAY));
+        let mut follow_up = downtime("f1", Repeat::None, Some(11 * DAY));
+        follow_up.notifications = Some(config::meta::downtimes::DowntimeNotifications {
+            continues: Some("p1".to_string()),
+            ..Default::default()
+        });
         assert!(
             insert_if_parent_unchanged_with(&db, &follow_up, "p1", 1)
                 .await
@@ -1179,6 +1207,14 @@ mod tests {
             get_with(&db, "acme", "p1").await.unwrap(),
             Some(parent.clone())
         );
+        let mut second = downtime("f3", Repeat::None, Some(11 * DAY));
+        second.notifications = follow_up.notifications.clone();
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &second, "p1", 1)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "f3").await.unwrap(), None);
 
         let mut cancelled = parent.clone();
         cancelled.cancelled_at = Some(10 * DAY + 1);

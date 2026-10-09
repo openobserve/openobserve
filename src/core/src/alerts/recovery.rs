@@ -122,13 +122,19 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
 /// Whether the scheduler's per-run on-call recovery waits: a window now, or a hold it started.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now: i64) -> bool {
-    let since = now.saturating_sub(RECORDED_MUTE_GRACE_MICROS);
-    if !crate::alerts::downtimes::any_since(&alert.org_id, TargetModule::Alerts, since) {
-        return false;
-    }
     let Some(alert_id) = alert.id.map(|id| id.to_string()) else {
         return false;
     };
+    let since = now.saturating_sub(RECORDED_MUTE_GRACE_MICROS);
+    if !crate::alerts::downtimes::any_since(&alert.org_id, TargetModule::Alerts, since) {
+        // A clear run more than the grace after the window still closes what the mute left open.
+        if crate::alerts::downtimes::any_row(&alert.org_id, TargetModule::Alerts)
+            && recorded_downtime(&alert_id).await.is_some()
+        {
+            forget_recorded_mute(&alert.org_id, &alert_id).await;
+        }
+        return false;
+    }
     let recorded = recorded_downtime(&alert_id).await;
     let muted_now = downtime_at(alert, folder_id, recorded.as_deref(), now).await;
     let episode_open = (recorded.is_some() || muted_now.is_some()) && episode_open(&alert_id).await;

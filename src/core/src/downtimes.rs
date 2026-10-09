@@ -366,6 +366,7 @@ pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeEr
     check_deletable(&row, now_micros())?;
     db::downtimes::delete(org, id).await?;
     db::authz::remove_ownership(org, "downtimes", db::downtimes::ownership(&row)).await;
+    forget_recorded_mutes(org, id).await;
     Ok(())
 }
 
