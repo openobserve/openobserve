@@ -711,15 +711,20 @@ pub async fn refresh_staleness_markers_supported() {
         return;
     }
     // the registry, not the cache: a failed health check drops a live node from the cache
-    if let Ok(nodes) = list_nodes().await {
-        latch_staleness_markers(&nodes);
-    }
+    latch_staleness_markers(list_nodes().await);
 }
 
-fn latch_staleness_markers(nodes: &[Node]) {
-    if all_support_staleness_markers(nodes) {
-        STALENESS_MARKERS_SUPPORTED.store(true, Ordering::Relaxed);
-        log::info!("[CLUSTER] every node supports staleness markers, ingesters now write them");
+fn latch_staleness_markers(nodes: Result<Vec<Node>>) {
+    match nodes {
+        Ok(nodes) if all_support_staleness_markers(&nodes) => {
+            STALENESS_MARKERS_SUPPORTED.store(true, Ordering::Relaxed);
+            log::info!("[CLUSTER] every node supports staleness markers, ingesters now write them");
+        }
+        Ok(_) => {}
+        // a failed listing may be partial, so it never opens the gate
+        Err(e) => {
+            log::warn!("[CLUSTER] staleness marker gate stays closed, node listing failed: {e}")
+        }
     }
 }
 
@@ -760,11 +765,13 @@ mod tests {
     #[test]
     fn test_staleness_markers_gate_latches_open() {
         let new = Node::default();
-        latch_staleness_markers(&[new.clone(), pre_marker_node("Online")]);
+        latch_staleness_markers(Err(Error::Message("partial node listing".to_string())));
         assert!(!STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
-        latch_staleness_markers(std::slice::from_ref(&new));
+        latch_staleness_markers(Ok(vec![new.clone(), pre_marker_node("Online")]));
+        assert!(!STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
+        latch_staleness_markers(Ok(vec![new.clone()]));
         assert!(STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
-        latch_staleness_markers(&[new, pre_marker_node("Online")]);
+        latch_staleness_markers(Ok(vec![new, pre_marker_node("Online")]));
         assert!(STALENESS_MARKERS_SUPPORTED.load(Ordering::Relaxed));
     }
 
