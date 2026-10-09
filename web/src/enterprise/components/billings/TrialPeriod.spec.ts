@@ -1,986 +1,257 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { reactive } from "vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import i18n from "@/locales";
-import { getDueDays } from "@/utils/zincutils";
 
-// Mock getDueDays function
-vi.mock("@/utils/zincutils", () => ({
-  getDueDays: vi.fn(),
-}));
+const awsConfig = vi.hoisted(() => ({ isCloud: "true" }));
+vi.mock("@/aws-exports", () => ({ default: awsConfig }));
 
-// Mock aws-exports
-vi.mock("@/aws-exports", () => ({
-  default: {
-    API_ENDPOINT: "http://localhost:5080",
-    isCloud: "true",
-  },
-}));
-
-// Mock siteURL
 vi.mock("@/constants/config", () => ({
-  siteURL: {
-    contactSupport: "https://openobserve.ai/contactus/",
-  },
+  siteURL: { contactSupport: "https://openobserve.ai/contactus/" },
 }));
 
-// Mock BillingService
 vi.mock("@/services/billings", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: {
-      list_subscription: vi.fn(),
-    },
+    default: { list_subscription: vi.fn() },
   });
 });
-
-// Import the mocked module to access the mock function
 import BillingService from "@/services/billings";
 
-// Mock router
-const mockRouter = {
-  push: vi.fn(),
-};
+const mockRouter = { push: vi.fn() };
+vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
 
-vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter,
-}));
+const DAY_MS = 24 * 60 * 60 * 1000;
+const NOW = new Date("2026-10-07T12:00:00Z").getTime();
 
-// Mock window.open
-const mockWindowOpen = vi.fn();
-Object.defineProperty(window, "open", {
-  value: mockWindowOpen,
-  writable: true,
-});
+const shortDate = (ms: number) =>
+  new Date(ms).toLocaleDateString(i18n.global.locale as unknown as string, {
+    month: "short",
+    day: "numeric",
+  });
 
 describe("TrialPeriod.vue", () => {
-  let wrapper: any;
-  let mockStore: any;
+  let wrapper: ReturnType<typeof mount> | undefined;
+  let store: any;
+  let openSpy: ReturnType<typeof vi.fn>;
+
+  const storeWith = (expiry: unknown) =>
+    reactive({
+      state: {
+        organizationData: { organizationSettings: { free_trial_expiry: expiry } },
+        selectedOrganization: { identifier: "acme_prod", label: "acme-prod" },
+      },
+    });
+
+  const mountStrip = async (props: Record<string, unknown> = {}) => {
+    wrapper = mount(TrialPeriod, {
+      props,
+      global: { plugins: [i18n], provide: { store } },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+  const strip = () => wrapper!.find('[data-test="trial-period-container"]');
+  const expiryInDays = (days: number) => (NOW + days * DAY_MS) * 1000;
 
   beforeEach(() => {
-    // Reset all mocks
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(NOW);
     vi.clearAllMocks();
-    vi.mocked(getDueDays).mockReturnValue(5);
-
-    // Setup mock store
-    mockStore = {
-      state: {
-        organizationData: {
-          organizationSettings: {
-            free_trial_expiry: "1640995200000000", // Mock timestamp
-          },
-        },
-      },
-    };
+    awsConfig.isCloud = "true";
+    vi.mocked(BillingService.list_subscription).mockResolvedValue({
+      data: { provider: "stripe" },
+    } as any);
+    openSpy = vi.fn();
+    Object.defineProperty(window, "open", { value: openSpy, writable: true });
+    store = storeWith(expiryInDays(9.5));
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
+    wrapper = undefined;
+    vi.useRealTimers();
   });
 
-  const createWrapper = (props = {}, storeOverride = null) => {
-    return mount(TrialPeriod, {
-      props,
-      global: {
-        plugins: [i18n],
-        provide: {
-          store: storeOverride || mockStore,
-        },
-        mocks: {
-          $store: storeOverride || mockStore,
-        },
-      },
-    });
-  };
+  describe("tone and text", () => {
+    it("reads 'Trial period · N days left · ends <date>' in info tone above 3 days", async () => {
+      await mountStrip({ currentPage: "usage" });
 
-  describe("Component Initialization", () => {
-    it("should render the component", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
+      expect(strip().attributes("data-tone")).toBe("info");
+      expect(strip().text()).toContain("Trial period");
+      expect(strip().text()).toContain("9 days left");
+      expect(strip().text()).toContain(`ends ${shortDate(NOW + 9.5 * DAY_MS)}`);
     });
 
-    it("should have correct component name", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe("TrialPeriod");
+    it("turns warning at 3 days or fewer", async () => {
+      store = storeWith(expiryInDays(3.5));
+      await mountStrip({ currentPage: "usage" });
+
+      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().text()).toContain("3 days left");
     });
 
-    it("should accept currentPage prop", () => {
-      wrapper = createWrapper({ currentPage: "billing" });
-      expect(wrapper.props().currentPage).toBe("billing");
+    it("uses the singular for one day", async () => {
+      store = storeWith(expiryInDays(1.5));
+      await mountStrip({ currentPage: "usage" });
+
+      expect(strip().text()).toContain("1 day left");
     });
 
-    it("should have default currentPage prop as undefined", () => {
-      wrapper = createWrapper();
-      expect(wrapper.props().currentPage).toBeUndefined();
-    });
-  });
+    it("reads 'ended <date>' in warning tone after expiry, naming the org", async () => {
+      store = storeWith(expiryInDays(-2));
+      await mountStrip({ currentPage: "billing" });
 
-  describe("showTrialPeriodMsg computed property", () => {
-    it("should show trial period message when free_trial_expiry exists and is not empty", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
+      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().text()).toContain(`ended ${shortDate(NOW - 2 * DAY_MS)}`);
+      expect(strip().text()).toContain("keep using acme-prod");
+      expect(strip().text()).not.toContain("days left");
     });
 
-    it("should not show trial period message when free_trial_expiry is empty string", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "",
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
-    });
+    it("keeps 'ends <date>' while time remains under one day, and says ended only after expiry", async () => {
+      store = storeWith(expiryInDays(0.5));
+      await mountStrip({ currentPage: "usage" });
 
-    it("should not show trial period message when free_trial_expiry is null", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: null,
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
-    });
-
-    it("should not show trial period message when free_trial_expiry property doesn't exist", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
-    });
-
-    it("should not show trial period message when organizationSettings doesn't exist", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
+      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().text()).toContain("less than a day left");
+      expect(strip().text()).toContain(`ends ${shortDate(NOW + 0.5 * DAY_MS)}`);
+      expect(strip().text()).not.toContain("ended");
     });
   });
 
-  describe("getTrialPeriodMessage method", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({}, mockStore);
+  describe("reactive clock", () => {
+    it("moves to the warning tone at the day boundary without a remount", async () => {
+      store = storeWith(expiryInDays(4) + 60_000 * 1000);
+      await mountStrip({ currentPage: "usage" });
+      expect(strip().attributes("data-tone")).toBe("info");
+      expect(strip().text()).toContain("4 days left");
+
+      vi.advanceTimersByTime(60_001);
+      await flushPromises();
+
+      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().text()).toContain("3 days left");
     });
 
-    it("should return message with multiple days remaining when due days > 1", () => {
-      vi.mocked(getDueDays).mockReturnValue(5);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("5 Days remaining in your trial account");
-      expect(getDueDays).toHaveBeenCalledWith("1640995200000000");
-    });
+    it("switches to the ended text when the trial runs out while open, not a day early", async () => {
+      store = storeWith(expiryInDays(1) + 1000 * 1000);
+      await mountStrip({ currentPage: "usage" });
+      expect(strip().text()).toContain("1 day left");
 
-    it("should return message with single day remaining when due days = 1", () => {
-      vi.mocked(getDueDays).mockReturnValue(1);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("1 Day remaining in your trial account");
-    });
+      vi.advanceTimersByTime(1001);
+      await flushPromises();
+      expect(strip().text()).toContain("less than a day left");
+      expect(strip().text()).not.toContain("ended");
 
-    it("should return message with single day remaining when due days = 0", () => {
-      vi.mocked(getDueDays).mockReturnValue(0);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      // vue-i18n uses the standard English plural rule, so 0 takes the plural form —
-      // the previous `dueDays > 1` check produced the ungrammatical "0 Day".
-      expect(message).toBe("0 Days remaining in your trial account");
-    });
-
-    it("should return expired message when due days < 0", () => {
-      vi.mocked(getDueDays).mockReturnValue(-1);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has expired.");
-    });
-
-    it("should return expired message when due days is -5", () => {
-      vi.mocked(getDueDays).mockReturnValue(-5);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has expired.");
-    });
-
-    it("should return undefined when free_trial_expiry is empty", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "",
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBeUndefined();
-    });
-
-    it("should return undefined when free_trial_expiry is null", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: null,
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBeUndefined();
-    });
-
-    it("should return undefined when free_trial_expiry property doesn't exist", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBeUndefined();
+      vi.advanceTimersByTime(DAY_MS);
+      await flushPromises();
+      expect(strip().text()).toContain("ended");
     });
   });
 
-  describe("redirectBilling method", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({}, mockStore);
-    });
+  describe("actions per page", () => {
+    it("on Usage carries Compare plans and the end-of-trial line", async () => {
+      await mountStrip({ currentPage: "usage" });
 
-    it("should redirect to billing plans page", () => {
-      wrapper.vm.redirectBilling();
-      expect(mockRouter.push).toHaveBeenCalledWith("/billings/plans/");
-    });
-
-    it("should call router.push exactly once", () => {
-      wrapper.vm.redirectBilling();
-      expect(mockRouter.push).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("redirectContactSupport method", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({}, mockStore);
-    });
-
-    it("should open contact support URL in new tab", () => {
-      wrapper.vm.redirectContactSupport();
-      expect(mockWindowOpen).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
-    });
-
-    it("should call window.open exactly once", () => {
-      wrapper.vm.redirectContactSupport();
-      expect(mockWindowOpen).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe("Setup function return values", () => {
-    beforeEach(() => {
-      wrapper = createWrapper({}, mockStore);
-    });
-
-    it("should expose t function from i18n", () => {
-      expect(wrapper.vm.t).toBeDefined();
-      expect(typeof wrapper.vm.t).toBe("function");
-    });
-
-    it("should expose store", () => {
-      expect(wrapper.vm.store).toBeDefined();
-    });
-
-    it("should expose router", () => {
-      expect(wrapper.vm.router).toBeDefined();
-    });
-
-    it("should expose config", () => {
-      expect(wrapper.vm.config).toBeDefined();
-    });
-
-    it("should expose redirectBilling function", () => {
-      expect(wrapper.vm.redirectBilling).toBeDefined();
-      expect(typeof wrapper.vm.redirectBilling).toBe("function");
-    });
-
-    it("should expose getDueDays function", () => {
-      expect(wrapper.vm.getDueDays).toBeDefined();
-      expect(typeof wrapper.vm.getDueDays).toBe("function");
-    });
-
-    it("should expose showTrialPeriodMsg", () => {
-      expect(wrapper.vm.showTrialPeriodMsg).toBeDefined();
-    });
-
-    it("should expose redirectContactSupport function", () => {
-      expect(wrapper.vm.redirectContactSupport).toBeDefined();
-      expect(typeof wrapper.vm.redirectContactSupport).toBe("function");
-    });
-  });
-
-  describe("Template rendering", () => {
-    it("should render trial period container when showTrialPeriodMsg is true", () => {
-      wrapper = createWrapper({}, mockStore);
-      const container = wrapper.find('[data-test="trial-period-container"]');
-      expect(container.exists()).toBe(true);
-    });
-
-    it("should not render trial period container when showTrialPeriodMsg is false", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "",
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, testStore);
-      const container = wrapper.find('[data-test="trial-period-container"]');
-      expect(container.exists()).toBe(false);
-    });
-
-    it("should render upgrade button when currentPage is not billing", () => {
-      wrapper = createWrapper({ currentPage: "dashboard" }, mockStore);
-      // Check for button with upgrade text
-      const buttons = wrapper.findAll("button");
-      const upgradeButton = buttons.find((btn: any) => btn.text().includes("upgradeNow"));
-      expect(upgradeButton || buttons.length > 0).toBeTruthy();
-    });
-
-    it("should render contact support button when currentPage is billing", () => {
-      wrapper = createWrapper({ currentPage: "billing" }, mockStore);
-      const buttons = wrapper.findAll("button");
-      const contactButton = buttons.find((btn: any) => btn.text().includes("contactSupport"));
-      expect(contactButton || buttons.length > 0).toBeTruthy();
-    });
-
-    it("should display trial message in template", () => {
-      vi.mocked(getDueDays).mockReturnValue(3);
-      wrapper = createWrapper({}, mockStore);
-      const banner = wrapper.find('[data-test="trial-period-container"]');
-      expect(banner.exists()).toBe(true);
-      expect(banner.find("strong").exists()).toBe(true);
-    });
-
-    it("should display trial subtitle", () => {
-      wrapper = createWrapper({}, mockStore);
-      const banner = wrapper.find('[data-test="trial-period-container"]');
-      expect(banner.exists()).toBe(true);
-      const subtitleSpan = banner.find("p span:last-child");
-      expect(subtitleSpan.exists()).toBe(true);
-    });
-  });
-
-  describe("Button click handlers", () => {
-    it("should call redirectBilling when upgrade button is clicked", async () => {
-      wrapper = createWrapper({ currentPage: "dashboard" }, mockStore);
-
-      // Directly call the method to test functionality
-      wrapper.vm.redirectBilling();
-      expect(mockRouter.push).toHaveBeenCalledWith("/billings/plans/");
-    });
-
-    it("should call redirectContactSupport when contact button is clicked", async () => {
-      wrapper = createWrapper({ currentPage: "billing" }, mockStore);
-
-      // Directly call the method to test functionality
-      wrapper.vm.redirectContactSupport();
-      expect(mockWindowOpen).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
-    });
-  });
-
-  describe("Edge cases and error handling", () => {
-    it("should handle undefined organizationData gracefully", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      expect(() => createWrapper({}, testStore)).not.toThrow();
-    });
-
-    it("should handle null organizationData gracefully", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      expect(() => createWrapper({}, testStore)).not.toThrow();
-    });
-
-    it("should handle missing organizationData property", () => {
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      expect(() => createWrapper({}, testStore)).not.toThrow();
-    });
-
-    it("should handle getDueDays returning NaN", () => {
-      vi.mocked(getDueDays).mockReturnValue(NaN);
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has expired.");
-    });
-
-    it("should handle getDueDays returning undefined", () => {
-      vi.mocked(getDueDays).mockReturnValue(undefined);
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has expired.");
-    });
-
-    it("should handle very large positive due days", () => {
-      vi.mocked(getDueDays).mockReturnValue(999999);
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("999999 Days remaining in your trial account");
-    });
-
-    it("should handle very large negative due days", () => {
-      vi.mocked(getDueDays).mockReturnValue(-999999);
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("Your trial period has expired.");
-    });
-  });
-
-  describe("Component lifecycle", () => {
-    it("should initialize with correct default state", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm).toBeDefined();
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.router).toBeDefined();
-    });
-
-    it("should maintain reactive state", async () => {
-      // Create a new store with valid trial expiry
-      const reactiveStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-        },
-      };
-      wrapper = createWrapper({}, reactiveStore);
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-
-      // Test the reactive property exists
-      expect(typeof wrapper.vm.showTrialPeriodMsg).toBe("boolean");
-    });
-  });
-
-  describe("Additional Coverage Tests", () => {
-    it("should handle getDueDays with zero value correctly", () => {
-      vi.mocked(getDueDays).mockReturnValue(0);
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      // vue-i18n uses the standard English plural rule, so 0 takes the plural form —
-      // the previous `dueDays > 1` check produced the ungrammatical "0 Day".
-      expect(message).toBe("0 Days remaining in your trial account");
-    });
-
-    it("should handle getDueDays with decimal values by flooring", () => {
-      vi.mocked(getDueDays).mockReturnValue(2.7);
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBe("2.7 Days remaining in your trial account");
-    });
-
-    it("should verify free_trial_expiry property check works correctly", () => {
-      wrapper = createWrapper({}, mockStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      // Verify that the method works correctly when the property exists
-      expect(message).toBeDefined();
-      expect(typeof message).toBe("string");
-    });
-
-    it("should handle empty organizationSettings object", () => {
-      const emptyStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {},
-          },
-        },
-      };
-      wrapper = createWrapper({}, emptyStore);
-      const message = wrapper.vm.getTrialPeriodMessage();
-      expect(message).toBeUndefined();
-    });
-
-    it("should correctly expose all required methods from setup", () => {
-      wrapper = createWrapper({}, mockStore);
-      const exposedMethods = [
-        "t",
-        "store",
-        "router",
-        "config",
-        "redirectBilling",
-        "getDueDays",
-        "showTrialPeriodMsg",
-        "redirectContactSupport",
-      ];
-      exposedMethods.forEach((method) => {
-        expect(wrapper.vm[method]).toBeDefined();
+      expect(wrapper!.find('[data-test="trial-period-end-rule"]').text()).toBe(
+        "When the trial ends, only Plans and settings open until you choose a plan.",
+      );
+      expect(wrapper!.find('[data-test="trial-period-contact-support-btn"]').exists()).toBe(false);
+      await wrapper!.find('[data-test="trial-period-compare-plans-btn"]').trigger("click");
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "plans",
+        query: { org_identifier: "acme_prod" },
       });
     });
 
-    it("should handle component unmounting gracefully", () => {
-      wrapper = createWrapper({}, mockStore);
-      expect(() => wrapper.unmount()).not.toThrow();
+    it("on Home > Usage (no page given) carries Compare plans, never Contact support", async () => {
+      await mountStrip({});
+
+      expect(wrapper!.find('[data-test="trial-period-end-rule"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="trial-period-contact-support-btn"]').exists()).toBe(false);
+      await wrapper!.find('[data-test="trial-period-compare-plans-btn"]').trigger("click");
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "plans",
+        query: { org_identifier: "acme_prod" },
+      });
     });
 
-    it("should render correct CSS classes", () => {
-      wrapper = createWrapper({}, mockStore);
-      const container = wrapper.find('[data-test="trial-period-container"]');
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("w-full");
-      expect(container.classes()).toContain("rounded-default");
-    });
+    it("on Plans carries Contact support and no end-of-trial line", async () => {
+      await mountStrip({ currentPage: "billing" });
 
-    it("should display correct subtitle text", () => {
-      wrapper = createWrapper({}, mockStore);
-      const banner = wrapper.find('[data-test="trial-period-container"]');
-      expect(banner.exists()).toBe(true);
-      expect(banner.text()).toContain(
-        "Upgrade to a plan to continue enjoying the services by OpenObserve.",
-      );
-    });
-
-    it("should render different buttons based on currentPage prop", () => {
-      // Test with billing page
-      const billingWrapper = createWrapper({ currentPage: "billing" }, mockStore);
-      const billingButtons = billingWrapper.findAll("button");
-      expect(billingButtons.length).toBeGreaterThanOrEqual(0);
-
-      // Test with non-billing page
-      const dashboardWrapper = createWrapper({ currentPage: "dashboard" }, mockStore);
-      const dashboardButtons = dashboardWrapper.findAll("button");
-      expect(dashboardButtons.length).toBeGreaterThanOrEqual(0);
-    });
-
-    it("should handle case when currentPage is undefined", () => {
-      wrapper = createWrapper({ currentPage: undefined }, mockStore);
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should verify component name matches export", () => {
-      expect(TrialPeriod.name).toBe("TrialPeriod");
-    });
-
-    it("should handle props validation", () => {
-      wrapper = createWrapper({ currentPage: "test-page" }, mockStore);
-      expect(wrapper.props().currentPage).toBe("test-page");
-    });
-
-    it("should verify button styling classes are applied", () => {
-      wrapper = createWrapper({ currentPage: "dashboard" }, mockStore);
-      const buttons = wrapper.findAll("button");
-      if (buttons.length > 0) {
-        const button = buttons[0];
-        expect(
-          button
-            .classes()
-            .some(
-              (cls: any) =>
-                cls.includes("bg-primary") ||
-                cls.includes("text-white") ||
-                cls.includes("cursor-pointer"),
-            ),
-        ).toBeTruthy();
-      }
-    });
-
-    it("should handle getDueDays with string input gracefully", () => {
-      wrapper = createWrapper({}, mockStore);
-      expect(wrapper.vm.getDueDays).toBeDefined();
-      expect(typeof wrapper.vm.getDueDays).toBe("function");
+      expect(wrapper!.find('[data-test="trial-period-end-rule"]').exists()).toBe(false);
+      expect(wrapper!.find('[data-test="trial-period-compare-plans-btn"]').exists()).toBe(false);
+      await wrapper!.find('[data-test="trial-period-contact-support-btn"]').trigger("click");
+      expect(openSpy).toHaveBeenCalledWith("https://openobserve.ai/contactus/", "_blank");
     });
   });
 
-  describe("onMounted lifecycle hook - BillingService integration", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
+  describe("who sees the strip", () => {
+    it.each([
+      ["missing", undefined],
+      ["null", null],
+      ["empty", ""],
+    ])("shows nothing when free_trial_expiry is %s", async (_label, expiry) => {
+      store = storeWith(expiry);
+      await mountStrip({ currentPage: "usage" });
+
+      expect(strip().exists()).toBe(false);
     });
 
-    it("should call list_subscription when isCloud is true", async () => {
-      // Mock successful response with non-AWS provider
+    it("shows nothing when organizationSettings is absent", async () => {
+      store = reactive({ state: { organizationData: {}, selectedOrganization: {} } });
+      await mountStrip();
+
+      expect(strip().exists()).toBe(false);
+    });
+
+    it("hides the strip for an AWS-billed org it looked up itself", async () => {
       vi.mocked(BillingService.list_subscription).mockResolvedValue({
-        data: {
-          provider: "stripe",
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
+        data: { provider: "aws" },
       } as any);
+      await mountStrip({ currentPage: "billing" });
 
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-123",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-123");
+      expect(BillingService.list_subscription).toHaveBeenCalledWith("acme_prod");
+      expect(strip().exists()).toBe(false);
     });
 
-    it("should set showTrialPeriodMsg to false when provider is AWS", async () => {
-      // Mock response with AWS provider
-      vi.mocked(BillingService.list_subscription).mockResolvedValue({
-        data: {
-          provider: "aws",
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any);
+    it("trusts a provider handed in by the parent and skips its own lookup", async () => {
+      await mountStrip({ currentPage: "usage", provider: "aws" });
 
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-456",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Initially should be true
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      // Should be set to false after AWS provider is detected
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-456");
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(false);
-    });
-
-    it("should keep showTrialPeriodMsg true when provider is not AWS", async () => {
-      // Mock response with non-AWS provider
-      vi.mocked(BillingService.list_subscription).mockResolvedValue({
-        data: {
-          provider: "stripe",
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any);
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-789",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-789");
-      // Should remain true for non-AWS providers
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-    });
-
-    it("should keep showTrialPeriodMsg true when provider is undefined", async () => {
-      // Mock response without provider field
-      vi.mocked(BillingService.list_subscription).mockResolvedValue({
-        data: {},
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any);
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-999",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-999");
-      // Should remain true when provider is not specified
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-    });
-
-    it("should handle list_subscription error gracefully", async () => {
-      // Mock error response
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      vi.mocked(BillingService.list_subscription).mockRejectedValue(new Error("Network error"));
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-error",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-error");
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Failed to fetch billing info:",
-        expect.any(Error),
-      );
-      // Should keep the default behavior (showTrialPeriodMsg should remain true)
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("should not log a 401 as an error — it's an expected session-expiry race already handled globally", async () => {
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const unauthorizedError: any = new Error("Request failed with status code 401");
-      unauthorizedError.response = { status: 401 };
-      vi.mocked(BillingService.list_subscription).mockRejectedValue(unauthorizedError);
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-401",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-401");
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
-      // Falls back to the default (unchanged) behavior, same as any other failure.
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("should handle list_subscription with null data", async () => {
-      // Mock response with null data
-      vi.mocked(BillingService.list_subscription).mockResolvedValue({
-        data: null,
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any);
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-null",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledWith("test-org-null");
-      // Should remain true when data is null
-      expect(wrapper.vm.showTrialPeriodMsg).toBe(true);
-    });
-
-    it("should call list_subscription with correct organization identifier", async () => {
-      vi.mocked(BillingService.list_subscription).mockResolvedValue({
-        data: {
-          provider: "gcp",
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      } as any);
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "specific-org-identifier-12345",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
-      expect(BillingService.list_subscription).toHaveBeenCalledWith(
-        "specific-org-identifier-12345",
-      );
-    });
-  });
-
-  describe("onMounted lifecycle hook - isCloud false scenarios", () => {
-    it("should NOT call list_subscription when isCloud is false", async () => {
-      // Import the mocked config to spy on it
-      const config = (await import("@/aws-exports")).default;
-      const isCloudSpy = vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
-
-      vi.clearAllMocks();
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-local",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      // BillingService should NOT be called when isCloud is "false"
       expect(BillingService.list_subscription).not.toHaveBeenCalled();
-
-      isCloudSpy.mockRestore();
+      expect(strip().exists()).toBe(false);
     });
 
-    it("should NOT call list_subscription when isCloud is undefined", async () => {
-      // Import the mocked config to spy on it
-      const config = (await import("@/aws-exports")).default;
-      const isCloudSpy = vi.spyOn(config, "isCloud", "get").mockReturnValue(undefined as any);
+    it("does not look up the provider outside Cloud", async () => {
+      awsConfig.isCloud = "false";
+      await mountStrip({ currentPage: "billing" });
 
-      vi.clearAllMocks();
-
-      const testStore = {
-        state: {
-          organizationData: {
-            organizationSettings: {
-              free_trial_expiry: "1640995200000000",
-            },
-          },
-          selectedOrganization: {
-            identifier: "test-org-undefined",
-          },
-        },
-      };
-
-      wrapper = createWrapper({}, testStore);
-
-      // Wait for onMounted to complete
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      // BillingService should NOT be called when isCloud is undefined
       expect(BillingService.list_subscription).not.toHaveBeenCalled();
+      expect(strip().exists()).toBe(true);
+    });
 
-      isCloudSpy.mockRestore();
+    it("keeps the strip and logs a failed lookup that is not a 401", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(BillingService.list_subscription).mockRejectedValue({
+        response: { status: 500 },
+      });
+      await mountStrip({ currentPage: "billing" });
+
+      expect(strip().exists()).toBe(true);
+      expect(error).toHaveBeenCalledTimes(1);
+      error.mockRestore();
+    });
+
+    it("does not log a 401, which http.ts already handles", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(BillingService.list_subscription).mockRejectedValue({
+        response: { status: 401 },
+      });
+      await mountStrip({ currentPage: "billing" });
+
+      expect(error).not.toHaveBeenCalled();
+      error.mockRestore();
     });
   });
 });

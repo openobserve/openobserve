@@ -20,6 +20,7 @@ import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
 import { deepCopy } from "@/utils/zincutils";
+import { isUserDataStream } from "@/utils/internalStreams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
@@ -401,8 +402,12 @@ const useStreams = (t: TranslateFn) => {
   // No "already fetched" bail-out: the caller only reaches here with a list the
   // query just produced, and refusing to store it would discard a refetch.
   const setStreams = (streamName: string = "all", streamList: any[] = []) => {
-    if (!store.state.organizationData.isDataIngested && !!streamList.length)
-      store.dispatch("setIsDataIngested", !!streamList.length);
+    // only user data flips the flag: internal streams such as usage exist before any ingest
+    if (
+      !store.state.organizationData.isDataIngested &&
+      streamList.some((s) => isUserDataStream(s?.name ?? "", s?.stream_type ?? streamName))
+    )
+      store.dispatch("setIsDataIngested", true);
 
     const streamObject = getStreamPayload();
     streamObject.name = streamName;

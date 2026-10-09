@@ -31,9 +31,9 @@ vi.mock("../../../utils/zincutils", () => ({
   getIngestionURL: vi.fn(),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     props: ["content"],
     template: "<div>{{ content }}</div>",
   },
@@ -384,15 +384,15 @@ describe("FluentBit Component", () => {
     emptyWrapper.unmount();
   });
 
-  // Test 36: CopyContent component integration
-  it("should include CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+  // Test 36: CredentialCodeBlock component integration
+  it("should include CredentialCodeBlock component", () => {
+    const copyContent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyContent.exists()).toBe(true);
   });
 
-  // Test 37: CopyContent receives correct content prop
-  it("should pass content to CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+  // Test 37: CredentialCodeBlock receives correct content prop
+  it("should pass content to CredentialCodeBlock component", () => {
+    const copyContent = wrapper.findComponent({ name: "CredentialCodeBlock" });
     expect(copyContent.props("content")).toBe(wrapper.vm.content);
   });
 });

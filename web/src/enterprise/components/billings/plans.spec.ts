@@ -22,6 +22,10 @@ import BillingService from "@/services/billings";
 import paidOverage from "@/services/paidOverage";
 import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
+import analytics from "@/services/product_analytics";
+import config from "@/aws-exports";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 // Mock toast
 const { mockToast } = vi.hoisted(() => ({
@@ -180,6 +184,26 @@ describe("Plans Component", () => {
     vi.clearAllMocks();
   });
 
+  it("fires billing_checkout_returned once with the plan when Stripe sends the user back", async () => {
+    vi.mocked(analytics.track).mockClear();
+    Object.defineProperty(document, "referrer", {
+      value: "https://checkout.stripe.com/c/pay/cs_test",
+      configurable: true,
+    });
+    const returned = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(
+      vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([name]) => name === "billing_checkout_returned"),
+    ).toEqual([["billing_checkout_returned", { plan: config.paidPlan }]]);
+    returned.unmount();
+    Object.defineProperty(document, "referrer", { value: "", configurable: true });
+  });
+
   // Test 1: Component mounting
   it("should mount the component successfully", () => {
     expect(wrapper.exists()).toBe(true);
@@ -262,7 +286,7 @@ describe("Plans Component", () => {
   });
 
   // Test 10: loadSubscription method - empty subscription type warning
-  it("should show warning when subscription type is empty", async () => {
+  it("never toasts or redirects when the org has no subscription yet", async () => {
     const response = {
       data: {
         subscription_type: "",
@@ -270,14 +294,13 @@ describe("Plans Component", () => {
       },
     };
     (BillingService.list_subscription as any).mockResolvedValue(response);
+    const pushSpy = vi.spyOn(wrapper.vm.$router, "push");
 
     await wrapper.vm.loadSubscription();
 
-    expect(mockToast).toHaveBeenCalledWith({
-      variant: "warning",
-      message: "Please subscribe to one of the plan.",
-      timeout: 5000,
-    });
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(pushSpy).not.toHaveBeenCalled();
+    expect(wrapper.vm.loading).toBe(false);
   });
 
   // Test 11: loadSubscription method - error handling

@@ -28,9 +28,9 @@ vi.mock("../../../utils/zincutils", () => ({
   getIngestionURL: vi.fn(() => "https://test.example.com:5080"),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: "<div class='copy-content'><slot /></div>",
     props: ["content"],
   },
@@ -65,7 +65,7 @@ describe("FileBeat.vue", () => {
       global: {
         plugins: [store],
         stubs: {
-          CopyContent: {
+          CredentialCodeBlock: {
             template: "<div class='copy-content-stub'>{{ content }}</div>",
             props: ["content"],
           },
@@ -100,8 +100,8 @@ describe("FileBeat.vue", () => {
       expect(FileBeat.props.currUserEmail.type).toBe(String);
     });
 
-    it("should have CopyContent in components", () => {
-      expect(FileBeat.components).toHaveProperty("CopyContent");
+    it("should have CredentialCodeBlock in components", () => {
+      expect(FileBeat.components).toHaveProperty("CredentialCodeBlock");
     });
   });
 
@@ -192,18 +192,18 @@ describe("FileBeat.vue", () => {
       expect(container.exists()).toBe(true);
     });
 
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       const copyContent = wrapper.find(".copy-content-stub");
       expect(copyContent.exists()).toBe(true);
     });
 
-    it("should pass content to CopyContent component", () => {
+    it("should pass content to CredentialCodeBlock component", () => {
       const copyContent = wrapper.find(".copy-content-stub");
       expect(copyContent.exists()).toBe(true);
       expect(copyContent.text()).toContain("setup.ilm.enabled: false");
     });
 
-    it("should apply correct class to CopyContent", () => {
+    it("should apply correct class to CredentialCodeBlock", () => {
       const copyContent = wrapper.find(".copy-content-stub");
       expect(copyContent.exists()).toBe(true);
     });
@@ -222,7 +222,7 @@ describe("FileBeat.vue", () => {
       const wrapperWithoutProp = mount(FileBeat, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
         props: {
           currUserEmail: "test@example.com",
@@ -235,7 +235,7 @@ describe("FileBeat.vue", () => {
       const wrapperWithoutProp = mount(FileBeat, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
         props: {
           currOrgIdentifier: "test-org",
@@ -262,7 +262,7 @@ describe("FileBeat.vue", () => {
       const newWrapper = mount(FileBeat, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(newWrapper.vm.content).toContain("/api/different-org/");
@@ -308,7 +308,7 @@ describe("FileBeat.vue", () => {
       const newWrapper = mount(FileBeat, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(newWrapper.vm.content).toContain("/api//");
@@ -334,7 +334,7 @@ describe("FileBeat.vue", () => {
       const newWrapper = mount(FileBeat, {
         global: {
           plugins: [storeWithNullOrg],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(newWrapper.exists()).toBe(true);
@@ -345,7 +345,7 @@ describe("FileBeat.vue", () => {
       const wrapperWithoutProps = mount(FileBeat, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(wrapperWithoutProps.exists()).toBe(true);

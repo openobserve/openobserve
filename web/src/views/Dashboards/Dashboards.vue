@@ -120,9 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-        <div class="bg-card-glass-bg h-full">
+        <div class="bg-card-glass-bg flex h-full flex-col">
+          <div
+            v-show="showFirstData"
+            class="shrink-0 px-5 pt-5 empty:hidden"
+            data-test="dashboards-first-data"
+          >
+            <FirstDataPanel v-if="showFirstData" signal="any" variant="compact" />
+          </div>
           <OTable
-            class="h-full w-full"
+            class="min-h-0 w-full flex-1"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -551,6 +558,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import { useRoute, useRouter } from "vue-router";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -629,6 +637,7 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    FirstDataPanel,
     OTruncatedText,
     OUserCell,
     OTimeCell,
@@ -1383,6 +1392,14 @@ export default defineComponent({
       { flush: "sync" },
     );
 
+    // mounted only while it can show, so a list with dashboards or an org with data runs no hidden watcher
+    const showFirstData = computed(
+      () =>
+        !loading.value &&
+        !dashboards.value.length &&
+        store.state.organizationData?.isDataIngested === false,
+    );
+
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
         // Capture before the row reference is cleared — used below to drop a
@@ -1809,6 +1826,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      showFirstData,
       refreshing,
       lastUpdatedAt,
       forbidden,

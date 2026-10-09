@@ -37,9 +37,11 @@ import { queryClient, setMutationNotifier } from "./composables/query/queryClien
 import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { isIgnoredNoise } from "./utils/rum/ignoredNoisePatterns";
 import { scrubAuthParams } from "./utils/rum/scrubAuthParams";
+import { isExtensionOnlyError } from "./utils/rum/extensionFrames";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import "@/composables/dashboard/usePanelDraft";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -159,6 +161,7 @@ const getConfig = async () => {
         beforeSend: (event) => {
           event.view.url = scrubAuthParams(event.view.url) ?? event.view.url;
           event.view.referrer = scrubAuthParams(event.view.referrer);
+          if (event.type === "error" && isExtensionOnlyError(event.error?.stack)) return false;
           // Filter out specific errors before sending to RUM
           if (event.type === "error") {
             const errorMessage = event.error?.message || "";
@@ -197,7 +200,7 @@ const getConfig = async () => {
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
         beforeSend: (log) => {
-          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url);
+          if (log.view?.url) log.view.url = scrubAuthParams(log.view.url) ?? log.view.url;
           // Filter out specific logs before sending
           const logMessage = log.message || "";
 

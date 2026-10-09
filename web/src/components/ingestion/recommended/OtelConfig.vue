@@ -1,21 +1,34 @@
 <template>
-  <div>
+  <div ref="root">
     <div class="p-2 pt-1">
       <div class="text-base font-bold font-medium">{{ t("ingestion.otlpHttp") }}</div>
-      <ContentCopy class="mt-2" :content="raw(getOtelHttpConfig)" />
+      <CredentialCodeBlock slug="otel-http" class="mt-2" :content="getOtelHttpConfig" />
     </div>
     <div class="p-3" v-if="showOtlpGrpc">
       <div class="text-base font-bold font-medium">{{ t("ingestion.otlpGrpc") }}</div>
-      <ContentCopy :content="raw(getOtelGrpcConfig)" />
+      <CredentialCodeBlock slug="otel-grpc" :content="getOtelGrpcConfig" />
     </div>
+    <FirstEventStatus
+      v-if="org"
+      ref="bar"
+      :key="org"
+      class="p-3"
+      :org="org"
+      signal="traces"
+      snippet-kind="config"
+      @copy-command="copyHttpConfig"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import ContentCopy from "@/components/CopyContent.vue";
+import { useStore } from "vuex";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
+import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
+import { provideSnippetCopied } from "@/composables/firstEvent/firstEventCopied";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useOtlpGrpcVisibility from "@/composables/useOtlpGrpcVisibility";
 import { getOtelCollectorGrpcYaml } from "@/utils/otelCollectorConfig";
 
@@ -63,4 +76,15 @@ service:
     logs:
       level: warn`;
 });
+
+const store = useStore();
+const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const root = ref<HTMLElement | null>(null);
+const bar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
+provideSnippetCopied(bar);
+// Re-copies through the HTTP block, so the clipboard, the toast and snippet_copied match a click on it.
+const copyHttpConfig = () =>
+  root.value
+    ?.querySelector<HTMLElement>('[data-test="ingestion-otel-http-code-block-copy-btn"]')
+    ?.click();
 </script>

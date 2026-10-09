@@ -174,6 +174,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </OForm>
     </template>
+    <OBanner
+      v-if="draftOffer"
+      :variant="draftConflict ? 'warning' : 'info'"
+      :icon="draftConflict ? 'warning' : 'info-outline'"
+      inline-actions
+      dense
+      class="mx-3 mt-3 shrink-0"
+      data-test="dashboard-panel-draft-offer"
+      :data-conflict="draftConflict ? 'true' : 'false'"
+    >
+      <i18n-t keypath="panel.draft.offer" tag="span">
+        <template #time>{{ draftOfferAge }}</template>
+        <template #title>
+          <strong class="font-semibold">{{ draftOfferTitle }}</strong>
+        </template>
+      </i18n-t>
+      <span v-if="draftConflict" class="ms-1" data-test="dashboard-panel-draft-conflict-note">{{
+        t("panel.draft.conflict")
+      }}</span>
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <OButton
+            variant="ghost"
+            size="xs"
+            data-test="dashboard-panel-draft-discard-btn"
+            @click="discardDraftOffer"
+            >{{ t("panel.draft.discard") }}</OButton
+          >
+          <OButton
+            variant="primary"
+            size="xs"
+            data-test="dashboard-panel-draft-resume-btn"
+            @click="resumeDraft"
+            >{{ t("panel.draft.resume") }}</OButton
+          >
+        </div>
+      </template>
+    </OBanner>
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
@@ -215,6 +253,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+
+    <ConfirmDialog
+      v-model="leaveDialogOpen"
+      :title="t('panel.draft.leaveTitle')"
+      :message="
+        leaveDraftKept ? t('panel.draft.leaveDraftKept') : t('panel.draft.leaveChangesLost')
+      "
+      :ok-label="t('panel.draft.leave')"
+      :cancel-label="t('panel.draft.keepEditing')"
+      @update:ok="settleLeave(true)"
+      @update:cancel="settleLeave(false)"
+    />
   </OPageLayout>
 </template>
 
@@ -282,6 +332,17 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { formatRelativeTime } from "@/utils/rum/errorIssueUtils";
+import {
+  panelDraftKey,
+  requestDraftRestore,
+  takeDraftRestore,
+  usePanelDraft,
+  type PanelDraftEntry,
+} from "@/composables/dashboard/usePanelDraft";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -305,6 +366,8 @@ export default defineComponent({
     AddSettingVariable,
     QueryInspector,
     PanelEditor,
+    OBanner,
+    ConfirmDialog,
   },
   setup() {
     provide("dashboardPanelDataPageKey", "dashboard");
@@ -604,6 +667,70 @@ export default defineComponent({
       panelBaseline !== null &&
       !isEqual(panelBaseline, JSON.parse(JSON.stringify(dashboardPanelData.data)));
 
+    // Frozen at setup: by the time the editor unmounts, the route already points at the next page.
+    const draftDashboardId = String(route.query.dashboard ?? "");
+    const draftKeyValue = panelDraftKey(
+      store.state.selectedOrganization?.identifier ?? "",
+      draftDashboardId,
+      route.query.panelId ? String(route.query.panelId) : undefined,
+    );
+    const draftKey = computed(() => draftKeyValue);
+    const panelDraft = usePanelDraft(draftKey);
+    const draftOffer = ref<PanelDraftEntry | null>(null);
+
+    // The list hash is what Save's 409 check compares; the schema version never moves.
+    const dashboardHash = (): string | undefined => {
+      const hash = store.state.organizationData?.allDashboardListHash?.[draftDashboardId];
+      return hash === undefined || hash === null ? undefined : String(hash);
+    };
+    const draftConflict = computed(() => {
+      const base = draftOffer.value?.draft.baseVersion;
+      const current = dashboardHash();
+      return base !== undefined && current !== undefined && base !== current;
+    });
+
+    const draftClock = ref(Date.now());
+    let draftClockTimer: ReturnType<typeof setInterval> | undefined;
+    watch(draftOffer, (offer) => {
+      clearInterval(draftClockTimer);
+      draftClockTimer = offer
+        ? setInterval(() => {
+            draftClock.value = Date.now();
+          }, 60_000)
+        : undefined;
+    });
+    const draftOfferAge = computed(() => {
+      // Reading the clock re-renders "n minutes ago" every minute.
+      void draftClock.value;
+      return draftOffer.value ? formatRelativeTime(draftOffer.value.draft.savedAt * 1000) : "";
+    });
+    const draftOfferTitle = computed(() => {
+      const title = draftOffer.value?.draft.panel.title;
+      return typeof title === "string" && title.trim() ? title : t("panel.draft.untitled");
+    });
+    // While an offer is pending nothing of this session is written, so the dialog must not promise it.
+    const leaveDraftKept = computed(() => panelDraft.available.value && draftOffer.value === null);
+
+    const snapshotDraft = () => ({
+      panel: JSON.parse(JSON.stringify(dashboardPanelData.data)),
+      baseVersion: dashboardHash(),
+      variables: Object.fromEntries(
+        Object.entries(route.query).filter(([name]) => name.startsWith("var-")),
+      ),
+    });
+
+    const draftContent = () => (hasUnsavedChanges() ? snapshotDraft() : null);
+    // An offer still waiting for Resume or Discard is never overwritten by the editor behind it.
+    const scheduleDraft = () => {
+      if (draftOffer.value || panelBaseline === null) return;
+      panelDraft.save(draftContent);
+    };
+    const writeDraftNow = () => {
+      scheduleDraft();
+      panelDraft.flush();
+    };
+    watch(() => dashboardPanelData.data, scheduleDraft, { deep: true });
+
     // @submit fires only after the schema passes (title required+trim). Write
     // the validated `value` into the editor state, then run the existing save
     // (which reads dashboardPanelData + does the deeper validatePanel checks).
@@ -616,6 +743,10 @@ export default defineComponent({
     };
 
     onUnmounted(async () => {
+      // Written before the reset below, which would otherwise be saved as the draft.
+      writeDraftNow();
+      clearInterval(draftClockTimer);
+
       // clear a few things
       resetDashboardPanelData();
 
@@ -699,6 +830,8 @@ export default defineComponent({
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
       await loadDashboard();
+      const dashboardMissing = Object.keys(currentDashboardData.data ?? {}).length === 0;
+      if (dashboardMissing) panelDraft.remove();
 
       // Call makeAutoSQLQuery after dashboard data is loaded
       // Only generate SQL if we're in auto query mode
@@ -720,6 +853,8 @@ export default defineComponent({
       );
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
+
+      if (!dashboardMissing) await offerOrRestoreDraft();
     });
 
     // Watch for stream or query type changes and update context provider
@@ -759,11 +894,17 @@ export default defineComponent({
     });
 
     const loadDashboard = async () => {
-      let data = JSON.parse(
-        JSON.stringify(
-          (await getDashboard(store, route.query.dashboard, route.query.folder ?? "default")) ?? {},
-        ),
-      );
+      let fetched: unknown;
+      try {
+        fetched = await getDashboard(store, route.query.dashboard, route.query.folder ?? "default");
+      } catch (error: unknown) {
+        // A draft whose dashboard is gone can never be resumed.
+        if ((error as { response?: { status?: number } })?.response?.status === 404) {
+          panelDraft.remove();
+        }
+        throw error;
+      }
+      let data = JSON.parse(JSON.stringify(fetched ?? {}));
 
       currentDashboardData.data = data;
 
@@ -1185,6 +1326,7 @@ export default defineComponent({
     };
 
     const beforeUnloadHandler = (e: any) => {
+      writeDraftNow();
       //check is data updated or not
       if (hasUnsavedChanges()) {
         // Display a confirmation message
@@ -1199,6 +1341,99 @@ export default defineComponent({
     // in cases where org is changed, we need to force a nvaigation, without warning
     let forceSkipBeforeUnloadListener = false;
 
+    const restoreDraft = async (entry: PanelDraftEntry) => {
+      captureBaselineOnFirstInput();
+      draftOffer.value = null;
+      Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(entry.draft.panel)));
+      const queryCount = dashboardPanelData.data.queries?.length ?? 0;
+      if (dashboardPanelData.layout.currentQueryIndex >= queryCount) {
+        dashboardPanelData.layout.currentQueryIndex = queryCount > 0 ? queryCount - 1 : 0;
+      }
+      if (entry.key !== draftKeyValue) panelDraft.remove(entry.key);
+      if (Object.keys(entry.draft.variables).length > 0) {
+        await router.replace({ query: { ...route.query, ...entry.draft.variables } });
+        if (variablesManager.variablesData.isInitialized) {
+          variablesManager.loadFromUrl(route);
+          variablesManager.commitAll();
+          updateCommittedVariables();
+        }
+      }
+      await nextTick();
+      panelEditorRef.value?.initChartData(dashboardPanelData.data);
+      writeDraftNow();
+    };
+
+    const resumeDraft = async () => {
+      const offer = draftOffer.value;
+      if (!offer) return;
+      const dashboardChanged = draftConflict.value;
+      await restoreDraft(offer);
+      analytics.track("dashboard_panel_draft_resumed", {
+        is_new: !editMode.value,
+        dashboard_changed: dashboardChanged,
+      });
+    };
+
+    const discardDraftOffer = () => {
+      if (draftOffer.value) panelDraft.remove(draftOffer.value.key);
+      draftOffer.value = null;
+    };
+
+    // Undo comes back through a fresh mount, which restores instead of offering.
+    const offerOrRestoreDraft = async () => {
+      const requested = takeDraftRestore(draftKeyValue);
+      if (requested) {
+        await restoreDraft(requested);
+        return;
+      }
+      draftOffer.value = panelDraft.read() ?? null;
+    };
+
+    const discardPanel = async () => {
+      panelDraft.cancel();
+      const discarded: PanelDraftEntry | null = hasUnsavedChanges()
+        ? { key: draftKeyValue, draft: { ...snapshotDraft(), savedAt: Date.now() } }
+        : draftOffer.value;
+      panelDraft.remove();
+      if (draftOffer.value) panelDraft.remove(draftOffer.value.key);
+      const returnTo = { path: route.path, query: { ...route.query } };
+      // Off before leaving, so neither the leave dialog nor the unmount write brings the draft back.
+      isUnsavedTrackingActive = false;
+      const failure = await goBack();
+      if (failure) {
+        isUnsavedTrackingActive = true;
+        return;
+      }
+      if (!discarded) return;
+      toast({
+        variant: "info",
+        message: t("panel.draft.discarded"),
+        timeout: 5000,
+        action: {
+          label: t("panel.draft.undo"),
+          handler: () => {
+            const restored = { key: draftKeyValue, draft: discarded.draft };
+            panelDraft.write(restored);
+            requestDraftRestore(restored);
+            router.push(returnTo);
+          },
+        },
+      });
+    };
+
+    const leaveDialogOpen = ref(false);
+    let pendingLeave: ((leave: boolean) => void) | null = null;
+    const settleLeave = (leave: boolean) => {
+      const resolve = pendingLeave;
+      pendingLeave = null;
+      leaveDialogOpen.value = false;
+      resolve?.(leave);
+    };
+    // Esc or the close button answers Keep editing.
+    watch(leaveDialogOpen, (open) => {
+      if (!open) settleLeave(false);
+    });
+
     onBeforeRouteLeave((to, from, next) => {
       // check if it is a force navigation, then allow
       if (forceSkipBeforeUnloadListener) {
@@ -1206,32 +1441,31 @@ export default defineComponent({
         return;
       }
 
-      // else continue to warn user
-      if (from.path === "/dashboards/add_panel" && hasUnsavedChanges()) {
-        const confirmMessage = t("dashboard.unsavedMessage");
-        if (window.confirm(confirmMessage)) {
-          // User confirmed navigation - clean up variables created during this session
-          if (
-            variablesCreatedInSession.value.length > 0 &&
-            currentDashboardData.data?.variables?.list
-          ) {
-            currentDashboardData.data.variables.list =
-              currentDashboardData.data.variables.list.filter(
-                (v: any) => !variablesCreatedInSession.value.includes(v.name),
-              );
-          }
-          variablesCreatedInSession.value = [];
-          variablesWithCurrentPanel.value = [];
-          // User confirmed, allow navigation
-          next();
-        } else {
-          // User canceled, prevent navigation
-          next(false);
-        }
-      } else {
-        // No unsaved changes or not leaving the edit route, allow navigation
+      if (from.path !== "/dashboards/add_panel" || !hasUnsavedChanges()) {
         next();
+        return;
       }
+
+      pendingLeave = (leave: boolean) => {
+        if (!leave) {
+          next(false);
+          return;
+        }
+        writeDraftNow();
+        if (
+          variablesCreatedInSession.value.length > 0 &&
+          currentDashboardData.data?.variables?.list
+        ) {
+          currentDashboardData.data.variables.list =
+            currentDashboardData.data.variables.list.filter(
+              (v: any) => !variablesCreatedInSession.value.includes(v.name),
+            );
+        }
+        variablesCreatedInSession.value = [];
+        variablesWithCurrentPanel.value = [];
+        next();
+      };
+      leaveDialogOpen.value = true;
     });
     const panelTitle = computed(() => {
       return { title: dashboardPanelData.data.title };
@@ -1406,6 +1640,8 @@ export default defineComponent({
         });
 
         isUnsavedTrackingActive = false;
+        panelDraft.cancel();
+        panelDraft.remove();
 
         // The author sees the value just saved, not an older view-mode override of this panel.
         clearExemplarOverride(
@@ -1833,11 +2069,21 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
+      draftOffer,
+      draftConflict,
+      draftOfferAge,
+      draftOfferTitle,
+      resumeDraft,
+      discardDraftOffer,
+      discardPanel,
+      leaveDialogOpen,
+      leaveDraftKept,
+      settleLeave,
     };
   },
   methods: {
     goBackToDashboardList() {
-      this.goBack();
+      this.discardPanel();
     },
   },
 });

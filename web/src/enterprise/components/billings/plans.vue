@@ -384,21 +384,6 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
-          // Only show subscribe prompt for Stripe orgs without subscription
-          toast({
-            variant: "warning",
-            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
-            timeout: 5000,
-          });
-
-          // Redirect to plans page only when there's no valid subscription
-          this.$router.push({
-            name: "plans",
-            query: {
-              org_identifier: this.store.state.selectedOrganization.identifier,
-            },
-          });
         }
 
         this.loading = false;

@@ -16,17 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent :content="raw(content)" />
+    <CredentialCodeBlock slug="telegraf" :content="content" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
-import { raw } from "@/types/i18n";
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 
 export default defineComponent({
@@ -39,7 +38,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent },
+  components: { CredentialCodeBlock, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -66,7 +65,6 @@ export default defineComponent({
 
     // Expose for testing
     return {
-      raw,
       store,
       config,
       endpoint,

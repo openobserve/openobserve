@@ -512,6 +512,39 @@ describe("Dashboards.vue", () => {
     });
   });
 
+  describe("First-data card", () => {
+    const findPanel = () => wrapper.findComponent({ name: "FirstDataPanel" });
+    const settle = async () => {
+      await flushPromises();
+      await nextTick();
+    };
+
+    it("mounts no card, and so no watcher, while the folder lists dashboards in an org without data", async () => {
+      store.state.organizationData.isDataIngested = false;
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n),
+      });
+      await settle();
+      expect(wrapper.vm.loading).toBe(false);
+      expect(wrapper.vm.dashboards).toHaveLength(1);
+      expect(wrapper.vm.showFirstData).toBe(false);
+      expect(findPanel().exists()).toBe(false);
+    });
+
+    it("mounts no card in an org with data, even in an empty folder", async () => {
+      store.state.organizationData.isDataIngested = true;
+      await router.push({ path: "/dashboards", query: { folder: "folder1" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(store, router, i18n, { folder: "folder1" }),
+      });
+      await settle();
+      expect(wrapper.vm.loading).toBe(false);
+      expect(wrapper.vm.dashboards).toHaveLength(0);
+      expect(wrapper.vm.showFirstData).toBe(false);
+      expect(findPanel().exists()).toBe(false);
+    });
+  });
+
   describe("Computed Properties", () => {
     it("should define table columns correctly", async () => {
       wrapper = shallowMount(Dashboards, {
@@ -632,6 +665,8 @@ describe("Dashboards.vue", () => {
   describe("Favorite dashboards", () => {
     const storeWithTwo = () => {
       const testStore = createMockStore();
+      // an org with data: an empty folder mounts no first-data card, and this suite's DOM cannot take new nodes
+      testStore.state.organizationData.isDataIngested = true;
       testStore.state.organizationData.allDashboardList = {
         default: [
           {

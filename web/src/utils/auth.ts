@@ -141,11 +141,12 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     return;
   }
 
+  // the flag is read first so an OSS build (flag off) never consults route meta
   if (
-    !isEmptyDataExempt(to) &&
     Object.prototype.hasOwnProperty.call(store.state.zoConfig, "restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&
-    store.state.organizationData.isDataIngested === false
+    store.state.organizationData.isDataIngested === false &&
+    !isEmptyDataExempt(to)
   ) {
     try {
       const orgIdentifier = store.state.selectedOrganization.identifier;

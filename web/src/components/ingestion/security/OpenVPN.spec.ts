@@ -3,7 +3,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import OpenVPN from "./OpenVPN.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 
 vi.mock("../../../aws-exports", () => ({
   default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1" },
@@ -43,9 +43,9 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },
@@ -84,15 +84,15 @@ describe("OpenVPN.vue Comprehensive Coverage", () => {
       global: {
         plugins: [mockRouter],
         provide: { store: mockStore },
-        components: { CopyContent },
+        components: { CredentialCodeBlock },
       },
     });
   };
 
   describe("Component Rendering Tests", () => {
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
     });
 
@@ -189,9 +189,9 @@ describe("OpenVPN.vue Comprehensive Coverage", () => {
   });
 
   describe("Component Props Passing Tests", () => {
-    it("should pass content prop to CopyContent that is defined", () => {
+    it("should pass content prop to CredentialCodeBlock that is defined", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.props("content")).toBeDefined();
     });
 

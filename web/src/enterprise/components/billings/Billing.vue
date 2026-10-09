@@ -169,6 +169,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <UsageMemberList v-model="usageMember.selected" :members="billingMembers" />
             </div>
             <div class="h-full min-w-0 flex-1 overflow-y-auto pb-3">
+              <TrialPeriod
+                v-if="isUsageRoute && billingInfoLoaded"
+                current-page="usage"
+                :provider="billingProvider"
+                class="ms-2 me-3 mb-3"
+              />
               <router-view title=""> </router-view>
             </div>
           </div>
@@ -201,6 +207,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import UsageMemberList from "./UsageMemberList.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import TrialPeriod from "./TrialPeriod.vue";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -215,6 +222,7 @@ export default defineComponent({
     OButton,
     UsageMemberList,
     DateTimePickerDashboard,
+    TrialPeriod,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -233,6 +241,13 @@ export default defineComponent({
     const billingProvider = ref(""); // empty until loaded
     const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
+    // Same rule TrialPeriod uses to show its strip.
+    const isTrialOrg = computed(() => {
+      const expiry = store.state.organizationData?.organizationSettings?.free_trial_expiry;
+      return (
+        expiry !== undefined && expiry !== null && expiry !== "" && billingProvider.value !== "aws"
+      );
+    });
 
     // Billing-group members for the Usage member selector (rendered as a
     // sidebar beside the usage view). Shared with usage.vue via provide/inject.
@@ -328,7 +343,10 @@ export default defineComponent({
         selectUsageDate();
       }
 
-      if (
+      if (router.currentRoute.value.name == "billings" && isTrialOrg.value) {
+        billingtab.value = "usage";
+        selectUsageDate();
+      } else if (
         router.currentRoute.value.name == "billings" ||
         router.currentRoute.value.name == "plans"
       ) {
@@ -467,6 +485,7 @@ export default defineComponent({
       showSidebar,
       lastSplitterPosition,
       showInvoiceTab,
+      billingInfoLoaded,
       billingProvider,
       isPaidUser,
       billingMembers,

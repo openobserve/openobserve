@@ -649,6 +649,46 @@ describe("Ingestion", () => {
       w.unmount();
     });
 
+    it("keeps the picked org token when /passcode answers after /ingestion-tokens", async () => {
+      stubNonEmptyTokens();
+      organizationsService.get_organization_passcode.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ data: { data: { passcode: "user-passcode", user: "a@b.c" } } }),
+              0,
+            ),
+          ),
+      );
+
+      const w = await mountIngestion();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscode).toBe(ORG_TOKEN);
+      expect(w.vm.selectedTokenName).toBe("default");
+      w.unmount();
+    });
+
+    it("keeps a token picked on the page over a later /passcode answer", async () => {
+      const second = { ...tokenRow, name: "second", token: "o2oi_second_token", is_default: false };
+      organizationsService.list_org_ingestion_tokens.mockResolvedValue({
+        data: { data: [tokenRow, second] },
+      });
+      organizationsService.get_organization_passcode.mockResolvedValue({
+        data: { data: { passcode: "user-passcode", user: "a@b.c" } },
+      });
+
+      const w = await mountIngestion();
+      w.vm.onTokenSelected("second");
+      queryClient.clear();
+      await w.vm.getOrganizationPasscode();
+      await flushPromises();
+
+      expect(orgData(w).organizationPasscode).toBe("o2oi_second_token");
+      w.unmount();
+    });
+
     it("re-evaluates after an org switch instead of latching forever", async () => {
       stubNonEmptyTokens();
       organizationsService.get_organization_passcode.mockRejectedValue({
@@ -676,7 +716,7 @@ describe("Ingestion", () => {
       await flushPromises();
 
       expect(orgData(w).organizationPasscodeForbidden).toBe(false);
-      expect(orgData(w).organizationPasscode).toBe("other-org-passcode");
+      expect(orgData(w).organizationPasscode).toBe(ORG_TOKEN);
 
       componentStore.state.selectedOrganization = {
         ...componentStore.state.selectedOrganization,
@@ -1068,8 +1108,8 @@ describe("Ingestion", () => {
     });
   });
 
-  describe("Warning Message Display Logic", () => {
-    it("should show warning message when restricted routes condition is met", async () => {
+  describe("Empty-data redirection banner", () => {
+    it("is gone with the flag on and no data ingested", async () => {
       if (!wrapper) {
         expect.fail("Component failed to mount");
         return;
@@ -1079,36 +1119,9 @@ describe("Ingestion", () => {
       wrapper.vm.store.state.organizationData.isDataIngested = false;
       await wrapper.vm.$nextTick();
 
-      const shouldShowWarning =
-        Object.prototype.hasOwnProperty.call(
-          wrapper.vm.store.state.zoConfig,
-          "restricted_routes_on_empty_data",
-        ) &&
-        wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
-        wrapper.vm.store.state.organizationData.isDataIngested === false;
-
-      expect(shouldShowWarning).toBe(true);
-    });
-
-    it("should not show warning message when data is ingested", async () => {
-      if (!wrapper) {
-        expect.fail("Component failed to mount");
-        return;
-      }
-
-      wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data = true;
-      wrapper.vm.store.state.organizationData.isDataIngested = true;
-      await wrapper.vm.$nextTick();
-
-      const shouldShowWarning =
-        Object.prototype.hasOwnProperty.call(
-          wrapper.vm.store.state.zoConfig,
-          "restricted_routes_on_empty_data",
-        ) &&
-        wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
-        wrapper.vm.store.state.organizationData.isDataIngested === false;
-
-      expect(shouldShowWarning).toBe(false);
+      expect(wrapper.text()).not.toContain(
+        "data ingestion must be initiated within the current organization",
+      );
     });
   });
 

@@ -19,6 +19,8 @@ import type { StreamPageParams } from "./stream";
 import { streamKeys } from "./stream.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
+export const STREAM_PROBE_PAGE = 20;
+
 export const streamNameListQuery = (org: string, type: string) =>
   queryOptions({
     queryKey: streamKeys.nameList(org, type),
@@ -45,6 +47,29 @@ export const streamPageQuery = (org: string, type: string, params: StreamPagePar
     },
     staleTime: MEDIUM_STALE_TIME,
   });
+
+/** A bounded first-event probe: one row for a type's total, or a 20-row page of a keyword match; always re-read because it is a poll. */
+export const streamProbeQuery = (org: string, type: string, keyword?: string, offset = 0) => {
+  const params: StreamPageParams = keyword
+    ? { offset, limit: STREAM_PROBE_PAGE, keyword }
+    : { offset: 0, limit: 1 };
+  return queryOptions({
+    queryKey: streamKeys.page(org, type, params),
+    queryFn: async (): Promise<{ list: any[]; total: number }> => {
+      const res = await stream.nameList(
+        org,
+        type,
+        false,
+        params.offset,
+        params.limit,
+        params.keyword ?? "",
+      );
+      return { list: res.data.list ?? [], total: res.data.total ?? 0 };
+    },
+    staleTime: 0,
+    retry: false,
+  });
+};
 
 /** Resolves to the payload, not the axios envelope, so the cache never holds an XHR object; `useStreams` keeps its own copy on purpose. */
 export const streamSchemaQuery = (org: string, streamName: string, type: string) =>

@@ -18,11 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <div
-    class="rounded-default logPage h-full max-h-full! min-h-full! overflow-hidden!"
+    class="rounded-default logPage flex h-full max-h-full! min-h-full! flex-col overflow-hidden!"
     id="logPage"
     data-test="logs-page-container"
   >
-    <div id="secondLevel" class="h-full max-h-full overflow-hidden">
+    <FirstDataPanel
+      v-if="firstDataArrival"
+      signal="logs"
+      variant="full"
+      :arrived="firstDataArrival"
+      class="mx-2.5 mt-2.5 shrink-0"
+      @dismiss="firstDataArrival = null"
+    />
+    <div id="secondLevel" class="h-full max-h-full min-h-0 flex-1 overflow-hidden">
       <OSplitter
         class="h-full max-h-full overflow-hidden"
         v-model="splitterModel"
@@ -112,11 +120,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="h-full max-lg:overflow-y-auto"
                     >
-                      <LogsNoDataState
-                        :ai-enabled="isAiEnabled"
-                        data-test="logs-search-no-streams-in-org-text"
-                        @ask-ai="onAskAiFixQuery"
-                      />
+                      <FirstDataPanel
+                        v-slot="{ layout, statusLine }"
+                        signal="logs"
+                        variant="full"
+                        status-in-slot
+                        @detected="onFirstDataDetected"
+                      >
+                        <LogsNoDataState
+                          :ai-enabled="isAiEnabled"
+                          :alternatives-only="layout === 'panel'"
+                          data-test="logs-search-no-streams-in-org-text"
+                          @ask-ai="onAskAiFixQuery"
+                        >
+                          <template v-if="layout === 'status'" #status>
+                            <component :is="statusLine" />
+                          </template>
+                        </LogsNoDataState>
+                      </FirstDataPanel>
                     </div>
                     <!--
                       No stream selected — the org has streams but none is
@@ -492,6 +513,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import {
@@ -520,6 +543,7 @@ export default defineComponent({
     OSpinner,
     LogsNoEventsState,
     LogsNoDataState,
+    FirstDataPanel,
     LogsNoStreamState,
     LogsErrorState,
   },
@@ -1598,6 +1622,16 @@ export default defineComponent({
     const onPickStream = (stream: string) => {
       searchObj.data.stream.selectedStream = [stream];
       searchObj.runQuery = true;
+    };
+
+    const firstDataArrival = ref<FirstEventResult | null>(null);
+    // query_on_stream_selection leaves the selection empty, so the arrival names the stream and its range itself
+    const onFirstDataDetected = async (result: FirstEventResult) => {
+      firstDataArrival.value = result;
+      await loadLogsData();
+      searchObj.data.stream.selectedStream = [result.streamName];
+      await extractFields();
+      onJumpToStreamData(result.rangeStart, result.rangeEnd);
     };
 
     const isAiEnabled = computed(
@@ -3356,6 +3390,8 @@ export default defineComponent({
       drillDownBaseFilter,
       handleActivation,
       runQueryFn,
+      firstDataArrival,
+      onFirstDataDetected,
       refreshData,
       setQuery,
       verifyOrganizationStatus,
