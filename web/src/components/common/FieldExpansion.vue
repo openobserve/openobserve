@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-          v-if="showQuickMode"
+          v-if="showQuickMode && isInterestingCandidate"
           variant="ghost-neutral"
           class="me-1 gap-0!"
           :title="
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-            v-if="showQuickMode"
+            v-if="showQuickMode && isInterestingCandidate"
             variant="ghost-neutral"
             class="gap-0!"
             :title="
@@ -136,6 +136,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
@@ -194,6 +195,9 @@ const emit = defineEmits<{
 
 const isExpanded = ref(props.expanded ?? false);
 const fieldValuesPanelRef = ref();
+
+// Mirrors FieldRow's gate rather than relying on it routing non-schema fields elsewhere.
+const isInterestingCandidate = computed(() => isSchemaBackedField(props.field));
 
 watch(
   () => props.expanded,

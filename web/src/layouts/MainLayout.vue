@@ -238,6 +238,7 @@ import {
   isEmptyDataExempt,
 } from "../utils/zincutils";
 import { isPaywalledDestination } from "@/utils/auth";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
 import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
 
@@ -1088,7 +1089,8 @@ export default defineComponent({
               user_email: store.state.userInfo.email,
             };
           }
-          orgOptions.value = store.state.organizations
+          const labeledOrgs = withDisambiguatedOrgLabels(store.state.organizations);
+          orgOptions.value = labeledOrgs
             .map(
               (data: {
                 id: any;
@@ -1100,7 +1102,9 @@ export default defineComponent({
                 search_threshold: number;
                 CustomerBillingObj: { subscription_type: string; note: string };
                 status: string;
+                label: string;
               }) => {
+                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
                 const optiondata: any = {
                   label: data.name,
                   id: data.id,
@@ -1159,7 +1163,8 @@ export default defineComponent({
                   tempDefaultOrg = optiondata;
                 }
 
-                return optiondata;
+                // Disambiguated label only for the dropdown entry — optiondata itself keeps the real name.
+                return { ...optiondata, label: data.label };
               },
             )
             .sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -1172,7 +1177,7 @@ export default defineComponent({
         }
 
         if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
-          let data = store.state.organizations[0];
+          let data = withDisambiguatedOrgLabels(store.state.organizations)[0];
           let optiondata = {
             label: data.name,
             id: data.id,

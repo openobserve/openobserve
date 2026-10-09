@@ -468,6 +468,7 @@ import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { shouldReloadStreamFieldsForVisualize } from "@/utils/logs/visualizeStreamFields";
+import { pruneInterestingFields } from "@/utils/logs/interestingFields";
 import useAiChat from "@/composables/useAiChat";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { onBeforeAppReload } from "@/utils/beforeAppReload";
@@ -1477,16 +1478,10 @@ export default defineComponent({
             }
 
             if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
-              const streamFieldNames: any = searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name,
+              pruneInterestingFields(
+                searchObj.data.stream.interestingFieldList,
+                searchObj.data.stream.selectedStreamFields,
               );
-
-              for (let i = searchObj.data.stream.interestingFieldList.length - 1; i >= 0; i--) {
-                const fieldName = searchObj.data.stream.interestingFieldList[i];
-                if (!streamFieldNames.includes(fieldName)) {
-                  searchObj.data.stream.interestingFieldList.splice(i, 1);
-                }
-              }
 
               if (
                 searchObj.data.stream.interestingFieldList.length > 0 &&
@@ -1832,6 +1827,13 @@ export default defineComponent({
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
+        // Guarded: pruning before the fields load would wipe the user's interesting fields.
+        if (searchObj.data.stream.selectedStreamFields?.length > 0) {
+          pruneInterestingFields(
+            searchObj.data.stream.interestingFieldList,
+            searchObj.data.stream.selectedStreamFields,
+          );
+        }
         if (searchObj.data.stream.interestingFieldList.length > 0) {
           field_list = searchObj.data.stream.interestingFieldList
             .map((field: string) => quoteSqlIdentifierIfNeeded(field))
