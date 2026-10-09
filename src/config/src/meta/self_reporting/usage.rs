@@ -311,6 +311,9 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
+    /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_attempted: Option<bool>,
 }
 
 impl Default for TriggerData {
@@ -350,6 +353,7 @@ impl Default for TriggerData {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         }
     }
 }
@@ -400,6 +404,7 @@ impl TriggerData {
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
+            delivery_attempted: Some(true),
         }
     }
 
@@ -1700,6 +1705,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2654,6 +2660,27 @@ mod tests {
                  `init_for_reflection` sets it, and a `triggers` schema without the column is a \
                  column the quota alert rule can never fire on"
             );
+        }
+    }
+
+    #[test]
+    fn trigger_data_delivery_attempted_reads_legacy_rows_as_unknown() {
+        let json =
+            serde_json::to_value(TriggerData::default()).expect("TriggerData must serialize");
+        assert!(json.get("delivery_attempted").is_none());
+        let legacy: TriggerData =
+            serde_json::from_value(json).expect("a row written before the field must deserialize");
+        assert_eq!(legacy.delivery_attempted, None);
+
+        for attempted in [true, false] {
+            let row = TriggerData {
+                delivery_attempted: Some(attempted),
+                ..TriggerData::default()
+            };
+            let json = serde_json::to_value(&row).expect("TriggerData must serialize");
+            assert_eq!(json["delivery_attempted"], attempted);
+            let back: TriggerData = serde_json::from_value(json).expect("must read back");
+            assert_eq!(back.delivery_attempted, Some(attempted));
         }
     }
 }

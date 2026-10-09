@@ -54,7 +54,7 @@ use crate::{
     alerts::{
         alert::{
             AlertError, AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
-            get_row_column_map,
+            get_row_column_map, send_attempted,
         },
         derived_streams::DerivedStreamExt,
     },
@@ -300,6 +300,8 @@ struct GroupDispatchOutcome {
     /// Group keys whose send succeeded. A dedup reservation is confirmed by
     /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
     delivered_groups: std::collections::HashSet<String>,
+    /// Whether any group's send dispatched a destination or workflow.
+    attempted: bool,
     /// The state layer failed, so nothing was even attempted. Distinct from
     /// "delivered nothing": a zero/zero result otherwise reads as a clean run
     /// and the caller would advance the trigger as if the alert had been
@@ -398,6 +400,7 @@ async fn dispatch_per_group(
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
+            attempted: false,
             state_failed: true,
         });
     }
@@ -412,6 +415,7 @@ async fn dispatch_per_group(
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
+                attempted: false,
                 state_failed: true,
             });
         }
@@ -472,6 +476,7 @@ async fn dispatch_per_group(
     let (mut delivered, mut failed) = (0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
     let mut delivered_groups: std::collections::HashSet<String> = Default::default();
+    let mut attempted = false;
     for item in &plan.items {
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
@@ -500,6 +505,7 @@ async fn dispatch_per_group(
         // be slow, and a window opened before its own notification landed can
         // expire while that notification is still in flight.
         let resolved_at = now_micros();
+        attempted |= send_attempted(&outcome);
 
         let ok = match outcome {
             Ok(outcome) => {
@@ -575,6 +581,7 @@ async fn dispatch_per_group(
         pending: plan.pending,
         errors,
         delivered_groups,
+        attempted,
         state_failed: false,
     })
 }
@@ -3138,6 +3145,7 @@ async fn handle_alert_triggers(
                         // Mark as suppressed for history tracking
                         trigger_data_stream.dedup_enabled = Some(true);
                         trigger_data_stream.dedup_suppressed = Some(true);
+                        trigger_data_stream.delivery_attempted = Some(false);
 
                         // All results were deduplicated, skip notification
                         // Still update the trigger timing
@@ -3234,6 +3242,7 @@ async fn handle_alert_triggers(
                     // (sent for new incidents/alert types, suppressed for repeats).
                     // The incident owns the resolve too, so the episode records it.
                     episode_incident_id = Some(correlated.outcome.incident_id().to_string());
+                    trigger_data_stream.delivery_attempted = Some(correlated.notify_attempted);
                     (true, correlated.notify_error)
                 }
                 Ok(None) => {
@@ -3355,6 +3364,7 @@ async fn handle_alert_triggers(
                 publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
+            trigger_data_stream.delivery_attempted = Some(dispatch.attempted);
             // MN-7: one record (D8) for the evaluation; per-group detail lives on each group's row.
             if let Some(status) = dispatch.history_status() {
                 trigger_data_stream.status = status;
@@ -3407,7 +3417,7 @@ async fn handle_alert_triggers(
             } else {
                 &trigger_data.notified_destinations
             };
-            match alert
+            let sent = alert
                 .send_notification(
                     &scheduler_trace_id,
                     &data,
@@ -3420,12 +3430,17 @@ async fn handle_alert_triggers(
                     skip_destinations,
                     episode_key.clone(),
                 )
-                .await
-            {
+                .await;
+            // The incident notification stamped above counts even if only workflows ran here.
+            trigger_data_stream.delivery_attempted = Some(
+                send_attempted(&sent) || trigger_data_stream.delivery_attempted.unwrap_or(false),
+            );
+            match sent {
                 Ok(outcome) => {
                     let NotificationOutcome {
                         succeeded,
                         failed,
+                        attempted: _,
                         success_message: success_msg,
                         error_message: err_msg,
                     } = outcome;
@@ -3633,6 +3648,7 @@ async fn handle_alert_triggers(
                 new_trigger.org,
                 new_trigger.module_key
             );
+            trigger_data_stream.delivery_attempted = Some(false);
         } else if trigger_results.frozen {
             // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
             // the outcome `should_persist` drops entirely, so BOTH state axes
@@ -6339,6 +6355,7 @@ mod tests {
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
             delivered_groups: std::collections::HashSet::new(),
+            attempted: false,
             state_failed: false,
         }
     }

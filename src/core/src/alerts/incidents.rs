@@ -81,6 +81,8 @@ pub struct CorrelatedIncident {
     pub outcome: IncidentCorrelationOutcome,
     /// `None` when every destination was notified, or no notification was due.
     pub notify_error: Option<String>,
+    /// Whether a notification was due and had a destination to go to.
+    pub notify_attempted: bool,
 }
 
 /// Combined correlation result from both Service Discovery and semantic extraction
@@ -771,6 +773,7 @@ pub async fn correlate_alert_to_incident(
     // Send incident notification unless rows are empty (manual trigger path)
     // or the outcome is a repeated alert (suppressed by design).
     let mut notify_error = None;
+    let mut notify_attempted = false;
     if !notify_rows.is_empty() {
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
@@ -784,6 +787,7 @@ pub async fn correlate_alert_to_incident(
                 let merged_destinations =
                     collect_incident_destinations(&alert.org_id, incident_id, &alert.destinations)
                         .await;
+                notify_attempted = !merged_destinations.is_empty();
                 notify_error = send_incident_notifications(
                     alert,
                     incident_id,
@@ -804,6 +808,7 @@ pub async fn correlate_alert_to_incident(
     Ok(Some(CorrelatedIncident {
         outcome,
         notify_error,
+        notify_attempted,
     }))
 }
 
