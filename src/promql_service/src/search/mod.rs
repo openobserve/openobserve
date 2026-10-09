@@ -74,6 +74,20 @@ pub async fn init() -> Result<()> {
     Ok(())
 }
 
+pub async fn search_rule(
+    trace_id: &str,
+    org_id: &str,
+    req: &MetricsQueryRequest,
+    user_email: &str,
+    timeout: i64,
+    is_super_cluster: bool,
+) -> Result<Value> {
+    let limit = get_max_series_limit(org_id).await;
+    let value = search(trace_id, org_id, req, user_email, timeout, is_super_cluster).await?;
+    ensure_rule_reply_complete(&value, limit.min(get_max_series_limit(org_id).await))?;
+    Ok(value)
+}
+
 #[tracing::instrument(skip_all, fields(org_id = org_id))]
 pub async fn search(
     trace_id: &str,
@@ -748,6 +762,17 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
     Ok(value)
 }
 
+fn ensure_rule_reply_complete(value: &Value, max_limit: usize) -> Result<()> {
+    if let Value::Vector(series) = value
+        && series.len() >= max_limit
+    {
+        return Err(server_internal_error(format!(
+            "Incomplete PromQL rule evaluation: response reached the {max_limit} series response limit; increase the organization or system limit"
+        )));
+    }
+    Ok(())
+}
+
 /// Get the maximum series limit for the organization.
 ///
 /// Fetches the org-specific setting if available, otherwise falls back
@@ -1004,5 +1029,19 @@ mod tests {
             let value = merge_vector_series(&response.series, query, 2);
             assert_eq!(instances(value), expected, "{query}");
         }
+    }
+    #[test]
+    fn test_rule_reply_at_response_cap_cannot_prove_absence() {
+        let series = InstantValue {
+            labels: vec![],
+            sample: Sample::new(600, f64::NAN),
+        };
+        assert!(ensure_rule_reply_complete(&Value::Vector(vec![series.clone()]), 2).is_ok());
+        assert!(ensure_rule_reply_complete(&Value::Vector(vec![series.clone()]), 1).is_err());
+        assert!(
+            ensure_rule_reply_complete(&Value::Vector(vec![series.clone(), series]), 1).is_err()
+        );
+        assert!(ensure_rule_reply_complete(&Value::Vector(vec![]), 1).is_ok());
+        assert!(ensure_rule_reply_complete(&Value::Vector(vec![]), 0).is_err());
     }
 }

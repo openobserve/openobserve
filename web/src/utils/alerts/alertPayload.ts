@@ -39,6 +39,9 @@ export interface PayloadFormData {
     aggregation?: any;
     conditions: any[];
     promql_condition?: any;
+    prom_rule_mode?: boolean;
+    promql_multi_alert?: boolean;
+    promql_warning_value?: number | string | null;
     sql: string;
     vrl_function?: string | null;
     multi_time_range?: any[] | null;
@@ -214,6 +217,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
     payload.query_condition.promql_condition = null;
+    payload.query_condition.prom_rule_mode = false;
   }
 
   // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF

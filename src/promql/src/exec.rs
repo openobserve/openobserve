@@ -634,4 +634,149 @@ mod tests {
             ["host1a", "host10a", "host2a", "host2b"]
         );
     }
+    struct RuleSamplesProvider {
+        rows: Vec<(i64, f64)>,
+        requested: Arc<std::sync::Mutex<Option<(i64, i64)>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl TableProvider for RuleSamplesProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream: &str,
+            time_range: (i64, i64),
+            _matchers: promql_parser::label::Matchers,
+            _labels: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+            _streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+                datatypes::{DataType, Field, Schema},
+            };
+            *self.requested.lock().unwrap() = Some(time_range);
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+            ]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(
+                        self.rows.iter().map(|r| r.0).collect::<Vec<_>>(),
+                    )),
+                    Arc::new(Float64Array::from(
+                        self.rows.iter().map(|r| r.1).collect::<Vec<_>>(),
+                    )),
+                    Arc::new(UInt64Array::from(vec![7; self.rows.len()])),
+                ],
+            )
+            .unwrap();
+            let ctx = datafusion::prelude::SessionContext::new();
+            ctx.register_batch(stream, batch).unwrap();
+            Ok(vec![crate::ScanContext::table(
+                ctx,
+                schema,
+                ScanStats::default(),
+                true,
+            )])
+        }
+    }
+
+    async fn rule_instant(query: &str, rows: Vec<(i64, f64)>, at: i64) -> Value {
+        let requested = Arc::new(std::sync::Mutex::new(None));
+        let query_ctx = crate::engine::tests::create_test_query_ctx("rule-lookback", "org", 30);
+        let mut ctx = PromqlContext::new(
+            query_ctx,
+            RuleSamplesProvider {
+                rows,
+                requested: requested.clone(),
+            },
+            vec![],
+        );
+        let time = std::time::UNIX_EPOCH + Duration::from_micros(at as u64);
+        let (value, result_type, _) = ctx
+            .exec(
+                "rule-lookback",
+                EvalStmt {
+                    expr: parser::parse(query).unwrap(),
+                    start: time,
+                    end: time,
+                    interval: crate::MINIMAL_INTERVAL,
+                    lookback_delta: DEFAULT_LOOKBACK,
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(result_type.as_deref(), Some("vector"));
+        assert_eq!(*requested.lock().unwrap(), Some((at - 300_000_000, at)));
+        value
+    }
+
+    #[tokio::test]
+    async fn test_rule_instant_path_uses_default_lookback_and_latest_valid_sample() {
+        let at = WINDOW_START + 10 * 60 * MINUTE;
+        let value = rule_instant(
+            "foo",
+            vec![
+                (at - 45_000_000, 1.0),
+                (at - 15_000_000, 2.0),
+                (at + 1_000_000, 3.0),
+            ],
+            at,
+        )
+        .await;
+        let Value::Vector(series) = value else {
+            panic!("expected vector");
+        };
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].sample.timestamp, at);
+        assert_eq!(series[0].sample.value, 2.0);
+    }
+
+    #[tokio::test]
+    async fn test_rule_instant_path_excludes_future_expired_and_stale_samples() {
+        let at = WINDOW_START + 10 * 60 * MINUTE;
+        for rows in [
+            vec![(at + 1_000_000, 1.0)],
+            vec![(at - 300_000_000, 1.0)],
+            vec![(at - 301_000_000, 1.0)],
+            vec![
+                (at - 30_000_000, 1.0),
+                (
+                    at - 15_000_000,
+                    f64::from_bits(config::meta::promql::STALE_NAN_BITS),
+                ),
+            ],
+        ] {
+            let result = rule_instant("foo", rows, at).await;
+            assert!(
+                matches!(result, Value::Vector(ref v) if v.is_empty())
+                    || matches!(result, Value::None)
+            );
+        }
+        let value = rule_instant("foo", vec![(at - 15_000_000, f64::NAN)], at).await;
+        let Value::Vector(series) = value else {
+            panic!("expected non-stale NaN series");
+        };
+        assert!(series[0].sample.value.is_nan());
+    }
+
+    #[tokio::test]
+    async fn test_rule_instant_path_keeps_expression_rate_window() {
+        let at = WINDOW_START + 10 * 60 * MINUTE;
+        let value = rule_instant(
+            "rate(foo[5m])",
+            vec![(at - 60_000_000, 60.0), (at - 15_000_000, 105.0)],
+            at,
+        )
+        .await;
+        let Value::Vector(series) = value else {
+            panic!("expected rate vector");
+        };
+        assert_eq!(series.len(), 1);
+        assert!(series[0].sample.value > 0.0);
+    }
 }

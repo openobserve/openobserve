@@ -44,6 +44,9 @@ vi.mock("@/services/search", async (importOriginal) => {
       result_schema: vi.fn().mockResolvedValue({
         data: { group_by: [], projections: [], timeseries_field: null },
       }),
+      metrics_query: vi.fn().mockResolvedValue({
+        data: { status: "success", data: { resultType: "vector", result: [] } },
+      }),
       search: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }),
     },
   });
@@ -2622,6 +2625,43 @@ describe("PreviewAlert - Forecast mode", () => {
     expect(w.vm.dashboardPanelData?.data?.queries?.[0]?.config?.promql_legend_fallback).toBe(
       "days until 1500",
     );
+    w.unmount();
+  });
+});
+
+describe("PromQL rule preview", () => {
+  it("uses an instant reply and never classifies chart NaN/Inf as missing", async () => {
+    vi.mocked(searchService.metrics_query).mockResolvedValue({
+      data: {
+        status: "success",
+        data: {
+          resultType: "vector",
+          result: [
+            { metric: { host: "a" }, value: [600, "NaN"] },
+            { metric: { host: "b" }, value: [600, "+Inf"] },
+          ],
+        },
+      },
+    } as any);
+    const w = await mountComp({
+      selectedTab: "promql",
+      query: "foo > 0",
+      formData: {
+        stream_name: "",
+        stream_type: "metrics",
+        trigger_condition: { period: 5, threshold: 1, operator: ">=" },
+        query_condition: { prom_rule_mode: true, promql_multi_alert: true, promql_condition: null },
+      },
+    });
+    await flushPromises();
+    expect(searchService.metrics_query).toHaveBeenCalled();
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
+    expect(w.vm.evaluationStatus?.reason).toContain("2 returned series");
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: [] },
+    });
+    await nextTick();
+    expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
     w.unmount();
   });
 });

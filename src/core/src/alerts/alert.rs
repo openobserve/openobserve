@@ -191,6 +191,8 @@ pub enum AlertError {
     #[error("Alert destination {dest} not found")]
     AlertDestinationNotFound { dest: String },
 
+    #[error("Cannot infer a referenced metrics stream for PromQL rule: {0}")]
+    PromRuleStreamMissing(String),
     #[error("Stream {stream_name} not found")]
     StreamNotFound { stream_name: String },
 
@@ -424,6 +426,11 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 // the size from this lint); boxing the error is not worth the churn here.
 #[allow(clippy::result_large_err)]
 fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
+    if alert.query_condition.prom_rule_mode && alert.stream_type != StreamType::Metrics {
+        return Err(AlertError::PromRuleStreamMissing(
+            "rule mode requires stream_type=metrics".into(),
+        ));
+    }
     config::meta::alerts::grouping::validate_multi_alert(
         &alert.query_condition,
         &alert.trigger_condition,
@@ -632,7 +639,22 @@ async fn prepare_alert(
         return Err(AlertError::AlertNameOfgaUnsupported);
     }
     alert.org_id = org_id.to_string();
+    if alert.query_condition.query_type == QueryType::PromQL
+        && !alert.query_condition.prom_rule_mode
+        && alert.query_condition.promql_condition.is_none()
+    {
+        return Err(AlertError::PromqlMissingQuery);
+    }
+
     let stream_type = alert.stream_type;
+    let stream_name = if stream_name.is_empty() && alert.query_condition.prom_rule_mode {
+        super::prom_rule::infer_stream(org_id, &alert.query_condition)
+            .await
+            .map_err(|e| AlertError::PromRuleStreamMissing(e.to_string()))?
+    } else {
+        stream_name.to_string()
+    };
+    let stream_name = stream_name.as_str();
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
@@ -813,6 +835,7 @@ async fn prepare_alert(
         if let Some(settings) = unwrap_stream_settings(&schema) {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
+                && !alert.query_condition.prom_rule_mode
                 && !alert.is_real_time
                 && alert.trigger_condition.period > max_query_range * 60
             {
@@ -1020,7 +1043,8 @@ async fn prepare_alert(
         QueryType::PromQL
             if (alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()) =>
+                || (!alert.query_condition.prom_rule_mode
+                    && alert.query_condition.promql_condition.is_none())) =>
         {
             return Err(AlertError::PromqlMissingQuery);
         }
@@ -2756,7 +2780,14 @@ impl AlertExt for Alert {
                     "alert_operator",
                     self.trigger_condition.operator.to_string().into(),
                 ),
-                ("alert_threshold", self.trigger_condition.threshold.into()),
+                (
+                    "alert_threshold",
+                    if self.query_condition.prom_rule_mode {
+                        Value::String(String::new())
+                    } else {
+                        self.trigger_condition.threshold.into()
+                    },
+                ),
                 (
                     "alert_count",
                     workflow_alert_count(self, rows.len(), actual_value),
@@ -3694,7 +3725,11 @@ fn process_row_templates_plain(
             )
             .replace(
                 "{alert_threshold}",
-                &alert.trigger_condition.threshold.to_string(),
+                &if alert.query_condition.prom_rule_mode {
+                    String::new()
+                } else {
+                    alert.trigger_condition.threshold.to_string()
+                },
             )
             .replace("{alert_count}", &alert_count.to_string())
             .replace(
@@ -3768,7 +3803,8 @@ fn workflow_alert_count(alert: &Alert, rows_len: usize, actual_value: Option<f64
     // `rows_len` caps at 100 and any Branch above it is a dead path.
     // Aggregation/PromQL payloads are groups/series; their length stands.
     let is_count_family = alert.query_condition.aggregation.is_none()
-        && alert.query_condition.promql_condition.is_none();
+        && alert.query_condition.promql_condition.is_none()
+        && !alert.query_condition.prom_rule_mode;
     match actual_value {
         Some(v) if is_count_family && v.is_finite() && v.fract() == 0.0 && v >= 0.0 => {
             Value::from(v as u64)
@@ -3856,7 +3892,8 @@ async fn build_notification_context(
     // payload, so `rows.len()` would render 48,213 real matches as "100".
     // Aggregation/PromQL payloads are groups/series; their length stands.
     let is_count_family = alert.query_condition.aggregation.is_none()
-        && alert.query_condition.promql_condition.is_none();
+        && alert.query_condition.promql_condition.is_none()
+        && !alert.query_condition.prom_rule_mode;
     let alert_count = match actual_value {
         Some(v) if is_count_family => fmt_observed(v),
         _ => rows.len().to_string(),
@@ -4050,9 +4087,21 @@ async fn build_notification_context(
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
-        alert_threshold: alert.trigger_condition.threshold.to_string(),
+        alert_threshold: if alert.query_condition.prom_rule_mode {
+            String::new()
+        } else {
+            alert.trigger_condition.threshold.to_string()
+        },
         alert_count,
-        alert_agg_value: format_agg_value(actual_value),
+        alert_agg_value: if alert.query_condition.prom_rule_mode {
+            rows.first()
+                .and_then(|r| r.get("value"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        } else {
+            format_agg_value(actual_value)
+        },
         alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
         alert_status: if resolved {
             crate::alerts::notifications::STATUS_RESOLVED
@@ -4063,7 +4112,11 @@ async fn build_notification_context(
         episode_id,
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
-        alert_threshold_crit: fmt_observed(family_crit),
+        alert_threshold_crit: if alert.query_condition.prom_rule_mode {
+            String::new()
+        } else {
+            fmt_observed(family_crit)
+        },
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
@@ -8545,5 +8598,48 @@ mod modifier_tests {
                 "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
             })]
         );
+    }
+}
+
+#[cfg(test)]
+mod rule_notification_tests {
+    use config::utils::json::json;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn rule_notifications_preserve_strings_and_render_empty_thresholds() {
+        let mut alert = Alert::default();
+        alert.query_condition.prom_rule_mode = true;
+        for value in ["NaN", "+Inf", "-Inf", "0.125"] {
+            let rows = vec![Map::from_iter([("value".into(), json!(value))])];
+            let options = ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: Some(config::meta::alerts::level::AlertLevel::Critical),
+                actual_value: Some(0.0),
+                episode_id: None,
+                resolved: false,
+            };
+            let result = process_dest_template("org", r#"{"value":"{value}","observed":"{alert_agg_value}","threshold":"{alert_threshold}"}"#,
+                &alert, &rows, &[], options, &hashbrown::HashMap::new(), None).await;
+            let parsed: Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["value"], value);
+            assert_eq!(parsed["observed"], value);
+            assert_eq!(parsed["threshold"], "");
+        }
+    }
+    #[tokio::test]
+    async fn rule_opt_out_missing_condition_keeps_operator_fallback_error() {
+        let mut alert = Alert::default();
+        alert.name = "ordinary-promql".into();
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql = Some("foo > 4".into());
+        let error = prepare_alert("org", "foo", "ordinary-promql", &mut alert, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, AlertError::PromqlMissingQuery));
     }
 }

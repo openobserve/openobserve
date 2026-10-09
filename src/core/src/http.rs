@@ -85,6 +85,7 @@ impl From<AlertError> for Response {
             | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
+            | AlertError::PromRuleStreamMissing(_)
             | AlertError::PromqlMissingQuery
             | AlertError::SqlUnsupportedQueryType { .. }
             | AlertError::PeriodExceedsMaxQueryRange { .. }

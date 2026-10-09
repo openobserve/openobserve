@@ -1565,11 +1565,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
+              <div
+                v-if="localTab === 'promql' && !isForecastMode"
+                class="flex flex-col gap-1 px-3 py-2"
+              >
+                <OFormSwitch
+                  name="query_condition.prom_rule_mode"
+                  :label="t('alerts.promRuleMode')"
+                  data-test="alert-prom-rule-mode"
+                  @update:model-value="onPromRuleModeChange"
+                />
+                <p class="text-text-secondary text-xs">{{ t("alerts.promRuleModeDescription") }}</p>
+              </div>
               <ForecastAlertFields v-if="localTab === 'promql' && isForecastMode" />
 
               <!-- PromQL: Alert if the value is + Having series -->
-              <template v-else-if="localTab === 'promql' && promqlCondition">
+              <template v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)">
                 <div
+                  v-if="!isPromRuleMode"
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
@@ -1680,6 +1693,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      `by (…)` clause, so the choice is always offered once a
                      condition exists to classify each series against. -->
                 <AlertMultiToggle
+                  v-if="!isPromRuleMode"
                   :enabled="isPromqlMultiAlert"
                   name="query_condition.promql_multi_alert"
                   unit="series"
@@ -1815,6 +1829,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
@@ -1853,6 +1868,7 @@ export default defineComponent({
     OToggleGroupItem,
     OSelect,
     OSwitch,
+    OFormSwitch,
     OTooltip,
     OIcon,
     OFormInput,
@@ -2592,6 +2608,22 @@ export default defineComponent({
       (s: any) => !!s.values?.query_condition?.promql_multi_alert,
     );
     const isPromqlMultiAlert = computed(() => promqlMultiAlertStore.value);
+    const promRuleModeStore = form.useStore(
+      (s: any) => !!s.values?.query_condition?.prom_rule_mode,
+    );
+    const isPromRuleMode = computed(() => promRuleModeStore.value);
+    const onPromRuleModeChange = (enabled: unknown) => {
+      if (enabled) {
+        setFV("query_condition.promql_condition", null);
+        setFV("query_condition.promql_warning_value", null);
+        setFV("trigger_condition.warning_threshold", null);
+        setFV("query_condition.promql_multi_alert", true);
+        setFV("trigger_condition.operator", ">=");
+        setFV("trigger_condition.threshold", 1);
+      } else {
+        setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
+      }
+    };
 
     // Forecast mode edits U and a few fields; the PromQL and its condition are generated from them.
     const forecastStore = form.useStore((s: any) => s.values?._ui?.forecast ?? null);
@@ -2611,6 +2643,7 @@ export default defineComponent({
     const THRESHOLD_FIELDS = [
       "query_condition.promql_condition",
       "query_condition.promql_multi_alert",
+      "query_condition.prom_rule_mode",
       "query_condition.promql_warning_value",
       "trigger_condition.threshold",
       "trigger_condition.operator",
@@ -2655,6 +2688,7 @@ export default defineComponent({
           H: 7,
         },
       );
+      setFV("query_condition.prom_rule_mode", false);
       setFV("trigger_condition.period", FORECAST_PERIOD_MINUTES);
       if (frequencyMode.value === "minutes") {
         checkEveryFrequency.value = FORECAST_FREQUENCY_MINUTES;
@@ -3873,6 +3907,8 @@ export default defineComponent({
       onMultiAlertChange,
       onSqlMultiAlertChange,
       isPromqlMultiAlert,
+      isPromRuleMode,
+      onPromRuleModeChange,
       onPromqlMultiAlertChange,
       checkEveryFrequency,
       onCheckEveryChange,

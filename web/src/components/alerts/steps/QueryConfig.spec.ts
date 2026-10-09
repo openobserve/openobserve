@@ -891,6 +891,26 @@ describe("QueryConfig.vue", () => {
       await flushPromises();
     });
 
+    it("rule mode clears thresholds, selects per-series and preserves frequency", async () => {
+      const previousFrequency = hostForm().state.values.trigger_condition.frequency;
+      hostForm().setFieldValue("query_condition.promql_warning_value", 4);
+      await flushPromises();
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      const value = hostForm().state.values;
+      expect(value.query_condition.prom_rule_mode).toBe(true);
+      expect(value.query_condition.promql_condition).toBeNull();
+      expect(value.query_condition.promql_warning_value).toBeNull();
+      expect(value.query_condition.promql_multi_alert).toBe(true);
+      expect(value.trigger_condition.frequency).toBe(previousFrequency);
+      expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(false);
+      expect(await submit()).toBe(true);
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.prom_rule_mode).toBe(false);
+      expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
+    });
+
     it("passes with a complete promql condition (§4 restore)", async () => {
       hostForm().setFieldValue("query_condition.promql_condition", {
         operator: ">=",

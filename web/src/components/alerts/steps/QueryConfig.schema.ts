@@ -288,6 +288,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
             .optional(),
           /** Optional PromQL-value WARNING (shares promql_condition.operator). */
           promql_warning_value: z.unknown().optional(),
+          prom_rule_mode: z.boolean().optional(),
+          promql_multi_alert: z.boolean().optional(),
         })
         .optional(),
       /** Logs/traces group-by lives on its own field (metrics group-by lives on
@@ -440,7 +442,11 @@ export const makeQueryConfigSchema = (t: Translator) =>
         }
       }
       // PromQL family: promql_warning_value vs promql_condition. Forecast mode has no warning.
-      if (isPromql && !(val._ui as Record<string, any> | undefined)?.forecast) {
+      if (
+        isPromql &&
+        !qc.prom_rule_mode &&
+        !(val._ui as Record<string, any> | undefined)?.forecast
+      ) {
         const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
         const msg = matrixIssue(qc.promql_warning_value, pc.value, pc.operator);
         if (msg) {
@@ -453,7 +459,21 @@ export const makeQueryConfigSchema = (t: Translator) =>
       }
 
       // ── PromQL branch ────────────────────────────────────────────────────────
-      if (isPromql) {
+      if (isPromql && qc.prom_rule_mode) {
+        if (
+          !qc.promql_multi_alert ||
+          qc.promql_condition != null ||
+          !isBlank(qc.promql_warning_value) ||
+          !isBlank(tc.warning_threshold)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "prom_rule_mode"],
+            message: t("alerts.promRuleModeConflict"),
+          });
+        }
+      }
+      if (isPromql && !qc.prom_rule_mode) {
         const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
         if (!pc.operator) {
           ctx.addIssue({
@@ -594,6 +614,8 @@ export const queryConfigDefaults = (args: {
       },
       aggregation: inputData.aggregation ?? null,
       promql_condition: inputData.promql_condition ?? null,
+      prom_rule_mode: inputData.prom_rule_mode ?? false,
+      promql_multi_alert: inputData.promql_multi_alert ?? false,
     },
     logGroupBy: [...args.logGroupBy],
     _meta: { ...args.meta },

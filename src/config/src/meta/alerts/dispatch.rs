@@ -362,6 +362,7 @@ pub fn delivery_failure_update(
         at: failed_at,
         // A delivery failure is not an observation.
         value: None,
+        rule_value: None,
         group_labels: current.group_labels.clone(),
     });
 

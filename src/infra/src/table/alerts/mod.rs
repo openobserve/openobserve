@@ -148,6 +148,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             // NULL is `false`: every alert written before the column existed
             // keeps its collapsed evaluation.
             promql_multi_alert: value.query_promql_multi_alert.unwrap_or(false),
+            prom_rule_mode: value.query_prom_rule_mode.unwrap_or(false),
             aggregation: query_aggregation.map(|a| a.into()),
             vrl_function: value.query_vrl_function,
             search_event_type: query_search_event_type.map(|t| t.into()),
@@ -1027,6 +1028,7 @@ fn update_mutable_fields(
     // Written as NULL when off, so the column reads the same for an alert that
     // opted out and one that predates the feature.
     alert_am.query_promql_multi_alert = Set(promql_multi_alert.then_some(true));
+    alert_am.query_prom_rule_mode = Set(alert.query_condition.prom_rule_mode.then_some(true));
     alert_am.query_slo_condition = Set(query_slo_condition);
     alert_am.slo_id = Set(slo_id);
     alert_am.oncall_team = Set(alert.oncall_team.clone());
@@ -1117,6 +1119,7 @@ pub(super) mod tests {
             query_promql_condition: None,
             query_aggregation: None,
             query_promql_multi_alert: None,
+            query_prom_rule_mode: None,
             query_vrl_function: None,
             query_search_event_type: None,
             query_multi_time_range: None,
@@ -2328,5 +2331,26 @@ pub(super) mod tests {
 
             assert_eq!(ids_of(&db, params).await, vec![a1]);
         }
+    }
+    #[test]
+    fn test_rule_mode_column_defaults_off_and_loads_opt_in() {
+        let mut m = make_model(&Ksuid::new(None, None).to_string());
+        m.query_prom_rule_mode = None;
+        let alert = MetaAlert::try_from(m.clone()).unwrap();
+        assert!(!alert.query_condition.prom_rule_mode);
+        m.query_prom_rule_mode = Some(true);
+        let alert = MetaAlert::try_from(m).unwrap();
+        assert!(alert.query_condition.prom_rule_mode);
+    }
+    #[test]
+    fn test_rule_mode_writes_the_nullable_opt_in_column() {
+        let mut alert =
+            MetaAlert::try_from(make_model(&Ksuid::new(None, None).to_string())).unwrap();
+        let mut active: alerts::ActiveModel = Default::default();
+        update_mutable_fields(&mut active, alert.clone()).unwrap();
+        assert_eq!(active.query_prom_rule_mode, Set(None));
+        alert.query_condition.prom_rule_mode = true;
+        update_mutable_fields(&mut active, alert).unwrap();
+        assert_eq!(active.query_prom_rule_mode, Set(Some(true)));
     }
 }
