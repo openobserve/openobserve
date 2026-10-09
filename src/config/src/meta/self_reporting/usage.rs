@@ -311,8 +311,7 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
-    /// Whether a firing actually tried a destination, workflow or incident page; absent on legacy
-    /// rows.
+    /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_attempted: Option<bool>,
 }

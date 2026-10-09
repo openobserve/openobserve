@@ -3431,7 +3431,7 @@ async fn handle_alert_triggers(
                     episode_key.clone(),
                 )
                 .await;
-            // The incident page stamped above counts even if only workflows ran here.
+            // The incident notification stamped above counts even if only workflows ran here.
             trigger_data_stream.delivery_attempted = Some(
                 send_attempted(&sent) || trigger_data_stream.delivery_attempted.unwrap_or(false),
             );
