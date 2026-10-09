@@ -1124,6 +1124,34 @@ pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
     cron_exp
 }
 
+/// Runs the checks [`create`] (given a folder) or [`update`] makes on a copy, writing nothing.
+pub async fn validate_save(
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: &Alert,
+    create: bool,
+    overwrite: bool,
+) -> Result<Alert, AlertError> {
+    if let Some(folder_id) = folder_id
+        && folder_id != DEFAULT_FOLDER
+        && !table::folders::exists(org_id, folder_id, FolderType::Alerts).await?
+    {
+        return Err(AlertError::CreateFolderNotFound);
+    }
+    let mut prepared = alert.clone();
+    // nothing is written here, so the SLO effect that follows a write is dropped unapplied
+    let _ = prepare_alert(
+        org_id,
+        &alert.stream_name,
+        &alert.name,
+        &mut prepared,
+        create,
+        overwrite,
+    )
+    .await?;
+    Ok(prepared)
+}
+
 /// Creates a new alert in the specified folder.
 pub async fn create<C: TransactionTrait>(
     conn: &C,
