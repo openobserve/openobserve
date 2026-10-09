@@ -56,6 +56,8 @@ import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
+import { promRulePreviewQuery } from "@/services/alerts.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -1089,6 +1091,7 @@ const evaluateAndSetStatus = (resultCount: number) => {
 const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (writeRealTimeStatus()) return;
 
+  if (props.formData.query_condition?.prom_rule_mode) return;
   const promqlCondition = props.formData.query_condition?.promql_condition;
   const critical = finiteThreshold(promqlCondition?.value);
   const warning = finiteThreshold(props.formData.query_condition?.promql_warning_value);
@@ -1230,6 +1233,30 @@ const handleSeriesDataUpdate = (seriesData: any) => {
   }
 };
 
+let rulePreviewGeneration = 0;
+const refreshRulePreview = async (at: number) => {
+  const generation = ++rulePreviewGeneration;
+  const expression = props.query;
+  evaluationStatus.value = null;
+  try {
+    const count = await queryClient.fetchQuery(
+      promRulePreviewQuery(store.state.selectedOrganization.identifier, expression, at),
+    );
+    if (
+      generation !== rulePreviewGeneration ||
+      expression !== props.query ||
+      !props.formData.query_condition?.prom_rule_mode
+    )
+      return;
+    evaluationStatus.value = {
+      wouldTrigger: count > 0,
+      reason: t("alerts.promRulePreview", { count }),
+    };
+  } catch {
+    if (generation === rulePreviewGeneration) evaluationStatus.value = null;
+  }
+};
+
 const refreshData = () => {
   // Skip if there is no query to run (e.g. user switched to SQL/PromQL
   // without writing a query yet, or closed the editor with an empty query).
@@ -1246,6 +1273,9 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
+  if (props.selectedTab === "promql" && props.formData.query_condition?.prom_rule_mode)
+    void refreshRulePreview(endTime / 1_000_000);
+  else rulePreviewGeneration++;
 
   // Priority order for time range:
   // 1. Use env variable ZO_ALERT_PREVIEW_TIMERANGE_MINUTES if set and > 0
@@ -1449,6 +1479,7 @@ watch(
     props.formData.trigger_condition?.threshold,
     props.formData.trigger_condition?.operator,
     props.formData.query_condition?.promql_condition?.value,
+    props.formData.query_condition?.prom_rule_mode,
     props.selectedTab,
     props.isUsingBackendSql,
   ],
@@ -1485,6 +1516,7 @@ watch(
 onMounted(() => {
   // Skip for PromQL to avoid duplicate API calls (watchers handle it)
   if (props.selectedTab === "promql") {
+    if (props.formData.query_condition?.prom_rule_mode) refreshDataOnce();
     return;
   }
   if (props.query) {

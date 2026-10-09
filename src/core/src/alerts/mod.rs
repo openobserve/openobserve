@@ -57,6 +57,7 @@ pub mod incidents;
 pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
+mod prom_rule;
 pub mod recovery;
 pub mod scheduler;
 pub mod templates;
@@ -164,6 +165,16 @@ impl QueryConditionExt for QueryCondition {
                 return Ok(eval_results);
             }
             QueryType::PromQL => {
+                if self.prom_rule_mode {
+                    return prom_rule::evaluate(
+                        self,
+                        org_id,
+                        end_time,
+                        &trace_id,
+                        search_event_context,
+                    )
+                    .await;
+                }
                 let Some(v) = self.promql.as_ref() else {
                     return Ok(eval_results);
                 };

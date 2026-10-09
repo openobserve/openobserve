@@ -40,6 +40,7 @@ pub mod grouping;
 pub mod incidents;
 pub mod level;
 pub mod priority;
+pub mod prom_rule;
 pub mod recovery;
 pub mod state;
 pub mod state_level;
@@ -431,6 +432,8 @@ pub struct TriggerEvalResults {
     /// show "112 vs 100". For count alerts this is a LOWER BOUND once the
     /// search cap is reached (`alerts_2.md` §7.5).
     pub actual_value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_value: Option<String>,
     /// Which group/series produced `actual_value` ("host=b,region=eu"), for
     /// grouped aggregation and PromQL alerts (T-9). `None` for count alerts —
     /// a row count has no group identity.
@@ -531,6 +534,8 @@ pub struct QueryCondition {
     /// alert that happens to be unaggregated.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub prom_rule_mode: bool,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
@@ -3104,5 +3109,22 @@ mod test {
     fn get_timezone_from_string_falls_back_to_utc_for_a_full_day_offset() {
         assert_eq!(get_timezone_from_string(None, 1440), Err(Utc.fix()));
         assert_eq!(get_timezone_from_string(None, i32::MAX), Err(Utc.fix()));
+    }
+    #[test]
+    fn test_rule_mode_is_explicit_and_defaults_off() {
+        let query: QueryCondition =
+            serde_json::from_value(serde_json::json!({"type":"promql","promql":"foo > 0"}))
+                .unwrap();
+        assert!(!query.prom_rule_mode);
+        let query = QueryCondition {
+            prom_rule_mode: true,
+            promql_multi_alert: true,
+            query_type: QueryType::PromQL,
+            ..Default::default()
+        };
+        let round_trip: QueryCondition =
+            serde_json::from_value(serde_json::to_value(&query).unwrap()).unwrap();
+        assert!(round_trip.prom_rule_mode);
+        assert!(round_trip.promql_multi_alert);
     }
 }
