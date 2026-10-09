@@ -209,6 +209,7 @@ mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
+mod m20261008_000001_add_name_to_rum_pa_tombstones;
 mod m20261009_000001_create_downtimes;
 mod m20261009_000002_add_muted_by_downtime_id_to_alert_incidents;
 mod m20261009_000003_add_last_downtime_id_to_alert_states;
@@ -337,8 +338,12 @@ pub(crate) async fn create_downtime_notifications_for_test(
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_rum_pa_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
     m20261003_000001_create_rum_pa_tables::Migration
-        .up(&SchemaManager::new(db))
+        .up(&manager)
+        .await?;
+    m20261008_000001_add_name_to_rum_pa_tombstones::Migration
+        .up(&manager)
         .await
 }
 
@@ -539,6 +544,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
+            Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
             Box::new(m20261009_000001_create_downtimes::Migration),
             Box::new(m20261009_000002_add_muted_by_downtime_id_to_alert_incidents::Migration),
             Box::new(m20261009_000003_add_last_downtime_id_to_alert_states::Migration),
@@ -601,8 +607,9 @@ mod tests {
         (96, "m20261003_000001_create_rum_pa_tables"),
         (97, "m20261004_000001_create_query_history"),
         (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
-        (99, "m20261009_000004_add_kind_to_slo_backfill_jobs"),
-        (100, "m20261009_000005_create_downtime_notifications"),
+        (99, "m20261008_000001_add_name_to_rum_pa_tombstones"),
+        (100, "m20261009_000004_add_kind_to_slo_backfill_jobs"),
+        (101, "m20261009_000005_create_downtime_notifications"),
     ];
 
     #[test]

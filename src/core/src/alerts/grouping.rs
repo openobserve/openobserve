@@ -168,6 +168,7 @@ fn stamp_flush_error(rows: &mut [TriggerData], error: &anyhow::Error) {
     for row in rows {
         row.status = RunOutcome::NotifyFailed;
         row.error = Some(text.clone());
+        row.delivery_attempted = Some(true);
     }
 }
 
@@ -326,6 +327,7 @@ pub fn refused_row(trigger_data: &TriggerData) -> TriggerData {
              notification was sent"
                 .to_string(),
         ),
+        delivery_attempted: Some(false),
         ..trigger_data.clone()
     }
 }
@@ -337,11 +339,12 @@ pub async fn flush_batch(trace_id: &str, batch: PendingBatch) -> bool {
     flush_decided(trace_id, batch, decisions).await
 }
 
+/// Sends one batch's notification; `Ok` says whether any destination or workflow was tried.
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification(
     trace_id: &str,
     batch: crate::alerts::grouping::PendingBatch,
-) -> Result<(), anyhow::Error> {
+) -> Result<bool, anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
 
     use crate::alerts::alert::AlertExt;
@@ -530,7 +533,7 @@ pub async fn send_grouped_notification(
                 batch.fingerprint,
                 success_msg
             );
-            Ok(())
+            Ok(outcome.attempted)
         }
         Err(e) => {
             log::error!(
@@ -561,7 +564,12 @@ async fn flush_decided(
     }
     let mut rows = flush_rows(&batch);
     let delivered = match send_grouped_notification(trace_id, batch).await {
-        Ok(()) => true,
+        Ok(attempted) => {
+            for row in &mut rows {
+                row.delivery_attempted = Some(attempted);
+            }
+            true
+        }
         Err(e) => {
             stamp_flush_error(&mut rows, &e);
             false
@@ -672,6 +680,7 @@ fn suppressed_entry_record(
     TriggerData {
         status: RunOutcome::Suppressed,
         downtime_id: Some(downtime.id),
+        delivery_attempted: Some(false),
         error: None,
         grouped: Some(true),
         ..entry.trigger_data.clone()
@@ -922,6 +931,8 @@ mod tests {
                 row.error.as_deref(),
                 Some("error sending notification for alert: Send failed: http 500")
             );
+            // A failure must count as an attempt, or failures could outnumber attempts.
+            assert_eq!(row.delivery_attempted, Some(true));
         }
     }
 
@@ -952,6 +963,7 @@ mod tests {
         );
         // The history page shows a dedup-enabled, ungrouped row as "notification sent".
         assert_eq!((row.dedup_enabled, row.grouped), (None, None));
+        assert_eq!(row.delivery_attempted, Some(false));
     }
 
     #[test]
@@ -1059,6 +1071,7 @@ mod tests {
         assert_eq!(record.downtime_id.as_deref(), Some("dt-1"));
         assert_eq!((record.start_time, record.end_time), (5, 9));
         assert_eq!(record.grouped, Some(true));
+        assert_eq!(record.delivery_attempted, Some(false));
     }
 
     #[cfg(feature = "enterprise")]

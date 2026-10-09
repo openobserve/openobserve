@@ -62,7 +62,7 @@ use super::{
     pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
-    alerts::alert::{AlertError, AlertExt, NotificationOutcome},
+    alerts::alert::{AlertError, AlertExt, NotificationOutcome, send_attempted},
     common::{
         infra::config::STREAM_ALERTS,
         meta::stream::{SchemaEvolution, SchemaRecords},
@@ -1071,6 +1071,7 @@ fn record_realtime_delivery(
     trigger_data_stream: &mut TriggerData,
     outcome: &Result<NotificationOutcome, AlertError>,
 ) {
+    trigger_data_stream.delivery_attempted = Some(send_attempted(outcome));
     match outcome {
         Err(e) => {
             trigger_data_stream.status = RunOutcome::NotifyFailed;
@@ -1909,6 +1910,7 @@ mod tests {
         let mut muted = realtime_row();
         crate::alerts::alert::record_suppressed_run(&mut muted, "alerts", "dt-1".to_string());
         assert_eq!(realtime_last_downtime(&muted), Some("dt-1"));
+        assert_eq!(muted.delivery_attempted, Some(false));
 
         let mut delivered = realtime_row();
         record_realtime_delivery(&mut delivered, &Ok(NotificationOutcome::default()));
@@ -1933,6 +1935,7 @@ mod tests {
         let mut row = realtime_row();
         let delivered = Ok(NotificationOutcome {
             succeeded: vec!["slack".to_string()],
+            attempted: true,
             success_message: " sent ".to_string(),
             ..Default::default()
         });
@@ -1940,6 +1943,15 @@ mod tests {
         assert_eq!(row.status, RunOutcome::Firing);
         assert_eq!(row.success_response.as_deref(), Some("sent"));
         assert_eq!(row.error, None);
+        assert_eq!(row.delivery_attempted, Some(true));
+    }
+
+    #[test]
+    fn test_realtime_alert_wired_to_nothing_fired_without_a_delivery_attempt() {
+        let mut row = realtime_row();
+        record_realtime_delivery(&mut row, &Ok(NotificationOutcome::default()));
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.delivery_attempted, Some(false));
     }
 
     #[test]
@@ -1948,11 +1960,13 @@ mod tests {
         let partial = Ok(NotificationOutcome {
             succeeded: vec!["slack".to_string()],
             failed: vec!["pagerduty".to_string()],
+            attempted: true,
             success_message: "sent to slack".to_string(),
             error_message: "pagerduty timed out".to_string(),
         });
         record_realtime_delivery(&mut row, &partial);
         assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
         assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
         assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
     }
@@ -1965,6 +1979,7 @@ mod tests {
         });
         record_realtime_delivery(&mut row, &failed);
         assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
         assert_eq!(
             row.error.as_deref(),
             Some("error sending notification for alert: http 500")

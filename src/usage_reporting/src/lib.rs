@@ -668,6 +668,7 @@ mod tests {
             synthetics_error_source: None,
             synthetics_location: None,
             downtime_id: None,
+            delivery_attempted: None,
         }
     }
 

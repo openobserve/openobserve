@@ -307,12 +307,15 @@ pub async fn update_if_version<T: PaTable, C: ConnectionTrait>(
 }
 
 /// Deletes the row and tombstones it at `version`, so a late replicated put cannot restore it.
+/// `name` is the row's name at the moment of deletion, kept on the tombstone so a caller can
+/// still show what a since-deleted id used to be called.
 pub async fn delete<T: PaTable, C: ConnectionTrait>(
     db: &C,
     org_id: &str,
     app: &str,
     id: &str,
     version: i32,
+    name: &str,
 ) -> Result<bool, DbErr> {
     let deleted = T::delete_many()
         .filter(T::ORG_ID.eq(org_id))
@@ -323,9 +326,29 @@ pub async fn delete<T: PaTable, C: ConnectionTrait>(
         .rows_affected
         > 0;
     if deleted {
-        record_tombstone::<T, _>(db, org_id, id, version).await?;
+        record_tombstone::<T, _>(db, org_id, id, version, Some(name)).await?;
     }
     Ok(deleted)
+}
+
+/// The name captured on deletion for each of `ids` that was, keyed by id; others are omitted.
+pub async fn tombstoned_names<T: PaTable, C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    ids: &[String],
+) -> Result<Vec<(String, String)>, DbErr> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(Tombstones::find()
+        .filter(rum_pa_tombstones::Column::Kind.eq(T::KIND))
+        .filter(rum_pa_tombstones::Column::OrgId.eq(org_id))
+        .filter(rum_pa_tombstones::Column::Id.is_in(ids.iter().cloned()))
+        .all(db)
+        .await?
+        .into_iter()
+        .filter_map(|t| t.name.map(|name| (t.id, name)))
+        .collect())
 }
 
 /// Creates the tables if absent; for tests, since the migrator replays the whole history.
@@ -359,6 +382,8 @@ pub async fn apply_upsert<T: PaTable, C: ConnectionTrait + TransactionTrait>(
 }
 
 /// Deletes the row only while it is at or below `version`, so a newer edit made elsewhere survives.
+/// A replicated delete message carries no name, so its tombstone leaves `name` as it was (or
+/// unset, on first insert); only a local `delete` captures one.
 pub async fn apply_delete<T: PaTable, C: ConnectionTrait + TransactionTrait>(
     db: &C,
     org_id: &str,
@@ -375,7 +400,7 @@ pub async fn apply_delete<T: PaTable, C: ConnectionTrait + TransactionTrait>(
         .await?
         .rows_affected
         > 0;
-    record_tombstone::<T, _>(&txn, org_id, id, version).await?;
+    record_tombstone::<T, _>(&txn, org_id, id, version, None).await?;
     txn.commit().await?;
     Ok(deleted)
 }
@@ -506,11 +531,14 @@ async fn tombstone_version<T: PaTable, C: ConnectionTrait>(
 }
 
 /// Raises the tombstone to `version`; never lowers it, so an older delete arriving late is a no-op.
+/// `name` only overwrites a stored name when given, so a nameless replicated delete never erases
+/// the name an earlier local delete already captured.
 async fn record_tombstone<T: PaTable, C: ConnectionTrait>(
     db: &C,
     org_id: &str,
     id: &str,
     version: i32,
+    name: Option<&str>,
 ) -> Result<(), DbErr> {
     use rum_pa_tombstones::Column;
     let stone = rum_pa_tombstones::ActiveModel {
@@ -519,11 +547,16 @@ async fn record_tombstone<T: PaTable, C: ConnectionTrait>(
         org_id: Set(org_id.to_string()),
         version: Set(version),
         deleted_at: Set(config::utils::time::now_micros()),
+        name: Set(name.map(str::to_string)),
     };
+    let mut update_columns = vec![Column::Version, Column::DeletedAt];
+    if name.is_some() {
+        update_columns.push(Column::Name);
+    }
     Tombstones::insert(stone)
         .on_conflict(
             OnConflict::columns([Column::Kind, Column::Id])
-                .update_columns([Column::Version, Column::DeletedAt])
+                .update_columns(update_columns)
                 .action_and_where(
                     Expr::col((rum_pa_tombstones::Entity, Column::Version))
                         .lt(Expr::cust("excluded.version")),
@@ -719,7 +752,7 @@ mod tests {
                 .is_none()
         );
         assert!(
-            !delete::<NamedEvents, _>(&db, "acme", "ios", "e1", 1)
+            !delete::<NamedEvents, _>(&db, "acme", "ios", "e1", 1, "Signup")
                 .await
                 .unwrap()
         );
@@ -1002,7 +1035,7 @@ mod tests {
             .await
             .unwrap();
         assert!(
-            delete::<NamedEvents, _>(&db, "acme", "web", "e1", 3)
+            delete::<NamedEvents, _>(&db, "acme", "web", "e1", 3, &row.name)
                 .await
                 .unwrap()
         );
@@ -1017,6 +1050,12 @@ mod tests {
             1
         );
         assert_eq!(
+            tombstoned_names::<NamedEvents, _>(&db, "acme", &["e1".into()])
+                .await
+                .unwrap(),
+            [("e1".to_string(), "Signup".to_string())],
+        );
+        assert_eq!(
             apply_upsert::<NamedEvents, _>(&db, "web", row)
                 .await
                 .unwrap(),
@@ -1026,6 +1065,52 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(events(&db, "web").await.len(), 2, "the name is free again");
+    }
+
+    #[tokio::test]
+    async fn a_replicated_delete_leaves_the_tombstone_nameless() {
+        let db = db().await;
+        let row = edit(&event("e1", "web", "Signup"), 2, 20, "a@x.io");
+        apply_upsert::<NamedEvents, _>(&db, "web", row.clone())
+            .await
+            .unwrap();
+        assert!(
+            apply_delete::<NamedEvents, _>(&db, "acme", "e1", 2)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            tombstoned_names::<NamedEvents, _>(&db, "acme", &["e1".into()])
+                .await
+                .unwrap(),
+            [],
+            "a replicated delete carries no name to capture"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_nameless_replicated_delete_never_erases_a_locally_captured_name() {
+        let db = db().await;
+        let row = edit(&event("e1", "web", "Signup"), 2, 20, "a@x.io");
+        insert::<NamedEvents, _>(&db, row.clone()).await.unwrap();
+        assert!(
+            delete::<NamedEvents, _>(&db, "acme", "web", "e1", 2, &row.name)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !apply_delete::<NamedEvents, _>(&db, "acme", "e1", 3)
+                .await
+                .unwrap(),
+            "the row is already gone, but the replicated delete still raises the tombstone's version"
+        );
+        assert_eq!(
+            tombstoned_names::<NamedEvents, _>(&db, "acme", &["e1".into()])
+                .await
+                .unwrap(),
+            [("e1".to_string(), "Signup".to_string())],
+            "the name captured by the earlier local delete survives"
+        );
     }
 
     #[tokio::test]
