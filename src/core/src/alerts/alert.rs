@@ -2162,6 +2162,11 @@ pub(crate) fn with_incident_notify_error(
     }
 }
 
+/// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
+pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
+    result.as_ref().map_or(true, |outcome| outcome.attempted)
+}
+
 /// Triggers an alert.
 /// ExistingAlertRepeated is suppressed by design and notifies nobody, so treating it as
 /// "notified" would skip every destination and leave the trigger silent.
@@ -2390,6 +2395,8 @@ pub struct NotificationOutcome {
     /// Destination names that failed on this attempt, for any reason
     /// (fetch error, missing template, bad content spec, transport error).
     pub failed: Vec<String>,
+    /// False when no destination or workflow was dispatched, e.g. an alert wired to nothing.
+    pub attempted: bool,
     pub success_message: String,
     pub error_message: String,
 }
@@ -2821,6 +2828,8 @@ impl AlertExt for Alert {
         // themselves all failed. T11's retry logic keys off this return
         // value, so the change is called out rather than left implicit.
         let attempted = self.destinations.len() - no_of_skipped;
+        outcome.attempted =
+            attempted > 0 || (cfg!(feature = "enterprise") && !self.workflows.is_empty());
         if attempted > 0 && no_of_error == attempted {
             Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
@@ -4620,8 +4629,8 @@ mod send_path_tests {
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
     use super::{
-        NotificationOutcome, all_workflows_failed, choose_template, send_discord_with_attachment,
-        send_http_notification,
+        Alert, AlertError, AlertExt, NotificationOutcome, all_workflows_failed, choose_template,
+        send_attempted, send_discord_with_attachment, send_http_notification,
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
@@ -4633,6 +4642,48 @@ mod send_path_tests {
         assert!(all_workflows_failed(0, 1, 1));
         assert!(!all_workflows_failed(0, 1, 0));
         assert!(!all_workflows_failed(1, 1, 1));
+    }
+
+    #[test]
+    fn a_failed_send_counts_as_attempted_and_an_empty_one_does_not() {
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(send_attempted(&failed));
+        assert!(!send_attempted(&Ok(NotificationOutcome::default())));
+        let sent = Ok(NotificationOutcome {
+            attempted: true,
+            ..Default::default()
+        });
+        assert!(send_attempted(&sent));
+    }
+
+    #[tokio::test]
+    async fn a_send_with_nothing_left_to_dispatch_attempts_nothing() {
+        let mut alert = Alert::default();
+        let unwired = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[], None)
+            .await
+            .expect("nothing to send is not an error");
+        assert!(!unwired.attempted);
+
+        alert.destinations = vec!["slack".to_string()];
+        let ledgered = alert
+            .send_notification(
+                "t",
+                &[],
+                0,
+                None,
+                0,
+                None,
+                None,
+                None,
+                &alert.destinations,
+                None,
+            )
+            .await
+            .expect("every destination already delivered is not an error");
+        assert!(!ledgered.attempted);
     }
 
     fn tpl(name: &str) -> Template {
@@ -4686,6 +4737,7 @@ mod send_path_tests {
         let outcome = NotificationOutcome {
             succeeded: vec!["slack".into()],
             failed: vec!["pagerduty".into()],
+            attempted: true,
             success_message: " destination slack sent;".into(),
             error_message: " Error sending notification for destination pagerduty err: boom;"
                 .into(),
