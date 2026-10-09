@@ -831,6 +831,10 @@
   /* custom: an operator-chosen colour set per element by OBanner's `colors` prop. */
   --color-banner-custom-bg: var(--color-banner-default-bg);
   --color-banner-custom-text: var(--color-banner-default-text);
+
+  /* the page behind a banner preview frame, fixed per mode whatever the app theme */
+  --color-banner-preview-page-bg: var(--color-grey-50);
+  --color-banner-preview-page-line: var(--color-grey-200);
 }
 
 :root {
@@ -2063,6 +2067,8 @@
   --color-banner-error-soft-text: var(--color-banner-error-soft-text);
   --color-banner-custom-bg: var(--color-banner-custom-bg);
   --color-banner-custom-text: var(--color-banner-custom-text);
+  --color-banner-preview-page-bg: var(--color-banner-preview-page-bg);
+  --color-banner-preview-page-line: var(--color-banner-preview-page-line);
   --color-banner-error-text: var(--color-banner-error-text);
   --color-banner-info-bg: var(--color-banner-info-bg);
   --color-banner-info-border: var(--color-banner-info-border);

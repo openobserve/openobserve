@@ -46,19 +46,17 @@ export function relativeTo(value: string, now: number = Date.now()): string {
 
 /** When a banner shows, in words. */
 export function scheduleSummary(draft: BannerDraft, t: TranslateFn): I18nText {
-  const { schedule, startsAt, endsAt, duration } = draft;
+  const from = draft.start === "at" && draft.startsAt ? formatStamp(draft.startsAt) : "";
+  const to = draft.end === "at" && draft.endsAt ? formatStamp(draft.endsAt, true) : "";
 
-  if (schedule === "duration") return t("announcements.card.forDuration", { duration });
-  if (schedule === "window") {
-    if (startsAt && endsAt) {
-      return t("announcements.card.between", {
-        from: formatStamp(startsAt),
-        to: formatStamp(endsAt, true),
-      });
-    }
-    if (startsAt) return t("announcements.card.from", { from: formatStamp(startsAt, true) });
-    if (endsAt) return t("announcements.card.until", { to: formatStamp(endsAt, true) });
+  if (draft.end === "after") {
+    return from
+      ? t("announcements.card.fromFor", { from, duration: draft.duration })
+      : t("announcements.card.forDuration", { duration: draft.duration });
   }
+  if (from && to) return t("announcements.card.between", { from, to });
+  if (from) return t("announcements.card.from", { from: formatStamp(draft.startsAt, true) });
+  if (to) return t("announcements.card.until", { to });
   return t("announcements.card.always");
 }
 

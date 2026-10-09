@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :icon="banner.draft.icon"
             :mode="isDark ? 'dark' : 'light'"
             :inert-actions="{
-              ctaText: banner.draft.hasCta ? banner.draft.ctaText : '',
+              links: banner.draft.links.map((link) => link.text),
               dismissible: banner.draft.dismissible,
             }"
           />
@@ -184,6 +184,7 @@ import { bannerMessageText } from "@/utils/announcementMarkdown";
 import {
   bannerStatus,
   draftFromAuthored,
+  hasCustomLook,
   isHiddenByCritical,
   stylesFromConfig,
   type AuthoredBanner,
@@ -266,13 +267,17 @@ const rows = computed<BannerRow[]>(() => {
     const others = drafts.filter((_, i) => i !== index);
     const status: RowStatus =
       base === "live" && isHiddenByCritical(draft, others) ? "hidden" : base;
-    const endsSoon = base === "live" && draft.schedule === "window" && draft.endsAt;
+    const endsSoon = base === "live" && draft.end === "at" && draft.endsAt;
     return {
       index,
       draft,
       authored: configQuery.data.value!.banners[index],
       text: bannerMessageText(draft.message),
-      severityLabel: styleNames.get(draft.styleId) ?? t(`announcements.variants.${draft.variant}`),
+      severityLabel:
+        styleNames.get(draft.styleId) ??
+        (hasCustomLook(draft)
+          ? t("announcements.styles.custom")
+          : t(`announcements.variants.${draft.variant}`)),
       status,
       statusLabel:
         status === "hidden"

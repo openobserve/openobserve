@@ -152,225 +152,297 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
 
-                <OFormSwitch
-                  name="hasCta"
-                  :label="t('announcements.form.hasCta')"
-                  data-test="announcement-editor-has-cta"
-                />
-                <div v-if="values.hasCta" class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-                  <OFormInput
-                    name="ctaText"
-                    :label="t('announcements.form.ctaText')"
-                    :placeholder="t('announcements.form.ctaTextPlaceholder')"
-                    data-test="announcement-editor-cta-text"
-                  />
-                  <OFormInput
-                    name="ctaUrl"
-                    :label="t('announcements.form.ctaUrl')"
-                    :placeholder="t('announcements.form.ctaUrlPlaceholder')"
-                    data-test="announcement-editor-cta-url"
-                  />
+                <div class="flex flex-col gap-2" data-test="announcement-editor-links">
+                  <span class="text-text-label text-xs font-medium">
+                    {{ t("announcements.form.links") }}
+                  </span>
+                  <div
+                    v-for="(_, position) in values.links"
+                    :key="position"
+                    class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_auto] items-start gap-2 max-md:grid-cols-[minmax(0,1fr)_auto]"
+                    :data-test="`announcement-editor-link-${position}`"
+                  >
+                    <OFormInput
+                      :name="`links[${position}].text`"
+                      :placeholder="t('announcements.form.ctaTextPlaceholder')"
+                      :aria-label="t('announcements.form.ctaText')"
+                      :data-test="`announcement-editor-link-${position}-text`"
+                    />
+                    <OFormInput
+                      :name="`links[${position}].url`"
+                      class="max-md:col-start-1"
+                      :placeholder="t('announcements.form.ctaUrlPlaceholder')"
+                      :aria-label="t('announcements.form.ctaUrl')"
+                      :data-test="`announcement-editor-link-${position}-url`"
+                    />
+                    <OButton
+                      variant="ghost-destructive"
+                      size="icon-sm"
+                      icon-left="delete"
+                      class="max-md:col-start-2 max-md:row-start-1"
+                      :aria-label="t('announcements.form.removeLink')"
+                      :title="t('announcements.form.removeLink')"
+                      :data-test="`announcement-editor-link-${position}-remove`"
+                      @click="removeLink(position)"
+                    />
+                  </div>
+                  <OButton
+                    v-if="values.links.length < MAX_LINKS"
+                    variant="dashed"
+                    size="sm-action"
+                    icon-left="add"
+                    class="self-start"
+                    data-test="announcement-editor-add-link"
+                    @click="addLink"
+                    >{{ t("announcements.form.addLink") }}</OButton
+                  >
                 </div>
               </div>
             </OFormSection>
 
             <OFormSection :title="t('announcements.editor.sections.style')">
-              <div class="flex flex-col gap-5" data-test="announcement-editor-style">
-                <OOptionGroup
-                  :model-value="styleChoice"
-                  type="radio"
-                  :label="t('announcements.form.styleChoice')"
-                  :options="styleOptions"
+              <div class="flex flex-col gap-4" data-test="announcement-editor-style">
+                <div
+                  class="flex flex-wrap gap-2"
+                  role="radiogroup"
+                  :aria-label="t('announcements.editor.sections.style')"
                   data-test="announcement-editor-variant"
-                  @update:model-value="chooseStyle"
-                />
-
-                <OFormToggleGroup
-                  name="textSize"
-                  :label="t('announcements.form.textSize')"
-                  data-test="announcement-editor-text-size"
                 >
-                  <OToggleGroupItem
-                    v-for="option in textSizeOptions"
+                  <OButton
+                    v-for="option in styleOptions"
                     :key="option.value"
-                    :value="option.value"
+                    variant="outline"
                     size="sm"
-                    :data-test="`announcement-editor-text-size-${option.value}`"
+                    role="radio"
+                    :icon-left="option.icon"
+                    :active="styleChoice === option.value"
+                    :aria-checked="styleChoice === option.value"
+                    :data-test="`announcement-editor-style-${option.testId}`"
+                    @click="chooseStyle(option.value)"
+                    >{{ option.label }}</OButton
                   >
-                    {{ option.label }}
-                  </OToggleGroupItem>
-                </OFormToggleGroup>
-
-                <div class="flex flex-col gap-2">
-                  <span class="text-text-label text-xs font-medium">
-                    {{ t("announcements.form.icon") }}
-                  </span>
-                  <div
-                    class="flex flex-wrap items-center gap-1"
-                    role="radiogroup"
-                    :aria-label="t('announcements.form.icon')"
-                    data-test="announcement-editor-icon"
-                  >
-                    <OButton
-                      variant="outline"
-                      size="xs"
-                      role="radio"
-                      :active="!values.icon"
-                      :aria-checked="!values.icon"
-                      data-test="announcement-editor-icon-default"
-                      @click="form.setFieldValue('icon', '')"
-                      >{{ t("announcements.form.iconDefault") }}</OButton
-                    >
-                    <OButton
-                      v-for="icon in BANNER_ICONS"
-                      :key="icon"
-                      variant="outline"
-                      size="icon-sm"
-                      role="radio"
-                      :icon-left="icon"
-                      :active="values.icon === icon"
-                      :aria-checked="values.icon === icon"
-                      :aria-label="icon"
-                      :title="icon"
-                      :data-test="`announcement-editor-icon-${icon}`"
-                      @click="form.setFieldValue('icon', icon)"
-                    />
-                  </div>
                 </div>
-
-                <div class="flex flex-col gap-2">
-                  <span class="text-text-label text-xs font-medium">
-                    {{ t("announcements.form.color") }}
-                  </span>
-                  <AnnouncementColorSwatches
-                    :model-value="colorChoice"
-                    data-test="announcement-editor-color"
-                    @update:model-value="chooseColor"
-                  />
-                  <span class="text-text-secondary text-xs">
-                    {{ t("announcements.form.colorHelp") }}
-                  </span>
-                </div>
+                <span
+                  class="text-text-secondary text-xs"
+                  data-test="announcement-editor-style-help"
+                >
+                  {{ styleHelp }}
+                </span>
 
                 <div
-                  v-if="colorChoice === CUSTOM_CHOICE"
-                  class="grid grid-cols-2 gap-4 max-md:grid-cols-1"
+                  v-if="styleChoice === CUSTOM_STYLE"
+                  class="border-border-default rounded-default flex flex-col gap-4 border p-4"
+                  data-test="announcement-editor-custom-look"
                 >
-                  <OFormColor
-                    name="colorLight"
-                    clearable
-                    :label="t('announcements.form.colorLight')"
-                    data-test="announcement-editor-color-light"
-                  />
-                  <OFormColor
-                    name="colorDark"
-                    clearable
-                    :label="t('announcements.form.colorDark')"
-                    data-test="announcement-editor-color-dark"
-                  />
-                </div>
+                  <OFormToggleGroup
+                    name="textSize"
+                    :label="t('announcements.form.textSize')"
+                    data-test="announcement-editor-text-size"
+                  >
+                    <OToggleGroupItem
+                      v-for="option in textSizeOptions"
+                      :key="option.value"
+                      :value="option.value"
+                      size="sm"
+                      :data-test="`announcement-editor-text-size-${option.value}`"
+                    >
+                      {{ option.label }}
+                    </OToggleGroupItem>
+                  </OFormToggleGroup>
 
-                <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex flex-col gap-2">
+                    <span class="text-text-label text-xs font-medium">
+                      {{ t("announcements.form.icon") }}
+                    </span>
+                    <div
+                      class="flex flex-wrap items-center gap-1"
+                      role="radiogroup"
+                      :aria-label="t('announcements.form.icon')"
+                      data-test="announcement-editor-icon"
+                    >
+                      <OButton
+                        v-for="icon in BANNER_ICONS"
+                        :key="icon"
+                        variant="outline"
+                        size="icon-sm"
+                        role="radio"
+                        :icon-left="icon"
+                        :active="(values.icon || severityIcon) === icon"
+                        :aria-checked="(values.icon || severityIcon) === icon"
+                        :aria-label="icon"
+                        :title="icon"
+                        :data-test="`announcement-editor-icon-${icon}`"
+                        @click="form.setFieldValue('icon', icon)"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="flex flex-col gap-2">
+                    <span class="text-text-label text-xs font-medium">
+                      {{ t("announcements.form.color") }}
+                    </span>
+                    <AnnouncementColorSwatches
+                      :model-value="colorChoice"
+                      data-test="announcement-editor-color"
+                      @update:model-value="chooseColor"
+                    />
+                    <span class="text-text-secondary text-xs">
+                      {{ t("announcements.form.colorHelp") }}
+                    </span>
+                  </div>
+
+                  <div
+                    v-if="colorChoice === CUSTOM_CHOICE"
+                    class="grid grid-cols-2 gap-4 max-md:grid-cols-1"
+                  >
+                    <OFormColor
+                      name="colorLight"
+                      clearable
+                      :label="t('announcements.form.colorLight')"
+                      data-test="announcement-editor-color-light"
+                    />
+                    <OFormColor
+                      name="colorDark"
+                      clearable
+                      :label="t('announcements.form.colorDark')"
+                      data-test="announcement-editor-color-dark"
+                    />
+                  </div>
+
                   <OButton
                     variant="outline"
                     size="sm"
                     icon-left="bookmark-add"
+                    class="self-start"
                     data-test="announcement-editor-save-style"
                     @click="openSaveStyle"
                     >{{ t("announcements.styles.saveAs") }}</OButton
                   >
-                  <OButton
-                    v-if="selectedStyle"
-                    variant="ghost-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    data-test="announcement-editor-delete-style"
-                    @click="deleteStyleOpen = true"
-                    >{{ t("announcements.styles.delete", { name: selectedStyle.name }) }}</OButton
-                  >
                 </div>
+
+                <OButton
+                  v-if="selectedStyle"
+                  variant="ghost-destructive"
+                  size="sm"
+                  icon-left="delete"
+                  class="self-start"
+                  data-test="announcement-editor-delete-style"
+                  @click="deleteStyleOpen = true"
+                  >{{ t("announcements.styles.delete", { name: selectedStyle.name }) }}</OButton
+                >
               </div>
             </OFormSection>
 
             <OFormSection :title="t('announcements.editor.sections.whoWhen')">
-              <div class="flex flex-col gap-4">
-                <OOptionGroup
-                  :model-value="audience"
-                  type="radio"
-                  orientation="horizontal"
-                  :label="t('announcements.form.orgs')"
-                  :options="audienceOptions"
-                  data-test="announcement-editor-audience"
-                  @update:model-value="chooseAudience"
-                />
-                <OFormSelect
-                  v-if="audience === 'some'"
-                  name="orgs"
-                  multiple
-                  :label="t('announcements.editor.orgsPick')"
-                  :options="orgOptions"
-                  data-test="announcement-editor-orgs"
-                />
+              <div class="flex flex-col gap-5">
+                <div class="flex flex-col gap-3">
+                  <OOptionGroup
+                    :model-value="audience"
+                    type="radio"
+                    orientation="horizontal"
+                    :label="t('announcements.form.orgs')"
+                    :options="audienceOptions"
+                    data-test="announcement-editor-audience"
+                    @update:model-value="chooseAudience"
+                  />
+                  <OFormSelect
+                    v-if="audience === 'some'"
+                    name="orgs"
+                    multiple
+                    :label="t('announcements.editor.orgsPick')"
+                    :options="orgOptions"
+                    data-test="announcement-editor-orgs"
+                  />
+                </div>
 
-                <OFormSelect
-                  name="schedule"
-                  :label="t('announcements.form.schedule')"
-                  :options="scheduleOptions"
-                  data-test="announcement-editor-schedule"
-                />
-                <div v-if="values.schedule === 'duration'" class="flex flex-col gap-2">
-                  <div class="flex flex-wrap items-end gap-2">
-                    <OFormInput
-                      name="duration"
-                      :label="t('announcements.form.duration')"
-                      :placeholder="t('announcements.form.durationPlaceholder')"
-                      field-width="sm"
-                      data-test="announcement-editor-duration"
-                    />
+                <div class="flex flex-col gap-3" data-test="announcement-editor-schedule">
+                  <OFormToggleGroup
+                    name="start"
+                    :label="t('announcements.form.starts')"
+                    data-test="announcement-editor-start"
+                  >
+                    <OToggleGroupItem
+                      v-for="option in startOptions"
+                      :key="option.value"
+                      :value="option.value"
+                      size="sm"
+                      :data-test="`announcement-editor-start-${option.value}`"
+                    >
+                      {{ option.label }}
+                    </OToggleGroupItem>
+                  </OFormToggleGroup>
+                  <OFormInput
+                    v-if="values.start === 'at'"
+                    name="startsAt"
+                    type="datetime-local"
+                    field-width="md"
+                    :aria-label="t('announcements.form.starts')"
+                    data-test="announcement-editor-starts-at"
+                  />
+
+                  <OFormToggleGroup
+                    name="end"
+                    :label="t('announcements.form.ends')"
+                    data-test="announcement-editor-end"
+                  >
+                    <OToggleGroupItem
+                      v-for="option in endOptions"
+                      :key="option.value"
+                      :value="option.value"
+                      size="sm"
+                      :data-test="`announcement-editor-end-${option.value}`"
+                    >
+                      {{ option.label }}
+                    </OToggleGroupItem>
+                  </OFormToggleGroup>
+                  <div v-if="values.end === 'after'" class="flex flex-wrap items-start gap-2">
                     <OButton
                       v-for="span in DURATION_PICKS"
-                      :key="span"
+                      :key="span.value"
                       variant="outline"
                       size="sm"
-                      :active="values.duration === span"
-                      :data-test="`announcement-editor-duration-${span}`"
-                      @click="form.setFieldValue('duration', span)"
-                      >{{ raw(span) }}</OButton
+                      :active="values.duration === span.value"
+                      :data-test="`announcement-editor-duration-${span.value}`"
+                      @click="form.setFieldValue('duration', span.value)"
+                      >{{ span.label }}</OButton
                     >
-                  </div>
-                  <span class="text-text-secondary text-xs">{{ durationHint }}</span>
-                </div>
-                <div v-if="values.schedule === 'window'" class="flex flex-col gap-2">
-                  <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
                     <OFormInput
-                      name="startsAt"
-                      type="datetime-local"
-                      :label="t('announcements.form.startsAt')"
-                      data-test="announcement-editor-starts-at"
-                    />
-                    <OFormInput
-                      name="endsAt"
-                      type="datetime-local"
-                      :label="t('announcements.form.endsAt')"
-                      data-test="announcement-editor-ends-at"
+                      name="duration"
+                      field-width="xs"
+                      :placeholder="t('announcements.form.durationPlaceholder')"
+                      :aria-label="t('announcements.form.durationCustom')"
+                      data-test="announcement-editor-duration"
                     />
                   </div>
-                  <span class="text-text-secondary text-xs">
-                    {{ t("announcements.form.timezoneHint", { zone: timeZone }) }}
+                  <OFormInput
+                    v-if="values.end === 'at'"
+                    name="endsAt"
+                    type="datetime-local"
+                    field-width="md"
+                    :aria-label="t('announcements.form.ends')"
+                    data-test="announcement-editor-ends-at"
+                  />
+                  <span
+                    class="text-text-secondary text-xs"
+                    data-test="announcement-editor-schedule-summary"
+                  >
+                    {{ scheduleHint }}
                   </span>
                 </div>
 
-                <OFormSwitch
-                  name="dismissible"
-                  :label="t('announcements.form.dismissible')"
-                  data-test="announcement-editor-dismissible"
-                />
-                <OSwitch
-                  v-if="!isNew && values.dismissible"
-                  v-model="resetDismissals"
-                  :label="t('announcements.editor.resetDismissals')"
-                  data-test="announcement-editor-reset-dismissals"
-                />
+                <div class="flex flex-col gap-3">
+                  <OFormSwitch
+                    name="dismissible"
+                    :label="t('announcements.form.dismissible')"
+                    data-test="announcement-editor-dismissible"
+                  />
+                  <OSwitch
+                    v-if="!isNew && values.dismissible"
+                    v-model="resetDismissals"
+                    :label="t('announcements.editor.resetDismissals')"
+                    data-test="announcement-editor-reset-dismissals"
+                  />
+                </div>
               </div>
             </OFormSection>
           </div>
@@ -393,11 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="saveStyleOpen"
     size="sm"
     :title="t('announcements.styles.saveTitle')"
-    :sub-title="
-      t('announcements.styles.saveHint', {
-        severity: t(`announcements.variants.${values.variant}`),
-      })
-    "
+    :sub-title="t('announcements.styles.saveHint')"
     :primary-button-label="t('announcements.styles.saveConfirm')"
     :secondary-button-label="t('common.cancel')"
     :primary-button-disabled="!styleName.trim()"
@@ -479,6 +547,7 @@ import {
   DEFAULT_CHOICE,
   DEFAULT_TEXT_SIZE,
   TEXT_SIZES,
+  bannerIcon,
   colorChoiceFor,
 } from "@/utils/announcementAppearance";
 import {
@@ -498,10 +567,12 @@ import AnnouncementBannerPreviewPanel, {
 } from "./AnnouncementBannerPreviewPanel.vue";
 import AnnouncementColorSwatches from "./AnnouncementColorSwatches.vue";
 import {
+  MAX_LINKS,
   VARIANTS,
   authoredFromDraft,
   authoredFromStyle,
   bannerStatus,
+  hasCustomLook,
   isHiddenByCritical,
   newBannerId,
   parseDurationMs,
@@ -536,8 +607,8 @@ const { isMobile } = useBreakpoint();
 const { update, isPending } = useAnnouncementConfigUpdate();
 
 const FORM_ID = "announcement-banner-editor-form";
+const CUSTOM_STYLE = "custom";
 const STYLE_CHOICE_PREFIX = "style:";
-const DURATION_PICKS = ["1h", "4h", "1d", "1w"];
 
 const EMOJIS = [
   { name: "siren", char: "🚨" },
@@ -582,10 +653,22 @@ const textSizeOptions = computed(() =>
   TEXT_SIZES.map((size) => ({ label: t(TEXT_SIZE_LABEL_KEYS[size]), value: size })),
 );
 
-const scheduleOptions = computed<SelectOption[]>(() => [
-  { label: t("announcements.form.scheduleAlways"), value: "always" },
-  { label: t("announcements.form.scheduleDuration"), value: "duration" },
-  { label: t("announcements.form.scheduleWindow"), value: "window" },
+const startOptions = computed(() => [
+  { label: t("announcements.form.startNow"), value: "now" },
+  { label: t("announcements.form.startAt"), value: "at" },
+]);
+
+const endOptions = computed(() => [
+  { label: t("announcements.form.endNever"), value: "never" },
+  { label: t("announcements.form.endAfter"), value: "after" },
+  { label: t("announcements.form.endAt"), value: "at" },
+]);
+
+const DURATION_PICKS = computed(() => [
+  { label: t("announcements.form.duration1h"), value: "1h" },
+  { label: t("announcements.form.duration4h"), value: "4h" },
+  { label: t("announcements.form.duration1d"), value: "1d" },
+  { label: t("announcements.form.duration1w"), value: "1w" },
 ]);
 
 /** Picking from the real org list beats typing identifiers that silently match nothing. */
@@ -616,14 +699,13 @@ const draftFromValues = (values: BannerForm): BannerDraft => ({
   id: values.id ?? "",
   message: values.message,
   variant: values.variant,
-  schedule: values.schedule,
-  duration: values.duration ?? "",
+  start: values.start,
   startsAt: values.startsAt ?? "",
+  end: values.end,
+  duration: values.duration ?? "",
   endsAt: values.endsAt ?? "",
   dismissible: values.dismissible,
-  hasCta: values.hasCta,
-  ctaText: values.ctaText ?? "",
-  ctaUrl: values.ctaUrl ?? "",
+  links: values.links,
   orgs: values.orgs ?? [],
   textSize: values.textSize,
   colorLight: values.colorLight?.trim() ?? "",
@@ -635,7 +717,7 @@ const draftFromValues = (values: BannerForm): BannerDraft => ({
 let leavingAfterSave = false;
 
 const form = useOForm<BannerForm>({
-  defaultValues: { ...props.draft } as BannerForm,
+  defaultValues: { ...props.draft, links: props.draft.links.map((l) => ({ ...l })) } as BannerForm,
   // Passed as the schema itself, never a computed — a ref never resolves in TanStack's validator slot.
   schema: makeBannerSchema(t),
   onSubmit: async (values) => {
@@ -696,11 +778,18 @@ const saveLabel = computed(() => {
 const formatStamp = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-const durationHint = computed(() => {
-  const ms = parseDurationMs(values.value.duration ?? "");
-  return ms
-    ? t("announcements.form.durationEnds", { time: formatStamp(Date.now() + ms) })
-    : t("announcements.form.durationHelp");
+/** One line saying when the banner will actually be up, so the two choices read as a sentence. */
+const scheduleHint = computed(() => {
+  const v = values.value;
+  const startMs = v.start === "at" && v.startsAt ? new Date(v.startsAt).getTime() : null;
+  const from: string = startMs ? formatStamp(startMs) : t("announcements.form.hintPublish");
+
+  let until: string = t("announcements.form.hintRemoved");
+  const spanMs = v.end === "after" ? parseDurationMs(v.duration ?? "") : null;
+  if (spanMs) until = formatStamp((startMs ?? Date.now()) + spanMs);
+  if (v.end === "at" && v.endsAt) until = formatStamp(new Date(v.endsAt).getTime());
+
+  return t("announcements.form.scheduleHint", { from, until, zone: timeZone });
 });
 
 const savedMessage = (draft: BannerDraft): I18nText => {
@@ -731,7 +820,7 @@ const previewBanner = computed<PreviewBanner>(() => ({
   colorLight: values.value.colorLight ?? "",
   colorDark: values.value.colorDark ?? "",
   icon: values.value.icon ?? "",
-  ctaText: values.value.hasCta ? (values.value.ctaText ?? "") : "",
+  links: values.value.links.map((link) => link.text.trim()).filter(Boolean),
   dismissible: values.value.dismissible,
 }));
 
@@ -739,30 +828,64 @@ const hiddenByCritical = computed(() =>
   isHiddenByCritical(draftFromValues(values.value), props.others),
 );
 
+// ── Link buttons ──────────────────────────────────────────────────────────
+
+const addLink = () => {
+  if (values.value.links.length >= MAX_LINKS) return;
+  form.setFieldValue("links", [...values.value.links, { text: "", url: "" }]);
+};
+
+const removeLink = (position: number) => {
+  form.setFieldValue(
+    "links",
+    values.value.links.filter((_, i) => i !== position),
+  );
+};
+
 // ── Style ─────────────────────────────────────────────────────────────────
 
 const selectedStyle = computed(() => props.styles.find((s) => s.id === values.value.styleId));
 
-const styleChoice = computed(() =>
-  selectedStyle.value ? `${STYLE_CHOICE_PREFIX}${selectedStyle.value.id}` : values.value.variant,
+const initialStyleChoice = () => {
+  if (props.styles.some((s) => s.id === props.draft.styleId)) {
+    return `${STYLE_CHOICE_PREFIX}${props.draft.styleId}`;
+  }
+  return hasCustomLook(props.draft) ? CUSTOM_STYLE : props.draft.variant;
+};
+
+// View state: a Custom look that happens to match the defaults must still read as Custom.
+const styleChoice = ref<string>(initialStyleChoice());
+
+const severityIcon = computed(() => bannerIcon(values.value.variant));
+
+const styleOptions = computed<{ value: string; label: string; icon: IconName; testId: string }[]>(
+  () => [
+    ...VARIANTS.map((variant) => ({
+      value: variant,
+      label: t(`announcements.variants.${variant}`),
+      icon: bannerIcon(variant),
+      testId: variant,
+    })),
+    ...props.styles.map((style) => ({
+      value: `${STYLE_CHOICE_PREFIX}${style.id}`,
+      label: style.name,
+      icon: bannerIcon("info", style.icon),
+      testId: style.id,
+    })),
+    {
+      value: CUSTOM_STYLE,
+      label: t("announcements.styles.custom"),
+      icon: "tune",
+      testId: CUSTOM_STYLE,
+    },
+  ],
 );
 
-const styleOptions = computed(() => [
-  ...VARIANTS.map((variant) => ({
-    label: t("announcements.editor.variantOption", {
-      name: t(`announcements.variants.${variant}`),
-      help: t(VARIANT_HELP_KEYS[variant]),
-    }),
-    value: variant,
-  })),
-  ...props.styles.map((style) => ({
-    label: t("announcements.styles.option", {
-      name: style.name,
-      severity: t(`announcements.variants.${style.base}`),
-    }),
-    value: `${STYLE_CHOICE_PREFIX}${style.id}`,
-  })),
-]);
+const styleHelp = computed(() => {
+  if (styleChoice.value === CUSTOM_STYLE) return t("announcements.styles.customHelp");
+  if (selectedStyle.value) return t("announcements.styles.savedHelp");
+  return t(VARIANT_HELP_KEYS[values.value.variant]);
+});
 
 // Which swatch is lit is view state; the colours themselves live only in the form.
 const colorChoice = ref(colorChoiceFor(props.draft.colorLight, props.draft.colorDark));
@@ -775,35 +898,26 @@ const applyLook = (look: Pick<BannerStyle, "icon" | "textSize" | "colorLight" | 
   colorChoice.value = colorChoiceFor(look.colorLight, look.colorDark);
 };
 
-const chooseStyle = (choice: unknown) => {
-  const value = String(choice);
-  const style = props.styles.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === value);
+const chooseStyle = (choice: string) => {
+  styleChoice.value = choice;
+  if (choice === CUSTOM_STYLE) {
+    // Starts from whatever is showing, so switching to Custom never makes the banner jump.
+    form.setFieldValue("styleId", "");
+    if (values.value.variant !== "info") form.setFieldValue("variant", "info");
+    return;
+  }
+
+  const style = props.styles.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice);
   if (style) {
-    form.setFieldValue("variant", style.base);
+    form.setFieldValue("variant", "info");
     applyLook(style);
     form.setFieldValue("styleId", style.id);
     return;
   }
-  form.setFieldValue("variant", value as BannerVariantName);
+  form.setFieldValue("variant", choice as BannerVariantName);
   form.setFieldValue("styleId", "");
   applyLook({ icon: "", textSize: DEFAULT_TEXT_SIZE, colorLight: "", colorDark: "" });
 };
-
-// A banner restyled after picking a saved style no longer matches it, so stop labelling it with that name.
-watch(
-  () => [values.value.icon, values.value.textSize, values.value.colorLight, values.value.colorDark],
-  () => {
-    const style = selectedStyle.value;
-    if (!style) return;
-    const v = values.value;
-    const same =
-      (v.icon ?? "") === style.icon &&
-      v.textSize === style.textSize &&
-      (v.colorLight ?? "").toUpperCase() === style.colorLight.toUpperCase() &&
-      (v.colorDark ?? "").toUpperCase() === style.colorDark.toUpperCase();
-    if (!same) form.setFieldValue("styleId", "");
-  },
-);
 
 const chooseColor = (choice: string) => {
   colorChoice.value = choice;
@@ -831,7 +945,6 @@ const saveStyle = async () => {
   const style: BannerStyle = {
     id: newBannerId("style"),
     name,
-    base: v.variant,
     icon: v.icon ?? "",
     textSize: v.textSize,
     colorLight: v.colorLight?.trim() ?? "",
@@ -841,6 +954,7 @@ const saveStyle = async () => {
   try {
     await update((latest) => ({ ...latest, styles: [...latest.styles, authoredFromStyle(style)] }));
     form.setFieldValue("styleId", style.id);
+    styleChoice.value = `${STYLE_CHOICE_PREFIX}${style.id}`;
     saveStyleOpen.value = false;
     toast({ variant: "success", message: t("announcements.styles.saved", { name }) });
   } catch (error: any) {
@@ -857,7 +971,9 @@ const deleteStyle = async () => {
       ...latest,
       styles: latest.styles.filter((s) => s.id !== style.id),
     }));
+    // The banner keeps the look it copied, now as its own custom look.
     form.setFieldValue("styleId", "");
+    styleChoice.value = CUSTOM_STYLE;
     toast({ variant: "success", message: t("announcements.styles.deleted", { name: style.name }) });
   } catch (error: any) {
     toast({
@@ -958,5 +1074,5 @@ const goBack = () => {
 };
 
 // Exposed so a test can drive the real submit and the toolbar without a browser selection.
-defineExpose({ form, applyFormat, insertEmoji, chooseStyle });
+defineExpose({ form, applyFormat, insertEmoji, chooseStyle, addLink });
 </script>

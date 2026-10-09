@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * The form model behind the banner builder, and its translation to and from the
- * authored JSON the API stores.
- *
- * Kept out of the components so the round-trip — the part that quietly loses an
- * author's work when it is wrong — is stated and tested in one place.
- */
+/** The form model behind the banner editor, and its round trip to the JSON the API stores. */
 
 import {
   DEFAULT_TEXT_SIZE,
@@ -30,12 +24,15 @@ import {
 } from "@/utils/announcementAppearance";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 
-/**
- * How an author describes when a banner shows. The three cases the form offers
- * cover every window the API accepts; a JSON-authored `starts_at` + `duration`
- * pair is folded into `window` on the way in.
- */
-export type BannerSchedule = "always" | "duration" | "window";
+export type BannerStart = "now" | "at";
+
+/** `after` is a span counted from the start, which the server pins to an absolute end on save. */
+export type BannerEnd = "never" | "after" | "at";
+
+export interface BannerLink {
+  text: string;
+  url: string;
+}
 
 /** One banner as the form holds it. Flat and all-strings, so fields bind directly. */
 export interface BannerDraft {
@@ -43,16 +40,16 @@ export interface BannerDraft {
   id: string;
   message: string;
   variant: BannerVariantName;
-  schedule: BannerSchedule;
-  /** A span like "1h", when `schedule` is `duration`. */
-  duration: string;
-  /** `datetime-local` values in the author's own zone, when `schedule` is `window`. */
+  start: BannerStart;
+  /** `datetime-local` value in the author's own zone, when `start` is `at`. */
   startsAt: string;
+  end: BannerEnd;
+  /** A span like "4h", when `end` is `after`. */
+  duration: string;
+  /** `datetime-local` value in the author's own zone, when `end` is `at`. */
   endsAt: string;
   dismissible: boolean;
-  hasCta: boolean;
-  ctaText: string;
-  ctaUrl: string;
+  links: BannerLink[];
   /** Empty means every organization. */
   orgs: string[];
   textSize: BannerTextSize;
@@ -65,12 +62,10 @@ export interface BannerDraft {
   styleId: string;
 }
 
-/** A saved look the editor copies into a banner; editing it later leaves existing banners alone. */
+/** A saved custom look the editor copies into a banner; editing it later leaves banners alone. */
 export interface BannerStyle {
   id: string;
   name: string;
-  /** The severity a banner with this style behaves as, for ordering and hiding promotions. */
-  base: BannerVariantName;
   icon: string;
   textSize: BannerTextSize;
   colorLight: string;
@@ -79,19 +74,21 @@ export interface BannerStyle {
 
 export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
 
+/** More buttons than this crowd the message out of a bar on a laptop; the server holds the same cap. */
+export const MAX_LINKS = 3;
+
 export function emptyDraft(): BannerDraft {
   return {
     id: "",
     message: "",
     variant: "info",
-    schedule: "always",
-    duration: "1h",
+    start: "now",
     startsAt: "",
+    end: "never",
+    duration: "4h",
     endsAt: "",
     dismissible: true,
-    hasCta: false,
-    ctaText: "",
-    ctaUrl: "",
+    links: [],
     orgs: [],
     textSize: DEFAULT_TEXT_SIZE,
     colorLight: "",
@@ -99,6 +96,15 @@ export function emptyDraft(): BannerDraft {
     icon: "",
     styleId: "",
   };
+}
+
+/** Whether the banner carries a look of its own rather than its severity's. */
+export function hasCustomLook(
+  draft: Pick<BannerDraft, "icon" | "textSize" | "colorLight" | "colorDark">,
+): boolean {
+  return (
+    !!(draft.icon || draft.colorLight || draft.colorDark) || draft.textSize !== DEFAULT_TEXT_SIZE
+  );
 }
 
 /** A fresh dismissal key, so a new or duplicated banner is never dismissed along with another. */
@@ -182,6 +188,7 @@ export interface AuthoredBanner {
   duration?: unknown;
   dismissible?: unknown;
   cta?: { text?: unknown; url?: unknown } | null;
+  ctas?: unknown;
   orgs?: unknown;
   text_size?: unknown;
   colors?: { light?: unknown; dark?: unknown } | null;
@@ -191,6 +198,14 @@ export interface AuthoredBanner {
 
 function str(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function linksFromAuthored(banner: AuthoredBanner): BannerLink[] {
+  const authored = Array.isArray(banner.ctas) ? banner.ctas : banner.cta ? [banner.cta] : [];
+  return authored
+    .filter((cta): cta is Record<string, unknown> => typeof cta === "object" && cta !== null)
+    .map((cta) => ({ text: str(cta.text), url: str(cta.url) }))
+    .filter((link) => link.text);
 }
 
 export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
@@ -203,35 +218,19 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
   if (VARIANTS.includes(variant)) draft.variant = variant;
 
   draft.startsAt = toLocalInput(str(banner.starts_at));
+  if (draft.startsAt) draft.start = "at";
+
   draft.endsAt = toLocalInput(str(banner.ends_at));
-
   const duration = str(banner.duration);
-  if (draft.startsAt && duration && !draft.endsAt) {
-    // `starts_at` + `duration` is a valid authored pair the form has no third
-    // control for. Resolving it to an end instant keeps the window intact
-    // instead of dropping one half of it.
-    const durationMs = parseDurationMs(duration);
-    if (durationMs) {
-      draft.endsAt = toLocalInput(
-        new Date(new Date(draft.startsAt).getTime() + durationMs).toISOString(),
-      );
-    }
-  }
-
-  if (draft.startsAt || draft.endsAt) {
-    draft.schedule = "window";
-  } else if (duration) {
-    draft.schedule = "duration";
+  if (draft.endsAt) {
+    draft.end = "at";
+  } else if (parseDurationMs(duration)) {
+    draft.end = "after";
     draft.duration = duration;
   }
 
   if (typeof banner.dismissible === "boolean") draft.dismissible = banner.dismissible;
-
-  if (banner.cta && str(banner.cta.text)) {
-    draft.hasCta = true;
-    draft.ctaText = str(banner.cta.text);
-    draft.ctaUrl = str(banner.cta.url);
-  }
+  draft.links = linksFromAuthored(banner);
 
   if (Array.isArray(banner.orgs)) {
     draft.orgs = banner.orgs.filter((org): org is string => typeof org === "string");
@@ -251,10 +250,7 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
   return draft;
 }
 
-/**
- * Drafts for every banner in a parsed config. Entries without a message are
- * dropped — they cannot be saved anyway, and the API names them by index.
- */
+/** Drafts for every banner in a parsed config; entries without a message are dropped. */
 export function draftsFromConfig(parsed: unknown): BannerDraft[] {
   const banners = (parsed as { banners?: unknown } | null)?.banners;
   if (!Array.isArray(banners)) return [];
@@ -265,31 +261,25 @@ export function draftsFromConfig(parsed: unknown): BannerDraft[] {
     .map(draftFromAuthored);
 }
 
-/**
- * One draft as authored JSON.
- *
- * Defaults are omitted rather than written out, so the stored config stays the
- * short document a person would have written by hand.
- */
+/** One draft as authored JSON, with defaults left out so the stored config stays short. */
 export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
   const banner: Record<string, unknown> = { message: draft.message.trim() };
 
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
 
-  if (draft.schedule === "duration" && draft.duration.trim()) {
+  if (draft.start === "at" && draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
+  if (draft.end === "after" && parseDurationMs(draft.duration)) {
     banner.duration = draft.duration.trim();
   }
-  if (draft.schedule === "window") {
-    if (draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
-    if (draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
-  }
+  if (draft.end === "at" && draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
 
   if (!draft.dismissible) banner.dismissible = false;
 
-  if (draft.hasCta && draft.ctaText.trim() && draft.ctaUrl.trim()) {
-    banner.cta = { text: draft.ctaText.trim(), url: draft.ctaUrl.trim() };
-  }
+  const links = draft.links
+    .map((link) => ({ text: link.text.trim(), url: link.url.trim() }))
+    .filter((link) => link.text && link.url);
+  if (links.length) banner.ctas = links;
 
   if (draft.orgs.length) banner.orgs = [...draft.orgs];
 
@@ -314,10 +304,8 @@ export function configFromDrafts(drafts: BannerDraft[]): { banners: Record<strin
 export type BannerStatus = "live" | "scheduled" | "ended";
 
 export function bannerStatus(draft: BannerDraft, now: number = Date.now()): BannerStatus {
-  if (draft.schedule !== "window") return "live";
-
-  const start = draft.startsAt ? new Date(draft.startsAt).getTime() : null;
-  const end = draft.endsAt ? new Date(draft.endsAt).getTime() : null;
+  const start = draft.start === "at" && draft.startsAt ? new Date(draft.startsAt).getTime() : null;
+  const end = draft.end === "at" && draft.endsAt ? new Date(draft.endsAt).getTime() : null;
 
   if (start !== null && now < start) return "scheduled";
   if (end !== null && now >= end) return "ended";
@@ -352,7 +340,6 @@ export function stylesFromConfig(parsed: unknown): BannerStyle[] {
     .map((style) => ({
       id: str(style.id),
       name: str(style.name),
-      base: VARIANTS.includes(style.base) ? style.base : "info",
       icon: isBannerIcon(style.icon) ? style.icon : "",
       textSize: isTextSize(style.text_size) ? style.text_size : DEFAULT_TEXT_SIZE,
       colorLight: isHexColor(style.colors?.light) ? style.colors.light : "",
@@ -361,11 +348,7 @@ export function stylesFromConfig(parsed: unknown): BannerStyle[] {
 }
 
 export function authoredFromStyle(style: BannerStyle): Record<string, unknown> {
-  const authored: Record<string, unknown> = {
-    id: style.id,
-    name: style.name.trim(),
-    base: style.base,
-  };
+  const authored: Record<string, unknown> = { id: style.id, name: style.name.trim() };
   if (style.icon) authored.icon = style.icon;
   if (style.textSize !== DEFAULT_TEXT_SIZE) authored.text_size = style.textSize;
 

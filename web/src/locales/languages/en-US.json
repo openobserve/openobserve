@@ -3106,28 +3106,19 @@
       "from": "From {from}",
       "until": "Until {to}",
       "allOrgs": "All organizations",
-      "someOrgs": "{count} organization | {count} organizations"
+      "someOrgs": "{count} organization | {count} organizations",
+      "fromFor": "From {from}, for {duration}"
     },
     "form": {
       "message": "Message",
       "messagePlaceholder": "Scheduled maintenance Sat 02:00-04:00 UTC. Search may be unavailable.",
       "messageRequired": "Enter the message people will see.",
       "severity": "Severity",
-      "schedule": "When should it show?",
-      "scheduleAlways": "Now, until I turn it off",
-      "scheduleDuration": "Now, for a set time",
-      "scheduleWindow": "Between two dates",
-      "duration": "For",
-      "durationPlaceholder": "2h",
-      "durationHelp": "A span such as 30m, 2h, 3d or 1w.",
-      "durationInvalid": "Enter a span such as 30m, 2h, 3d or 1w.",
-      "startsAt": "Start",
-      "endsAt": "End",
-      "timezoneHint": "In your timezone ({zone}). Leave Start empty to begin when you publish, or End empty to keep it up until you remove it.",
-      "windowRequired": "Set a start, an end, or both.",
-      "windowBackwards": "The end time must be after the start time.",
+      "schedule": "Schedule",
+      "durationPlaceholder": "e.g. 90m",
+      "durationInvalid": "Use a span such as 30m, 2h, 3d or 1w.",
+      "windowBackwards": "The end must be after the start.",
       "dismissible": "Let people dismiss this banner",
-      "hasCta": "Add a link button",
       "ctaText": "Button text",
       "ctaTextPlaceholder": "Status page",
       "ctaTextRequired": "Enter the text for the button.",
@@ -3148,10 +3139,27 @@
       "colorDark": "Dark mode",
       "colorInvalid": "Enter a hex color such as #1D4ED8.",
       "messageTooLong": "Keep it under 300 characters.",
-      "durationEnds": "Ends around {time} if you publish now.",
-      "styleChoice": "Severity or saved style",
       "icon": "Icon",
-      "iconDefault": "Severity default"
+      "links": "Link buttons",
+      "addLink": "Add link button",
+      "removeLink": "Remove link button",
+      "starts": "Starts",
+      "startNow": "When I publish",
+      "startAt": "At a set time",
+      "ends": "Ends",
+      "endNever": "When I remove it",
+      "endAfter": "After a while",
+      "endAt": "At a set time",
+      "duration1h": "1 hour",
+      "duration4h": "4 hours",
+      "duration1d": "1 day",
+      "duration1w": "1 week",
+      "durationCustom": "Custom duration",
+      "startRequired": "Pick the start time.",
+      "endRequired": "Pick the end time.",
+      "scheduleHint": "Shows from {from} until {until} · times in {zone}",
+      "hintPublish": "when you publish",
+      "hintRemoved": "you remove it"
     },
     "colorPresets": {
       "blue": "Blue",
@@ -3191,7 +3199,7 @@
       "sections": {
         "message": "Message",
         "style": "Style",
-        "whoWhen": "Who and when"
+        "whoWhen": "Audience and schedule"
       },
       "messageHelp": "Supports **bold**, _italic_, `code` and [links](https://example.com).",
       "characters": "{count} / {max}",
@@ -3254,10 +3262,8 @@
       "caption": "Links are disabled in the preview."
     },
     "styles": {
-      "option": "{name} — saved style, behaves as {severity}",
       "saveAs": "Save as style",
       "saveTitle": "Save this look as a style",
-      "saveHint": "Keeps the icon, text size and colours for reuse. Banners with this style behave as {severity}.",
       "saveConfirm": "Save style",
       "name": "Style name",
       "namePlaceholder": "Release notes",
@@ -3265,7 +3271,11 @@
       "delete": "Delete “{name}”",
       "deleteTitle": "Delete style “{name}”?",
       "deleteHint": "Banners already using it keep their look.",
-      "deleted": "Style “{name}” deleted"
+      "deleted": "Style “{name}” deleted",
+      "custom": "Custom",
+      "customHelp": "Pick your own icon, text size and colours. Shown in the same place as Info banners.",
+      "savedHelp": "A saved custom style. Pick Custom to change its look for this banner.",
+      "saveHint": "Saves this icon, text size and colours under a name, so you can reuse them."
     }
   },
   "ticket": {

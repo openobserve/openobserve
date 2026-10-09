@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="[
           mode === 'dark' ? 'dark' : '',
-          'rounded-surface border-border-default overflow-hidden border',
+          'rounded-surface border-border-default bg-banner-preview-page-bg overflow-hidden border',
         ]"
         :data-banner-theme="mode"
         :data-test="`${dataTest}-${mode}`"
@@ -50,8 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :colors="{ light: banner.colorLight, dark: banner.colorDark }"
           :icon="banner.icon"
           :mode="mode"
-          :inert-actions="{ ctaText: banner.ctaText, dismissible: banner.dismissible }"
+          :inert-actions="{ links: banner.links, dismissible: banner.dismissible }"
         />
+        <div class="flex flex-col gap-2 p-4" aria-hidden="true">
+          <span class="bg-banner-preview-page-line h-2 w-2/3 rounded-full" />
+          <span class="bg-banner-preview-page-line h-2 w-1/3 rounded-full" />
+        </div>
       </div>
     </div>
 
@@ -68,18 +72,11 @@ import { useI18nTyped } from "@/types/i18n";
 import type { BannerThemeMode } from "@/utils/announcementAppearance";
 import type { BannerDraft } from "./announcementDrafts";
 
-/** The fields a preview frame paints. */
+/** The fields a preview frame paints; `links` are the button labels. */
 export type PreviewBanner = Pick<
   BannerDraft,
-  | "message"
-  | "variant"
-  | "textSize"
-  | "colorLight"
-  | "colorDark"
-  | "icon"
-  | "ctaText"
-  | "dismissible"
->;
+  "message" | "variant" | "textSize" | "colorLight" | "colorDark" | "icon" | "dismissible"
+> & { links: string[] };
 
 defineProps<{
   banner: PreviewBanner;

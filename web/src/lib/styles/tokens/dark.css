@@ -550,6 +550,8 @@
 
   /* Banner (OBanner) */
   --color-banner-default-bg: var(--color-grey-800);
+  --color-banner-preview-page-bg: var(--color-grey-950);
+  --color-banner-preview-page-line: var(--color-grey-800);
   --color-banner-default-text: var(--color-grey-200);
   --color-banner-info-bg: color-mix(in srgb, var(--color-blue-800) 20%, transparent);
   --color-banner-info-border: var(--color-blue-700);

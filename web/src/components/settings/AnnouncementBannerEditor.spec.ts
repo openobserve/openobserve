@@ -67,25 +67,27 @@ describe("makeBannerSchema", () => {
   });
 
   it("rejects a duration that is not a span", () => {
-    expect(issuesFor(draft({ message: "m", schedule: "duration", duration: "soon" }))).toContain(
+    expect(issuesFor(draft({ message: "m", end: "after", duration: "soon" }))).toContain(
       "duration",
     );
-    expect(issuesFor(draft({ message: "m", schedule: "duration", duration: "90m" }))).toEqual([]);
+    expect(issuesFor(draft({ message: "m", end: "after", duration: "90m" }))).toEqual([]);
   });
 
-  it("wants at least one end of a scheduled window", () => {
-    expect(issuesFor(draft({ message: "m", schedule: "window" }))).toContain("startsAt");
-    expect(
-      issuesFor(draft({ message: "m", schedule: "window", startsAt: "2026-08-12T02:00" })),
-    ).toEqual([]);
+  it("wants the times the chosen start and end use", () => {
+    expect(issuesFor(draft({ message: "m", start: "at" }))).toContain("startsAt");
+    expect(issuesFor(draft({ message: "m", end: "at" }))).toContain("endsAt");
+    expect(issuesFor(draft({ message: "m", start: "at", startsAt: "2026-08-12T02:00" }))).toEqual(
+      [],
+    );
   });
 
-  it("rejects a window that ends before it starts, as the server would", () => {
+  it("rejects an end before the start, as the server would", () => {
     const issues = issuesFor(
       draft({
         message: "m",
-        schedule: "window",
+        start: "at",
         startsAt: "2026-08-12T04:00",
+        end: "at",
         endsAt: "2026-08-12T02:00",
       }),
     );
@@ -93,31 +95,29 @@ describe("makeBannerSchema", () => {
     expect(issues).toContain("endsAt");
   });
 
-  it("ignores schedule fields the chosen mode does not use", () => {
+  it("ignores schedule fields the chosen options do not use", () => {
     // A leftover bad duration from a previous choice must not block a save.
-    expect(issuesFor(draft({ message: "m", schedule: "always", duration: "nonsense" }))).toEqual(
-      [],
+    expect(issuesFor(draft({ message: "m", end: "never", duration: "nonsense" }))).toEqual([]);
+  });
+
+  it("requires both halves of every link button", () => {
+    const issues = issuesFor(draft({ message: "m", links: [{ text: "", url: "" }] }));
+
+    expect(issues).toContain("links.0.text");
+    expect(issues).toContain("links.0.url");
+  });
+
+  it("rejects a link that is not http(s), and more than three buttons", () => {
+    const link = (url: string) => ({ text: "Go", url });
+    expect(issuesFor(draft({ message: "m", links: [link("javascript:alert(1)")] }))).toContain(
+      "links.0.url",
     );
-  });
-
-  it("requires both halves of a CTA once it is turned on", () => {
-    const issues = issuesFor(draft({ message: "m", hasCta: true }));
-
-    expect(issues).toContain("ctaText");
-    expect(issues).toContain("ctaUrl");
-  });
-
-  it("rejects a CTA link that is not http(s)", () => {
-    // The same rule the server enforces — a javascript: URL never reaches an anchor.
+    expect(issuesFor(draft({ message: "m", links: [link("https://x.dev")] }))).toEqual([]);
     expect(
       issuesFor(
-        draft({ message: "m", hasCta: true, ctaText: "Go", ctaUrl: "javascript:alert(1)" }),
+        draft({ message: "m", links: Array.from({ length: 4 }, () => link("https://x.dev")) }),
       ),
-    ).toContain("ctaUrl");
-
-    expect(
-      issuesFor(draft({ message: "m", hasCta: true, ctaText: "Go", ctaUrl: "https://x.dev" })),
-    ).toEqual([]);
+    ).toContain("links");
   });
 
   it("rejects a colour that is not #RRGGBB, and allows none", () => {
@@ -126,10 +126,6 @@ describe("makeBannerSchema", () => {
       "colorDark",
     ]);
     expect(issuesFor(draft({ message: "m", colorLight: "", colorDark: "#1E3A8A" }))).toEqual([]);
-  });
-
-  it("ignores CTA fields while the CTA is off", () => {
-    expect(issuesFor(draft({ message: "m", hasCta: false, ctaUrl: "not-a-url" }))).toEqual([]);
   });
 });
 
@@ -175,7 +171,7 @@ describe("AnnouncementBannerEditorForm", () => {
   it("lays out every section and previews both theme modes", async () => {
     await mountForm({ message: "Both modes" });
 
-    for (const part of ["message", "variant", "style", "icon", "has-cta", "schedule", "audience"]) {
+    for (const part of ["message", "links", "variant", "schedule", "start", "end", "audience"]) {
       expect(
         document.querySelector(`[data-test="announcement-editor-${part}"]`),
         part,
@@ -184,8 +180,53 @@ describe("AnnouncementBannerEditorForm", () => {
     for (const mode of ["light", "dark"]) {
       const frame = document.querySelector(`[data-test="announcement-editor-preview-${mode}"]`);
       expect(frame?.getAttribute("data-banner-theme")).toBe(mode);
+      expect(frame?.classList.contains("bg-banner-preview-page-bg")).toBe(true);
       expect(frame?.textContent).toContain("Both modes");
     }
+    expect(
+      document.querySelector('[data-test="announcement-editor-preview-dark"]')?.classList,
+    ).toContain("dark");
+  });
+
+  it("shows the look controls only for a custom style", async () => {
+    const wrapper = await mountForm({ message: "m" });
+    const look = '[data-test="announcement-editor-custom-look"]';
+    expect(document.querySelector(look)).toBeNull();
+
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
+    expect(document.querySelector(look)).not.toBeNull();
+    expect(document.querySelector('[data-test="announcement-editor-icon"]')).not.toBeNull();
+  });
+
+  it("saves several link buttons in order", async () => {
+    const wrapper = await mountForm({
+      message: "m",
+      links: [
+        { text: "Status", url: "https://s.io" },
+        { text: "Docs", url: "https://d.io" },
+      ],
+    });
+    await submit(wrapper);
+
+    expect(savedBanners()[2].ctas).toEqual([
+      { text: "Status", url: "https://s.io" },
+      { text: "Docs", url: "https://d.io" },
+    ]);
+  });
+
+  it("adds link buttons up to three", async () => {
+    const wrapper = await mountForm({ message: "m" });
+    const add = () =>
+      document.querySelector<HTMLElement>('[data-test="announcement-editor-add-link"]');
+
+    for (let i = 0; i < 3; i++) {
+      add()!.click();
+      await flushPromises();
+    }
+
+    expect((wrapper.vm as any).form.state.values.links).toHaveLength(3);
+    expect(add()).toBeNull();
   });
 
   it("replaces the edited banner in place and leaves the others untouched", async () => {
@@ -202,6 +243,8 @@ describe("AnnouncementBannerEditorForm", () => {
 
   it("appends a new banner with the chosen preset colours", async () => {
     const wrapper = await mountForm({ message: "New" });
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
 
     document
       .querySelector<HTMLElement>('[data-test="announcement-editor-color-preset-amber"]')!
@@ -216,7 +259,7 @@ describe("AnnouncementBannerEditorForm", () => {
   });
 
   it("sends a duration as typed, for the server to pin to an absolute end", async () => {
-    const wrapper = await mountForm({ message: "Timed", schedule: "duration", duration: "2h" });
+    const wrapper = await mountForm({ message: "Timed", end: "after", duration: "2h" });
     await submit(wrapper);
 
     expect(savedBanners()[2]).toMatchObject({ message: "Timed", duration: "2h" });
@@ -294,15 +337,14 @@ describe("AnnouncementBannerEditorForm", () => {
 
   it("caps the button text so the bar stays readable on phones", () => {
     const paths = issuesFor(
-      draft({ message: "m", hasCta: true, ctaText: "x".repeat(31), ctaUrl: "https://a.dev" }),
+      draft({ message: "m", links: [{ text: "x".repeat(31), url: "https://a.dev" }] }),
     );
-    expect(paths).toContain("ctaText");
+    expect(paths).toContain("links.0.text");
   });
 
   const release: BannerStyle = {
     id: "style-1",
     name: "Release",
-    base: "promo",
     icon: "rocket-launch",
     textSize: "large",
     colorLight: "#DBEAFE",
@@ -315,8 +357,8 @@ describe("AnnouncementBannerEditorForm", () => {
     await flushPromises();
     await submit(wrapper);
 
+    expect(savedBanners()[2].variant).toBeUndefined();
     expect(savedBanners()[2]).toMatchObject({
-      variant: "promo",
       icon: "rocket-launch",
       text_size: "large",
       colors: { light: "#DBEAFE", dark: "#1E3A8A" },
@@ -324,14 +366,18 @@ describe("AnnouncementBannerEditorForm", () => {
     });
   });
 
-  it("drops the style label once the look is changed", async () => {
+  it("switching a saved style to Custom keeps its look but drops its name", async () => {
     const wrapper = await mountForm({ message: "v2" }, null, null, { styles: [release] });
     (wrapper.vm as any).chooseStyle("style:style-1");
     await flushPromises();
-    (wrapper.vm as any).form.setFieldValue("icon", "info");
+    (wrapper.vm as any).chooseStyle("custom");
     await flushPromises();
 
-    expect((wrapper.vm as any).form.state.values.styleId).toBe("");
+    expect((wrapper.vm as any).form.state.values).toMatchObject({
+      styleId: "",
+      icon: "rocket-launch",
+      textSize: "large",
+    });
   });
 
   it("saves the current look as a style without touching the banners", async () => {
@@ -353,7 +399,7 @@ describe("AnnouncementBannerEditorForm", () => {
 
     expect(savedConfig().banners).toEqual(stored);
     expect(savedConfig().styles).toEqual([
-      { id: expect.stringMatching(/^style-/), name: "Maintenance", base: "warning", icon: "build" },
+      { id: expect.stringMatching(/^style-/), name: "Maintenance", icon: "build" },
     ]);
   });
 

@@ -16,7 +16,7 @@
 import { z } from "zod";
 
 import { isHexColor } from "@/utils/announcementAppearance";
-import { parseDurationMs } from "./announcementDrafts";
+import { MAX_LINKS, parseDurationMs } from "./announcementDrafts";
 
 /** Past this a banner wraps onto several lines on a laptop and stops reading as a notice. */
 export const MESSAGE_MAX_LENGTH = 300;
@@ -24,10 +24,9 @@ export const MESSAGE_MAX_LENGTH = 300;
 /** A longer button label pushes the message into a narrow column on phones. */
 export const CTA_MAX_LENGTH = 30;
 
-/**
- * The same rules the API enforces, checked here so an author is told at the
- * field rather than by a rejected save that names a banner index.
- */
+const isHttpUrl = (value: string) => /^https?:\/\//.test(value.trim());
+
+/** The same rules the API enforces, checked here so an author is told at the field. */
 export const makeBannerSchema = (t: (_key: string) => string) =>
   z
     .object({
@@ -38,14 +37,24 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
         .min(1, { message: t("announcements.form.messageRequired") })
         .max(MESSAGE_MAX_LENGTH, { message: t("announcements.form.messageTooLong") }),
       variant: z.enum(["info", "warning", "critical", "promo"]),
-      schedule: z.enum(["always", "duration", "window"]),
-      duration: z.string().optional(),
+      start: z.enum(["now", "at"]),
       startsAt: z.string().optional(),
+      end: z.enum(["never", "after", "at"]),
+      duration: z.string().optional(),
       endsAt: z.string().optional(),
       dismissible: z.boolean(),
-      hasCta: z.boolean(),
-      ctaText: z.string().optional(),
-      ctaUrl: z.string().optional(),
+      links: z
+        .array(
+          z.object({
+            text: z
+              .string()
+              .trim()
+              .min(1, { message: t("announcements.form.ctaTextRequired") })
+              .max(CTA_MAX_LENGTH, { message: t("announcements.editor.ctaTooLong") }),
+            url: z.string().refine(isHttpUrl, { message: t("announcements.form.ctaUrlInvalid") }),
+          }),
+        )
+        .max(MAX_LINKS),
       orgs: z.array(z.string()).optional(),
       textSize: z.enum(["small", "medium", "large"]),
       colorLight: z.string().optional(),
@@ -54,70 +63,29 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
       styleId: z.string().optional(),
     })
     .superRefine((value, ctx) => {
-      if (value.schedule === "duration" && !parseDurationMs(value.duration ?? "")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["duration"],
-          message: t("announcements.form.durationInvalid"),
-        });
-      }
+      const issue = (path: string, key: string) =>
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message: t(key) });
 
-      if (value.schedule === "window") {
-        if (!value.startsAt && !value.endsAt) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["startsAt"],
-            message: t("announcements.form.windowRequired"),
-          });
-        }
-        // The API rejects a backwards window; catching it here saves a round trip.
-        if (
-          value.startsAt &&
-          value.endsAt &&
-          new Date(value.endsAt).getTime() <= new Date(value.startsAt).getTime()
-        ) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["endsAt"],
-            message: t("announcements.form.windowBackwards"),
-          });
+      if (value.start === "at" && !value.startsAt)
+        issue("startsAt", "announcements.form.startRequired");
+      if (value.end === "after" && !parseDurationMs(value.duration ?? "")) {
+        issue("duration", "announcements.form.durationInvalid");
+      }
+      if (value.end === "at") {
+        if (!value.endsAt) {
+          issue("endsAt", "announcements.form.endRequired");
+        } else {
+          const start = value.start === "at" && value.startsAt ? value.startsAt : null;
+          const startMs = start ? new Date(start).getTime() : Date.now();
+          if (new Date(value.endsAt).getTime() <= startMs) {
+            issue("endsAt", "announcements.form.windowBackwards");
+          }
         }
       }
 
       for (const field of ["colorLight", "colorDark"] as const) {
         const color = value[field]?.trim();
-        if (color && !isHexColor(color)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [field],
-            message: t("announcements.form.colorInvalid"),
-          });
-        }
-      }
-
-      if (value.hasCta) {
-        if ((value.ctaText?.trim().length ?? 0) > CTA_MAX_LENGTH) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["ctaText"],
-            message: t("announcements.editor.ctaTooLong"),
-          });
-        }
-        if (!value.ctaText?.trim()) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["ctaText"],
-            message: t("announcements.form.ctaTextRequired"),
-          });
-        }
-        const url = value.ctaUrl?.trim() ?? "";
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["ctaUrl"],
-            message: t("announcements.form.ctaUrlInvalid"),
-          });
-        }
+        if (color && !isHexColor(color)) issue(field, "announcements.form.colorInvalid");
       }
     });
 

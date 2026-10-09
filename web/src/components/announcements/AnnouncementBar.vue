@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="$slots.actions" #actions>
       <slot name="actions" />
     </template>
-    <template v-else-if="inertActions?.ctaText || inertActions?.dismissible" #actions>
+    <template v-else-if="inertActions?.links.length || inertActions?.dismissible" #actions>
       <div class="flex flex-wrap items-center gap-3 font-bold underline" aria-hidden="true">
-        <span v-if="inertActions.ctaText">{{ raw(inertActions.ctaText) }}</span>
+        <span v-for="(link, position) in inertActions.links" :key="position">{{ raw(link) }}</span>
         <span v-if="inertActions.dismissible">{{ t("announcements.dismiss") }}</span>
       </div>
     </template>
@@ -64,7 +64,7 @@ const props = defineProps<{
   /** Which of the authored colours to paint; the live bar passes the app's current mode. */
   mode: BannerThemeMode;
   /** Draws the button text and Dismiss as they will appear, without making them clickable. */
-  inertActions?: { ctaText: string; dismissible: boolean };
+  inertActions?: { links: string[]; dismissible: boolean };
   dataTest?: string;
 }>();
 

@@ -26,20 +26,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :message="banner.message"
     :data-test="`announcement-banner-${banner.variant}`"
   >
-    <template v-if="banner.cta || banner.dismissible" #actions>
+    <template v-if="banner.ctas.length || banner.dismissible" #actions>
       <div class="flex flex-wrap items-center gap-3">
         <OButton
-          v-if="banner.cta"
+          v-for="(cta, position) in banner.ctas"
+          :key="position"
           as="a"
-          :href="banner.cta.url"
+          :href="cta.url"
           target="_blank"
           rel="noopener noreferrer"
           variant="banner-dismiss"
           size="sm"
           class="text-[length:inherit]!"
-          :data-test="`announcement-banner-cta-${banner.id}`"
+          :data-test="`announcement-banner-cta-${banner.id}-${position}`"
         >
-          {{ banner.cta.text }}
+          {{ cta.text }}
         </OButton>
 
         <OButton
