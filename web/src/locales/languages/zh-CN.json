@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "锁定的操作来自 {scope}，在 {module} 中设置",
       "scopeAllOf": "所有 {module}",
       "scopeIncludesFuture": "包括之后创建的资源",
-      "scopeDowntimeHint": "停机时间文件夹限制的是谁可以管理停机时间，而不是它静默的内容：任何可以创建停机时间的人都可以静默整个组织。静默标记和横幅可能会显示用户无法列出的停机时间名称。",
+      "scopeDowntimeHint": "停机时间文件夹限制的是谁可以管理停机时间，而不是它静默的内容。要静默某个模块的所有文件夹，用户需要有列出该模块每个文件夹的权限。静默标记和横幅可能会显示用户无法列出的停机时间名称。",
       "grantedByWiderScope": "由更大范围授予",
       "grantedHereAndByWiderScope": "在此处及更大范围授予",
       "stillGrantedByWiderScope": "已在此处移除，但仍由更大范围授予",

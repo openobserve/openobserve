@@ -172,7 +172,16 @@ pub async fn get_or_create(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder, bool), errors::Error> {
-    let client = get_orm_client_rw().await;
+    get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await
+}
+
+/// [`get_or_create`] on a given connection.
+pub async fn get_or_create_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    folder: Folder,
+    folder_type: FolderType,
+) -> Result<(Ksuid, Folder, bool), errors::Error> {
     let folder_id = folder.folder_id.clone();
 
     if let Some(model) = get_model(client, org_id, &folder_id, folder_type).await? {

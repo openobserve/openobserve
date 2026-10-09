@@ -102,6 +102,29 @@ pub async fn plan_for_downtime(
     plan_remeasures(get_orm_client_rw().await, &covered, before, after).await
 }
 
+/// The re-measure of every SLO the edit moves a window of; one failed read fails the plan.
+pub async fn plan_remeasures(
+    db: &DatabaseConnection,
+    slos: &[(Slo, HashMap<String, String>)],
+    before: Option<&Downtime>,
+    after: &Downtime,
+) -> Result<RemeasurePlan, anyhow::Error> {
+    let mut plan = RemeasurePlan::default();
+    for (slo, dims) in slos {
+        let Some((start, end)) = remeasure_slo(db, slo, dims, before, after).await? else {
+            continue;
+        };
+        plan.jobs.push(jobs::Remeasure {
+            slo_id: slo.id.clone(),
+            generation: slo.definition_generation,
+            range_start: start,
+            range_end: end,
+        });
+        plan.slos.push(slo.clone());
+    }
+    Ok(plan)
+}
+
 /// The one aligned range inside `[from, to)` covering every window, gaps between windows included.
 pub fn remeasure_span(
     windows: &[CorrectionWindow],
@@ -170,29 +193,6 @@ pub fn corrected_keys_sql(slo_id: &str, generation: i32, start: i64, end: i64) -
          ) WHERE zo_rn = 1 AND corrected_by <> '' \
          ORDER BY slice_start, group_key"
     )
-}
-
-/// The re-measure of every SLO the edit moves a window of; one failed read fails the plan.
-async fn plan_remeasures(
-    db: &DatabaseConnection,
-    slos: &[(Slo, HashMap<String, String>)],
-    before: Option<&Downtime>,
-    after: &Downtime,
-) -> Result<RemeasurePlan, anyhow::Error> {
-    let mut plan = RemeasurePlan::default();
-    for (slo, dims) in slos {
-        let Some((start, end)) = remeasure_slo(db, slo, dims, before, after).await? else {
-            continue;
-        };
-        plan.jobs.push(jobs::Remeasure {
-            slo_id: slo.id.clone(),
-            generation: slo.definition_generation,
-            range_start: start,
-            range_end: end,
-        });
-        plan.slos.push(slo.clone());
-    }
-    Ok(plan)
 }
 
 /// The range one SLO needs re-measured for the edit, or `None` if nothing moved.

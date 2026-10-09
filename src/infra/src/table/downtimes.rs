@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use config::meta::{
     downtimes::{Downtime, DowntimeSchedule, Repeat},
-    folder::FolderType,
+    folder::{DEFAULT_FOLDER, FolderType},
 };
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, NotSet, PaginatorTrait, QueryFilter,
@@ -202,7 +202,7 @@ pub async fn get_with<C: ConnectionTrait>(
     Ok(into_downtimes(conn, vec![model]).await?.pop())
 }
 
-/// Tombstones still reference the folder through `downtimes_folder_fk`, so they go before it.
+/// Tombstones move to the default folder, so they still order a late replicated put of their row.
 pub async fn release_folder_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
@@ -211,12 +211,21 @@ pub async fn release_folder_with<C: ConnectionTrait>(
     if count_by_folder_with(conn, org, folder_pk).await? > 0 {
         return Ok(false);
     }
-    Entity::delete_many()
-        .filter(Column::Org.eq(org))
-        .filter(Column::FolderId.eq(folder_pk))
-        .filter(Column::DeletedAt.is_not_null())
-        .exec(conn)
-        .await?;
+    let tombstones = Condition::all()
+        .add(Column::Org.eq(org))
+        .add(Column::FolderId.eq(folder_pk))
+        .add(Column::DeletedAt.is_not_null());
+    let default_pk = default_folder_pk_with(conn, org).await?;
+    // The default folder itself has nowhere to send them.
+    if default_pk == folder_pk {
+        Entity::delete_many().filter(tombstones).exec(conn).await?;
+    } else {
+        Entity::update_many()
+            .col_expr(Column::FolderId, Expr::value(default_pk))
+            .filter(tombstones)
+            .exec(conn)
+            .await?;
+    }
     Ok(true)
 }
 
@@ -611,6 +620,27 @@ async fn folder_pk<C: ConnectionTrait>(
             downtime.folder_id, downtime.org
         ))
     })
+}
+
+/// The primary key of the org's default downtime folder, created on this connection if missing.
+async fn default_folder_pk_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<String, errors::Error> {
+    if let Some(model) = get_folder_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes).await? {
+        return Ok(model.id);
+    }
+    let folder = config::meta::folder::Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: DEFAULT_FOLDER.to_owned(),
+        description: DEFAULT_FOLDER.to_owned(),
+        icon: None,
+    };
+    super::folders::get_or_create_with(conn, org, folder, FolderType::Downtimes).await?;
+    get_folder_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes)
+        .await?
+        .map(|model| model.id)
+        .ok_or_else(|| Error::Message(format!("no default downtime folder in {org}")))
 }
 
 /// Open-ended recurring rows have no `ends_at`, so they never match.
@@ -1370,6 +1400,42 @@ mod tests {
         );
         assert!(Entity::find_by_id("d1").one(&db).await.unwrap().is_none());
         folders::Entity::delete_by_id("pk-default")
+            .exec(&db)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_released_folder_hands_its_tombstones_to_the_default_folder() {
+        let db = db_with_folder_fk().await;
+        folders::Entity::insert(folders::ActiveModel {
+            id: Set("pk-ops".to_string()),
+            org: Set("acme".to_string()),
+            folder_id: Set("ops".to_string()),
+            name: Set("ops".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(folder_type_into_i16(FolderType::Downtimes)),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        let mut row = downtime("d1", Repeat::None, Some(11 * DAY));
+        row.folder_id = "ops".to_string();
+        put_with(&db, &row).await.unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+
+        assert!(release_folder_with(&db, "acme", "pk-ops").await.unwrap());
+        let stored = Entity::find_by_id("d1").one(&db).await.unwrap().unwrap();
+        assert_eq!(stored.folder_id, "pk-default");
+        assert!(
+            version_with(&db, "acme", "d1")
+                .await
+                .unwrap()
+                .is_some_and(|v| v.deleted),
+            "the tombstone still orders a late put"
+        );
+        folders::Entity::delete_by_id("pk-ops")
             .exec(&db)
             .await
             .unwrap();

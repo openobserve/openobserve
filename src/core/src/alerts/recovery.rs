@@ -16,10 +16,16 @@
 //! Subsystems used to decide independently that an alert had got better; they are consumers now.
 //! Best effort: the episode is already committed, so a failure costs a message, not the record.
 
+#[cfg(feature = "enterprise")]
+use config::meta::downtimes::TargetModule;
 use config::meta::{
     alerts::{alert::Alert, recovery::RecoveryEvent},
     self_reporting::usage::{TriggerData, TriggerDataType},
 };
+
+/// A clear run this long after the last window still closes the mute that window recorded.
+#[cfg(feature = "enterprise")]
+const RECORDED_MUTE_GRACE_MICROS: i64 = 24 * 3_600 * 1_000_000;
 
 /// Which consumers one recovery reaches.
 #[derive(Debug, PartialEq)]
@@ -35,6 +41,8 @@ struct ClearRunOncall<'a> {
     withheld: bool,
     /// The downtime to record as the alert's mute.
     record: Option<&'a str>,
+    /// The recorded mute is over, so the record goes and the escalations it held close.
+    forget: bool,
 }
 
 /// Tell every consumer, then return. Never fails.
@@ -56,14 +64,17 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
             event.org_id,
             event.alert_id
         );
-        // Keeps the scheduler's per-run on-call recovery withheld after the window.
+        // Keeps the per-run on-call recovery withheld through a hold, then lets it close the rest.
         #[cfg(feature = "enterprise")]
-        crate::alerts::scheduler::handlers::record_last_downtime(
-            &event.org_id,
-            &event.alert_id,
-            Some(downtime_id),
-        )
-        .await;
+        if let Err(e) =
+            infra::table::alert_states::set_last_downtime_id(&event.alert_id, Some(downtime_id))
+                .await
+        {
+            log::warn!(
+                "[RECOVERY] could not record the downtime of {}: {e}",
+                event.alert_id
+            );
+        }
         usage_reporting::publish_triggers_usage(suppressed_recovery_record(
             alert,
             event,
@@ -108,10 +119,11 @@ pub async fn dispatch_recovery(alert: &Alert, event: &RecoveryEvent) {
     // TODO: a workflow consumer, once a link can carry AlertResolved (see that variant).
 }
 
-/// Whether the scheduler's per-run on-call recovery waits: a recorded mute or a window now.
+/// Whether the scheduler's per-run on-call recovery waits: a window now, or a hold it started.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now: i64) -> bool {
-    if !alert_downtimes_in(&alert.org_id) {
+    let since = now.saturating_sub(RECORDED_MUTE_GRACE_MICROS);
+    if !crate::alerts::downtimes::any_since(&alert.org_id, TargetModule::Alerts, since) {
         return false;
     }
     let Some(alert_id) = alert.id.map(|id| id.to_string()) else {
@@ -119,8 +131,17 @@ pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now
     };
     let recorded = recorded_downtime(&alert_id).await;
     let muted_now = downtime_at(alert, folder_id, recorded.as_deref(), now).await;
-    let episode_open = recorded.is_none() && muted_now.is_some() && episode_open(&alert_id).await;
-    let decision = clear_run_oncall(recorded.as_deref(), muted_now.as_deref(), episode_open);
+    let episode_open = (recorded.is_some() || muted_now.is_some()) && episode_open(&alert_id).await;
+    let held = recorded.as_deref().is_some_and(|id| {
+        let hold = alert.keep_firing_for.saturating_mul(1_000_000);
+        crate::alerts::downtimes::had_window(&alert.org_id, id, now.saturating_sub(hold), now)
+    });
+    let decision = clear_run_oncall(
+        recorded.as_deref(),
+        muted_now.as_deref(),
+        episode_open,
+        held,
+    );
     if let Some(downtime_id) = decision.record {
         crate::alerts::scheduler::handlers::record_last_downtime(
             &alert.org_id,
@@ -129,19 +150,25 @@ pub(crate) async fn oncall_recovery_withheld(alert: &Alert, folder_id: &str, now
         )
         .await;
     }
+    if decision.forget {
+        forget_recorded_mute(&alert.org_id, &alert_id).await;
+    }
     decision.withheld
 }
 
-/// The first clear run of an open episode records its mute, so a hold past the window stays muted.
+/// A recorded mute withholds only while its downtime still covers the `keep_firing_for` hold.
 #[cfg(feature = "enterprise")]
 fn clear_run_oncall<'a>(
     recorded: Option<&str>,
     muted_now: Option<&'a str>,
     episode_open: bool,
+    recorded_held: bool,
 ) -> ClearRunOncall<'a> {
+    let withheld = muted_now.is_some() || (recorded.is_some() && episode_open && recorded_held);
     ClearRunOncall {
-        withheld: recorded.is_some() || muted_now.is_some(),
+        withheld,
         record: muted_now.filter(|_| recorded.is_none() && episode_open),
+        forget: recorded.is_some() && !withheld,
     }
 }
 
@@ -173,15 +200,12 @@ fn suppressed_recovery_record(
     data
 }
 
-#[cfg(feature = "enterprise")]
-fn alert_downtimes_in(org: &str) -> bool {
-    crate::alerts::downtimes::any_for(org, config::meta::downtimes::TargetModule::Alerts)
-}
-
 /// Asked at `recovered_at`, so a `keep_firing_for` hold that outlasts the window still mutes.
 #[cfg(feature = "enterprise")]
 async fn recovery_downtime(alert: &Alert, event: &RecoveryEvent) -> Option<String> {
-    if !alert_downtimes_in(&event.org_id) {
+    // From `recovered_at`, so a hold that outlasts the org's last window still mutes.
+    if !crate::alerts::downtimes::any_since(&event.org_id, TargetModule::Alerts, event.recovered_at)
+    {
         return None;
     }
     let alert_id = alert.id?;
@@ -235,6 +259,18 @@ async fn episode_open(alert_id: &str) -> bool {
             log::warn!("[RECOVERY] state of {alert_id} unreadable for the mute record: {e}");
             false
         }
+    }
+}
+
+/// Clears the record and closes the escalation of the incident a muted recovery resolved quietly.
+#[cfg(feature = "enterprise")]
+async fn forget_recorded_mute(org: &str, alert_id: &str) {
+    // Direct: the org may already be off the downtime path that `record_last_downtime` checks.
+    if let Err(e) = infra::table::alert_states::set_last_downtime_id(alert_id, None).await {
+        log::warn!("[RECOVERY] could not clear the recorded downtime of {alert_id}: {e}");
+    }
+    if let Err(e) = crate::alerts::incidents::recover_after_muted_resolve(org, alert_id).await {
+        log::error!("[RECOVERY] incident on-call recovery failed for {org}/{alert_id}: {e}");
     }
 }
 
@@ -329,26 +365,101 @@ mod tests {
     #[test]
     fn a_hold_that_outlasts_the_window_keeps_the_oncall_recovery_withheld() {
         // Delivered before the window; the first clear run falls inside it and starts the hold.
-        let first = clear_run_oncall(None, Some("dt-1"), true);
+        let first = clear_run_oncall(None, Some("dt-1"), true, false);
         assert_eq!(
             first,
             ClearRunOncall {
                 withheld: true,
-                record: Some("dt-1")
+                record: Some("dt-1"),
+                forget: false,
             }
         );
         // After the window, still inside the hold: the recorded mute keeps it withheld.
-        let after = clear_run_oncall(first.record, None, true);
+        let after = clear_run_oncall(first.record, None, true, true);
         assert!(after.withheld);
         assert_eq!(after.record, None, "recorded once");
+        assert!(!after.forget);
         // No open episode: withheld inside the window, nothing recorded.
         assert_eq!(
-            clear_run_oncall(None, Some("dt-1"), false),
+            clear_run_oncall(None, Some("dt-1"), false, false),
             ClearRunOncall {
                 withheld: true,
-                record: None
+                record: None,
+                forget: false,
             }
         );
-        assert!(!clear_run_oncall(None, None, true).withheld);
+        assert!(!clear_run_oncall(None, None, true, false).withheld);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_recovery_inside_a_window_closes_the_escalation_once_the_window_is_over() {
+        use config::meta::oncall::{PageDecision, ResponseState, page_decision};
+
+        // Paged at 09:00, the window opens at 09:05 and the alert recovers at 09:10.
+        let inside = clear_run_oncall(None, Some("dt-1"), true, false);
+        assert!(inside.withheld, "no recovery is sent inside the window");
+        // The muted recovery closed the episode and recorded the downtime.
+        let still_inside = clear_run_oncall(inside.record, Some("dt-1"), false, false);
+        assert!(still_inside.withheld && !still_inside.forget);
+        // 10:01, the window is over: the clear run recovers and drops the record.
+        let after = clear_run_oncall(inside.record, None, false, false);
+        assert_eq!(
+            after,
+            ClearRunOncall {
+                withheld: false,
+                record: None,
+                forget: true,
+            }
+        );
+        // A record left from a window long gone does not hold a firing episode either.
+        let stale = clear_run_oncall(Some("dt-old"), None, true, false);
+        assert!(!stale.withheld && stale.forget);
+        // Left open, the escalation would absorb the next firing; closed, the next firing pages.
+        let window = config::meta::oncall::DEFAULT_FLAP_DAMPENING_SECS * 1_000_000;
+        assert_eq!(
+            page_decision(
+                Some(&escalation(ResponseState::Triggered, None)),
+                1_000,
+                window
+            ),
+            PageDecision::AlreadyOpen
+        );
+        let closed = escalation(ResponseState::Resolved, Some(1_000));
+        assert_eq!(
+            page_decision(Some(&closed), 1_000 + window + 1, window),
+            PageDecision::Page
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn escalation(
+        state: config::meta::oncall::ResponseState,
+        closed_at: Option<i64>,
+    ) -> config::meta::oncall::Response {
+        use config::meta::oncall::{ResponderRole, SubjectRef, SubjectType};
+        config::meta::oncall::Response {
+            id: "resp_1".into(),
+            org_id: "default".into(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
+            team_id: Some("team_1".into()),
+            title: None,
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: None,
+            priority: 2,
+            responder_role: ResponderRole::Owner,
+            exhausted_at: None,
+            origin_response_id: None,
+            state,
+            opened_at: 0,
+            acked_by: None,
+            acked_at: None,
+            closed_at,
+            incident_id: None,
+            updated_at: 0,
+        }
     }
 }

@@ -190,11 +190,12 @@ mod tests {
             .await
             .unwrap();
         assert!(!folder_exists(&db).await);
-        assert_eq!(
+        assert!(
             table::downtimes::version_with(&db, "acme", "d1")
                 .await
-                .unwrap(),
-            None
+                .unwrap()
+                .is_some_and(|stored| stored.deleted),
+            "the tombstone moves to the default folder"
         );
     }
 

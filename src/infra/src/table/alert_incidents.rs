@@ -617,6 +617,24 @@ pub async fn find_open_incident_containing_alert(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The incident the alert's latest firing joined, whatever its status now.
+pub async fn latest_incident_for_alert(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let Some(link) = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .order_by_desc(alert_incident_alerts::Column::AlertFiredAt)
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+    else {
+        return Ok(None);
+    };
+    get(org_id, &link.incident_id).await
+}
+
 /// Get actual alert counts for multiple incidents (source of truth)
 ///
 /// Returns a HashMap of incident_id -> actual_count from junction table.

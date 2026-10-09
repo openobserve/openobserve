@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "As ações bloqueadas vêm de {scope}, definido em {module}",
       "scopeAllOf": "Tudo em {module}",
       "scopeIncludesFuture": "Inclui recursos criados depois",
-      "scopeDowntimeHint": "Uma pasta de inatividades limita quem gere uma inatividade, não o que silencia: quem pode criar uma inatividade pode silenciar toda a organização. As etiquetas de silêncio e os banners podem nomear uma inatividade que o utilizador não pode listar.",
+      "scopeDowntimeHint": "Uma pasta de inatividades limita quem gere uma inatividade, não o que silencia. Para silenciar Todas as pastas de um módulo, o utilizador precisa da permissão de listar todas as pastas desse módulo. As etiquetas de silêncio e os banners podem nomear uma inatividade que o utilizador não pode listar.",
       "grantedByWiderScope": "Concedido por um escopo mais amplo",
       "grantedHereAndByWiderScope": "Concedido aqui e por um escopo mais amplo",
       "stillGrantedByWiderScope": "Removido aqui, ainda concedido por um escopo mais amplo",

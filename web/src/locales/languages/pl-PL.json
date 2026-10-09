@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Zablokowane akcje pochodzą z {scope}, ustawionego w {module}",
       "scopeAllOf": "Wszystkie {module}",
       "scopeIncludesFuture": "Obejmuje zasoby utworzone później",
-      "scopeDowntimeHint": "Folder okien serwisowych ogranicza, kto zarządza oknem serwisowym, a nie to, co wycisza: każdy, kto może utworzyć okno serwisowe, może wyciszyć całą organizację. Etykiety wyciszenia i banery mogą wskazywać okno serwisowe, którego użytkownik nie może wyświetlić na liście.",
+      "scopeDowntimeHint": "Folder okien serwisowych ogranicza, kto zarządza oknem serwisowym, a nie to, co wycisza. Aby wyciszyć Wszystkie foldery modułu, użytkownik potrzebuje uprawnienia do wyświetlania każdego folderu tego modułu. Etykiety wyciszenia i banery mogą wskazywać okno serwisowe, którego użytkownik nie może wyświetlić na liście.",
       "grantedByWiderScope": "Przyznane przez szerszy zakres",
       "grantedHereAndByWiderScope": "Przyznane tutaj i przez szerszy zakres",
       "stillGrantedByWiderScope": "Usunięte tutaj, nadal przyznane przez szerszy zakres",

@@ -586,9 +586,10 @@ async fn flush_decided(
 async fn entry_decisions(
     batch: &PendingBatch,
 ) -> Vec<Option<config::meta::downtimes::ActiveDowntime>> {
-    if !crate::alerts::downtimes::any_for(
+    if !crate::alerts::downtimes::any_since(
         &batch.org_id,
         config::meta::downtimes::TargetModule::Alerts,
+        oldest_entry(batch),
     ) {
         return vec![None; batch.alerts.len()];
     }
@@ -603,6 +604,12 @@ async fn entry_decisions(
 #[cfg(feature = "enterprise")]
 fn judged_at(batch: &PendingBatch) -> Vec<i64> {
     batch.alerts.iter().map(|entry| entry.timestamp).collect()
+}
+
+/// The downtime gate looks back to here, so a window that ended before the flush still mutes.
+#[cfg(feature = "enterprise")]
+fn oldest_entry(batch: &PendingBatch) -> i64 {
+    judged_at(batch).into_iter().min().unwrap_or_default()
 }
 
 #[cfg(feature = "enterprise")]
@@ -1042,6 +1049,64 @@ mod tests {
         drop_muted_entries(&mut batch, decisions);
         let kept: Vec<_> = batch.alerts.iter().map(|e| e.timestamp).collect();
         assert_eq!(kept, [50]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_entry_inside_a_window_that_ended_before_the_flush_is_still_judged() {
+        use config::meta::downtimes::{
+            Downtime, DowntimeSchedule, DowntimeTarget, Repeat, TargetFolders, TargetModule,
+        };
+
+        use crate::alerts::downtimes::enterprise::{any_live_target, any_target_since};
+
+        const MINUTE: i64 = 60_000_000;
+        let (opens, closes) = (540 * MINUTE, 600 * MINUTE);
+        let only_window = Downtime {
+            id: "dt-1".to_string(),
+            org: "org-ended".to_string(),
+            folder_id: "default".to_string(),
+            name: "dt-1".to_string(),
+            reason: None,
+            condition: None,
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Alerts,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: vec![],
+                slo_mode: None,
+                incident_mode: Default::default(),
+            }],
+            schedule: DowntimeSchedule {
+                repeat: Repeat::None,
+                starts_at: opens,
+                ends_at: Some(closes),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: 3_600,
+                weekdays: vec![],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: false,
+            notifications: None,
+            origin_region: None,
+            version: 1,
+            created_by: "lin".to_string(),
+            created_at: 0,
+            updated_by: "lin".to_string(),
+            updated_at: 0,
+        };
+        let rows = std::slice::from_ref(&only_window);
+        let batch = queued_batch("grouping_test_ended_window", "org-ended", &[598 * MINUTE]);
+        let flush = 602 * MINUTE;
+        assert!(!any_live_target(rows, TargetModule::Alerts, flush));
+        assert!(any_target_since(
+            rows,
+            TargetModule::Alerts,
+            oldest_entry(&batch),
+            flush
+        ));
     }
 
     #[cfg(feature = "enterprise")]

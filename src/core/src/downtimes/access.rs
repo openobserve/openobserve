@@ -190,10 +190,19 @@ async fn check_target_folders(
     user_id: &str,
     target: &DowntimeTarget,
 ) -> Result<(), DowntimeError> {
-    let TargetFolders::Some { folder_ids } = &target.folders else {
-        return Ok(());
-    };
     let (folder_type, ofga_type) = folder_kind(target.module);
+    let TargetFolders::Some { folder_ids } = &target.folders else {
+        // All needs the role-wide LIST grant on every folder of the module.
+        let all = format!("_all_{org}");
+        if check_permissions(
+            &all, org, user_id, ofga_type, "LIST", None, false, false, false,
+        )
+        .await
+        {
+            return Ok(());
+        }
+        return Err(DowntimeError::Forbidden(all_folders_denied(target.module)));
+    };
     for folder_id in folder_ids {
         if !infra::table::folders::exists(org, folder_id, folder_type).await? {
             return Err(DowntimeError::BadRequest(format!(
@@ -274,6 +283,14 @@ fn granted_ids(
         .collect()
 }
 
+fn all_folders_denied(module: TargetModule) -> String {
+    let folders = match module {
+        TargetModule::Synthetics => "synthetics",
+        _ => "alert",
+    };
+    format!("You cannot list every {folders} folder, so you cannot silence all of them.")
+}
+
 /// SLOs and anomaly detections live in alert folders and use the `alerts` resource.
 fn folder_kind(module: TargetModule) -> (FolderType, &'static str) {
     match module {
@@ -314,6 +331,22 @@ mod tests {
         let objects = ["downtime:d2".to_string()];
         let granted = granted_ids("downtime", "acme", &objects, rows());
         assert_eq!(granted, HashSet::from(["d2".to_string()]));
+    }
+
+    #[test]
+    fn all_folders_without_the_org_wide_list_right_names_the_folders_it_needs() {
+        assert_eq!(
+            all_folders_denied(TargetModule::Alerts),
+            "You cannot list every alert folder, so you cannot silence all of them."
+        );
+        assert_eq!(
+            all_folders_denied(TargetModule::Slos),
+            all_folders_denied(TargetModule::AnomalyDetections)
+        );
+        assert_eq!(
+            all_folders_denied(TargetModule::Synthetics),
+            "You cannot list every synthetics folder, so you cannot silence all of them."
+        );
     }
 
     #[test]

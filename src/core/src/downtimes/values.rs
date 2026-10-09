@@ -41,6 +41,8 @@ use super::{DowntimeError, matching::Inventory};
 pub const MAX_VALUES: usize = 50;
 /// Streams searched at the same time; the rest wait for a slot under the same deadline.
 pub const MAX_SEARCH_STREAMS: usize = 10;
+/// A longer prefix matches no real value and only costs the searches.
+pub const MAX_PREFIX_CHARS: usize = 256;
 const VALUES_WINDOW_MICROS: i64 = 3_600 * 1_000_000;
 const VALUES_DEADLINE: Duration = Duration::from_secs(2);
 const VALUES_ROWS_PER_STREAM: usize = 100;
@@ -115,6 +117,7 @@ pub async fn values(
     user_id: &str,
     req: &ValuesRequest,
 ) -> Result<ValuesResponse, DowntimeError> {
+    ensure_prefix_len(&req.prefix)?;
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     ensure_dimension(&groups, &req.key)?;
     let pairs = narrowing_pairs(req.condition.as_ref(), &req.key);
@@ -176,6 +179,15 @@ pub fn ensure_dimension(groups: &[FieldAlias], key: &str) -> Result<(), Downtime
             "`{key}` is not a dimension of this organization."
         )))
     }
+}
+
+pub fn ensure_prefix_len(prefix: &str) -> Result<(), DowntimeError> {
+    if prefix.chars().count() > MAX_PREFIX_CHARS {
+        return Err(DowntimeError::BadRequest(format!(
+            "The search text can be at most {MAX_PREFIX_CHARS} characters."
+        )));
+    }
+    Ok(())
 }
 
 /// The `=` pairs of the And spine without the edited key or an empty value, normalized.
@@ -1153,5 +1165,15 @@ mod tests {
     fn a_quote_in_a_value_is_escaped() {
         assert_eq!(equality("svc", "o'brien"), "\"svc\" = 'o''brien'");
         assert_eq!(contains("svc", "o'b"), "LOWER(\"svc\") LIKE '%o''b%'");
+    }
+
+    #[test]
+    fn a_prefix_longer_than_the_cap_is_a_bad_request() {
+        assert!(ensure_prefix_len(&"é".repeat(MAX_PREFIX_CHARS)).is_ok());
+        assert!(ensure_prefix_len("").is_ok());
+        assert!(matches!(
+            ensure_prefix_len(&"a".repeat(MAX_PREFIX_CHARS + 1)),
+            Err(DowntimeError::BadRequest(_))
+        ));
     }
 }

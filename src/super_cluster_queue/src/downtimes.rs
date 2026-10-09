@@ -15,9 +15,12 @@
 
 //! Applies downtime rows replicated from another region, so each region decides locally.
 
-use config::meta::{
-    downtimes::Downtime,
-    folder::{DEFAULT_FOLDER, Folder, FolderType},
+use config::{
+    meta::{
+        downtimes::Downtime,
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
+    },
+    utils::time::now_micros,
 };
 use infra::{
     coordinator,
@@ -25,6 +28,7 @@ use infra::{
     table::{self, downtimes::RowVersion},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{DowntimeMessage, Message};
+use openobserve_core::slo::corrections::{self, RemeasurePlan};
 use sea_orm::ConnectionTrait;
 
 /// Compare-and-swap rounds before a replicated write gives up on a row that keeps changing.
@@ -51,6 +55,8 @@ impl PutOrder {
 #[derive(Debug)]
 struct PlannedPut {
     stored: Option<RowVersion>,
+    /// The live row the put replaces, for the SLO re-measure.
+    before: Option<Downtime>,
     downtime: Downtime,
     coverage_changed: bool,
 }
@@ -64,12 +70,18 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             downtime.org = org;
             downtime.folder_id = local_folder_id(&downtime).await?;
             let client = infra::db::get_orm_client_rw().await;
-            let Some(coverage_changed) = apply_put(client, &downtime).await? else {
+            let Some(written) = apply_put(client, &downtime).await? else {
                 return Ok(());
             };
             coordinator::downtimes::emit_put_event(&downtime.org, &downtime.id).await?;
-            if coverage_changed {
-                forget_recorded_mutes(&downtime.id).await;
+            if written.coverage_changed {
+                openobserve_core::downtimes::forget_recorded_mutes(&downtime.org, &downtime.id)
+                    .await;
+            }
+            let (before, after) = (written.before.as_ref(), &written.downtime);
+            let planner = async || corrections::plan_for_downtime(&after.org, before, after).await;
+            if let Some(plan) = remeasure(client, before, after, planner).await {
+                plan.trigger(&after.id).await;
             }
             Ok(())
         }
@@ -139,14 +151,17 @@ async fn apply_delete<C: ConnectionTrait>(
     )))
 }
 
-/// Writes the put unless the stored row is newer; `Some(coverage changed)` if it wrote.
-async fn apply_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<bool>> {
+/// Writes the put unless the stored row is newer; the written plan if it wrote.
+async fn apply_put<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+) -> Result<Option<PlannedPut>> {
     for _ in 0..WRITE_ATTEMPTS {
         let Some(planned) = plan_put(conn, downtime).await? else {
             return Ok(None);
         };
         if write_put(conn, &planned).await? {
-            return Ok(Some(planned.coverage_changed));
+            return Ok(Some(planned));
         }
     }
     Err(Error::Message(format!(
@@ -171,9 +186,12 @@ async fn plan_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<O
     if let Some(before) = &before {
         downtime.origin_region = before.origin_region.clone();
     }
-    let coverage_changed = before.is_some_and(|before| !before.same_coverage(&downtime));
+    let coverage_changed = before
+        .as_ref()
+        .is_some_and(|before| !before.same_coverage(&downtime));
     Ok(Some(PlannedPut {
         stored,
+        before,
         downtime,
         coverage_changed,
     }))
@@ -240,11 +258,40 @@ fn delete_applies(stored: RowVersion, version: i64, deleted_at: i64) -> bool {
     }
 }
 
-/// The same rule as the region that made the edit; a failure only delays the chip's correction.
-async fn forget_recorded_mutes(id: &str) {
-    if let Err(e) = table::alert_states::clear_last_downtime_id(id).await {
-        log::warn!("[DOWNTIMES] could not clear the recorded mutes of {id}: {e}");
+/// Slices and re-measure jobs are per region, so a replicated edit re-measures here as a save does.
+async fn remeasure<C: ConnectionTrait>(
+    conn: &C,
+    before: Option<&Downtime>,
+    after: &Downtime,
+    plan: impl AsyncFnOnce() -> std::result::Result<RemeasurePlan, anyhow::Error>,
+) -> Option<RemeasurePlan> {
+    if !openobserve_core::downtimes::corrections_may_change(before, after) {
+        return None;
     }
+    let plan = match plan().await {
+        Ok(plan) => plan,
+        Err(e) => {
+            log::error!(
+                "[DOWNTIMES] could not plan the SLO re-measure of {}/{}: {e}",
+                after.org,
+                after.id
+            );
+            return None;
+        }
+    };
+    if let Err(e) = queue_planned(conn, &plan).await {
+        log::error!(
+            "[DOWNTIMES] could not queue the SLO re-measure of {}/{}: {e}",
+            after.org,
+            after.id
+        );
+        return None;
+    }
+    Some(plan)
+}
+
+async fn queue_planned<C: ConnectionTrait>(conn: &C, plan: &RemeasurePlan) -> Result<()> {
+    table::slo_backfill_jobs::queue_remeasures(conn, plan.jobs(), now_micros() / 1_000_000).await
 }
 
 /// A row that arrives before its folder is filed in the default folder until its next edit.
@@ -363,22 +410,26 @@ mod tests {
         stored.deleted_at.expect("soft-deleted")
     }
 
+    /// [apply_put] as `Some(coverage changed)` when it wrote.
+    async fn put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<bool>> {
+        Ok(apply_put(conn, downtime)
+            .await?
+            .map(|written| written.coverage_changed))
+    }
+
     #[tokio::test]
     async fn a_redelivered_older_put_after_a_delete_writes_nothing() {
         let db = db().await;
-        apply_put(&db, &downtime(10)).await.unwrap();
+        put(&db, &downtime(10)).await.unwrap();
         table::downtimes::delete_with(&db, "acme", "d1")
             .await
             .unwrap();
         let tombstone = deleted_at(&db).await;
 
-        assert_eq!(apply_put(&db, &downtime(10)).await.unwrap(), None);
-        assert_eq!(apply_put(&db, &downtime(tombstone)).await.unwrap(), None);
+        assert_eq!(put(&db, &downtime(10)).await.unwrap(), None);
+        assert_eq!(put(&db, &downtime(tombstone)).await.unwrap(), None);
         // An older version stays stale even with a clock ahead of the tombstone.
-        assert_eq!(
-            apply_put(&db, &downtime(tombstone + 1_000)).await.unwrap(),
-            None
-        );
+        assert_eq!(put(&db, &downtime(tombstone + 1_000)).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             None
@@ -389,15 +440,15 @@ mod tests {
     #[tokio::test]
     async fn a_higher_version_after_a_delete_restores_the_row() {
         let db = db().await;
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         table::downtimes::delete_with(&db, "acme", "d1")
             .await
             .unwrap();
         // The delete is version 2; a clock behind the tombstone does not matter.
         let older = versioned(1, deleted_at(&db).await + 1);
-        assert_eq!(apply_put(&db, &older).await.unwrap(), None);
+        assert_eq!(put(&db, &older).await.unwrap(), None);
         let newer = versioned(3, 5);
-        assert_eq!(apply_put(&db, &newer).await.unwrap(), Some(false));
+        assert_eq!(put(&db, &newer).await.unwrap(), Some(false));
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             Some(newer)
@@ -408,16 +459,16 @@ mod tests {
     async fn a_delete_that_overtakes_missed_updates_keeps_their_late_puts_out() {
         let db = db().await;
         // This region saw version 1 only; the deleting region wrote 2 and 3, then deleted at 4.
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         assert!(apply_delete(&db, "acme", "d1", 4, 40).await.unwrap());
-        assert_eq!(apply_put(&db, &versioned(3, 30)).await.unwrap(), None);
-        assert_eq!(apply_put(&db, &versioned(2, 20)).await.unwrap(), None);
+        assert_eq!(put(&db, &versioned(3, 30)).await.unwrap(), None);
+        assert_eq!(put(&db, &versioned(2, 20)).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             None
         );
         // A Delete from a region that predates the field (version 0) still bumps locally.
-        apply_put(&db, &versioned(5, 50)).await.unwrap();
+        put(&db, &versioned(5, 50)).await.unwrap();
         assert!(apply_delete(&db, "acme", "d1", 0, 0).await.unwrap());
         let stored = table::downtimes::version_with(&db, "acme", "d1")
             .await
@@ -430,7 +481,7 @@ mod tests {
     async fn a_newer_delete_raises_a_local_tombstone_so_late_puts_stay_out() {
         let db = db().await;
         // B deletes its version 1 locally while A edits through 3 and deletes at 4.
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         assert_eq!(
             table::downtimes::delete_with(&db, "acme", "d1")
                 .await
@@ -439,7 +490,7 @@ mod tests {
             Some(2)
         );
         assert!(apply_delete(&db, "acme", "d1", 4, 40).await.unwrap());
-        assert_eq!(apply_put(&db, &versioned(3, i64::MAX)).await.unwrap(), None);
+        assert_eq!(put(&db, &versioned(3, i64::MAX)).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             None
@@ -450,17 +501,14 @@ mod tests {
     async fn a_delete_before_its_put_leaves_no_live_row() {
         let db = db().await;
         apply_delete(&db, "acme", "d1", 2, 1_000).await.unwrap();
-        assert_eq!(apply_put(&db, &versioned(1, 500)).await.unwrap(), None);
+        assert_eq!(put(&db, &versioned(1, 500)).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             None
         );
         assert_eq!(deleted_at(&db).await, 1_000);
         // A later edit from another region still restores it, as with any tombstone.
-        assert_eq!(
-            apply_put(&db, &versioned(3, 2_000)).await.unwrap(),
-            Some(false)
-        );
+        assert_eq!(put(&db, &versioned(3, 2_000)).await.unwrap(), Some(false));
     }
 
     #[tokio::test]
@@ -478,12 +526,9 @@ mod tests {
     #[tokio::test]
     async fn a_higher_version_wins_whatever_its_clock_says() {
         let db = db().await;
-        apply_put(&db, &versioned(2, 100)).await.unwrap();
-        assert_eq!(apply_put(&db, &versioned(1, 500)).await.unwrap(), None);
-        assert_eq!(
-            apply_put(&db, &versioned(3, 50)).await.unwrap(),
-            Some(false)
-        );
+        put(&db, &versioned(2, 100)).await.unwrap();
+        assert_eq!(put(&db, &versioned(1, 500)).await.unwrap(), None);
+        assert_eq!(put(&db, &versioned(3, 50)).await.unwrap(), Some(false));
         let stored = table::downtimes::get_with(&db, "acme", "d1")
             .await
             .unwrap()
@@ -494,16 +539,10 @@ mod tests {
     #[tokio::test]
     async fn equal_versions_from_two_regions_keep_the_later_updated_at() {
         let db = db().await;
-        apply_put(&db, &versioned(2, 100)).await.unwrap();
-        assert_eq!(apply_put(&db, &versioned(2, 90)).await.unwrap(), None);
-        assert_eq!(
-            apply_put(&db, &versioned(2, 110)).await.unwrap(),
-            Some(false)
-        );
-        assert_eq!(
-            apply_put(&db, &versioned(2, 110)).await.unwrap(),
-            Some(false)
-        );
+        put(&db, &versioned(2, 100)).await.unwrap();
+        assert_eq!(put(&db, &versioned(2, 90)).await.unwrap(), None);
+        assert_eq!(put(&db, &versioned(2, 110)).await.unwrap(), Some(false));
+        assert_eq!(put(&db, &versioned(2, 110)).await.unwrap(), Some(false));
         let stored = table::downtimes::get_with(&db, "acme", "d1")
             .await
             .unwrap()
@@ -539,9 +578,9 @@ mod tests {
     #[tokio::test]
     async fn an_older_put_never_reverts_a_newer_live_row() {
         let db = db().await;
-        assert_eq!(apply_put(&db, &downtime(20)).await.unwrap(), Some(false));
-        assert_eq!(apply_put(&db, &downtime(10)).await.unwrap(), None);
-        assert_eq!(apply_put(&db, &downtime(20)).await.unwrap(), Some(false));
+        assert_eq!(put(&db, &downtime(20)).await.unwrap(), Some(false));
+        assert_eq!(put(&db, &downtime(10)).await.unwrap(), None);
+        assert_eq!(put(&db, &downtime(20)).await.unwrap(), Some(false));
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1")
                 .await
@@ -556,11 +595,11 @@ mod tests {
         let db = db().await;
         let mut created = downtime(10);
         created.origin_region = Some("us-east".to_string());
-        apply_put(&db, &created).await.unwrap();
+        put(&db, &created).await.unwrap();
 
         let mut edited = downtime(20);
         edited.origin_region = Some("eu-west".to_string());
-        apply_put(&db, &edited).await.unwrap();
+        put(&db, &edited).await.unwrap();
         let stored = table::downtimes::get_with(&db, "acme", "d1")
             .await
             .unwrap()
@@ -572,10 +611,10 @@ mod tests {
     #[tokio::test]
     async fn a_redelivered_delete_after_a_restoring_put_leaves_the_row_live() {
         let db = db().await;
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         assert!(apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
         let restored = versioned(3, 30);
-        assert_eq!(apply_put(&db, &restored).await.unwrap(), Some(false));
+        assert_eq!(put(&db, &restored).await.unwrap(), Some(false));
 
         assert!(!apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
         assert_eq!(
@@ -587,7 +626,7 @@ mod tests {
     #[tokio::test]
     async fn a_replicated_delete_keeps_its_own_version_and_time() {
         let db = db().await;
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         assert!(apply_delete(&db, "acme", "d1", 4, 5_000).await.unwrap());
         let tombstone = RowVersion {
             version: 4,
@@ -614,7 +653,7 @@ mod tests {
     #[tokio::test]
     async fn a_local_delete_between_the_read_and_the_write_of_a_put_stands() {
         let db = db().await;
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         let incoming = versioned(2, 20);
         let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
 
@@ -623,7 +662,7 @@ mod tests {
             .unwrap();
         assert!(!write_put(&db, &planned).await.unwrap());
         // The local tombstone is version 2 too, and it is later, so the put is stale on its retry.
-        assert_eq!(apply_put(&db, &incoming).await.unwrap(), None);
+        assert_eq!(put(&db, &incoming).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             None
@@ -633,7 +672,7 @@ mod tests {
     #[tokio::test]
     async fn a_local_edit_between_the_read_and_the_write_of_a_put_stands() {
         let db = db().await;
-        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        put(&db, &versioned(1, 10)).await.unwrap();
         let incoming = versioned(2, 20);
         let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
 
@@ -645,7 +684,7 @@ mod tests {
                 .unwrap()
         );
         assert!(!write_put(&db, &planned).await.unwrap());
-        assert_eq!(apply_put(&db, &incoming).await.unwrap(), None);
+        assert_eq!(put(&db, &incoming).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             Some(local)
@@ -660,7 +699,7 @@ mod tests {
 
         assert!(apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
         assert!(!write_put(&db, &planned).await.unwrap());
-        assert_eq!(apply_put(&db, &incoming).await.unwrap(), None);
+        assert_eq!(put(&db, &incoming).await.unwrap(), None);
         assert_eq!(deleted_at(&db).await, 20);
     }
 
@@ -683,5 +722,169 @@ mod tests {
             let live_after_put = put_order(row(2, incoming_at, true), 2, stored_at).applies();
             assert_eq!(live_after_delete, live_after_put);
         }
+    }
+
+    #[tokio::test]
+    async fn a_put_at_the_version_of_a_tombstone_moved_by_a_folder_delete_is_skipped() {
+        let db = db().await;
+        folders::Entity::insert(folders::ActiveModel {
+            id: Set("pk-ops".to_string()),
+            org: Set("acme".to_string()),
+            folder_id: Set("ops".to_string()),
+            name: Set("ops".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(6),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        let mut row = versioned(1, 10);
+        row.folder_id = "ops".to_string();
+        put(&db, &row).await.unwrap();
+        assert!(apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
+        assert!(
+            table::downtimes::release_folder_with(&db, "acme", "pk-ops")
+                .await
+                .unwrap()
+        );
+
+        let late = Downtime {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            ..versioned(2, 20)
+        };
+        assert_eq!(put(&db, &late).await.unwrap(), None);
+        assert!(
+            table::downtimes::version_with(&db, "acme", "d1")
+                .await
+                .unwrap()
+                .is_some_and(|stored| stored.deleted)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replicated_put_that_covers_an_slo_queues_its_re_measure_here() {
+        use config::meta::{
+            downtimes::{DowntimeTarget, TargetFolders, TargetModule},
+            slo::{CountSource, SliConfig, Slo, SloDefinition, slice::Writer},
+        };
+        use infra::table::{
+            entity::{slo_backfill_jobs, slo_status},
+            slo as slo_table,
+        };
+
+        const HOUR: i64 = 3_600;
+        const WATERMARK: i64 = 20 * HOUR;
+        let db = db().await;
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(slo_backfill_jobs::Entity),
+            schema.create_table_from_entity(slo_status::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        slo_table::init_generation(&db, "s1", 1).await.unwrap();
+        slo_table::apply_status(
+            &db,
+            &slo_table::StatusWrite {
+                slo_id: "s1".to_string(),
+                definition_generation: 1,
+                writer: Writer::Incremental,
+                deltas: vec![],
+                watermark_end: Some(WATERMARK),
+                trailing_slices: None,
+                burn_windows: None,
+                computed_at: WATERMARK,
+            },
+        )
+        .await
+        .unwrap();
+        let slo = Slo {
+            id: "s1".to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: "s1".to_string(),
+            description: String::new(),
+            definition: SloDefinition {
+                sli_config: SliConfig::Count {
+                    source: CountSource::SingleQuery {
+                        stream: "requests".to_string(),
+                        stream_type: "logs".to_string(),
+                        scope: None,
+                        good_expr: "status < 500".to_string(),
+                    },
+                },
+                group_by: None,
+                window_secs: 86_400,
+                slice_interval_secs: 300,
+            },
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        };
+        let replicated = Downtime {
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Slos,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: vec![],
+                slo_mode: None,
+                incident_mode: Default::default(),
+            }],
+            schedule: DowntimeSchedule {
+                repeat: Repeat::None,
+                starts_at: 10 * HOUR * 1_000_000,
+                ends_at: Some(11 * HOUR * 1_000_000),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: HOUR,
+                weekdays: vec![],
+            },
+            ..versioned(1, 10)
+        };
+
+        let slos = [(slo, Default::default())];
+        let written = apply_put(&db, &replicated).await.unwrap().unwrap();
+        let (before, after) = (written.before.as_ref(), &written.downtime);
+        let planned = remeasure(&db, before, after, async || {
+            corrections::plan_remeasures(&db, &slos, before, after).await
+        })
+        .await;
+        assert!(planned.is_some());
+
+        // A rename of the stored row moves no window, so it plans nothing.
+        let renamed = Downtime {
+            name: "renamed".to_string(),
+            version: 2,
+            updated_at: 20,
+            ..replicated.clone()
+        };
+        let written = apply_put(&db, &renamed).await.unwrap().unwrap();
+        assert!(written.before.is_some());
+        let mut planned_again = false;
+        let skipped = remeasure(
+            &db,
+            written.before.as_ref(),
+            &written.downtime,
+            async || {
+                planned_again = true;
+                Ok(Default::default())
+            },
+        )
+        .await;
+        assert!(skipped.is_none() && !planned_again);
+
+        let jobs = slo_backfill_jobs::Entity::find().all(&db).await.unwrap();
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].kind, table::slo_backfill_jobs::KIND_REMEASURE);
+        assert_eq!(
+            (jobs[0].range_start, jobs[0].range_end),
+            (10 * HOUR, 11 * HOUR)
+        );
     }
 }

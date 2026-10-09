@@ -214,12 +214,16 @@ pub async fn create(
     let folder_id = resolve_folder(org, &req.folder_id).await?;
     let req = checked_request(org, user_id, req).await?;
     check_room(org)?;
-    let mut downtime = created(org, folder_id, &req, user_id, now_micros());
+    let now = now_micros();
+    let mut downtime = created(org, folder_id, &req, user_id, now);
     downtime.notifications = with_continues(req.notifications.clone(), None);
     downtime.origin_region = origin_region();
     let plan = remeasure_plan(None, &downtime).await?;
     db::downtimes::set(&downtime, plan.jobs()).await?;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
+    if let Some(due) = started_on_save(&downtime, now) {
+        notify::deliver_in_background(downtime.clone(), due);
+    }
     plan.trigger(&downtime.id).await;
     Ok(downtime)
 }
@@ -240,12 +244,18 @@ pub async fn update(
         .as_ref()
         .and_then(|n| n.continues.clone());
     let notifications = with_continues(req.notifications.clone(), continues);
-    let mut after = edited(&before, req, user_id, now_micros());
+    let now = now_micros();
+    let mut after = edited(&before, req, user_id, now);
     after.notifications = notifications;
     let plan = remeasure_plan(Some(&before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     if !before.same_coverage(&after) {
-        forget_recorded_mutes(&after.id).await;
+        forget_recorded_mutes(&after.org, &after.id).await;
+    }
+    if before.schedule != after.schedule
+        && let Some(due) = started_on_save(&after, now)
+    {
+        notify::deliver_in_background(after.clone(), due);
     }
     plan.trigger(&after.id).await;
     Ok(after)
@@ -260,9 +270,11 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
         return Ok(before);
     }
     let now = now_micros();
+    check_cancellable(&before, now)?;
     let after = cancelled(&before, user_id, now);
     let plan = remeasure_plan(Some(&before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
+    forget_recorded_mutes(&after.org, &after.id).await;
     if let Some(window) = cancelled_window(&before, now) {
         notify::deliver_in_background(
             after.clone(),
@@ -270,6 +282,9 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
         );
     }
     plan.trigger(&after.id).await;
+    if before.schedule.repeat != Repeat::None {
+        cancel_follow_ups(org, user_id, &before.id, now).await;
+    }
     Ok(after)
 }
 
@@ -285,19 +300,29 @@ pub async fn extend(
     access::authorize_row(org, user_id, &before, "PUT").await?;
     let now = now_micros();
     let window = extendable_window(&before, now)?;
-    let new_end = extended_end(window.end, req, now)?;
     if before.schedule.repeat == Repeat::None {
-        let after = extended_once(&before, new_end, user_id, now);
-        checked_request(org, user_id, request_of(&after)).await?;
-        let plan = remeasure_plan(Some(&before), &after).await?;
-        set_if_unchanged(&after, before.updated_at, &plan).await?;
+        let new_end = extended_end(window.end, req, now)?;
+        let after = extend_once(org, user_id, &before, new_end, now).await?;
         notify::deliver_in_background(after.clone(), extended_event(window.start, new_end));
-        plan.trigger(&after.id).await;
         return Ok(ExtendDowntimeResponse {
             downtime: after,
             created_id: None,
         });
     }
+    let cached = db::downtimes::list_cached(org);
+    if let Some(follow_up) = live_follow_up(&cached, &before.id, window.end, now) {
+        let follow_up = load(org, &follow_up.id).await?;
+        access::authorize_row(org, user_id, &follow_up, "PUT").await?;
+        let current_end = follow_up.schedule.ends_at.unwrap_or(window.end);
+        let new_end = extended_end(current_end, req, now)?;
+        let after = extend_once(org, user_id, &follow_up, new_end, now).await?;
+        notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
+        return Ok(ExtendDowntimeResponse {
+            created_id: Some(after.id.clone()),
+            downtime: after,
+        });
+    }
+    let new_end = extended_end(window.end, req, now)?;
     if !crate::auth::check_folder_write_permissions(
         org,
         user_id,
@@ -486,6 +511,35 @@ pub fn continues_window(follow_up: &Downtime, parent: &Downtime, window_end: i64
             .is_none_or(|cancelled| cancelled > at)
 }
 
+/// Drops the Muted chips recorded under the row and closes the escalations they kept open.
+pub async fn forget_recorded_mutes(org: &str, id: &str) {
+    let cleared = match infra::table::alert_states::clear_last_downtime_id(id).await {
+        Ok(cleared) => cleared,
+        Err(e) => {
+            log::warn!("[downtimes] could not clear the recorded mutes of {id}: {e}");
+            return;
+        }
+    };
+    recover_cleared(org, &cleared, async |org, alert_id| {
+        crate::alerts::incidents::recover_after_muted_resolve(org, alert_id).await
+    })
+    .await;
+}
+
+/// Only the schedule, the targets with their `slo_mode`, the condition and a cancel move a window.
+pub fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bool {
+    let has_slos = |d: &Downtime| scope::target_for(&d.targets, TargetModule::Slos).is_some();
+    if !has_slos(after) && !before.is_some_and(has_slos) {
+        return false;
+    }
+    before.is_none_or(|before| {
+        before.schedule != after.schedule
+            || before.targets != after.targets
+            || before.condition != after.condition
+            || before.cancelled_at != after.cancelled_at
+    })
+}
+
 /// A concurrent edit, cancel or delete since `expected_updated_at` makes this write a 409.
 async fn set_if_unchanged(
     downtime: &Downtime,
@@ -497,6 +551,57 @@ async fn set_if_unchanged(
     } else {
         Err(changed_meanwhile())
     }
+}
+
+/// Moves the end of a one-time row, validated like an edit; the caller sends the notification.
+async fn extend_once(
+    org: &str,
+    user_id: &str,
+    before: &Downtime,
+    new_end: i64,
+    now: i64,
+) -> Result<Downtime, DowntimeError> {
+    let after = extended_once(before, new_end, user_id, now);
+    checked_request(org, user_id, request_of(&after)).await?;
+    let plan = remeasure_plan(Some(before), &after).await?;
+    set_if_unchanged(&after, before.updated_at, &plan).await?;
+    plan.trigger(&after.id).await;
+    Ok(after)
+}
+
+/// A follow-up outlives its parent's cancel unless it is cancelled too; a failure is logged.
+async fn cancel_follow_ups(org: &str, user_id: &str, parent_id: &str, now: i64) {
+    let cached = db::downtimes::list_cached(org);
+    for id in follow_ups_to_cancel(&cached, parent_id, now) {
+        if let Err(e) = cancel_follow_up(org, user_id, id, now).await {
+            log::warn!(
+                "[downtimes] could not cancel {org}/{id}, the follow-up of {parent_id}: {e}"
+            );
+        }
+    }
+}
+
+async fn cancel_follow_up(
+    org: &str,
+    user_id: &str,
+    id: &str,
+    now: i64,
+) -> Result<(), DowntimeError> {
+    let before = load(org, id).await?;
+    if before.cancelled_at.is_some() {
+        return Ok(());
+    }
+    // A follow-up can be moved to a folder the caller cannot change; it then stays.
+    access::authorize_row(org, user_id, &before, "PUT").await?;
+    let after = cancelled(&before, user_id, now);
+    let plan = remeasure_plan(Some(&before), &after).await?;
+    set_if_unchanged(&after, before.updated_at, &plan).await?;
+    forget_recorded_mutes(&after.org, &after.id).await;
+    if let Some(due) = follow_up_cancelled_event(&before, now) {
+        notify::deliver_in_background(after.clone(), due);
+    }
+    plan.trigger(&after.id).await;
+    Ok(())
 }
 
 fn changed_meanwhile() -> DowntimeError {
@@ -790,6 +895,76 @@ fn cancelled_window(row: &Downtime, now: i64) -> Option<DowntimeWindow> {
         .or_else(|| schedule::next_window(&row.schedule, now))
 }
 
+/// Only a follow-up in force now tells its subscribers; the parent's own cancel covers a later one.
+fn follow_up_cancelled_event(row: &Downtime, now: i64) -> Option<DueEvent> {
+    schedule::window_at(&row.schedule, now).map(|w| {
+        DueEvent::of_window(
+            NotificationEvent::Cancelled,
+            DowntimeWindow {
+                start: w.start,
+                end: now,
+            },
+        )
+    })
+}
+
+/// A row saved inside its window already started, and the job looks back only to its last tick.
+fn started_on_save(row: &Downtime, now: i64) -> Option<DueEvent> {
+    if row.cancelled_at.is_some() || !notify::wants(row, NotificationEvent::Started) {
+        return None;
+    }
+    schedule::window_at(&row.schedule, now)
+        .map(|window| DueEvent::of_window(NotificationEvent::Started, window))
+}
+
+/// Cancelling a row that already ended would rewrite its history as a cancel.
+fn check_cancellable(row: &Downtime, now: i64) -> Result<(), DowntimeError> {
+    if matches!(
+        schedule::status(&row.schedule, row.cancelled_at, now),
+        DowntimeStatus::Ended
+    ) {
+        return Err(DowntimeError::Conflict(
+            "Downtime already ended".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// The live one-time row an earlier extension made from the parent's current window end.
+fn live_follow_up<'a>(
+    rows: &'a [Downtime],
+    parent_id: &str,
+    window_end: i64,
+    now: i64,
+) -> Option<&'a Downtime> {
+    rows.iter().find(|row| {
+        continues(row) == Some(parent_id)
+            && row.schedule.repeat == Repeat::None
+            && row.schedule.starts_at == window_end
+            && row.cancelled_at.is_none()
+            && row.schedule.ends_at.is_some_and(|end| end > now)
+    })
+}
+
+/// The ids of the parent's follow-ups whose window has not ended.
+fn follow_ups_to_cancel<'a>(rows: &'a [Downtime], parent_id: &str, now: i64) -> Vec<&'a str> {
+    rows.iter()
+        .filter(|row| {
+            continues(row) == Some(parent_id)
+                && row.cancelled_at.is_none()
+                && (schedule::window_at(&row.schedule, now).is_some()
+                    || schedule::next_window(&row.schedule, now).is_some())
+        })
+        .map(|row| row.id.as_str())
+        .collect()
+}
+
+fn continues(row: &Downtime) -> Option<&str> {
+    row.notifications
+        .as_ref()
+        .and_then(|n| n.continues.as_deref())
+}
+
 /// Each extension is its own event, so it is keyed by its new end rather than the window start.
 fn extended_event(start: i64, new_end: i64) -> DueEvent {
     DueEvent {
@@ -955,10 +1130,16 @@ fn check_deletable(row: &Downtime, now: i64) -> Result<(), DowntimeError> {
     Ok(())
 }
 
-/// A coverage edit drops the Muted chips recorded under the row until firings record them again.
-async fn forget_recorded_mutes(id: &str) {
-    if let Err(e) = infra::table::alert_states::clear_last_downtime_id(id).await {
-        log::warn!("[downtimes] could not clear the recorded mutes of {id}: {e}");
+/// Recovers each cleared alert's quietly resolved incident; one failure does not stop the rest.
+async fn recover_cleared(
+    org: &str,
+    alert_ids: &[String],
+    mut recover: impl AsyncFnMut(&str, &str) -> Result<(), anyhow::Error>,
+) {
+    for alert_id in alert_ids {
+        if let Err(e) = recover(org, alert_id).await {
+            log::error!("[downtimes] incident on-call recovery failed for {org}/{alert_id}: {e}");
+        }
     }
 }
 
@@ -971,20 +1152,6 @@ async fn remeasure_plan(
         return Ok(RemeasurePlan::default());
     }
     Ok(crate::slo::corrections::plan_for_downtime(&after.org, before, after).await?)
-}
-
-/// Only the schedule, the targets with their `slo_mode`, the condition and a cancel move a window.
-fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bool {
-    let has_slos = |d: &Downtime| scope::target_for(&d.targets, TargetModule::Slos).is_some();
-    if !has_slos(after) && !before.is_some_and(has_slos) {
-        return false;
-    }
-    before.is_none_or(|before| {
-        before.schedule != after.schedule
-            || before.targets != after.targets
-            || before.condition != after.condition
-            || before.cancelled_at != after.cancelled_at
-    })
 }
 
 fn matches_of(downtime: &Downtime, inventory: &Inventory) -> Matches {
@@ -2094,5 +2261,136 @@ mod tests {
         mark_slo_applies(&mut slos, &short, &inventory, 10 * HOUR);
         let applies: Vec<_> = slos.iter().map(|m| m.applies).collect();
         assert_eq!(applies, [Some(false), Some(true), None]);
+    }
+
+    #[test]
+    fn a_save_inside_its_window_sends_started_once_keyed_by_the_window() {
+        let now = 10 * HOUR;
+        let events = NotificationEvents {
+            started: true,
+            ..Default::default()
+        };
+        let started = notifying(
+            row(vec![TargetModule::Alerts], now - 60_000_000, 12 * HOUR),
+            events,
+            600,
+        );
+        assert_eq!(
+            started_on_save(&started, now),
+            Some(DueEvent {
+                event: NotificationEvent::Started,
+                window: window(now - 60_000_000, 12 * HOUR),
+                key: now - 60_000_000,
+            })
+        );
+        let later = notifying(
+            row(vec![TargetModule::Alerts], 11 * HOUR, 12 * HOUR),
+            events,
+            600,
+        );
+        assert_eq!(started_on_save(&later, now), None, "the job sends it");
+        let silent = notifying(
+            row(vec![TargetModule::Alerts], now - 60_000_000, 12 * HOUR),
+            NotificationEvents::default(),
+            600,
+        );
+        assert_eq!(started_on_save(&silent, now), None);
+    }
+
+    #[test]
+    fn a_second_extension_lengthens_the_follow_up_instead_of_adding_one() {
+        let parent = daily("09:00", 3_600);
+        let now = 9 * HOUR + HOUR / 2;
+        let current = extendable_window(&parent, now).unwrap();
+        assert!(
+            live_follow_up(std::slice::from_ref(&parent), &parent.id, current.end, now).is_none()
+        );
+        let first_end = extended_end(current.end, &by(3_600), now).unwrap();
+        let first = follow_up(&parent, current.end, first_end, "ops", now);
+        assert_eq!(first.schedule.ends_at, Some(11 * HOUR));
+
+        let rows = [parent.clone(), first.clone()];
+        let found = live_follow_up(&rows, &parent.id, current.end, now).unwrap();
+        assert_eq!(found.id, first.id);
+        let second_end = extended_end(found.schedule.ends_at.unwrap(), &by(3_600), now).unwrap();
+        let extended = extended_once(found, second_end, "ops", now);
+        assert_eq!(extended.id, first.id, "no second follow-up");
+        assert_eq!(extended.schedule.ends_at, Some(12 * HOUR));
+        let events = [
+            extended_event(current.start, first_end),
+            extended_event(current.start, second_end),
+        ];
+        assert_ne!(events[0].key, events[1].key, "two Extended events");
+
+        let mut cancelled_one = first.clone();
+        cancelled_one.cancelled_at = Some(now);
+        assert!(
+            live_follow_up(
+                &[parent.clone(), cancelled_one],
+                &parent.id,
+                current.end,
+                now
+            )
+            .is_none()
+        );
+        assert!(live_follow_up(&rows, "other", current.end, now).is_none());
+    }
+
+    #[test]
+    fn a_parent_cancel_cancels_the_follow_ups_that_have_not_ended() {
+        let parent = daily("09:00", 3_600);
+        let now = 9 * HOUR + HOUR / 2;
+        let live = follow_up(&parent, 10 * HOUR, 11 * HOUR, "ops", now);
+        let ended = Downtime {
+            id: "old".to_string(),
+            ..follow_up(&parent, 2 * HOUR, 3 * HOUR, "ops", now)
+        };
+        let unrelated = row(vec![TargetModule::Alerts], 10 * HOUR, 11 * HOUR);
+        let rows = [parent.clone(), live.clone(), ended, unrelated];
+        assert_eq!(
+            follow_ups_to_cancel(&rows, &parent.id, now),
+            vec![live.id.as_str()]
+        );
+        assert_eq!(
+            follow_up_cancelled_event(&live, now),
+            None,
+            "the parent's cancel reports the window it cut short"
+        );
+        let in_force = 10 * HOUR + HOUR / 2;
+        assert_eq!(
+            follow_up_cancelled_event(&live, in_force),
+            Some(DueEvent::of_window(
+                NotificationEvent::Cancelled,
+                window(10 * HOUR, in_force)
+            ))
+        );
+        let stopped = cancelled(&live, "ops", now);
+        assert_eq!(stopped.cancelled_at, Some(now));
+        assert!(follow_ups_to_cancel(&[parent.clone(), stopped], &parent.id, now).is_empty());
+    }
+
+    #[test]
+    fn a_cancel_of_an_ended_row_is_a_conflict() {
+        let d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let err = check_cancellable(&d, 13 * HOUR).unwrap_err();
+        assert!(matches!(&err, DowntimeError::Conflict(m) if m == "Downtime already ended"));
+        assert!(check_cancellable(&d, 11 * HOUR).is_ok());
+        assert!(check_cancellable(&d, 9 * HOUR).is_ok());
+        assert!(check_cancellable(&daily("09:00", 3_600), 30 * HOUR).is_ok());
+    }
+
+    #[tokio::test]
+    async fn every_alert_whose_mute_a_cancel_clears_has_its_incident_recovered() {
+        let cleared = ["a1".to_string(), "a2".to_string(), "a3".to_string()];
+        let mut recovered = Vec::new();
+        recover_cleared("acme", &cleared, async |org, alert_id| {
+            recovered.push(format!("{org}/{alert_id}"));
+            if alert_id == "a2" {
+                anyhow::bail!("oncall down");
+            }
+            Ok(())
+        })
+        .await;
+        assert_eq!(recovered, ["acme/a1", "acme/a2", "acme/a3"]);
     }
 }

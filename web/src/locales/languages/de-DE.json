@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Gesperrte Aktionen stammen aus {scope}, festgelegt in {module}",
       "scopeAllOf": "Alle {module}",
       "scopeIncludesFuture": "Enthält später erstellte Ressourcen",
-      "scopeDowntimeHint": "Ein Wartungsfenster-Ordner legt fest, wer ein Wartungsfenster verwaltet, nicht was es stummschaltet: Wer ein Wartungsfenster erstellen kann, kann die ganze Organisation stummschalten. Stumm-Chips und Banner können ein Wartungsfenster nennen, das ein Benutzer nicht auflisten darf.",
+      "scopeDowntimeHint": "Ein Wartungsfenster-Ordner legt fest, wer ein Wartungsfenster verwaltet, nicht was es stummschaltet. Um Alle Ordner eines Moduls stummzuschalten, braucht ein Benutzer das Recht, jeden Ordner dieses Moduls aufzulisten. Stumm-Chips und Banner können ein Wartungsfenster nennen, das ein Benutzer nicht auflisten darf.",
       "grantedByWiderScope": "Durch weiteren Geltungsbereich gewährt",
       "grantedHereAndByWiderScope": "Hier und durch weiteren Geltungsbereich gewährt",
       "stillGrantedByWiderScope": "Hier entfernt, weiterhin durch weiteren Geltungsbereich gewährt",

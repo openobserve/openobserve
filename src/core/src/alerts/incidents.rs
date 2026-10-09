@@ -1014,6 +1014,28 @@ pub async fn resolve_alert_firing(
     Ok(())
 }
 
+/// The on-call recovery a muted [resolve_alert_firing] skipped, run once the window is over.
+pub async fn recover_after_muted_resolve(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<(), anyhow::Error> {
+    if !o2_enterprise::enterprise::oncall::is_enabled() {
+        return Ok(());
+    }
+    let Some(incident) =
+        infra::table::alert_incidents::latest_incident_for_alert(org_id, alert_id).await?
+    else {
+        return Ok(());
+    };
+    // An open incident is still live; its own resolve closes the record.
+    if incident.status != "resolved" {
+        return Ok(());
+    }
+    o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, &incident.id)
+        .await?;
+    Ok(())
+}
+
 /// Auto-resolve the open incident containing `external.id`, but only once every
 /// other `External`-kind alert already linked to that incident is also resolved
 /// in `external_alerts` — a single source clearing shouldn't close an incident
@@ -1366,6 +1388,15 @@ fn mute_change<'a>(muted_by: Option<&'a str>, recorded: Option<&'a str>) -> Mute
     }
 }
 
+/// Joins first, so a failed join leaves the mute for the next firing to clear and reopen.
+async fn join_then_unmute<T>(
+    join: impl std::future::Future<Output = Result<T, infra::errors::Error>>,
+    unmute: impl AsyncFnOnce() -> bool,
+) -> Result<(T, bool), infra::errors::Error> {
+    let joined = join.await?;
+    Ok((joined, unmute().await))
+}
+
 /// A region that is not upgraded cannot read the Unmute byte, so it is sent only with the flag on.
 #[cfg(feature = "enterprise")]
 fn publishes_unmute() -> bool {
@@ -1647,15 +1678,17 @@ async fn find_or_create_incident(
         if let Some(incident) =
             infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
         {
-            let reopened = unmute_for_firing(org_id, &incident, muted_by).await;
             // Found existing AlertId incident for this alert - join it
-            let _ = infra::table::alert_incidents::add_alert_to_incident(
-                &incident.id,
-                &alert_id,
-                &subject.name,
-                subject.kind.as_str(),
-                triggered_at,
-                correlation_reason,
+            let (_, reopened) = join_then_unmute(
+                infra::table::alert_incidents::add_alert_to_incident(
+                    &incident.id,
+                    &alert_id,
+                    &subject.name,
+                    subject.kind.as_str(),
+                    triggered_at,
+                    correlation_reason,
+                ),
+                async || unmute_for_firing(org_id, &incident, muted_by).await,
             )
             .await?;
 
@@ -1748,17 +1781,19 @@ async fn find_or_create_incident(
                 continue;
             }
 
-            let reopened = unmute_for_firing(org_id, &existing, muted_by).await;
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
 
-            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
-                &existing.id,
-                &subject.id,
-                &subject.name,
-                subject.kind.as_str(),
-                triggered_at,
-                correlation_reason,
+            let (is_new_alert_type, reopened) = join_then_unmute(
+                infra::table::alert_incidents::add_alert_to_incident(
+                    &existing.id,
+                    &subject.id,
+                    &subject.name,
+                    subject.kind.as_str(),
+                    triggered_at,
+                    correlation_reason,
+                ),
+                async || unmute_for_firing(org_id, &existing, muted_by).await,
             )
             .await?;
 
@@ -2860,6 +2895,11 @@ async fn model_to_incident(
     Ok(model_to_incident_with_topology(db_model, topology))
 }
 
+/// Only a resolve can clear a mute, and only an org with downtimes can have one.
+fn reads_mute_before(status: &str, downtimes_enabled: bool) -> bool {
+    downtimes_enabled && status == "resolved"
+}
+
 /// A quiet change or a muted incident pages nobody and starts no workflow.
 fn status_change_is_muted(quiet: bool, muted_by_downtime_id: Option<&str>) -> bool {
     quiet || muted_by_downtime_id.is_some()
@@ -2955,10 +2995,14 @@ pub async fn update_status_as(
     // second/concurrent acknowledge can't silently overwrite the first
     // acknowledger — see `infra::table::alert_incidents::acknowledge`.
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
-    let muted_before = status == "resolved"
-        && infra::table::alert_incidents::get(org_id, incident_id)
-            .await?
-            .is_some_and(|m| m.muted_by_downtime_id.is_some());
+    let muted_before = reads_mute_before(
+        status,
+        o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled,
+    ) && infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
     let updated = if status == "acknowledged" {
         infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
             .await?
@@ -3542,6 +3586,44 @@ mod tests {
         assert_eq!(mute_change(Some("dt-1"), None), MuteChange::Keep);
         assert_eq!(mute_change(None, Some("dt-1")), MuteChange::Unmute("dt-1"));
         assert_eq!(mute_change(None, None), MuteChange::Keep);
+    }
+
+    #[test]
+    fn a_resolve_reads_the_mute_only_with_downtimes_on() {
+        assert!(reads_mute_before("resolved", true));
+        assert!(
+            !reads_mute_before("resolved", false),
+            "no extra get with the flag off"
+        );
+        assert!(!reads_mute_before("acknowledged", true));
+        assert!(!reads_mute_before("open", true));
+    }
+
+    #[tokio::test]
+    async fn a_failed_join_leaves_the_mute_so_the_next_firing_still_reopens() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let muted = AtomicBool::new(true);
+        let failed = join_then_unmute(
+            async { Err::<bool, _>(infra::errors::Error::Message("db down".to_string())) },
+            async || muted.swap(false, Ordering::SeqCst),
+        )
+        .await;
+        assert!(failed.is_err());
+        assert!(
+            muted.load(Ordering::SeqCst),
+            "the mute stays for the next firing"
+        );
+        let (_, reopened) = join_then_unmute(async { Ok(false) }, async || {
+            muted.swap(false, Ordering::SeqCst)
+        })
+        .await
+        .unwrap();
+        assert!(
+            reopened,
+            "the next firing reopens, so it yields NewIncidentCreated"
+        );
+        assert!(!muted.load(Ordering::SeqCst));
     }
 
     #[tokio::test]

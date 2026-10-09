@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Las acciones bloqueadas provienen de {scope}, definidas en {module}",
       "scopeAllOf": "Todo {module}",
       "scopeIncludesFuture": "Incluye recursos creados después",
-      "scopeDowntimeHint": "Una carpeta de tiempos de inactividad limita quién gestiona un tiempo de inactividad, no lo que silencia: quien puede crear un tiempo de inactividad puede silenciar toda la organización. Las etiquetas de silencio y los banners pueden nombrar un tiempo de inactividad que el usuario no puede listar.",
+      "scopeDowntimeHint": "Una carpeta de tiempos de inactividad limita quién gestiona un tiempo de inactividad, no lo que silencia. Para silenciar Todas las carpetas de un módulo, el usuario necesita el permiso de listar todas las carpetas de ese módulo. Las etiquetas de silencio y los banners pueden nombrar un tiempo de inactividad que el usuario no puede listar.",
       "grantedByWiderScope": "Otorgado por un alcance más amplio",
       "grantedHereAndByWiderScope": "Otorgado aquí y por un alcance más amplio",
       "stillGrantedByWiderScope": "Eliminado aquí, aún otorgado por un alcance más amplio",

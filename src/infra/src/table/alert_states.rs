@@ -142,8 +142,8 @@ pub async fn set_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
-/// Forgets a downtime every alert recorded, because an edit changed what it covers.
-pub async fn clear_last_downtime_id(downtime_id: &str) -> Result<u64, errors::Error> {
+/// Forgets a downtime every alert recorded; returns those alerts, whose mute the caller closes.
+pub async fn clear_last_downtime_id(downtime_id: &str) -> Result<Vec<String>, errors::Error> {
     let client = get_orm_client_rw().await;
     clear_last_downtime_id_with(client, downtime_id).await
 }
@@ -152,8 +152,20 @@ pub async fn clear_last_downtime_id(downtime_id: &str) -> Result<u64, errors::Er
 pub async fn clear_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
     conn: &C,
     downtime_id: &str,
-) -> Result<u64, errors::Error> {
-    let res = alert_states::Entity::update_many()
+) -> Result<Vec<String>, errors::Error> {
+    let mut alert_ids: Vec<String> = alert_states::Entity::find()
+        .select_only()
+        .column(alert_states::Column::AlertId)
+        .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    alert_ids.sort();
+    alert_ids.dedup();
+    if alert_ids.is_empty() {
+        return Ok(alert_ids);
+    }
+    alert_states::Entity::update_many()
         .col_expr(
             alert_states::Column::LastDowntimeId,
             sea_orm::sea_query::Expr::value(Option::<String>::None),
@@ -161,7 +173,7 @@ pub async fn clear_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
         .filter(alert_states::Column::LastDowntimeId.eq(downtime_id))
         .exec(conn)
         .await?;
-    Ok(res.rows_affected)
+    Ok(alert_ids)
 }
 
 /// `alert_id -> last_downtime_id` for the alerts of a list page that carry one.
@@ -1729,7 +1741,16 @@ mod tests {
         recorded(&db, "alert-1", "dt-1").await;
         recorded(&db, "alert-2", "dt-1").await;
         recorded(&db, "alert-3", "dt-2").await;
-        assert_eq!(clear_last_downtime_id_with(&db, "dt-1").await.unwrap(), 2);
+        assert_eq!(
+            clear_last_downtime_id_with(&db, "dt-1").await.unwrap(),
+            ["alert-1", "alert-2"]
+        );
+        assert!(
+            clear_last_downtime_id_with(&db, "dt-1")
+                .await
+                .unwrap()
+                .is_empty()
+        );
         let ids: Vec<String> = ["alert-1", "alert-2", "alert-3"].map(String::from).to_vec();
         let left = last_downtime_ids_with(&db, &ids).await.unwrap();
         assert_eq!(left.len(), 1);

@@ -28,12 +28,30 @@ pub fn any_for(org: &str, module: config::meta::downtimes::TargetModule) -> bool
     o2_enterprise::enterprise::common::config::get_config()
         .downtimes
         .enabled
-        && enterprise::any_live_target(&db::downtimes::list_cached(org), module)
+        && enterprise::any_live_target(
+            &db::downtimes::list_cached(org),
+            module,
+            config::utils::time::now_micros(),
+        )
 }
 
 #[cfg(not(feature = "enterprise"))]
 pub fn any_for(_org: &str, _module: config::meta::downtimes::TargetModule) -> bool {
     false
+}
+
+/// [any_for], counting also a row whose window ended after `since`, so the mute it left is closed.
+#[cfg(feature = "enterprise")]
+pub fn any_since(org: &str, module: config::meta::downtimes::TargetModule, since: i64) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && enterprise::any_target_since(
+            &db::downtimes::list_cached(org),
+            module,
+            since,
+            config::utils::time::now_micros(),
+        )
 }
 
 #[cfg(feature = "enterprise")]
@@ -78,6 +96,17 @@ pub fn active_by_id(org: &str, id: &str, at: i64) -> Option<ActiveDowntime> {
 #[cfg(not(feature = "enterprise"))]
 pub fn active_by_id(_org: &str, _id: &str, _at: i64) -> Option<ActiveDowntime> {
     None
+}
+
+/// Whether the recorded downtime had a window in `[from, to)`, cut at its cancel.
+#[cfg(feature = "enterprise")]
+pub fn had_window(org: &str, id: &str, from: i64, to: i64) -> bool {
+    enterprise::had_window_in(&db::downtimes::list_cached(org), id, from, to)
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn had_window(_org: &str, _id: &str, _from: i64, _to: i64) -> bool {
+    false
 }
 
 #[cfg(feature = "enterprise")]
@@ -207,7 +236,7 @@ pub(crate) mod enterprise {
     use config::meta::{
         downtimes::{
             ActiveDowntime, CorrectionRef, CorrectionWindow, Downtime, DowntimeStatus,
-            SloCorrectionMode, TargetModule,
+            IncidentMode, SloCorrectionMode, TargetModule,
         },
         slo::{Slo, window::align_up},
     };
@@ -232,13 +261,32 @@ pub(crate) mod enterprise {
         }
     }
 
-    pub(crate) fn any_live_target(rows: &[Downtime], module: TargetModule) -> bool {
+    /// An org whose windows are all over leaves the slow path, though its rows stay for history.
+    pub(crate) fn any_live_target(rows: &[Downtime], module: TargetModule, now: i64) -> bool {
         rows.iter().any(|row| {
-            row.cancelled_at.is_none() && scope::target_for(&row.targets, module).is_some()
+            row.cancelled_at.is_none()
+                && scope::target_for(&row.targets, module).is_some()
+                && (schedule::window_at(&row.schedule, now).is_some()
+                    || schedule::next_window(&row.schedule, now).is_some())
         })
     }
 
-    /// The first live row whose window holds `now` and whose target of `module` matches.
+    /// [any_live_target], or a row with a window in `[since, now)`.
+    pub(crate) fn any_target_since(
+        rows: &[Downtime],
+        module: TargetModule,
+        since: i64,
+        now: i64,
+    ) -> bool {
+        any_live_target(rows, module, now)
+            || rows.iter().any(|row| {
+                scope::target_for(&row.targets, module).is_some()
+                    && !schedule::windows_between(&row.schedule, row.cancelled_at, since, now)
+                        .is_empty()
+            })
+    }
+
+    /// Every live row whose window holds `now` and whose target of `module` matches, merged.
     pub(crate) fn active_in(
         rows: &[Downtime],
         module: TargetModule,
@@ -247,7 +295,7 @@ pub(crate) mod enterprise {
     ) -> Option<ActiveDowntime> {
         rows.iter()
             .filter(|row| row.cancelled_at.is_none())
-            .find_map(|row| {
+            .filter_map(|row| {
                 let window = schedule::window_at(&row.schedule, now)?;
                 let target = scope::target_for(&row.targets, module)?;
                 scope::matches(target, row.condition.as_ref(), item).then(|| ActiveDowntime {
@@ -257,6 +305,29 @@ pub(crate) mod enterprise {
                     incident_mode: target.incident_mode,
                 })
             })
+            .reduce(merged)
+    }
+
+    /// Overlapping downtimes in any order: the latest end names the chip, any muted mode mutes.
+    pub(crate) fn merged(a: ActiveDowntime, b: ActiveDowntime) -> ActiveDowntime {
+        let incident_mode = if a.incident_mode.is_muted() || b.incident_mode.is_muted() {
+            IncidentMode::Muted
+        } else {
+            IncidentMode::None
+        };
+        let latest = if b.ends_at > a.ends_at { b } else { a };
+        ActiveDowntime {
+            incident_mode,
+            ..latest
+        }
+    }
+
+    /// Whether row `id` had a window overlapping `[from, to)`, cut at its cancel.
+    pub(crate) fn had_window_in(rows: &[Downtime], id: &str, from: i64, to: i64) -> bool {
+        rows.iter().any(|row| {
+            row.id == id
+                && !schedule::windows_between(&row.schedule, row.cancelled_at, from, to).is_empty()
+        })
     }
 
     /// One live row by id whose window holds `at` and which still targets `module`.
@@ -498,10 +569,122 @@ mod tests {
         let mut cancelled = row("d2", vec![target(TargetModule::Slos)], 0, HOUR);
         cancelled.cancelled_at = Some(1);
         let rows = [alerts, cancelled];
-        assert!(any_live_target(&rows, TargetModule::Alerts));
-        assert!(!any_live_target(&rows, TargetModule::Slos));
-        assert!(!any_live_target(&rows, TargetModule::Synthetics));
-        assert!(!any_live_target(&[], TargetModule::Alerts));
+        assert!(any_live_target(&rows, TargetModule::Alerts, 1));
+        assert!(!any_live_target(&rows, TargetModule::Slos, 1));
+        assert!(!any_live_target(&rows, TargetModule::Synthetics, 1));
+        assert!(!any_live_target(&[], TargetModule::Alerts, 1));
+    }
+
+    #[test]
+    fn a_row_whose_windows_are_over_takes_the_org_off_the_slow_path() {
+        const DAY: i64 = 24 * HOUR;
+        let ended_yesterday = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let now = DAY + 2 * HOUR;
+        assert!(!any_live_target(
+            std::slice::from_ref(&ended_yesterday),
+            TargetModule::Alerts,
+            now
+        ));
+        let scheduled = row(
+            "d2",
+            vec![target(TargetModule::Alerts)],
+            2 * DAY,
+            2 * DAY + HOUR,
+        );
+        assert!(any_live_target(&[scheduled], TargetModule::Alerts, now));
+        let mut daily = row("d3", vec![target(TargetModule::Alerts)], 0, HOUR);
+        daily.schedule = DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at: 0,
+            ends_at: None,
+            timezone: "UTC".to_string(),
+            start_time_local: Some("00:00".to_string()),
+            duration_secs: 3_600,
+            weekdays: vec![],
+        };
+        assert!(any_live_target(
+            &[ended_yesterday, daily],
+            TargetModule::Alerts,
+            now
+        ));
+    }
+
+    #[test]
+    fn a_window_that_ended_after_since_still_counts_for_closing_its_mute() {
+        let ended = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let rows = std::slice::from_ref(&ended);
+        let now = 2 * HOUR;
+        assert!(!any_live_target(rows, TargetModule::Alerts, now));
+        assert!(any_target_since(rows, TargetModule::Alerts, HOUR / 2, now));
+        assert!(!any_target_since(rows, TargetModule::Alerts, HOUR, now));
+        assert!(!any_target_since(rows, TargetModule::Slos, 0, now));
+    }
+
+    #[test]
+    fn overlapping_downtimes_give_the_latest_end_and_mute_in_either_order() {
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let a = row(
+            "a",
+            vec![DowntimeTarget {
+                incident_mode: IncidentMode::None,
+                ..target(TargetModule::Alerts)
+            }],
+            9 * HOUR,
+            10 * HOUR,
+        );
+        let b = row("b", vec![target(TargetModule::Alerts)], 9 * HOUR, 12 * HOUR);
+        for rows in [[a.clone(), b.clone()], [b, a]] {
+            let hit = active_in(&rows, TargetModule::Alerts, &alert, 9 * HOUR + 1).unwrap();
+            assert_eq!(hit.id, "b");
+            assert_eq!(hit.ends_at, 12 * HOUR);
+            assert_eq!(hit.incident_mode, IncidentMode::Muted);
+        }
+    }
+
+    #[test]
+    fn a_later_ending_none_mode_downtime_keeps_the_mute_of_the_earlier_one() {
+        let early = ActiveDowntime {
+            id: "a".to_string(),
+            name: "a".to_string(),
+            ends_at: 10,
+            incident_mode: IncidentMode::Muted,
+        };
+        let late = ActiveDowntime {
+            id: "b".to_string(),
+            name: "b".to_string(),
+            ends_at: 12,
+            incident_mode: IncidentMode::None,
+        };
+        for merged in [
+            merged(early.clone(), late.clone()),
+            merged(late.clone(), early.clone()),
+        ] {
+            assert_eq!((merged.id.as_str(), merged.ends_at), ("b", 12));
+            assert_eq!(merged.incident_mode, IncidentMode::Muted);
+        }
+        let none = ActiveDowntime {
+            incident_mode: IncidentMode::None,
+            ..early
+        };
+        assert_eq!(merged(none, late).incident_mode, IncidentMode::None);
+    }
+
+    #[test]
+    fn a_recorded_downtime_holds_only_while_its_window_overlaps_the_hold() {
+        let mut rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        // A hold that started inside the window still overlaps it after the window ends.
+        assert!(had_window_in(&rows, "d1", 12 * HOUR - 10, 12 * HOUR + 20));
+        assert!(!had_window_in(&rows, "d1", 13 * HOUR, 14 * HOUR));
+        assert!(!had_window_in(&rows, "d1", 12 * HOUR, 12 * HOUR), "no hold");
+        assert!(!had_window_in(&rows, "d2", 10 * HOUR, 11 * HOUR));
+        rows[0].cancelled_at = Some(10 * HOUR);
+        assert!(!had_window_in(&rows, "d1", 11 * HOUR, 12 * HOUR));
     }
 
     #[test]
