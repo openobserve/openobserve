@@ -54,6 +54,8 @@ use self::matching::{Inventory, Matches, Visibility};
 const MATCH_COUNTS_TTL: Duration = Duration::from_secs(60);
 /// The `affected` lists of `GET /{id}` stop at this many names per module.
 const AFFECTED_CAP: usize = 500;
+/// A move takes at most this many ids, each a write and an authorization check.
+const MAX_MOVE_IDS: usize = 100;
 
 /// The order modules are listed in on a combined banner.
 const MODULE_ORDER: [TargetModule; 4] = [
@@ -148,9 +150,16 @@ pub async fn list(
     let folders = access::listable_downtime_folders(org, user_id).await?;
     let now = now_micros();
     let inventory = inventory::cached(org).await?;
-    let items = db::downtimes::list_cached(org)
+    let rows = db::downtimes::list_cached(org);
+    let outside: Vec<(String, String)> = rows
         .iter()
-        .filter(|row| folders.contains(&row.folder_id))
+        .filter(|row| !folders.contains(&row.folder_id))
+        .map(|row| (row.id.clone(), row.folder_id.clone()))
+        .collect();
+    let granted = access::individually_readable(org, user_id, outside).await;
+    let items = rows
+        .iter()
+        .filter(|row| folders.contains(&row.folder_id) || granted.contains(&row.id))
         .map(|row| list_item(row, &counts_of(&match_counts_with(row, &inventory)), now))
         .collect();
     let alert = query
@@ -193,27 +202,7 @@ pub async fn create(
             "This organization already has {limit} downtimes, the most allowed. Delete ended ones first."
         )));
     }
-    let now = now_micros();
-    let downtime = Downtime {
-        id: infra::table::downtimes::new_id(),
-        org: org.to_string(),
-        folder_id,
-        name: name_of(&req, now),
-        reason: req.reason.clone(),
-        condition: req.condition.clone(),
-        targets: req.targets.clone(),
-        schedule: req.schedule.clone(),
-        cancelled_at: None,
-        cancelled_by: None,
-        show_banner: req.show_banner,
-        notifications: None,
-        origin_region: None,
-        version: 0,
-        created_by: user_id.to_string(),
-        created_at: now,
-        updated_by: user_id.to_string(),
-        updated_at: now,
-    };
+    let downtime = created(org, folder_id, &req, user_id, now_micros());
     db::downtimes::set(&downtime).await?;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
     remeasure_slos(None, &downtime);
@@ -231,18 +220,7 @@ pub async fn update(
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
     let req = checked_request(org, user_id, req).await?;
-    let now = now_micros();
-    let after = Downtime {
-        name: name_of(&req, now),
-        reason: req.reason,
-        condition: req.condition,
-        targets: req.targets,
-        schedule: req.schedule,
-        show_banner: req.show_banner,
-        updated_by: user_id.to_string(),
-        updated_at: now,
-        ..before.clone()
-    };
+    let after = edited(&before, req, user_id, now_micros());
     set_if_unchanged(&after, before.updated_at).await?;
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.id).await;
@@ -259,14 +237,7 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     if before.cancelled_at.is_some() {
         return Ok(before);
     }
-    let now = now_micros();
-    let after = Downtime {
-        cancelled_at: Some(now),
-        cancelled_by: Some(user_id.to_string()),
-        updated_by: user_id.to_string(),
-        updated_at: now,
-        ..before.clone()
-    };
+    let after = cancelled(&before, user_id, now_micros());
     set_if_unchanged(&after, before.updated_at).await?;
     remeasure_slos(Some(before), &after);
     Ok(after)
@@ -282,34 +253,37 @@ pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeEr
     Ok(())
 }
 
-/// One row at a time through `set`, so every node cache and every region sees the new folder.
+/// One `set_if_unchanged` per row, so every node and region sees it; this node reloads once.
 pub async fn move_to_folder(
     org: &str,
     user_id: &str,
     req: &MoveDowntimesRequest,
 ) -> Result<(), DowntimeError> {
     ensure_enabled()?;
+    let ids = move_ids(&req.downtime_ids)?;
     let folder_id = resolve_folder(org, &req.dst_folder_id).await?;
-    let mut rows = Vec::with_capacity(req.downtime_ids.len());
-    for id in &req.downtime_ids {
+    let mut rows = Vec::with_capacity(ids.len());
+    for id in ids {
         let row = load(org, id).await?;
         access::authorize_row(org, user_id, &row, "PUT").await?;
         rows.push(row);
     }
     let now = now_micros();
-    for row in rows {
-        let from = row.folder_id.clone();
-        let expected = row.updated_at;
-        let moved = Downtime {
-            folder_id: folder_id.clone(),
-            updated_by: user_id.to_string(),
-            updated_at: now,
-            ..row
-        };
-        set_if_unchanged(&moved, expected).await?;
-        access::reparent(&moved.id, &from, &folder_id).await;
+    let froms: Vec<String> = rows.iter().map(|row| row.folder_id.clone()).collect();
+    let moves: Vec<(Downtime, i64)> = rows
+        .into_iter()
+        .map(|row| (moved(&row, &folder_id, user_id, now), row.updated_at))
+        .collect();
+    let (written, outcome) = write_moves(
+        &moves,
+        async |moved, expected| Ok(db::downtimes::write_if_unchanged(moved, expected).await?),
+        async || Ok(db::downtimes::reload_org(org).await?),
+    )
+    .await;
+    for ((moved, _), from) in moves.iter().zip(&froms).take(written) {
+        access::reparent(&moved.id, from, &folder_id).await;
     }
-    Ok(())
+    outcome
 }
 
 pub async fn preview(
@@ -318,6 +292,10 @@ pub async fn preview(
     req: &PreviewRequest,
 ) -> Result<PreviewResponse, DowntimeError> {
     ensure_enabled()?;
+    check_preview(
+        req,
+        &db::system_settings::get_semantic_field_groups(org).await,
+    )?;
     let condition = req.condition.as_ref().map(normalized_condition);
     let inventory = inventory::load(org).await?;
     let matches = matching::match_all(&inventory, condition.as_ref(), &req.targets);
@@ -394,10 +372,79 @@ async fn set_if_unchanged(
     if db::downtimes::set_if_unchanged(downtime, expected_updated_at).await? {
         Ok(())
     } else {
-        Err(DowntimeError::Conflict(
-            "The downtime changed while you were editing it. Reload and try again.".to_string(),
-        ))
+        Err(changed_meanwhile())
     }
+}
+
+fn changed_meanwhile() -> DowntimeError {
+    DowntimeError::Conflict(
+        "The downtime changed while you were editing it. Reload and try again.".to_string(),
+    )
+}
+
+/// Writes the moves in order up to the first conflict, then reloads once; returns how many landed.
+async fn write_moves(
+    moves: &[(Downtime, i64)],
+    mut write: impl AsyncFnMut(&Downtime, i64) -> Result<bool, DowntimeError>,
+    reload: impl AsyncFnOnce() -> Result<(), DowntimeError>,
+) -> (usize, Result<(), DowntimeError>) {
+    let mut written = 0;
+    let mut outcome = Ok(());
+    for (moved, expected) in moves {
+        match write(moved, *expected).await {
+            Ok(true) => written += 1,
+            Ok(false) => {
+                outcome = Err(changed_meanwhile());
+                break;
+            }
+            Err(e) => {
+                outcome = Err(e);
+                break;
+            }
+        }
+    }
+    let reloaded = reload().await;
+    (written, outcome.and(reloaded))
+}
+
+/// The ids of a move, deduplicated in request order; more than [MAX_MOVE_IDS] is a 400.
+fn move_ids(ids: &[String]) -> Result<Vec<&str>, DowntimeError> {
+    if ids.len() > MAX_MOVE_IDS {
+        return Err(DowntimeError::BadRequest(format!(
+            "A move takes at most {MAX_MOVE_IDS} downtimes at a time."
+        )));
+    }
+    let mut seen = HashSet::new();
+    Ok(ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| seen.insert(*id))
+        .collect())
+}
+
+/// A preview has no schedule, so a valid placeholder lets `validate` check targets and condition.
+fn check_preview(
+    req: &PreviewRequest,
+    groups: &[config::meta::correlation::FieldAlias],
+) -> Result<(), DowntimeError> {
+    let placeholder = DowntimeRequest {
+        folder_id: DEFAULT_FOLDER.to_string(),
+        name: None,
+        reason: None,
+        condition: req.condition.clone(),
+        targets: req.targets.clone(),
+        schedule: config::meta::downtimes::DowntimeSchedule {
+            repeat: config::meta::downtimes::Repeat::None,
+            starts_at: 0,
+            ends_at: Some(3600 * 1_000_000),
+            timezone: "UTC".to_string(),
+            start_time_local: None,
+            duration_secs: 3600,
+            weekdays: vec![],
+        },
+        show_banner: false,
+    };
+    validate(&placeholder, groups).map_err(DowntimeError::BadRequest)
 }
 
 async fn load(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
@@ -436,6 +483,7 @@ async fn checked_request(
 ) -> Result<DowntimeRequest, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
+    span_as_duration(&mut req.schedule);
     req.condition = req.condition.as_ref().map(normalized_condition);
     for target in &mut req.targets {
         target.tags = config::meta::alerts::tags::normalize_tags(&target.tags)
@@ -462,6 +510,82 @@ fn normalized_condition(cond: &DimensionCondition) -> DimensionCondition {
             operator: *operator,
             value: normalize_value(value),
         },
+    }
+}
+
+/// A one-time window is its span, so the stored `duration_secs` cannot disagree with it.
+fn span_as_duration(schedule: &mut config::meta::downtimes::DowntimeSchedule) {
+    if schedule.repeat == config::meta::downtimes::Repeat::None
+        && let Some(end) = schedule.ends_at
+        && let Some(span) = end.checked_sub(schedule.starts_at)
+    {
+        schedule.duration_secs = span / 1_000_000;
+    }
+}
+
+/// A new row starts at version 1; replication orders writes by version, not by clocks.
+fn created(
+    org: &str,
+    folder_id: String,
+    req: &DowntimeRequest,
+    user_id: &str,
+    now: i64,
+) -> Downtime {
+    Downtime {
+        id: infra::table::downtimes::new_id(),
+        org: org.to_string(),
+        folder_id,
+        name: name_of(req, now),
+        reason: req.reason.clone(),
+        condition: req.condition.clone(),
+        targets: req.targets.clone(),
+        schedule: req.schedule.clone(),
+        cancelled_at: None,
+        cancelled_by: None,
+        show_banner: req.show_banner,
+        notifications: None,
+        origin_region: None,
+        version: 1,
+        created_by: user_id.to_string(),
+        created_at: now,
+        updated_by: user_id.to_string(),
+        updated_at: now,
+    }
+}
+
+fn edited(before: &Downtime, req: DowntimeRequest, user_id: &str, now: i64) -> Downtime {
+    Downtime {
+        name: name_of(&req, now),
+        reason: req.reason,
+        condition: req.condition,
+        targets: req.targets,
+        schedule: req.schedule,
+        show_banner: req.show_banner,
+        version: before.version + 1,
+        updated_by: user_id.to_string(),
+        updated_at: now,
+        ..before.clone()
+    }
+}
+
+fn cancelled(before: &Downtime, user_id: &str, now: i64) -> Downtime {
+    Downtime {
+        cancelled_at: Some(now),
+        cancelled_by: Some(user_id.to_string()),
+        version: before.version + 1,
+        updated_by: user_id.to_string(),
+        updated_at: now,
+        ..before.clone()
+    }
+}
+
+fn moved(before: &Downtime, folder_id: &str, user_id: &str, now: i64) -> Downtime {
+    Downtime {
+        folder_id: folder_id.to_string(),
+        version: before.version + 1,
+        updated_by: user_id.to_string(),
+        updated_at: now,
+        ..before.clone()
     }
 }
 
@@ -1031,5 +1155,127 @@ mod tests {
         let ids: Vec<_> = kept.iter().map(|f| f.folder_id.as_str()).collect();
         assert_eq!(ids, ["default", "payments"]);
         assert!(listable_folders("acme", root, vec![]).await.is_empty());
+    }
+
+    #[test]
+    fn an_invalid_preview_is_a_bad_request() {
+        let alerts = DowntimeTarget {
+            module: TargetModule::Alerts,
+            folders: TargetFolders::All,
+            tags: vec![],
+            ids: vec![],
+            slo_mode: None,
+        };
+        let valid = PreviewRequest {
+            condition: None,
+            targets: vec![alerts.clone()],
+        };
+        assert!(check_preview(&valid, &[]).is_ok());
+        let no_targets = PreviewRequest {
+            condition: None,
+            targets: vec![],
+        };
+        assert!(matches!(
+            check_preview(&no_targets, &[]),
+            Err(DowntimeError::BadRequest(_))
+        ));
+        let twice = PreviewRequest {
+            condition: None,
+            targets: vec![alerts.clone(), alerts],
+        };
+        assert!(matches!(
+            check_preview(&twice, &[]),
+            Err(DowntimeError::BadRequest(_))
+        ));
+    }
+
+    #[test]
+    fn a_move_of_more_than_a_hundred_ids_is_a_bad_request() {
+        let ids: Vec<String> = (0..=MAX_MOVE_IDS).map(|i| format!("d{i}")).collect();
+        assert!(matches!(move_ids(&ids), Err(DowntimeError::BadRequest(_))));
+        assert_eq!(move_ids(&ids[..MAX_MOVE_IDS]).unwrap().len(), MAX_MOVE_IDS);
+        let repeated = ["b", "a", "b", "a"].map(String::from);
+        assert_eq!(move_ids(&repeated).unwrap(), ["b", "a"]);
+    }
+
+    #[tokio::test]
+    async fn a_move_of_three_rows_reloads_once() {
+        let moves: Vec<(Downtime, i64)> = ["d1", "d2", "d3"]
+            .into_iter()
+            .map(|id| {
+                let mut moved = row(vec![TargetModule::Alerts], 0, HOUR);
+                moved.id = id.to_string();
+                (moved, 1)
+            })
+            .collect();
+        let mut writes = 0;
+        let mut reloads = 0;
+        let (written, outcome) = write_moves(
+            &moves,
+            async |_, _| {
+                writes += 1;
+                Ok(true)
+            },
+            async || {
+                reloads += 1;
+                Ok(())
+            },
+        )
+        .await;
+        assert!(outcome.is_ok());
+        assert_eq!((written, writes, reloads), (3, 3, 1));
+
+        let mut reloads = 0;
+        let (written, outcome) = write_moves(
+            &moves,
+            async |moved, _| Ok(moved.id != "d2"),
+            async || {
+                reloads += 1;
+                Ok(())
+            },
+        )
+        .await;
+        assert!(matches!(outcome, Err(DowntimeError::Conflict(_))));
+        assert_eq!(
+            (written, reloads),
+            (1, 1),
+            "a conflict stops the move and still reloads"
+        );
+    }
+
+    #[test]
+    fn a_one_time_duration_is_set_from_its_span() {
+        let mut once = row(vec![TargetModule::Alerts], 0, 2 * HOUR).schedule;
+        once.duration_secs = 60;
+        span_as_duration(&mut once);
+        assert_eq!(once.duration_secs, 7200);
+        let mut daily = DowntimeSchedule {
+            repeat: Repeat::Daily,
+            ..once.clone()
+        };
+        daily.duration_secs = 60;
+        span_as_duration(&mut daily);
+        assert_eq!(daily.duration_secs, 60, "a recurring length is its own");
+    }
+
+    #[test]
+    fn every_writer_bumps_the_version() {
+        let req = DowntimeRequest {
+            folder_id: "default".to_string(),
+            name: None,
+            reason: None,
+            condition: None,
+            targets: vec![],
+            schedule: row(vec![TargetModule::Alerts], 0, HOUR).schedule,
+            show_banner: false,
+        };
+        let new = created("acme", "default".to_string(), &req, "lin", 5);
+        assert_eq!(new.version, 1);
+        let mut before = row(vec![TargetModule::Alerts], 0, HOUR);
+        before.version = 4;
+        assert_eq!(edited(&before, req, "lin", 6).version, 5);
+        assert_eq!(cancelled(&before, "lin", 6).version, 5);
+        let moved = moved(&before, "planned", "lin", 6);
+        assert_eq!((moved.version, moved.folder_id.as_str()), (5, "planned"));
     }
 }

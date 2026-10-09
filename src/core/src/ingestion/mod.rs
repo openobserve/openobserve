@@ -247,6 +247,8 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                 "alerts",
                 downtime.id,
             );
+            #[cfg(feature = "enterprise")]
+            record_realtime_mute(alert, &trigger_data_stream).await;
             trigger_data_stream.end_time = Utc::now().timestamp_micros();
             trigger_usage_reports.push(trigger_data_stream);
             continue;
@@ -255,6 +257,8 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
             .await;
         record_realtime_delivery(&mut trigger_data_stream, &outcome);
+        #[cfg(feature = "enterprise")]
+        record_realtime_mute(alert, &trigger_data_stream).await;
         match outcome {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
@@ -942,6 +946,28 @@ async fn realtime_downtime(
     _now: i64,
 ) -> Option<config::meta::downtimes::ActiveDowntime> {
     None
+}
+
+/// The Muted chip of a real-time run, set by a suppressed run and cleared by a send.
+#[cfg(feature = "enterprise")]
+async fn record_realtime_mute(alert: &Alert, run: &TriggerData) {
+    if let Some(alert_id) = alert.id.as_ref() {
+        crate::alerts::scheduler::handlers::record_last_downtime(
+            &alert.org_id,
+            &alert_id.to_string(),
+            realtime_last_downtime(run),
+        )
+        .await;
+    }
+}
+
+/// A suppressed run's downtime; any other real-time run reached a send and clears the chip.
+#[cfg(feature = "enterprise")]
+fn realtime_last_downtime(run: &TriggerData) -> Option<&str> {
+    match run.status {
+        RunOutcome::Suppressed => run.downtime_id.as_deref(),
+        _ => None,
+    }
 }
 
 fn silenced_realtime_trigger(
@@ -1749,6 +1775,24 @@ mod tests {
             decide(&mixed, &["payments", "checkout"]).as_deref(),
             Some("dt-payments")
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_suppressed_realtime_run_sets_the_muted_chip_and_the_next_send_clears_it() {
+        let mut muted = realtime_row();
+        crate::alerts::alert::record_suppressed_run(&mut muted, "alerts", "dt-1".to_string());
+        assert_eq!(realtime_last_downtime(&muted), Some("dt-1"));
+
+        let mut delivered = realtime_row();
+        record_realtime_delivery(&mut delivered, &Ok(NotificationOutcome::default()));
+        assert_eq!(realtime_last_downtime(&delivered), None);
+        let mut failed = realtime_row();
+        let error = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        record_realtime_delivery(&mut failed, &error);
+        assert_eq!(realtime_last_downtime(&failed), None);
     }
 
     fn realtime_row() -> TriggerData {

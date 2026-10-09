@@ -64,6 +64,22 @@ pub fn active_for_alert(
     None
 }
 
+/// The recorded downtime's window at `at`; the muted firing that recorded it matched its scope.
+#[cfg(feature = "enterprise")]
+pub fn active_by_id(org: &str, id: &str, at: i64) -> Option<ActiveDowntime> {
+    enterprise::active_by_id_in(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        id,
+        at,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn active_by_id(_org: &str, _id: &str, _at: i64) -> Option<ActiveDowntime> {
+    None
+}
+
 #[cfg(feature = "enterprise")]
 pub fn active_for_synthetic(
     org: &str,
@@ -237,6 +253,26 @@ pub(crate) mod enterprise {
                     ends_at: window.end,
                 })
             })
+    }
+
+    /// One live row by id whose window holds `at` and which still targets `module`.
+    pub(crate) fn active_by_id_in(
+        rows: &[Downtime],
+        module: TargetModule,
+        id: &str,
+        at: i64,
+    ) -> Option<ActiveDowntime> {
+        let row = rows.iter().find(|row| {
+            row.id == id
+                && row.cancelled_at.is_none()
+                && scope::target_for(&row.targets, module).is_some()
+        })?;
+        let window = schedule::window_at(&row.schedule, at)?;
+        Some(ActiveDowntime {
+            id: row.id.clone(),
+            name: row.name.clone(),
+            ends_at: window.end,
+        })
     }
 
     /// `Exclude` windows sort first, so the honest mode wins where two overlap.
@@ -435,6 +471,29 @@ mod tests {
         assert!(!any_live_target(&rows, TargetModule::Slos));
         assert!(!any_live_target(&rows, TargetModule::Synthetics));
         assert!(!any_live_target(&[], TargetModule::Alerts));
+    }
+
+    #[test]
+    fn a_recorded_downtime_covers_a_recovery_its_own_scope_cannot_see() {
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        // The firing row carried service=payments; the definition alone has no service.
+        let no_dims = HashMap::new();
+        let definition = item("a1", "default", &no_dims, &[]);
+        assert!(active_in(&rows, TargetModule::Alerts, &definition, 11 * HOUR).is_none());
+        let recorded = active_by_id_in(&rows, TargetModule::Alerts, "d1", 11 * HOUR).unwrap();
+        assert_eq!(recorded.id, "d1");
+        // Asked at the recovery instant, so a hold that ends after the window still finds it.
+        assert!(active_by_id_in(&rows, TargetModule::Alerts, "d1", 13 * HOUR).is_none());
+        assert!(active_by_id_in(&rows, TargetModule::Slos, "d1", 11 * HOUR).is_none());
+        assert!(active_by_id_in(&rows, TargetModule::Alerts, "d2", 11 * HOUR).is_none());
+        let mut cancelled = rows.clone();
+        cancelled[0].cancelled_at = Some(10 * HOUR);
+        assert!(active_by_id_in(&cancelled, TargetModule::Alerts, "d1", 11 * HOUR).is_none());
     }
 
     #[test]

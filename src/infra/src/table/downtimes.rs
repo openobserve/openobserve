@@ -40,9 +40,13 @@ use crate::{
     errors::{self, Error},
 };
 
+/// A delete retries its compare-and-swap this often before it gives up on a busy row.
+const TOMBSTONE_ATTEMPTS: usize = 8;
+
 /// The version of a stored row, soft-deleted or not, for ordering replicated writes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RowVersion {
+    pub version: i64,
     pub updated_at: i64,
     pub deleted: bool,
 }
@@ -83,9 +87,19 @@ pub async fn put_if_unchanged(
 }
 
 /// Soft delete: the row stays as a tombstone so a late replicated put cannot bring it back.
-pub async fn delete(org: &str, id: &str) -> Result<(), errors::Error> {
+pub async fn delete(org: &str, id: &str) -> Result<Option<i64>, errors::Error> {
     let client = get_orm_client_rw().await;
     delete_with(client, org, id).await
+}
+
+/// [delete] of a replicated tombstone, at least at the deleting region's version.
+pub async fn delete_at_least(
+    org: &str,
+    id: &str,
+    version: i64,
+) -> Result<Option<i64>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_at_least_with(client, org, id, version).await
 }
 
 /// The version of the row, including a soft-deleted one.
@@ -217,6 +231,7 @@ pub async fn version_with<C: ConnectionTrait>(
         .one(conn)
         .await?
         .map(|m| RowVersion {
+            version: m.version,
             updated_at: m.updated_at,
             deleted: m.deleted_at.is_some(),
         }))
@@ -284,24 +299,34 @@ pub async fn put_if_unchanged_with<C: ConnectionTrait>(
     Ok(res.rows_affected == 1)
 }
 
-/// Marks the row deleted; a second delete keeps the first tombstone time.
+/// Marks the row deleted as a new version; returns the tombstone's version, `None` for no row.
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
     id: &str,
-) -> Result<(), errors::Error> {
-    let now = config::utils::time::now_micros();
-    Entity::update_many()
-        .col_expr(Column::DeletedAt, Expr::value(now))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
-        .filter(Column::Org.eq(org))
-        .filter(Column::Id.eq(id))
-        .filter(Column::DeletedAt.is_null())
-        .exec(conn)
-        .await?;
-    Ok(())
+) -> Result<Option<i64>, errors::Error> {
+    delete_at_least_with(conn, org, id, 0).await
 }
 
+/// Tombstone at max(stored + 1, `at_least`) or raise an older one; returns the committed version.
+pub async fn delete_at_least_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    at_least: i64,
+) -> Result<Option<i64>, errors::Error> {
+    for _ in 0..TOMBSTONE_ATTEMPTS {
+        let Some(stored) = version_with(conn, org, id).await? else {
+            return Ok(None);
+        };
+        if let Some(version) = write_tombstone(conn, org, id, stored, at_least).await? {
+            return Ok(Some(version));
+        }
+    }
+    Err(Error::Message(format!(
+        "downtime {org}/{id} kept changing during its delete"
+    )))
+}
 pub async fn delete_ended_before_with<C: ConnectionTrait>(
     conn: &C,
     cutoff: i64,
@@ -371,6 +396,41 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(ids)
+}
+
+/// One compare-and-swap against `stored`; `None` when another write moved the row first.
+async fn write_tombstone<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    stored: RowVersion,
+    at_least: i64,
+) -> Result<Option<i64>, errors::Error> {
+    let update = Entity::update_many()
+        .filter(Column::Org.eq(org))
+        .filter(Column::Id.eq(id))
+        .filter(Column::Version.eq(stored.version));
+    let (update, version) = if stored.deleted {
+        // A redelivered or older Delete leaves the tombstone as it is.
+        if at_least <= stored.version {
+            return Ok(Some(stored.version));
+        }
+        let update = update
+            .col_expr(Column::Version, Expr::value(at_least))
+            .filter(Column::DeletedAt.is_not_null());
+        (update, at_least)
+    } else {
+        let version = (stored.version + 1).max(at_least);
+        let now = config::utils::time::now_micros();
+        let update = update
+            .col_expr(Column::DeletedAt, Expr::value(now))
+            .col_expr(Column::UpdatedAt, Expr::value(now))
+            .col_expr(Column::Version, Expr::value(version))
+            .filter(Column::DeletedAt.is_null());
+        (update, version)
+    };
+    let res = update.exec(conn).await?;
+    Ok((res.rows_affected == 1).then_some(version))
 }
 
 async fn folder_pk<C: ConnectionTrait>(
@@ -695,6 +755,7 @@ mod tests {
         assert_eq!(
             version_with(&db, "acme", "d1").await.unwrap(),
             Some(RowVersion {
+                version: 1,
                 updated_at: deleted_at,
                 deleted: true
             })
@@ -702,9 +763,73 @@ mod tests {
         assert_eq!(
             version_with(&db, "acme", "d2").await.unwrap(),
             Some(RowVersion {
+                version: 0,
                 updated_at: 1,
                 deleted: false
             })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delete_whose_read_went_stale_retries_against_the_newer_row() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.version = 1;
+        put_with(&db, &d).await.unwrap();
+        let read = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+        // A replicated put lands between the delete's read and its write.
+        d.version = 7;
+        put_with(&db, &d).await.unwrap();
+
+        assert_eq!(
+            write_tombstone(&db, "acme", "d1", read, 0).await.unwrap(),
+            None
+        );
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d));
+        assert_eq!(delete_with(&db, "acme", "d1").await.unwrap(), Some(8));
+        let stored = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert_eq!((stored.version, stored.deleted), (8, true));
+    }
+
+    #[tokio::test]
+    async fn an_incoming_delete_raises_an_older_tombstone_once() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.version = 1;
+        put_with(&db, &d).await.unwrap();
+        assert_eq!(delete_with(&db, "acme", "d1").await.unwrap(), Some(2));
+        let tombstone_at = version_with(&db, "acme", "d1")
+            .await
+            .unwrap()
+            .unwrap()
+            .updated_at;
+
+        assert_eq!(
+            delete_at_least_with(&db, "acme", "d1", 4).await.unwrap(),
+            Some(4)
+        );
+        // A redelivered or older Delete leaves the tombstone where it is.
+        assert_eq!(
+            delete_at_least_with(&db, "acme", "d1", 4).await.unwrap(),
+            Some(4)
+        );
+        assert_eq!(
+            delete_at_least_with(&db, "acme", "d1", 3).await.unwrap(),
+            Some(4)
+        );
+        assert_eq!(delete_with(&db, "acme", "d1").await.unwrap(), Some(4));
+        let stored = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert_eq!(
+            stored,
+            RowVersion {
+                version: 4,
+                updated_at: tombstone_at,
+                deleted: true
+            }
+        );
+        assert_eq!(
+            delete_at_least_with(&db, "acme", "nope", 4).await.unwrap(),
+            None
         );
     }
 

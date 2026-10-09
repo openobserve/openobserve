@@ -940,6 +940,7 @@ pub async fn correlate_external_event(
 /// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
 pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
+    muted: bool,
 ) -> Result<(), anyhow::Error> {
     let Some(incident_id) = event.incident_id.as_deref() else {
         return Ok(());
@@ -985,11 +986,12 @@ pub async fn resolve_alert_firing(
         return Ok(());
     }
 
-    update_status(
+    update_status_as(
         &event.org_id,
         incident_id,
         "resolved",
         "system@openobserve.ai",
+        muted,
     )
     .await?;
     log::info!(
@@ -2781,6 +2783,11 @@ async fn model_to_incident(
     Ok(model_to_incident_with_topology(db_model, topology))
 }
 
+/// A quiet change or a muted incident pages nobody and starts no workflow.
+fn status_change_is_muted(quiet: bool, muted_by_downtime_id: Option<&str>) -> bool {
+    quiet || muted_by_downtime_id.is_some()
+}
+
 /// Convert database model to domain model with pre-fetched topology
 /// A muted incident keeps its timeline but starts no workflow (D3).
 async fn append_event_unless_muted(
@@ -2829,6 +2836,17 @@ pub async fn update_status(
     status: &str,
     user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
+    update_status_as(org_id, incident_id, status, user_id, false).await
+}
+
+/// [update_status]; `quiet` treats the incident as muted for this change only.
+pub async fn update_status_as(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+    quiet: bool,
+) -> Result<Incident, anyhow::Error> {
     // Acknowledging goes through a dedicated atomic path so the actor and
     // timestamp land on the row itself (not just the event log) and a
     // second/concurrent acknowledge can't silently overwrite the first
@@ -2841,7 +2859,7 @@ pub async fn update_status(
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
 
-    let muted = updated.muted_by_downtime_id.is_some();
+    let muted = status_change_is_muted(quiet, updated.muted_by_downtime_id.as_deref());
     // Every resolution path lands here, so closing the record once covers all of them.
     #[cfg(feature = "enterprise")]
     if status == "resolved"
@@ -3091,6 +3109,16 @@ mod tests {
     /// alert, so an unset priority has to mean the same thing on both. They used
     /// to differ — P2 here, P3 in `scheduler::handlers` — which made
     /// `creates_incident` a hidden severity switch.
+    #[test]
+    fn a_resolve_caused_by_a_muted_recovery_is_quiet() {
+        assert!(
+            status_change_is_muted(true, None),
+            "an incident opened before the window"
+        );
+        assert!(status_change_is_muted(false, Some("dt-1")));
+        assert!(!status_change_is_muted(false, None));
+    }
+
     #[test]
     fn test_the_incident_path_uses_the_shared_default_priority() {
         assert_eq!(

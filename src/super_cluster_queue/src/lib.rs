@@ -65,8 +65,8 @@ use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
     AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue, EvalDatasetsQueue,
     EvalExperimentsQueue, EvalJobsQueue, EvalPlaygroundSnapshotsQueue, EvalProvidersQueue,
-    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue, OrgUsersQueue,
-    PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, StatusPagesQueue,
+    EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, Message, MessageType, MetaQueue,
+    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue, StatusPagesQueue,
     SuperClusterQueueTrait, SyntheticsQueue, TemplatesQueue,
 };
 
@@ -90,6 +90,14 @@ fn parse_eval_key(
             Ok((org_id.to_string(), entity_id.to_string()))
         }
         _ => Err(infra::errors::Error::Message(invalid_message.to_string())),
+    }
+}
+
+/// The `incidents` key carries two payloads; byte 94 is the unmute an older region skips.
+async fn incident_msg(msg: Message) -> infra::errors::Result<()> {
+    match msg.message_type {
+        MessageType::IncidentUnmute => incidents::process_unmute(msg).await,
+        _ => incidents::process(msg).await,
     }
 }
 
@@ -123,7 +131,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_alert_msg: alerts::process,
         on_scheduler_msg: scheduler::process,
         on_semantic_groups_msg: semantic_groups::process,
-        on_incident_msg: incidents::process,
+        on_incident_msg: incident_msg,
         on_anomaly_detection_msg: anomaly_detection::process,
         on_alert_state_msg: alert_states::process,
         on_downtime_msg: downtimes::process,

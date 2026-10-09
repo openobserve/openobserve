@@ -43,22 +43,35 @@ pub async fn set_if_unchanged(
     downtime: &Downtime,
     expected_updated_at: i64,
 ) -> Result<bool, anyhow::Error> {
+    if !write_if_unchanged(downtime, expected_updated_at).await? {
+        return Ok(false);
+    }
+    reload_org(&downtime.org).await?;
+    Ok(true)
+}
+
+/// [set_if_unchanged] without this node's reload, for a batch that calls [reload_org] once after.
+pub async fn write_if_unchanged(
+    downtime: &Downtime,
+    expected_updated_at: i64,
+) -> Result<bool, anyhow::Error> {
     if !table::put_if_unchanged(downtime, expected_updated_at).await? {
         return Ok(false);
     }
     coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
-    reload_org(&downtime.org).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_put(downtime).await;
     Ok(true)
 }
 
 pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
-    table::delete(org, id).await?;
+    let version = table::delete(org, id).await?;
     coordinator::emit_delete_event(org, id).await?;
     remove_cached(org, id);
     #[cfg(feature = "enterprise")]
-    super_cluster::emit_delete(org, id).await;
+    super_cluster::emit_delete(org, id, version.unwrap_or_default()).await;
+    #[cfg(not(feature = "enterprise"))]
+    let _ = version;
     Ok(())
 }
 
@@ -68,8 +81,9 @@ pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
     let ids = table::delete_by_org(org).await?;
     for id in &ids {
         coordinator::emit_delete_event(org, id).await?;
+        // Org deletion removes the rows outright, so there is no tombstone version to send.
         #[cfg(feature = "enterprise")]
-        super_cluster::emit_delete(org, id).await;
+        super_cluster::emit_delete(org, id, 0).await;
     }
     remove_org(org);
     for row in &rows {
@@ -246,11 +260,11 @@ mod super_cluster {
         }
     }
 
-    pub(super) async fn emit_delete(org: &str, id: &str) {
+    pub(super) async fn emit_delete(org: &str, id: &str, version: i64) {
         if !enabled() {
             return;
         }
-        if let Err(e) = queue::downtimes_delete(org, id).await {
+        if let Err(e) = queue::downtimes_delete(org, id, version).await {
             log::error!("[DOWNTIMES] super cluster delete {org}/{id} failed: {e}");
         }
     }

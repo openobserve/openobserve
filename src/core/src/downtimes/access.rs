@@ -89,6 +89,50 @@ pub async fn listable_downtime_folders(
     Ok(retain_listable_folders(org, user_id, candidates).await)
 }
 
+/// Of rows outside the listable folders, those granted one by one; one OpenFGA ListObjects call.
+pub async fn individually_readable(
+    org: &str,
+    user_id: &str,
+    rows: Vec<(String, String)>,
+) -> HashSet<String> {
+    if rows.is_empty() {
+        return HashSet::new();
+    }
+    let ofga_type = get_ofga_type("downtimes");
+    match crate::authz::list_objects_for_user(org, user_id, "GET_INDIVIDUAL_FROM_ROLE", &ofga_type)
+        .await
+    {
+        Ok(Some(objects)) => granted_ids(&ofga_type, org, &objects, rows),
+        // No list filtering configured: the per-row check the GET route runs decides.
+        Ok(None) => {
+            let checks = rows.into_iter().map(|(id, folder_id)| async move {
+                check_permissions(
+                    &id,
+                    org,
+                    user_id,
+                    "downtimes",
+                    "GET",
+                    Some(&folder_id),
+                    false,
+                    true,
+                    false,
+                )
+                .await
+                .then_some(id)
+            });
+            futures::future::join_all(checks)
+                .await
+                .into_iter()
+                .flatten()
+                .collect()
+        }
+        Err(e) => {
+            log::warn!("[downtimes] individual grants of {user_id} in {org} unreadable: {e}");
+            HashSet::new()
+        }
+    }
+}
+
 /// Keeps the downtime folders the user may LIST, each checked on its own.
 pub async fn retain_listable_folders(
     org: &str,
@@ -215,6 +259,21 @@ async fn check_target_ids(
     Ok(())
 }
 
+/// The `(id, folder)` rows a ListObjects answer grants; a role-wide grant answers `_all_{org}`.
+fn granted_ids(
+    ofga_type: &str,
+    org: &str,
+    objects: &[String],
+    rows: Vec<(String, String)>,
+) -> HashSet<String> {
+    let objects: HashSet<&str> = objects.iter().map(String::as_str).collect();
+    let all = objects.contains(format!("{ofga_type}:_all_{org}").as_str());
+    rows.into_iter()
+        .map(|(id, _)| id)
+        .filter(|id| all || objects.contains(format!("{ofga_type}:{id}").as_str()))
+        .collect()
+}
+
 /// SLOs and anomaly detections live in alert folders and use the `alerts` resource.
 fn folder_kind(module: TargetModule) -> (FolderType, &'static str) {
     match module {
@@ -237,5 +296,32 @@ fn verb(method: &str) -> &'static str {
         "GET" => "read",
         "DELETE" => "delete",
         _ => "change",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rows() -> Vec<(String, String)> {
+        [("d1", "ops"), ("d2", "ops"), ("d3", "db")]
+            .map(|(id, folder)| (id.to_string(), folder.to_string()))
+            .to_vec()
+    }
+
+    #[test]
+    fn a_single_downtime_grant_lists_only_that_row() {
+        let objects = ["downtime:d2".to_string()];
+        let granted = granted_ids("downtime", "acme", &objects, rows());
+        assert_eq!(granted, HashSet::from(["d2".to_string()]));
+    }
+
+    #[test]
+    fn a_role_wide_grant_lists_every_row_and_none_lists_nothing() {
+        let all = ["downtime:_all_acme".to_string()];
+        assert_eq!(granted_ids("downtime", "acme", &all, rows()).len(), 3);
+        let other_org = ["downtime:_all_other".to_string()];
+        assert!(granted_ids("downtime", "acme", &other_org, rows()).is_empty());
+        assert!(granted_ids("downtime", "acme", &[], rows()).is_empty());
     }
 }

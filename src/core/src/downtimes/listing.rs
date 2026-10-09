@@ -117,18 +117,10 @@ fn mentions(d: &Downtime, search: &str) -> bool {
             .is_some_and(|r| r.to_lowercase().contains(&needle))
 }
 
+/// The send path's rule: folders, tags, ids and the condition over the alert's dimensions.
 fn names_alert(d: &Downtime, alert: &TargetItem<'_>) -> bool {
-    let Some(target) = scope::target_for(&d.targets, TargetModule::Alerts) else {
-        return false;
-    };
-    if target.ids.iter().any(|id| id == alert.id) {
-        return true;
-    }
-    d.condition.as_ref().is_some_and(|cond| {
-        target.ids.is_empty()
-            && scope::matches(target, None, alert)
-            && scope::eval_condition(cond, alert.dimensions)
-    })
+    scope::target_for(&d.targets, TargetModule::Alerts)
+        .is_some_and(|target| scope::matches(target, d.condition.as_ref(), alert))
 }
 
 #[cfg(test)]
@@ -292,5 +284,39 @@ mod tests {
         };
         assert_eq!(list_page(rows(), &query, Some(&unrelated)).total, 0);
         assert_eq!(list_page(rows(), &query, None).total, 0);
+    }
+
+    #[test]
+    fn a_folder_only_downtime_is_listed_for_an_alert_in_that_folder() {
+        let no_dims = HashMap::new();
+        let in_planned = TargetItem {
+            id: "al1",
+            folder_id: "planned",
+            dimensions: &no_dims,
+            tags: &[],
+        };
+        let elsewhere = TargetItem {
+            folder_id: "default",
+            ..in_planned
+        };
+        let folder_only = |folders: TargetFolders| {
+            let mut row = item("f", DowntimeStatus::Active, Repeat::None, 1);
+            row.downtime.condition = None;
+            row.downtime.targets[0].folders = folders;
+            row
+        };
+        let query = ListQuery {
+            alert_id: Some("al1".into()),
+            ..Default::default()
+        };
+        let planned = TargetFolders::Some {
+            folder_ids: vec!["planned".to_string()],
+        };
+        let rows = vec![folder_only(planned)];
+        assert_eq!(list_page(rows.clone(), &query, Some(&in_planned)).total, 1);
+        assert_eq!(list_page(rows, &query, Some(&elsewhere)).total, 0);
+        let all = vec![folder_only(TargetFolders::All)];
+        assert_eq!(list_page(all.clone(), &query, Some(&in_planned)).total, 1);
+        assert_eq!(list_page(all, &query, Some(&elsewhere)).total, 1);
     }
 }

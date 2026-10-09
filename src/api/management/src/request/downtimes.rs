@@ -430,25 +430,28 @@ fn error_response(e: openobserve_core::downtimes::DowntimeError) -> Response {
         DowntimeError::BadRequest(m) => MetaHttpResponse::bad_request(m),
         DowntimeError::Forbidden(m) => MetaHttpResponse::forbidden(m),
         DowntimeError::Conflict(m) => MetaHttpResponse::conflict(m),
+        // The text can carry database errors, so it goes to the log only.
         DowntimeError::Internal(m) => {
             log::error!("[DOWNTIMES] {m}");
-            MetaHttpResponse::internal_error(m)
+            MetaHttpResponse::internal_error("Something went wrong, see the server log")
         }
     }
 }
 
-#[cfg(all(test, not(feature = "enterprise")))]
+#[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
 
     use super::*;
 
+    #[cfg(not(feature = "enterprise"))]
     fn user() -> Headers<UserEmail> {
         Headers(UserEmail {
             user_id: "root@example.com".to_string(),
         })
     }
 
+    #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn every_route_is_forbidden_in_the_oss_build() {
         let org = || Path("default".to_string());
@@ -475,5 +478,21 @@ mod tests {
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_internal_error_answers_without_the_database_text() {
+        let db_text = "error returned from database: relation \"downtimes\" does not exist";
+        let response = error_response(openobserve_core::downtimes::DowntimeError::Internal(
+            db_text.to_string(),
+        ));
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body = String::from_utf8_lossy(&body);
+        assert!(!body.contains("database"), "{body}");
+        assert!(body.contains("see the server log"), "{body}");
     }
 }

@@ -207,11 +207,11 @@ pub async fn muted_by(
     check(org, check_id, folder_id, tags).await
 }
 
-/// A muted run moves only the streak: `alerting` means someone was told, so it stays as it was.
+/// A muted run may close `alerting` but never open it, so a muted recovery is dropped.
 pub fn suppressed_state(prior: AlertState, next: AlertState) -> AlertState {
     AlertState {
         last_alert_at: prior.last_alert_at,
-        alerting: prior.alerting,
+        alerting: prior.alerting && next.alerting,
         degraded_notified_at: prior.degraded_notified_at,
         ..next
     }
@@ -798,16 +798,20 @@ mod tests {
     }
 
     #[test]
-    fn a_recovery_inside_the_window_is_sent_by_the_first_pass_after_it() {
+    fn a_recovery_inside_the_window_sends_nothing_on_the_first_pass_after_it() {
         let paged = state(3, MIN, true);
         let (outcome, next) = decide(paged, RunClass::Healthy, 3, 30, 45 * MIN);
         assert_eq!(outcome, AlertOutcome::Recovered);
         let muted = suppressed_state(paged, next);
-        assert!(muted.alerting, "the recovery is still owed");
+        assert!(!muted.alerting, "the recovery is dropped, not owed");
         assert_eq!(muted.consecutive_failures, 0);
         let (outcome, after) = decide(muted, RunClass::Healthy, 3, 30, 61 * MIN);
-        assert_eq!(outcome, AlertOutcome::Recovered);
-        assert!(!after.alerting);
+        assert_eq!(outcome, AlertOutcome::Silent);
+        // The next outage after the window notifies.
+        let (_, one) = decide(after, RunClass::Failing, 3, 30, 62 * MIN);
+        let (_, two) = decide(one, RunClass::Failing, 3, 30, 63 * MIN);
+        let (outcome, _) = decide(two, RunClass::Failing, 3, 30, 64 * MIN);
+        assert_eq!(outcome, AlertOutcome::Firing);
     }
 
     #[test]

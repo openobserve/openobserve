@@ -2245,7 +2245,7 @@ fn alert_downtimes_in(org: &str) -> bool {
 
 /// The downtime silencing a matched run (D2); a multi-alert only when every group is muted.
 #[cfg(feature = "enterprise")]
-async fn downtime_decision(
+pub(crate) async fn downtime_decision(
     alert: &config::meta::alerts::alert::Alert,
     folder_id: &str,
     rows: Option<&[config::utils::json::Map<String, config::utils::json::Value>]>,
@@ -2417,22 +2417,34 @@ async fn unmuted_identity(
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
     now: i64,
 ) -> Vec<HashMap<String, String>> {
-    let mut identity = alert_identity(alert, rows).await;
-    if let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string())
-        && alert_downtimes_in(&alert.org_id)
-    {
-        identity.retain(|dims| {
-            crate::alerts::downtimes::active_for_alert(
-                &alert.org_id,
-                &alert_id,
-                folder_id,
-                dims,
-                now,
-            )
-            .is_none()
-        });
+    let on_call = alert_identity(alert, rows).await;
+    let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
+        return on_call;
+    };
+    if !alert_downtimes_in(&alert.org_id) {
+        return on_call;
     }
-    identity
+    let identities = downtime_identities(alert, rows).await;
+    unmuted_maps(on_call, identities, |dims| {
+        crate::alerts::downtimes::active_for_alert(&alert.org_id, &alert_id, folder_id, dims, now)
+            .is_some()
+    })
+}
+
+/// The on-call maps while no group is muted, else the unmuted groups' own maps.
+#[cfg(feature = "enterprise")]
+fn unmuted_maps(
+    on_call: Vec<HashMap<String, String>>,
+    identities: Vec<HashMap<String, String>>,
+    mut muted: impl FnMut(&HashMap<String, String>) -> bool,
+) -> Vec<HashMap<String, String>> {
+    let total = identities.len();
+    let unmuted: Vec<_> = identities.into_iter().filter(|dims| !muted(dims)).collect();
+    if unmuted.len() == total {
+        on_call
+    } else {
+        unmuted
+    }
 }
 
 /// The rows of a multi-alert's unmuted groups for incident correlation; `None` keeps every row.
@@ -2461,7 +2473,7 @@ async fn unmuted_group_rows(
 }
 
 #[cfg(not(feature = "enterprise"))]
-async fn downtime_decision(
+pub(crate) async fn downtime_decision(
     _alert: &config::meta::alerts::alert::Alert,
     _folder_id: &str,
     _rows: Option<&[config::utils::json::Map<String, config::utils::json::Value>]>,
@@ -2520,6 +2532,28 @@ async fn correlate_muted_incident(
     }
 }
 
+/// Whether a matched single-series run is still inside its pending period.
+fn holds_pending(
+    alert: &config::meta::alerts::alert::Alert,
+    last: Option<&config::meta::alerts::state::AlertState>,
+    rows: Option<&[config::utils::json::Map<String, config::utils::json::Value>]>,
+    now: i64,
+) -> bool {
+    if alert.query_condition.multi_alert_enabled()
+        || alert.pending_period_sec <= 0
+        || rows.is_none_or(|rows| rows.is_empty())
+    {
+        return false;
+    }
+    match last.map(|state| (state.last_outcome.as_ref(), state.since)) {
+        None | Some((None | Some(RunOutcome::Normal), _)) => true,
+        Some((Some(RunOutcome::Pending), Some(since))) => {
+            now - since < alert.pending_period_sec.saturating_mul(1_000_000)
+        }
+        _ => false,
+    }
+}
+
 /// D6: only a delivered firing opens the silence, so the run after a downtime delivers.
 fn starts_silence_window(
     condition_matched: bool,
@@ -2549,7 +2583,7 @@ fn clears_recorded_mute(outcome: &RunOutcome) -> bool {
 
 /// The Muted chip of a condition-scoped downtime, recorded or cleared at run time.
 #[cfg(feature = "enterprise")]
-async fn record_last_downtime(org: &str, alert_id: &str, downtime_id: Option<&str>) {
+pub(crate) async fn record_last_downtime(org: &str, alert_id: &str, downtime_id: Option<&str>) {
     if !alert_downtimes_in(org) {
         return;
     }
@@ -3109,6 +3143,7 @@ async fn handle_alert_triggers(
     if matched_level.is_none()
         && o2_enterprise::enterprise::oncall::is_enabled()
         && let Some(alert_id) = alert.id.as_ref()
+        && !crate::alerts::recovery::oncall_recovery_withheld(&alert, &folder_id, now).await
         && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
             &alert.org_id,
             &alert_id.to_string(),
@@ -3192,6 +3227,72 @@ async fn handle_alert_triggers(
         alert.query_condition.multi_alert_enabled(),
         multi_level,
     );
+    // ── §7.1 delivery decision ──────────────────────────────────────────────
+    // Computed for multi-level alerts only; single-level alerts short-circuit
+    // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
+    // MN-1/MN-2: a multi-alert's suppression is per group, decided inside
+    // `dispatch_per_group` from each row's own `silenced_until`. The
+    // alert-level decision must not run in front of it — one window for the
+    // whole alert would mute every group at once, and a group that starts
+    // firing mid-window would never page at all.
+    let alert_level_delivery = config::meta::alerts::dispatch::alert_level_delivery_applies(
+        alert.query_condition.multi_alert_enabled(),
+        multi_level,
+    );
+    let level_delivery = if alert_level_delivery {
+        config::meta::alerts::level::delivery_decision(
+            recorded_level,
+            trigger_data
+                .last_notified_level
+                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+            trigger_data.delivery_silenced_until,
+            triggered_at,
+            notify_on_warning,
+        )
+    } else {
+        config::meta::alerts::level::DeliveryDecision::Deliver
+    };
+    if trigger_results.data.is_some() {
+        trigger_data.last_satisfied_at = Some(triggered_at);
+    }
+    // Asked before the downtime, so a muted run still counts toward the pending period.
+    if level_delivery.should_deliver()
+        && holds_pending(
+            &alert,
+            last_states.get(config::meta::alerts::state::ROLLUP_GROUP_KEY),
+            trigger_results.data.as_deref(),
+            now,
+        )
+    {
+        trigger_data_stream.status = RunOutcome::Pending;
+        trigger_data.period_end_time = if should_store_last_end_time {
+            Some(trigger_results.end_time)
+        } else {
+            None
+        };
+        // A pending run was never delivered, so the next run keeps the cadence without silence.
+        new_trigger.next_run_at =
+            alert
+                .trigger_condition
+                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
+        new_trigger.is_silenced = false;
+        trigger_data_stream.next_run_at = new_trigger.next_run_at;
+        new_trigger.data = json::to_string(&trigger_data).unwrap();
+        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        if let Some(alert_id) = alert.id.as_ref() {
+            let _ = persist_alert_run_state(
+                &alert,
+                &alert_id.to_string(),
+                &trigger_data_stream.status,
+                eval_level,
+                trigger_results.group_classification.as_ref(),
+                &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
+            )
+            .await;
+        }
+        publish_triggers_usage(trigger_data_stream);
+        return Ok(());
+    }
     // Decided after the query, from the fired rows, and never from the definition alone.
     let downtime =
         downtime_decision(&alert, &folder_id, trigger_results.data.as_deref(), now).await;
@@ -3217,37 +3318,10 @@ async fn handle_alert_triggers(
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
-    if trigger_results.data.is_some() {
-        trigger_data.last_satisfied_at = Some(triggered_at);
-    }
-
     // send notification
-    // ── §7.1 delivery decision ──────────────────────────────────────────────
-    // Computed for multi-level alerts only; single-level alerts short-circuit
-    // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
-    // MN-1/MN-2: a multi-alert's suppression is per group, decided inside
-    // `dispatch_per_group` from each row's own `silenced_until`. The
-    // alert-level decision must not run in front of it — one window for the
-    // whole alert would mute every group at once, and a group that starts
-    // firing mid-window would never page at all.
-    let alert_level_delivery = config::meta::alerts::dispatch::alert_level_delivery_applies(
-        alert.query_condition.multi_alert_enabled(),
-        multi_level,
-    );
-    let delivery = if let Some(downtime) = downtime.as_ref() {
-        DeliveryDecision::SuppressedByDowntime(downtime.id.clone())
-    } else if alert_level_delivery {
-        config::meta::alerts::level::delivery_decision(
-            recorded_level,
-            trigger_data
-                .last_notified_level
-                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
-            trigger_data.delivery_silenced_until,
-            triggered_at,
-            notify_on_warning,
-        )
-    } else {
-        config::meta::alerts::level::DeliveryDecision::Deliver
+    let delivery = match downtime.as_ref() {
+        Some(downtime) => DeliveryDecision::SuppressedByDowntime(downtime.id.clone()),
+        None => level_delivery,
     };
     if !delivery.should_deliver() && (alert_level_delivery || downtime.is_some()) {
         log::info!(
@@ -3366,134 +3440,6 @@ async fn handle_alert_triggers(
             let _ = is_multi_alert;
             false
         };
-
-        // for non multi alert, we need to check if it should move to pending state or firing state
-        // this only applies if the pending period > 0, for 0 pending period, always immediately
-        // transition to firing etc.
-        if !is_multi_alert && alert.pending_period_sec > 0 {
-            if let Some(last_state) = last_states.get("") {
-                match (last_state.last_outcome.as_ref(), last_state.since) {
-                    (None, _) | (Some(RunOutcome::Normal), _) => {
-                        // last state not recorded, so maybe first firing, or normal
-                        // so set to pending
-                        trigger_data_stream.status = RunOutcome::Pending;
-                        trigger_data.period_end_time = if should_store_last_end_time {
-                            Some(trigger_results.end_time)
-                        } else {
-                            None
-                        };
-                        // reset the next run time without silence, because this was never
-                        // delivered, simply pending
-                        new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
-                            true,
-                            alert.tz_offset,
-                            false,
-                            None,
-                        )?;
-                        new_trigger.is_silenced = false;
-                        trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                        new_trigger.data = json::to_string(&trigger_data).unwrap();
-                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                        // Condition matched; only the notification was
-                        // deduplicated away. State must reflect the firing.
-                        if let Some(alert_id) = alert.id.as_ref() {
-                            let _ = persist_alert_run_state(
-                                &alert,
-                                &alert_id.to_string(),
-                                &trigger_data_stream.status,
-                                eval_level,
-                                trigger_results.group_classification.as_ref(),
-                                &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                                    alert.keep_firing_for,
-                                ),
-                            )
-                            .await;
-                        }
-                        publish_triggers_usage(trigger_data_stream);
-                        return Ok(());
-                    }
-                    #[allow(clippy::collapsible_match)]
-                    (Some(RunOutcome::Pending), Some(last)) => {
-                        // last state was pending, so check if the the pending state exists for more
-                        // than pending seconds or not.
-                        if now - last < alert.pending_period_sec.saturating_mul(1_000_000) {
-                            trigger_data_stream.status = RunOutcome::Pending;
-                            trigger_data.period_end_time = if should_store_last_end_time {
-                                Some(trigger_results.end_time)
-                            } else {
-                                None
-                            };
-                            // reset the next run time without silence, because this was never
-                            // delivered, simply pending
-                            new_trigger.next_run_at = alert
-                                .trigger_condition
-                                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
-                            new_trigger.is_silenced = false;
-                            trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                            new_trigger.data = json::to_string(&trigger_data).unwrap();
-                            db::scheduler::update_trigger(new_trigger, true, &query_trace_id)
-                                .await?;
-                            // Condition matched; only the notification was
-                            // deduplicated away. State must reflect the firing.
-                            if let Some(alert_id) = alert.id.as_ref() {
-                                let _ = persist_alert_run_state(
-                                    &alert,
-                                    &alert_id.to_string(),
-                                    &trigger_data_stream.status,
-                                    eval_level,
-                                    trigger_results.group_classification.as_ref(),
-                                    &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                                        alert.keep_firing_for,
-                                    ),
-                                )
-                                .await;
-                            }
-                            publish_triggers_usage(trigger_data_stream);
-                            return Ok(());
-                        }
-                    }
-                    // for all other states, continue processing
-                    _ => {}
-                }
-            } else {
-                // last state not recorded, so maybe first firing, set it to pending
-                trigger_data_stream.status = RunOutcome::Pending;
-                trigger_data.period_end_time = if should_store_last_end_time {
-                    Some(trigger_results.end_time)
-                } else {
-                    None
-                };
-                // reset the next run time without silence, because this was never delivered,
-                // simply pending
-                new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
-                    true,
-                    alert.tz_offset,
-                    false,
-                    None,
-                )?;
-                new_trigger.is_silenced = false;
-                trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                new_trigger.data = json::to_string(&trigger_data).unwrap();
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
-                // Condition matched; only the notification was
-                // deduplicated away. State must reflect the firing.
-                if let Some(alert_id) = alert.id.as_ref() {
-                    let _ = persist_alert_run_state(
-                        &alert,
-                        &alert_id.to_string(),
-                        &trigger_data_stream.status,
-                        eval_level,
-                        trigger_results.group_classification.as_ref(),
-                        &config::meta::alerts::recovery::EpisodeInput::undelivered(
-                            alert.keep_firing_for,
-                        ),
-                    )
-                    .await;
-                }
-                publish_triggers_usage(trigger_data_stream);
-                return Ok(());
-            }
-        }
 
         if grouping_enabled {
             #[cfg(feature = "enterprise")]
@@ -8281,6 +8227,39 @@ mod tests {
     }
 
     #[test]
+    fn a_muted_run_still_counts_toward_the_pending_period() {
+        use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
+
+        const MINUTE: i64 = 60_000_000;
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.pending_period_sec = 120;
+        let rows = [json::json!({ "value": 1 }).as_object().cloned().unwrap()];
+        let run = |prev: Option<&config::meta::alerts::state::AlertState>, at: i64| {
+            let pending = holds_pending(&alert, prev, Some(&rows), at);
+            let outcome = if pending {
+                RunOutcome::Pending
+            } else {
+                RunOutcome::Firing
+            };
+            let state = apply_outcome("a1", ROLLUP_GROUP_KEY, prev, outcome, None, at).state;
+            (pending, state)
+        };
+        // Run 1 falls inside the window; the pending check runs before the downtime decision.
+        let (pending, state) = run(None, 0);
+        assert!(pending, "run 1 is pending, muted or not");
+        let (pending, state) = run(state.as_ref(), MINUTE);
+        assert!(pending, "run 2, after the window, still waits");
+        let (pending, _) = run(state.as_ref(), 2 * MINUTE);
+        assert!(!pending, "run 3 pages");
+
+        let fired = apply_outcome("a1", ROLLUP_GROUP_KEY, None, RunOutcome::Firing, None, 0).state;
+        assert!(!holds_pending(&alert, fired.as_ref(), Some(&rows), MINUTE));
+        assert!(!holds_pending(&alert, None, None, 0));
+        alert.pending_period_sec = 0;
+        assert!(!holds_pending(&alert, None, Some(&rows), 0));
+    }
+
+    #[test]
     fn a_composite_with_downtimes_off_is_never_suppressed() {
         let definition = infra::table::entity::alert_composites::Model {
             id: "2f9K".to_string(),
@@ -8430,6 +8409,31 @@ mod tests {
         assert_eq!(run_downtime(&alert, &rows, &["payments"]), None);
         assert_eq!(run_downtime(&alert, &rows, &["checkout"]), None);
         assert!(run_downtime(&alert, &rows, &["payments", "checkout"]).is_some());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_promql_multi_alert_with_a_muted_first_series_pages_only_the_unmuted_series() {
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        let rows = [service_row("checkout", 1), service_row("payments", 2)];
+        let identities = || -> Vec<HashMap<String, String>> {
+            identities_by_key(&alert, &rows, &service_groups())
+                .into_iter()
+                .map(|(_, dims)| dims)
+                .collect()
+        };
+        let first_row = vec![identities()[0].clone()];
+        let muted_first = first_row[0]["service"].clone();
+        let paged = unmuted_maps(first_row.clone(), identities(), |dims| {
+            dims["service"] == muted_first
+        });
+        assert_eq!(paged.len(), 1);
+        assert_ne!(paged[0]["service"], muted_first);
+        let unmuted = unmuted_maps(first_row.clone(), identities(), |_| false);
+        assert_eq!(unmuted, first_row, "nothing muted keeps the on-call maps");
+        assert!(unmuted_maps(first_row, identities(), |_| true).is_empty());
     }
 
     /// `entry_downtime` reads every row of a grouped-flush entry, not the first.
