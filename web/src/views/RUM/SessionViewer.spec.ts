@@ -1501,6 +1501,32 @@ describe("SessionViewer.vue — background batches (G5)", () => {
     wrapper.unmount();
   });
 
+  it("passes each view's last row end to the player, and none while the session is live", async () => {
+    replaySchema.fields = { ...replaySchema.fields, view_id: true, index_in_view: true };
+    const rows = manyRows(4).map((row, i) => ({
+      ...row,
+      view_id: i % 2 ? "W" : "V",
+      index_in_view: Math.floor(i / 2),
+    }));
+    resetStreaming(rowsResponder(rows));
+    const wrapper = await mountWithFakeTimers();
+    const vm = wrapper.vm as any;
+    const player = () =>
+      wrapper.findComponent('[data-test="stub-video-player"]').vm.$attrs["view-ends"] as Map<
+        string,
+        number
+      >;
+
+    expect([...player()]).toEqual([
+      ["V", S + 2999],
+      ["W", S + 3999],
+    ]);
+    vm.isLive = true;
+    await flushPromises();
+    expect(player().size).toBe(0);
+    wrapper.unmount();
+  });
+
   it("re-queues a segment missing from a successful batch twice, then skips it", async () => {
     const good = rowsResponder(fixtureRows);
     resetStreaming((sql, from) =>

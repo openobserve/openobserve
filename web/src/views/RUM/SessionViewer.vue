@@ -235,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :single-snapshot="singleSnapshot"
               :watermark="replayWatermark"
               :anchor-moved-for-tabs="anchorMovedForTabs"
+              :view-ends="replayViewEnds"
               class="min-h-0 flex-1"
               @ready="handlePlayerReady"
               @seek-request="requestSeek"
@@ -320,6 +321,7 @@ import { rumField } from "@/utils/rum/fields";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import {
   dedupManifest,
+  lastEndByView,
   trimBeforeReplayStart,
   segmentId,
   replayWatermark as watermarkFor,
@@ -578,6 +580,11 @@ const windowStart = computed(() => Number(manifest.value[run.value.anchorIndex]?
 
 const replayWatermark = computed(() =>
   watermarkFor(manifest.value, run.value.appendedThroughIndex, isLive.value),
+);
+
+// A live view's newest row is not its end yet, so implicit view ends wait for the session to finish.
+const replayViewEnds = computed(() =>
+  isLive.value ? new Map<string, number>() : lastEndByView(manifest.value),
 );
 
 const anchorMovedForTabs = ref(false);

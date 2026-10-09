@@ -1415,6 +1415,32 @@ describe("VideoPlayer", () => {
       wrapper.unmount();
     });
 
+    it("passes the known view ends to the decoder, so a page load without ViewEnd is not another tab", async () => {
+      const text = (t: number) => ({ type: 12, timestamp: t, data: [] });
+      const segments = [
+        seg("A", 0, [...opening(T, "A"), text(T + 300)]),
+        seg("B", 0, opening(T + 1000, "B")),
+      ];
+      const known = mountComponent({
+        viewEnds: new Map([
+          ["A", T + 300],
+          ["B", T + 1000],
+        ]),
+      });
+      await flushPromises();
+      await known.setProps({ segments });
+      await flushPromises();
+      expect(known.find('[data-test="video-player-showing"]').exists()).toBe(false);
+      known.unmount();
+
+      const unknown = mountComponent();
+      await flushPromises();
+      await unknown.setProps({ segments });
+      await flushPromises();
+      expect(unknown.find('[data-test="video-player-showing"]').exists()).toBe(true);
+      unknown.unmount();
+    });
+
     it("decorates a reused rebuilt snapshot only once", async () => {
       const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
       (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();

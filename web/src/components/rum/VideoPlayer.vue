@@ -263,6 +263,7 @@ const props = defineProps({
   intent: { type: String as PropType<ReplayIntent>, default: "pause" },
   watermark: { type: Number, default: Number.POSITIVE_INFINITY },
   anchorMovedForTabs: { type: Boolean, default: false },
+  viewEnds: { type: Map as PropType<Map<string, number>>, default: () => new Map() },
 });
 
 const emit = defineEmits<{
@@ -660,6 +661,7 @@ const syncDecoderState = (decoder: MultiViewDecoder) => {
 
 // One decoder serves the whole forward-only run, so per-view converter state survives every batch.
 const convertSegments = (segments: any[], decoder: MultiViewDecoder) => {
+  decoder.setViewEnds(props.viewEnds);
   const { events, skippedRecords } = decoder.push(segments, props.watermark);
   if (skippedRecords) {
     console.warn(`Session replay: ${skippedRecords} record(s) could not be converted`);
