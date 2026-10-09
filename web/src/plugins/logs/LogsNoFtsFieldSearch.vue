@@ -163,7 +163,7 @@ onMounted(async () => {
       }}</OText>
       <div class="flex flex-wrap justify-end gap-2">
         <OButton variant="outline" size="sm-action" @click="emit('cancel')">{{
-          t("search.noFtsRecovery.cancel")
+          t("common.cancel")
         }}</OButton>
         <OButton
           type="submit"

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { onScopeDispose, watch } from "vue";
 import {
   buildFilterContext,
@@ -31,7 +33,7 @@ export function useFreeTextPreview(
   searchObj: PreviewSearchObj,
   config: () => FreeTextZoConfig | null | undefined,
   readEditor: () => string,
-  t: (key: string, params?: Record<string, unknown>) => string,
+  t: (key: string, params?: Record<string, unknown>) => I18nText,
 ): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const cancel = () => {

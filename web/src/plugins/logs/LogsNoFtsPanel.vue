@@ -18,10 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto pb-4">
     <OEmptyState
       illustration="no-results"
-      size="block"
+      :size="fieldSearchOpen ? 'compact' : 'block'"
       :hide-action="true"
       class="w-full shrink-0"
-      :class="fieldSearchOpen && 'min-h-0! py-4! [&>div]:gap-3!'"
       data-test="logs-no-fts-panel"
     >
       <template #title>{{ title }}</template>
@@ -29,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <EmptyStateActionCard
           :hide-chevron="true"
-          class="max-w-80! gap-2! [&>span:first-child]:size-8 md:[&>span>span:first-child]:whitespace-nowrap"
+          size="compact"
           icon="search"
           :label="t('search.noFtsRecovery.searchField')"
           :sublabel="t('search.noFtsRecovery.searchFieldHint', { term })"
@@ -38,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <EmptyStateActionCard
           :hide-chevron="true"
-          class="max-w-80! gap-2! [&>span:first-child]:size-8 md:[&>span>span:first-child]:whitespace-nowrap"
+          size="compact"
           icon="list"
           :label="t('search.noFtsRecovery.clearRun')"
           :sublabel="t('search.noFtsRecovery.clearRunHint', { term })"
@@ -47,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <EmptyStateActionCard
           :hide-chevron="true"
-          class="max-w-80! gap-2! [&>span:first-child]:size-8 md:[&>span>span:first-child]:whitespace-nowrap"
+          size="compact"
           v-if="configureStream"
           icon="settings"
           :label="t('search.freeTextSetField')"
@@ -56,11 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? t('search.noFtsRecovery.configureHint')
               : t('search.noFtsRecovery.editPermission')
           "
-          :aria-disabled="!canConfigure || undefined"
-          :class="
-            !canConfigure &&
-            'hover:border-border-default! hover:bg-surface-base! [&>span:first-child]:bg-section-header-bg! [&>span:first-child]:text-text-disabled! [&>span>span:first-child]:text-text-disabled! cursor-not-allowed! hover:shadow-none!'
-          "
+          :unavailable="!canConfigure"
           :aria-describedby="!canConfigure ? permissionId : undefined"
           data-test="logs-no-fts-configure-btn"
           @click="canConfigure && emit('configure', configureStream)"

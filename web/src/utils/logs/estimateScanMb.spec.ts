@@ -34,7 +34,6 @@ import {
 const NOW = 2_000 * MICROS_PER_DAY;
 const ctx: EstimateContext = { nowUs: NOW, defaultRetentionDays: 30, superCluster: false };
 
-// 10 days of data, 1000 MB per day, last persisted file 1 hour ago.
 const steady: StreamStatsEntry = {
   name: "steady",
   stats: {
@@ -267,7 +266,6 @@ describe("Narrow to", () => {
   });
 
   it("picks the largest preset under the threshold, shorter than the current window", () => {
-    // About 41.6 MB per hour, so 3 h is about 125 MB and 6 h about 250 MB.
     const pick = chooseNarrowPreset(["steady"], [steady], ctx, 200, 7 * MICROS_PER_DAY);
     expect(pick?.period).toBe("3h");
     expect(pick?.decision.allowed).toBe(true);

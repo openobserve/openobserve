@@ -166,13 +166,13 @@ import {
   type EmptyStateVariant,
 } from "./presets";
 
-type Size = "hero" | "block" | "inline";
+type Size = "hero" | "block" | "compact" | "inline";
 
 const props = withDefaults(
   defineProps<{
     /** Named scenario from the catalog (fills illustration + copy + action). */
     preset?: EmptyStatePresetName;
-    /** Visual scale for the context this empty state sits in. */
+    /** Visual scale, including compact content above an inline form. */
     size?: Size;
     /** Tone; defaults from the preset, else "neutral". */
     variant?: EmptyStateVariant;
@@ -349,6 +349,18 @@ const SIZE_MAP: Record<
   block: {
     root: "w-full min-h-65 px-6 py-10 max-md:min-h-0 max-md:px-4 max-md:py-5",
     stack: "gap-5 max-md:gap-3",
+    copy: "gap-2 max-md:gap-1",
+    actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
+    extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
+    title: raw("text-lg! max-md:text-base!"),
+    description: raw("text-sm"),
+    illustrationWidth: 150,
+    illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
+    iconWrap: "",
+  },
+  compact: {
+    root: "w-full min-h-0 px-6 py-4 max-md:px-4",
+    stack: "gap-3",
     copy: "gap-2 max-md:gap-1",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",

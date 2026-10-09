@@ -49,7 +49,6 @@ export const maxParenDepth = (text: string): number => {
   return max;
 };
 
-/** Paren depth outside literals, quoted identifiers and comments; Infinity when the text cannot be read with certainty. */
 export const lexicalParenDepth = (sql: string): number => {
   const n = sql.length;
   let depth = 0;
@@ -68,7 +67,6 @@ export const lexicalParenDepth = (sql: string): number => {
       i = end + 2;
     } else {
       if (ch === "(") max = Math.max(max, ++depth);
-      // A stray closer means the quoting was not what it looked like, so nothing is certain.
       else if (ch === ")" && --depth < 0) return Infinity;
       i++;
     }
@@ -162,7 +160,6 @@ export const stripWherePredicate = (sql: string): string => {
   return out + sql.slice(prev);
 };
 
-// Index just past the quoted run opening at `start` (a doubled quote is an escape), or -1 when unterminated.
 function skipQuoted(sql: string, start: number): number {
   const quote = sql[start];
   let i = start + 1;

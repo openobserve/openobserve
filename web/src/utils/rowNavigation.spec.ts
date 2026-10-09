@@ -121,7 +121,6 @@ describe("nextRowTarget", () => {
 });
 
 describe("nextVisibleSpan", () => {
-  // R → A (A1, A2), B
   const parents: Record<string, string | undefined> = { A: "R", A1: "A", A2: "A", B: "R" };
   const ancestorsOf = (id: string) => ancestorChain(id, (s) => parents[s], 10);
   const all = ["R", "A", "A1", "A2", "B"];
@@ -168,7 +167,6 @@ describe("nextVisibleSpan", () => {
   });
 
   it("uses the nearest visible ancestor, not the root", () => {
-    // R → A → A1 → A1x, with A1 collapsed: A1x is hidden, A1 is its nearest visible ancestor.
     const deep: Record<string, string | undefined> = { A: "R", A1: "A", A1x: "A1", B: "R" };
     const chain = (id: string) => ancestorChain(id, (s) => deep[s], 10);
     expect(nextVisibleSpan(["R", "A", "A1", "B"], "A1x", chain, -1)).toBe("A1");

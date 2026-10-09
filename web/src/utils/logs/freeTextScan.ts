@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { b64DecodeUnicodeSafe, b64EncodeUnicode } from "@/utils/formatters";
 import type { FreeTextScanEntry } from "@/utils/query/freeTextFilter";
 
@@ -21,7 +23,6 @@ export const FREE_TEXT_I18N = {
   scan: "search.freeTextScanLogsOnly",
 } as const;
 
-/** The slice of the logs search object the scan-consent helpers read and write. */
 export interface FreeTextScanHolder {
   meta: { sqlMode?: boolean; freeTextScan?: Record<string, FreeTextScanEntry> | null };
   data: { stream: { selectedStream: string[] }; freeTextBlocked?: unknown };
@@ -33,8 +34,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function freeTextGateFlags(
   searchObj: FreeTextScanHolder,
-  t: (key: string) => string,
-): { blockedReason: string | null; scanReason: string | null } {
+  t: (key: string) => I18nText,
+): { blockedReason: I18nText | null; scanReason: I18nText | null } {
   const selected = searchObj.data.stream.selectedStream ?? [];
   const scan = searchObj.meta.freeTextScan ?? {};
   return {
@@ -43,7 +44,6 @@ export function freeTextGateFlags(
   };
 }
 
-/** Keeps only well-formed `{ fields, materialized? }` entries; anything else is dropped, never thrown. */
 export function sanitizeFreeTextScan(value: unknown): Record<string, FreeTextScanEntry> {
   const out: Record<string, FreeTextScanEntry> = {};
   if (!isRecord(value)) return out;
@@ -70,7 +70,6 @@ export function decodeFtScan(param: unknown): Record<string, FreeTextScanEntry> 
   }
 }
 
-/** Drops scan entries for streams that are no longer selected. */
 export function pruneFreeTextScan(searchObj: FreeTextScanHolder): void {
   const scan = searchObj.meta.freeTextScan ?? {};
   const selected = new Set(searchObj.data.stream.selectedStream ?? []);

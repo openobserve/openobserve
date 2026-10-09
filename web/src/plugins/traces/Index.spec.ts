@@ -810,7 +810,6 @@ describe("Index.vue (Main Traces Page)", () => {
         },
       });
 
-    // The page re-reads the shared toggle from storage once auto_query_enabled is known.
     beforeEach(() => localStorage.setItem("oo_toggle_auto_run", "false"));
 
     afterEach(() => {

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Item 4a: J/K on the Traces list (J6) and trace-detail J/K in visible tree order (J7).
 const crypto = require("crypto");
 const {
   test,
@@ -35,7 +34,6 @@ const hex = (bytes) => crypto.randomBytes(bytes).toString("hex");
 const apiBase = () =>
   (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, "");
 
-// Fixture R → A (A1, A2) and B, as 4a J7 describes.
 const tree = {
   traceId: hex(16),
   R: hex(8),
@@ -303,13 +301,11 @@ test.describe("Traces J/K navigation (item 4a)", () => {
     async ({ page }) => {
       await openTree(page);
 
-      // AC7.1: everything expanded.
       for (const id of [tree.R, tree.A, tree.A1, tree.A2, tree.B]) {
         await page.keyboard.press("j");
         await current(page, id);
       }
 
-      // AC7.2 and AC7.4: A collapsed and selected, J goes to B over the hidden children.
       await toggle(page, tree.A);
       await expect(page.locator(spanRow(tree.A1))).toHaveCount(0);
       await selectSpan(page, tree.A);
@@ -319,7 +315,6 @@ test.describe("Traces J/K navigation (item 4a)", () => {
         page.locator('[data-test="trace-details-span-nav-live"]'),
       ).toHaveText("Span 3 of 3: B child");
 
-      // AC7.3: a hidden selection steps from its nearest visible ancestor.
       await toggle(page, tree.A);
       await selectSpan(page, tree.A1);
       await toggle(page, tree.A);

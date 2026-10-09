@@ -77,7 +77,6 @@ describe("SearchResult Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
-    // The auto-run engine is a page singleton; each test starts from a clean one.
     resetLogsAutoRunForTests();
     // jsdom does not implement HTMLElement.scrollTo
     HTMLElement.prototype.scrollTo = vi.fn();

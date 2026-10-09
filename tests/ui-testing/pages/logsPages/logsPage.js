@@ -3924,17 +3924,14 @@ export class LogsPage {
         testLogger.info('✓ Previous and Next navigation buttons are visible');
     }
 
-    /** The results-table row at hit index `n`; DetailTable's Table tab reuses the same row ids. */
     logResultsRow(n) {
         return this.page.locator(`[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${n}"]`);
     }
 
-    /** Presses a J/K row key with nothing typed into, the way a keyboard user would. */
     async pressLogRowKey(key, options = {}) {
         await this.page.keyboard.press(key, options);
     }
 
-    /** Asserts that exactly hit `n` carries the open-row highlight (4a AC1.1). */
     async expectActiveLogRow(n) {
         await expect(this.logResultsRow(n)).toHaveAttribute('aria-current', 'true');
         await expect(this.page.locator('[data-test="logs-search-result-logs-table"] [data-active-row="true"]')).toHaveCount(1);
@@ -7579,7 +7576,6 @@ export class LogsPage {
     async clickShareLinkButton() {
         const btn = this.page.locator(this.shareLinkButton);
         await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // ShareButton stays disabled until /api/<org>/config supplies web_url, and (G1) until the query has run.
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
             testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
@@ -11379,12 +11375,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            // The value span excludes the expand icon text and the sr-only severity text.
             const valueSpan = cells.nth(i).locator('[data-test="log-row-timestamp-value"]');
             let text = (await valueSpan.count()) > 0
                 ? await valueSpan.first().textContent()
                 : await cells.nth(i).textContent();
             text = text?.trim() || '';
+            // Strip expand button icon text that appears before the timestamp
             text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             values.push(text);
         }

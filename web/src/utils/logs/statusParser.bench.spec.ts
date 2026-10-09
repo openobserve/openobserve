@@ -21,7 +21,6 @@ import {
   severityRowClass,
 } from "./statusParser";
 
-// S-A2: reports render cost only; it asserts correctness, never a time budget.
 const ROWS = 1000;
 const MESSAGE_BYTES = 2048;
 
@@ -57,14 +56,11 @@ const renderPass = (rows: ReturnType<typeof makeRows>) => {
 };
 
 describe("S-A2 severity render cost (1,000 rows, 2 KB messages)", () => {
-  it("reports cold and memoised timings", () => {
+  it("resolves severity across cold and memoised render passes", () => {
     const rows = makeRows();
     expect(rows.every((r) => r.message.length === MESSAGE_BYTES)).toBe(true);
-    const cold = renderPass(rows);
-    const memoised = renderPass(rows);
-    process.stdout.write(
-      `[S-A2] ${ROWS} rows x ${MESSAGE_BYTES} B: cold ${cold.toFixed(2)} ms, memoised ${memoised.toFixed(2)} ms\n`,
-    );
+    renderPass(rows);
+    renderPass(rows);
     expect(rows.filter((r) => resolveLogSeverity(r, projection).level === "unknown")).toHaveLength(
       ROWS - Math.ceil(ROWS / 3),
     );

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Item 1: bare-word search in filter mode. Scan mode is off until spike S1, so a stream
-// without full-text fields shows the configure card only.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const { trackSearches, ingestRows } = require('../utils/auto-run-helpers.js');
@@ -41,7 +39,6 @@ const urlFor = (streams, query, extra = '') =>
   `/web/logs?org_identifier=${ORG}&stream=${streams}&stream_type=logs&period=15m&refresh=0` +
   `&sql_mode=false&quick_mode=false&show_histogram=true&query=${b64(query)}${extra}`;
 
-/** A search request's SQL, decoded when sql_base64_enabled sends it as base64. */
 function decodedSql(entry) {
   return /^[A-Za-z0-9\-_.]+$/.test(entry.sql) && !entry.sql.includes(' ') ? unb64(entry.sql) : entry.sql;
 }
@@ -61,7 +58,6 @@ async function open(page, streams, query, extra = '') {
   const searches = trackSearches(page);
   await page.goto(urlFor(streams, query, extra));
   await page.locator(editor).first().waitFor({ timeout: 60000 });
-  // The load run may already have replaced the text with the filter it sent.
   await expect
     .poll(async () => {
       const text = await editorText(page);
@@ -71,7 +67,6 @@ async function open(page, streams, query, extra = '') {
   return searches;
 }
 
-/** Runs the current editor text and waits for the hits request it sends. */
 async function run(page, searches) {
   const before = searches.hits().length;
   await page.locator(runBtn).click();
@@ -128,7 +123,6 @@ test.describe('Logs bare-word search (item 1)', () => {
       NOTEXT,
       Array.from({ length: 10 }, (_, i) => ({ _timestamp: at(i), code: i })),
     );
-    // Ingested rows are searchable from the WAL; wait until the full-text stream answers.
     await expect
       .poll(() => apiTotal(request, `SELECT * FROM "${FTS}"`), { timeout: 120000 })
       .toBe(40);
@@ -327,7 +321,6 @@ test.describe('Logs bare-word search (item 1)', () => {
   test('the SQL toggle renders the word, and is refused on a no-FTS stream (AC6.3)', {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
-    // The toolbar toggle is gone; SQL mode is switched the way saved views and quick mode do.
     const logsPage = new PageManager(page).logsPage;
     await open(page, FTS, 'timeout');
     await logsPage._setSqlModeViaVue(true);
@@ -407,7 +400,6 @@ test.describe('Logs bare-word search (item 1)', () => {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
     const searches = await open(page, FTS, 'NOT timeout');
-    // The load run shows its rendered SQL, which Build can hold; retype the text to test the gate.
     await new PageManager(page).logsPage.setQueryEditorContent('NOT timeout');
     const gridSql = `select * from "${FTS}"  WHERE NOT match_all('timeout')`;
     await page.locator('[data-test="logs-build-toggle"]').click();
@@ -422,7 +414,6 @@ test.describe('Logs bare-word search (item 1)', () => {
     await expect(refreshItem).toHaveAttribute('aria-disabled', 'true');
     await page.keyboard.press('Escape');
 
-    // A later grid run orders the request log: a chart query from the clicks above would precede it.
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await expect(page.locator(runBtn)).toBeEnabled({ timeout: 30000 });
     expect(await run(page, searches)).toBe(gridSql);

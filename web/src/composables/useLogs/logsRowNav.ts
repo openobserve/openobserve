@@ -24,7 +24,6 @@ import {
   type PendingPageSelection,
 } from "@/utils/pageCrossing";
 
-/** The slice of the logs searchObj that the drawer model and page crossings read and write. */
 export interface RowNavSearchObj {
   meta: {
     showDetailTab: boolean;
@@ -58,22 +57,17 @@ export interface HitsCompletePayload {
 }
 
 let jobRequestCounter = 0;
-// The origin of the grid query being built; getQueryReq runs inside getQueryData's synchronous part.
 let activeQueryOrigin: string | undefined;
 
-/** Text of `logs-row-nav-live`; rendered by the logs page, so a failure that swaps the results for an error state is still announced. */
 export const logsRowNavAnnouncement = ref("");
 let failureHandler: ((failure: PageNavFailure) => void) | null = null;
 const hitsCompleteListeners = new Set<(payload: HitsCompletePayload) => void>();
 
-// A J/K crossing keeps the drawer open over its own pagination request (4a §3.2.2).
 const crossingExemption: DrawerCloseExemption = ({ isPagination, searchObj }) =>
   isPagination && !!navigationOf(searchObj)?.pendingPageSelection;
 
-/** Origins whose query keeps the detail drawer open; 4c C appends its permalink entry. */
 export const drawerCloseExemptions: DrawerCloseExemption[] = [crossingExemption];
 
-/** The one drawer-close rule shared by both query entry points (4a §3.2.7). */
 export function closeDrawerForQuery(
   searchObj: RowNavSearchObj,
   isPagination: boolean,
@@ -84,7 +78,6 @@ export function closeDrawerForQuery(
   searchObj.meta.showDetailTab = false;
 }
 
-/** Runs `build` with `origin` as the grid query's origin, so the close rule inside it sees the caller's origin. */
 export function withQueryOrigin<T>(origin: string | undefined, build: () => T): T {
   const previous = activeQueryOrigin;
   activeQueryOrigin = origin;
@@ -95,7 +88,6 @@ export function withQueryOrigin<T>(origin: string | undefined, build: () => T): 
   }
 }
 
-/** Drops the J/K anchor, the open-row highlight and any crossing in flight. */
 export function resetRowSelection(searchObj: RowNavSearchObj): void {
   const navigation = navigationOf(searchObj);
   if (!navigation) return;
@@ -119,7 +111,6 @@ export function notePageLoad(
   if (grid) recordPageLoad(grid, { requestId, ok: reason === "done", reason });
 }
 
-/** Marks the bound pagination request cancelled when a generation tears it down without a terminal event. */
 export function notePageCancelled(searchObj: RowNavSearchObj, traceId: string): void {
   if (searchObj.data?.resultGrid?.pageRequest?.requestId !== traceId) return;
   notePageLoad(searchObj, traceId, "cancelled");
@@ -135,7 +126,6 @@ export function nextJobRequestId(): string {
   return `job-${jobRequestCounter}`;
 }
 
-/** Installs the drawer's failure handler; the disposer only clears it while it is still the installed one. */
 export function setPageNavFailureHandler(handler: (failure: PageNavFailure) => void): () => void {
   failureHandler = handler;
   return () => {
@@ -143,7 +133,6 @@ export function setPageNavFailureHandler(handler: (failure: PageNavFailure) => v
   };
 }
 
-/** A crossing whose request was never dispatched (or never reached the server) fails here instead of hanging. */
 export function failPendingPageNavigation(
   searchObj: RowNavSearchObj,
   options: { quiet?: boolean } = {},
@@ -162,7 +151,6 @@ export function onHitsComplete(listener: (payload: HitsCompletePayload) => void)
   return () => hitsCompleteListeners.delete(listener);
 }
 
-/** Fired once per hits request at its terminal completion; the drawer's row match runs from here. */
 export function notifyHitsComplete(payload: HitsCompletePayload): void {
   hitsCompleteListeners.forEach((listener) => {
     try {
@@ -173,7 +161,6 @@ export function notifyHitsComplete(payload: HitsCompletePayload): void {
   });
 }
 
-// Partial shapes (an old restored state, a test double) must never throw inside a search callback.
 function navigationOf(
   searchObj: RowNavSearchObj,
 ): (RowNavNavigation & { pendingPageSelection: PendingPageSelection | null }) | null {

@@ -15,7 +15,6 @@ export interface Shortcut {
   keyForWindows?: string;
   /** Override combo on macOS (falls back to `key`). */
   keyForMac?: string;
-  /** Receives the keydown event, e.g. to read `repeat`. */
   handler: (e?: KeyboardEvent) => void;
   description?: I18nText;
   scope?: string;
@@ -46,7 +45,6 @@ export interface ShortcutById {
 export type ShortcutInput = ShortcutById | Shortcut;
 
 export interface UseShortcutsOptions {
-  /** While false the shortcuts are unregistered and their scope is released. */
   active?: Ref<boolean>;
 }
 

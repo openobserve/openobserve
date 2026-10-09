@@ -381,7 +381,6 @@ describe("transport binding (AC4.1, P2 records)", () => {
     fakeSearchObj.value.organizationIdentifier = "org2";
     run().engine.cancelGeneration(null, { cause: "user" });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    // The old generation's org, even though the page has switched org since.
     expect(serverCancel).toHaveBeenCalledWith("org1", ["t1"]);
   });
 });

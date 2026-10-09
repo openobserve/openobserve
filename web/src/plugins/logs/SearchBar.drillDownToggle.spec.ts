@@ -138,7 +138,6 @@ describe("SearchBar — Drill down mode toggle", () => {
     await wrapper.vm.onLogsVisualizeToggleUpdate("patterns");
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    // Patterns activation is an entry point routed through the scheduler (J4), after the mode is set.
     expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("patterns");
     expect(patterns).toHaveBeenCalledTimes(1);
     expect(patterns.mock.calls[0][0]).toMatchObject({ reason: "patterns", op: "patterns" });

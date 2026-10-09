@@ -56,7 +56,6 @@ import { sqlSources } from "@/utils/logs/sqlSources";
 
 export interface InitialStreamInput {
   list: StreamStatsEntry[];
-  /** The selection already on the page: a URL restore, or the in-session pick. */
   current: string[];
   currentFromUrl: boolean;
   persisted: string[];
@@ -71,18 +70,15 @@ export interface InitialStreamPick {
 
 export interface StreamListOptions {
   fromUrl?: boolean;
-  // False once a later selection owns the list; checked before any shared-state write.
   isCurrent?: () => boolean;
 }
 
-/** P1 order: URL, then the in-session pick, then the persisted set, then the newest stream, then none. */
 export function pickInitialLogsStreams(input: InitialStreamInput): InitialStreamPick {
   const readable = new Set(input.list.map((entry) => entry.name));
   const current = input.current.filter((name) => !!name);
   if (current.length) {
     const valid = current.filter((name) => readable.has(name));
     const missing = current.filter((name) => !readable.has(name));
-    // A URL naming an unreadable stream is an error the recipient must see, never a silent subset.
     if (input.currentFromUrl) {
       return missing.length
         ? { selected: [], missing, source: "url" }
@@ -952,13 +948,12 @@ export const useStreamFields = () => {
     let current: string[] = Array.isArray(searchObj.data.stream.selectedStream)
       ? [...searchObj.data.stream.selectedStream]
       : [];
-    // A SQL-only link names its streams in FROM; they are resolved before selection (P1).
     if (options.fromUrl && !current.length && searchObj.meta.sqlMode && searchObj.data.query) {
       current = sqlSources(searchObj.data.query).sources;
     }
     const legacy =
-      zoConfig.query_on_stream_selection == false ||
-      router?.currentRoute?.value?.query?.type == "stream_explorer";
+      zoConfig.query_on_stream_selection === false ||
+      router?.currentRoute?.value?.query?.type === "stream_explorer";
     return {
       list: searchObj.data.streamResults.list,
       current,
@@ -966,7 +961,6 @@ export const useStreamFields = () => {
       persisted: zoConfig.auto_query_enabled
         ? restoreLogsSelectedStreams(store.state.selectedOrganization?.identifier, streamType)
         : [],
-      // Never an unguarded auto-run of a stream the user did not choose (DECISIONS: preselect).
       allowLatest: legacy || isGuardActive(zoConfig),
     };
   };
@@ -1030,7 +1024,6 @@ export const useStreamFields = () => {
     });
   };
 
-  // Names a shared link carries that this stream's schema no longer has are dropped (4c C7).
   const dropUnknownLinkColumns = () => {
     const known = new Set(
       (searchObj.data.stream.selectedStreamFields ?? []).map(
@@ -1052,7 +1045,6 @@ export const useStreamFields = () => {
       const logFieldSelectedValue: any = [];
       const stream = searchObj.data.stream.selectedStream.sort().join("_");
       if (columnsFromUrl.value) dropUnknownLinkColumns();
-      // A shared link's columns, including [], are rendered as given: this user's saved selection is not read (4c C7).
       if (
         !columnsFromUrl.value &&
         Object.keys(logFilterField).length > 0 &&

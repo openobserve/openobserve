@@ -14,11 +14,9 @@ export interface RowNavInput {
   page: number;
   pageCount: number;
   canChangePage: boolean;
-  /** `KeyboardEvent.repeat`: a held key walks rows but never crosses a page. */
   isRepeat: boolean;
 }
 
-/** One J/K step over a paged list (4a §3.1): select a row, cross a page, or stop at an edge. */
 export function nextRowTarget(input: RowNavInput): RowNavTarget {
   const { anchor, count, direction, page, pageCount, canChangePage, isRepeat } = input;
   if (count <= 0) return { kind: "none" };
@@ -38,7 +36,6 @@ export function nextRowTarget(input: RowNavInput): RowNavTarget {
     : { kind: "edge", edge: "first" };
 }
 
-/** One J/K step over the visible span order; a hidden selection steps from its nearest visible ancestor (4a §3.5). */
 export function nextVisibleSpan(
   visibleIds: string[],
   selectedId: string | null,
@@ -60,7 +57,6 @@ export function nextVisibleSpan(
   return direction === -1 ? visibleIds[ancestorAt] : (visibleIds[ancestorAt + 1] ?? null);
 }
 
-/** Nearest-first ancestor ids; stops at a missing parent, a repeated id, or `maxHops`, so a cyclic trace cannot loop. */
 export function ancestorChain(
   spanId: string,
   parentOf: (spanId: string) => string | null | undefined,

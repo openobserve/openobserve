@@ -24,11 +24,9 @@ import {
   hasPath,
   normaliseOnSave,
   prepareSearchForSave,
-  registerTransientSearchKeys,
   resetTransient,
   setPath,
   stripTransient,
-  unregisterTransientSearchKey,
   type PlainObject,
 } from "./transientSearchKeys";
 import {
@@ -72,7 +70,6 @@ function liveSearchObj(liveMode: boolean): PlainObject {
   };
 }
 
-// Mirrors the two apply sites in SearchBar.vue: hooks wrapped around the existing mergeDeep.
 function applyView(target: PlainObject, view: PlainObject): PlainObject {
   return applySearchSnapshot(target, view, mergeDeep);
 }
@@ -85,8 +82,10 @@ const REPLACE_KEY = {
 };
 
 afterEach(() => {
-  unregisterTransientSearchKey("meta.freeTextScan");
-  unregisterTransientSearchKey("meta.compare");
+  for (const path of ["meta.freeTextScan", "meta.compare"]) {
+    const index = TRANSIENT_SEARCH_KEYS.findIndex((entry) => entry.path === path);
+    if (index >= 0) TRANSIENT_SEARCH_KEYS.splice(index, 1);
+  }
 });
 
 describe("registry", () => {
@@ -150,18 +149,6 @@ describe("registry", () => {
     expect(target.data.resultGrid.hitsSettled).toBe(true);
   });
 
-  it("replaces an entry registered twice under the same path and unregisters it", () => {
-    const before = TRANSIENT_SEARCH_KEYS.length;
-    const undo = registerTransientSearchKeys([REPLACE_KEY]);
-    registerTransientSearchKeys([{ ...REPLACE_KEY, owner: "item1-again" }]);
-    expect(TRANSIENT_SEARCH_KEYS.length).toBe(before + 1);
-    expect(TRANSIENT_SEARCH_KEYS.find((k) => k.path === "meta.freeTextScan")?.owner).toBe(
-      "item1-again",
-    );
-    undo();
-    expect(TRANSIENT_SEARCH_KEYS.length).toBe(before);
-  });
-
   it("path helpers create, read and delete nested keys", () => {
     const obj: PlainObject = {};
     setPath(obj, "a.b.c", 1);
@@ -201,7 +188,7 @@ describe("save hook (getSearchObj)", () => {
   });
 
   it("strips every reset and strip-only key and keeps replace keys and other state", () => {
-    registerTransientSearchKeys([REPLACE_KEY]);
+    TRANSIENT_SEARCH_KEYS.push(REPLACE_KEY);
     const live = liveSearchObj(true);
     setPath(live, "meta.freeTextScan", { app: "consented" });
     const clone = prepareSearchForSave(JSON.parse(JSON.stringify(live)), live);
@@ -212,17 +199,15 @@ describe("save hook (getSearchObj)", () => {
   });
 
   it("runs normaliseOnSave after the strip, so a view saved during a comparison reopens in Search mode", () => {
-    registerTransientSearchKeys([
-      {
-        path: "meta.compare",
-        mode: "reset",
-        owner: "item4b",
-        defaultValue: () => null,
-        normaliseOnSave: (clone, liveObj) => {
-          if (getPath(liveObj, "meta.compare")) setPath(clone, "meta.logsVisualizeToggle", "logs");
-        },
+    TRANSIENT_SEARCH_KEYS.push({
+      path: "meta.compare",
+      mode: "reset",
+      owner: "item4b",
+      defaultValue: () => null,
+      normaliseOnSave: (clone, liveObj) => {
+        if (getPath(liveObj, "meta.compare")) setPath(clone, "meta.logsVisualizeToggle", "logs");
       },
-    ]);
+    });
     const live = liveSearchObj(true);
     setPath(live, "meta.compare", { baseline: "rest" });
     setPath(live, "meta.logsVisualizeToggle", "drilldown");
@@ -273,7 +258,7 @@ describe("apply hook (both mergeDeep sites)", () => {
   });
 
   it("replaces a replace key with the incoming value instead of merging into it", () => {
-    registerTransientSearchKeys([REPLACE_KEY]);
+    TRANSIENT_SEARCH_KEYS.push(REPLACE_KEY);
     const target = liveSearchObj(true);
     setPath(target, "meta.freeTextScan", { a: { consent: true } });
     applyView(target, { meta: { freeTextScan: { b: { consent: true } } } });
@@ -281,7 +266,7 @@ describe("apply hook (both mergeDeep sites)", () => {
   });
 
   it("sets a replace key to its default when an older view lacks it", () => {
-    registerTransientSearchKeys([REPLACE_KEY]);
+    TRANSIENT_SEARCH_KEYS.push(REPLACE_KEY);
     const target = liveSearchObj(true);
     setPath(target, "meta.freeTextScan", { a: { consent: true } });
     applyView(target, { meta: { sqlMode: false } });
@@ -322,7 +307,7 @@ describe("meta.liveMode survives a view apply", () => {
   });
 
   it("is never reset by the store-snapshot restore", () => {
-    registerTransientSearchKeys([REPLACE_KEY]);
+    TRANSIENT_SEARCH_KEYS.push(REPLACE_KEY);
     const target = liveSearchObj(false);
     setPath(target, "meta.freeTextScan", { a: 1 });
     resetTransient(target);

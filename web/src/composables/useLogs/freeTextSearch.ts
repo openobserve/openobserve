@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import {
   freeTextRanges,
   phrasePlan,
@@ -34,7 +36,6 @@ import {
   type TextSearchTarget,
 } from "@/utils/query/freeTextFilter";
 
-// Schemas older than this are re-read before text is rewritten, so a new field is never searched as a word.
 export const FREE_TEXT_SCHEMA_MAX_AGE_MS = 10 * 60 * 1000;
 
 const BLOCKED_TARGET: TextSearchTarget = { mode: "blocked", candidates: [] };
@@ -43,9 +44,7 @@ const freshSchemas = new Map<string, { at: number; stream: StreamWithSchema }>()
 const failedSchemas = new Set<string>();
 
 export interface FilterResolveContext extends FreeTextContext {
-  /** Names the SQL-filter quoting loop double-quotes: the selected streams' sidebar fields. */
   knownFields: ReadonlySet<string>;
-  /** False while a schema is missing or its refresh failed; the filter is then sent unchanged. */
   textEnabled?: boolean;
 }
 
@@ -56,7 +55,7 @@ export interface FreeTextBlocked {
 
 export interface FreeTextDecorations {
   ranges: TextRange[];
-  hover: string;
+  hover: I18nText;
 }
 
 export interface NoFtsStream {
@@ -64,7 +63,6 @@ export interface NoFtsStream {
   hasTextFields: boolean;
 }
 
-/** The slice of the logs search object these helpers read and write. */
 export interface FreeTextSearchObj {
   organizationIdentifier?: string;
   meta: { sqlMode?: boolean; freeTextScan?: Record<string, FreeTextScanEntry> | null };
@@ -104,7 +102,6 @@ function streamEntry(searchObj: FreeTextSearchObj, name: string): StreamWithSche
   return (searchObj.data.streamResults?.list ?? []).find((stream) => stream?.name === name);
 }
 
-/** Classifier and renderer inputs for the selected streams, from their full cached schemas. */
 export function buildFilterContext(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -124,7 +121,6 @@ export function buildFilterContext(
     for (const field of [...entry.schema, ...(entry.removedSchemaFields ?? [])]) {
       if (field?.name) fieldNames.add(field.name);
     }
-    // Scan consent is recorded only by the scan card, which stays off until spike S1 sets its guard.
     targets[name] = streamTextTarget(
       entry,
       zoConfig?.default_fts_keys ?? [],
@@ -145,7 +141,6 @@ export function buildFilterContext(
   };
 }
 
-/** The plan shared by every selected stream; the token gate applies when any of them has FTS. */
 export function planStreamsFilter(
   raw: string,
   streams: string[],
@@ -162,7 +157,6 @@ export function planStreamsFilter(
   });
 }
 
-/** True when a run would send something other than the typed filter: pure text or a rewritten mix. */
 function rewritesInput(plan: FilterPlan, raw: string): boolean {
   return plan.kind === "freeText" || (plan.kind === "sql" && plan.filter !== raw);
 }
@@ -175,7 +169,6 @@ export function markFreeTextBlocked(
   searchObj.data.freeTextBlocked = { streams: [...streams], plan };
 }
 
-/** Highlight source for a pure-text filter: its rendering for the first stream that can search text. */
 export function freeTextHighlight(
   searchObj: FreeTextSearchObj,
   ctx: FilterResolveContext,
@@ -191,7 +184,6 @@ export function freeTextHighlight(
   return null;
 }
 
-/** The filter a run sends when the planner rewrote the typed text; null when it is sent as typed. */
 export function rewrittenFilter(
   searchObj: FreeTextSearchObj,
   ctx: FilterResolveContext,
@@ -204,9 +196,8 @@ export function rewrittenFilter(
     const rendered = streams.map((stream) =>
       renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields),
     );
-    // Text that renders per stream (a no-FTS arm is skipped) keeps that meaning only as typed.
     const [first] = rendered;
-    return first != null && rendered.every((where) => where === first)
+    return first !== null && first !== undefined && rendered.every((where) => where === first)
       ? preserveFilterComments(raw, first)
       : null;
   }
@@ -215,7 +206,6 @@ export function rewrittenFilter(
   return rendered === null ? null : preserveFilterComments(raw, rendered);
 }
 
-/** Per-stream WHERE for side requests such as field values; null unless the filter is pure text. */
 export function freeTextWhereByStream(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -225,7 +215,6 @@ export function freeTextWhereByStream(
   const streams = searchObj.data.stream.selectedStream ?? [];
   const plan = planStreamsFilter((searchObj.data.query ?? "").trim(), streams, ctx);
   if (plan.kind !== "freeText") return null;
-  // A stream that cannot search text keeps only the SQL nodes, which a pure-text filter has none of.
   return new Map(
     streams.map((stream) => [
       stream,
@@ -234,18 +223,16 @@ export function freeTextWhereByStream(
   );
 }
 
-/** The filter as parseable SQL: pure text becomes match_all, so a word never reads as a column. */
 export function filterForParsing(raw: string, fieldNames: ReadonlySet<string>): string {
   const plan = planFilter(raw, fieldNames);
   if (plan.kind !== "freeText") return plan.filter;
   return renderPlan(plan, { mode: "fts", fields: ["_"] }, new Set()) ?? raw;
 }
 
-/** Editor ranges of the searched words and the hover naming the fields they are searched in. */
 export function freeTextDecorations(
   searchObj: FreeTextSearchObj,
   ctx: FilterResolveContext,
-  t: (key: string, params?: Record<string, unknown>) => string,
+  t: (key: string, params?: Record<string, unknown>) => I18nText,
 ): FreeTextDecorations | null {
   if (searchObj.meta.sqlMode) return null;
   const raw = searchObj.data.query ?? "";
@@ -262,14 +249,10 @@ export function freeTextDecorations(
     targetMode: targetModeOf(targets as TextSearchTarget[]),
     tokenLimits: ctx.tokenLimits,
   });
-  const hover = [
-    t("search.freeTextSearchedFields", { fields: fields.join(", ") }),
-    t("search.freeTextRunsAs", { sql: rendered }),
-  ].join("\n\n");
+  const hover = t("search.freeTextPreview", { fields: fields.join(", "), sql: rendered });
   return ranges.length ? { ranges, hover } : null;
 }
 
-/** Streams shown in the no-FTS panel, each marked by whether it has any text field at all. */
 export function noFtsStreams(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -330,7 +313,6 @@ export function noFtsRecoveryStreams(
   });
 }
 
-/** Post-error cards for a filter-mode run: Run as, else Search text. */
 export function recoveryCardsFor(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -345,7 +327,6 @@ export function recoveryCardsFor(
   return suggestRecovery(raw, ctx.fieldNames, allFts);
 }
 
-/** Search-text recovery: durable match_all SQL when every stream has FTS, else a quoted phrase. */
 export function searchTextReplacement(
   text: string,
   searchObj: FreeTextSearchObj,
@@ -358,7 +339,6 @@ export function searchTextReplacement(
   return renderPlan(phrasePlan(text), fts[0], ctx.knownFields) ?? quoteFreeTextPhrase(text);
 }
 
-/** Re-reads stale schemas before a run that rewrites the filter; a failed read sends it unchanged. */
 export async function refreshFreeTextSchemas(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -389,7 +369,6 @@ export async function refreshFreeTextSchemas(
   );
 }
 
-/** Test hook: forgets refreshed and failed schemas. */
 export function resetFreeTextSchemasForTests(): void {
   freshSchemas.clear();
   failedSchemas.clear();

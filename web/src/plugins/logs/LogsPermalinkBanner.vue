@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The opened line link's outcome (4c C5) and the shared page notice (C7), in the permalink slot of the notice order. -->
 <template>
   <OBanner
     v-if="banner"
@@ -89,8 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { logsPageCount } from "@/utils/logs/pageCount";
 import { computed } from "vue";
-import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { LOG_LINK_I18N } from "@/utils/logs/logPermalink";
@@ -127,11 +127,10 @@ const message = computed<I18nText>(() => {
   if (!current) return raw("");
   const params = { ...current.messageParams };
   if (typeof params.count === "number") params.count = params.count.toLocaleString();
-  const key = current.messageKey as I18nKey;
+  const key = current.messageKey;
   return current.pluralCount === null ? t(key, params) : t(key, params, current.pluralCount);
 });
 
-// Actions belong to the permalink still open; a banner left after a user search only informs.
 const isCurrent = computed(
   () => !!banner.value && activePermalink.value?.generation === banner.value.generation,
 );
@@ -143,7 +142,7 @@ const actionVisible = computed(() => {
 });
 
 const actionLabel = computed<I18nText>(() =>
-  banner.value?.actionKey ? t(banner.value.actionKey as I18nKey) : raw(""),
+  banner.value?.actionKey ? t(banner.value.actionKey) : raw(""),
 );
 
 const actionDataTest = computed(() => {
@@ -157,12 +156,13 @@ const actionDataTest = computed(() => {
   }
 });
 
-// Same page count the paginator shows; it can grow while the page-count request lands.
 const knownPages = computed<number | null>(() => {
-  const results = searchObj.data.queryResults ?? {};
-  const paged = searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != "";
-  const count = paged ? results.pagination?.length : results.partitionDetail?.paginations?.length;
-  return count > 0 ? count : null;
+  const count = logsPageCount(
+    searchObj.communicationMethod,
+    searchObj.meta.jobId,
+    searchObj.data.queryResults,
+  );
+  return count !== undefined && count > 0 ? count : null;
 });
 
 const lastPage = computed(() => sharedPageNotice.value?.lastPage ?? knownPages.value);

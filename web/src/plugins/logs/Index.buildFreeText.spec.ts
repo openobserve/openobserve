@@ -32,7 +32,6 @@ const { panelRuns, panelQueries, sentRequests, parserGate } = vi.hoisted(() => (
   parserGate: { wait: null as Promise<void> | null, calls: 0 },
 }));
 
-// Holds Build's WHERE parse open, so a test can act while the filter is not yet in the builder.
 vi.mock("@/utils/query/sqlUtils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/utils/query/sqlUtils")>();
   return {
@@ -45,13 +44,11 @@ vi.mock("@/utils/query/sqlUtils", async (importOriginal) => {
   };
 });
 
-// The Build panel's only request path; every call is a chart search.
 vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
   default: {
     name: "PanelEditor",
     template: '<div data-test="panel-editor" />',
     emits: ["queryGenerated"],
-    // The real editor emits its interim builder query as soon as it mounts, before any filter is set.
     mounted(this: any) {
       this.$emit(
         "queryGenerated",
@@ -101,7 +98,6 @@ const ftsStream = {
   settings: { full_text_search_keys: ["body"] },
 };
 
-// Mounting the whole page is slow on a loaded machine, so the budget is per test, not global.
 describe(
   "Logs Index — Build tab with a text search it cannot hold (AC6.6)",
   { timeout: 30000 },

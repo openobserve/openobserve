@@ -282,7 +282,6 @@ export default createStore({
     // },
     setConfig(state, payload) {
       state.zoConfig = payload;
-      // Absent on backends that predate the kill switch, which means inference stays on.
       setSeverityInferenceEnabled(payload?.ui_logs_severity_inference !== false);
     },
     setFolders(state, payload) {

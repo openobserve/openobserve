@@ -22,8 +22,7 @@ function readStreamArray(key: string): string[] {
   }
 }
 
-/** The pre-item-2 logs key; read as a fallback only, never written. */
-export function restoreLogsStream(orgId: string): string[] {
+function restoreLogsStream(orgId: string): string[] {
   return readStreamArray(STORAGE_KEYS.logs(orgId));
 }
 

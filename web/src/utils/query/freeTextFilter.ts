@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { escapeSingleQuotes } from "@/utils/queryUtils";
+
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { addSpacesToOperators } from "@/utils/queryUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
-// Zero keeps scan mode off until spike S1 sets the field guard.
 export const FREE_TEXT_SCAN_MAX_FIELDS = 0;
 
 export const DEFAULT_TOKEN_LIMITS: TokenLimits = { min: 2, max: 64 };
@@ -54,7 +55,6 @@ const KEYWORDS = new Set([
 
 const CONNECTIVES = new Set(["AND", "OR", "NOT"]);
 
-// Far above SQL_PARSE_MAX_DEPTH, yet keeps the recursive descent clear of the JS stack limit.
 const MAX_TEXT_NESTING = 256;
 
 const LIST_OWNING_KEYWORDS = new Set(["IN", "EXISTS"]);
@@ -80,10 +80,8 @@ const SCAN_EXCLUDED_FIELDS = new Set([
 
 const SCAN_RANK_PATTERN = /message|msg|text|body|log|error|desc|detail|reason|content|summary/i;
 
-// Mirrors the backend: every policy other than AtIngestion redacts hits at search time.
 const AT_INGESTION_POLICY = "AtIngestion";
 
-// One single-quoted argument and nothing else; any other call keeps the whole filter SQL.
 const MATCH_ALL_CALL = /^match_all\(\s*'(?:[^']|'')*'\s*\)$/i;
 
 const NUMERIC_LITERAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
@@ -147,10 +145,8 @@ export interface TokenLimits {
 }
 
 export interface PlanFilterOptions {
-  /** The token gate applies only to fts targets; defaults to fts. */
   targetMode?: TextSearchTarget["mode"];
   tokenLimits?: TokenLimits;
-  /** Text+SQL mixes are rewritten only when every selected stream has FTS; defaults to an fts target. */
   allTargetsFts?: boolean;
 }
 
@@ -185,7 +181,6 @@ export interface FreeTextScanEntry {
 }
 
 export interface FreeTextContext {
-  /** Every schema field of the selected streams plus the selected stream names. */
   fieldNames: ReadonlySet<string>;
   targets: Readonly<Record<string, TextSearchTarget>>;
   tokenLimits?: TokenLimits;
@@ -250,7 +245,6 @@ type WhereShape = "predicate" | "column" | null;
 
 let sharedParser: SqlParser | null = null;
 
-/** Classifies a filter-mode input; only a wholly pure-text filter becomes `freeText`. */
 export function planFilter(
   raw: string,
   booleanFields: ReadonlySet<string>,
@@ -269,7 +263,6 @@ export function planFilter(
   if (root === null) return { kind: "unclassified", filter: raw };
 
   const units = collectUnits(root);
-  // match_all calls alone are already rendered, so there is nothing to rewrite.
   if (units.length === 0 || units.some((unit) => unit === "")) return { kind: "sql", filter: raw };
   const limits = options.tokenLimits ?? DEFAULT_TOKEN_LIMITS;
   if ((options.targetMode ?? "fts") === "fts" && !units.every((u) => hasIndexToken(u, limits))) {
@@ -284,7 +277,6 @@ export function phrasePlan(raw: string): FilterPlan {
   return { kind: "freeText", root: { k: "text", value }, units: [value] };
 }
 
-/** Renders the WHERE body; `null` only for a text plan on a blocked target. */
 export function renderPlan(
   plan: FilterPlan,
   target: TextSearchTarget,
@@ -342,16 +334,14 @@ export function streamTextTarget(
 }
 
 export function quoteFreeTextPhrase(raw: string): string {
-  return `'${raw.trim().replaceAll("'", "''")}'`;
+  return `'${escapeSingleQuotes(raw.trim())}'`;
 }
 
-/** Statement-start test: the first non-comment token is SELECT or WITH. */
 export function isAuthoredStatement(raw: string): boolean {
   const word = leadingWord(raw);
   return word === "select" || word === "with";
 }
 
-/** Auto-flip test; without a lookup it falls back to the statement-start test. */
 export function looksLikeSqlStatement(raw: string, lookup?: StreamLookup): boolean {
   if (!isAuthoredStatement(raw)) return false;
   if (!lookup) return true;
@@ -374,7 +364,6 @@ export function tokenLimitsFromConfig(
   };
 }
 
-/** Editor text with free-text units rendered; `null` when no single rendering fits every stream. */
 export function materializeFreeText(
   raw: string,
   streams: string[],
@@ -396,7 +385,6 @@ export function materializeFreeText(
   return rendered;
 }
 
-/** Facet-include core: `(\n<filter>\n) AND <predicate>`, or today's append when materialising fails. */
 export function appendConjunct(
   filter: string,
   predicate: string,
@@ -409,7 +397,6 @@ export function appendConjunct(
   return `(\n${materialized}\n) AND ${predicate}`;
 }
 
-/** Post-error recovery: a Run-as suggestion, or else the Search-text candidate. */
 export function suggestRecovery(
   raw: string,
   booleanFields: ReadonlySet<string>,
@@ -434,12 +421,10 @@ export function suggestRecovery(
   if (valid && (tally.text === 0 || allStreamsFts)) {
     return { runSuggestion: text, freeTextCandidate: null };
   }
-  // Phrase search would turn an accepted field predicate into literal text, unless a valid mix is only blocked by FTS.
   if (!valid && tally.predicates > 0) return { runSuggestion: null, freeTextCandidate: null };
   return { runSuggestion: null, freeTextCandidate: trimmed };
 }
 
-/** Source offsets of the words and phrases a pure-text filter searches; empty for any other filter. */
 export function freeTextRanges(
   raw: string,
   booleanFields: ReadonlySet<string>,
@@ -469,7 +454,6 @@ function renderSqlFilter(filter: string, knownFields: ReadonlySet<string>): stri
     const range = protectedRanges[rangeIndex];
     const isProtected = range !== undefined && range.start < offset + token.length;
     const normalizedToken = token.replaceAll('"', "");
-    // A field name inside a string literal is searched text, so its quotes stay as typed.
     if (!isProtected && knownFields.has(normalizedToken)) {
       parts[index] = quoteSqlIdentifierIfNeeded(normalizedToken);
     }
@@ -521,7 +505,7 @@ function scanPredicate(value: string, fields: string[]): string {
 }
 
 function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
+  return `'${escapeSingleQuotes(value)}'`;
 }
 
 function filterComments(raw: string): string[] {
@@ -664,7 +648,6 @@ function lexWord(raw: string, i: number): Lexed {
   return { tok, start: i, end: j };
 }
 
-// The quoted value of a `field:'two words'` unit stays inside its word.
 function startsValueLiteral(raw: string, j: number): boolean {
   return raw[j - 1] === ":" && (raw[j] === "'" || raw[j] === '"');
 }
@@ -682,7 +665,6 @@ function isSpaceDelimited(raw: string, i: number): boolean {
   return (/\s/.test(before) || before === "(") && /\s/.test(after);
 }
 
-// Folds `fn(...)`, `IN (...)` and `EXISTS (...)` into one opaque token each.
 function mergeParenSpans(tokens: Lexed[] | null, raw: string): Lexed[] | null {
   if (tokens === null) return null;
   const out: Lexed[] = [];
@@ -800,13 +782,11 @@ function isMatchAllCall(lexed: Lexed | undefined): boolean {
   return lexed?.tok.t === "opaque" && MATCH_ALL_CALL.test(lexed.tok.text);
 }
 
-// A quoted token glued to a following operand (`"s".f`, `'a'b`) is identifier syntax, not text.
 function gluedToNextOperand(lexed: Lexed, next: Lexed | undefined): boolean {
   if (!next || next.start !== lexed.end) return false;
   return next.tok.t === "word" || next.tok.t === "squote" || next.tok.t === "dquote";
 }
 
-// Exact and DataFusion-lowercased forms both count, since today's quoting loop matches exact names.
 function isFieldLikeWord(word: string, names: ReadonlySet<string>): boolean {
   const colon = word.indexOf(":");
   if (colon > 0 && isFieldLikeWord(word.slice(0, colon), names)) return true;
@@ -834,7 +814,6 @@ function parseOr(tokens: Lexed[], state: { pos: number }): PlanNode | null {
   return children.length === 1 ? children[0] : { k: "or", children };
 }
 
-// Adjacent operands are joined by an implicit AND.
 function parseAnd(tokens: Lexed[], state: { pos: number }): PlanNode | null {
   const children: PlanNode[] = [];
   for (;;) {
@@ -881,7 +860,6 @@ function parsePrimary(tokens: Lexed[], state: { pos: number }): PlanNode | null 
   return null;
 }
 
-// Counts only the groups and NOTs still open at each token, so sibling operands never add up.
 function exceedsTextNesting(tokens: Lexed[]): boolean {
   const enclosing: number[] = [];
   let outer = 0;
@@ -929,7 +907,6 @@ function collectUnits(node: PlanNode): string[] {
   }
 }
 
-// Mirrors the o2 search tokenizer: ASCII alphanumeric runs, single non-ASCII alphanumerics, byte lengths.
 function hasIndexToken(value: string, limits: TokenLimits): boolean {
   const pieces = value.match(/[A-Za-z0-9]+|[^\p{ASCII}]/gu) ?? [];
   return pieces.some((piece) => {
@@ -939,14 +916,12 @@ function hasIndexToken(value: string, limits: TokenLimits): boolean {
   });
 }
 
-// Rendered as SQL so field checks and per-stream mapping still see every predicate; null keeps the filter.
 function planMix(
   tokens: Lexed[],
   raw: string,
   names: ReadonlySet<string>,
   options: PlanFilterOptions,
 ): string | null {
-  // A scan or blocked target would need consent or would drop the SQL half on side requests.
   const allFts = options.allTargetsFts ?? (options.targetMode ?? "fts") === "fts";
   if (!allFts || exceedsTextNesting(tokens)) return null;
   const state: MixState = {
@@ -996,7 +971,6 @@ function buildMixUnit(tokens: Lexed[], raw: string, state: MixState): PlanNode |
   return children.length === 1 ? children[0] : { k: "and", children };
 }
 
-// Numbers stay SQL literals here, unlike pure text, because a predicate beside them makes the filter SQL.
 function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): PlanNode | null {
   const { tok } = lexed;
   if (tok.t === "opaque") return { k: "sql", text: tok.text };
@@ -1060,7 +1034,6 @@ function buildSuggestionUnit(
   return buildSqlSegment(tokens, raw, names, tally);
 }
 
-// A run of words and quotes: each becomes a text unit or a `field='value'` comparison.
 function buildOperandRun(
   tokens: Lexed[],
   names: ReadonlySet<string>,
@@ -1096,7 +1069,6 @@ function operandNode(tok: Token, names: ReadonlySet<string>): PlanNode | null {
   return isFieldLikeWord(tok.text, names) ? null : { k: "text", value: tok.text };
 }
 
-// A segment with SQL tokens: verbatim when it parses, else split off a leading or trailing text run.
 function buildSqlSegment(
   tokens: Lexed[],
   raw: string,
@@ -1116,7 +1088,6 @@ function buildSqlSegment(
   return verbatimSql(tokens, raw, tally);
 }
 
-// Kept as typed; the final parse of the whole suggestion rejects it when it is not valid SQL.
 function verbatimSql(tokens: Lexed[], raw: string, tally: SuggestionTally): PlanNode {
   const text = sliceOf(tokens, raw);
   return countSql(whereShape(text), text, tally);
@@ -1153,7 +1124,6 @@ function isOperandToken(lexed: Lexed): boolean {
   return t === "word" || t === "squote" || t === "dquote";
 }
 
-// Splits at top-level connectives; the AND of `BETWEEN … AND` is not a split point.
 function splitTopLevel(tokens: Lexed[], connective: "AND" | "OR"): Lexed[][] {
   const parts: Lexed[][] = [[]];
   let depth = 0;
@@ -1211,7 +1181,6 @@ function astifySelect(sql: string): AstNode | null {
   }
 }
 
-// A select list of bare identifiers that are not fields reads as a sentence (`select messages from cache`).
 function isSentenceShaped(raw: string, fields: ReadonlySet<string> | undefined): boolean {
   if (!fields || maxParenDepth(raw) > SQL_PARSE_MAX_DEPTH) return false;
   const stmt = astifySelect(raw);
@@ -1220,11 +1189,10 @@ function isSentenceShaped(raw: string, fields: ReadonlySet<string> | undefined):
   if (columns.length === 0) return false;
   return columns.every((column: AstNode) => {
     const name = bareIdentifier(column?.expr);
-    return column?.as == null && name !== null && !fields.has(name);
+    return (column?.as === null || column?.as === undefined) && name !== null && !fields.has(name);
   });
 }
 
-// Only then are the projected names the stream's own fields; a CTE, subquery, join or union renames them.
 function readsOneStreamDirectly(stmt: AstNode): boolean {
   const from: AstNode[] = Array.isArray(stmt.from) ? stmt.from : [];
   return (
@@ -1258,7 +1226,6 @@ function fromStreamName(raw: string): string | null {
   return name.startsWith('"') ? name.slice(1, -1).replaceAll('""', '"') : name;
 }
 
-// Same-length copy with comments and string literals blanked, and quoted identifiers kept opaque.
 function maskLiteralsAndComments(raw: string): string {
   let out = "";
   let i = 0;

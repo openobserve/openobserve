@@ -10,7 +10,7 @@ import {
   TOGGLE_GROUP_CONTEXT_KEY,
 } from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
-import { computed, inject, useAttrs, type ComputedRef } from "vue";
+import { computed, inject, useAttrs, useId, type ComputedRef } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -23,6 +23,7 @@ const isAnimated = computed(() => Boolean(animatedSelection?.value));
 
 const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
   disabled: false,
+  focusableUnavailable: false,
   size: "md",
 });
 
@@ -31,6 +32,9 @@ const slots = defineSlots<ToggleGroupItemSlots>();
 // Set when the parent group has collapsed into a dropdown (phones): render as its trigger label or a menu row.
 const menu = inject(ToggleGroupMenuKey, null);
 const attrs = useAttrs();
+const reasonId = `${useId()}-reason`;
+const labelId = `${useId()}-label`;
+const unavailable = computed(() => props.disabled && props.focusableUnavailable);
 const menuItemTestId = computed(() =>
   attrs["data-test"] ? `${attrs["data-test"]}-item` : `o-toggle-group-item-${String(props.value)}`,
 );
@@ -94,6 +98,8 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
   <ODropdownItem
     v-else-if="menu"
     :disabled="props.disabled"
+    :focusable-unavailable="props.focusableUnavailable"
+    :description="unavailable ? props.tooltip : undefined"
     :data-test="menuItemTestId"
     @select="menu.select(props.value)"
   >
@@ -111,11 +117,23 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
     The span wrapper intercepts hover so cursor-not-allowed and the tooltip
     remain visible even when the inner item is disabled.
   -->
-  <span v-else :class="props.disabled ? 'cursor-not-allowed' : 'contents'">
+  <span
+    v-else
+    :class="props.disabled ? 'cursor-not-allowed' : 'contents'"
+    :tabindex="unavailable ? 0 : undefined"
+    :role="unavailable ? 'button' : undefined"
+    :aria-disabled="unavailable || undefined"
+    :aria-label="
+      unavailable && typeof attrs['aria-label'] === 'string' ? attrs['aria-label'] : undefined
+    "
+    :aria-labelledby="unavailable && typeof attrs['aria-label'] !== 'string' ? labelId : undefined"
+    :aria-describedby="unavailable && props.tooltip ? reasonId : undefined"
+  >
     <ToggleGroupItem
       v-bind="$attrs"
       :value="props.value"
       :disabled="props.disabled"
+      :aria-hidden="unavailable || undefined"
       :class="[
         // Layout
         'inline-flex items-center justify-center gap-2',
@@ -167,10 +185,14 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       <!-- Slot takes precedence; falls back to `icon-left` prop -->
       <slot v-if="slots['icon-left']" name="icon-left" />
       <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" :size="iconSize[props.size]" />
-      <slot />
+      <span v-if="unavailable" :id="labelId" class="contents"><slot /></span>
+      <slot v-else />
       <slot v-if="slots['icon-right']" name="icon-right" />
       <OIcon v-else-if="props.iconRight" :name="props.iconRight" :size="iconSize[props.size]" />
     </ToggleGroupItem>
+    <span v-if="unavailable && props.tooltip" :id="reasonId" aria-hidden="true" class="sr-only">{{
+      props.tooltip
+    }}</span>
     <OTooltip v-if="props.tooltip" :content="props.tooltip" />
   </span>
 </template>

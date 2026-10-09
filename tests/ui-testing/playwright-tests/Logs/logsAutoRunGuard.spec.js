@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Item 2 cost guard (§9 @guard). Needs auto_query_max_scan_mb = 1, ingest allowed 25 h back,
-// and short stats intervals so the fixture's stats exist within a minute.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const {
@@ -70,7 +68,6 @@ test.describe('Logs Auto Run cost guard', () => {
   test.beforeAll(async ({ request }) => {
     const now = Date.now() * 1000;
     const filler = 'x'.repeat(1800);
-    // About 14 MB spread evenly over the last 24 h, so 15 min stays under 1 MB and 24 h does not.
     const rows = Array.from({ length: 7200 }, (_, i) => ({
       _timestamp: now - 24 * HOUR_US + i * 12_000_000 + 1_000_000,
       level: i % 7 === 0 ? 'error' : 'info',

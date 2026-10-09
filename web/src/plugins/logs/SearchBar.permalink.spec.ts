@@ -48,7 +48,6 @@ vi.mock("@/lib/feedback/Toast/useToast", async () => {
   return { ...actual, toast: toastMock };
 });
 
-// Field extraction fetches schemas; the apply path only needs it to resolve.
 vi.mock("@/composables/useLogs/useStreamFields", async () => {
   const actual = await vi.importActual<any>("@/composables/useLogs/useStreamFields");
   return {
@@ -57,7 +56,6 @@ vi.mock("@/composables/useLogs/useStreamFields", async () => {
   };
 });
 
-// The apply path re-reads the stream list; a fixed readable list keeps it off the network.
 vi.mock("@/composables/useStreams", async () => {
   const actual = await vi.importActual<any>("@/composables/useStreams");
   return {
@@ -70,7 +68,6 @@ vi.mock("@/composables/useStreams", async () => {
   };
 });
 
-// A light in-memory router: the app router lazy-loads real pages on navigation.
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [{ path: "/logs", name: "logs", component: { template: "<div />" } }],

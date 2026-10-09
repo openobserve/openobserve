@@ -54,11 +54,8 @@ const props = defineProps<{
   errorDetail?: string;
   aiEnabled: boolean;
   streamName?: string;
-  /** Filter-mode text offered as a one-phrase search after a query error. */
   freeTextCandidate?: string | null;
-  /** Filter with its text rendered as match_all, offered after a query error. */
   runSuggestion?: string | null;
-  /** Filter mode reads the query-error code back from the server message (the stream sends HTTP status only). */
   filterMode?: boolean;
 }>();
 
@@ -71,7 +68,6 @@ const emit = defineEmits<{
   "run-suggestion": [text: string];
 }>();
 
-// The recovery cards key on the 2000x codes, which the logs search stream does not carry.
 const effectiveCode = computed(() => {
   if (!props.filterMode || QUERY_ERROR_CODES.has(props.errorCode)) return props.errorCode;
   return queryErrorCodeFromText(`${props.errorMsg} ${props.errorDetail ?? ""}`) ?? props.errorCode;

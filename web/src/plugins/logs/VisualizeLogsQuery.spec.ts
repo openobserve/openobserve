@@ -160,9 +160,7 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
   })),
 }));
 
-// G1 for Add to dashboard is driven by the auto-run engine; each test sets the panel's reason.
 const persistReasonMock = vi.hoisted(() => {
-  // A reactive box, so the component's computed reason follows each test's value.
   const { ref } = require("vue");
   return ref(null as string | null);
 });

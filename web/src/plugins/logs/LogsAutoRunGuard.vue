@@ -14,10 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  LogsAutoRunGuard — the cost guard's paused state (item 2, J5): the hero empty
-  state when no rows are on screen, the warning banner above existing rows.
--->
 <template>
   <OBanner
     v-if="variant === 'banner'"
@@ -134,9 +130,7 @@ const props = withDefaults(
   defineProps<{
     blocked: AutoRunBlocked;
     variant?: "empty" | "banner";
-    /** Auto Run on: the copy names it; with it off the run is only "paused". */
     autoRunOn?: boolean;
-    /** Same visibility rule as the menu's search-job item (ENT). */
     showSearchJob?: boolean;
   }>(),
   { variant: "empty", autoRunOn: false, showSearchJob: false },
@@ -233,10 +227,14 @@ const heroDescription = computed(() => {
   }
   if (isSuperCluster.value) return t("search.autoRunGuardSuperClusterDesc", { scope: scope.value });
   if (reason.value === "unknown-unvalidated") {
-    return t("search.autoRunGuardUnknownManyDesc", {
-      count: estimate?.unknownStreams?.length ?? 0,
-      scope: scope.value,
-    });
+    return t(
+      "search.autoRunGuardUnknownManyDesc",
+      {
+        count: estimate?.unknownStreams?.length ?? 0,
+        scope: scope.value,
+      },
+      estimate?.unknownStreams?.length ?? 0,
+    );
   }
   if (reason.value === "unknown-window") {
     return t("search.autoRunGuardUnknownDesc", {

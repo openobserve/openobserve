@@ -46,6 +46,11 @@ describe("ODropdownItem focusable unavailable opt-in", () => {
     expect(blocked.hasAttribute("data-disabled")).toBe(false);
     expect(blocked.getAttribute("aria-describedby")).toBe("blocked-reason");
     expect(document.getElementById("blocked-reason")?.textContent).toBe("Run first");
+    const reason = document.getElementById("blocked-reason")!;
+    expect(reason.getAttribute("aria-hidden")).toBe("true");
+    const nameContent = blocked.cloneNode(true) as HTMLElement;
+    nameContent.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
+    expect(nameContent.textContent).toBe("Blocked");
     for (const key of ["Enter", " "])
       blocked.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
     blocked.click();

@@ -147,7 +147,6 @@ describe("runGridSearch after a deferred free-text schema refresh (item 1, spec 
     await flushPromises();
 
     expect(searchObj.data.queryResults.hits).toEqual(rowsB);
-    // B's own follow-up (its page count) may go out; nothing of A's does.
     expect(sent.filter((s) => s.payload.type === "search")).toHaveLength(1);
     expect(sent.every((s) => s.payload.generationId === generationB)).toBe(true);
   });
@@ -170,7 +169,6 @@ describe("runGridSearch after a deferred free-text schema refresh (item 1, spec 
   });
 
   describe("same-query re-dispatches reuse the loaded schema (user report 2026-10-07)", () => {
-    // An earlier test's field extraction may still be in flight; its schema read is not this test's.
     beforeEach(async () => {
       await vi.waitFor(() => expect(searchObj.loadingStream).toBe(false));
       await flushPromises();

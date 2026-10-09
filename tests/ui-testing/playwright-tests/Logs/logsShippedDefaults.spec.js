@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Item 2 shipped-defaults smoke (§9): a fresh user lands on Logs and sees rows with no click.
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const {
@@ -43,7 +42,6 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
     await ingestRows(request, ORG, STREAM, rows);
     const entry = await waitForStats(request, ORG, STREAM);
     config = await readConfig(request, ORG);
-    // Fail, never adapt: this smoke only means something on the shipped configuration.
     expect(config.auto_query_enabled).toBe(true);
     expect(config.query_on_stream_selection).toBe(true);
     expect(Number(config.auto_query_max_scan_mb)).toBeGreaterThan(0);
@@ -54,7 +52,6 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
     tag: ['@smoke', '@shippedDefaults', '@logs'],
   }, async ({ page }) => {
     await navigateToBase(page);
-    // An empty Logs history; the session itself also lives in localStorage and must stay.
     await page.evaluate(() => {
       for (const key of Object.keys(localStorage)) {
         if (/^oo_(toggle_auto_run|logs_|selected_stream_)/.test(key)) localStorage.removeItem(key);

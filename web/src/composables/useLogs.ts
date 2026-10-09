@@ -87,15 +87,13 @@ const useLogs = (t: TranslateFn) => {
     searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))));
   };
 
-  // `snapshot` is the guard's frozen request (J5), so a job never runs dialog-time state.
   const getJobData = async (isPagination = false, snapshot: any = null) => {
-    const scheduling = searchObj.meta.jobId == "";
+    const scheduling = searchObj.meta.jobId === "";
     try {
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
       const queryReq: any = snapshot ? cloneDeep(snapshot) : buildSearch();
-      // A blocked text search builds no request at all, so null must stop here too.
       if (!queryReq) {
         throw new Error(notificationMsg.value || t("search.somethingWentWrongPeriod"));
       }
@@ -160,7 +158,6 @@ const useLogs = (t: TranslateFn) => {
       }
     } catch (e: any) {
       searchObj.loading = false;
-      // The scheduling caller reports its own failure (403 vs server message).
       if (!scheduling) {
         showErrorNotification(
           raw(
@@ -195,13 +192,12 @@ const useLogs = (t: TranslateFn) => {
     });
   };
 
-  // Every tick goes through requestRun("refresh"): pause predicates, consent and busy deferral (P3).
   const armRefreshInterval = () => {
     clearInterval(store.state.refreshIntervalID);
     if (!(searchObj.meta.refreshInterval > 0)) return;
     const refreshIntervalID = setInterval(() => {
       if (
-        searchObj.meta.logsVisualizeToggle == "logs" &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
         searchObj.data.stream.selectedStream.length > 0
       ) {
         useLogsAutoRun().engine.tick();
@@ -211,7 +207,7 @@ const useLogs = (t: TranslateFn) => {
   };
 
   useLogsAutoRun().setRearmRefresh(() => {
-    if (searchObj.meta.refreshInterval > 0 && router.currentRoute.value.name == "logs") {
+    if (searchObj.meta.refreshInterval > 0 && router.currentRoute.value.name === "logs") {
       armRefreshInterval();
     }
   });
@@ -252,14 +248,12 @@ const useLogs = (t: TranslateFn) => {
     }
   };
 
-  /** Loads the list, functions and fields, then requests the scope's first run (AC4.6 `reason` unless the URL names it). */
   const loadLogsData = async (
     reason: RunReason = "landing",
     options: { ignoreUrl?: boolean; origin?: string } = {},
   ) => {
     try {
       const autoRun = useLogsAutoRun();
-      // resetScope settles loading; the page keeps its loading state while the list loads.
       const wasLoading = searchObj.loading;
       autoRun.engine.resetScope(reason === "url" ? "url" : "org");
       searchObj.loading = wasLoading;
@@ -287,10 +281,8 @@ const useLogs = (t: TranslateFn) => {
     }
   };
 
-  // A skipped or blocked first run leaves an empty grid: show "no query applied", not a blank table.
   const showNoQueryAppliedIfIdle = () => {
     if (searchObj.loading || searchObj.meta.executed || searchObj.meta.pendingExecution) return;
-    // resetSearchObj() leaves a placeholder "no stream" error that only a run would clear.
     if (searchObj.data.stream.streamLists.length) searchObj.data.errorMsg = "";
     if (!Array.isArray(searchObj.data.queryResults?.hits)) {
       searchObj.data.queryResults = { hits: [] };
@@ -335,7 +327,6 @@ const useLogs = (t: TranslateFn) => {
     }
   };
 
-  // Explicit Run: supersedes any in-flight generation and never waits on the guard (AC4.6).
   const handleRunQuery = async (clear_cache = false) => {
     try {
       searchObj.meta.clearCache = clear_cache;
@@ -352,7 +343,6 @@ const useLogs = (t: TranslateFn) => {
     }
   };
 
-  /** The grid executor body: one full run, or one page/page-size run, under `generationId`. */
   const runGridSearch = async (
     generationId: number,
     mode: "full" | "page" | "page-size" = "full",
@@ -365,22 +355,18 @@ const useLogs = (t: TranslateFn) => {
     }
     searchObj.loading = true;
     searchObj.loadingProgressPercentage = 0;
-    // Only a new run can change the query's streams; a page or page-size run re-sends the executed query.
     if (mode === "full") {
       await refreshFreeTextSchemas(searchObj, store.state.zoConfig, (name) =>
         getStream(name, searchObj.data.stream.streamType || "logs", true, true),
       );
-      // A run that replaced this one while the schema loaded owns the shared results now.
       if (!useLogsAutoRun().engine.isCurrent(generationId)) return;
     }
     await getQueryData(mode === "page", { generationId, reuseSchema: mode !== "full", origin });
   };
 
-  // Search-history and AI re-apply load a scope for the user to run, so run-state from before is dropped.
   const resetRunStateForReapply = () => {
     useLogsAutoRun().engine.resetScope("reapply");
     resetTransient(searchObj as unknown as Record<string, unknown>);
-    // Re-applied SQL is user-authored, so it carries no scan provenance.
     searchObj.meta.freeTextScan = {};
   };
 
@@ -432,7 +418,6 @@ const useLogs = (t: TranslateFn) => {
         searchObj.meta.pendingUrlQueryRestore = true;
       }
     }
-    // Read with `query`; a malformed or absent value restores no scan consent.
     searchObj.meta.freeTextScan = decodeFtScan(queryParams.ft_scan);
 
     if (
@@ -477,7 +462,6 @@ const useLogs = (t: TranslateFn) => {
       searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
     }
 
-    // C7: page size and columns are applied before the first query; `page` only offers a notice.
     const rows = parseRowsParam(queryParams.rows);
     if (rows !== null) searchObj.meta.resultGrid.rowsPerPage = rows;
     const columns = searchObj.meta.sqlMode ? null : decodeColumns(queryParams.columns);
@@ -513,7 +497,6 @@ const useLogs = (t: TranslateFn) => {
     }
 
     initShownSearchFromUrl(queryParams);
-    // Opening a link must not add a second history entry (C7b): the restore's own write replaces.
     void writeLogsUrl("replace", {
       ...queryParams,
       sql_mode: searchObj.meta.sqlMode,

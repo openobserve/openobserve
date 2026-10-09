@@ -13,16 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mounted J/K journeys (4a §9): the real SearchResult, ODrawer (reka-ui), DetailTable and OTable,
-// the real shortcut manager, and the real pagination dispatch down to the streaming transport.
-
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { readLogsSignature, resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import {
+  readLogsSignature,
+  resetLogsAutoRunForTests,
+  useLogsAutoRun,
+} from "@/composables/useLogs/logsAutoRun";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsRowNavAnnouncement } from "@/composables/useLogs/logsRowNav";
@@ -42,7 +43,6 @@ vi.mock("vue-router", async (importOriginal) => ({
   }),
 }));
 
-// The streaming transport is the only stub: everything above it is the production path.
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
@@ -64,7 +64,6 @@ const hostApi: { getQueryData: (isPagination?: boolean) => Promise<unknown> } = 
   getQueryData: async () => undefined,
 };
 
-// Mirrors Index.vue (which also renders logs-row-nav-live): the paginator's update:scroll runs the real pagination query, and J/K step rows.
 const Host = defineComponent({
   setup() {
     const { getQueryData } = useSearchBar(i18n.global.t as any);
@@ -74,7 +73,6 @@ const Host = defineComponent({
       { id: "logsNextRow", handler: (e) => result.value?.stepLogRow(1, !!e?.repeat) },
       { id: "logsPrevRow", handler: (e) => result.value?.stepLogRow(-1, !!e?.repeat) },
     ]);
-    // Like Index.vue, a search error replaces the results with the error state.
     return () => [
       searchState().searchObj.data.errorMsg
         ? h("div", { "data-test": "logs-error-state-stub" })
@@ -121,7 +119,6 @@ const activeRows = () =>
 
 const lastSent = () => transport.sent[transport.sent.length - 1];
 
-// Streams one page through the real response handlers: metadata, hits, then completion.
 const deliverPage = async (hits: any[]) => {
   const { payload, handlers } = lastSent();
   handlers.data(payload, {
@@ -199,6 +196,46 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     vi.clearAllMocks();
   });
 
+  it("locks the real page-size select while loading and restores it afterward", async () => {
+    const select = () =>
+      document.querySelector<HTMLElement>(
+        '[data-test="logs-search-result-records-per-page-trigger"]',
+      )!;
+    searchObj.loading = true;
+    await flushPromises();
+    expect(select().getAttribute("data-disabled")).not.toBeNull();
+    searchObj.loading = false;
+    await flushPromises();
+    expect(select().getAttribute("data-disabled")).toBeNull();
+  });
+
+  it("locks the page-size trigger for search-around even after loading stops", async () => {
+    useLogsAutoRun().invalidateExecuted("search-around");
+    await flushPromises();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      '[data-test="logs-search-result-records-per-page-trigger"]',
+    )!;
+    expect(trigger.disabled).toBe(true);
+    trigger.click();
+    await flushPromises();
+    expect(trigger.getAttribute("data-state")).toBe("closed");
+    expect(searchObj.meta.resultGrid.rowsPerPage).toBe(3);
+  });
+
+  it("explains search-around at drawer navigation boundaries", async () => {
+    searchObj.data.searchAround.indexTimestamp = rows(1)[0]._timestamp;
+    await press("j");
+    await vi.waitFor(() => expect(drawerText()).toContain("p1-row1"));
+    await press("k");
+    await vi.waitFor(() => expect(drawerText()).toContain("p1-row0"));
+    const previous = document.querySelector<HTMLElement>(
+      '[data-test="log-detail-previous-detail-btn"]',
+    )!;
+    expect(document.getElementById(previous.getAttribute("aria-describedby")!)?.textContent).toBe(
+      i18n.global.t("search.autoRunSearchAroundActive"),
+    );
+  });
+
   it("J opens row 0 with focus on the drawer panel, then J J K keeps one live region node (AC1.1, AC1.2, AC1.4)", async () => {
     await press("j");
     await vi.waitFor(() => expect(drawerText()).toContain("p1-row0"));
@@ -257,7 +294,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
   it("keeps the Table tab across steps (AC1.6)", async () => {
     await press("j");
     await vi.waitFor(() => expect(drawerText()).toContain("p1-row0"));
-    // reka's TabsTrigger activates on mousedown, not click.
     document
       .querySelector<HTMLElement>('[data-test="log-detail-table-tab"]')
       ?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
@@ -298,7 +334,7 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     expect(document.querySelector('[data-test="log-detail-page-loading"]')).not.toBeNull();
     expect(drawer()?.textContent).toContain("Loading page 2…");
     const next = document.querySelector('[data-test="log-detail-next-detail-btn"]')!;
-    expect(next.hasAttribute("disabled")).toBe(true);
+    expect(next.getAttribute("aria-disabled") === "true").toBe(true);
 
     await deliverPage(rows(2));
     await vi.waitFor(() => expect(drawerText()).toContain("p2-row0"));
@@ -341,7 +377,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     await press("j");
     await press("j");
     const { payload, handlers } = lastSent();
-    // The server answers the page with an error status, as the Playwright route does.
     handlers.error(payload, { content: { message: "boom", code: 500 } });
     await flushPromises();
 
@@ -351,7 +386,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
         "Couldn't load page 2",
       ),
     );
-    // The failure also swaps the results for the error state, as in Index.vue; the region outside still speaks.
     expect(document.querySelector('[data-test="logs-error-state-stub"]')).not.toBeNull();
     expect(searchObj.meta.resultGrid.navigation).toMatchObject({
       selectionActive: false,
@@ -383,7 +417,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     await press("Escape");
     await vi.waitFor(() => expect(drawer()).toBeNull());
     expect(searchObj.meta.resultGrid.navigation.pendingPageSelection).toBeNull();
-    // No row is open any more, so focus falls back to the results scroller (AC2.15).
     await vi.waitFor(() => expect(document.activeElement?.getAttribute("tabindex")).toBe("-1"));
     await deliverPage(rows(2));
     expect(drawer()).toBeNull();
@@ -423,7 +456,7 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
       ).toBe("Last result"),
     );
     const next = document.querySelector('[data-test="log-detail-next-detail-btn"]')!;
-    expect(next.hasAttribute("disabled")).toBe(true);
+    expect(next.getAttribute("aria-disabled") === "true").toBe(true);
   });
 
   it("a row clicked while a crossing loads supersedes it; the landed page runs the row match instead (AC2.14)", async () => {
@@ -446,8 +479,8 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     expect(activeRows()).toEqual([]);
     const next = document.querySelector('[data-test="log-detail-next-detail-btn"]')!;
     const prev = document.querySelector('[data-test="log-detail-previous-detail-btn"]')!;
-    expect(next.hasAttribute("disabled")).toBe(true);
-    expect(prev.hasAttribute("disabled")).toBe(true);
+    expect(next.getAttribute("aria-disabled") === "true").toBe(true);
+    expect(prev.getAttribute("aria-disabled") === "true").toBe(true);
     expect(wrapper.findComponent({ name: "SearchDetail" }).vm.nextTooltip).toBe("Results changed");
   });
 
@@ -468,7 +501,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     resultsRow(1)!.click();
     await vi.waitFor(() => expect(drawerText()).toContain("p1-row1"));
 
-    // A later chunk is re-sorted by order_by_metadata, so a newer row lands on top and the opened record moves to index 2.
     searchObj.data.queryResults.order_by_metadata = [["_timestamp", "desc"]];
     const newer = { _timestamp: 1_700_000_000_000_001, message: "newest", _stream_name: "app" };
     run.handlers.data(run.payload, {
@@ -506,7 +538,7 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
       ).toBe("Run the query to update results"),
     );
     const next = document.querySelector('[data-test="log-detail-next-detail-btn"]')!;
-    expect(next.hasAttribute("disabled")).toBe(true);
+    expect(next.getAttribute("aria-disabled") === "true").toBe(true);
     expect(wrapper.findComponent({ name: "SearchDetail" }).vm.nextTooltip).toBe(
       "Run the query to update results",
     );
@@ -556,7 +588,7 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     await press("j");
     expect(drawerText()).toContain("p1-row0");
     const next = document.querySelector('[data-test="log-detail-next-detail-btn"]')!;
-    expect(next.hasAttribute("disabled")).toBe(true);
+    expect(next.getAttribute("aria-disabled") === "true").toBe(true);
     expect(wrapper.findComponent({ name: "SearchDetail" }).vm.nextTooltip).toBe("Loading results…");
     searchObj.data.resultGrid.hitsSettled = true;
     await flushPromises();
@@ -590,7 +622,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
     let helperStreamsModule: any = null;
 
     beforeEach(() => {
-      // The app store's streams module replaces the helper's stub, so the real useStreams cache and mapping run.
       helperStreamsModule = (store as any)._modules.get(["streams"])?._rawModule ?? null;
       if (helperStreamsModule) (store as any).unregisterModule("streams");
       (store as any).registerModule("streams", streamsModule);
@@ -600,7 +631,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
       schemaSpy = vi
         .spyOn(StreamService, "schema")
         .mockImplementation(async (_org: string, name: string) => schemaOf(name) as any);
-      // The executed query's first page already loaded this stream's schema.
       searchObj.data.streamResults = {
         list: [{ name: "app", stream_type: "logs", ...schemaOf("app").data }],
       };
@@ -621,7 +651,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
       await press("j");
       await deliverPage(rows(2));
       await vi.waitFor(() => expect(drawerText()).toContain("p2-row0"));
-      // extractFields replaces the field list once it has its schema, whichever way it got it.
       await vi.waitFor(() =>
         expect(searchObj.data.stream.selectedStreamFields).not.toBe(fieldsBefore),
       );
@@ -635,18 +664,6 @@ describe("SearchResult J/K navigation (mounted, 4a)", { timeout: 30000 }, () => 
       hostApi.getQueryData(false);
       await flushPromises();
       await deliverPage(rows(1));
-      await new Promise((r) => setTimeout(r, 300));
-      process.stdout.write(
-        "DBG " +
-          JSON.stringify({
-            logs: (store.state as any).streams?.logs?.list?.map((x: any) => x.name),
-            map: (store.state as any).streams?.streamsIndexMapping,
-            nl: (StreamService.nameList as any).mock?.calls?.length,
-            err: searchObj.data.errorMsg,
-            org: (store.state as any).selectedOrganization?.identifier,
-          }) +
-          "\n",
-      );
       await vi.waitFor(() =>
         expect(schemaSpy).toHaveBeenCalledWith(expect.any(String), "app", "logs"),
       );

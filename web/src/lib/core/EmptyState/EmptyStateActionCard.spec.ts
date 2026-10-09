@@ -155,4 +155,17 @@ describe("EmptyStateActionCard", () => {
     expect(wrapper.text()).toContain("Get started with observability");
     expect(wrapper.find("[data-icon-name='chevron-right']").exists()).toBe(true);
   });
+  it("uses compact sizing without appearance overrides", () => {
+    const wrapper = mountCard({ size: "compact" });
+    expect(wrapper.classes()).toContain("max-w-80");
+    expect(wrapper.classes()).toContain("gap-2");
+  });
+
+  it("keeps an unavailable card focusable without emitting its action", async () => {
+    const wrapper = mountCard({ unavailable: true });
+    expect(wrapper.attributes("disabled")).toBeUndefined();
+    expect(wrapper.attributes("aria-disabled")).toBe("true");
+    await wrapper.trigger("click");
+    expect(wrapper.emitted("click")).toBeUndefined();
+  });
 });

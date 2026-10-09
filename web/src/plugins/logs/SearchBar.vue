@@ -75,6 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem
               v-if="store.state.zoConfig.timechart_enabled"
               data-test="logs-visualize-toggle"
+              :aria-label="t('search.visualize')"
+              focusable-unavailable
               :disabled="isVisualizeDisabled || !!visualizeReason"
               :tooltip="
                 isVisualizeDisabled
@@ -281,11 +283,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon-xs-sq"
                         icon-left="edit"
                         class="ms-auto"
-                        :title="saveViewReason || t('search.updateSavedViewWithCurrent')"
+                        :aria-label="t('search.updateSavedViewWithCurrent')"
                         :disabled="!!saveViewReason"
+                        focusable-unavailable
                         :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
                         @click.stop.prevent="quickUpdateSavedView(view)"
-                      />
+                        @keydown.enter.stop.prevent="quickUpdateSavedView(view)"
+                        @keydown.space.stop
+                      >
+                        <template #unavailable-reason>{{ saveViewReason }}</template>
+                      </OButton>
                     </template>
                   </ODropdownItem>
                 </div>
@@ -315,13 +322,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
+              :aria-label="t('search.createSavedView')"
               variant="ghost"
               size="icon-panel"
               :disabled="!!saveViewReason"
+              focusable-unavailable
               @click="fnSavedView"
             >
               <OIcon name="save" size="sm" />
               <OTooltip :content="saveViewReason || t('search.createSavedView')" :side-offset="6" />
+              <template #unavailable-reason>{{ saveViewReason }}</template>
             </OButton>
           </OButtonGroup>
 
@@ -1041,7 +1051,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
                       buildRunBlocked ||
-                      (config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length)
+                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
                     "
                     @select="handleRunQueryFn(true)"
                   >
@@ -1130,7 +1140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
                       buildRunBlocked ||
-                      (config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length)
+                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
                     "
                     @select="handleRunQueryFn(true)"
                   >
@@ -1155,7 +1165,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
               >
-              <!-- Cancel for an in-flight generation, both editions (P2) -->
               <OButton
                 v-else-if="isGridInFlight"
                 data-test="logs-search-bar-refresh-btn"
@@ -1862,7 +1871,11 @@ import {
   clearPermalink,
   noteUserScopeChange,
 } from "@/composables/useLogs/useLogPermalink";
-import type { PersistAction, PersistSurface } from "@/composables/useLogs/useAutoRun";
+import type {
+  PersistAction,
+  PersistSurface,
+  PersistReasonCode,
+} from "@/composables/useLogs/useAutoRun";
 import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -2147,29 +2160,46 @@ export default defineComponent({
     const { cancelPatterns } = usePatterns(t);
     const autoRun = useLogsAutoRun();
 
-    // The surface a save or share serialises (J7): the grid for Search and Drill down.
     const activeSurface = computed<PersistSurface>(() => {
       const mode = searchObj.meta.logsVisualizeToggle;
       if (mode === "patterns" || mode === "visualize" || mode === "build") return mode;
       return "logs";
     });
-    // These take the editor's query, not the shown results, so an unrun query gets a note instead of a block.
     const EDITOR_QUERY_ACTIONS = new Set<PersistAction>([
       "save-view",
       "create-alert",
       "search-job",
     ]);
-    const persistReason = (surface: PersistSurface, action?: PersistAction) => {
-      const reason = autoRun.persistReason(surface, action, {
+    type PersistControlReason = PersistReasonCode | "edited-query" | "unrun-query";
+    const persistReason = (
+      surface: PersistSurface,
+      action?: PersistAction,
+    ): PersistControlReason | null => {
+      if (surface === "logs" && autoRun.searchAroundActive()) return "search-around";
+      const decision = autoRun.engine.canPersistOrShare(surface, action, {
         allowNotRun: !!action && EDITOR_QUERY_ACTIONS.has(action),
       });
-      if (reason !== t("search.autoRunPersistNeedsRun") || action === "share-link") return reason;
-      return queryRunReason.value;
+      if (decision.ok) return null;
+      if (decision.code !== "needs-run" || action === "share-link") return decision.code;
+      return isQueryEdited.value ? "edited-query" : "unrun-query";
+    };
+    const persistReasonText = (surface: PersistSurface, action?: PersistAction) => {
+      const code = persistReason(surface, action);
+      if (code === null) return null;
+      const keys = {
+        "search-around": "search.autoRunSearchAroundActive",
+        "free-text-blocked": "search.freeTextChooseFirst",
+        "needs-run": "search.autoRunPersistNeedsRun",
+        "free-text-scan": "search.freeTextScanLogsOnly",
+        "edited-query": "search.queryActions.runEditedFirst",
+        "unrun-query": "search.queryActions.runFirst",
+      } as const;
+      return t(keys[code]);
     };
     const unrunQueryNote = (surface: PersistSurface, action: PersistAction) => {
       if (persistReason(surface, action)) return null;
-      if (autoRun.persistReason(surface, action) !== t("search.autoRunPersistNeedsRun"))
-        return null;
+      const decision = autoRun.engine.canPersistOrShare(surface, action);
+      if (decision.ok || decision.code !== "needs-run") return null;
       return isQueryEdited.value
         ? t("search.queryActions.usesEditedQuery")
         : t("search.queryActions.usesUnrunQuery");
@@ -2188,20 +2218,20 @@ export default defineComponent({
         ? t("search.queryActions.runEditedFirst")
         : t("search.queryActions.runFirst"),
     );
-    const saveViewReason = computed(() => persistReason(activeSurface.value, "save-view"));
+    const saveViewReason = computed(() => persistReasonText(activeSurface.value, "save-view"));
     const saveViewNote = computed(() => unrunQueryNote(activeSurface.value, "save-view"));
-    const shareReason = computed(() => persistReason(activeSurface.value, "share-link"));
-    const scheduleJobReason = computed(() => persistReason("logs", "search-job"));
+    const shareReason = computed(() => persistReasonText(activeSurface.value, "share-link"));
+    const scheduleJobReason = computed(() => persistReasonText("logs", "search-job"));
     const scheduleJobNote = computed(() => unrunQueryNote("logs", "search-job"));
     const visualizeReason = computed(() =>
       searchObj.meta.logsVisualizeToggle === "visualize"
         ? null
-        : persistReason("logs", "visualize"),
+        : persistReasonText("logs", "visualize"),
     );
     const isGridInFlight = computed(
       () =>
         searchObj.meta.logsVisualizeToggle !== "patterns" &&
-        (searchObj.loading == true || searchObj.loadingHistogram == true),
+        (searchObj.loading === true || searchObj.loadingHistogram === true),
     );
     const showRunPendingDot = computed(
       () =>
@@ -2435,7 +2465,6 @@ export default defineComponent({
 
     const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
     const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
-    // Lifted into meta so isAutoRunActive() can read it outside this component (P2).
     watch(
       isNaturalLanguageDetected,
       (detected) => {
@@ -2758,7 +2787,6 @@ export default defineComponent({
       return columnNames;
     };
 
-    // An unknown stream has no fields: a sentence stays a filter, "SELECT * FROM missing" still flips.
     const sqlStatementLookup = {
       hasStream: () => true,
       fieldsOf: (name: string) => {
@@ -2942,7 +2970,6 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  // Editor-origin: loads fields, never runs (D3).
                   onStreamChange(searchObj.data.query, { origin: "editor" });
                 }
               });
@@ -2979,7 +3006,6 @@ export default defineComponent({
       } catch (e) {
         console.log(e, "Logs: Error while updating query value");
       }
-      // A keystroke pair that cancels out within the debounce never changes the signature, so only this commit sees it.
       autoRun.engine.reconcileEditorDirty();
     };
     const handleEscKey = (event: KeyboardEvent) => {
@@ -2988,13 +3014,11 @@ export default defineComponent({
       }
     };
 
-    // A histogram drag marks the next date change as a zoom, an explicit run (J4).
     let zoomPending = false;
     const markZoom = () => {
       zoomPending = true;
     };
 
-    // Typed absolute times keep their 2.5 s debounce inside the scheduler ("time-typed").
     const requestTimeRun = (valueType: string) => {
       let reason: "zoom" | "time-typed" | "time" = "time";
       if (zoomPending) reason = "zoom";
@@ -3015,7 +3039,6 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle === "logs" ||
       searchObj.meta.logsVisualizeToggle === "drilldown";
 
-    // The picker's whole-second echo of a programmatic µs window must not trim it; DateTime can stamp that echo as a user change, so the ignore flag counts too.
     const keepsSubSecondWindow = (value: any): boolean => {
       const current = searchObj.data.datetime;
       const programmatic = value.userChangedValue === false || !!searchObj.shouldIgnoreWatcher;
@@ -3030,7 +3053,6 @@ export default defineComponent({
 
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
-      // A picked time is a user scope change: it ends an opened line link (4c C5 step 6b).
       if (value.userChangedValue === true) noteUserScopeChange();
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
@@ -3135,9 +3157,8 @@ export default defineComponent({
         return;
       }
 
-      // Search, Drill down and Patterns time changes are refinements; the scheduler applies AC4.6.
       if (
-        ignoreAutoTrigger == false &&
+        ignoreAutoTrigger === false &&
         (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
         requestTimeRun(value.valueType);
@@ -3156,7 +3177,6 @@ export default defineComponent({
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-    // Shows the filter a run sent as an editor edit, so Cmd+Z restores what was typed.
     const showRanQuery = (text: string) => {
       if (queryEditorRef.value?.replaceValue) queryEditorRef.value.replaceValue(text);
       else updateQuery();
@@ -3400,7 +3420,6 @@ export default defineComponent({
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
 
-      // A saved view applies its function while loading; the view's own run covers it.
       if (!store.state.savedViewFlag) autoRun.request("function");
     };
 
@@ -3547,7 +3566,6 @@ export default defineComponent({
     const applySavedView = async (item) => {
       savedViewDropdownModel.value = false;
       autoRun.engine.resetScope("saved-view");
-      // A saved view replaces the scope: the shared line and the link's columns end here (C5 step 1).
       clearPermalink();
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
@@ -3924,7 +3942,6 @@ export default defineComponent({
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
                 searchObj.communicationMethod = "streaming";
                 await extractFields();
-                // Applying a view is explicit and always reloads the grid, whatever tab it opens on (C11).
                 autoRun.engine.requestRun("saved-view", { op: "full" });
                 store.dispatch("setSavedViewFlag", false);
                 searchObj.shouldIgnoreWatcher = false;
@@ -4313,7 +4330,7 @@ export default defineComponent({
       }
 
       queryEditorRef.value?.setValue(searchObj.data.query);
-      if (store.state.zoConfig.query_on_stream_selection == false) {
+      if (store.state.zoConfig.query_on_stream_selection === false) {
         handleRunQueryFn();
       } else {
         autoRun.request("filter");
@@ -4331,7 +4348,6 @@ export default defineComponent({
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
     const showDownloadSubmenu = ref(false);
     const { isMobile } = useBreakpoint();
-    // An incomplete grid would export rows that no longer match the query (AC5.2); an unrun edit only gets a note.
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length ||
@@ -4361,7 +4377,6 @@ export default defineComponent({
         ? t("search.queryActions.downloadsShownResults")
         : null,
     );
-    // Custom range re-sends the request the last run built, not the editor's text.
     const customRangeNote = computed<I18nText | null>(() =>
       !isDownloadDisabled.value && !customRangeReason.value && autoRun.engine.isResultsStale()
         ? t("search.queryActions.downloadsLastRun")
@@ -4415,7 +4430,6 @@ export default defineComponent({
 
     const handleHistogramMode = () => {};
 
-    // Runs and rewrites must use what was typed, not the editor's 100 ms-old debounced emission.
     const flushEditorValue = () => {
       const currentEditorVal = queryEditorRef.value?.getValue?.();
       if (typeof currentEditorVal === "string") {
@@ -4481,7 +4495,6 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = async (value: any) => {
-      // Entry-point runs are requested only once the new mode is set, so they target the right surface.
       let tabRunPending: "tab" | "patterns" | null = null;
       if (value === "visualize" && blockWithReason(visualizeReason.value)) return;
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
@@ -4738,7 +4751,7 @@ export default defineComponent({
         toast({
           variant: "error",
           message:
-            status == 403
+            status === 403
               ? t("search.searchJobNoPermission")
               : e?.response?.data?.message
                 ? raw(e.response.data.message)
@@ -4747,7 +4760,6 @@ export default defineComponent({
       }
     };
 
-    // Set only by the guard's "Run as search job": the frozen request of the blocked run (G1-X1).
     const guardJobSnapshot = ref<any>(null);
 
     const createScheduleJob = () => {
@@ -4757,7 +4769,6 @@ export default defineComponent({
       searchObj.meta.jobRecords = 100;
     };
 
-    // The guard's job path is exempt from G1: it executes the blocked snapshot (G1-X1).
     const openGuardSearchJob = (snapshot: any) => {
       guardJobSnapshot.value = snapshot;
       searchSchedulerJob.value = true;
@@ -4771,7 +4782,7 @@ export default defineComponent({
       if (!searchObj.data.stream.selectedStream?.length) {
         return t("logs.searchBar.selectStreamBeforeSchedule");
       }
-      return persistReason(isPatternsTab.value ? "patterns" : "logs", "create-alert");
+      return persistReasonText(isPatternsTab.value ? "patterns" : "logs", "create-alert");
     });
     const createAlertNote = computed(() =>
       createAlertDisabledReason.value
@@ -5209,7 +5220,6 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        // Typed-but-uncommitted text is merged into the rewrite, never lost (AC4.4).
         this.flushEditorValue();
         // Never split the query on "|": the legacy "function | where" syntax is gone,
         // and the split is quote-unaware, so a pipe inside a term such as

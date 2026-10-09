@@ -15,7 +15,6 @@
 
 export type PagePosition = "first" | "last";
 
-/** A J/K page crossing waiting for its own page request (4a §3.2.2). */
 export interface PendingPageSelection {
   page: number;
   position: PagePosition;
@@ -43,7 +42,6 @@ export interface PageCrossingGrid {
   pageLoad: PageLoad | null;
 }
 
-/** Records a dispatched page request; it binds an unbound crossing, and supersedes a bound one. */
 export function recordPageRequest(
   navigation: PageCrossingNavigation,
   grid: PageCrossingGrid,
@@ -59,13 +57,11 @@ export function recordPageRequest(
   }
 }
 
-/** Records a page request's terminal outcome; only its first terminal event counts. */
 export function recordPageLoad(grid: PageCrossingGrid, load: PageLoad): void {
   if (grid.pageLoad?.requestId === load.requestId) return;
   grid.pageLoad = { ...load };
 }
 
-/** Lets a retried request take over the crossing its failed attempt was bound to. */
 export function unbindForRetry(navigation: PageCrossingNavigation, requestId: string): void {
   const pending = navigation.pendingPageSelection;
   if (pending?.requestId === requestId) {

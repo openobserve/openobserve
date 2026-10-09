@@ -31,7 +31,6 @@ export const MAX_SHARED_PAGE = 1000;
 
 export const LINE_LINK_PARAMS = ["log_stream", "log_ts", "log_id", "log_fp"];
 
-/** C7b "view state" and "surface mode" rows: a write that changes only these replaces the history entry. */
 export const VIEW_STATE_PARAMS = new Set([
   "refresh",
   "show_histogram",
@@ -46,7 +45,6 @@ export const VIEW_STATE_PARAMS = new Set([
   ...LINE_LINK_PARAMS,
 ]);
 
-// `type` is transient: updateUrlQueryParams deletes it before writing.
 const IGNORED_PARAMS = new Set(["type"]);
 
 const SURFACES: PersistSurface[] = ["logs", "patterns", "visualize", "build"];
@@ -58,7 +56,6 @@ export const shownSearch = reactive<Record<PersistSurface, ShownEntry | null>>({
   build: null,
 });
 
-/** `page` from the opened link, waiting for the first run to settle (C7 "Go to page N"). */
 export const sharedPage = ref<number | null>(null);
 
 export const sharedPageNotice = ref<{ page: number; lastPage: number | null } | null>(null);
@@ -74,7 +71,6 @@ let historyStateProvider: () => LogsHistoryState = () => ({
 
 export type LogsUrlMode = "push" | "replace";
 
-/** The executed-input rows of the C7b registry, as one run saw them. */
 export interface ShownInputs {
   streams: string[];
   streamType: string;
@@ -97,13 +93,12 @@ export interface ShownEntry {
   rows: number | null;
 }
 
-/** Live values a record does not carry: the stream order on screen and the window a non-grid run resolved. */
 export interface ShownLiveContext {
   selectedStreams?: string[];
   resolvedWindow?: { startTime: number; endTime: number } | null;
 }
 
-export interface LogsHistoryState {
+interface LogsHistoryState {
   zoomStack: unknown[];
   returnPreset: string | null;
   stackId: string | null;
@@ -114,21 +109,14 @@ export function bindLogsUrlRouter(router: Router | null | undefined): void {
   if (router) boundRouter = router;
 }
 
-/** Item 4b replaces the provider with its zoom history; until then the state is neutral. */
-export function setLogsHistoryStateProvider(provider: () => LogsHistoryState): void {
-  historyStateProvider = provider;
-}
-
 export function resetShownSearch(): void {
   for (const surface of SURFACES) shownSearch[surface] = null;
 }
 
-/** The record a surface's URL and share link name; a surface that never ran falls back to the grid's. */
 export function shownEntryFor(surface: PersistSurface): ShownEntry | null {
   return shownSearch[surface] ?? shownSearch.logs;
 }
 
-/** Displayed page and page size from the recorded hits request; a request asking one extra row (page count) is size + 1. */
 export function pageFromRequest(req: unknown): { page: number; rows: number | null } {
   const query = (req as { query?: { from?: unknown; size?: unknown } } | null)?.query;
   const size = numberOr(query?.size, null);
@@ -140,7 +128,6 @@ export function pageFromRequest(req: unknown): { page: number; rows: number | nu
   return { page: rows === null ? 1 : Math.floor(from / rows) + 1, rows };
 }
 
-/** Sets `shownSearch[surface]` from item 2's record; true when it patches the entry already shown (same run). */
 export function recordShownSearch(
   event: ExecutedRecordedEvent,
   live: ShownLiveContext = {},
@@ -175,7 +162,6 @@ export function recordShownSearch(
   return previous !== null && event.generation !== null && previous.generation === event.generation;
 }
 
-/** Controlled fallback: before anything has run, the URL names the link the user opened. */
 export function initShownSearchFromUrl(query: LocationQuery | Record<string, unknown>): void {
   resetShownSearch();
   const stream = firstString(query.stream);
@@ -213,7 +199,6 @@ export function initShownSearchFromUrl(query: LocationQuery | Record<string, unk
   };
 }
 
-/** `page` param: an integer 1–1000, else null. */
 export function parseSharedPage(value: unknown): number | null {
   const raw = firstString(value);
   if (!raw || !/^\d{1,4}$/.test(raw)) return null;
@@ -221,7 +206,6 @@ export function parseSharedPage(value: unknown): number | null {
   return page >= 1 && page <= MAX_SHARED_PAGE ? page : null;
 }
 
-/** `rows` param: one of the paginator's page sizes, else null. */
 export function parseRowsParam(value: unknown): number | null {
   const raw = firstString(value);
   if (!raw || !/^\d{1,3}$/.test(raw)) return null;
@@ -233,7 +217,6 @@ export function encodeColumns(fields: string[]): string {
   return b64EncodeUnicode(JSON.stringify(fields)) ?? "";
 }
 
-/** `columns` param: a b64 JSON array of field names (`[]` allowed), else null. */
 export function decodeColumns(value: unknown): string[] | null {
   const raw = firstString(value);
   if (raw === undefined || raw === "") return null;
@@ -246,7 +229,6 @@ export function decodeColumns(value: unknown): string[] | null {
   }
 }
 
-/** Keys whose values differ between two URL queries, `type` ignored. */
 export function changedParams(
   current: LocationQuery | Record<string, unknown>,
   next: LocationQueryRaw | Record<string, unknown>,
@@ -260,7 +242,6 @@ export function changedParams(
   );
 }
 
-/** The C7b rule: only view-state params changed → replace, else push. */
 export function urlWriteMode(
   current: LocationQuery | Record<string, unknown>,
   next: LocationQueryRaw | Record<string, unknown>,
@@ -270,7 +251,6 @@ export function urlWriteMode(
     : "push";
 }
 
-/** The one logs URL writer (C7b, 4b R1): every write carries the history context; an identical query is not written. */
 export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promise<unknown> {
   const router = boundRouter;
   if (!router) return Promise.resolve();
@@ -279,7 +259,6 @@ export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promis
   return mode === "replace" ? router.replace(target) : router.push(target);
 }
 
-/** Drops `log_*` from the address bar with a replace (permalink clear, Back hook). */
 export function dropLineLinkParams(): Promise<unknown> {
   const query: LocationQueryRaw = { ...currentQuery() };
   let changed = false;
@@ -296,7 +275,6 @@ export function routeHasLineLink(query: LocationQuery | Record<string, unknown>)
   return LINE_LINK_PARAMS.some((key) => (query as Record<string, unknown>)[key] !== undefined);
 }
 
-/** Test hook: forgets the bound router and every recorded entry. */
 export function resetLogsUrlForTests(): void {
   boundRouter = null;
   resetShownSearch();

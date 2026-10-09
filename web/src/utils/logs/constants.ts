@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw } from "@/types/i18n";
+
 import { useLocalWrapContent } from "@/utils/zincutils";
 import { TimePeriodUnit } from "@/ts/interfaces";
 import type { PageLoad, PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
@@ -195,7 +197,7 @@ export const DEFAULT_LOGS_CONFIG = {
       column?: number;
       error: string;
     }>,
-    missingStreamMessage: "",
+    missingStreamMessage: raw(""),
     additionalErrorMsg: "",
     savedViewFilterFields: "",
     hasSearchDataTimestampField: false,

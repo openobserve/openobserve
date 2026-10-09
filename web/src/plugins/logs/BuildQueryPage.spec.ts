@@ -157,7 +157,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 
 // Mock useNotifications composable
 const mockShowErrorNotification = vi.fn();
-// G1 for Add to dashboard is driven by the auto-run engine; each test sets the panel's reason.
 const persistReasonMock = vi.hoisted(() => ({ value: null as string | null }));
 const openPanelRunMock = vi.hoisted(() => vi.fn(() => 1));
 const markPanelDispatchedMock = vi.hoisted(() => vi.fn());
@@ -275,6 +274,26 @@ function createWrapper(props = {}) {
     },
   });
 }
+
+describe("BuildQueryPage parser recovery", () => {
+  it("renders a soft error with a readable outline Retry action", async () => {
+    const parser = vi
+      .spyOn(await import("@/utils/query/sqlUtils"), "parseWhereClauseToFilterChecked")
+      .mockRejectedValueOnce(new Error("parser unavailable"));
+    const wrapper = createWrapper({ whereClause: "code = 503", isSqlMode: false });
+    await flushPromises();
+    const banner = wrapper.get('[data-test="logs-build-parser-error"]');
+    expect(banner.attributes("role")).toBe("alert");
+    expect(banner.classes()).toContain("bg-banner-error-soft-bg");
+    expect(banner.classes()).toContain("text-banner-error-soft-text");
+    expect(banner.get('[data-test="logs-build-parser-retry"]').attributes("data-o2-variant")).toBe(
+      "outline",
+    );
+    expect(parser).toHaveBeenCalled();
+    wrapper.unmount();
+    vi.restoreAllMocks();
+  });
+});
 
 describe("BuildQueryPage Component", () => {
   let wrapper: any;
@@ -956,7 +975,6 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
   afterEach(() => wrapper?.unmount());
 
   const notice = () => wrapper.find('[data-test="logs-build-free-text-notice"]');
-  // The SQL parser loads lazily, so wait for the page to finish its initialisation.
   const initialized = () => vi.waitFor(() => expect(wrapper.emitted("initialized")).toBeTruthy());
 
   it("keeps rendered match_all units as builder conditions and runs", async () => {
@@ -1098,7 +1116,6 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     const editor = { runQuery: vi.fn() };
     wrapper.vm.panelEditorRef = editor;
     openPanelRunMock.mockReturnValueOnce(41);
-    // A saved view applied on the Build tab re-initialises while this run loads stream fields.
     mockUpdateGroupedFields.mockImplementationOnce(async () => {
       searchState().searchObj.meta.savedBuildConfig = { config: {} };
       await nextTick();

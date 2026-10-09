@@ -195,7 +195,7 @@ describe("DetailTable Component", () => {
       },
       OButton: {
         template:
-          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
+          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled" :aria-disabled="$attrs.disabled || undefined"><slot /></button>',
         emits: ["click"],
       },
       ODropdown: true,
@@ -403,13 +403,13 @@ describe("DetailTable Component", () => {
 
   it("should disable previous button when currentIndex is 0", () => {
     const prevButton = wrapper.find('[data-test="log-detail-previous-detail-btn"]');
-    expect(prevButton.attributes("disabled")).toBeDefined();
+    expect(prevButton.attributes("aria-disabled")).toBeDefined();
   });
 
   it("should disable next button when at last index", async () => {
     await wrapper.setProps({ currentIndex: 9, totalLength: 10 });
     const nextButton = wrapper.find('[data-test="log-detail-next-detail-btn"]');
-    expect(nextButton.attributes("disabled")).toBeDefined();
+    expect(nextButton.attributes("aria-disabled")).toBeDefined();
   });
 
   it("should emit showPrevDetail when previous button clicked", async () => {
@@ -1412,11 +1412,11 @@ describe("DetailTable Component", () => {
 
     it("keeps Next enabled on the last row when another page exists", async () => {
       await mountFooter({ currentIndex: 9, totalLength: 10, hasNextPage: true });
-      expect(button("next").attributes("disabled")).toBeUndefined();
+      expect(button("next").attributes("aria-disabled")).toBeUndefined();
       await wrapper.setProps({ hasNextPage: false });
-      expect(button("next").attributes("disabled")).toBeDefined();
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
       await wrapper.setProps({ currentIndex: 0, hasPrevPage: true });
-      expect(button("previous").attributes("disabled")).toBeUndefined();
+      expect(button("previous").attributes("aria-disabled")).toBeUndefined();
     });
 
     it("covers the record while a page loads, keeps the footer and blocks record actions", async () => {
@@ -1432,9 +1432,9 @@ describe("DetailTable Component", () => {
       expect(overlay.exists()).toBe(true);
       expect(overlay.text()).toContain("Loading page 2…");
       expect(overlay.element.parentElement?.getAttribute("aria-busy")).toBe("true");
-      expect(button("next").attributes("disabled")).toBeDefined();
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
       expect(button("next").attributes("aria-busy")).toBe("true");
-      expect(button("previous").attributes("disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-disabled")).toBeDefined();
       expect(button("previous").attributes("aria-busy")).toBeUndefined();
       expect(
         wrapper.find('[data-test="logs-detail-table-search-around-btn"]').attributes("disabled"),
@@ -1443,8 +1443,8 @@ describe("DetailTable Component", () => {
 
     it("disables both buttons with the reason as their tooltip", async () => {
       await mountFooter({ currentIndex: 3, navDisabledReason: "resultsChanged" });
-      expect(button("next").attributes("disabled")).toBeDefined();
-      expect(button("previous").attributes("disabled")).toBeDefined();
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-disabled")).toBeDefined();
       expect(wrapper.vm.nextTooltip).toBe("Results changed");
       await wrapper.setProps({ navDisabledReason: "loading" });
       expect(wrapper.vm.prevTooltip).toBe("Loading results…");
@@ -1458,7 +1458,7 @@ describe("DetailTable Component", () => {
         totalLength: 10,
         pageEdgeReason: "Run the query to update results",
       });
-      expect(button("next").attributes("disabled")).toBeDefined();
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
       expect(wrapper.vm.nextTooltip).toBe("Run the query to update results");
       expect(wrapper.vm.prevTooltip).toBe("Previous log");
     });

@@ -150,7 +150,6 @@ export const usePatternActions = () => {
    * so it cannot be spliced in front of the pattern terms; we say so instead of
    * silently dropping the user's query.
    */
-  // Free text and text+SQL mixes become what a run would send for the patterns' stream.
   const patternsBaseFilter = (rawQuery: string): string => {
     const stream = searchObj.data.stream.selectedStream?.[0];
     if (!rawQuery || !stream) return rawQuery;

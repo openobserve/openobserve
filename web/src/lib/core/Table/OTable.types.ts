@@ -321,9 +321,7 @@ export interface OTableProps<TData = any> {
   sortOrder?: "asc" | "desc";
   /** Maps TanStack column id → backend field name for server-side sort */
   sortFieldMap?: Record<string, string>;
-  /** Server sorting: when false a sorted column toggles asc ↔ desc and is never cleared. Default true. */
   sortClearable?: boolean;
-  /** Sort triggers stay visible but ignore clicks and show `sortDisabledReason`. */
   sortDisabled?: boolean;
   sortDisabledReason?: I18nText;
 
@@ -533,7 +531,6 @@ export interface OTableProps<TData = any> {
   rowTone?: (row: TData) => RowTone | null;
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
-  /** Row (by `row.index`) shown as the current one: ring, selected background and `aria-current`. */
   activeRowIndex?: number | null;
   /** Dynamic inline style for row */
   getRowStyle?: (row: TData) => Record<string, any>;

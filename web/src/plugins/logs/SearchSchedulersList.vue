@@ -314,15 +314,7 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import {
-  ref,
-  onMounted,
-  onUnmounted,
-  computed,
-  defineAsyncComponent,
-  defineComponent,
-  reactive,
-} from "vue";
+import { onMounted, ref, computed, defineAsyncComponent, defineComponent, reactive } from "vue";
 import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -353,7 +345,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
@@ -870,16 +862,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Releasing a token, not restoring a captured name, keeps an out-of-order unmount from clobbering a newer owner.
-    let scopeToken: symbol | null = null;
     onMounted(() => {
-      scopeToken = getManager()?.acquireScope("search-schedulers") ?? null;
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      if (scopeToken) getManager()?.releaseScope(scopeToken);
-      scopeToken = null;
-    });
+
     return {
       searchObj,
       store,

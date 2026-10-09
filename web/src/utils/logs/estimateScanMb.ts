@@ -20,7 +20,6 @@ export const MIN_KNOWN_SPAN_US = MICROS_PER_MINUTE;
 export const FRESH_UNKNOWN_MAX_STREAMS = 10;
 export const FRESH_UNKNOWN_MAX_WINDOW_US = MICROS_PER_HOUR;
 
-// Month matches DateTime.vue's relativeDatesInHour (744 h), the pessimistic length.
 const UNIT_MICROS: Record<string, number> = {
   s: 1_000_000,
   m: MICROS_PER_MINUTE,
@@ -148,7 +147,6 @@ export function estimateStreamMb(
   const retentionUs = retentionDays * MICROS_PER_DAY;
   const denominator = retentionUs > 0 ? Math.min(retentionUs, spanUs) : spanUs;
   const rate = Number(entry.stats?.storage_size ?? 0) / denominator;
-  // Not clipped at doc_time_max: stats exclude the WAL, so ingest is assumed to continue.
   const covered = Math.max(0, Math.min(window.endUs, ctx.nowUs) - Math.max(window.startUs, docMin));
   return { name: entry.name, status: "known", estimateMb: rate * covered, cause: null };
 }

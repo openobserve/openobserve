@@ -66,7 +66,6 @@ export class ShortcutManager {
 
   // ---------- Scope ----------
 
-  /** Sets the base scope, used only while no owner holds an acquired scope. */
   setScope(scope: string): void {
     this.activeScope = scope;
   }
@@ -75,14 +74,12 @@ export class ShortcutManager {
     return this.scopeStack.at(-1)?.scope ?? this.activeScope;
   }
 
-  /** Makes `scope` active until the returned token is released. */
   acquireScope(scope: string): symbol {
     const token = Symbol(scope);
     this.scopeStack.push({ token, scope });
     return token;
   }
 
-  // Removes the token wherever it sits, so an out-of-order release never clobbers a newer owner.
   releaseScope(token: symbol): void {
     this.scopeStack = this.scopeStack.filter((entry) => entry.token !== token);
   }

@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The shared line's drawer while the results grid is not mounted (errored, guard-blocked or unsent first search, 4c C5 step 5). -->
 <template>
   <ODrawer
     bleed

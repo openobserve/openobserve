@@ -110,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
           </div>
         </OPopover>
-        <!-- The tooltip sits on the wrapper: a disabled button gets no hover, and its reason must still show. -->
         <div
           v-if="!embedded && lineLink.kind !== 'hidden'"
           class="flex shrink-0 items-center"
@@ -122,12 +121,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="xs"
             icon-left="link"
-            class="disabled:pointer-events-none"
             :disabled="lineLink.kind === 'disabled' || pageLoading"
+            focusable-unavailable
             :loading="lineLinkBusy"
             @click="copyLineLink(modelValue, 'drawer')"
           >
             {{ t("search.linePermalink.copyLink") }}
+            <template #unavailable-reason>{{ lineLinkTooltip }}</template>
           </OButton>
           <LogLineLinkPopover source="drawer" />
         </div>
@@ -181,7 +181,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       :aria-busy="pageLoading ? 'true' : undefined"
     >
-      <!-- Covers the old record while a page crossing loads, so its field actions cannot fire. -->
       <div
         v-if="pageLoading"
         class="bg-dialog-bg/80 text-text-secondary absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 text-sm"
@@ -535,10 +534,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="prevDisabled"
+            focusable-unavailable
             :loading="pageLoading && pageLoadingDirection === 'prev'"
             @click="$emit('showPrevDetail', false, true)"
           >
-            <!-- First child, so the tooltip anchors to the whole button. -->
             <OTooltip :content="prevTooltip" shortcut-id="logsPrevRow" />
             <OIcon name="navigate-before" size="sm" class="me-1" />{{ t("common.previous") }}
             <OShortcut
@@ -546,6 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ms-1.5 max-md:hidden"
               data-test="log-detail-previous-detail-btn-kbd"
             />
+            <template #unavailable-reason>{{ prevTooltip }}</template>
           </OButton>
         </div>
         <div
@@ -579,6 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="nextDisabled"
+            focusable-unavailable
             :loading="pageLoading && pageLoadingDirection === 'next'"
             @click="$emit('showNextDetail', true, false)"
           >
@@ -590,6 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="log-detail-next-detail-btn-kbd"
             />
             <OIcon name="navigate-next" size="sm" class="ms-1" />
+            <template #unavailable-reason>{{ nextTooltip }}</template>
           </OButton>
         </div>
       </div>
@@ -656,7 +658,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
-// Literal class names so Tailwind emits each one.
 const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
   emergency: "border-log-severity-emergency-indicator",
   alert: "border-log-severity-alert-indicator",
@@ -797,7 +798,6 @@ export default defineComponent({
       type: String as PropType<"resultsChanged" | "notInPage" | "loading" | null>,
       default: null,
     },
-    // Why the page edge cannot be crossed (stale results, auto-refresh); shown on the disabled edge button.
     pageEdgeReason: {
       type: String as unknown as PropType<I18nText | null>,
       default: null,
@@ -849,9 +849,11 @@ export default defineComponent({
     const { lineLinkState, copyLineLink } = useLogLineLink();
     const lineLink = computed(() => lineLinkState(props.modelValue));
     const lineLinkTooltip = computed(() =>
-      lineLink.value.kind === "disabled"
-        ? lineLink.value.reason
-        : t("search.linePermalink.copyLinkTooltip"),
+      props.pageLoading
+        ? t("logs.rowNav.loadingPage", { page: props.pageLoadingPage })
+        : lineLink.value.kind === "disabled"
+          ? lineLink.value.reason
+          : t("search.linePermalink.copyLinkTooltip"),
     );
 
     // The View Trace action is rendered in this component's header row (not
@@ -971,7 +973,6 @@ export default defineComponent({
     );
 
     const { rowSeverity } = useLogSeverity();
-    // Embedded hosts show another panel's stream, so the logs-page projection guard does not apply.
     const severity = computed(() =>
       props.embedded ? resolveLogSeverity(props.modelValue) : rowSeverity(props.modelValue),
     );
@@ -1106,7 +1107,6 @@ export default defineComponent({
       window.localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.name)));
     };
 
-    // The tab watch has no `immediate`, and the drawer can mount straight onto a correlated tab (4a guard 6).
     onMounted(() => emit("update:tab", tab.value));
 
     const NAV_DISABLED_KEYS = {
@@ -1126,13 +1126,18 @@ export default defineComponent({
       () => props.pageLoading || !!props.navDisabledReason || atLast.value,
     );
 
-    const navTooltip = (atEdge: boolean, fallback: I18nText): I18nText => {
+    const navTooltip = (atEdge: boolean, fallback: I18nText, edge: I18nText): I18nText => {
+      if (props.pageLoading) return t("logs.rowNav.loadingPage", { page: props.pageLoadingPage });
       if (props.navDisabledReason) return t(NAV_DISABLED_KEYS[props.navDisabledReason]);
-      if (atEdge && props.pageEdgeReason) return props.pageEdgeReason;
+      if (atEdge) return props.pageEdgeReason ?? edge;
       return fallback;
     };
-    const prevTooltip = computed(() => navTooltip(atFirst.value, t("logs.rowNav.previousLog")));
-    const nextTooltip = computed(() => navTooltip(atLast.value, t("logs.rowNav.nextLog")));
+    const prevTooltip = computed(() =>
+      navTooltip(atFirst.value, t("logs.rowNav.previousLog"), t("traces.rowNav.firstResult")),
+    );
+    const nextTooltip = computed(() =>
+      navTooltip(atLast.value, t("logs.rowNav.nextLog"), t("traces.rowNav.lastResult")),
+    );
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {

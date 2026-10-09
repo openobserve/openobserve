@@ -33,7 +33,6 @@ import {
   setSeverityInferenceEnabled,
   severityIndicatorColor,
   severityRowClass,
-  severitySqlPredicate,
   severityStringValues,
   sqlSelectOutputNames,
   type SeverityProjectionInput,
@@ -419,7 +418,6 @@ describe("statusParser.ts", () => {
   });
 });
 
-// Fresh object per call, so the per-row memo never hides a case.
 const sev = (row: Record<string, unknown>) => resolveLogSeverity({ ...row });
 const levelOf = (row: Record<string, unknown>) => sev(row).level;
 
@@ -1160,57 +1158,5 @@ describe("exported level tables (A4, for item 4b)", () => {
     expect(resolveSeverityFieldValue("status", "3")).toEqual({ level: "error", source: "http" });
     expect(resolveSeverityFieldValue("Level", "50")).toEqual({ level: "error", source: "field" });
     expect(resolveSeverityFieldValue("host", "error")).toBeNull();
-  });
-});
-
-describe("severitySqlPredicate (A4)", () => {
-  const branchOrder = (sql: string, fields: string[]) => fields.map((f) => sql.indexOf(`"${f}"`));
-
-  it("walks the present tier-1 fields in tier-1 order", () => {
-    const sql = severitySqlPredicate(["level", "severity", "host"], ["error"]);
-    expect(sql.startsWith("(CASE WHEN")).toBe(true);
-    const [severity, level] = branchOrder(sql, ["severity", "level"]);
-    expect(severity).toBeGreaterThan(0);
-    expect(level).toBeGreaterThan(severity);
-    expect(sql).not.toContain('"host"');
-    expect(sql).toContain("'error3'");
-    expect(sql).toContain("'failure'");
-    expect(sql.endsWith("ELSE false END)")).toBe(true);
-  });
-
-  it("falls through numeric values outside the field's table", () => {
-    const sql = severitySqlPredicate(["severity"], ["error"]);
-    expect(sql).toContain("IN (1, 2, 3, 4, 5, 6, 7, 10, 20, 30, 40, 50, 60) THEN");
-    expect(sql).toContain("IN (3, 50)");
-    const syslog = severitySqlPredicate(["syslog_severity"], ["emergency"]);
-    expect(syslog).toContain("IN (0, 1, 2, 3, 4, 5, 6, 7) THEN");
-    expect(syslog).toContain("IN (0)");
-  });
-
-  it("returns false when no tier-1 field is present", () => {
-    expect(severitySqlPredicate(["host"], ["error"])).toBe("false");
-    expect(severitySqlPredicate(["status", "severity_number"], ["error"])).toBe("false");
-  });
-
-  it("appends tiers 2, 3 and 4 after tier 1 in on-screen order", () => {
-    const sql = severitySqlPredicate(
-      ["status", "severity_number", "level", "response_code"],
-      ["error"],
-      { includeTiers: [1, 2, 3, 4] },
-    );
-    const level = sql.indexOf('"level"');
-    const number = sql.indexOf('"severity_number"');
-    const statusText = sql.indexOf('"status"');
-    const response = sql.indexOf('"response_code"');
-    expect(level).toBeLessThan(number);
-    expect(number).toBeLessThan(statusText);
-    expect(statusText).toBeLessThan(response);
-    expect(sql).toContain("BETWEEN 17 AND 20");
-    expect(sql).toContain("BETWEEN 500 AND 599");
-    expect(sql).toContain("BETWEEN 1 AND 7 THEN");
-  });
-
-  it("quotes identifiers", () => {
-    expect(severitySqlPredicate(["syslog.severity"], ["error"])).toContain('"syslog.severity"');
   });
 });

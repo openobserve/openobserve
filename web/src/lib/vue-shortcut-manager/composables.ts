@@ -40,7 +40,6 @@ function isById(input: ShortcutInput): input is ShortcutById {
   return !("key" in input) && !("keyForWindows" in input) && !("keyForMac" in input);
 }
 
-/** Resolves the inputs into concrete registrations plus the scope they share. */
 function resolveShortcuts(
   shortcuts: ShortcutInput[],
   scope: string | undefined,
@@ -73,7 +72,6 @@ function resolveShortcuts(
         });
       });
     } else {
-      // Inline shortcut — pick the combo for this platform.
       if (input.scope && inferredScope === undefined) inferredScope = input.scope;
       const key = (mac ? input.keyForMac : input.keyForWindows) ?? input.key;
       toRegister.push({ ...input, key });

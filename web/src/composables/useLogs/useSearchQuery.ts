@@ -68,7 +68,6 @@ export const NON_SQL_LIMIT_MESSAGE =
 
 const BLOCKED_TARGET: TextSearchTarget = { mode: "blocked", candidates: [] };
 
-/** What the multi-stream field check needs beyond the filter context. */
 export interface MultiStreamFieldContext {
   selectedStreamFields: { name: string; streams?: string[] }[];
   fieldToGroupId: Map<string, string>;
@@ -150,7 +149,9 @@ const stripCommentLines = (text: string): string =>
 
 const columnName = (column: any): string | null => {
   if (typeof column === "string") return column.replace(/^"|"$/g, "");
-  return column?.expr?.value != null ? String(column.expr.value) : null;
+  return column?.expr?.value !== null && column?.expr?.value !== undefined
+    ? String(column.expr.value)
+    : null;
 };
 
 const extractFilterColumnsOf = (expression: any): any[] => {
@@ -170,7 +171,6 @@ const extractFilterColumnsOf = (expression: any): any[] => {
   return columns;
 };
 
-/** Field check for multi-stream filters: errors, the streams each field misses, and semantic equivalents. */
 const checkFilterFields = (filter: string, streams: string[], fields: MultiStreamFieldContext) => {
   const parsed = fields.parse("select * from stream where " + filter);
   const filterColumns = extractFilterColumnsOf(parsed?.where);
@@ -180,7 +180,6 @@ const checkFilterFields = (filter: string, streams: string[], fields: MultiStrea
 
   for (const column of filterColumns) {
     const fieldName = columnName(column);
-    // Not a stored field: the arm rewrite resolves it per stream.
     if (fieldName === null || fieldName === STREAM_NAME_FIELD) continue;
     const matching = fields.selectedStreamFields.filter((field) => field.name === fieldName);
     if (matching.length > 0) {
@@ -221,7 +220,6 @@ const checkFilterFields = (filter: string, streams: string[], fields: MultiStrea
   };
 };
 
-// The arm's semantic-field and _stream_name rewrite, applied to a probe statement's WHERE body.
 const rewriteArmWhere = (
   where: string,
   stream: string,
@@ -237,12 +235,7 @@ const rewriteArmWhere = (
   return at < 0 ? where : unparsed.slice(at).replace(/^\sWHERE\s/i, "");
 };
 
-/** Single-stream filter normalisation; `where` is null only when text has nowhere to search. */
-export function resolveStreamFilter(
-  raw: string,
-  stream: string,
-  ctx: FilterResolveContext,
-): StreamFilter {
+function resolveStreamFilter(raw: string, stream: string, ctx: FilterResolveContext): StreamFilter {
   const filter = raw.trim();
   const plan = planStreamsFilter(filter, [stream], ctx);
   if (plan.kind !== "freeText" && hasLimitClause(stripCommentLines(filter))) {
@@ -256,7 +249,6 @@ export function resolveStreamFilter(
   return { where, blocked: where === null, sqlNodesOnly: "", plan };
 }
 
-/** Per-arm filters plus the union of missing-field and no-FTS exclusions. */
 export function resolveFiltersForStreams(
   raw: string,
   streams: string[],
@@ -391,7 +383,6 @@ export const useSearchQuery = (t: TranslateFn) => {
 
     if (queryReq === null) {
       searchObj.loading = false;
-      // A stale code from the previous run would otherwise pick the error cards.
       searchObj.data.errorCode = 0;
       if (searchObj.data.freeTextBlocked) return null;
       if (!notificationMsg.value) {
@@ -518,7 +509,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       // Only clear error messages in normal mode
       if (!readOnly) {
         searchObj.data.filterErrMsg = "";
-        searchObj.data.missingStreamMessage = "";
+        searchObj.data.missingStreamMessage = raw("");
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
         searchObj.data.freeTextExcluded = [];
         searchObj.data.freeTextBlocked = null;
@@ -776,7 +767,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     const stream = searchObj.data.stream.selectedStream[0];
     let resolved: StreamFilter;
     try {
-      // A LIMIT spliced into the WHERE body breaks the histogram query, so the resolver refuses it.
       resolved = resolveStreamFilter(query, stream, filterContext());
     } catch (e) {
       if (!(e instanceof NonSqlLimitError)) throw e;
@@ -836,18 +826,16 @@ export const useSearchQuery = (t: TranslateFn) => {
     const noFts = resolved.excluded.filter((e) => e.reason === "no_fts");
     searchObj.data.stream.missingStreamMultiStreamFilter = resolved.excluded.map((e) => e.stream);
     searchObj.data.freeTextExcluded = noFts.map((e) => e.stream);
-    searchObj.data.missingStreamMessage = [
-      missing.length
-        ? t("search.missingStreamFilterFields", {
-            streams: missing.map((e) => e.stream).join(", "),
-          })
-        : "",
-      noFts.length
-        ? t("search.freeTextNotSearched", { streams: noFts.map((e) => e.stream).join(", ") })
-        : "",
-    ]
-      .filter((message) => message !== "")
-      .join(" ");
+    const missingStreams = missing.map((entry) => entry.stream).join(", ");
+    const noFtsStreams = noFts.map((entry) => entry.stream).join(", ");
+    searchObj.data.missingStreamMessage =
+      missing.length && noFts.length
+        ? t("search.missingStreamAndNoFts", { missingStreams, noFtsStreams })
+        : missing.length
+          ? t("search.missingStreamFilterFields", { streams: missingStreams })
+          : noFts.length
+            ? t("search.freeTextNotSearched", { streams: noFtsStreams })
+            : raw("");
   };
 
   const handleMultiStream = (
@@ -856,7 +844,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     ignoreQuickMode: boolean = false,
     readOnly: boolean = false,
   ): SearchRequestPayload | null => {
-    // A stream listed twice would emit two identical arms and duplicate every row.
     const selected: string[] = [
       ...new Set<string>(searchObj.data.stream.selectedStream.join(",").split(",")),
     ].filter((stream: string) => stream.trim() !== "");
@@ -883,7 +870,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     const arms: string[] = streams.map((item: string) => {
       const where = resolved.perStream.get(item) ?? "";
       const finalQuery =
-        where.trim() != ""
+        where.trim() !== ""
           ? preSQLQuery.split("[WHERE_CLAUSE]").join(" WHERE " + where)
           : preSQLQuery.replace("[WHERE_CLAUSE]", "");
       return finalQuery
@@ -937,10 +924,9 @@ export const useSearchQuery = (t: TranslateFn) => {
     return req;
   };
 
-  /** Field check for a filter's SQL nodes (default: the editor filter); writes the banner state. */
   const validateFilterForMultiStream = (filter: string = searchObj.data.query): boolean => {
     searchObj.data.filterErrMsg = "";
-    searchObj.data.missingStreamMessage = "";
+    searchObj.data.missingStreamMessage = raw("");
     searchObj.data.stream.missingStreamMultiStreamFilter = [];
     const streams: string[] = searchObj.data.stream.selectedStream;
     try {

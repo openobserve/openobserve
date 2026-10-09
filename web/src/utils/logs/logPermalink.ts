@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nKey } from "@/types/i18n";
+
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 
@@ -37,7 +39,7 @@ export const LOG_LINK_I18N = {
   bannerFound: "search.linePermalink.bannerFound",
   bannerAmbiguous: "search.linePermalink.bannerAmbiguous",
   bannerChanged: "search.linePermalink.bannerChanged",
-  actionRetry: "search.linePermalink.actionRetry",
+  actionRetry: "common.retry",
   actionShowLines: "search.linePermalink.actionShowLines",
   actionShowInContext: "search.linePermalink.actionShowInContext",
 } as const;
@@ -56,7 +58,6 @@ const FNV_OFFSET = 0xcbf29ce484222325n;
 const FNV_PRIME = 0x100000001b3n;
 const FNV_MASK = 0xffffffffffffffffn;
 const VIEW_MODES_WITHOUT_ROWS = new Set(["visualize", "patterns", "build"]);
-// Parsed as plain `function` nodes, so the `aggr_func` node type alone misses them.
 const AGGREGATE_FUNCTIONS = new Set([
   "count",
   "sum",
@@ -105,7 +106,7 @@ const OUTCOME_SEVERITY: Record<PermalinkState, PermalinkOutcome["severity"]> = {
   ambiguous: "info",
 };
 
-const OUTCOME_ACTION: Record<PermalinkState, string | null> = {
+const OUTCOME_ACTION: Record<PermalinkState, I18nKey | null> = {
   invalid: null,
   denied: null,
   stream_missing: null,
@@ -131,7 +132,7 @@ export type ParsedPermalink =
 export type TrustworthyFields = string[] | "all";
 
 export type LineLinkEligibility =
-  { kind: "hidden" } | { kind: "disabled"; reasonKey: string } | { kind: "enabled" };
+  { kind: "hidden" } | { kind: "disabled"; reasonKey: I18nKey } | { kind: "enabled" };
 
 export interface LineLinkEligibilityInput {
   viewMode: string;
@@ -197,7 +198,7 @@ export interface CopyLinkInput {
 }
 
 export type CopyLinkDecision =
-  { kind: "exact"; link: LineLink } | { kind: "timestamp"; link: LineLink; toastKey: string };
+  { kind: "exact"; link: LineLink } | { kind: "timestamp"; link: LineLink; toastKey: I18nKey };
 
 export type PermalinkState =
   "invalid" | "denied" | "stream_missing" | "error" | "incomplete" | "gone" | "found" | "ambiguous";
@@ -205,11 +206,10 @@ export type PermalinkState =
 export interface PermalinkOutcome {
   state: PermalinkState;
   severity: "info" | "warning" | "error";
-  messageKey: string;
+  messageKey: I18nKey;
   messageParams: Record<string, string | number>;
-  /** Plural count for `messageKey` when it has plural forms, else null. */
   pluralCount: number | null;
-  actionKey: string | null;
+  actionKey: I18nKey | null;
   record: LogRow | null;
 }
 
@@ -221,7 +221,6 @@ export interface PermalinkOutcomeInput {
   size?: number;
 }
 
-/** Canonical JSON used by the fingerprint: sorted keys, null/"" dropped, scalars as strings, internal columns excluded. */
 export const canonicalRecordJson = (record: LogRow, allFieldsName?: string): string => {
   const excluded = new Set([...INTERNAL_COLUMNS, STREAM_NAME]);
   if (allFieldsName) excluded.add(allFieldsName);
@@ -261,7 +260,6 @@ export const parsePermalinkQuery = (query: Record<string, unknown>): ParsedPerma
   return { kind: "valid", link: { stream, ts } };
 };
 
-/** Line-link URL query from the share query: log_* set, refresh 0, window widened to hold log_ts; null when the link would not parse back. */
 export const buildLineLinkQuery = (
   shareQuery: Record<string, unknown>,
   link: LineLink,
@@ -289,7 +287,6 @@ export const lineStreamOf = (row: LogRow, selectedStreams: string[]): string | n
   return selectedStreams[0] ?? null;
 };
 
-/** The row's timestamp as a µs integer, or null when it is missing or not a safe integer. */
 export const readRowTimestamp = (row: LogRow, timestampColumn: string): number | null => {
   const value = row[timestampColumn];
   if (typeof value === "number") {
@@ -304,7 +301,6 @@ export const lineLinkEligibility = (input: LineLinkEligibilityInput): LineLinkEl
   return reasonKey === null ? { kind: "enabled" } : { kind: "disabled", reasonKey };
 };
 
-/** Wide-stream rule (D-H3): config absent means 500 fields and force on. */
 export const isWideStream = (input: WideStreamInput): boolean => {
   const limit =
     typeof input.quickModeNumFields === "number" && input.quickModeNumFields > 0
@@ -336,7 +332,6 @@ export const buildResolveRequest = (input: ResolveRequestInput): ResolveRequest 
   };
 };
 
-/** Complete means HTTP 200, not partial, no function error and fewer hits than the size cap. */
 export const isResolveComplete = (result: ResolveResult, size: number = RESOLVE_SIZE): boolean => {
   if (result.status !== 200 || !isRecord(result.data)) return false;
   const body = result.data;
@@ -365,7 +360,6 @@ export const decideCopyLink = (input: CopyLinkInput): CopyLinkDecision => {
   return { kind: "exact", link: { ...base, fp: fingerprintRecord(picked, input.allFieldsName) } };
 };
 
-/** Open-time outcome, C5 precedence: invalid, denied, stream_missing, error, incomplete, gone, found, ambiguous. */
 export const permalinkOutcome = (input: PermalinkOutcomeInput): PermalinkOutcome => {
   if (input.parsed.kind !== "valid") return outcome("invalid", LOG_LINK_I18N.bannerInvalid);
   const { link } = input.parsed;
@@ -393,7 +387,6 @@ export const permalinkOutcome = (input: PermalinkOutcomeInput): PermalinkOutcome
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-// Plain assignment of a JSON-parsed "__proto__" key would hit the prototype setter and lose the field.
 const setOwn = (target: Record<string, unknown>, key: string, value: unknown): void => {
   Object.defineProperty(target, key, {
     value,
@@ -456,7 +449,7 @@ const toFiniteNumber = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const disabledReason = (input: LineLinkEligibilityInput): string | null => {
+const disabledReason = (input: LineLinkEligibilityInput): I18nKey | null => {
   if (input.functionActive) return LOG_LINK_I18N.disabledFunction;
   if (input.sqlMode) {
     const statement = singleStatement(input.parsedSql);
@@ -530,7 +523,6 @@ const hasClause = (clause: unknown): boolean => {
   return true;
 };
 
-// DataFusion lowercases unquoted identifiers, so only a double-quoted name keeps its case.
 const columnRefName = (expr: unknown): string | null => {
   if (!isRecord(expr) || expr.type !== "column_ref") return null;
   const column = expr.column;
@@ -547,7 +539,6 @@ const aliasName = (alias: unknown): string | null => {
   return isRecord(alias) && typeof alias.value === "string" ? alias.value : null;
 };
 
-// The parser drops alias quoting, so aliases compare case-insensitively and an ambiguous one fails closed.
 const rewritesIdentity = (statement: Record<string, unknown>, timestampColumn: string): boolean => {
   const guarded = new Set([timestampColumn, O2_ID]);
   const guardedLower = new Set([...guarded].map((name) => name.toLowerCase()));
@@ -608,7 +599,7 @@ const distinctRecords = (rows: LogRow[], allFieldsName?: string): LogRow[] => {
 
 const outcome = (
   state: PermalinkState,
-  messageKey: string,
+  messageKey: I18nKey,
   messageParams: Record<string, string | number> = {},
   extra: Partial<PermalinkOutcome> = {},
 ): PermalinkOutcome => ({
@@ -616,7 +607,7 @@ const outcome = (
   severity: OUTCOME_SEVERITY[state],
   messageKey,
   messageParams,
-  pluralCount: null,
+  pluralCount: typeof messageParams.count === "number" ? messageParams.count : null,
   actionKey: OUTCOME_ACTION[state],
   record: null,
   ...extra,

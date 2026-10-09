@@ -48,7 +48,6 @@ function cteName(entry: unknown): string | null {
   return null;
 }
 
-/** Walks a WITH list; each body sees only the CTEs before it (and itself when recursive). */
 function collectCtes(
   entries: unknown[],
   scope: ReadonlySet<string>,
@@ -66,7 +65,6 @@ function collectCtes(
   return names;
 }
 
-/** CTE names are lexical: a WITH binds its own query (and its union branches), never a sibling. */
 function collect(node: unknown, scope: ReadonlySet<string>, walk: Walk, depth: number): void {
   if (!isObject(node)) return;
   if (depth > MAX_DEPTH) {
@@ -94,19 +92,15 @@ function countSelects(text: string): number {
   return text.match(SELECT_WORD)?.length ?? 0;
 }
 
-/** SQL that is safe to astify, or null; the parser is exponential in paren depth (SQL_PARSE_MAX_DEPTH). */
 function parseableText(text: string): string | null {
   const depth = lexicalParenDepth(text);
   if (depth <= SQL_PARSE_MAX_DEPTH) return text;
-  // Unreadable quoting or comments mean even the WHERE bounds are uncertain.
   if (!Number.isFinite(depth)) return null;
   const stripped = stripWherePredicate(text);
-  // A dropped predicate holding a subquery could name a stream, so it may not be stripped.
   if (countSelects(stripped) !== countSelects(text)) return null;
   return lexicalParenDepth(stripped) <= SQL_PARSE_MAX_DEPTH ? stripped : null;
 }
 
-/** Physical streams a parsed SQL statement reads, across joins, unions, CTEs and subqueries. */
 export function sqlSourcesFromAst(ast: unknown): SqlSources {
   const walk: Walk = { out: new Set<string>(), truncated: false };
   collect(ast, new Set<string>(), walk, 0);

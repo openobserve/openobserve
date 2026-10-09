@@ -213,39 +213,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <OSelect
+          <span
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
             "
-            data-test="logs-search-result-records-per-page"
-            v-model="searchObj.meta.resultGrid.rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="select-pagination min-w-[4.5rem]"
-            size="sm"
-            :searchable="false"
-            :disable="searchObj.loading || !!gridLockReason"
-            @update:model-value="getPageData('recordsPerPage')"
-          />
+            :tabindex="gridLockReason ? 0 : undefined"
+            :aria-disabled="gridLockReason ? true : undefined"
+            :aria-describedby="gridLockReason ? 'logs-page-size-reason' : undefined"
+          >
+            <OSelect
+              v-if="
+                searchObj.meta.resultGrid.showPagination &&
+                searchObj.meta.logsVisualizeToggle === 'logs'
+              "
+              data-test="logs-search-result-records-per-page"
+              v-model="searchObj.meta.resultGrid.rowsPerPage"
+              :options="rowsPerPageOptions"
+              class="select-pagination min-w-[4.5rem]"
+              size="sm"
+              :searchable="false"
+              :disabled="searchObj.loading || !!gridLockReason"
+              @update:model-value="getPageData('recordsPerPage')"
+            />
+            <span v-if="gridLockReason" id="logs-page-size-reason" class="sr-only">{{
+              gridLockReason
+            }}</span>
+          </span>
           <OTooltip
             v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
             :content="gridLockReason"
           />
-          <OPagination
+          <span
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
             "
-            :disable="searchObj.loading || !!gridLockReason"
-            :data-locked="gridLockReason ? 'true' : undefined"
-            v-model="pageNumberInput"
-            :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
-            :max="pageCount"
-            :max-pages="paginationMaxPages"
-            class="paginator-section"
-            @update:model-value="getPageData('pageChange')"
-            data-test="logs-search-result-pagination"
-          />
+            :tabindex="gridLockReason ? 0 : undefined"
+            :aria-disabled="gridLockReason ? true : undefined"
+            :aria-describedby="gridLockReason ? 'logs-pagination-reason' : undefined"
+          >
+            <OPagination
+              v-if="
+                searchObj.meta.resultGrid.showPagination &&
+                searchObj.meta.logsVisualizeToggle === 'logs'
+              "
+              :disable="searchObj.loading || !!gridLockReason"
+              :data-locked="gridLockReason ? 'true' : undefined"
+              v-model="pageNumberInput"
+              :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
+              :max="pageCount"
+              :max-pages="paginationMaxPages"
+              class="paginator-section"
+              @update:model-value="getPageData('pageChange')"
+              data-test="logs-search-result-pagination"
+            />
+            <span v-if="gridLockReason" id="logs-pagination-reason" class="sr-only">{{
+              gridLockReason
+            }}</span>
+          </span>
           <OTooltip
             v-if="gridLockReason && searchObj.meta.resultGrid.showPagination"
             :content="gridLockReason"
@@ -265,7 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
         The histogram is pinned along the X axis only (see histogramPinStyle), so
         scrolling the wide results table sideways can't drag the chart with it. -->
-      <!-- tabindex -1: focus lands here when a closed drawer has no row to return to (4a §3.2.2). -->
       <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef" tabindex="-1">
         <div
           ref="histogramRef"
@@ -625,10 +650,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="contextLineLink.kind !== 'hidden'"
                 icon-left="link"
                 :disabled="contextLineLink.kind === 'disabled'"
+                focusable-unavailable
+                :description="
+                  contextLineLink.kind === 'disabled' ? contextLineLink.reason : undefined
+                "
                 data-test="log-context-menu-copy-line-link"
                 @select="copyLineLink(contextCell.row, 'menu')"
               >
-                <!-- A child tooltip binds to its previous sibling, so the label gets its own box. -->
                 <span class="min-w-0 flex-1">
                   <OTooltip
                     v-if="contextLineLink.kind === 'disabled'"
@@ -775,13 +803,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
-        <!-- Outside the keyed DetailTable so it is one node across steps, inside the dialog so reka does not hide it. -->
         <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-detail-nav-live">
           {{ detailNavAnnouncement }}
         </div>
       </ODrawer>
 
-      <!-- The menu closes on select, so the fallback popover anchors where the right-click landed, outside the scrolling results. -->
+      <!-- eslint-disable local/no-hardcoded-px -- Context-menu coordinates come from MouseEvent client pixels. -->
       <div
         v-if="menuLinkAnchor"
         class="pointer-events-none fixed size-0"
@@ -800,6 +827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @add-to-search="addPatternToSearch"
         @create-alert="createAlertFromPattern"
       />
+      <!-- eslint-enable local/no-hardcoded-px -->
     </div>
 
     <!-- Correlation Dashboard (for inline expanded logs, opens as separate dialog) -->
@@ -826,6 +854,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { logsPageCount } from "@/utils/logs/pageCount";
+import { announceInto } from "@/utils/announceInto";
 import {
   computed,
   defineComponent,
@@ -1057,7 +1087,6 @@ export default defineComponent({
     },
 
     getPageData(actionType: string) {
-      // The controls are disabled while locked; this also covers keyboard paths.
       if (this.gridLockReason) return false;
       if (actionType == "prev") {
         if (this.searchObj.data.resultGrid.currentPage > 1) {
@@ -1164,10 +1193,8 @@ export default defineComponent({
       }
     },
     onTimeBoxed(obj: any) {
-      // Search-around is a user scope change, so it ends a shared line (4c C5 step 6b).
       clearPermalink();
       this.searchObj.meta.showDetailTab = false;
-      // Search-around never reaches getQueryData, so it drops the old open row itself (AC5.4).
       resetRowSelection(this.searchObj);
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       // this.$emit("search:timeboxed", obj);
@@ -1285,7 +1312,6 @@ export default defineComponent({
     );
     const noFtsRecoveryTerm = computed(() => recoveryTerm(searchObj, store.state.zoConfig));
 
-    // Paging an out-of-date or search-around grid would fetch a different query than the rows show (AC5.2, D6).
     const gridLockReason = computed(() => {
       if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
       if (autoRun.searchAroundActive()) return t("search.autoRunSearchAroundActive");
@@ -1732,7 +1758,6 @@ export default defineComponent({
         return;
       }
 
-      // Identity is the hit's position: timestamps repeat within a batch.
       const index = logsRowIndex(row);
       if (index < 0) {
         console.error("[SearchResult] Could not find flex index for correlation", {
@@ -1918,14 +1943,15 @@ export default defineComponent({
     const pageCount = computed(() =>
       Math.max(
         1,
-        (searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
-          ? searchObj.data.queryResults?.pagination?.length
-          : searchObj.data.queryResults?.partitionDetail?.paginations?.length) || 0,
+        logsPageCount(
+          searchObj.communicationMethod,
+          searchObj.meta.jobId,
+          searchObj.data.queryResults,
+        ) || 0,
       ),
     );
     const searchAroundShown = () => searchObj.data.searchAround?.indexTimestamp > 0;
     const autoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
-    // Live mode stays page-1-only, and a stale or search-around grid would page a different query (4a §3.2).
     const canChangePage = computed(
       () =>
         !!searchObj.meta.resultGrid.showPagination &&
@@ -1935,7 +1961,6 @@ export default defineComponent({
     );
     const hasNextPage = computed(() => canChangePage.value && currentPage.value < pageCount.value);
     const hasPrevPage = computed(() => canChangePage.value && currentPage.value > 1);
-    // Another request clearing `loading` must not enable J/K while the hits stream still reorders rows.
     const hitsSettled = () => searchObj.data.resultGrid.hitsSettled !== false && !searchObj.loading;
 
     const activeRowIndex = computed(() =>
@@ -1943,19 +1968,19 @@ export default defineComponent({
     );
 
     const pageEdgeReason = computed(() => {
-      if (!searchObj.meta.resultGrid.showPagination || searchAroundShown()) return null;
+      if (searchAroundShown()) return t("search.autoRunSearchAroundActive");
+      if (!searchObj.meta.resultGrid.showPagination) return null;
       if (autoRefreshOn()) return t("logs.rowNav.autoRefreshEdge");
       if (autoRun.engine.isResultsStale()) return t("search.autoRunStaleTooltip");
       return null;
     });
 
-    // True while the drawer shows the resolved record of an opened line link (4c C5).
     const detailIsShared = ref(false);
 
     const navDisabledReason = computed<"resultsChanged" | "notInPage" | "loading" | null>(() => {
       if (navigation().pendingPageSelection) return null;
       if (!hitsSettled()) return "loading";
-      if (navigation().currentRowIndex == null) {
+      if (navigation().currentRowIndex === null || navigation().currentRowIndex === undefined) {
         return detailIsShared.value ? "notInPage" : "resultsChanged";
       }
       return null;
@@ -1971,7 +1996,7 @@ export default defineComponent({
       const pending = navigation().pendingPageSelection;
       if (pending) return t("logs.rowNav.loadingPage", { page: pending.page });
       const index = navigation().currentRowIndex;
-      if (index == null || !hitsList().length) return undefined;
+      if (index === null || index === undefined || !hitsList().length) return undefined;
       return t("logs.rowNav.positionLabel", {
         row: index + 1,
         count: hitsList().length,
@@ -1986,15 +2011,7 @@ export default defineComponent({
 
     const detailReturnFocus = (): HTMLElement | null => {
       const index = navigation().currentRowIndex;
-      return index == null ? null : resultsRowElement(index);
-    };
-
-    // Re-setting the same text is not re-announced, so the region is emptied first.
-    const announceInto = (region: typeof rowNavAnnouncement, message: string) => {
-      region.value = "";
-      nextTick(() => {
-        region.value = message;
-      });
+      return index === null || index === undefined ? null : resultsRowElement(index);
     };
 
     const announce = (message: string) =>
@@ -2012,7 +2029,6 @@ export default defineComponent({
         }),
       );
 
-    // The table header sticks inside the scroller, so plain scrollIntoView can park the row under it.
     const scrollRowIntoView = (index: number) => {
       nextTick(() => {
         const row = resultsRowElement(index);
@@ -2035,7 +2051,6 @@ export default defineComponent({
       navigation().currentRowIndex = null;
     };
 
-    /** The drawer's only writer (4a §3.2.7): snapshots the record and remounts DetailTable. */
     const openDetail = (
       target: { index: number } | { record: Record<string, any> },
       options: { origin?: "user" | "permalink" | "crossing"; tab?: string } = {},
@@ -2050,7 +2065,6 @@ export default defineComponent({
       }
       if (!record) return false;
       const origin = options.origin ?? "user";
-      // The user's own row always wins over a shared line, pending or open (4c C5 step 6c).
       if (origin !== "permalink" && activePermalink.value) clearPermalink();
       detailIsShared.value = origin === "permalink";
       if (origin !== "crossing") navigation().pendingPageSelection = null;
@@ -2086,7 +2100,6 @@ export default defineComponent({
       return match ? Number(match[1]) : null;
     };
 
-    // Hover is never an anchor: it is pointer-incidental (4a §3.2 "Anchor").
     const resolveAnchor = (): number | null => {
       if (searchObj.meta.showDetailTab) return navigation().currentRowIndex ?? null;
       const focused = focusedResultsRow();
@@ -2106,20 +2119,19 @@ export default defineComponent({
         !searchAroundShown() &&
         (direction === 1 ? currentPage.value < pageCount.value : currentPage.value > 1);
       if (morePages && pageEdgeReason.value) return pageEdgeReason.value;
-      return edge === "last" ? t("logs.rowNav.lastResult") : t("logs.rowNav.firstResult");
+      return edge === "last" ? t("traces.rowNav.lastResult") : t("traces.rowNav.firstResult");
     };
 
-    /** Paginator and J/K crossings share this; only a crossing keeps the open row (4a §3.2). */
     const changePage = (page: number, options: { fromCrossing?: boolean } = {}): boolean => {
-      // The controls are disabled while locked; this also covers keyboard paths.
       if (gridLockReason.value) return false;
       const results = searchObj.data.queryResults;
-      if (searchObj.meta.jobId != "" && results.paginations == undefined) results.pagination = [];
-      const maxPages =
-        searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
-          ? results.pagination?.length
-          : results?.partitionDetail?.paginations?.length;
-      if (page > Math.ceil(maxPages) && searchObj.meta.jobId == "") {
+      if (
+        searchObj.meta.jobId !== "" &&
+        (results.paginations === null || results.paginations === undefined)
+      )
+        results.pagination = [];
+      const maxPages = logsPageCount(searchObj.communicationMethod, searchObj.meta.jobId, results);
+      if (page > Math.ceil(maxPages ?? Number.NaN) && searchObj.meta.jobId === "") {
         toast({ variant: "error", message: t("logs.searchResult.pageOutOfRange"), timeout: 1000 });
         pageNumberInput.value = searchObj.data.resultGrid.currentPage;
         return false;
@@ -2137,13 +2149,11 @@ export default defineComponent({
       navigation().pendingPageSelection = { page, position, requestId: null };
       announce(t("logs.rowNav.loadingPageAnnouncement", { page }));
       const sent = changePage(page, { fromCrossing: true });
-      // The dispatch is synchronous, so a still-unbound crossing here was never sent (4a §3.2 "Dispatch check").
       if (navigation().pendingPageSelection?.requestId === null) {
         failPendingPageNavigation(searchObj, { quiet: !sent });
       }
     };
 
-    /** One J/K step, shared by the keys and the drawer's Prev/Next buttons. */
     const stepLogRow = (direction: 1 | -1, isRepeat = false) => {
       if (searchObj.meta.logsVisualizeToggle !== "logs") return;
       if (!hitsSettled() || navigation().pendingPageSelection) return;
@@ -2173,7 +2183,6 @@ export default defineComponent({
       }
     };
 
-    // A drawer close that coincides with this message is announced outside, once the dialog content is gone.
     const closeDrawerAnnouncing = (message: string) => {
       if (searchObj.meta.showDetailTab) {
         afterCloseAnnouncement = message;
@@ -2190,7 +2199,7 @@ export default defineComponent({
         closeDrawerAnnouncing("");
         return;
       }
-      const message = t("logs.rowNav.pageFailed", { page });
+      const message = t("traces.rowNav.pageFailed", { page });
       if (!options.quiet) toast({ variant: "error", message });
       closeDrawerAnnouncing(message);
     };
@@ -2215,7 +2224,7 @@ export default defineComponent({
       if (!hits.length) {
         navigation().pendingPageSelection = null;
         clearRowSelection();
-        closeDrawerAnnouncing(t("logs.rowNav.pageEmpty", { page: pending.page }));
+        closeDrawerAnnouncing(t("traces.rowNav.pageEmpty", { page: pending.page }));
         return;
       }
       const index = pending.position === "first" ? 0 : hits.length - 1;
@@ -2231,7 +2240,6 @@ export default defineComponent({
       nextTick(() => announcePosition(index));
     };
 
-    // Sync: the error that fails a page also swaps the results for the error state, which unmounts this component.
     watch(
       () => searchObj.data.resultGrid.pageLoad,
       (load) => {
@@ -2241,7 +2249,6 @@ export default defineComponent({
       { flush: "sync" },
     );
 
-    // Leaving Logs mode abandons a crossing; nothing reopens when its page lands (4a §3.2.2 "Cancel").
     watch(
       () => searchObj.meta.logsVisualizeToggle,
       (mode) => {
@@ -2252,7 +2259,7 @@ export default defineComponent({
     const onDetailDrawerAfterClose = () => {
       const message = afterCloseAnnouncement;
       afterCloseAnnouncement = null;
-      if (navigation().currentRowIndex == null)
+      if (navigation().currentRowIndex === null || navigation().currentRowIndex === undefined)
         scrollContainerRef.value?.focus({ preventScroll: true });
       if (message) nextTick(() => announceInto(rowNavAnnouncement, message));
     };
@@ -2273,7 +2280,6 @@ export default defineComponent({
         : "all";
     };
 
-    /** Keeps the open drawer on its row after a search replaced the hits (4a §3.2.7 "Row match"). */
     const rematchDetailRow = () => {
       const snapshot = detailRow.value;
       if (!snapshot) return;
@@ -2286,13 +2292,11 @@ export default defineComponent({
       );
     };
 
-    /** Maps the shared line onto the loaded page: open-row highlight, scroll, and J/K resume from it (4c C5 row 7). */
     const mapSharedLine = () => {
       const record = detailRow.value;
       if (!record) return;
       const hits = hitsList();
       const snapshot: Record<string, any> = { ...record };
-      // The resolve always carries _o2_id; a page whose projection dropped it must still match on content.
       if (!hits.some((hit) => hit?._o2_id !== undefined)) delete snapshot._o2_id;
       const options = { timestampColumn: logsTimestampCol.value };
       const index = matchDetailRow(hits, snapshot, executedTrustworthy(), options);
@@ -2310,7 +2314,6 @@ export default defineComponent({
       else rematchDetailRow();
     });
 
-    // Opens the shared line whatever the first search is doing; a page already loaded maps at once.
     watch(
       sharedLineRecord,
       (record) => {
@@ -2322,7 +2325,6 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // An explicit close of the drawer ends the shared line and drops log_* (4c C5 step 6a).
     const endSharedDetail = () => {
       if (detailIsShared.value) clearPermalink();
     };
@@ -2343,7 +2345,6 @@ export default defineComponent({
       searchResultMounts.value = Math.max(0, searchResultMounts.value - 1);
       stopHitsComplete();
       stopPageNavFailure();
-      // A failed page can swap the results for the error state before the drawer reports its close.
       if (afterCloseAnnouncement) announceInto(rowNavAnnouncement, afterCloseAnnouncement);
       afterCloseAnnouncement = null;
     });
@@ -2517,7 +2518,6 @@ export default defineComponent({
           if (searchObj.meta.sqlMode) {
             return;
           }
-          // A shared link's columns, including [], are rendered as given (4c C7).
           if (columnsFromUrl.value) return;
           // Only the system may overwrite a column the system itself picked.
           // isFtsDefaultColumn is the authoritative "current columns are a system
@@ -2588,7 +2588,6 @@ export default defineComponent({
           correlationDashboardProps.value = null;
           correlationLoading.value = false;
           correlationError.value = null;
-          // Esc or × during a crossing cancels it; the page still lands but nothing reopens (AC2.8).
           if (navigation().pendingPageSelection) resetRowSelection(searchObj);
         }
       },
@@ -2787,7 +2786,6 @@ export default defineComponent({
       if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
         classes.push("bg-table-row-selected-bg");
       }
-      // Ambiguous timestamp link: every loaded row at that µs, without the open-row ring (DECISIONS S-C3).
       const sharedTs = permalinkHighlightTs.value;
       const sharedStream = activePermalink.value?.link.stream;
       if (

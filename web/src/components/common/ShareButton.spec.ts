@@ -85,6 +85,20 @@ describe("ShareButton", () => {
     vi.clearAllTimers();
   });
 
+  it("keeps the icon-only Share name distinct from its unavailable reason", () => {
+    const wrapper = mount(ShareButton, {
+      props: { url: "https://example.com/logs", disabled: true, tooltip: "Run first" },
+      global: { plugins: [store, i18n] },
+    });
+    const button = wrapper.get("button");
+    expect(button.attributes("aria-label")).toBe("Share Link");
+    const reason = wrapper.get(".sr-only");
+    expect(reason.attributes("aria-hidden")).toBe("true");
+    expect(button.attributes("aria-describedby")).toBe(reason.attributes("id"));
+    expect(reason.text()).toBe("Run first");
+    wrapper.unmount();
+  });
+
   it("should render the share button", () => {
     const wrapper = mount(ShareButton, {
       props: {

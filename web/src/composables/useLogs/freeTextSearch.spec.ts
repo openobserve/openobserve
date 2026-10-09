@@ -163,7 +163,7 @@ describe("freeTextHighlight and freeTextDecorations", () => {
       { start: 2, end: 22 },
       { start: 26, end: 33 },
     ]);
-    expect(deco?.hover).toContain('search.freeTextSearchedFields{"fields":"body"}');
+    expect(deco?.hover).toContain('search.freeTextPreview{"fields":"body","sql":');
   });
 
   it("has no decoration when no stream can search text", () => {

@@ -160,7 +160,7 @@ export interface SearchObjectData {
   errorCode: number;
   countErrorMsg: string;
   filterErrMsg: string;
-  missingStreamMessage: string;
+  missingStreamMessage: I18nText;
   additionalErrorMsg?: string;
   savedViewFilterFields?: string;
   stream: StreamData;
@@ -319,7 +319,6 @@ export const searchState = () => {
           refreshInterval: 0,
         }),
       );
-      // Runs before data is restored, so the restored rows keep their own download request.
       resetTransient(searchObj as unknown as Record<string, unknown>);
 
       // Initialize data with default histogram structure
@@ -351,7 +350,6 @@ export const searchState = () => {
       // Restore cached query results and histogram data
       searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
       searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
-      // No request is in flight after a remount, so no page request can still resolve.
       searchObj.data.resultGrid.pageRequest = null;
       searchObj.data.resultGrid.pageLoad = null;
       searchObj.data.resultGrid.hitsSettled = true;

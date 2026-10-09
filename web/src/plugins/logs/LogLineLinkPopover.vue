@@ -14,9 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The copy fallback when the browser refused the automatic copy (4c C6): the link and a Copy button, a second gesture. -->
 <template>
-  <!-- Modal: the closing context menu hands focus back to the row, which would dismiss a non-modal popover at once. -->
   <OPopover
     :open="open"
     modal

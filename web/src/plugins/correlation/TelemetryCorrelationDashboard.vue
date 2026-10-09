@@ -1147,7 +1147,6 @@ export interface TelemetryCorrelationDashboardProps {
   panelHeight?: number; // Override default panel height (grid units) for metric panels
   logsPanelWidth?: number; // Override default panel width (grid units) for logs panel
   logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
-  /** Forwarded to the embedded TraceDetails; a kept-alive tab that is not shown must not own J/K. */
   shortcutsActive?: boolean;
 }
 

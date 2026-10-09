@@ -413,7 +413,6 @@ export const logsUtils = () => {
   };
 
   const liveSelectedStreams = (): string[] => {
-    // selectedStream is string[] in state; legacy string / { value } shapes may still reach this path.
     const selectedStream = searchObj.data.stream.selectedStream as unknown;
     if (Array.isArray(selectedStream)) return selectedStream.map(String);
     if (selectedStream && typeof selectedStream === "object" && "value" in selectedStream) {
@@ -423,7 +422,7 @@ export const logsUtils = () => {
   };
 
   const liveFunctionContent = (): string | null =>
-    searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != ""
+    searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent !== ""
       ? searchObj.data.tempFunctionContent.trim()
       : null;
 
@@ -440,12 +439,11 @@ export const logsUtils = () => {
     freeTextScan: searchObj.meta.freeTextScan,
   });
 
-  // Executed inputs come from the shown run (C7b); time is `period` in the address bar and `bounds` in a share link.
   const writeShownTime = (query: any, shown: ShownEntry | null, isShareLink: boolean) => {
     const date = searchObj.data.datetime;
     if (!shown) {
-      if (date.type == "relative" && !isShareLink) query["period"] = date.relativeTimePeriod;
-      else if (date.type == "relative" || date.type == "absolute") {
+      if (date.type === "relative" && !isShareLink) query["period"] = date.relativeTimePeriod;
+      else if (date.type === "relative" || date.type === "absolute") {
         query["from"] = date.startTime;
         query["to"] = date.endTime;
       }
@@ -465,7 +463,6 @@ export const logsUtils = () => {
     }
   };
 
-  // C7 view state: columns, rows and page; columns are omitted for a system FTS pick and in SQL mode.
   const writeGridViewState = (query: any, inputs: ShownInputs) => {
     const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
     if (!inputs.sqlMode && !searchObj.meta.isFtsDefaultColumn) {
@@ -510,12 +507,10 @@ export const logsUtils = () => {
     if (inputs.query) {
       query["sql_mode"] = inputs.sqlMode;
       query["query"] = b64EncodeUnicode(inputs.query);
-      // Written in the same call as `query`, so the two never disagree.
       const ftScan = encodeFtScan(inputs.freeTextScan);
       if (ftScan) query["ft_scan"] = ftScan;
     }
 
-    // A shown run's null transform stays null: a VRL draft picked after it ran did not produce these results.
     query["fn_editor"] = shown
       ? !!shown.inputs.functionContent
       : searchObj.meta.showTransformEditor;
@@ -585,7 +580,6 @@ export const logsUtils = () => {
     }
 
     writeGridViewState(query, inputs);
-    // The Share button never copies log_*, so a query link shared during a permalink stays a query link.
     if (!isShareLink) writeLineLinkState(query);
 
     return query;
@@ -594,12 +588,11 @@ export const logsUtils = () => {
   const isLogsRoute = () => router?.currentRoute.value?.name === "logs";
 
   const dropTransientType = (query: any) => {
-    if (query.type == "search_history_re_apply" || query.type == "search_scheduler") {
+    if (query.type === "search_history_re_apply" || query.type === "search_scheduler") {
       delete query.type;
     }
   };
 
-  /** Full write from the shown run; `auto` replaces when only view-state params change (C7b). */
   const updateUrlQueryParams = (
     dashboardPanelData: any = null,
     buildPanelData: any = null,
@@ -612,7 +605,6 @@ export const logsUtils = () => {
     return writeLogsUrl(writeMode, query);
   };
 
-  /** View-state patch (C7b): the address bar keeps its search inputs and only view-state params change, with a replace. */
   const patchUrlViewState = (dashboardPanelData: any = null, buildPanelData: any = null) => {
     if (!isLogsRoute()) return;
     const next = generateURLQuery(false, dashboardPanelData, buildPanelData);
@@ -644,7 +636,6 @@ export const logsUtils = () => {
     if (searchObj.meta?.isFtsDefaultColumn) {
       return;
     }
-    // A shared link's columns are the sharer's, not this user's choice (C7 persistence guard).
     if (columnsFromUrl.value) return;
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =

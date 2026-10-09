@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div
-                      v-else-if="searchObj.data.freeTextBlocked && searchObj.loading == false"
+                      v-else-if="searchObj.data.freeTextBlocked && searchObj.loading === false"
                       class="flex h-full min-h-0 flex-col"
                     >
                       <LogsPermalinkBanner
@@ -285,7 +285,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @show-in-context="onPermalinkShowInContext"
                         @go-to-page="onSharedPageGo"
                       />
-                      <!-- With no rows the results grid is gone, so the exclusions banner moves here. -->
                       <LogsMissingStreamBanner
                         v-if="searchObj.data.missingStreamMessage"
                         :message="searchObj.data.missingStreamMessage"
@@ -354,7 +353,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-search-result"
                       class="flex h-full max-h-full flex-col overflow-hidden"
                     >
-                      <!-- Notice order above the table is owned by item 2 (P4): guard banner, then the cancelled notice; the Run query button alone shows stale results. -->
                       <LogsAutoRunGuard
                         v-if="showGuardBanner"
                         variant="banner"
@@ -424,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <LogsNoFtsPanel
               v-if="
-                searchObj.data.freeTextBlocked && searchObj.meta.logsVisualizeToggle == 'visualize'
+                searchObj.data.freeTextBlocked && searchObj.meta.logsVisualizeToggle === 'visualize'
               "
               :streams="noFtsPanelStreams"
               :term="noFtsRecoveryTerm"
@@ -601,7 +599,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODrawer>
-    <!-- Outside the results, which an error state replaces exactly when a failed page is announced. -->
     <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-row-nav-live">
       {{ rowNavAnnouncement }}
     </div>
@@ -782,7 +779,6 @@ export default defineComponent({
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
     },
     searchData() {
-      // Explicit: supersedes an in-flight run instead of waiting for it (P2).
       this.autoRun.engine.requestRun("run");
 
       analytics.track("Button Click", {
@@ -810,7 +806,7 @@ export default defineComponent({
           this.autoRun.engine.requestRun("page-size");
         } else {
           this.searchObj.loading = true;
-          // Without this a page-size change fired a page-count request instead of the histogram.
+          // A page-size change must request the histogram rather than the page count.
           this.searchObj.meta.refreshHistogram = true;
           this.searchObj.data.queryResults.aggs = null;
           await this.getJobData(false);
@@ -838,7 +834,6 @@ export default defineComponent({
           this.autoRun.engine.requestRun("pagination");
         } else {
           this.searchObj.loading = true;
-          // Bound before the await, so a J/K crossing sees its request when the paginator returns (4a §3.2.2).
           const requestId = nextJobRequestId();
           notePageRequest(this.searchObj, requestId);
           try {
@@ -1238,7 +1233,6 @@ export default defineComponent({
       },
     );
 
-    // The `runQuery` flag path (Run, legacy QOSS=false runs): an explicit run under a generation.
     const runQueryFn = async () => {
       searchObj.runQuery = false;
       if (!searchObj.data.stream.selectedStream.length) {
@@ -1248,7 +1242,6 @@ export default defineComponent({
       autoRun.engine.requestRun("run");
     };
 
-    // After a run the editor shows the filter that was sent: pure text and mixes become their rendering.
     const showRanFilter = (generationId: number, ranQuery: string) => {
       if (searchObj.meta.sqlMode || searchObj.meta.editorDirty) return;
       if (!autoRun.engine.isCurrent(generationId)) return;
@@ -1262,7 +1255,6 @@ export default defineComponent({
       autoRun.engine.recordQueryRewrite(generationId, rendered);
     };
 
-    // Executor for every grid run (AC4.6 dispatch by mode): full, pagination and page size.
     const executeGridRun = async (ctx: RunContext) => {
       const generationId = ctx.generation.id;
       const ranQuery = ctx.signature.query;
@@ -1284,7 +1276,6 @@ export default defineComponent({
       }
     };
 
-    // Executor for the histogram reveal (C14): one histogram request, rows kept, zero hits requests.
     const executeHistogramRun = async (ctx: RunContext) => {
       const generationId = ctx.generation.id;
       try {
@@ -1307,7 +1298,8 @@ export default defineComponent({
     ) => {
       const engine = autoRun.engine;
       const settle = () => {
-        if (generationId != null) engine.settleGeneration(generationId);
+        if (generationId !== null && generationId !== undefined)
+          engine.settleGeneration(generationId);
       };
       // Clear any stale error from previous logs search
       resetSearchError();
@@ -1320,7 +1312,8 @@ export default defineComponent({
         cancelPatterns();
         clearPatterns();
         showErrorNotification(t("logs.index.patternsUnavailableForMultiStream"));
-        if (generationId != null) engine.recordPatternsFailure(generationId);
+        if (generationId !== null && generationId !== undefined)
+          engine.recordPatternsFailure(generationId);
         settle();
         return;
       }
@@ -1332,11 +1325,18 @@ export default defineComponent({
         const queryReq = buildSearch(false, true);
         if (!queryReq) {
           searchObj.loading = false;
-          if (generationId != null) engine.recordPatternsFailure(generationId);
+          if (generationId !== null && generationId !== undefined)
+            engine.recordPatternsFailure(generationId);
           settle();
           return;
         }
-        if (generationId != null && ranQuery != null) showRanFilter(generationId, ranQuery);
+        if (
+          generationId !== null &&
+          generationId !== undefined &&
+          ranQuery !== null &&
+          ranQuery !== undefined
+        )
+          showRanFilter(generationId, ranQuery);
 
         // Set size to -1 to let backend determine sampling size based on config
         queryReq.query.size = -1;
@@ -1359,7 +1359,8 @@ export default defineComponent({
           if (!selectedStreams?.length) {
             searchObj.loading = false;
             showErrorNotification(t("logs.index.selectStreamToExtractPatterns"));
-            if (generationId != null) engine.recordPatternsFailure(generationId);
+            if (generationId !== null && generationId !== undefined)
+              engine.recordPatternsFailure(generationId);
             settle();
             return;
           }
@@ -1367,10 +1368,11 @@ export default defineComponent({
         }
 
         await extractPatterns(searchObj.organizationIdentifier, streamName, queryReq);
-        // A cancelled or replaced extraction returns quietly; it must not publish a record.
-        if (generationId != null && !engine.isCurrent(generationId)) return;
+        if (generationId !== null && generationId !== undefined && !engine.isCurrent(generationId))
+          return;
         searchObj.loading = false;
-        if (generationId != null) engine.recordPatternsComplete(generationId);
+        if (generationId !== null && generationId !== undefined)
+          engine.recordPatternsComplete(generationId);
 
         // Only update histogram for patterns mode, don't fetch logs data
         // Patterns have their own separate state and don't need logs data
@@ -1389,7 +1391,8 @@ export default defineComponent({
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
         showErrorNotification(t("logs.index.errorExtractingPatterns"));
-        if (generationId != null) engine.recordPatternsFailure(generationId);
+        if (generationId !== null && generationId !== undefined)
+          engine.recordPatternsFailure(generationId);
         settle();
       }
     };
@@ -1699,7 +1702,6 @@ export default defineComponent({
       loadLogsData("url");
     }
 
-    // Helper function for organization change (C20): the old org's generation is cancelled with its own orgId.
     function handleOrganizationChange() {
       bumpSelectionToken();
       autoRun.engine.resetScope("org");
@@ -1707,7 +1709,6 @@ export default defineComponent({
       searchObj.meta.freeTextScan = {};
       searchObj.loading = true;
       resetStreamData();
-      // The URL still names the previous org's stream; this is a landing in the new org (C20).
       loadLogsData("landing", { ignoreUrl: true });
     }
 
@@ -1716,7 +1717,6 @@ export default defineComponent({
       return searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier;
     }
 
-    // Visualize / Patterns / Build restore and keep-alive reactivation are guarded entry points (C17, C21).
     function handleVisualizeTab() {
       autoRun.request(
         searchObj.meta.logsVisualizeToggle === "patterns" ? "patterns" : "visualize-restore",
@@ -1754,7 +1754,6 @@ export default defineComponent({
             currentQuery != "" &&
             (currentQuery.toLowerCase() === "select" ||
               currentQuery.toLowerCase().indexOf("select ") == 0);
-          // An authored statement is kept as typed; text that merely contains "select" is a filter.
           if (isAuthoredStatement(currentQuery)) {
             return;
           }
@@ -1775,7 +1774,6 @@ export default defineComponent({
                 })
               : null;
           if (textWhere?.some((where) => where === null)) {
-            // A no-FTS arm would fail or be dropped, so the toggle is refused (AC6.3).
             const blocked = toggleStreams.filter((_, index) => textWhere[index] === null);
             searchObj.meta.sqlModeEditTransition = true;
             searchObj.meta.sqlMode = false;
@@ -1953,7 +1951,6 @@ export default defineComponent({
       trigger?.click();
     };
 
-    // A hero chip is a stream pick: fields load, then a guarded "stream" refinement (F4).
     const onPickStream = (stream: string) => {
       searchObj.data.stream.selectedStream = [stream];
       onStreamChange("", { origin: "selector" });
@@ -2075,7 +2072,6 @@ export default defineComponent({
       }
     };
 
-    // Build gets the rendered WHERE, so a text search is never parsed as a column.
     const buildRunBlocked = computed(
       () =>
         searchObj.meta.logsVisualizeToggle === "build" &&
@@ -2099,7 +2095,6 @@ export default defineComponent({
       };
     });
 
-    // Only routes to the stream settings; nothing is written from the logs page.
     const onConfigureFreeTextStream = (stream: string) => {
       router.push(`/streams?dialog=${stream}`);
     };
@@ -2133,7 +2128,6 @@ export default defineComponent({
         : { runSuggestion: null, freeTextCandidate: null },
     );
 
-    // Recovery text is SQL (match_all) or a quoted phrase, so later runs send it verbatim.
     const runRecoveryFilter = (text: string) => {
       searchObj.data.query = text;
       searchObj.data.editorValue = text;
@@ -3031,7 +3025,6 @@ export default defineComponent({
       },
     );
 
-    // Run for Visualize, Patterns and Build: explicit, so it always opens a generation and never waits on the guard.
     const handleRunQueryFn = async (clear_cache = false) => {
       const mode = searchObj.meta.logsVisualizeToggle;
       if (mode !== "visualize" && mode !== "patterns" && mode !== "build") return;
@@ -3039,7 +3032,6 @@ export default defineComponent({
       autoRun.engine.requestRun("run");
     };
 
-    // G1 for Visualize and Build: the proof is the panel's own completed run (J7).
     const executePanelRun = async (ctx: RunContext) => {
       autoRun.beginPanelRun(ctx.generation.id, () =>
         searchBarRef.value?.cancelVisualizeQueries?.(),
@@ -3048,7 +3040,6 @@ export default defineComponent({
       if (!launched && autoRun.hasPanelRun(ctx.generation.id)) autoRun.endPanelRun(false);
     };
 
-    // Returns false when validation stopped the run before any panel request was made.
     const runPanelQuery = async (clear_cache = false, generationId?: number): Promise<boolean> => {
       if (searchObj.meta.logsVisualizeToggle == "visualize") {
         // Set the shouldRefreshWithoutCache flag
@@ -3132,8 +3123,8 @@ export default defineComponent({
         };
 
         await copyDashboardDataToVisualize();
-        // The chart renders this copy, so it is the config the panel run certifies.
-        if (generationId != null) autoRun.markPanelDispatched(generationId);
+        if (generationId !== null && generationId !== undefined)
+          autoRun.markPanelDispatched(generationId);
 
         // Sync visualization config to URL parameters
         patchUrlViewState(dashboardPanelData);
@@ -3419,7 +3410,6 @@ export default defineComponent({
           return null;
         }
 
-        // Blocked text shows the no-FTS panel in the Visualize pane instead of a toast.
         if (logsPageQuery === "" && searchObj.data.freeTextBlocked) {
           variablesAndPanelsDataLoadingState.fieldsExtractionLoading = false;
           return null;
@@ -3780,13 +3770,11 @@ export default defineComponent({
     const showGuardBanner = computed(() => guardBlocksGrid.value && !showGuardEmptyState.value);
     const showGuardSearchJob = computed(() => config.isEnterprise === "true");
 
-    // A paused interval resumes once nothing pauses it any more (P3 "missedTick").
     watch(
       () => [isResultsStale.value, !!searchObj.meta.autoRunBlocked],
       () => autoRun.engine.checkRefreshResume(),
     );
 
-    // A refinement that moves the scope away from a blocked snapshot withdraws "Run anyway" (AC5.1).
     watch(
       () => autoRun.readSignature(),
       () => {
@@ -3796,12 +3784,10 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Run anyway on the initial-load generation keeps the shared line open (CROSS-SPEC row 10).
     const onGuardRunAnyway = () => {
       autoRun.engine.runAnyway({ origin: initOriginForRun(currentInitOrigin()) });
     };
 
-    /** Initial load only: reads `page` and `log_*` before restore (4c C5 step 2, C7). */
     const startSharedLinkSession = (query: Record<string, any>) => {
       clearColumnsFromUrl();
       resetShownSearch();
@@ -3812,7 +3798,6 @@ export default defineComponent({
       beginPermalinkFromUrl(query, store.state.selectedOrganization.identifier);
     };
 
-    /** Leaving Logs or switching org: no shared line, page notice, link columns or shown run survive. */
     const endSharedLinkSession = () => {
       resetPermalinkState();
       clearColumnsFromUrl();
@@ -3842,7 +3827,6 @@ export default defineComponent({
       void retryPermalinkResolve(permalinkResolveContext());
     };
 
-    // "Show these lines" is a user scope change that ends the permalink; SearchBar keeps the 1 µs window through the picker echo.
     const onPermalinkShowLines = (ts: number) => {
       onJumpToStreamData(ts, ts + 1);
     };
@@ -3889,7 +3873,6 @@ export default defineComponent({
           : (buildQueryPageRef.value?.dashboardPanelData ?? buildDashboardPanelData),
     });
 
-    // Narrow to sets only the date, then runs once after re-checking the guard (J5).
     const onGuardNarrow = (period: string) => {
       searchObj.shouldIgnoreWatcher = true;
       searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
@@ -3901,7 +3884,6 @@ export default defineComponent({
       });
     };
 
-    // G1-X1: the job runs the frozen blocked scope, so it bypasses canPersistOrShare.
     const onGuardSearchJob = () => {
       const snapshot = buildSearch(true);
       if (!snapshot) return;
@@ -3913,7 +3895,6 @@ export default defineComponent({
       {
         id: "logsRunQuery",
         handler: () => {
-          // Explicit in every mode: it supersedes an in-flight run instead of waiting (P2).
           searchBarRef.value?.handleRunQueryFn?.();
         },
       },
@@ -3955,7 +3936,6 @@ export default defineComponent({
         id: "logsSaveView",
         handler: () => {
           if (isInputFocused()) return;
-          // fnSavedView applies the same G1 save gate as the buttons (2-U-2).
           (searchBarRef.value as any)?.fnSavedView?.();
         },
       },
@@ -4206,7 +4186,6 @@ export default defineComponent({
         ) {
           this.searchObj.meta.histogramDirtyFlag = false;
 
-          // A histogram-only entry point, guarded against the executed scope (C14).
           this.autoRun.request("histogram");
         }
       }

@@ -29,7 +29,6 @@ const IDENTIFIER_TYPES = new Set(["default", "double_quote_string", "backticks_q
 
 let parser: Parser | null = null;
 
-/** Fields whose returned values equal the stored record, per 4a §3.2.7; never expressions or aliases. */
 export function trustworthyFields(
   executedReq: ExecutedSearchReq,
   options: DetailRowMatchOptions = {},
@@ -43,7 +42,6 @@ export function trustworthyFields(
   return projectionFields(columns, options.timestampColumn ?? DEFAULT_TIMESTAMP_COLUMN);
 }
 
-/** Index of the hit that is the snapshot's record, the lowest among identical duplicates; null when none or ambiguous. */
 export function matchDetailRow(
   hits: readonly LogRecord[],
   snapshot: LogRecord,
@@ -56,7 +54,6 @@ export function matchDetailRow(
     : isPresent(snapshot[timestampColumn])
       ? timestampColumn
       : null;
-  // Without an identity, any hit would pass the field check, including an unrelated one.
   if (identityField === null) return null;
   const survivors: number[] = [];
   hits.forEach((hit, index) => {
@@ -70,7 +67,6 @@ export function matchDetailRow(
   return survivors.every((index) => sameRecord(hits[index], first)) ? survivors[0] : null;
 }
 
-// Output names of `*` are unknown, so beside a computed column only identity and bare columns are provably stored.
 function projectionFields(columns: ProjectionColumn[], timestampColumn: string): TrustworthyFields {
   const aliases = new Set(columns.map((column) => column.as).filter((as): as is string => !!as));
   const bare = columns.map(bareColumnName);
@@ -105,7 +101,6 @@ function parseProjection(sql: string): ProjectionColumn[] | "all" {
   }
 }
 
-// A table-qualified reference is skipped: under a join two qualifiers can return the same name.
 function bareColumnName(column: ProjectionColumn): string | null {
   if (column.as) return null;
   const expr = column.expr;

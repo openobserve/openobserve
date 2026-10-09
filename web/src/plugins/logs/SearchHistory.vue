@@ -319,7 +319,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -738,16 +738,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Releasing a token, not restoring a captured name, keeps an out-of-order unmount from clobbering a newer owner.
-    let scopeToken: symbol | null = null;
     onMounted(() => {
-      scopeToken = getManager()?.acquireScope("search-history") ?? null;
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      if (scopeToken) getManager()?.releaseScope(scopeToken);
-      scopeToken = null;
-    });
+
     return {
       isMobile,
       searchObj,
