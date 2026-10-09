@@ -100,6 +100,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
@@ -128,10 +129,7 @@ defineEmits<{
 const isFieldSelected = computed(() => props.selectedFields.includes(props.field.name));
 
 // Quick mode turns the interesting fields into the query's SELECT list, so only a
-// schema-backed field can be one. A VRL function's output field is carried on the
-// result hits (isSchemaField: false) and does not exist when the SQL runs — the
-// backend applies the VRL afterwards — so offering the toggle on one would build a
-// query that fails with "Search field not found". Fields from the paths that assign
-// a raw stream schema carry no isSchemaField at all and stay eligible.
-const isInterestingCandidate = computed(() => props.field.isSchemaField !== false);
+// schema-backed field can be one — offering the toggle on a VRL-derived field would
+// build a query that fails with "Search field not found". See interestingFields.ts.
+const isInterestingCandidate = computed(() => isSchemaBackedField(props.field));
 </script>

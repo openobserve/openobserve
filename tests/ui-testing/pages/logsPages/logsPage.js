@@ -13348,10 +13348,14 @@ export class LogsPage {
     /** The search must not have failed — asserts the error state is absent. */
     async expectNoSearchError() {
         const error = this.page.locator(this.errorMessage);
-        const text = (await error.isVisible().catch(() => false))
-            ? await error.textContent().catch(() => '')
-            : '';
-        await expect(error, `Search must not error (shown: "${text?.trim()}")`).toBeHidden();
+        try {
+            await expect(error).toBeHidden();
+        } catch {
+            // Read the text only once the wait has settled on "visible", otherwise it
+            // is empty precisely when the error is the thing worth reporting.
+            const text = (await error.first().textContent().catch(() => '')) || '';
+            throw new Error(`Search must not error, but the error state shows: "${text.trim()}"`);
+        }
     }
 
 }

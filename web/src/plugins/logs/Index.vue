@@ -468,6 +468,7 @@ import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 import { isWebSocketEnabled, isStreamingEnabled } from "@/utils/zincutils";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { shouldReloadStreamFieldsForVisualize } from "@/utils/logs/visualizeStreamFields";
+import { pruneInterestingFields } from "@/utils/logs/interestingFields";
 import useAiChat from "@/composables/useAiChat";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { onBeforeAppReload } from "@/utils/beforeAppReload";
@@ -1477,19 +1478,12 @@ export default defineComponent({
             }
 
             if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
-              // Skip VRL-derived fields (isSchemaField: false) — they are not
-              // selectable columns, so they must not survive into [FIELD_LIST].
-              // See the same filter in useSearchQuery.ts buildSearch().
-              const streamFieldNames: any = searchObj.data.stream.selectedStreamFields
-                .filter((item: any) => item.isSchemaField !== false)
-                .map((item: any) => item.name);
-
-              for (let i = searchObj.data.stream.interestingFieldList.length - 1; i >= 0; i--) {
-                const fieldName = searchObj.data.stream.interestingFieldList[i];
-                if (!streamFieldNames.includes(fieldName)) {
-                  searchObj.data.stream.interestingFieldList.splice(i, 1);
-                }
-              }
+              // Drops the VRL-derived fields too — they are not selectable columns,
+              // so they must not survive into [FIELD_LIST].
+              pruneInterestingFields(
+                searchObj.data.stream.interestingFieldList,
+                searchObj.data.stream.selectedStreamFields,
+              );
 
               if (
                 searchObj.data.stream.interestingFieldList.length > 0 &&
@@ -1835,6 +1829,16 @@ export default defineComponent({
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
+        // Same prune as setQuery/buildSearch: a non-schema field in this SELECT
+        // would fail the search with "Search field not found". Guarded on the schema
+        // being loaded, like setQuery — pruning against an empty field list would
+        // wipe the user's interesting fields instead of just the unselectable ones.
+        if (searchObj.data.stream.selectedStreamFields?.length > 0) {
+          pruneInterestingFields(
+            searchObj.data.stream.interestingFieldList,
+            searchObj.data.stream.selectedStreamFields,
+          );
+        }
         if (searchObj.data.stream.interestingFieldList.length > 0) {
           field_list = searchObj.data.stream.interestingFieldList
             .map((field: string) => quoteSqlIdentifierIfNeeded(field))
