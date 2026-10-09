@@ -94,9 +94,9 @@
           class="border-dialog-header-border flex items-center justify-between gap-3 border-b px-3 py-2.5"
         >
           <div class="flex min-w-0 flex-col gap-px">
-            <strong class="text-compact text-text-heading truncate font-semibold">{{
+            <OTruncatedText as="strong" class="text-compact text-text-heading font-semibold">{{
               scorer.name
-            }}</strong>
+            }}</OTruncatedText>
             <small class="text-2xs text-text-secondary">{{
               t("onlineEvals.job.scorerPicker.meta", {
                 type: scorerTypeOf(scorer).replace("_", " "),
@@ -146,9 +146,9 @@
             class="grid grid-cols-[minmax(8.125rem,0.35fr)_minmax(0,1fr)] items-center gap-2.5"
             :data-test="`job-input-mapping-row-${entityId(scorer)}-${variable}`"
           >
-            <code class="rounded-default bg-surface-subtle truncate overflow-hidden px-2 py-1.25">{{
+            <OTruncatedText as="code" class="rounded-default bg-surface-subtle px-2 py-1.25">{{
               formatTemplateVariable(variable)
-            }}</code>
+            }}</OTruncatedText>
             <div class="flex min-w-0 items-center gap-1.5">
               <OSelect
                 class="min-w-0 flex-1"
@@ -212,6 +212,7 @@ import {
   type SystemProvidedVariable,
 } from "../../utils/systemProvidedVariables";
 import SpanSelectorBinding from "./SpanSelectorBinding.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = withDefaults(
   defineProps<{

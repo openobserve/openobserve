@@ -133,6 +133,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dbm-samples-table"
         @row-click="onRowClick"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-samples-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #subheader>
           <!-- The scatter — inside the table frame because it draws exactly
                the rows below it. Hidden while empty: an axis with no points
@@ -151,7 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-query="{ row }">
           <DbmQueryCell
             :text="raw(row.queryText)"
-            :title-attr="row.queryText"
             :db-system="row.dbSystem"
             :meta-items="[
               { key: 'instance', label: raw(row.dbInstance ?? '') },
@@ -175,9 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-service="{ row }">
-          <span class="text-text-body block truncate text-xs">{{
-            raw(row.serviceName || "—")
-          }}</span>
+          <span class="text-text-body text-xs">{{ raw(row.serviceName || "—") }}</span>
         </template>
 
         <!-- Failed calls carry the driver's status code when there is one;
@@ -305,7 +310,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-query="{ row }">
             <DbmQueryCell
               :text="raw(row.query ?? '')"
-              :title-attr="row.query ?? undefined"
               :db-system="row.db_system"
               :meta-items="[
                 { key: 'instance', label: raw(row.db_instance ?? '') },
@@ -326,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-muted">{{ raw("—") }}</span>
           </template>
           <template #cell-user="{ row }">
-            <span class="text-text-body block truncate text-xs">{{ raw(row.db_user || "—") }}</span>
+            <span class="text-text-body text-xs">{{ raw(row.db_user || "—") }}</span>
           </template>
           <template v-if="serverTruncated" #footer-note>
             <span>{{ t("dbm.samples.serverList.truncated", { count: serverRows.length }) }}</span>
@@ -571,6 +575,8 @@ const columns = computed<OTableColumnDef<DbmSampleRow>[]>(() => [
     id: "query",
     accessorKey: "queryText",
     header: t("dbm.samples.columns.query"),
+    // Unsized, it took an even share and truncated every statement inside its SELECT list.
+    size: 480,
     sortable: false,
   },
   {
@@ -652,6 +658,7 @@ const serverColumns = computed<OTableColumnDef<ServerSampleTableRow>[]>(() => [
     id: "query",
     accessorKey: "query",
     header: t("dbm.samples.serverList.columns.query"),
+    size: 480,
     sortable: false,
   },
   {

@@ -26,6 +26,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface SavedViewRow {
   view_id: string;
@@ -201,15 +202,15 @@ const applyView = (row: SavedViewRow) => {
             </template>
           </template>
           <template #cell-view_name="{ row, value }">
-            <div
-              class="w-full min-w-0 cursor-pointer truncate text-sm"
-              :title="value"
+            <OTruncatedText
+              as="div"
+              class="w-full cursor-pointer text-sm"
               :data-test="ids.apply(pane.key, row)"
               :data-test-view-name="row.view_name"
               @click.stop="applyView(row)"
             >
               {{ value }}
-            </div>
+            </OTruncatedText>
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-0.5">

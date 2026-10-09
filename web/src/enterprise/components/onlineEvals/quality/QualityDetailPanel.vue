@@ -72,9 +72,9 @@
           <div class="text-3xs text-text-secondary font-semibold tracking-wide uppercase">
             {{ t("onlineEvals.quality.detail.health.title") }}
           </div>
-          <div class="text-2xs text-text-secondary mt-0.5 truncate" :title="healthSummary">
+          <OTruncatedText as="div" class="text-2xs text-text-secondary mt-0.5">
             {{ healthSummary }}
-          </div>
+          </OTruncatedText>
         </div>
         <OTag
           type="qualityStatus"
@@ -269,6 +269,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";

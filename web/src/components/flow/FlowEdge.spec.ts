@@ -197,10 +197,13 @@ describe("FlowEdge.vue", () => {
       expect(chip(wrapper).text()).toBe("Severe (>=1000)");
     });
 
-    it("exposes the full text as a title so a truncated label stays readable", () => {
+    it("cuts a long label with an overflow-only tooltip that can receive hover, not a title", () => {
       const long = "Severe breach over one thousand requests per second sustained";
       wrapper = createWrapper({ label: long });
-      expect(chip(wrapper).attributes("title")).toBe(long);
+      expect(chip(wrapper).attributes("title")).toBeUndefined();
+      expect(chip(wrapper).classes()).toEqual(
+        expect.arrayContaining(["truncate", "pointer-events-auto"]),
+      );
     });
 
     it("positions the label from the bezier midpoint via the shared CSS var", () => {

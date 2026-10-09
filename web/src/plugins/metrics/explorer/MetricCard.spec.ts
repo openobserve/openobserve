@@ -190,7 +190,8 @@ describe("MetricCard (ported to @/lib)", () => {
       );
       expect(title.classes()).toContain("min-w-0");
       expect(title.element.parentElement!.className).toContain("min-w-0");
-      expect(title.find("span[title]").classes()).toContain("text-ellipsis");
+      expect(title.find('[data-test="o-truncated-text"]').classes()).toContain("truncate");
+      expect(title.find("[title]").exists()).toBe(false);
     });
   });
 

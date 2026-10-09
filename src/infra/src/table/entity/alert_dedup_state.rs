@@ -20,13 +20,14 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "alert_dedup_state")]
 pub struct Model {
-    /// Fingerprint hash (primary key)
+    /// Part of the key because the fingerprint itself carries no org.
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub org_id: String,
+    /// Fingerprint hash
     #[sea_orm(primary_key, auto_increment = false)]
     pub fingerprint: String,
     /// Alert ID reference
     pub alert_id: String,
-    /// Organization ID
-    pub org_id: String,
     /// First time this fingerprint was seen (microseconds)
     pub first_seen_at: i64,
     /// Last time this fingerprint was seen (microseconds)

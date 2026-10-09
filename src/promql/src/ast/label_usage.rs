@@ -23,7 +23,7 @@ use promql_parser::parser::{
 
 /// Aggregations that with no modifier group every series into a single
 /// labelless output series, so the input labels are provably unused.
-const LABEL_DROPPING_AGGS: [u8; 8] = [
+const LABEL_DROPPING_AGGS: [token::TokenId; 8] = [
     token::T_SUM,
     token::T_AVG,
     token::T_COUNT,
@@ -37,7 +37,7 @@ const LABEL_DROPPING_AGGS: [u8; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 64] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 65] = [
     "rate",
     "irate",
     "increase",
@@ -58,6 +58,7 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 64] = [
     "quantile_over_time",
     "predict_linear",
     "holt_winters",
+    "double_exponential_smoothing",
     "abs",
     "ceil",
     "floor",
@@ -205,6 +206,10 @@ mod tests {
             ("count(metric)", true),
             ("(sum(rate(metric[5m])))", true),
             ("sum(clamp(rate(metric[5m]), 0, 100))", true),
+            (
+                "sum(double_exponential_smoothing(metric[5m], 0.5, 0.3))",
+                true,
+            ),
             ("sum(deg(atan(metric)))", true),
             ("max(ts_of_max_over_time(metric[5m]))", true),
             // grouping keeps labels
@@ -233,9 +238,13 @@ mod tests {
 
     #[test]
     fn test_grouping_labels() {
-        let cases: [(&str, &[&str]); 33] = [
+        let cases: [(&str, &[&str]); 34] = [
             ("sum by (job) (m)", &["job"]),
             ("sum by (job) (rate(m[5m]))", &["job"]),
+            (
+                "sum by (job) (double_exponential_smoothing(m[5m], 0.5, 0.3))",
+                &["job"],
+            ),
             ("sum by (job) (abs(-m))", &["job"]),
             ("max by (job) (timestamp(m))", &["job"]),
             ("count by (job) (hour(m))", &["job"]),

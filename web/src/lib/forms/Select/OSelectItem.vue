@@ -8,9 +8,8 @@ import {
   NULL_VALUE_SENTINEL,
 } from "./OSelect.types";
 import { SelectItem, SelectItemText } from "reka-ui";
-import { computed, inject, onMounted, onUnmounted, ref, useSlots } from "vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
+import { computed, inject, onMounted, onUnmounted } from "vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = withDefaults(defineProps<SelectItemProps>(), {
   disabled: false,
@@ -40,12 +39,6 @@ onMounted(() => {
 onUnmounted(() => {
   valueMap?.delete(rekaValue.value);
 });
-
-// Only the default (unslotted) label rendering below is measured — a custom
-// slot's own content is that consumer's responsibility to truncate/tooltip.
-const labelRef = ref<HTMLElement | null>(null);
-const { isTruncated } = useIsTruncated(labelRef);
-const hasCustomSlot = computed(() => !!useSlots().default);
 </script>
 
 <template>
@@ -66,11 +59,11 @@ const hasCustomSlot = computed(() => !!useSlots().default);
       'data-disabled:text-select-item-disabled data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
     ]"
   >
-    <SelectItemText>
+    <!-- reka renders SelectItemText as a bare span, which cannot shrink without min-w-0. -->
+    <SelectItemText class="min-w-0 flex-1">
       <slot>
-        <span ref="labelRef" class="block min-w-0 flex-1 truncate">{{ props.label }}</span>
+        <OTruncatedText class="block flex-1">{{ props.label }}</OTruncatedText>
       </slot>
     </SelectItemText>
-    <OTooltip v-if="!hasCustomSlot" :content="props.label" :disabled="!isTruncated" />
   </SelectItem>
 </template>

@@ -234,6 +234,18 @@ pub async fn get(org_id: &str, user_email: &str) -> Result<OrgUserRecord, anyhow
     Ok(org_user)
 }
 
+pub async fn get_optional(
+    org_id: &str,
+    user_email: &str,
+) -> Result<Option<OrgUserRecord>, anyhow::Error> {
+    let cache_key = user_email.to_lowercase();
+    if let Some(org_user) = ORG_USERS.get(&format!("{org_id}/{cache_key}")) {
+        return Ok(Some(org_user.value().clone()));
+    }
+    let org_user = org_users::get_optional(org_id, user_email).await?;
+    Ok(org_user)
+}
+
 pub async fn get_expanded_user_org(
     org_id: &str,
     user_email: &str,

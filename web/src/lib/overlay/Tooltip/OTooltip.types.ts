@@ -6,6 +6,15 @@ import type { I18nText } from "@/types/i18n";
 
 import type { TooltipContentProps } from "reka-ui";
 
+/** Set on every element that owns an OTooltip, so shared tooltips (e.g. OTable's) can avoid doubling it. */
+export const TOOLTIP_TRIGGER_ATTR = "data-o-tooltip-trigger";
+
+/** `TOOLTIP_TRIGGER_ATTR` value of an overflow-only tooltip, which shows only while its element is cut. */
+export const TOOLTIP_TRIGGER_OVERFLOW = "overflow";
+
+/** Marks an element whose text must never reach a tooltip (a secret); shared tooltips honour it. */
+export const TOOLTIP_OFF_ATTR = "data-o-tooltip-off";
+
 export type TooltipSide = "top" | "right" | "bottom" | "left";
 export type TooltipAlign = "start" | "center" | "end";
 
@@ -49,6 +58,15 @@ export interface TooltipProps {
    * Prefer this over `shortcut`; `shortcut` wins if both are set.
    */
   shortcutId?: string;
+  /** Open only when the trigger's text is actually cut off; without `content` it shows that text. */
+  overflowOnly?: boolean;
+  /** Element to position against, for one tooltip shared by many targets; visibility then follows `open` alone. */
+  anchor?: HTMLElement | null;
+}
+
+export interface TooltipEmits {
+  /** Requested open state, e.g. `false` when Escape is pressed. */
+  (e: "update:open", value: boolean): void;
 }
 
 export interface TooltipSlots {

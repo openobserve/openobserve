@@ -334,7 +334,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 110,
-    meta: { align: "right", format: (value: number | null) => formatCount(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.tuplesEstimated"),
+      align: "right",
+      format: (value: number | null) => formatCount(value),
+    },
   },
   {
     id: "dead_tuples",
@@ -344,7 +348,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 110,
-    meta: { align: "right", format: (value: number | null) => formatCount(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.tuplesEstimated"),
+      align: "right",
+      format: (value: number | null) => formatCount(value),
+    },
   },
   {
     id: "dead_tup_pct",
@@ -355,6 +363,7 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     resizable: true,
     size: 120,
     meta: {
+      headerTooltip: t("dbm.tableHealth.tuplesEstimated"),
       align: "right",
       bar: "percent",
       format: (value: number | null) => (value == null ? "—" : `${value.toFixed(2)}%`),
@@ -378,7 +387,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 130,
-    meta: { align: "right", format: (value: number | null) => formatCount(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.countersCumulative"),
+      align: "right",
+      format: (value: number | null) => formatCount(value),
+    },
   },
   {
     id: "seq_tup_read",
@@ -388,7 +401,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 130,
-    meta: { align: "right", format: (value: number | null) => formatCount(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.countersCumulative"),
+      align: "right",
+      format: (value: number | null) => formatCount(value),
+    },
   },
   {
     id: "idx_scan_count",
@@ -398,7 +415,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 130,
-    meta: { align: "right", format: (value: number | null) => formatCount(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.countersCumulative"),
+      align: "right",
+      format: (value: number | null) => formatCount(value),
+    },
   },
   {
     id: "autovacuum_count",
@@ -408,7 +429,11 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     sortable: true,
     resizable: true,
     size: 130,
-    meta: { align: "right", format: (value: number | null) => formatCount(value) },
+    meta: {
+      headerTooltip: t("dbm.tableHealth.countersCumulative"),
+      align: "right",
+      format: (value: number | null) => formatCount(value),
+    },
   },
   {
     id: "frozen_xid_age",

@@ -20,6 +20,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 interface TracesSavedView {
   view_id: string;
@@ -74,7 +75,7 @@ const isFavorite = (view: TracesSavedView) => props.favoriteIds.includes(view.vi
           :data-test="`traces-saved-view-icon-${view.view_id}`"
         />
       </template>
-      <span class="max-w-56 truncate">{{ view.view_name }}</span>
+      <OTruncatedText class="max-w-56">{{ view.view_name }}</OTruncatedText>
       <template #icon-right>
         <OButton
           variant="ghost"

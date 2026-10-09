@@ -355,6 +355,21 @@ pub async fn get(org_id: &str, email: &str) -> Result<OrgUserRecord, errors::Err
     Ok(OrgUserRecord::from(record))
 }
 
+pub async fn get_optional(
+    org_id: &str,
+    email: &str,
+) -> Result<Option<OrgUserRecord>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(record.map(OrgUserRecord::from))
+}
+
 pub async fn get_admin(org_id: &str) -> Result<OrgUserRecord, errors::Error> {
     let client = get_orm_client_ro().await;
     let user = Entity::find()

@@ -80,6 +80,14 @@ const scopeBox = (wrapper: any, scope: string, action: string) =>
     `[data-test="edit-role-module-pane-scope-${scope}-${action}"] button[role="checkbox"]`,
   );
 
+// The page header and cut-off labels carry tooltips of their own, so pick the one wrapping the badge.
+const insideBadgeTooltip = (wrapper: any, folderName: string) =>
+  wrapper
+    .findAllComponents({ name: "OTooltip" })
+    .find((tip: any) =>
+      tip.find(`[data-test="edit-role-module-pane-inside-${folderName}"]`).exists(),
+    );
+
 describe("ModulePane - scope ladder", () => {
   it("renders every scope above the resource list", async () => {
     const wrapper = await mountPane([makeScope("stream"), makeScope("metrics")], [makeNode("cpu")]);
@@ -516,7 +524,7 @@ describe("ModulePane - grants one level down", () => {
     expect(wrapper.find('[data-test="edit-role-module-pane-inside-traces"]').text()).toBe(
       String(i18n.global.t("iam.editRole.grantedInsideCount", { count: 1 })),
     );
-    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+    expect(insideBadgeTooltip(wrapper, "traces").props("content")).toBe(
       String(i18n.global.t("iam.editRole.grantedInside", { names: "_evaluator" })),
     );
     expect(wrapper.find('[data-test="edit-role-module-pane-inside-logs"]').exists()).toBe(false);
@@ -528,7 +536,7 @@ describe("ModulePane - grants one level down", () => {
       innerGrants: () => ({ count: 12, names }),
     });
 
-    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+    expect(insideBadgeTooltip(wrapper, "traces").props("content")).toBe(
       String(i18n.global.t("iam.editRole.grantedInsideMore", { names: names.join(", "), more: 2 })),
     );
   });

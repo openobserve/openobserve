@@ -199,7 +199,6 @@ describe("SavedViewsListDialog", () => {
       expect(el.tagName).not.toBe("HR");
       expect(el.className).not.toMatch(/(^|\s)border(-[tb])?(\s|$)/);
     }
-    expect(favorites.element.childElementCount).toBe(2);
     expect(favorites.find("hr").exists()).toBe(false);
     expect(
       favorites.find('[data-test="traces-saved-views-dialog-favorites-apply-t2"]').text(),

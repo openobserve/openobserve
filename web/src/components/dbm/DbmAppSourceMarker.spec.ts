@@ -67,9 +67,9 @@ describe("DbmAppSourceLegend", () => {
       global,
     });
     expect(wrapper.text()).toContain("completed in this window");
-    expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toContain(
-      "completed in this window",
-    );
+    const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
+    expect(tooltips).toHaveLength(1);
+    expect(tooltips[0].props("overflowOnly")).toBe(true);
   });
 });
 

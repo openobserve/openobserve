@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
 import type { VNode } from "vue";
+import type { TooltipSide } from "@/lib/overlay/Tooltip/OTooltip.types";
 import {
   Comment,
   Fragment,
@@ -20,7 +21,7 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey } from "../OTable.types";
+import { OTableCellActionsKey, OTableOverflowTooltipKey } from "../OTable.types";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18nTyped } from "@/types/i18n";
@@ -349,6 +350,18 @@ function onCellActionsEnter(event: MouseEvent) {
 function onCellActionsLeave() {
   if (hasCellActions.value) cellActionsCtx?.setActiveCell(null);
 }
+
+const overflowTooltipCtx = inject(OTableOverflowTooltipKey, null);
+function onCellEnter(event: MouseEvent) {
+  if (!isAction.value && meta.value?.cellOverflowTooltip !== false && cellEl.value) {
+    overflowTooltipCtx?.enter(cellEl.value, cellActionsSide);
+  }
+  onCellActionsEnter(event);
+}
+function onCellLeave() {
+  overflowTooltipCtx?.leave();
+  onCellActionsLeave();
+}
 // The toolbar lives outside the <td>, so the cell's mouseleave has already fired by
 // the time the pointer reaches it — re-assert the active cell to cancel the clear.
 function onCellActionsHoverEnter() {
@@ -381,6 +394,14 @@ const hasCellActionsContent = computed(() => {
     }),
   );
 });
+
+// Read when the table's cut-off tooltip opens, so it can take the side this toolbar leaves free.
+function cellActionsSide(): TooltipSide | null {
+  if (!hasCellActions.value || !isCellActionActive.value || !hasCellActionsContent.value) {
+    return null;
+  }
+  return cellActionsBelow.value ? "bottom" : "top";
+}
 
 // Fixed coordinates don't follow a scrolling row, so drop the toolbar instead of
 // letting it hang over unrelated content.
@@ -471,8 +492,8 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
     ]"
     @click="handleClick"
     @contextmenu="handleContextMenu"
-    @mouseenter="onCellActionsEnter"
-    @mouseleave="onCellActionsLeave"
+    @mouseenter="onCellEnter"
+    @mouseleave="onCellLeave"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
@@ -502,7 +523,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       </span>
       <div class="min-w-0 flex-1">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" :class="slotContentClass"><slot /></div>
+          <div v-if="!isAction" :class="slotContentClass" data-o2-cell-clip><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -521,7 +542,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
     <template v-else-if="!pivotMerge?.hideContent">
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" :class="slotContentClass"><slot /></div>
+        <div v-if="!isAction" :class="slotContentClass" data-o2-cell-clip><slot /></div>
         <slot v-else />
       </div>
       <!-- Copy-enabled cell: value and copy button share a flex row, so the
@@ -539,9 +560,10 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
         <span
           v-else-if="highlightedHtml"
           :class="[defaultTextClass, copyValueClass]"
+          data-o2-cell-clip
           v-html="highlightedHtml"
         />
-        <span v-else :class="[defaultTextClass, copyValueClass]">
+        <span v-else :class="[defaultTextClass, copyValueClass]" data-o2-cell-clip>
           {{ displayValue }}
         </span>
         <OButton
