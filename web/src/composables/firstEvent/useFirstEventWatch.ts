@@ -158,6 +158,8 @@ export function useFirstEventWatch(
   let pollingGen: number | undefined;
   let rejectionsGen: number | undefined;
   let lastRejectionsReadMs: number | undefined;
+  // an org with data can never turn tracked again, so automatic reads stop until the watch restarts
+  let untracked = false;
   let diagnosisTrigger: DiagnosisTrigger | undefined;
   let snapshots: Partial<Record<StreamSignal, TypeSnapshot>> = {};
   let candidates: Partial<Record<StreamSignal, Map<string, StreamRow>>> = {};
@@ -563,6 +565,7 @@ export function useFirstEventWatch(
       );
       if (stale(ctx) || received()) return;
       if (!tracked) {
+        untracked = true;
         // an untracked org never stores a rejection, so an earlier named cause is stale, unlike after a failed read
         if (state.value === "rejected" || state.value === "no-requests") {
           state.value = "waiting";
@@ -620,7 +623,7 @@ export function useFirstEventWatch(
     const gen = generation;
     await poll();
     if (gen !== generation) return;
-    if (running && state.value !== "received" && autoDiagnosis() && rejectionsDue()) {
+    if (running && state.value !== "received" && autoDiagnosis() && !untracked && rejectionsDue()) {
       await readRejections("auto");
     }
     if (gen === generation) schedule();
@@ -658,6 +661,7 @@ export function useFirstEventWatch(
     diagnosis.value = undefined;
     diagnosisTrigger = undefined;
     lastRejectionsReadMs = undefined;
+    untracked = false;
     troubleshooting.value = false;
     state.value = "waiting";
   };
@@ -667,6 +671,7 @@ export function useFirstEventWatch(
     if (state.value === "received") return;
     if (running) {
       if (reason === "copy") {
+        untracked = false;
         startedAtMs.value = nowMs();
         schedule(FIRST_EVENT_BUDGET.fastMs);
       }
@@ -677,6 +682,7 @@ export function useFirstEventWatch(
     startedAtMs.value = nowMs();
     // a restart is a new watch: its first automatic read waits the full diagnosisAtMs again
     lastRejectionsReadMs = undefined;
+    untracked = false;
     diagnosisTrigger = undefined;
     if (state.value === "stopped") {
       state.value = "waiting";

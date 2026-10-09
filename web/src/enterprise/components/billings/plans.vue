@@ -216,6 +216,14 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
+function isStripeCheckoutReferrer(referrer: string): boolean {
+  try {
+    return new URL(referrer).hostname === "checkout.stripe.com";
+  } catch {
+    return false;
+  }
+}
+
 export default defineComponent({
   name: "plans",
   components: {
@@ -232,7 +240,7 @@ export default defineComponent({
   emits: ["update:proSubscription"],
   async mounted() {
     // Stripe sends the user back here after checkout; the referrer is the only trace of that return.
-    if (document.referrer.includes("checkout.stripe.com")) {
+    if (isStripeCheckoutReferrer(document.referrer)) {
       analytics.track("billing_checkout_returned", { plan: config.paidPlan });
     }
     this.loading = true;

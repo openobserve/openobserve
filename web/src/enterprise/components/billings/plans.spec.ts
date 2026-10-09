@@ -204,6 +204,28 @@ describe("Plans Component", () => {
     Object.defineProperty(document, "referrer", { value: "", configurable: true });
   });
 
+  it.each([
+    "https://checkout.stripe.com.evil.test/c/pay/cs_test",
+    "https://evil.test/checkout.stripe.com",
+    "https://evil.test/?next=https://checkout.stripe.com",
+    "not a url checkout.stripe.com",
+  ])("does not fire billing_checkout_returned for the look-alike referrer %s", async (referrer) => {
+    vi.mocked(analytics.track).mockClear();
+    Object.defineProperty(document, "referrer", { value: referrer, configurable: true });
+    const returned = mount(Plans, {
+      global: { plugins: [i18n], provide: { store }, mocks: { $router: mockRouter } },
+    });
+    await flushPromises();
+
+    expect(
+      vi
+        .mocked(analytics.track)
+        .mock.calls.filter(([name]) => name === "billing_checkout_returned"),
+    ).toEqual([]);
+    returned.unmount();
+    Object.defineProperty(document, "referrer", { value: "", configurable: true });
+  });
+
   // Test 1: Component mounting
   it("should mount the component successfully", () => {
     expect(wrapper.exists()).toBe(true);

@@ -647,7 +647,7 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(w.diagnosis.value?.trigger).toBe("troubleshoot");
   });
 
-  it("keeps the automatic read silent when the org is untracked, and retries it", async () => {
+  it("keeps the automatic read silent when the org is untracked, and never repeats it", async () => {
     recentRejections.mockResolvedValue({ data: { tracked: false, list: [] } });
     const w = watchOf("logs");
     w.start("open");
@@ -655,9 +655,26 @@ describe("useFirstEventWatch — diagnosis", () => {
     expect(recentRejections).toHaveBeenCalledTimes(1);
     expect(w.state.value).toBe("waiting");
     expect(w.diagnosis.value).toBeUndefined();
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(recentRejections).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(4 * 30_000);
+    expect(recentRejections).toHaveBeenCalledTimes(1);
     expect(w.state.value).toBe("waiting");
+  });
+
+  it("after an untracked answer reads again only on Troubleshoot or a restart", async () => {
+    recentRejections.mockResolvedValue({ data: { tracked: false, list: [] } });
+    const w = watchOf("logs");
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(recentRejections).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(4 * 30_000);
+    expect(recentRejections).toHaveBeenCalledTimes(1);
+    await w.troubleshoot();
+    expect(recentRejections).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(4 * 30_000);
+    expect(recentRejections).toHaveBeenCalledTimes(2);
+    w.start("copy");
+    await vi.advanceTimersByTimeAsync(35_000);
+    expect(recentRejections).toHaveBeenCalledTimes(3);
   });
 
   it("opens the unavailable form, never no-requests, on Troubleshoot in an untracked org", async () => {
