@@ -2891,5 +2891,46 @@ describe("VariablesValueSelector", () => {
       });
       expectReleased(manager, ns);
     });
+
+    it("a load cut off by the selector unmounting stays unloaded, so it reloads when shown again", async () => {
+      const { useVariablesManager } = await import("@/composables/dashboard/useVariablesManager");
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(config.list as any, {});
+      wrapper = createWrapper({
+        variablesConfig: config,
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+      let endStream = () => {};
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          endStream = () => {
+            handlers.data(payload, {
+              type: "cancel_response",
+              content: { trace_id: payload.traceId },
+            });
+            handlers.complete(payload, { code: 1000 });
+          };
+        },
+      );
+      const vm = wrapper.vm as any;
+      const ns = vm.variablesData.values.find((v: any) => v.name === "ns");
+      ns.isVariablePartialLoaded = false;
+      void vm.loadVariableOptions(ns);
+      await new Promise((r) => setTimeout(r, 0));
+
+      const state = manager.variablesData.global[0] as any;
+      expect(state.isLoading).toBe(true);
+
+      wrapper.unmount();
+      wrapper = undefined as any;
+      expect(state.isLoading).toBe(false);
+      expect(state.isVariablePartialLoaded).toBe(false);
+
+      endStream();
+      await nextTick();
+      expect(state.isVariablePartialLoaded).toBe(false);
+    });
   });
 });

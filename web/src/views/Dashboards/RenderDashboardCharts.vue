@@ -722,6 +722,13 @@ export default defineComponent({
       },
     );
 
+    // Auto Run applies without the time change that drops per-panel refresh snapshots above.
+    variablesManager.onAutoCommit(() => {
+      if (!variablesManager.isLiveMode.value) return;
+      const { __global, ...panelSnapshots } = currentVariablesDataRef.value;
+      if (Object.keys(panelSnapshots).length) currentVariablesDataRef.value = { __global };
+    });
+
     watch(
       () => currentVariablesDataRef.value,
       () => {

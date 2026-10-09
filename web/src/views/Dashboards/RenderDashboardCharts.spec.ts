@@ -18,6 +18,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesManager";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -568,6 +569,29 @@ describe("RenderDashboardCharts", () => {
       autoRun.value = false;
       await flushPromises();
       expect(manager.isLiveMode.value).toBe(false);
+    });
+
+    it("an Auto Run apply drops a panel's own refresh snapshot", async () => {
+      wrapper = mountWith({ dashboardAutoRun: ref(true) });
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const [env, service, pod] = manager.variablesData.global;
+      loaded(env, "prod");
+      loaded(service, "api");
+      loaded(pod, "api-1");
+      await flushPromises();
+      const podFor = (panelId: string) =>
+        wrapper.vm.getMergedVariablesForPanel(panelId).values.find((v: any) => v.name === "pod")
+          ?.value;
+
+      await wrapper.vm.refreshPanelRequest("panel-1");
+      expect(podFor("panel-1")).toBe("api-1");
+
+      manager.updateVariableValue("pod", "global", undefined, undefined, "api-2");
+      await new Promise((r) => setTimeout(r, LIVE_COMMIT_DEBOUNCE_MS + 20));
+      await flushPromises();
+
+      expect(podFor("panel-1")).toBe("api-2");
     });
 
     it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {

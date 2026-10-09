@@ -24,7 +24,8 @@ import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock lodash debounce - improved version
-vi.mock("lodash-es", () => ({
+vi.mock("lodash-es", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("lodash-es")>()),
   debounce: vi.fn((fn) => {
     // Return a mock function that can be called immediately for testing
     const mockFn = vi.fn((...args) => {
@@ -859,6 +860,14 @@ describe("VariableQueryValueSelector", () => {
 
       wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+    });
+
+    it("multi-select closing without a change emits nothing", () => {
+      wrapper = createWrapper({ variableItem: multiSelectVariableItem });
+
+      wrapper.vm.onPopupHide();
+
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
     });
 
     it("should handle popup show without loadOptions callback", () => {

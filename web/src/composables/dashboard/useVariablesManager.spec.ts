@@ -1109,6 +1109,98 @@ describe("useVariablesManager live apply and commit-once", () => {
     expect(committed(manager, "env")).toBe("dev");
   });
 
+  it("a change still inside its debounce joins the settling commit instead of being dropped", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      [
+        ...chainConfig().slice(0, 2),
+        {
+          name: "method",
+          type: "custom",
+          scope: "global",
+          value: "GET",
+          options: [
+            { label: "GET", value: "GET" },
+            { label: "POST", value: "POST" },
+          ],
+        },
+        {
+          name: "code",
+          type: "query_values",
+          scope: "global",
+          value: null,
+          query_data: { field: "code", filter: [{ filter: "method=$method" }] },
+        },
+      ],
+      {},
+    );
+    const [env, service, method, code] = manager.variablesData.global;
+    finishLoading(env);
+    finishLoading(service, "api");
+    finishLoading(method);
+    finishLoading(code, "200");
+    manager.commitAll();
+    await nextTick();
+    const commits = vi.fn();
+    manager.onAutoCommit(commits);
+    manager.setLiveMode(true);
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    manager.updateVariableValue("method", "global", undefined, undefined, "POST");
+    vi.advanceTimersByTime(100);
+    finishLoading(service, "web");
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(LIVE_COMMIT_DEBOUNCE_MS);
+    await nextTick();
+    expect(commits).not.toHaveBeenCalled();
+
+    finishLoading(code, "201");
+    await nextTick();
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(committed(manager, "method")).toBe("POST");
+    expect(committed(manager, "code")).toBe("201");
+  });
+
+  it("a parent reload that keeps its value leaves loaded children alone", async () => {
+    const { manager, service } = await setupSettled();
+    manager.onVariablePartiallyLoaded("env@global");
+    finishLoading(service, "api");
+
+    manager.onVariablePartiallyLoaded("env@global");
+
+    expect(service.value).toBe("api");
+    expect(service.isVariableLoadingPending).toBe(false);
+    expect(service.isVariablePartialLoaded).toBe(true);
+  });
+
+  it("a parent changed by the user still reloads children after a same-value reload", async () => {
+    const { manager, service } = await setupSettled();
+    manager.onVariablePartiallyLoaded("env@global");
+    finishLoading(service, "api");
+
+    manager.updateVariableValue("env", "global", undefined, undefined, "dev");
+    finishLoading(service, "web");
+    manager.onVariablePartiallyLoaded("env@global");
+
+    expect(service.value).toBe("web");
+    expect(service.isVariableLoadingPending).toBe(false);
+  });
+
+  it("a parent reload that lands on a new value reloads its children", async () => {
+    const { manager, env, service } = await setupSettled();
+    manager.onVariablePartiallyLoaded("env@global");
+    finishLoading(service, "api");
+
+    env.value = "dev";
+    manager.onVariablePartiallyLoaded("env@global");
+
+    expect(service.value).toBe(null);
+    expect(service.isVariableLoadingPending).toBe(true);
+  });
+
   it("an aborted dependent load releases the commit", async () => {
     const { manager, service, commits } = await setupSettled();
     manager.setLiveMode(true);

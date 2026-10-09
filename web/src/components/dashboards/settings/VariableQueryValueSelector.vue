@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
-import { debounce } from "lodash-es";
+import { debounce, isEqual } from "lodash-es";
 import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -332,9 +332,10 @@ export default defineComponent({
       isOpen.value = false;
 
       filterText.value = "";
-      if (props.variableItem.multiSelect) {
-        emit("update:modelValue", selectedValue.value);
-      }
+      if (!props.variableItem.multiSelect) return;
+      // An unchanged value still resets every dependent variable downstream.
+      if (isEqual(selectedValue.value, props.variableItem.value)) return;
+      emit("update:modelValue", selectedValue.value);
     };
 
     const displayValue = computed(() => {

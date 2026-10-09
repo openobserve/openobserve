@@ -16,6 +16,7 @@
 import type { I18nText, TranslateFn } from "@/types/i18n";
 
 import { ref, computed, reactive, watch, getCurrentScope, onScopeDispose } from "vue";
+import { cloneDeep, isEqual } from "lodash-es";
 import {
   buildScopedDependencyGraph,
   detectCyclesInScopedGraph,
@@ -308,6 +309,8 @@ export const useVariablesManager = (t: TranslateFn) => {
   let liveCommitTimer: ReturnType<typeof setTimeout> | null = null;
   const commitRequested = ref(false);
   const pendingLiveKeys = new Set<string>();
+  // Value each parent's children were last loaded against, so a reload that keeps it leaves them alone.
+  const childrenLoadedAgainst = new Map<string, any>();
 
   // ========== HELPER FUNCTIONS ==========
   const areVariableArraysEqual = (
@@ -456,6 +459,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     extraPanelTabMapping?: Record<string, string>,
   ) => {
     cancelPendingCommit();
+    childrenLoadedAgainst.clear();
     currentDashboard.value = dashboard;
     panelTabMapping.value = {
       ...buildPanelTabMapping(dashboard),
@@ -660,8 +664,10 @@ export const useVariablesManager = (t: TranslateFn) => {
   };
 
   const flushRequestedCommit = () => {
-    if (!commitRequested.value || isSettling.value) return;
-    cancelPendingCommit();
+    // Wait for a change still in its debounce, or its dependents get applied half-loaded.
+    if (!commitRequested.value || isSettling.value || liveCommitTimer !== null) return;
+    commitRequested.value = false;
+    settleKeys.value = new Set();
     commitAll();
     autoCommitListeners.forEach((listener) => listener());
   };
@@ -733,6 +739,11 @@ export const useVariablesManager = (t: TranslateFn) => {
     // Mark as partially loaded
     variable.isVariablePartialLoaded = true;
 
+    const valueUnchanged =
+      childrenLoadedAgainst.has(variableKey) &&
+      isEqual(childrenLoadedAgainst.get(variableKey), variable.value);
+    childrenLoadedAgainst.set(variableKey, cloneDeep(variable.value));
+
     // Check if parent has null value (no data found)
     const parentHasNullValue =
       variable.value === null ||
@@ -769,7 +780,8 @@ export const useVariablesManager = (t: TranslateFn) => {
             // This is critical for scoped variables that need fresh data
             if (childVar.type === "query_values") {
               // Only reset if not already loading/pending
-              if (!childVar.isLoading && !childVar.isVariableLoadingPending) {
+              const keepsLoadedChild = valueUnchanged && childVar.isVariablePartialLoaded;
+              if (!childVar.isLoading && !childVar.isVariableLoadingPending && !keepsLoadedChild) {
                 childVar.isVariablePartialLoaded = false;
                 childVar.isLoading = false;
                 // Reset value and options to force fresh load
@@ -845,6 +857,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     // Start the cascade from the changed variable
     const variableKey = getVariableKey(name, scope, tabId, panelId);
     resetDescendants(variableKey);
+    childrenLoadedAgainst.set(variableKey, cloneDeep(newValue));
 
     // After resetting all descendants, trigger ONLY the immediate children
     // that are ready to load (i.e. all their parents are now ready)

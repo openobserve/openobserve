@@ -185,6 +185,31 @@ describe("OSelect", () => {
     expect(wrapper.emitted("close")).toHaveLength(1);
   });
 
+  it("emits open when typing on the closed trigger opens the dropdown", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { multiple: true, searchable: true, options: [{ label: "A", value: "a" }] },
+    });
+
+    await wrapper.find("button").trigger("keydown", { key: "a" });
+    await flushPromises();
+
+    expect(wrapper.find("button").attributes("aria-expanded")).toBe("true");
+    expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
+  it("emits open when focus() opens the dropdown", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { multiple: true, options: [{ label: "A", value: "a" }] },
+    });
+
+    (wrapper.vm as any).focus();
+    await flushPromises();
+
+    expect(wrapper.emitted("open")).toHaveLength(1);
+  });
+
   it("does not emit create on Enter when creatable is false", async () => {
     wrapper = mount(OSelect, {
       attachTo: document.body,

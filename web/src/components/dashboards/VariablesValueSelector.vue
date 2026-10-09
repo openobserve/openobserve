@@ -327,8 +327,11 @@ export default defineComponent({
       }
     };
 
+    let isUnmounted = false;
+
     // onUnmounted want to cancel the values api call for all http2, and streaming
     onUnmounted(() => {
+      isUnmounted = true;
       // Cancel all active trace IDs for all variables
       Object.keys(traceIdMapper.value).forEach((field) => {
         cancelTraceId(field);
@@ -339,10 +342,17 @@ export default defineComponent({
       Object.keys(currentlyExecutingPromises).forEach((key) => {
         currentlyExecutingPromises[key] = null;
       });
+
+      // A cancelled stream may never call back, and a variable left loading is never fetched again.
+      variablesData.values.forEach((v: any) => {
+        if (v.isLoading && !v.isVariablePartialLoaded) v.isLoading = false;
+      });
     });
 
     // A load that ended without a stream still running counts as finished, so it never holds panels back.
     const markLoadEnded = (variableObject: any) => {
+      // Unmounting released this load, and a late callback must not touch the next selector's load.
+      if (isUnmounted) return;
       if (traceIdMapper.value[variableObject.name]?.length) return;
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
@@ -390,7 +400,7 @@ export default defineComponent({
       removeTraceId(variableObject.name, request.traceId);
 
       // Mark as done on error so manager's isLoading resolves and panels are not blocked
-      if (!variableObject.isVariablePartialLoaded) {
+      if (!isUnmounted && !variableObject.isVariablePartialLoaded) {
         variableObject.isVariablePartialLoaded = true;
         if (useManager && manager) {
           const variableKey = getVariableKey(

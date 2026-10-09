@@ -990,9 +990,10 @@ function handleViewportScroll(event: Event) {
   }
 }
 
-// Escape, a pick and programmatic closes set popoverOpen directly and Reka never reports them.
+// Type-ahead, label clicks, focus(), Escape and picks set popoverOpen directly and Reka never reports them.
 watch(popoverOpen, (open, wasOpen) => {
-  if (!open && wasOpen) emit("close");
+  if (open && !wasOpen) emit("open");
+  else if (!open && wasOpen) emit("close");
 });
 
 watch(isOpen, (open) => {
@@ -1219,7 +1220,7 @@ const fieldWidthClass = computed(() => {
     </label>
 
     <template v-if="listboxModeEnabled">
-      <PopoverRoot v-model:open="popoverOpen" @update:open="(v) => v && emit('open')">
+      <PopoverRoot v-model:open="popoverOpen">
         <div ref="triggerWrapperRef" class="relative flex items-center">
           <PopoverTrigger
             type="button"
