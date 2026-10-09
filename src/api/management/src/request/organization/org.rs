@@ -120,6 +120,21 @@ pub async fn organizations(
         }
     };
 
+    // Batch-resolve each org's admin/owner (one query for the whole list) so
+    // the frontend can disambiguate two orgs that share a display name, e.g.
+    // two orgs both named "default" — one the user's own, one they were
+    // invited into. Best-effort: an org without a resolvable admin just gets
+    // empty owner fields rather than failing the whole response.
+    let org_ids: Vec<String> = all_orgs.iter().map(|o| o.identifier.clone()).collect();
+    let admin_by_org: HashMap<String, (String, String)> =
+        match infra::table::org_users::get_admins_for_orgs(&org_ids).await {
+            Ok(admins) => admins
+                .into_iter()
+                .map(|a| (a.org_id, (a.email, a.first_name)))
+                .collect(),
+            Err(_) => HashMap::new(),
+        };
+
     for org in all_orgs {
         // Hide blocked orgs (pending_deletion or deleting) from the regular org
         // list (switcher) so a soft-deleted org feels gone. _meta admins inspect
@@ -137,6 +152,8 @@ pub async fn organizations(
             .unwrap_or_default();
         #[cfg(not(feature = "cloud"))]
         let org_subscription = 0;
+        let (owner_email, owner_first_name) =
+            admin_by_org.get(&org.identifier).cloned().unwrap_or_default();
         let org = OrgDetails {
             id,
             identifier: org.identifier.clone(),
@@ -147,6 +164,8 @@ pub async fn organizations(
             org_type: org.org_type,
             user_obj: user_detail.clone(),
             plan: org_subscription,
+            owner_email,
+            owner_first_name,
         };
         if !org_names.contains(&org.identifier) {
             org_names.insert(org.identifier.clone());

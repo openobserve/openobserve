@@ -210,6 +210,7 @@ import {
   getImageURL,
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -401,7 +402,8 @@ export default defineComponent({
                   await organizationsService
                     .os_list(0, 100000, "id", false, "", "default")
                     .then((res: any) => {
-                      orgOptions.value = res.data.data.map(
+                      const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+                      orgOptions.value = labeledOrgs.map(
                         (data: {
                           id: any;
                           name: any;
@@ -412,9 +414,10 @@ export default defineComponent({
                           search_threshold: any;
                           CustomerBillingObj: any;
                           status: any;
+                          label: string;
                         }) => {
                           let optiondata: any = {
-                            label: data.name,
+                            label: data.label,
                             id: data.id,
                             identifier: data.identifier,
                             user_email: store.state.userInfo.email,

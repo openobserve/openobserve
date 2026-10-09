@@ -238,6 +238,7 @@ import {
   isEmptyDataExempt,
 } from "../utils/zincutils";
 import { isPaywalledDestination } from "@/utils/auth";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
 import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
 
@@ -1063,7 +1064,8 @@ export default defineComponent({
               user_email: store.state.userInfo.email,
             };
           }
-          orgOptions.value = store.state.organizations
+          const labeledOrgs = withDisambiguatedOrgLabels(store.state.organizations);
+          orgOptions.value = labeledOrgs
             .map(
               (data: {
                 id: any;
@@ -1075,9 +1077,10 @@ export default defineComponent({
                 search_threshold: number;
                 CustomerBillingObj: { subscription_type: string; note: string };
                 status: string;
+                label: string;
               }) => {
                 const optiondata: any = {
-                  label: data.name,
+                  label: data.label,
                   id: data.id,
                   identifier: data.identifier,
                   user_email: store.state.userInfo.email,
@@ -1147,9 +1150,9 @@ export default defineComponent({
         }
 
         if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
-          let data = store.state.organizations[0];
+          let data = withDisambiguatedOrgLabels(store.state.organizations)[0];
           let optiondata = {
-            label: data.name,
+            label: data.label,
             id: data.id,
             identifier: data.identifier,
             user_email: store.state.userInfo.email,

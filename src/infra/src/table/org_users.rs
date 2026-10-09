@@ -383,6 +383,50 @@ pub async fn get_admin(org_id: &str) -> Result<OrgUserRecord, errors::Error> {
     Ok(OrgUserRecord::from(user))
 }
 
+#[derive(Debug, Clone)]
+pub struct OrgAdminContact {
+    pub org_id: String,
+    pub email: String,
+    pub first_name: String,
+}
+
+impl FromQueryResult for OrgAdminContact {
+    fn from_query_result(res: &QueryResult, pre: &str) -> Result<Self, DbErr> {
+        Ok(Self {
+            org_id: res.try_get(pre, "org_id")?,
+            email: res.try_get(pre, "email")?,
+            first_name: res.try_get(pre, "first_name")?,
+        })
+    }
+}
+
+/// Batched admin/owner lookup for a set of orgs — one query for the whole
+/// list instead of calling `get_admin` per org. Used to label orgs with
+/// their owner's identity (e.g. disambiguating two orgs that share a
+/// display name in the org switcher).
+pub async fn get_admins_for_orgs(
+    org_ids: &[String],
+) -> Result<Vec<OrgAdminContact>, errors::Error> {
+    if org_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let client = get_orm_client_ro().await;
+    let records = Entity::find()
+        .filter(Column::OrgId.is_in(org_ids.to_vec()))
+        .filter(Column::Role.eq(UserRole::Admin as i16))
+        .inner_join(users::Entity)
+        .select_only()
+        .column(Column::OrgId)
+        .column(users::Column::Email)
+        .column(users::Column::FirstName)
+        .into_model::<OrgAdminContact>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(records)
+}
+
 pub async fn get_expanded_user_org(
     org_id: &str,
     email: &str,

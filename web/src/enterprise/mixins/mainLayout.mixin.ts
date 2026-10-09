@@ -13,6 +13,7 @@ import {
 } from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import userService from "@/services/users";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -65,10 +66,18 @@ const MainLayoutCloudMixin = {
         .then((res: any) => {
           store.dispatch("setOrganizations", res.data.data);
           const localOrg: any = useLocalOrganization();
-          orgOptions.value = res.data.data.map(
-            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+          const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+          orgOptions.value = labeledOrgs.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+              label: string;
+            }) => {
               const optiondata: any = {
-                label: data.name,
+                label: data.label,
                 id: data.id,
                 identifier: data.identifier,
                 user_email: store.state.userInfo.email,
