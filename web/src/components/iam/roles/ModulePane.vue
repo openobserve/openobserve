@@ -56,7 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="query"
         clearable
         class="w-72 max-md:w-full"
-        :placeholder="t('iam.editRole.searchModuleResources')"
+        :placeholder="
+          listsModules ? t('iam.editRole.filterModules') : t('iam.editRole.searchModuleResources')
+        "
         data-test="edit-role-module-pane-search"
         @update:model-value="(value) => setFilter(String(value ?? ''), scope)"
       />
@@ -108,14 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-secondary text-xs">{{ row.hint }}</OTruncatedText>
           </div>
           <div
-            v-else-if="row.node.has_entities && row.node.childName"
+            v-else-if="listsModules || (row.node.has_entities && row.node.childName)"
             class="flex min-w-0 items-center gap-1"
           >
+            <!-- Pulled back by its own padding, so the name lines up with the column title and plain rows. -->
             <OButton
               variant="ghost-primary"
               size="sm"
               icon-right="chevron-right"
-              class="min-w-0"
+              class="-ms-3 min-w-0"
               :data-test="`edit-role-module-pane-open-${row.node.name}`"
               @click="emit('open', row.node)"
             >
@@ -178,7 +181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default text-text-secondary flex shrink-0 items-center gap-2 border-t px-3 py-2 text-xs"
       data-test="edit-role-module-pane-no-match"
     >
-      <span>{{ t("iam.editRole.noMatchingResources") }}</span>
+      <span>{{
+        listsModules ? t("iam.editRole.noModuleMatch") : t("iam.editRole.noMatchingResources")
+      }}</span>
       <OButton
         variant="ghost-primary"
         size="xs"
@@ -192,12 +197,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, h, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import ModulePaneBulkHeader from "@/components/iam/roles/ModulePaneBulkHeader.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -239,6 +245,8 @@ const props = defineProps<{
   added?: number;
   removed?: number;
   icon?: IconName;
+  /** Rows are whole modules (All Modules view): each action header gets a select-all box, and every row opens its module. */
+  listsModules?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -274,17 +282,19 @@ const scope = ref("all");
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "label",
-    header: t("iam.editRole.moduleResourceColumn"),
+    header: props.listsModules
+      ? t("iam.editRole.moduleColumn")
+      : t("iam.editRole.moduleResourceColumn"),
     accessorKey: "label",
     size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
-  { id: "AllowAll", header: t("iam.all"), size: 72, meta: { align: "left" } },
-  { id: "AllowList", header: t("iam.list"), size: 72, meta: { align: "left" } },
-  { id: "AllowGet", header: t("iam.get"), size: 72, meta: { align: "left" } },
-  { id: "AllowPost", header: t("iam.create"), size: 90, meta: { align: "left" } },
-  { id: "AllowPut", header: t("iam.update"), size: 90, meta: { align: "left" } },
-  { id: "AllowDelete", header: t("iam.delete"), size: 90, meta: { align: "left" } },
+  actionColumn("AllowAll", t("iam.all"), 72),
+  actionColumn("AllowList", t("iam.list"), 72),
+  actionColumn("AllowGet", t("iam.get"), 72),
+  actionColumn("AllowPost", t("iam.create"), 90),
+  actionColumn("AllowPut", t("iam.update"), 90),
+  actionColumn("AllowDelete", t("iam.delete"), 90),
 ]);
 
 // Index is the position in the full scope list, which is the depth inheritance is measured against.
@@ -330,8 +340,8 @@ const hasEffectiveGrant = (row: any) =>
 const grantedAtOpen = ref(new Set<string>());
 
 watch(
-  // Length, not identity: the loaders push into the same array, so the reference never changes.
-  () => props.entities.length,
+  // Length, since loaders push into the same array; loading, since a list shown mid-load only learns its grants at the end.
+  [() => props.entities.length, () => props.loading],
   () => {
     grantedAtOpen.value = new Set(props.entities.filter(hasOwnGrant).map((row) => row.name));
   },
@@ -466,4 +476,40 @@ const checkboxHint = (node: any, resource: string, action: string, depth: number
 
 const change = (row: any, permission: string, newValue: boolean) =>
   emit("change", { row, permission, newValue });
+
+// Every row the filter keeps, on every page; module rows sit under no wider scope, so none is locked.
+const bulkRows = (action: string) =>
+  filteredEntities.value.filter((node) => node.permission?.[action]?.show);
+
+const bulkState = (action: string) => {
+  const rows = bulkRows(action);
+  const checked = rows.filter((node) => props.isGranted(node, action)).length;
+  if (!checked) return false;
+  return checked === rows.length ? true : "indeterminate";
+};
+
+const toggleBulk = (action: string) => {
+  const rows = bulkRows(action);
+  const newValue = !rows.every((node) => props.isGranted(node, action));
+  rows
+    .filter((node) => props.isGranted(node, action) !== newValue)
+    .forEach((node) => change(node, action, newValue));
+};
+
+// The column API takes a component, not a slot, so the header is mounted here; FlexRender re-runs it as grants change.
+const actionColumn = (action: string, label: I18nText, size: number): OTableColumnDef => ({
+  id: action,
+  header: props.listsModules
+    ? () =>
+        h(ModulePaneBulkHeader, {
+          action,
+          label,
+          state: bulkState(action),
+          disabled: props.loading || !bulkRows(action).length,
+          onToggle: () => toggleBulk(action),
+        })
+    : label,
+  size,
+  meta: { align: "left" },
+});
 </script>
