@@ -38,6 +38,9 @@ vi.mock("vuex", () => ({
 }));
 
 import { useAnnouncementBanners } from "./useAnnouncementBanners";
+import { queryClient } from "@/composables/query/queryClient";
+import { announcementKeys } from "@/services/announcements.querykeys";
+import { downtimeKeys } from "@/services/downtimes.querykeys";
 
 const MINUTE_MICROS = 60 * 1_000_000;
 /** Browser clock, fixed so "now" is predictable in every test. */
@@ -289,5 +292,34 @@ describe("useAnnouncementBanners", () => {
     await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
 
     expect(getActive).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches when a write invalidates the banners, so an extended end shows at once", async () => {
+    const end = BROWSER_NOW_MICROS + 10 * MINUTE_MICROS;
+    respondWith([banner({ id: "downtime:d1:1", ends_at: end })]);
+    const { banners, dispose } = await mountComposable();
+    expect(banners.value[0].ends_at).toBe(end);
+
+    respondWith([banner({ id: "downtime:d1:1", ends_at: end + 60 * MINUTE_MICROS })]);
+    await queryClient
+      .getMutationCache()
+      .build(queryClient, {
+        mutationFn: async () => null,
+        meta: { invalidates: [downtimeKeys.all("acme")] },
+      })
+      .execute(undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getActive).toHaveBeenCalledTimes(1);
+
+    await queryClient
+      .getMutationCache()
+      .build(queryClient, {
+        mutationFn: async () => null,
+        meta: { invalidates: [announcementKeys.all("acme")] },
+      })
+      .execute(undefined);
+    await vi.waitFor(() => expect(getActive).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(banners.value[0].ends_at).toBe(end + 60 * MINUTE_MICROS));
+    dispose();
   });
 });

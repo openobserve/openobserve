@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
-import { countChipLabel, countdownText, msUntilCountdownChanges } from "./banner";
+import { bannerRowCount, countChipLabel, countdownText, msUntilCountdownChanges } from "./banner";
 
 describe("downtime banner", () => {
   it("counts down in hours and minutes at 90 minutes", () => {
@@ -42,5 +42,18 @@ describe("downtime banner", () => {
     expect(countChipLabel({ module: "alerts", count: 7 }, gt)).toBe("Alerts 7");
     expect(countChipLabel({ module: "slos", count: 3 }, gt)).toBe("SLOs 3");
     expect(countChipLabel({ module: "mystery", count: 1 }, gt)).toBe("mystery 1");
+  });
+
+  it("says first ends in when the banner covers several rows", () => {
+    expect(countdownText(20 * 60, gt, true)).toBe("first ends in 20 minutes");
+    expect(countdownText(30, gt, true)).toBe("first ends in less than a minute");
+    expect(countdownText(90 * 60, gt, true)).toBe("first ends in 1 h 30 min");
+    expect(countdownText(0, gt, true)).toBe("ended");
+  });
+
+  it("counts the rows a generated banner covers from its id", () => {
+    expect(bannerRowCount("downtime:d1:36000000000")).toBe(1);
+    expect(bannerRowCount("downtime:d1:36000000000,d2:32400000000,d3:39600000000")).toBe(3);
+    expect(bannerRowCount("maintenance-notice")).toBe(0);
   });
 });

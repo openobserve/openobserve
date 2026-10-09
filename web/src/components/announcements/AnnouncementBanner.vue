@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DowntimeCountdown
         :ends-at="banner.ends_at"
         :now="serverNowMs"
+        :first="bannerRowCount(banner.id) > 1"
         :data-test="`announcement-banner-countdown-${banner.id}`"
       />
     </template>
@@ -80,7 +81,7 @@ import { onMounted } from "vue";
 
 import { useAnnouncementBanners, type Banner } from "@/composables/useAnnouncementBanners";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { countChipLabel } from "@/utils/downtimes/banner";
+import { bannerRowCount, countChipLabel } from "@/utils/downtimes/banner";
 import DowntimeCountdown from "@/components/alerts/downtimes/DowntimeCountdown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

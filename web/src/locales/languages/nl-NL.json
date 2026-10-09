@@ -8920,6 +8920,7 @@
         "recurring": "Terugkerend",
         "ended": "Beëindigd",
         "cancelled": "Geannuleerd",
+        "endedEarly": "Vroegtijdig beëindigd",
         "total": "Totaal"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Terugkerend",
       "bannerOn": "Er wordt een banner getoond aan iedereen in de organisatie zolang deze downtime actief is",
       "endsLabel": "eindigt",
+      "confirmEndNow": {
+        "title": "Deze onderbreking nu beëindigen?",
+        "message": "Meldingen worden meteen hervat. De onderbreking blijft in de lijst als vroegtijdig beëindigd.",
+        "ok": "Nu beëindigen",
+        "keep": "Laten doorlopen"
+      },
+      "extend": {
+        "menu": "Verlengen met",
+        "notActive": "Alleen een actieve onderbreking kan worden verlengd",
+        "dialogTitle": "{name} verlengen",
+        "newEnd": "Nieuw einde",
+        "confirmUntil": "Verlengen tot {time}",
+        "followUp": "Deze onderbreking herhaalt zich, dus het schema blijft zoals het is. Vanaf het einde van het huidige venster wordt een eenmalige onderbreking met de naam {name} gemaakt.",
+        "endAfterCurrent": "Het nieuwe einde moet later zijn dan het huidige einde."
+      },
       "nextLabel": "volgende",
       "matched": {
         "alerts": "{count} alarm | {count} alarmen",
@@ -8951,7 +8967,8 @@
         "cancel": "Downtime annuleren",
         "delete": "Verwijderen",
         "more": "Meer acties",
-        "muteForHour": "Nu 1 uur dempen"
+        "muteForHour": "Nu 1 uur dempen",
+        "extend": "Verlengen"
       },
       "confirmCancel": {
         "title": "Downtime annuleren",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "eindigt over minder dan een minuut",
         "endsInMinutes": "eindigt over {count} minuut | eindigt over {count} minuten",
         "endsIn": "eindigt over {duration}",
+        "firstEndsInUnderMinute": "eerste eindigt binnen een minuut",
+        "firstEndsInMinutes": "eerste eindigt over {count} minuut | eerste eindigt over {count} minuten",
+        "firstEndsIn": "eerste eindigt over {duration}",
         "count": "{module} {count}",
         "showBanner": "Toon een banner aan iedereen in de organisatie zolang deze downtime actief is",
         "showBannerCaption": "De banner toont de naam, de getroffen aantallen en de resterende tijd. Er wordt nooit een alarm bij naam genoemd.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Gepland",
         "active": "Actief",
         "ended": "Beëindigd",
-        "cancelled": "Geannuleerd"
+        "cancelled": "Geannuleerd",
+        "endedEarly": "Vroegtijdig beëindigd"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Onderbreking geannuleerd",
       "cancelledMany": "{count} onderbreking geannuleerd | {count} onderbrekingen geannuleerd",
       "cancelFailed": "Kon de onderbreking niet annuleren",
+      "extended": "Verlengd tot {time}",
+      "extendedFollowUp": "{name} gemaakt, loopt tot {time}",
+      "extendFailed": "Kon de onderbreking niet verlengen",
       "deleted": "Onderbreking verwijderd",
       "deleteFailed": "Kon de onderbreking niet verwijderen",
       "created": "Onderbreking aangemaakt",

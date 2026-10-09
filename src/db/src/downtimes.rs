@@ -64,6 +64,23 @@ pub async fn write_if_unchanged(
     Ok(true)
 }
 
+/// [set] for a row that extends `parent_id`: writes only if the parent still has
+/// `expected_updated_at`.
+pub async fn set_if_parent_unchanged(
+    downtime: &Downtime,
+    parent_id: &str,
+    expected_updated_at: i64,
+) -> Result<bool, anyhow::Error> {
+    if !table::insert_if_parent_unchanged(downtime, parent_id, expected_updated_at).await? {
+        return Ok(false);
+    }
+    coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
+    reload_org(&downtime.org).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put(downtime).await;
+    Ok(true)
+}
+
 pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
     let version = table::delete(org, id).await?;
     coordinator::emit_delete_event(org, id).await?;

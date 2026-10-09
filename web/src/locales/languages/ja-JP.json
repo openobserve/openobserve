@@ -8920,6 +8920,7 @@
         "recurring": "繰り返し",
         "ended": "終了",
         "cancelled": "キャンセル済み",
+        "endedEarly": "早期終了",
         "total": "合計"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "繰り返し",
       "bannerOn": "このダウンタイムが有効な間、組織内の全員にバナーが表示されます",
       "endsLabel": "終了",
+      "confirmEndNow": {
+        "title": "このダウンタイムを今すぐ終了しますか？",
+        "message": "通知はすぐに再開されます。ダウンタイムは早期終了としてリストに残ります。",
+        "ok": "今すぐ終了",
+        "keep": "継続する"
+      },
+      "extend": {
+        "menu": "延長時間",
+        "notActive": "延長できるのはアクティブなダウンタイムのみです",
+        "dialogTitle": "{name} を延長",
+        "newEnd": "新しい終了",
+        "confirmUntil": "{time} まで延長",
+        "followUp": "このダウンタイムは繰り返しのため、スケジュールは変更されません。現在のウィンドウの終了時刻から {name} という一回限りのダウンタイムが作成されます。",
+        "endAfterCurrent": "新しい終了は現在の終了より後にしてください。"
+      },
       "nextLabel": "次回",
       "matched": {
         "alerts": "{count} 件のアラート | {count} 件のアラート",
@@ -8951,7 +8967,8 @@
         "cancel": "ダウンタイムをキャンセル",
         "delete": "削除",
         "more": "その他のアクション",
-        "muteForHour": "今すぐ 1 時間ミュート"
+        "muteForHour": "今すぐ 1 時間ミュート",
+        "extend": "延長"
       },
       "confirmCancel": {
         "title": "ダウンタイムをキャンセル",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "1 分未満で終了",
         "endsInMinutes": "{count} 分後に終了 | {count} 分後に終了",
         "endsIn": "{duration} 後に終了",
+        "firstEndsInUnderMinute": "最初の終了まで 1 分未満",
+        "firstEndsInMinutes": "最初の終了まで {count} 分 | 最初の終了まで {count} 分",
+        "firstEndsIn": "最初の終了まで {duration}",
         "count": "{module} {count}",
         "showBanner": "このダウンタイムが有効な間、組織内の全員にバナーを表示する",
         "showBannerCaption": "バナーには名前、影響を受ける件数、残り時間が表示されます。アラート名が表示されることはありません。",
@@ -17642,7 +17662,8 @@
         "scheduled": "スケジュール済み",
         "active": "アクティブ",
         "ended": "終了",
-        "cancelled": "キャンセル済み"
+        "cancelled": "キャンセル済み",
+        "endedEarly": "早期終了"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "ダウンタイムをキャンセルしました",
       "cancelledMany": "{count} 件のダウンタイムをキャンセルしました | {count} 件のダウンタイムをキャンセルしました",
       "cancelFailed": "ダウンタイムをキャンセルできませんでした",
+      "extended": "{time} まで延長しました",
+      "extendedFollowUp": "{name} を作成しました（{time} まで）",
+      "extendFailed": "ダウンタイムを延長できませんでした",
       "deleted": "ダウンタイムを削除しました",
       "deleteFailed": "ダウンタイムを削除できませんでした",
       "created": "ダウンタイムを作成しました",

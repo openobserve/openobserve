@@ -17,7 +17,9 @@ import { computed, onScopeDispose, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
+import { queryClient } from "@/composables/query/queryClient";
 import announcements from "@/services/announcements";
+import { announcementKeys } from "@/services/announcements.querykeys";
 import { raw, type I18nText } from "@/types/i18n";
 import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
 
@@ -58,6 +60,14 @@ const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const MAX_TIMER_MS = 60 * 60 * 1000;
 
 const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
+
+/** True when one of a write's invalidation scopes is a prefix of `target`. */
+function coversKey(
+  scopes: readonly (readonly unknown[])[] | undefined,
+  target: readonly unknown[],
+) {
+  return (scopes ?? []).some((scope) => scope.every((part, i) => part === target[i]));
+}
 
 function readDismissed(): string[] {
   try {
@@ -205,9 +215,19 @@ export function useAnnouncementBanners() {
   // the previous org's set across.
   watch(orgIdentifier, () => void fetchBanners());
 
+  // Banners live outside the query cache, so a write that invalidates their scope refetches here.
+  const unsubscribeWrites = queryClient.getMutationCache().subscribe((event) => {
+    if (event.type !== "updated" || event.action.type !== "success") return;
+    const org = orgIdentifier.value;
+    if (org && coversKey(event.mutation.meta?.invalidates, announcementKeys.active(org))) {
+      void fetchBanners();
+    }
+  });
+
   onScopeDispose(() => {
     if (pollTimer) clearInterval(pollTimer);
     clearBoundaryTimer();
+    unsubscribeWrites();
   });
 
   return {

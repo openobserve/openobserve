@@ -8920,6 +8920,7 @@
         "recurring": "Recurring",
         "ended": "Ended",
         "cancelled": "Cancelled",
+        "endedEarly": "Ended early",
         "total": "Total"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Recurring",
       "bannerOn": "A banner shows to everyone in the org while this downtime is active",
       "endsLabel": "ends",
+      "confirmEndNow": {
+        "title": "End this downtime now?",
+        "message": "Notifications resume at once. The downtime stays in the list as ended early.",
+        "ok": "End now",
+        "keep": "Keep running"
+      },
+      "extend": {
+        "menu": "Extend by",
+        "notActive": "Only an active downtime can be extended",
+        "dialogTitle": "Extend {name}",
+        "newEnd": "New end",
+        "confirmUntil": "Extend until {time}",
+        "followUp": "This downtime repeats, so its schedule stays as it is. A one-time downtime named {name} is created from the end of the current window.",
+        "endAfterCurrent": "The new end must be later than the current end."
+      },
       "nextLabel": "next",
       "matched": {
         "alerts": "{count} alert | {count} alerts",
@@ -8951,7 +8967,8 @@
         "cancel": "Cancel downtime",
         "delete": "Delete",
         "more": "More actions",
-        "muteForHour": "Mute now for 1 h"
+        "muteForHour": "Mute now for 1 h",
+        "extend": "Extend"
       },
       "confirmCancel": {
         "title": "Cancel downtime",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "ends in less than a minute",
         "endsInMinutes": "ends in {count} minute | ends in {count} minutes",
         "endsIn": "ends in {duration}",
+        "firstEndsInUnderMinute": "first ends in less than a minute",
+        "firstEndsInMinutes": "first ends in {count} minute | first ends in {count} minutes",
+        "firstEndsIn": "first ends in {duration}",
         "count": "{module} {count}",
         "showBanner": "Show a banner to everyone in the org while this downtime is active",
         "showBannerCaption": "The banner shows the name, the affected counts and the time left. It never names an alert.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Scheduled",
         "active": "Active",
         "ended": "Ended",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "endedEarly": "Ended early"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Downtime cancelled",
       "cancelledMany": "{count} downtime cancelled | {count} downtimes cancelled",
       "cancelFailed": "Could not cancel the downtime",
+      "extended": "Extended until {time}",
+      "extendedFollowUp": "Created {name}, running until {time}",
+      "extendFailed": "Could not extend the downtime",
       "deleted": "Downtime deleted",
       "deleteFailed": "Could not delete the downtime",
       "created": "Downtime created",

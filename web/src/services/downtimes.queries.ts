@@ -19,6 +19,8 @@ import type {
   DowntimeDetail,
   DowntimeListResponse,
   DowntimeRequest,
+  ExtendDowntimeRequest,
+  ExtendDowntimeResponse,
   PreviewRequest,
   PreviewResponse,
   ResourcesRequest,
@@ -29,6 +31,7 @@ import { alertKeys } from "./alerts.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
 import { syntheticsKeys } from "./synthetics.querykeys";
 import { sloKeys } from "./slos.querykeys";
+import { announcementKeys } from "./announcements.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 /** The API caps an org at 500 downtimes, so one page holds the whole list. */
@@ -37,7 +40,7 @@ export const DOWNTIME_LIST_PAGE_SIZE = 500;
 const EMPTY_LIST: DowntimeListResponse = {
   items: [],
   total: 0,
-  counts: { active: 0, scheduled: 0, recurring: 0, ended: 0, cancelled: 0 },
+  counts: { active: 0, scheduled: 0, recurring: 0, ended: 0, cancelled: 0, ended_early: 0 },
 };
 
 export const downtimesListQuery = (org: string) =>
@@ -102,7 +105,19 @@ export const cancelDowntimeMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { id: string; folder?: string }) =>
       downtimes.cancel(org, vars.id, vars.folder),
-    meta: { invalidates: mutedListKeys(org), silentError: true },
+    meta: { invalidates: [...mutedListKeys(org), announcementKeys.all(org)], silentError: true },
+  });
+
+/** The banner refetches too, so its countdown re-arms on the new end. */
+export const extendDowntimeMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: async (vars: {
+      id: string;
+      body: ExtendDowntimeRequest;
+      folder?: string;
+    }): Promise<ExtendDowntimeResponse> =>
+      (await downtimes.extend(org, vars.id, vars.body, vars.folder)).data,
+    meta: { invalidates: [...mutedListKeys(org), announcementKeys.all(org)], silentError: true },
   });
 
 export const deleteDowntimeMutation = (org: string) =>

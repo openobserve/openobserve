@@ -8920,6 +8920,7 @@
         "recurring": "반복",
         "ended": "종료됨",
         "cancelled": "취소됨",
+        "endedEarly": "조기 종료",
         "total": "전체"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "반복",
       "bannerOn": "이 다운타임이 활성 상태인 동안 조직의 모든 사용자에게 배너가 표시됩니다",
       "endsLabel": "종료",
+      "confirmEndNow": {
+        "title": "이 다운타임을 지금 종료할까요?",
+        "message": "알림이 즉시 다시 시작됩니다. 다운타임은 조기 종료로 목록에 남습니다.",
+        "ok": "지금 종료",
+        "keep": "계속 실행"
+      },
+      "extend": {
+        "menu": "연장 시간",
+        "notActive": "활성 다운타임만 연장할 수 있습니다",
+        "dialogTitle": "{name} 연장",
+        "newEnd": "새 종료",
+        "confirmUntil": "{time}까지 연장",
+        "followUp": "이 다운타임은 반복되므로 일정은 그대로 유지됩니다. 현재 창이 끝나는 시점부터 {name}(이)라는 일회성 다운타임이 생성됩니다.",
+        "endAfterCurrent": "새 종료는 현재 종료보다 늦어야 합니다."
+      },
       "nextLabel": "다음",
       "matched": {
         "alerts": "{count}개 알림 | {count}개 알림",
@@ -8951,7 +8967,8 @@
         "cancel": "다운타임 취소",
         "delete": "삭제",
         "more": "추가 작업",
-        "muteForHour": "지금 1시간 음소거"
+        "muteForHour": "지금 1시간 음소거",
+        "extend": "연장"
       },
       "confirmCancel": {
         "title": "다운타임 취소",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "1분 이내에 종료",
         "endsInMinutes": "{count}분 후 종료 | {count}분 후 종료",
         "endsIn": "{duration} 후 종료",
+        "firstEndsInUnderMinute": "첫 번째가 1분 이내에 종료",
+        "firstEndsInMinutes": "첫 번째가 {count}분 후 종료 | 첫 번째가 {count}분 후 종료",
+        "firstEndsIn": "첫 번째가 {duration} 후 종료",
         "count": "{module} {count}",
         "showBanner": "이 다운타임이 활성 상태인 동안 조직의 모든 사용자에게 배너 표시",
         "showBannerCaption": "배너에는 이름, 영향받은 개수, 남은 시간이 표시됩니다. 알림 이름은 표시되지 않습니다.",
@@ -17642,7 +17662,8 @@
         "scheduled": "예약됨",
         "active": "활성",
         "ended": "종료됨",
-        "cancelled": "취소됨"
+        "cancelled": "취소됨",
+        "endedEarly": "조기 종료"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "다운타임이 취소되었습니다",
       "cancelledMany": "{count}개의 다운타임이 취소되었습니다 | {count}개의 다운타임이 취소되었습니다",
       "cancelFailed": "다운타임을 취소할 수 없습니다",
+      "extended": "{time}까지 연장됨",
+      "extendedFollowUp": "{name} 생성됨, {time}까지 실행",
+      "extendFailed": "다운타임을 연장할 수 없습니다",
       "deleted": "다운타임이 삭제되었습니다",
       "deleteFailed": "다운타임을 삭제할 수 없습니다",
       "created": "다운타임이 생성되었습니다",

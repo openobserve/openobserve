@@ -31,8 +31,10 @@ use config::{
     meta::{
         downtimes::{
             AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
-            DowntimeRequest, DowntimeWindow, MoveDowntimesRequest, PreviewMatch, PreviewRequest,
-            PreviewResponse, ResourcesRequest, ResourcesResponse, TargetModule,
+            DowntimeRequest, DowntimeSchedule, DowntimeStatus, DowntimeWindow,
+            ExtendDowntimeRequest, ExtendDowntimeResponse, MoveDowntimesRequest, PreviewMatch,
+            PreviewRequest, PreviewResponse, Repeat, ResourcesRequest, ResourcesResponse,
+            TargetModule,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -41,7 +43,7 @@ use config::{
 use o2_enterprise::enterprise::{
     announcements::meta::{Banner, BannerCount, BannerCta, BannerVariant},
     common::config::get_config as get_o2_config,
-    downtimes::{banner_message, generated_name, schedule, scope, validate},
+    downtimes::{MAX_NAME_LEN, banner_message, generated_name, schedule, scope, validate},
     oncall::routing::normalize_value,
 };
 use serde::Serialize;
@@ -56,6 +58,9 @@ const MATCH_COUNTS_TTL: Duration = Duration::from_secs(60);
 const AFFECTED_CAP: usize = 500;
 /// A move takes at most this many ids, each a write and an authorization check.
 const MAX_MOVE_IDS: usize = 100;
+const MICROS_PER_SEC: i64 = 1_000_000;
+/// Appended to the name of the one-time row that extends a recurring one.
+const EXTENDED_SUFFIX: &str = " (extended)";
 
 /// The order modules are listed in on a combined banner.
 const MODULE_ORDER: [TargetModule; 4] = [
@@ -196,12 +201,7 @@ pub async fn create(
     ensure_enabled()?;
     let folder_id = resolve_folder(org, &req.folder_id).await?;
     let req = checked_request(org, user_id, req).await?;
-    let limit = get_o2_config().downtimes.max_per_org;
-    if db::downtimes::list_cached(org).len() >= limit {
-        return Err(DowntimeError::BadRequest(format!(
-            "This organization already has {limit} downtimes, the most allowed. Delete ended ones first."
-        )));
-    }
+    check_room(org)?;
     let downtime = created(org, folder_id, &req, user_id, now_micros());
     db::downtimes::set(&downtime).await?;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
@@ -241,6 +241,56 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     set_if_unchanged(&after, before.updated_at).await?;
     remeasure_slos(Some(&before), &after).await;
     Ok(after)
+}
+
+/// Lengthens the active window; a recurring row gets a one-time follow-up instead.
+pub async fn extend(
+    org: &str,
+    user_id: &str,
+    id: &str,
+    req: &ExtendDowntimeRequest,
+) -> Result<ExtendDowntimeResponse, DowntimeError> {
+    ensure_enabled()?;
+    let before = load(org, id).await?;
+    access::authorize_row(org, user_id, &before, "PUT").await?;
+    let now = now_micros();
+    let window = extendable_window(&before, now)?;
+    let new_end = extended_end(window.end, req, now)?;
+    if before.schedule.repeat == Repeat::None {
+        let after = extended_once(&before, new_end, user_id, now);
+        checked_request(org, user_id, request_of(&after)).await?;
+        set_if_unchanged(&after, before.updated_at).await?;
+        remeasure_slos(Some(&before), &after).await;
+        return Ok(ExtendDowntimeResponse {
+            downtime: after,
+            created_id: None,
+        });
+    }
+    if !crate::auth::check_folder_write_permissions(
+        org,
+        user_id,
+        "downtime_folders",
+        &before.folder_id,
+    )
+    .await
+    {
+        return Err(DowntimeError::Forbidden(
+            "Extending a recurring downtime creates a new one, and you cannot create downtimes in its folder."
+                .to_string(),
+        ));
+    }
+    let follow_up = follow_up(&before, window.end, new_end, user_id, now);
+    checked_request(org, user_id, request_of(&follow_up)).await?;
+    check_room(org)?;
+    if !db::downtimes::set_if_parent_unchanged(&follow_up, &before.id, before.updated_at).await? {
+        return Err(changed_meanwhile());
+    }
+    db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&follow_up)).await;
+    remeasure_slos(None, &follow_up).await;
+    Ok(ExtendDowntimeResponse {
+        created_id: Some(follow_up.id.clone()),
+        downtime: follow_up,
+    })
 }
 
 pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeError> {
@@ -475,6 +525,16 @@ async fn resolve_folder(org: &str, folder_id: &str) -> Result<String, DowntimeEr
     }
 }
 
+fn check_room(org: &str) -> Result<(), DowntimeError> {
+    let limit = get_o2_config().downtimes.max_per_org;
+    if db::downtimes::list_cached(org).len() >= limit {
+        return Err(DowntimeError::BadRequest(format!(
+            "This organization already has {limit} downtimes, the most allowed. Delete ended ones first."
+        )));
+    }
+    Ok(())
+}
+
 /// Validates, normalizes as stored, then checks what the user may silence (WP6).
 async fn checked_request(
     org: &str,
@@ -596,6 +656,101 @@ fn name_of(req: &DowntimeRequest, now: i64) -> String {
         .filter(|n| !n.is_empty())
         .map(str::to_string)
         .unwrap_or_else(|| generated_name(req, now))
+}
+
+/// The request an edit to `row` would send, so an extension is validated like an edit.
+fn request_of(row: &Downtime) -> DowntimeRequest {
+    DowntimeRequest {
+        folder_id: row.folder_id.clone(),
+        name: Some(row.name.clone()),
+        reason: row.reason.clone(),
+        condition: row.condition.clone(),
+        targets: row.targets.clone(),
+        schedule: row.schedule.clone(),
+        show_banner: row.show_banner,
+    }
+}
+
+/// Only a window in force now can be extended; anything else is edited or recreated instead.
+fn extendable_window(row: &Downtime, now: i64) -> Result<DowntimeWindow, DowntimeError> {
+    let refuse = |m: &str| Err(DowntimeError::BadRequest(m.to_string()));
+    match schedule::status(&row.schedule, row.cancelled_at, now) {
+        DowntimeStatus::Active => schedule::window_at(&row.schedule, now)
+            .map_or_else(|| refuse("This downtime is not in a window now."), Ok),
+        DowntimeStatus::Scheduled => {
+            refuse("This downtime has not started yet. Edit its schedule instead.")
+        }
+        DowntimeStatus::Ended => refuse("This downtime has ended and cannot be extended."),
+        DowntimeStatus::Cancelled | DowntimeStatus::EndedEarly => {
+            refuse("This downtime was cancelled and cannot be extended.")
+        }
+    }
+}
+
+/// `by_secs` counts from the later of the current end and now; `until` must be past both.
+fn extended_end(
+    current_end: i64,
+    req: &ExtendDowntimeRequest,
+    now: i64,
+) -> Result<i64, DowntimeError> {
+    let from = current_end.max(now);
+    let bad = |m: &str| DowntimeError::BadRequest(m.to_string());
+    match (req.by_secs, req.until) {
+        (Some(secs), None) if secs > 0 => secs
+            .checked_mul(MICROS_PER_SEC)
+            .and_then(|by| from.checked_add(by))
+            .ok_or_else(|| bad("The extension is too long.")),
+        (Some(_), None) => Err(bad("The extension must be at least one second.")),
+        (None, Some(until)) if until > from => Ok(until),
+        (None, Some(_)) => Err(bad("The new end must be later than the current end.")),
+        _ => Err(bad("Give either by_secs or until.")),
+    }
+}
+
+fn extended_once(before: &Downtime, new_end: i64, user_id: &str, now: i64) -> Downtime {
+    Downtime {
+        schedule: DowntimeSchedule {
+            ends_at: Some(new_end),
+            duration_secs: (new_end - before.schedule.starts_at) / MICROS_PER_SEC,
+            ..before.schedule.clone()
+        },
+        version: before.version + 1,
+        updated_by: user_id.to_string(),
+        updated_at: now,
+        ..before.clone()
+    }
+}
+
+/// A one-time row from `start` to `end` that covers what `parent` covers, in its folder.
+fn follow_up(parent: &Downtime, start: i64, end: i64, user_id: &str, now: i64) -> Downtime {
+    let base: String = parent
+        .name
+        .chars()
+        .take(MAX_NAME_LEN - EXTENDED_SUFFIX.chars().count())
+        .collect();
+    Downtime {
+        id: infra::table::downtimes::new_id(),
+        name: format!("{}{EXTENDED_SUFFIX}", base.trim_end()),
+        schedule: DowntimeSchedule {
+            repeat: Repeat::None,
+            starts_at: start,
+            ends_at: Some(end),
+            timezone: parent.schedule.timezone.clone(),
+            start_time_local: None,
+            duration_secs: (end - start) / MICROS_PER_SEC,
+            weekdays: vec![],
+        },
+        cancelled_at: None,
+        cancelled_by: None,
+        notifications: None,
+        origin_region: None,
+        version: 1,
+        created_by: user_id.to_string(),
+        created_at: now,
+        updated_by: user_id.to_string(),
+        updated_at: now,
+        ..parent.clone()
+    }
 }
 
 /// A row that corrected SLO slices must outlive them, so it can be cancelled but not deleted.
@@ -838,9 +993,7 @@ fn affected(matches: &Matches, visibility: &Visibility) -> AffectedItems {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::downtimes::{
-        DowntimeSchedule, DowntimeTarget, LogicalOp, PairOperator, Repeat, TargetFolders,
-    };
+    use config::meta::downtimes::{DowntimeTarget, LogicalOp, PairOperator, TargetFolders};
 
     use super::{matching::ModuleMatch, *};
 
@@ -1133,6 +1286,168 @@ mod tests {
         let cancelled = list_item(&d, &MatchCounts::default(), 11 * HOUR);
         assert!(cancelled.current_window.is_none());
         assert!(cancelled.next_window.is_none());
+    }
+
+    fn by(secs: i64) -> ExtendDowntimeRequest {
+        ExtendDowntimeRequest {
+            by_secs: Some(secs),
+            until: None,
+        }
+    }
+
+    fn until(at: i64) -> ExtendDowntimeRequest {
+        ExtendDowntimeRequest {
+            by_secs: None,
+            until: Some(at),
+        }
+    }
+
+    fn daily(start_time: &str, duration_secs: i64) -> Downtime {
+        let mut d = row(vec![TargetModule::Alerts, TargetModule::Slos], 0, 0);
+        d.name = "Nightly deploy".to_string();
+        d.schedule = DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at: 0,
+            ends_at: None,
+            timezone: "UTC".to_string(),
+            start_time_local: Some(start_time.to_string()),
+            duration_secs,
+            weekdays: vec![],
+        };
+        d
+    }
+
+    #[test]
+    fn a_one_time_extension_moves_the_end_and_remeasures_the_extra_time() {
+        let before = row(vec![TargetModule::Slos], 10 * HOUR, 12 * HOUR);
+        let now = 11 * HOUR;
+        let current = extendable_window(&before, now).unwrap();
+        let end = extended_end(current.end, &by(3_600), now).unwrap();
+        let after = extended_once(&before, end, "ops", now);
+        assert_eq!(after.schedule.ends_at, Some(13 * HOUR));
+        assert_eq!(after.schedule.duration_secs, 3 * 3_600);
+        assert_eq!(after.schedule.starts_at, before.schedule.starts_at);
+        assert_eq!(after.version, before.version + 1);
+        assert_eq!((after.updated_by.as_str(), after.updated_at), ("ops", now));
+        assert!(validate(&request_of(&after), &[]).is_ok());
+        assert!(corrections_may_change(Some(&before), &after));
+        assert_eq!(
+            schedule::windows_between(&after.schedule, None, 12 * HOUR, 14 * HOUR),
+            vec![window(12 * HOUR, 13 * HOUR)]
+        );
+        let alerts_only = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert!(!corrections_may_change(Some(&alerts_only), &alerts_only));
+    }
+
+    #[test]
+    fn until_sets_the_end_and_must_be_past_the_current_end() {
+        assert_eq!(
+            extended_end(12 * HOUR, &until(15 * HOUR), 11 * HOUR).unwrap(),
+            15 * HOUR
+        );
+        for req in [
+            until(12 * HOUR),
+            until(11 * HOUR),
+            by(0),
+            by(-60),
+            ExtendDowntimeRequest::default(),
+            ExtendDowntimeRequest {
+                by_secs: Some(60),
+                until: Some(15 * HOUR),
+            },
+        ] {
+            assert!(
+                matches!(
+                    extended_end(12 * HOUR, &req, 11 * HOUR),
+                    Err(DowntimeError::BadRequest(_))
+                ),
+                "{req:?}"
+            );
+        }
+        assert!(matches!(
+            extended_end(12 * HOUR, &by(i64::MAX), 11 * HOUR),
+            Err(DowntimeError::BadRequest(_))
+        ));
+    }
+
+    #[test]
+    fn an_extension_past_seven_days_is_rejected_by_the_edit_rules() {
+        let before = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let end = extended_end(12 * HOUR, &by(7 * 24 * 3_600), 11 * HOUR).unwrap();
+        let after = extended_once(&before, end, "ops", 11 * HOUR);
+        assert!(validate(&request_of(&after), &[]).is_err());
+    }
+
+    #[test]
+    fn an_ended_cancelled_or_scheduled_row_cannot_be_extended() {
+        let d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let refused = |d: &Downtime, now: i64| {
+            matches!(extendable_window(d, now), Err(DowntimeError::BadRequest(_)))
+        };
+        assert!(refused(&d, 13 * HOUR), "ended");
+        assert!(refused(&d, 9 * HOUR), "not started");
+        let mut ended_early = d.clone();
+        ended_early.cancelled_at = Some(11 * HOUR);
+        assert!(refused(&ended_early, 11 * HOUR + 1), "ended early");
+        let mut cancelled = d.clone();
+        cancelled.cancelled_at = Some(9 * HOUR);
+        assert!(refused(&cancelled, 11 * HOUR), "cancelled");
+        assert_eq!(
+            extendable_window(&d, 11 * HOUR).unwrap(),
+            window(10 * HOUR, 12 * HOUR)
+        );
+        let between = daily("02:00", 3_600);
+        assert!(refused(&between, 5 * HOUR), "between two windows");
+    }
+
+    #[test]
+    fn a_recurring_extension_creates_a_follow_up_with_the_same_coverage() {
+        let mut parent = daily("02:00", 3_600);
+        parent.folder_id = "planned".to_string();
+        parent.reason = Some("CHG-9".to_string());
+        parent.condition = Some(DimensionCondition::Pair {
+            key: "service".to_string(),
+            operator: PairOperator::Eq,
+            value: "payments".to_string(),
+        });
+        parent.show_banner = false;
+        let now = 2 * HOUR + HOUR / 2;
+        let current = extendable_window(&parent, now).unwrap();
+        assert_eq!(current.end, 3 * HOUR);
+        let end = extended_end(current.end, &by(2 * 3_600), now).unwrap();
+        let next = follow_up(&parent, current.end, end, "ops", now);
+        assert_ne!(next.id, parent.id);
+        assert_eq!(next.name, "Nightly deploy (extended)");
+        assert_eq!(next.folder_id, "planned");
+        assert_eq!(next.targets, parent.targets);
+        assert_eq!(next.condition, parent.condition);
+        assert_eq!(next.reason, parent.reason);
+        assert!(!next.show_banner);
+        assert_eq!(next.schedule.repeat, Repeat::None);
+        assert_eq!(next.schedule.starts_at, 3 * HOUR);
+        assert_eq!(next.schedule.ends_at, Some(5 * HOUR));
+        assert_eq!(next.schedule.duration_secs, 2 * 3_600);
+        assert!(next.schedule.start_time_local.is_none());
+        assert_eq!(next.created_by, "ops");
+        assert_eq!(next.cancelled_at, None);
+        let schedule_only = DowntimeRequest {
+            condition: None,
+            ..request_of(&next)
+        };
+        assert_eq!(validate(&schedule_only, &[]), Ok(()));
+        assert_eq!(
+            parent.schedule.duration_secs, 3_600,
+            "later windows keep their length"
+        );
+    }
+
+    #[test]
+    fn a_follow_up_name_fits_the_name_limit() {
+        let mut parent = daily("02:00", 3_600);
+        parent.name = "x".repeat(MAX_NAME_LEN);
+        let next = follow_up(&parent, 3 * HOUR, 4 * HOUR, "ops", 0);
+        assert_eq!(next.name.chars().count(), MAX_NAME_LEN);
+        assert!(next.name.ends_with(EXTENDED_SUFFIX));
     }
 
     fn folder(id: &str) -> Folder {

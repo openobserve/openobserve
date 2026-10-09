@@ -82,6 +82,7 @@ fn count(items: &[DowntimeListItem]) -> StatusCounts {
             DowntimeStatus::Scheduled => counts.scheduled += 1,
             DowntimeStatus::Ended => counts.ended += 1,
             DowntimeStatus::Cancelled => counts.cancelled += 1,
+            DowntimeStatus::EndedEarly => counts.ended_early += 1,
         }
         if item.downtime.schedule.repeat != Repeat::None {
             counts.recurring += 1;
@@ -96,6 +97,7 @@ fn status_name(status: DowntimeStatus) -> &'static str {
         DowntimeStatus::Active => "active",
         DowntimeStatus::Ended => "ended",
         DowntimeStatus::Cancelled => "cancelled",
+        DowntimeStatus::EndedEarly => "ended_early",
     }
 }
 
@@ -196,6 +198,7 @@ mod tests {
             item("p2", DowntimeStatus::Scheduled, Repeat::None, 3),
             item("e", DowntimeStatus::Ended, Repeat::None, 2),
             item("c", DowntimeStatus::Cancelled, Repeat::Daily, 1),
+            item("x", DowntimeStatus::EndedEarly, Repeat::None, 0),
         ]
     }
 
@@ -206,7 +209,7 @@ mod tests {
     #[test]
     fn counts_cover_the_filtered_rows_and_recurring_overlaps() {
         let resp = list_page(rows(), &ListQuery::default(), None);
-        assert_eq!(resp.total, 5);
+        assert_eq!(resp.total, 6);
         assert_eq!(
             resp.counts,
             StatusCounts {
@@ -215,9 +218,10 @@ mod tests {
                 recurring: 2,
                 ended: 1,
                 cancelled: 1,
+                ended_early: 1,
             }
         );
-        assert_eq!(ids(&resp), ["a", "p1", "p2", "e", "c"]);
+        assert_eq!(ids(&resp), ["a", "p1", "p2", "e", "c", "x"]);
     }
 
     #[test]
@@ -235,16 +239,18 @@ mod tests {
             ids(&q(|q| q.status = Some("scheduled".into()))),
             ["p1", "p2"]
         );
+        assert_eq!(ids(&q(|q| q.status = Some("ended_early".into()))), ["x"]);
+        assert_eq!(ids(&q(|q| q.status = Some("cancelled".into()))), ["c"]);
         assert_eq!(
             ids(&q(|q| q.repeat = Some("recurring".into()))),
             ["p1", "c"]
         );
         assert_eq!(
             ids(&q(|q| q.repeat = Some("none".into()))),
-            ["a", "p2", "e"]
+            ["a", "p2", "e", "x"]
         );
         assert_eq!(ids(&q(|q| q.search = Some("P1 MAINT".into()))), ["p1"]);
-        assert_eq!(q(|q| q.search = Some("chg-4471".into())).total, 5);
+        assert_eq!(q(|q| q.search = Some("chg-4471".into())).total, 6);
     }
 
     #[test]
@@ -256,12 +262,12 @@ mod tests {
         };
         let resp = list_page(rows(), &query, None);
         assert_eq!(ids(&resp), ["p2", "e"]);
-        assert_eq!(resp.total, 5);
+        assert_eq!(resp.total, 6);
         let huge = ListQuery {
             page_size: Some(10_000),
             ..Default::default()
         };
-        assert_eq!(list_page(rows(), &huge, None).items.len(), 5);
+        assert_eq!(list_page(rows(), &huge, None).items.len(), 6);
     }
 
     #[test]
@@ -277,7 +283,7 @@ mod tests {
             alert_id: Some("al1".into()),
             ..Default::default()
         };
-        assert_eq!(list_page(rows(), &query, Some(&alert)).total, 5);
+        assert_eq!(list_page(rows(), &query, Some(&alert)).total, 6);
         let other = HashMap::from([("service".to_string(), "checkout".to_string())]);
         let unrelated = TargetItem {
             dimensions: &other,

@@ -186,6 +186,10 @@ export const BADGE_GROUPS = {
         variant: "default-outline",
         labelKey: "components.badge.downtimeStatus.cancelled",
       },
+      endedearly: {
+        variant: "default-soft",
+        labelKey: "components.badge.downtimeStatus.endedEarly",
+      },
     },
   },
 

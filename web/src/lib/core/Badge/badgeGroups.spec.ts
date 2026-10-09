@@ -35,6 +35,9 @@ describe("badgeGroups", () => {
     expect(cancelled.variant).toBe("default-outline");
     expect(cancelled.dot).toBe(true);
     expect(cancelled.labelKey).toBe("components.badge.downtimeStatus.cancelled");
+    const early = resolveBadge("downtimeStatus", "ended_early");
+    expect(early.variant).toBe("default-soft");
+    expect(early.labelKey).toBe("components.badge.downtimeStatus.endedEarly");
   });
 
   it("resolves logLevel to plain mode (no dot, no icon)", () => {

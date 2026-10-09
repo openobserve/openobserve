@@ -8920,6 +8920,7 @@
         "recurring": "Recurrente",
         "ended": "Finalizado",
         "cancelled": "Cancelado",
+        "endedEarly": "Finalizado antes",
         "total": "Total"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Recurrente",
       "bannerOn": "Se muestra un banner a todos los miembros de la organización mientras este tiempo de inactividad esté activo",
       "endsLabel": "finaliza",
+      "confirmEndNow": {
+        "title": "¿Finalizar este tiempo de inactividad ahora?",
+        "message": "Las notificaciones se reanudan de inmediato. El tiempo de inactividad queda en la lista como finalizado antes.",
+        "ok": "Finalizar ahora",
+        "keep": "Seguir activo"
+      },
+      "extend": {
+        "menu": "Ampliar en",
+        "notActive": "Solo se puede ampliar un tiempo de inactividad activo",
+        "dialogTitle": "Ampliar {name}",
+        "newEnd": "Nuevo fin",
+        "confirmUntil": "Ampliar hasta {time}",
+        "followUp": "Este tiempo de inactividad se repite, así que su programación no cambia. Se crea un tiempo de inactividad único llamado {name} desde el fin de la ventana actual.",
+        "endAfterCurrent": "El nuevo fin debe ser posterior al fin actual."
+      },
       "nextLabel": "próxima",
       "matched": {
         "alerts": "{count} alerta | {count} alertas",
@@ -8951,7 +8967,8 @@
         "cancel": "Cancelar el tiempo de inactividad",
         "delete": "Eliminar",
         "more": "Más acciones",
-        "muteForHour": "Silenciar ahora durante 1 h"
+        "muteForHour": "Silenciar ahora durante 1 h",
+        "extend": "Ampliar"
       },
       "confirmCancel": {
         "title": "Cancelar periodo de inactividad",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "finaliza en menos de un minuto",
         "endsInMinutes": "finaliza en {count} minuto | finaliza en {count} minutos",
         "endsIn": "finaliza en {duration}",
+        "firstEndsInUnderMinute": "el primero finaliza en menos de un minuto",
+        "firstEndsInMinutes": "el primero finaliza en {count} minuto | el primero finaliza en {count} minutos",
+        "firstEndsIn": "el primero finaliza en {duration}",
         "count": "{module} {count}",
         "showBanner": "Mostrar un banner a todos los miembros de la organización mientras este periodo de inactividad esté activo",
         "showBannerCaption": "El banner muestra el nombre, los recuentos afectados y el tiempo restante. Nunca menciona una alerta concreta.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Programado",
         "active": "Activo",
         "ended": "Finalizado",
-        "cancelled": "Cancelado"
+        "cancelled": "Cancelado",
+        "endedEarly": "Finalizado antes"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Tiempo de inactividad cancelado",
       "cancelledMany": "{count} tiempo de inactividad cancelado | {count} tiempos de inactividad cancelados",
       "cancelFailed": "No se pudo cancelar el tiempo de inactividad",
+      "extended": "Ampliado hasta {time}",
+      "extendedFollowUp": "Se creó {name}, activo hasta {time}",
+      "extendFailed": "No se pudo ampliar el tiempo de inactividad",
       "deleted": "Tiempo de inactividad eliminado",
       "deleteFailed": "No se pudo eliminar el tiempo de inactividad",
       "created": "Tiempo de inactividad creado",

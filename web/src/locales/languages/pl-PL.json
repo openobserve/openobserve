@@ -8920,6 +8920,7 @@
         "recurring": "Cykliczne",
         "ended": "Zakończone",
         "cancelled": "Anulowane",
+        "endedEarly": "Zakończona wcześniej",
         "total": "Razem"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Cykliczne",
       "bannerOn": "Gdy to okno serwisowe jest aktywne, wszyscy w organizacji widzą baner",
       "endsLabel": "kończy się",
+      "confirmEndNow": {
+        "title": "Zakończyć tę przerwę teraz?",
+        "message": "Powiadomienia zostaną od razu wznowione. Przerwa pozostanie na liście jako zakończona wcześniej.",
+        "ok": "Zakończ teraz",
+        "keep": "Pozostaw aktywną"
+      },
+      "extend": {
+        "menu": "Przedłuż o",
+        "notActive": "Przedłużyć można tylko aktywną przerwę",
+        "dialogTitle": "Przedłuż {name}",
+        "newEnd": "Nowy koniec",
+        "confirmUntil": "Przedłuż do {time}",
+        "followUp": "Ta przerwa się powtarza, więc jej harmonogram pozostaje bez zmian. Od końca bieżącego okna zostanie utworzona jednorazowa przerwa o nazwie {name}.",
+        "endAfterCurrent": "Nowy koniec musi być późniejszy niż obecny."
+      },
       "nextLabel": "następne",
       "matched": {
         "alerts": "{count} alert | {count} alerty",
@@ -8951,7 +8967,8 @@
         "cancel": "Anuluj okno serwisowe",
         "delete": "Usuń",
         "more": "Więcej akcji",
-        "muteForHour": "Wycisz teraz na 1 godz."
+        "muteForHour": "Wycisz teraz na 1 godz.",
+        "extend": "Przedłuż"
       },
       "confirmCancel": {
         "title": "Anuluj przestój",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "kończy się w mniej niż minutę",
         "endsInMinutes": "kończy się za {count} minutę | kończy się za {count} minuty",
         "endsIn": "kończy się za {duration}",
+        "firstEndsInUnderMinute": "pierwsza kończy się za mniej niż minutę",
+        "firstEndsInMinutes": "pierwsza kończy się za {count} minutę | pierwsza kończy się za {count} minut",
+        "firstEndsIn": "pierwsza kończy się za {duration}",
         "count": "{module} {count}",
         "showBanner": "Pokaż baner wszystkim w organizacji, gdy to wyciszenie jest aktywne",
         "showBannerCaption": "Baner pokazuje nazwę, liczby objętych elementów i pozostały czas. Nigdy nie podaje nazwy alertu.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Zaplanowana",
         "active": "Aktywna",
         "ended": "Zakończona",
-        "cancelled": "Anulowana"
+        "cancelled": "Anulowana",
+        "endedEarly": "Zakończona wcześniej"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Przerwa anulowana",
       "cancelledMany": "{count} przerwa anulowana | {count} przerw anulowanych",
       "cancelFailed": "Nie udało się anulować przerwy",
+      "extended": "Przedłużono do {time}",
+      "extendedFollowUp": "Utworzono {name}, trwa do {time}",
+      "extendFailed": "Nie udało się przedłużyć przerwy",
       "deleted": "Przerwa usunięta",
       "deleteFailed": "Nie udało się usunąć przerwy",
       "created": "Przerwa utworzona",

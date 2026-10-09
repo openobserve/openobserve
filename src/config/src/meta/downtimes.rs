@@ -190,6 +190,8 @@ pub enum DowntimeStatus {
     Active,
     Ended,
     Cancelled,
+    /// Cancelled inside a window, which it cut short.
+    EndedEarly,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -337,7 +339,7 @@ pub struct CorrectionRef {
 pub struct ListDowntimesQuery {
     /// Absent means every folder the user may list.
     pub folder_id: Option<String>,
-    /// `scheduled`, `active`, `ended` or `cancelled`.
+    /// `scheduled`, `active`, `ended`, `ended_early` or `cancelled`.
     pub status: Option<String>,
     /// `none`, `daily`, `weekly`, or `recurring` for both.
     pub repeat: Option<String>,
@@ -355,6 +357,7 @@ pub struct DowntimeStatusCounts {
     pub recurring: usize,
     pub ended: usize,
     pub cancelled: usize,
+    pub ended_early: usize,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -390,6 +393,27 @@ pub struct MoveDowntimesRequest {
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct CreateDowntimeResponse {
     pub id: String,
+}
+
+/// `POST /v2/{org}/downtimes/{id}/extend`: exactly one of `by_secs` and `until`.
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct ExtendDowntimeRequest {
+    /// Added to the later of the current end and now.
+    #[serde(default)]
+    pub by_secs: Option<i64>,
+    /// The new end, microseconds UTC.
+    #[serde(default)]
+    pub until: Option<i64>,
+}
+
+/// The row that now ends later: the extended one-time row, or the follow-up of a recurring one.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ExtendDowntimeResponse {
+    #[serde(flatten)]
+    pub downtime: Downtime,
+    /// Set when a recurring row got a one-time follow-up instead of a longer window.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_id: Option<String>,
 }
 
 pub fn default_folder() -> String {
@@ -631,6 +655,29 @@ mod tests {
         assert_eq!(json["status"], "scheduled");
         assert!(json["current_window"].is_null());
         assert_eq!(json["next_window"]["end"], 2);
+    }
+
+    #[test]
+    fn ended_early_is_snake_case_on_the_wire() {
+        assert_eq!(
+            serde_json::to_value(DowntimeStatus::EndedEarly).unwrap(),
+            "ended_early"
+        );
+    }
+
+    #[test]
+    fn an_extend_body_takes_either_field_and_the_response_flattens_the_row() {
+        let by: ExtendDowntimeRequest = serde_json::from_str(r#"{ "by_secs": 1800 }"#).unwrap();
+        assert_eq!((by.by_secs, by.until), (Some(1800), None));
+        let until: ExtendDowntimeRequest = serde_json::from_str(r#"{ "until": 5 }"#).unwrap();
+        assert_eq!((until.by_secs, until.until), (None, Some(5)));
+        let json = serde_json::to_value(ExtendDowntimeResponse {
+            downtime: minimal(),
+            created_id: None,
+        })
+        .unwrap();
+        assert_eq!(json["id"], "2f9KQe4b7Nq1vH3sT0mLzXpRcWd");
+        assert!(json.get("created_id").is_none());
     }
 
     #[test]

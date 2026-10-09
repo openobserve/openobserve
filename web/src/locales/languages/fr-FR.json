@@ -8920,6 +8920,7 @@
         "recurring": "Récurrentes",
         "ended": "Terminées",
         "cancelled": "Annulées",
+        "endedEarly": "Terminé plus tôt",
         "total": "Total"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Récurrente",
       "bannerOn": "Une bannière s'affiche pour tous les membres de l'organisation tant que cette plage de maintenance est active",
       "endsLabel": "fin",
+      "confirmEndNow": {
+        "title": "Terminer cette indisponibilité maintenant ?",
+        "message": "Les notifications reprennent aussitôt. L'indisponibilité reste dans la liste comme terminée plus tôt.",
+        "ok": "Terminer maintenant",
+        "keep": "Laisser continuer"
+      },
+      "extend": {
+        "menu": "Prolonger de",
+        "notActive": "Seule une indisponibilité active peut être prolongée",
+        "dialogTitle": "Prolonger {name}",
+        "newEnd": "Nouvelle fin",
+        "confirmUntil": "Prolonger jusqu'à {time}",
+        "followUp": "Cette indisponibilité se répète, son planning reste donc inchangé. Une indisponibilité ponctuelle nommée {name} est créée à partir de la fin de la fenêtre actuelle.",
+        "endAfterCurrent": "La nouvelle fin doit être postérieure à la fin actuelle."
+      },
       "nextLabel": "prochaine",
       "matched": {
         "alerts": "{count} alerte | {count} alertes",
@@ -8951,7 +8967,8 @@
         "cancel": "Annuler la plage de maintenance",
         "delete": "Supprimer",
         "more": "Plus d'actions",
-        "muteForHour": "Mettre en sourdine maintenant pour 1 h"
+        "muteForHour": "Mettre en sourdine maintenant pour 1 h",
+        "extend": "Prolonger"
       },
       "confirmCancel": {
         "title": "Annuler l'indisponibilité",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "se termine dans moins d'une minute",
         "endsInMinutes": "se termine dans {count} minute | se termine dans {count} minutes",
         "endsIn": "se termine dans {duration}",
+        "firstEndsInUnderMinute": "la première se termine dans moins d'une minute",
+        "firstEndsInMinutes": "la première se termine dans {count} minute | la première se termine dans {count} minutes",
+        "firstEndsIn": "la première se termine dans {duration}",
         "count": "{module} {count}",
         "showBanner": "Afficher une bannière à tous les membres de l'organisation pendant que cette période de silence est active",
         "showBannerCaption": "La bannière affiche le nom, les décomptes concernés et le temps restant. Elle ne mentionne jamais une alerte.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Planifié",
         "active": "Actif",
         "ended": "Terminé",
-        "cancelled": "Annulé"
+        "cancelled": "Annulé",
+        "endedEarly": "Terminé plus tôt"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Indisponibilité annulée",
       "cancelledMany": "{count} indisponibilité annulée | {count} indisponibilités annulées",
       "cancelFailed": "Impossible d'annuler l'indisponibilité",
+      "extended": "Prolongée jusqu'à {time}",
+      "extendedFollowUp": "{name} créée, active jusqu'à {time}",
+      "extendFailed": "Impossible de prolonger l'indisponibilité",
       "deleted": "Indisponibilité supprimée",
       "deleteFailed": "Impossible de supprimer l'indisponibilité",
       "created": "Indisponibilité créée",

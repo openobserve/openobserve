@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="downtime" #actions-overflow>
       <OButton
+        v-if="isEditable(downtime)"
         variant="outline"
         size="sm"
         icon-left="edit"
@@ -62,13 +63,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-if="downtime && cancellable" #actions>
+      <ExtendDowntimeMenu
+        :enabled="isExtendable(downtime)"
+        data-test="downtime-detail-extend"
+        @preset="(secs) => downtime && extendBy(downtime, secs)"
+        @until="extendOpen = true"
+      />
       <OButton
         variant="destructive"
         size="sm"
-        data-test="downtime-detail-cancel"
+        :data-test="endsNow ? 'downtime-detail-end-now' : 'downtime-detail-cancel'"
         @click="cancelOpen = true"
       >
-        {{ t("alerts.downtimes.actions.cancel") }}
+        {{ endsNow ? t("alerts.downtimes.actions.endNow") : t("alerts.downtimes.actions.cancel") }}
       </OButton>
     </template>
 
@@ -158,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DowntimeScheduleBand
             :past="pastWindows"
             :active="downtime.current_window"
-            :next="downtime.status === 'cancelled' ? null : downtime.next_window"
+            :next="isCalledOff(downtime) ? null : downtime.next_window"
             :timezone="downtime.schedule.timezone"
             :now-micros="nowMicros"
           />
@@ -239,11 +246,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OContent>
 
     <ConfirmDialog
+      v-if="endsNow"
+      v-model="cancelOpen"
+      :title="t('alerts.downtimes.confirmEndNow.title')"
+      :message="t('alerts.downtimes.confirmEndNow.message')"
+      :ok-label="t('alerts.downtimes.confirmEndNow.ok')"
+      :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
+      ok-color="destructive"
+      @update:ok="confirmCancel"
+      @update:cancel="cancelOpen = false"
+    />
+    <ConfirmDialog
+      v-else
       v-model="cancelOpen"
       :title="t('alerts.downtimes.confirmCancel.title')"
       :message="t('alerts.downtimes.confirmCancel.message')"
       @update:ok="confirmCancel"
       @update:cancel="cancelOpen = false"
+    />
+
+    <ExtendDowntimeDialog
+      v-model:open="extendOpen"
+      :downtime="downtime"
+      data-test="downtime-detail-extend-dialog"
     />
   </OPageLayout>
 </template>
@@ -294,6 +319,11 @@ import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import DowntimeScheduleBand from "./DowntimeScheduleBand.vue";
+import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
+import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
+import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
+import { isExtendable } from "@/utils/downtimes/extend";
+import { isEditable } from "@/utils/downtimes/listOrder";
 
 type DetailTab = "overview" | "affected" | "suppressed";
 
@@ -375,9 +405,13 @@ const targetFolderName: FolderNameFn = (module, fid) =>
     fid,
   );
 
-const cancellable = computed(
-  () => downtime.value?.status === "active" || downtime.value?.status === "scheduled",
-);
+const cancellable = computed(() => !!downtime.value && isEditable(downtime.value));
+const endsNow = computed(() => downtime.value?.status === "active");
+const isCalledOff = (d: { status: string }) =>
+  d.status === "cancelled" || d.status === "ended_early";
+
+const { extendBy } = useExtendDowntime();
+const extendOpen = ref(false);
 
 const conditionText = computed(() =>
   downtime.value ? conditionSummary(downtime.value.condition, t) : null,
@@ -391,7 +425,7 @@ const pastWindows = computed(() =>
 );
 
 const nextWindow = computed(() =>
-  downtime.value && downtime.value.status !== "cancelled"
+  downtime.value && !isCalledOff(downtime.value)
     ? (downtime.value.next_window ?? currentOrNextWindow(downtime.value.schedule, nowMicros))
     : null,
 );

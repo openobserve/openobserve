@@ -8920,6 +8920,7 @@
         "recurring": "Ricorrenti",
         "ended": "Conclusi",
         "cancelled": "Annullati",
+        "endedEarly": "Terminato in anticipo",
         "total": "Totale"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Ricorrente",
       "bannerOn": "Un banner viene mostrato a tutti nell'organizzazione mentre questo periodo di inattività è attivo",
       "endsLabel": "termina",
+      "confirmEndNow": {
+        "title": "Terminare questo downtime ora?",
+        "message": "Le notifiche riprendono subito. Il downtime resta nell'elenco come terminato in anticipo.",
+        "ok": "Termina ora",
+        "keep": "Lascia attivo"
+      },
+      "extend": {
+        "menu": "Estendi di",
+        "notActive": "Solo un downtime attivo può essere esteso",
+        "dialogTitle": "Estendi {name}",
+        "newEnd": "Nuova fine",
+        "confirmUntil": "Estendi fino alle {time}",
+        "followUp": "Questo downtime si ripete, quindi la sua pianificazione resta invariata. Viene creato un downtime singolo chiamato {name} dalla fine della finestra attuale.",
+        "endAfterCurrent": "La nuova fine deve essere successiva alla fine attuale."
+      },
       "nextLabel": "prossimo",
       "matched": {
         "alerts": "{count} avviso | {count} avvisi",
@@ -8951,7 +8967,8 @@
         "cancel": "Annulla periodo di inattività",
         "delete": "Elimina",
         "more": "Altre azioni",
-        "muteForHour": "Silenzia ora per 1 h"
+        "muteForHour": "Silenzia ora per 1 h",
+        "extend": "Estendi"
       },
       "confirmCancel": {
         "title": "Annulla downtime",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "termina tra meno di un minuto",
         "endsInMinutes": "termina tra {count} minuto | termina tra {count} minuti",
         "endsIn": "termina tra {duration}",
+        "firstEndsInUnderMinute": "il primo termina tra meno di un minuto",
+        "firstEndsInMinutes": "il primo termina tra {count} minuto | il primo termina tra {count} minuti",
+        "firstEndsIn": "il primo termina tra {duration}",
         "count": "{module} {count}",
         "showBanner": "Mostra un banner a tutti nell'organizzazione mentre questo silenziamento è attivo",
         "showBannerCaption": "Il banner mostra il nome, i conteggi interessati e il tempo rimanente. Non nomina mai un avviso.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Pianificato",
         "active": "Attivo",
         "ended": "Terminato",
-        "cancelled": "Annullato"
+        "cancelled": "Annullato",
+        "endedEarly": "Terminato in anticipo"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Downtime annullato",
       "cancelledMany": "{count} downtime annullato | {count} downtime annullati",
       "cancelFailed": "Impossibile annullare il downtime",
+      "extended": "Esteso fino alle {time}",
+      "extendedFollowUp": "Creato {name}, attivo fino alle {time}",
+      "extendFailed": "Impossibile estendere il downtime",
       "deleted": "Downtime eliminato",
       "deleteFailed": "Impossibile eliminare il downtime",
       "created": "Downtime creato",

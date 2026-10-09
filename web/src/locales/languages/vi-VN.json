@@ -8920,6 +8920,7 @@
         "recurring": "Định kỳ",
         "ended": "Đã kết thúc",
         "cancelled": "Đã hủy",
+        "endedEarly": "Kết thúc sớm",
         "total": "Tổng"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Định kỳ",
       "bannerOn": "Biểu ngữ hiển thị cho mọi người trong tổ chức khi thời gian ngừng này đang hoạt động",
       "endsLabel": "kết thúc",
+      "confirmEndNow": {
+        "title": "Kết thúc thời gian ngừng này ngay?",
+        "message": "Thông báo sẽ tiếp tục ngay. Thời gian ngừng vẫn ở trong danh sách với trạng thái kết thúc sớm.",
+        "ok": "Kết thúc ngay",
+        "keep": "Tiếp tục chạy"
+      },
+      "extend": {
+        "menu": "Gia hạn thêm",
+        "notActive": "Chỉ có thể gia hạn thời gian ngừng đang hoạt động",
+        "dialogTitle": "Gia hạn {name}",
+        "newEnd": "Kết thúc mới",
+        "confirmUntil": "Gia hạn đến {time}",
+        "followUp": "Thời gian ngừng này lặp lại nên lịch của nó giữ nguyên. Một thời gian ngừng một lần tên {name} sẽ được tạo từ cuối cửa sổ hiện tại.",
+        "endAfterCurrent": "Thời điểm kết thúc mới phải sau thời điểm kết thúc hiện tại."
+      },
       "nextLabel": "tiếp theo",
       "matched": {
         "alerts": "{count} cảnh báo | {count} cảnh báo",
@@ -8951,7 +8967,8 @@
         "cancel": "Hủy thời gian ngừng",
         "delete": "Xóa",
         "more": "Thêm hành động",
-        "muteForHour": "Tắt tiếng ngay trong 1 giờ"
+        "muteForHour": "Tắt tiếng ngay trong 1 giờ",
+        "extend": "Gia hạn"
       },
       "confirmCancel": {
         "title": "Hủy khoảng ngừng",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "kết thúc sau chưa đầy một phút",
         "endsInMinutes": "kết thúc sau {count} phút | kết thúc sau {count} phút",
         "endsIn": "kết thúc sau {duration}",
+        "firstEndsInUnderMinute": "cái đầu tiên kết thúc sau chưa đầy một phút",
+        "firstEndsInMinutes": "cái đầu tiên kết thúc sau {count} phút | cái đầu tiên kết thúc sau {count} phút",
+        "firstEndsIn": "cái đầu tiên kết thúc sau {duration}",
         "count": "{module} {count}",
         "showBanner": "Hiển thị biểu ngữ cho mọi người trong tổ chức khi khoảng thời gian tắt thông báo này đang hoạt động",
         "showBannerCaption": "Biểu ngữ hiển thị tên, số lượng bị ảnh hưởng và thời gian còn lại. Nó không bao giờ nêu tên cảnh báo.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Đã lên lịch",
         "active": "Đang hoạt động",
         "ended": "Đã kết thúc",
-        "cancelled": "Đã hủy"
+        "cancelled": "Đã hủy",
+        "endedEarly": "Kết thúc sớm"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Đã hủy thời gian ngừng",
       "cancelledMany": "Đã hủy {count} thời gian ngừng | Đã hủy {count} thời gian ngừng",
       "cancelFailed": "Không thể hủy thời gian ngừng",
+      "extended": "Đã gia hạn đến {time}",
+      "extendedFollowUp": "Đã tạo {name}, chạy đến {time}",
+      "extendFailed": "Không thể gia hạn thời gian ngừng",
       "deleted": "Đã xóa thời gian ngừng",
       "deleteFailed": "Không thể xóa thời gian ngừng",
       "created": "Đã tạo thời gian ngừng",

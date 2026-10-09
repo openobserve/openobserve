@@ -2100,6 +2100,7 @@ pub fn downtime_routes() -> Router {
         .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
         .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
         .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
 }
 
 /// Create other service routes (AWS, GCP, RUM)

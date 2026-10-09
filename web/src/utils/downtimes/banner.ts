@@ -27,17 +27,32 @@ export interface BannerCount {
 const MINUTE_SECS = 60;
 const HOUR_SECS = 3600;
 
+const DOWNTIME_BANNER_PREFIX = "downtime:";
+
 /** "ends in 2 h 15 min", "ends in 5 minutes", "ends in less than a minute", or "ended"; minutes round down. */
-export function countdownText(remainingSecs: number, t: TranslateFn): I18nText {
+export function countdownText(remainingSecs: number, t: TranslateFn, first = false): I18nText {
   if (remainingSecs <= 0) return t("alerts.downtimes.banner.ended");
-  if (remainingSecs < MINUTE_SECS) return t("alerts.downtimes.banner.endsInUnderMinute");
+  if (remainingSecs < MINUTE_SECS) {
+    return first
+      ? t("alerts.downtimes.banner.firstEndsInUnderMinute")
+      : t("alerts.downtimes.banner.endsInUnderMinute");
+  }
   const minutes = Math.floor(remainingSecs / MINUTE_SECS);
   if (remainingSecs < HOUR_SECS) {
-    return t("alerts.downtimes.banner.endsInMinutes", { count: minutes }, minutes);
+    return first
+      ? t("alerts.downtimes.banner.firstEndsInMinutes", { count: minutes }, minutes)
+      : t("alerts.downtimes.banner.endsInMinutes", { count: minutes }, minutes);
   }
-  return t("alerts.downtimes.banner.endsIn", {
-    duration: formatDuration(minutes * MINUTE_SECS, t),
-  });
+  const duration = formatDuration(minutes * MINUTE_SECS, t);
+  return first
+    ? t("alerts.downtimes.banner.firstEndsIn", { duration })
+    : t("alerts.downtimes.banner.endsIn", { duration });
+}
+
+/** How many downtime rows a generated banner covers; its id lists one `<row>:<start>` per row. */
+export function bannerRowCount(bannerId: string): number {
+  if (!bannerId.startsWith(DOWNTIME_BANNER_PREFIX)) return 0;
+  return bannerId.slice(DOWNTIME_BANNER_PREFIX.length).split(",").filter(Boolean).length;
 }
 
 /** Milliseconds until `countdownText` reads differently, or `null` once it reads "ended". */

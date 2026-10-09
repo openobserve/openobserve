@@ -21,9 +21,9 @@ use axum::{
     response::Response,
 };
 use config::meta::downtimes::{
-    CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, ListDowntimesQuery,
-    ListDowntimesResponse, MoveDowntimesRequest, PreviewRequest, PreviewResponse, ResourcesRequest,
-    ResourcesResponse,
+    CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, ExtendDowntimeRequest,
+    ExtendDowntimeResponse, ListDowntimesQuery, ListDowntimesResponse, MoveDowntimesRequest,
+    PreviewRequest, PreviewResponse, ResourcesRequest, ResourcesResponse,
 };
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
@@ -304,6 +304,48 @@ pub async fn cancel_downtime(
     }
 }
 
+/// ExtendDowntime
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/downtimes/{downtime_id}/extend",
+    context_path = "/api",
+    tag = "Downtimes",
+    operation_id = "ExtendDowntime",
+    summary = "Extend an active downtime",
+    description = "Moves the end of the active window by `by_secs` or to `until`, exactly one of them. A recurring downtime keeps its schedule; a one-time downtime named \"<name> (extended)\" is created from the end of the current window instead, and its id is returned as `created_id`.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("downtime_id" = String, Path, description = "Downtime id"),
+    ),
+    request_body(content = ExtendDowntimeRequest, description = "The extension", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Extended", content_type = "application/json", body = ExtendDowntimeResponse),
+        (status = 400, description = "Not active, or an invalid extension", content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 409, description = "The downtime changed since it was read", content_type = "application/json", body = ()),
+    ),
+)]
+pub async fn extend_downtime(
+    Path((org_id, downtime_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<ExtendDowntimeRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        respond(
+            openobserve_core::downtimes::extend(&org_id, &user_email.user_id, &downtime_id, &req)
+                .await,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, downtime_id, user_email, req);
+        not_supported()
+    }
+}
+
 /// MoveDowntimes
 #[utoipa::path(
     patch,
@@ -473,6 +515,7 @@ mod tests {
             get_downtime(one(), user()).await,
             update_downtime(one(), user(), Json(body)).await,
             cancel_downtime(one(), user()).await,
+            extend_downtime(one(), user(), Json(ExtendDowntimeRequest::default())).await,
             delete_downtime(one(), user()).await,
         ];
         for response in responses {

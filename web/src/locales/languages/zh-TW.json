@@ -8915,6 +8915,7 @@
         "recurring": "週期性",
         "ended": "已結束",
         "cancelled": "已取消",
+        "endedEarly": "提前結束",
         "total": "總計"
       },
       "columns": {
@@ -8931,6 +8932,21 @@
       "recurring": "週期性",
       "bannerOn": "此停機時段作用中時，會向組織中的所有人顯示橫幅",
       "endsLabel": "結束",
+      "confirmEndNow": {
+        "title": "立即結束此停機時間？",
+        "message": "通知會立即恢復。此停機時間會以提前結束狀態保留在清單中。",
+        "ok": "立即結束",
+        "keep": "繼續執行"
+      },
+      "extend": {
+        "menu": "延長時長",
+        "notActive": "只能延長處於啟用狀態的停機時間",
+        "dialogTitle": "延長 {name}",
+        "newEnd": "新的結束時間",
+        "confirmUntil": "延長至 {time}",
+        "followUp": "此停機時間會重複，因此其排程保持不變。將從目前時段結束時建立名為 {name} 的一次性停機時間。",
+        "endAfterCurrent": "新的結束時間必須晚於目前的結束時間。"
+      },
       "nextLabel": "下次",
       "matched": {
         "alerts": "{count} 個警示 | {count} 個警示",
@@ -8946,7 +8962,8 @@
         "cancel": "取消停機時段",
         "delete": "刪除",
         "more": "更多動作",
-        "muteForHour": "立即靜音 1 小時"
+        "muteForHour": "立即靜音 1 小時",
+        "extend": "延長"
       },
       "confirmCancel": {
         "title": "取消停機時段",
@@ -9182,6 +9199,9 @@
         "endsInUnderMinute": "將於不到一分鐘後結束",
         "endsInMinutes": "將於 {count} 分鐘後結束 | 將於 {count} 分鐘後結束",
         "endsIn": "將於 {duration} 後結束",
+        "firstEndsInUnderMinute": "最早的一個不到一分鐘後結束",
+        "firstEndsInMinutes": "最早的一個將於 {count} 分鐘後結束 | 最早的一個將於 {count} 分鐘後結束",
+        "firstEndsIn": "最早的一個將於 {duration} 後結束",
         "count": "{module} {count}",
         "showBanner": "當此靜音期間生效時，向組織中的所有人顯示橫幅",
         "showBannerCaption": "橫幅會顯示名稱、受影響的數量和剩餘時間。它永遠不會列出警示名稱。",
@@ -17637,7 +17657,8 @@
         "scheduled": "已排程",
         "active": "進行中",
         "ended": "已結束",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "endedEarly": "提前結束"
       }
     }
   },
@@ -18039,6 +18060,9 @@
       "cancelled": "停機時間已取消",
       "cancelledMany": "{count} 個停機時間已取消 | {count} 個停機時間已取消",
       "cancelFailed": "無法取消停機時間",
+      "extended": "已延長至 {time}",
+      "extendedFollowUp": "已建立 {name}，執行至 {time}",
+      "extendFailed": "無法延長停機時間",
       "deleted": "停機時間已刪除",
       "deleteFailed": "無法刪除停機時間",
       "created": "停機時間已建立",

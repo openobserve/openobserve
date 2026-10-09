@@ -8920,6 +8920,7 @@
         "recurring": "Wiederkehrend",
         "ended": "Beendet",
         "cancelled": "Abgebrochen",
+        "endedEarly": "Vorzeitig beendet",
         "total": "Gesamt"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Wiederkehrend",
       "bannerOn": "Solange dieses Wartungsfenster aktiv ist, wird allen in der Organisation ein Banner angezeigt",
       "endsLabel": "endet",
+      "confirmEndNow": {
+        "title": "Diese Ausfallzeit jetzt beenden?",
+        "message": "Benachrichtigungen werden sofort wieder gesendet. Die Ausfallzeit bleibt als vorzeitig beendet in der Liste.",
+        "ok": "Jetzt beenden",
+        "keep": "Weiterlaufen lassen"
+      },
+      "extend": {
+        "menu": "Verlängern um",
+        "notActive": "Nur eine aktive Ausfallzeit kann verlängert werden",
+        "dialogTitle": "{name} verlängern",
+        "newEnd": "Neues Ende",
+        "confirmUntil": "Bis {time} verlängern",
+        "followUp": "Diese Ausfallzeit wiederholt sich, daher bleibt ihr Zeitplan unverändert. Eine einmalige Ausfallzeit namens {name} wird ab dem Ende des aktuellen Fensters erstellt.",
+        "endAfterCurrent": "Das neue Ende muss nach dem aktuellen Ende liegen."
+      },
       "nextLabel": "nächste",
       "matched": {
         "alerts": "{count} Warnmeldung | {count} Warnmeldungen",
@@ -8951,7 +8967,8 @@
         "cancel": "Wartungsfenster abbrechen",
         "delete": "Löschen",
         "more": "Weitere Aktionen",
-        "muteForHour": "Jetzt für 1 Std. stummschalten"
+        "muteForHour": "Jetzt für 1 Std. stummschalten",
+        "extend": "Verlängern"
       },
       "confirmCancel": {
         "title": "Wartungsfenster abbrechen",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "endet in weniger als einer Minute",
         "endsInMinutes": "endet in {count} Minute | endet in {count} Minuten",
         "endsIn": "endet in {duration}",
+        "firstEndsInUnderMinute": "erste endet in weniger als einer Minute",
+        "firstEndsInMinutes": "erste endet in {count} Minute | erste endet in {count} Minuten",
+        "firstEndsIn": "erste endet in {duration}",
         "count": "{module} {count}",
         "showBanner": "Allen in der Organisation ein Banner anzeigen, solange diese Ausfallzeit aktiv ist",
         "showBannerCaption": "Das Banner zeigt den Namen, die betroffenen Anzahlen und die verbleibende Zeit. Es nennt nie eine Warnmeldung.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Geplant",
         "active": "Aktiv",
         "ended": "Beendet",
-        "cancelled": "Storniert"
+        "cancelled": "Storniert",
+        "endedEarly": "Vorzeitig beendet"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Ausfallzeit storniert",
       "cancelledMany": "{count} Ausfallzeit storniert | {count} Ausfallzeiten storniert",
       "cancelFailed": "Die Ausfallzeit konnte nicht storniert werden",
+      "extended": "Verlängert bis {time}",
+      "extendedFollowUp": "{name} erstellt, läuft bis {time}",
+      "extendFailed": "Die Ausfallzeit konnte nicht verlängert werden",
       "deleted": "Ausfallzeit gelöscht",
       "deleteFailed": "Die Ausfallzeit konnte nicht gelöscht werden",
       "created": "Ausfallzeit erstellt",

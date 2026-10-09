@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="text-xs font-medium whitespace-nowrap tabular-nums"
     :data-test="dataTest"
   >
-    {{ countdownText(remainingSecs, t) }}
+    {{ countdownText(remainingSecs, t, first) }}
   </span>
 </template>
 
@@ -35,9 +35,11 @@ const props = withDefaults(
     endsAt: number;
     /** The clock to count against, e.g. the server-corrected one. */
     now?: () => number;
+    /** The soonest of several ends, worded "first ends in …". */
+    first?: boolean;
     dataTest?: string;
   }>(),
-  { now: () => Date.now(), dataTest: "downtime-countdown" },
+  { now: () => Date.now(), first: false, dataTest: "downtime-countdown" },
 );
 
 const { t } = useI18nTyped();

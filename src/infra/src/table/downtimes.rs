@@ -23,8 +23,8 @@ use config::meta::{
 };
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, NotSet, PaginatorTrait, QueryFilter,
-    QueryOrder, Set,
-    sea_query::{Expr, OnConflict},
+    QueryOrder, QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType, OnConflict},
 };
 use svix_ksuid::KsuidLike;
 
@@ -84,6 +84,16 @@ pub async fn put_if_unchanged(
 ) -> Result<bool, errors::Error> {
     let client = get_orm_client_rw().await;
     put_if_unchanged_with(client, downtime, expected_updated_at).await
+}
+
+/// Inserts `row` only while `parent` still has `expected_updated_at`, uncancelled and not deleted.
+pub async fn insert_if_parent_unchanged(
+    row: &Downtime,
+    parent_id: &str,
+    expected_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    insert_if_parent_unchanged_with(client, row, parent_id, expected_updated_at).await
 }
 
 /// Soft delete: the row stays as a tombstone so a late replicated put cannot bring it back.
@@ -297,6 +307,30 @@ pub async fn put_if_unchanged_with<C: ConnectionTrait>(
         .exec(conn)
         .await?;
     Ok(res.rows_affected == 1)
+}
+
+pub async fn insert_if_parent_unchanged_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    row: &Downtime,
+    parent_id: &str,
+    expected_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await?;
+    let mut parent = Entity::find_by_id(parent_id).filter(Column::Org.eq(&row.org));
+    // The row lock holds a racing cancel until this commits; SQLite serializes writers instead.
+    if txn.get_database_backend() != sea_orm::DatabaseBackend::Sqlite {
+        parent = parent.lock(LockType::Update);
+    }
+    let unchanged = parent.one(&txn).await?.is_some_and(|p| {
+        p.updated_at == expected_updated_at && p.cancelled_at.is_none() && p.deleted_at.is_none()
+    });
+    if !unchanged {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+    put_with(&txn, row).await?;
+    txn.commit().await?;
+    Ok(true)
 }
 
 /// Marks the row deleted as a new version; returns the tombstone's version, `None` for no row.
@@ -873,6 +907,71 @@ mod tests {
         foreign.org = "other".to_string();
         foreign.folder_id = "default".to_string();
         assert!(!put_if_unchanged_with(&db, &foreign, 3).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn an_extension_read_before_a_cancel_is_refused_and_the_cancel_stands() {
+        let db = db().await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+
+        let mut cancelled = d.clone();
+        cancelled.cancelled_at = Some(10 * DAY + 1);
+        cancelled.cancelled_by = Some("lin".to_string());
+        cancelled.updated_at = 2;
+        assert!(put_if_unchanged_with(&db, &cancelled, 1).await.unwrap());
+
+        let mut extended = d.clone();
+        extended.schedule.ends_at = Some(12 * DAY);
+        extended.schedule.duration_secs = 2 * 86_400;
+        extended.updated_at = 3;
+        assert!(!put_if_unchanged_with(&db, &extended, 1).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(cancelled));
+    }
+
+    #[tokio::test]
+    async fn a_follow_up_is_inserted_only_while_its_parent_is_unchanged() {
+        let db = db().await;
+        let parent = downtime("p1", Repeat::Daily, None);
+        put_with(&db, &parent).await.unwrap();
+        let follow_up = downtime("f1", Repeat::None, Some(11 * DAY));
+        assert!(
+            insert_if_parent_unchanged_with(&db, &follow_up, "p1", 1)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            get_with(&db, "acme", "f1").await.unwrap(),
+            Some(follow_up.clone())
+        );
+        assert_eq!(
+            get_with(&db, "acme", "p1").await.unwrap(),
+            Some(parent.clone())
+        );
+
+        let mut cancelled = parent.clone();
+        cancelled.cancelled_at = Some(10 * DAY + 1);
+        cancelled.cancelled_by = Some("lin".to_string());
+        cancelled.updated_at = 2;
+        assert!(put_if_unchanged_with(&db, &cancelled, 1).await.unwrap());
+        let late = downtime("f2", Repeat::None, Some(11 * DAY));
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &late, "p1", 1)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &late, "p1", 2)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "f2").await.unwrap(), None);
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &late, "missing", 1)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "f2").await.unwrap(), None);
     }
 
     #[tokio::test]

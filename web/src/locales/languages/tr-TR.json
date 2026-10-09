@@ -8920,6 +8920,7 @@
         "recurring": "Yinelenen",
         "ended": "Sona erdi",
         "cancelled": "İptal edildi",
+        "endedEarly": "Erken bitti",
         "total": "Toplam"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Yinelenen",
       "bannerOn": "Bu kesinti etkinken kuruluştaki herkese bir banner gösterilir",
       "endsLabel": "bitiş",
+      "confirmEndNow": {
+        "title": "Bu kesinti şimdi bitirilsin mi?",
+        "message": "Bildirimler hemen yeniden başlar. Kesinti listede erken bitti olarak kalır.",
+        "ok": "Şimdi bitir",
+        "keep": "Devam etsin"
+      },
+      "extend": {
+        "menu": "Uzatma süresi",
+        "notActive": "Yalnızca etkin bir kesinti uzatılabilir",
+        "dialogTitle": "{name} uzat",
+        "newEnd": "Yeni bitiş",
+        "confirmUntil": "{time} saatine kadar uzat",
+        "followUp": "Bu kesinti tekrarlandığı için zamanlaması olduğu gibi kalır. Geçerli pencerenin bitişinden itibaren {name} adlı tek seferlik bir kesinti oluşturulur.",
+        "endAfterCurrent": "Yeni bitiş, geçerli bitişten sonra olmalıdır."
+      },
       "nextLabel": "sonraki",
       "matched": {
         "alerts": "{count} uyarı | {count} uyarılar",
@@ -8951,7 +8967,8 @@
         "cancel": "Kesintiyi iptal et",
         "delete": "Sil",
         "more": "Diğer işlemler",
-        "muteForHour": "Şimdi 1 saat sessize al"
+        "muteForHour": "Şimdi 1 saat sessize al",
+        "extend": "Uzat"
       },
       "confirmCancel": {
         "title": "Kesinti süresini iptal et",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "bir dakikadan kısa süre içinde bitiyor",
         "endsInMinutes": "{count} dakika içinde bitiyor | {count} dakika içinde bitiyor",
         "endsIn": "{duration} içinde bitiyor",
+        "firstEndsInUnderMinute": "ilki bir dakikadan kısa sürede bitiyor",
+        "firstEndsInMinutes": "ilki {count} dakika içinde bitiyor | ilki {count} dakika içinde bitiyor",
+        "firstEndsIn": "ilki {duration} içinde bitiyor",
         "count": "{module} {count}",
         "showBanner": "Bu kesinti aktifken organizasyondaki herkese bir banner göster",
         "showBannerCaption": "Banner adı, etkilenen sayıları ve kalan süreyi gösterir. Hiçbir zaman bir uyarının adını vermez.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Planlandı",
         "active": "Etkin",
         "ended": "Sona erdi",
-        "cancelled": "İptal edildi"
+        "cancelled": "İptal edildi",
+        "endedEarly": "Erken bitti"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Kesinti iptal edildi",
       "cancelledMany": "{count} kesinti iptal edildi | {count} kesinti iptal edildi",
       "cancelFailed": "Kesinti iptal edilemedi",
+      "extended": "{time} saatine kadar uzatıldı",
+      "extendedFollowUp": "{name} oluşturuldu, {time} saatine kadar sürüyor",
+      "extendFailed": "Kesinti uzatılamadı",
       "deleted": "Kesinti silindi",
       "deleteFailed": "Kesinti silinemedi",
       "created": "Kesinti oluşturuldu",

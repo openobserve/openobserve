@@ -16,7 +16,7 @@
 import http from "./http";
 
 export type TargetModule = "alerts" | "anomaly_detections" | "synthetics" | "slos";
-export type DowntimeStatus = "scheduled" | "active" | "ended" | "cancelled";
+export type DowntimeStatus = "scheduled" | "active" | "ended" | "cancelled" | "ended_early";
 export type Repeat = "none" | "daily" | "weekly";
 export type LogicalOp = "and" | "or";
 export type PairOperator = "=" | "!=";
@@ -91,6 +91,7 @@ export interface DowntimeCounts {
   recurring: number;
   ended: number;
   cancelled: number;
+  ended_early: number;
 }
 
 export interface DowntimeListResponse {
@@ -126,6 +127,14 @@ export interface DowntimeRequest {
   targets: DowntimeTarget[];
   schedule: DowntimeSchedule;
   show_banner: boolean;
+}
+
+/** Exactly one of the two. */
+export type ExtendDowntimeRequest = { by_secs: number } | { until: number };
+
+/** The row that now ends later; for a recurring row, the one-time follow-up it created. */
+export interface ExtendDowntimeResponse extends Downtime {
+  created_id?: string;
 }
 
 export interface PreviewRequest {
@@ -203,6 +212,8 @@ const downtimes = {
     http().put(one(org, id), body, inFolder(body.folder_id)),
   cancel: (org: string, id: string, folder?: string) =>
     http().post(`${one(org, id)}/cancel`, undefined, inFolder(folder)),
+  extend: (org: string, id: string, body: ExtendDowntimeRequest, folder?: string) =>
+    http().post<ExtendDowntimeResponse>(`${one(org, id)}/extend`, body, inFolder(folder)),
   remove: (org: string, id: string, folder?: string) =>
     http().delete(one(org, id), inFolder(folder)),
   move: (org: string, downtimeIds: string[], dstFolderId: string, folder?: string) =>

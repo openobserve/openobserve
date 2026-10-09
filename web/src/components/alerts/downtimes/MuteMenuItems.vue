@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- Direct items, not a hover submenu, so a preset is two clicks on a touch screen too. -->
 <template>
-  <ODropdownGroup :label="t('alerts.downtimes.mute.menu')">
+  <ODropdownGroup :label="t(LABELS[labels].menu)">
     <ODropdownItem
       v-for="preset in QUICK_MUTE_PRESETS"
       :key="preset.key"
-      icon-left="notifications-paused"
+      :icon-left="LABELS[labels].icon"
       :data-test="`${dataTestPrefix}-${preset.key}`"
       @select="emit('preset', preset.secs)"
     >
@@ -33,12 +33,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { QUICK_MUTE_PRESETS } from "@/utils/downtimes/quickMute";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
-withDefaults(defineProps<{ dataTestPrefix?: string }>(), { dataTestPrefix: "mute" });
+type LabelSet = "mute" | "extend";
+
+const LABELS: Record<LabelSet, { menu: I18nKey; icon: IconName }> = {
+  mute: { menu: "alerts.downtimes.mute.menu", icon: "notifications-paused" },
+  extend: { menu: "alerts.downtimes.extend.menu", icon: "hourglass-empty" },
+};
+
+withDefaults(defineProps<{ dataTestPrefix?: string; labels?: LabelSet }>(), {
+  dataTestPrefix: "mute",
+  labels: "mute",
+});
 
 const emit = defineEmits<{
   preset: [seconds: number];

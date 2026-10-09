@@ -8920,6 +8920,7 @@
         "recurring": "Recorrentes",
         "ended": "Encerradas",
         "cancelled": "Canceladas",
+        "endedEarly": "Terminada antes",
         "total": "Total"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "Recorrente",
       "bannerOn": "Um banner é exibido para todos na organização enquanto esta inatividade estiver ativa",
       "endsLabel": "termina",
+      "confirmEndNow": {
+        "title": "Encerrar esta indisponibilidade agora?",
+        "message": "As notificações são retomadas de imediato. A indisponibilidade fica na lista como terminada antes.",
+        "ok": "Encerrar agora",
+        "keep": "Manter ativa"
+      },
+      "extend": {
+        "menu": "Prolongar por",
+        "notActive": "Só é possível prolongar uma indisponibilidade ativa",
+        "dialogTitle": "Prolongar {name}",
+        "newEnd": "Novo fim",
+        "confirmUntil": "Prolongar até {time}",
+        "followUp": "Esta indisponibilidade repete-se, por isso o agendamento mantém-se. É criada uma indisponibilidade única chamada {name} a partir do fim da janela atual.",
+        "endAfterCurrent": "O novo fim tem de ser posterior ao fim atual."
+      },
       "nextLabel": "próxima",
       "matched": {
         "alerts": "{count} alerta | {count} alertas",
@@ -8951,7 +8967,8 @@
         "cancel": "Cancelar inatividade",
         "delete": "Excluir",
         "more": "Mais ações",
-        "muteForHour": "Silenciar agora por 1 h"
+        "muteForHour": "Silenciar agora por 1 h",
+        "extend": "Prolongar"
       },
       "confirmCancel": {
         "title": "Cancelar downtime",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "termina em menos de um minuto",
         "endsInMinutes": "termina em {count} minuto | termina em {count} minutos",
         "endsIn": "termina em {duration}",
+        "firstEndsInUnderMinute": "a primeira termina em menos de um minuto",
+        "firstEndsInMinutes": "a primeira termina em {count} minuto | a primeira termina em {count} minutos",
+        "firstEndsIn": "a primeira termina em {duration}",
         "count": "{module} {count}",
         "showBanner": "Mostrar um banner para todos na organização enquanto esta inatividade estiver ativa",
         "showBannerCaption": "O banner mostra o nome, as contagens afetadas e o tempo restante. Ele nunca nomeia um alerta.",
@@ -17642,7 +17662,8 @@
         "scheduled": "Agendada",
         "active": "Ativa",
         "ended": "Encerrada",
-        "cancelled": "Cancelada"
+        "cancelled": "Cancelada",
+        "endedEarly": "Terminada antes"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "Indisponibilidade cancelada",
       "cancelledMany": "{count} indisponibilidade cancelada | {count} indisponibilidades canceladas",
       "cancelFailed": "Não foi possível cancelar a indisponibilidade",
+      "extended": "Prolongada até {time}",
+      "extendedFollowUp": "{name} criada, ativa até {time}",
+      "extendFailed": "Não foi possível prolongar a indisponibilidade",
       "deleted": "Indisponibilidade excluída",
       "deleteFailed": "Não foi possível excluir a indisponibilidade",
       "created": "Indisponibilidade criada",

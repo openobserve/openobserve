@@ -8920,6 +8920,7 @@
         "recurring": "重复",
         "ended": "已结束",
         "cancelled": "已取消",
+        "endedEarly": "提前结束",
         "total": "总计"
       },
       "columns": {
@@ -8936,6 +8937,21 @@
       "recurring": "重复",
       "bannerOn": "此停机时间生效期间，组织内所有人都会看到横幅提示",
       "endsLabel": "结束",
+      "confirmEndNow": {
+        "title": "立即结束此停机？",
+        "message": "通知会立即恢复。该停机将以提前结束状态保留在列表中。",
+        "ok": "立即结束",
+        "keep": "继续运行"
+      },
+      "extend": {
+        "menu": "延长时长",
+        "notActive": "只能延长处于活动状态的停机",
+        "dialogTitle": "延长 {name}",
+        "newEnd": "新的结束时间",
+        "confirmUntil": "延长至 {time}",
+        "followUp": "此停机会重复，因此其计划保持不变。将从当前窗口结束时创建名为 {name} 的一次性停机。",
+        "endAfterCurrent": "新的结束时间必须晚于当前结束时间。"
+      },
       "nextLabel": "下次",
       "matched": {
         "alerts": "{count} 条告警 | {count} 条告警",
@@ -8951,7 +8967,8 @@
         "cancel": "取消停机时间",
         "delete": "删除",
         "more": "更多操作",
-        "muteForHour": "立即静音 1 小时"
+        "muteForHour": "立即静音 1 小时",
+        "extend": "延长"
       },
       "confirmCancel": {
         "title": "取消静默时段",
@@ -9187,6 +9204,9 @@
         "endsInUnderMinute": "不到 1 分钟后结束",
         "endsInMinutes": "{count} 分钟后结束 | {count} 分钟后结束",
         "endsIn": "{duration}后结束",
+        "firstEndsInUnderMinute": "最早的一个不到一分钟后结束",
+        "firstEndsInMinutes": "最早的一个 {count} 分钟后结束 | 最早的一个 {count} 分钟后结束",
+        "firstEndsIn": "最早的一个 {duration}后结束",
         "count": "{module} {count}",
         "showBanner": "在此静音时段生效期间，向组织内所有人显示横幅",
         "showBannerCaption": "横幅会显示名称、受影响的数量和剩余时间。它绝不会显示具体的告警名称。",
@@ -17642,7 +17662,8 @@
         "scheduled": "已计划",
         "active": "生效中",
         "ended": "已结束",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "endedEarly": "提前结束"
       }
     }
   },
@@ -18044,6 +18065,9 @@
       "cancelled": "停机已取消",
       "cancelledMany": "{count} 个停机已取消 | {count} 个停机已取消",
       "cancelFailed": "无法取消停机",
+      "extended": "已延长至 {time}",
+      "extendedFollowUp": "已创建 {name}，运行至 {time}",
+      "extendFailed": "无法延长停机",
       "deleted": "停机已删除",
       "deleteFailed": "无法删除停机",
       "created": "停机已创建",

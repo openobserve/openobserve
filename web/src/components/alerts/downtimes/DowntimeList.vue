@@ -241,38 +241,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-actions="{ row }">
-                <div class="flex items-center">
-                  <OButton
-                    v-if="row.status === 'active'"
-                    class="max-md:hidden"
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    icon-left="stop-circle"
-                    :data-test="`downtime-list-${row.id}-end-now`"
-                    @click.stop="endNow(row)"
-                  >
-                    <OTooltip side="bottom" :content="t('alerts.downtimes.actions.endNow')" />
-                  </OButton>
-                  <OButton
-                    class="max-md:hidden"
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="edit"
-                    :data-test="`downtime-list-${row.id}-edit`"
-                    @click.stop="editDowntime(row)"
-                  >
-                    <OTooltip side="bottom" :content="t('alerts.downtimes.actions.edit')" />
-                  </OButton>
-                  <OButton
-                    class="max-md:hidden"
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="content-copy"
-                    :data-test="`downtime-list-${row.id}-duplicate`"
-                    @click.stop="duplicateDowntime(row)"
-                  >
-                    <OTooltip side="bottom" :content="t('alerts.downtimes.actions.duplicate')" />
-                  </OButton>
+                <div class="flex items-center" :data-test="`downtime-list-${row.id}-actions`">
+                  <span class="inline-flex size-8 max-md:hidden">
+                    <ExtendDowntimeMenu
+                      compact
+                      :enabled="isExtendable(row)"
+                      :data-test="`downtime-list-${row.id}-extend`"
+                      @preset="(secs) => extendBy(row, secs)"
+                      @until="openExtendUntil(row)"
+                    />
+                  </span>
+                  <span class="inline-flex size-8 max-md:hidden">
+                    <OButton
+                      v-if="row.status === 'scheduled'"
+                      variant="ghost-destructive"
+                      size="icon-sm"
+                      icon-left="cancel"
+                      :data-test="`downtime-list-${row.id}-cancel`"
+                      @click.stop="askCancel([row.id])"
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.downtimes.actions.cancel')" />
+                    </OButton>
+                    <OButton
+                      v-else
+                      variant="ghost-destructive"
+                      size="icon-sm"
+                      icon-left="stop-circle"
+                      :disabled="row.status !== 'active'"
+                      :aria-label="t('alerts.downtimes.actions.endNow')"
+                      :data-test="`downtime-list-${row.id}-end-now`"
+                      @click.stop="askEndNow(row)"
+                    >
+                      <OTooltip
+                        v-if="row.status === 'active'"
+                        side="bottom"
+                        :content="t('alerts.downtimes.actions.endNow')"
+                      />
+                    </OButton>
+                  </span>
+                  <span class="inline-flex size-8 max-md:hidden">
+                    <OButton
+                      v-if="isEditable(row)"
+                      variant="ghost"
+                      size="icon-sm"
+                      icon-left="edit"
+                      :data-test="`downtime-list-${row.id}-edit`"
+                      @click.stop="editDowntime(row)"
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.downtimes.actions.edit')" />
+                    </OButton>
+                  </span>
+                  <span class="inline-flex size-8 max-md:hidden">
+                    <OButton
+                      variant="ghost"
+                      size="icon-sm"
+                      icon-left="content-copy"
+                      :data-test="`downtime-list-${row.id}-duplicate`"
+                      @click.stop="duplicateDowntime(row)"
+                    >
+                      <OTooltip side="bottom" :content="t('alerts.downtimes.actions.duplicate')" />
+                    </OButton>
+                  </span>
                   <ODropdown align="end">
                     <template #trigger>
                       <OButton
@@ -284,16 +313,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop
                       />
                     </template>
+                    <MuteMenuItems
+                      v-if="isExtendable(row)"
+                      class="md:hidden"
+                      labels="extend"
+                      :data-test-prefix="`downtime-list-${row.id}-extend-menu`"
+                      @preset="(secs) => extendBy(row, secs)"
+                      @until="openExtendUntil(row)"
+                    />
                     <ODropdownItem
                       v-if="row.status === 'active'"
                       class="md:hidden"
                       icon-left="stop-circle"
                       :data-test="`downtime-list-${row.id}-end-now-menu`"
-                      @select="endNow(row)"
+                      @select="askEndNow(row)"
                     >
                       {{ t("alerts.downtimes.actions.endNow") }}
                     </ODropdownItem>
                     <ODropdownItem
+                      v-if="row.status === 'scheduled'"
+                      class="md:hidden"
+                      icon-left="cancel"
+                      :data-test="`downtime-list-${row.id}-cancel-menu`"
+                      @select="askCancel([row.id])"
+                    >
+                      {{ t("alerts.downtimes.actions.cancel") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      v-if="isEditable(row)"
                       class="md:hidden"
                       icon-left="edit"
                       :data-test="`downtime-list-${row.id}-edit-menu`"
@@ -317,15 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("alerts.downtimes.actions.moveToFolder") }}
                     </ODropdownItem>
-                    <ODropdownItem
-                      v-if="row.status === 'scheduled'"
-                      icon-left="cancel"
-                      :data-test="`downtime-list-${row.id}-cancel`"
-                      @select="askCancel([row.id])"
-                    >
-                      {{ t("alerts.downtimes.actions.cancel") }}
-                    </ODropdownItem>
-                    <template v-if="row.status === 'ended' || row.status === 'cancelled'">
+                    <template v-if="isFinished(row)">
                       <ODropdownSeparator />
                       <ODropdownItem
                         variant="destructive"
@@ -405,6 +444,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <ConfirmDialog
+      v-model="endNowOpen"
+      :title="t('alerts.downtimes.confirmEndNow.title')"
+      :message="t('alerts.downtimes.confirmEndNow.message')"
+      :ok-label="t('alerts.downtimes.confirmEndNow.ok')"
+      :cancel-label="t('alerts.downtimes.confirmEndNow.keep')"
+      ok-color="destructive"
+      @update:ok="confirmEndNow"
+      @update:cancel="endNowOpen = false"
+    />
+
+    <ExtendDowntimeDialog
+      v-model:open="extendOpen"
+      :downtime="extendTarget"
+      data-test="downtime-list-extend-dialog"
+    />
+
+    <ConfirmDialog
       v-model="deleteOpen"
       :title="t('alerts.downtimes.confirmDelete.title')"
       :message="t('alerts.downtimes.confirmDelete.message')"
@@ -464,14 +520,21 @@ import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
+import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
+import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
+import MuteMenuItems from "./MuteMenuItems.vue";
+import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
+import { isExtendable } from "@/utils/downtimes/extend";
+import { isEditable, isFinished, sortDowntimeRows } from "@/utils/downtimes/listOrder";
 
 type TypeFilter = "all" | "once" | "recurring";
-type StatKey = "active" | "scheduled" | "recurring" | "ended" | "cancelled";
+type StatKey = "active" | "scheduled" | "recurring" | "ended" | "ended_early" | "cancelled";
 
 const RAIL_COLORS: Record<DowntimeListItem["status"], string> = {
   active: "var(--color-warning-500)",
   scheduled: "var(--color-blue-500)",
   ended: "var(--color-grey-400)",
+  ended_early: "var(--color-grey-400)",
   cancelled: "var(--color-grey-300)",
 };
 
@@ -549,7 +612,7 @@ const typeFilter = ref<TypeFilter>(
   (["once", "recurring"] as const).find((v) => v === route.query.repeat) ?? "all",
 );
 const statFilter = ref<StatKey | null>(
-  (["active", "scheduled", "recurring", "ended", "cancelled"] as const).find(
+  (["active", "scheduled", "recurring", "ended", "ended_early", "cancelled"] as const).find(
     (v) => v === route.query.status,
   ) ?? null,
 );
@@ -603,9 +666,12 @@ const folderRows = computed(() => {
 
 const displayedRows = computed(() => {
   const f = statFilter.value;
-  if (!f) return folderRows.value;
-  if (f === "recurring") return folderRows.value.filter((r) => r.schedule.repeat !== "none");
-  return folderRows.value.filter((r) => r.status === f);
+  const rows = !f
+    ? folderRows.value
+    : f === "recurring"
+      ? folderRows.value.filter((r) => r.schedule.repeat !== "none")
+      : folderRows.value.filter((r) => r.status === f);
+  return sortDowntimeRows(rows);
 });
 
 const isFiltered = computed(
@@ -655,6 +721,15 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "neutral",
       max: share,
       dataTest: "downtime-summary-ended",
+    },
+    {
+      key: "ended_early",
+      label: t("alerts.downtimes.stats.endedEarly"),
+      value: count((r) => r.status === "ended_early"),
+      icon: "stop-circle",
+      tone: "neutral",
+      max: share,
+      dataTest: "downtime-summary-ended-early",
     },
     {
       key: "cancelled",
@@ -756,7 +831,7 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     hideable: true,
     size: COL.owner,
   },
-  { id: "actions", header: raw(""), isAction: true, size: 150, pinned: "right" },
+  { id: "actions", header: raw(""), isAction: true, size: 184, pinned: "right" },
 ]);
 
 const defaultColumnVisibility = { folder_id: false, created_by: false };
@@ -836,7 +911,27 @@ const cancelIds = async (ids: string[]) => {
   }
 };
 
-const endNow = (row: DowntimeListItem) => cancelIds([row.id]);
+const endNowOpen = ref(false);
+const pendingEndNow = ref("");
+
+const askEndNow = (row: DowntimeListItem) => {
+  pendingEndNow.value = row.id;
+  endNowOpen.value = true;
+};
+
+const confirmEndNow = async () => {
+  endNowOpen.value = false;
+  await cancelIds([pendingEndNow.value]);
+};
+
+const { extendBy } = useExtendDowntime();
+const extendOpen = ref(false);
+const extendTarget = ref<DowntimeListItem | null>(null);
+
+const openExtendUntil = (row: DowntimeListItem) => {
+  extendTarget.value = row;
+  extendOpen.value = true;
+};
 
 const askCancel = (ids: string[]) => {
   pendingCancel.value = [...ids];
