@@ -117,10 +117,20 @@ export function hasRelativeRange(link: PublicLink): boolean {
   return link.time_range.ranges.some((r) => r.type === "relative");
 }
 
-/** Only absolute ranges wait for a rebuild; a paused link builds nothing. */
 // Offered on every link with a dashboard; a paused or expired one gets the server's reason.
 export function canRebuild(link: PublicLink): boolean {
   return link.status !== "dashboard_deleted";
+}
+
+// Expired and orphaned links can't be resumed, so their pause toggle is disabled.
+export function canPause(link: PublicLink): boolean {
+  return link.status !== "expired" && link.status !== "dashboard_deleted";
+}
+
+export function pauseBlockedReason(link: PublicLink, t: TranslateFn): I18nText {
+  return link.status === "expired"
+    ? t("dashboard.publicLinks.pauseExpired")
+    : t("dashboard.publicLinks.dashboardDeletedAction");
 }
 
 export function isDefaultRange(link: PublicLink, range: PublicLinkRange): boolean {

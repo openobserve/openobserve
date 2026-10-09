@@ -284,11 +284,14 @@ describe("PublicLinksTable", () => {
     });
   });
 
-  it("hides dashboard, edit and pause actions for a deleted dashboard but keeps revoke", async () => {
+  it("disables edit and pause and hides menu actions for a deleted dashboard but keeps revoke", async () => {
     const w = build();
     await flushPromises();
     await selectTile(w, "attention");
-    for (const id of ["edit-btn", "pause-btn", "dashboard-menu", "edit-menu"]) {
+    for (const id of ["edit-btn", "pause-btn"]) {
+      expect(find(w, `dashboards-public-links-l3-${id}`).attributes("disabled")).toBeDefined();
+    }
+    for (const id of ["dashboard-menu", "edit-menu"]) {
       expect(find(w, `dashboards-public-links-l3-${id}`).exists()).toBe(false);
     }
     expect(find(w, "dashboards-public-links-l3-revoke-menu").exists()).toBe(true);

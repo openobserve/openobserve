@@ -425,27 +425,32 @@
             >
               <OTooltip side="bottom" :content="t('dashboard.publicLinks.editSettings')" />
             </OButton>
-            <OButton
-              v-if="canPause(row)"
-              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-              size="icon-sm"
-              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-              class="max-md:hidden"
-              :aria-label="
-                row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
-              "
-              :loading="busyRows.get(row.id) === 'inline'"
-              :disabled="busyRows.has(row.id)"
-              :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
-              @click="setPaused(row, row.enabled, 'inline')"
-            >
-              <OTooltip
-                side="bottom"
-                :content="
+            <!-- A disabled button gets no pointer events, so the reason tooltip sits on the wrapper. -->
+            <span class="inline-flex max-md:hidden">
+              <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
+              <OButton
+                :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                size="icon-sm"
+                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                :aria-label="
                   row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
                 "
-              />
-            </OButton>
+                :loading="busyRows.get(row.id) === 'inline'"
+                :disabled="!canPause(row) || busyRows.has(row.id)"
+                :data-test="`dashboards-public-links-panel-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
+                @click="setPaused(row, row.enabled, 'inline')"
+              >
+                <OTooltip
+                  v-if="canPause(row)"
+                  side="bottom"
+                  :content="
+                    row.enabled
+                      ? t('dashboard.publicLinks.pause')
+                      : t('dashboard.publicLinks.resume')
+                  "
+                />
+              </OButton>
+            </span>
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
@@ -587,12 +592,14 @@ import {
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
 import {
+  canPause,
   canRebuild,
   hasRelativeRange,
   longRange,
   publicLinkColumns,
   publicLinkSearchTerm,
   forbiddenMessage,
+  pauseBlockedReason,
   publicLinkUrl as publicUrl,
   refreshLabel,
 } from "./publicLinkDisplay";
@@ -851,11 +858,6 @@ function addRange() {
 function removeRange(row: RangeRow) {
   rows.value = rows.value.filter((r) => r.id !== row.id);
   syncRanges();
-}
-
-// Expired and orphaned links can't be resumed, so they offer no pause toggle.
-function canPause(link: PublicLink): boolean {
-  return link.status !== "expired" && link.status !== "dashboard_deleted";
 }
 
 function serverMessage(e: unknown): I18nText {

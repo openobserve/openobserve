@@ -6711,6 +6711,8 @@
       "editSettings": "Edit settings",
       "pause": "Pause",
       "resume": "Resume",
+      "pauseExpired": "Expired links can't be paused. Extend the expiry to bring it back.",
+      "dashboardDeletedAction": "Unavailable because the dashboard was deleted",
       "pausedToast": "Link paused",
       "resumedToast": "Link resumed",
       "savedToast": "Link settings saved",

@@ -159,39 +159,52 @@
           >
             <OTooltip side="bottom" :content="t('dashboard.publicLinks.openPublicPage')" />
           </OButton>
-          <OButton
-            v-if="hasDashboard(row)"
-            variant="ghost"
-            size="icon-sm"
-            icon-left="edit"
-            class="max-md:hidden"
-            :aria-label="t('dashboard.publicLinks.editSettings')"
-            :data-test="`dashboards-public-links-${row.id}-edit-btn`"
-            @click="editLink(row)"
-          >
-            <OTooltip side="bottom" :content="t('dashboard.publicLinks.editSettings')" />
-          </OButton>
-          <OButton
-            v-if="canPause(row)"
-            :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-            size="icon-sm"
-            :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-            class="max-md:hidden"
-            :aria-label="
-              row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
-            "
-            :loading="busyRows.get(row.id) === 'inline'"
-            :disabled="busyRows.has(row.id)"
-            :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
-            @click="setPaused(row, row.enabled, 'inline')"
-          >
+          <span class="inline-flex max-md:hidden">
             <OTooltip
+              v-if="!hasDashboard(row)"
               side="bottom"
-              :content="
+              :content="t('dashboard.publicLinks.dashboardDeletedAction')"
+            />
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="edit"
+              :aria-label="t('dashboard.publicLinks.editSettings')"
+              :disabled="!hasDashboard(row)"
+              :data-test="`dashboards-public-links-${row.id}-edit-btn`"
+              @click="editLink(row)"
+            >
+              <OTooltip
+                v-if="hasDashboard(row)"
+                side="bottom"
+                :content="t('dashboard.publicLinks.editSettings')"
+              />
+            </OButton>
+          </span>
+          <!-- A disabled button gets no pointer events, so the reason tooltip sits on the wrapper. -->
+          <span class="inline-flex max-md:hidden">
+            <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
+            <OButton
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+              size="icon-sm"
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              :aria-label="
                 row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
               "
-            />
-          </OButton>
+              :loading="busyRows.get(row.id) === 'inline'"
+              :disabled="!canPause(row) || busyRows.has(row.id)"
+              :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-btn`"
+              @click="setPaused(row, row.enabled, 'inline')"
+            >
+              <OTooltip
+                v-if="canPause(row)"
+                side="bottom"
+                :content="
+                  row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
+                "
+              />
+            </OButton>
+          </span>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
@@ -334,11 +347,13 @@ import {
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
 import {
+  canPause,
   canRebuild,
   hasRelativeRange,
   publicLinkColumns,
   publicLinkSearchTerm,
   forbiddenMessage,
+  pauseBlockedReason,
   publicLinkUrl,
   refreshLabel,
 } from "./publicLinkDisplay";
@@ -462,10 +477,6 @@ const columns = publicLinkColumns(t, { withDashboard: true });
 
 function hasDashboard(link: PublicLink): boolean {
   return link.status !== "dashboard_deleted";
-}
-
-function canPause(link: PublicLink): boolean {
-  return link.status !== "expired" && link.status !== "dashboard_deleted";
 }
 
 function serverMessage(e: unknown): I18nText {
