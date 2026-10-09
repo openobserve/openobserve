@@ -80,6 +80,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
             render,
             render::slack as slack_render,
@@ -3554,7 +3555,49 @@ async fn send_sns_notification(
 
 fn process_row_template(
     org_name: &str,
-    tpl: &String,
+    tpl: &str,
+    alert: &Alert,
+    row_type: RowTemplateType,
+    rows: &[Map<String, Value>],
+) -> Vec<Value> {
+    let mut fields = std::collections::HashMap::<String, Vec<Value>>::new();
+    let templates = (0..rows.len())
+        .map(|index| {
+            prepare_modifiers(
+                tpl,
+                |field| {
+                    let placeholder = format!("{{{field}}}");
+                    let values = fields.entry(field.to_string()).or_insert_with(|| {
+                        process_row_templates_plain(
+                            org_name,
+                            &(0..rows.len())
+                                .map(|_| PreparedTemplate::plain(placeholder.clone()))
+                                .collect::<Vec<_>>(),
+                            alert,
+                            RowTemplateType::String,
+                            rows,
+                        )
+                    });
+                    let value = values[index].as_str()?;
+                    (value != placeholder).then(|| value.to_string())
+                },
+                |field| {
+                    rows[index].contains_key(field)
+                        || alert
+                            .context_attributes
+                            .as_ref()
+                            .is_some_and(|attrs| attrs.contains_key(field))
+                },
+                false,
+            )
+        })
+        .collect::<Vec<_>>();
+    process_row_templates_plain(org_name, &templates, alert, row_type, rows)
+}
+
+fn process_row_templates_plain(
+    org_name: &str,
+    templates: &[PreparedTemplate],
     alert: &Alert,
     row_type: RowTemplateType,
     rows: &[Map<String, Value>],
@@ -3570,8 +3613,8 @@ fn process_row_template(
     // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
-    for row in rows.iter() {
-        let mut resp = tpl.to_string();
+    for (row, tpl) in rows.iter().zip(templates) {
+        let mut resp = tpl.template.clone();
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
@@ -3667,6 +3710,8 @@ fn process_row_template(
                 process_variable_replace(&mut resp, key, &VarValue::Str(value), false);
             }
         }
+
+        resp = tpl.finish(resp);
 
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
@@ -7263,7 +7308,7 @@ mod tests {
 
         let out = process_row_template(
             "default",
-            &STREAM_TPL.to_string(),
+            STREAM_TPL,
             &alert,
             RowTemplateType::String,
             &[row],
@@ -8244,4 +8289,93 @@ fn collapse_slo_evals(evals: &[crate::slo::evaluate::SloEvalResult]) -> SloColla
         return SloCollapse::Frozen;
     }
     SloCollapse::Healthy
+}
+
+#[cfg(test)]
+mod modifier_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn row_numeric_modifiers_numbers_strings_and_precedence() {
+        let rows = vec![
+            serde_json::from_value(json!({
+                "ratio": 0.9123, "bytes": "1048576", "rate": 1234567,
+                "latency": "3661.9", "alert_count": 1200, "pipe|humanize": "literal",
+                "message": "abc\"def", "payload": "{ratio|humanizePercentage}"
+            }))
+            .unwrap(),
+            serde_json::from_value(json!({
+                "ratio": "0.5", "bytes": 1024, "rate": "2000", "latency": 0.25,
+                "message": "second"
+            }))
+            .unwrap(),
+        ];
+        let mut alert = Alert::default();
+        alert.context_attributes = Some([(String::from("rate"), String::from("10"))].into());
+        let tpl = r#"{"ratio":"{ratio|humanizePercentage}","bytes":"{bytes|humanize1024}","rate":"{rate|humanize}","latency":"{latency|humanizeDuration}","count":"{alert_count|humanize}","pipe":"{pipe|humanize}","message":"{message:4}","payload":"{payload}"}"#.to_string();
+        let rendered = process_row_template("default", &tpl, &alert, RowTemplateType::Json, &rows);
+        assert_eq!(
+            rendered[0],
+            json!({"ratio":"91.23%", "bytes":"1Mi", "rate":"1.235M", "latency":"1h 1m 1s", "count":"1.2k", "pipe":"literal", "message":"abc\"", "payload":"{ratio|humanizePercentage}"})
+        );
+        assert_eq!(rendered[1]["count"], "2");
+        assert_eq!(rendered[1]["ratio"], "50%");
+        assert_eq!(rendered[1]["bytes"], "1ki");
+        assert_eq!(rendered[1]["rate"], "2k");
+        assert_eq!(rendered[1]["latency"], "250ms");
+    }
+
+    #[test]
+    fn row_modifiers_fallback_special_values_and_injection() {
+        let rows = vec![serde_json::from_value(json!({"bad": "oops", "nan": "NaN", "inf": "+Inf", "negative_inf": "-Inf", "payload": "{alert_count|humanizePercentage}"})).unwrap()];
+        let tpl = "{bad|humanize} {missing|humanize} {nan|humanize} {inf|humanizeDuration} {negative_inf|humanizePercentage} {alert_count|unknown} {alert_count|humanize:2} {payload}".to_string();
+        let rendered = process_row_template(
+            "default",
+            &tpl,
+            &Alert::default(),
+            RowTemplateType::String,
+            &rows,
+        );
+        assert_eq!(rendered, vec![Value::String("{bad|humanize} {missing|humanize} NaN +Inf -Inf% {alert_count|unknown} {alert_count|humanize:2} {alert_count|humanizePercentage}".into())]);
+        let ctx = NotificationContext {
+            alert_count: "1".into(),
+            rows_tpl_val: rendered,
+            ..Default::default()
+        };
+        let embedded = apply_custom_template("{rows} {alert_count|humanizePercentage}", &ctx, true);
+        assert!(embedded.ends_with("{alert_count|humanizePercentage} 100%"));
+    }
+
+    #[test]
+    fn row_timestamp_and_size_modifiers() {
+        let rows = vec![serde_json::from_value(json!({"t":1700000000123456_i64,"seconds":"-0.1","bytes":1536,"payload":"{t|formatTimestampMicros}","host":"expanded"})).unwrap()];
+        let tpl = r#"{"timestamp":"{t|formatTimestampMicros}","seconds":"{seconds|formatTimestamp}","size":"{bytes|humanSize}","custom":"{t|formatTimestampMicros("{host} %Y%m%d%H%M%S%z \"quoted\"", "Asia/Shanghai")}","payload":"{payload}"}"#.to_string();
+        let output = process_row_template(
+            "default",
+            &tpl,
+            &Alert::default(),
+            RowTemplateType::Json,
+            &rows,
+        );
+        assert_eq!(
+            output[0],
+            json!({
+                "timestamp":"2023-11-14T22:13:20.123456Z", "seconds":"1969-12-31T23:59:59.900Z",
+                "size":"1.5 KiB", "custom":"{host} 20231115061320+0800 \"quoted\"", "payload":"{t|formatTimestampMicros}"
+            })
+        );
+        let bad = r#"{seconds|formatTimestamp("%Q")} {t|formatTimestampMicros("%Y", "+25:00")} {bytes|humanSize()}"#.to_string();
+        assert_eq!(
+            process_row_template(
+                "default",
+                &bad,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(bad)]
+        );
+    }
 }
