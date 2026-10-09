@@ -1,6 +1,12 @@
 ---
 name: ui-architect
 description: >-
+  ALWAYS use this skill for ANY change to the OpenObserve web UI (web/) — new or
+  existing, big or one-line: building, fixing a UI bug, moving, reordering,
+  showing/hiding, resizing, re-spacing, restyling, re-coloring, relabeling,
+  changing layout or behavior of anything the user sees, or editing any .vue
+  file/template — even when the task is framed as a bug fix and the user never
+  mentions UI, this skill, or its rules. Load it BEFORE the first edit.
   Authoring guardrails for building ANY new frontend UI in the OpenObserve web
   app (web/) — new views, pages, panels, dialogs, feature components, or edits
   to existing ones. Enforce seven house rules the moment you write Vue/template
@@ -45,9 +51,10 @@ description: >-
   view) by the weight of the interaction, and build every validated form with
   OForm + a colocated Zod schema (single-source-of-truth name-bound fields, no
   v-model/ref mirrors, automatic submit/loading, correct field-array keys).
-  Trigger this whenever the user asks to create, add, build, scaffold, lay out,
-  validate, or restyle any screen, component, header, table, list, dialog,
-  drawer, form, field, or panel in the web frontend, asks to make any of them
+  Trigger this whenever the user asks to create, add, build, scaffold, change,
+  fix, move, reorder, show/hide, lay out, validate, or restyle any screen,
+  component, header, table, list, dialog, drawer, form, field, or panel in the
+  web frontend, asks to make any of them
   work on mobile / phone / tablet / small screens (responsive), or asks where a
   form/table/fetch should live, how to cache or refresh server data, how to validate a form, how to add a keyboard
   shortcut, how to build a new reusable/common O2 component when nothing existing
@@ -56,9 +63,8 @@ description: >-
   listed in navigation — the left-rail menu, a Settings/IAM sub-menu, or a
   hover-flyout — how to register its route, and how to gate it for cloud /
   enterprise / RBAC — even if they don't mention
-  these rules by name. If you are
-  about to type <template>, a page title, a hex color, a px value, or
-  <style scoped>, this skill applies.
+  these rules by name. If you are about to edit a .vue file or type <template>,
+  a page title, a hex color, a px value, or <style scoped>, this skill applies.
 ---
 
 # UI Architect — Frontend UI Guardrails (OpenObserve `web/`)
