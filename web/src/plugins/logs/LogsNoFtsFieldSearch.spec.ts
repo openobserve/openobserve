@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import LogsNoFtsFieldSearch from "./LogsNoFtsFieldSearch.vue";
+import { planFilter } from "@/utils/query/freeTextFilter";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { fieldSearchPredicate, type NoFtsFieldValues } from "./LogsNoFtsFieldSearch.schema";
 
@@ -41,6 +42,38 @@ const values = (overrides: Partial<NoFtsFieldValues> = {}): NoFtsFieldValues => 
 });
 
 describe("no-FTS field recovery", () => {
+  it.each([
+    [
+      "debug -message",
+      "debug",
+      "((message IS NOT NULL AND str_match_ignore_case(message, 'debug')) AND NOT (message IS NOT NULL AND str_match_ignore_case(message, 'message')))",
+    ],
+    ["-refused", "", "NOT (message IS NOT NULL AND str_match_ignore_case(message, 'refused'))"],
+    [
+      "-debug -info",
+      "",
+      "(NOT (message IS NOT NULL AND str_match_ignore_case(message, 'debug')) AND NOT (message IS NOT NULL AND str_match_ignore_case(message, 'info')))",
+    ],
+    [
+      "debug timeout -'O’Reilly'",
+      "debug",
+      "((message IS NOT NULL AND str_match_ignore_case(message, 'debug')) AND (message IS NOT NULL AND str_match_ignore_case(message, 'timeout')) AND NOT (message IS NOT NULL AND str_match_ignore_case(message, 'o’reilly')))",
+    ],
+  ])("keeps every unit in preview and submission for %s", async (query, term, expected) => {
+    const plan = planFilter(query, new Set(), { targetMode: "blocked", allTargetsFts: false });
+    expect(plan.kind).toBe("freeText");
+    if (plan.kind !== "freeText") return;
+    const wrapper = setup({ term, streams: [{ ...streams[0], recoveryRoot: plan.root }] });
+    expect(wrapper.get('[data-test="logs-no-fts-preview"]').text()).toBe(expected);
+    expect(wrapper.text()).not.toContain("“”");
+    expect(wrapper.text()).toContain("replaces the whole query");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(wrapper.emitted("submit")?.[0]?.[0]).toMatchObject({ predicate: expected }),
+    );
+  });
+
   it.each([
     [
       { value: "O'Reilly" },

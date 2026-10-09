@@ -921,9 +921,8 @@ import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import {
-  buildFilterContext,
   noFtsRecoveryStreams,
-  planStreamsFilter,
+  noFtsRecoveryTerm as recoveryTerm,
 } from "@/composables/useLogs/freeTextSearch";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -1282,16 +1281,9 @@ export default defineComponent({
     const { searchObj } = searchState();
     const autoRun = useLogsAutoRun();
     const noFtsRecoverySchemas = computed(() =>
-      noFtsRecoveryStreams(searchObj, searchObj.data.freeTextExcluded ?? []),
+      noFtsRecoveryStreams(searchObj, searchObj.data.freeTextExcluded ?? [], store.state.zoConfig),
     );
-    const noFtsRecoveryTerm = computed(() => {
-      const plan = planStreamsFilter(
-        searchObj.data.query.trim(),
-        searchObj.data.stream.selectedStream,
-        buildFilterContext(searchObj, store.state.zoConfig),
-      );
-      return plan.kind === "freeText" ? plan.units.join(" ") : searchObj.data.query;
-    });
+    const noFtsRecoveryTerm = computed(() => recoveryTerm(searchObj, store.state.zoConfig));
 
     // Paging an out-of-date or search-around grid would fetch a different query than the rows show (AC5.2, D6).
     const gridLockReason = computed(() => {

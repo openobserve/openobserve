@@ -93,7 +93,7 @@ describe("IndexList with a free-text filter (item 1)", () => {
     expect(searchObj.data.filterErrMsg).toBe("");
   });
 
-  it("renders the text per stream and drops it where a stream cannot search text", async () => {
+  it("requests values only from streams searched by the text filter", async () => {
     select(stream("fts_a", true), stream("nofts_b", false));
     searchObj.data.query = "timeout";
 
@@ -102,10 +102,21 @@ describe("IndexList with a free-text filter (item 1)", () => {
       { name: "level", ftsKey: false, streams: ["fts_a", "nofts_b"] },
     );
 
-    expect(valuesSql()).toEqual([
-      ["fts_a", `SELECT * FROM "fts_a" WHERE match_all('timeout')`],
-      ["nofts_b", `SELECT * FROM "nofts_b"`],
-    ]);
+    expect(valuesSql()).toEqual([["fts_a", `SELECT * FROM "fts_a" WHERE match_all('timeout')`]]);
+  });
+
+  it("settles the values loader when only skipped streams have the field", async () => {
+    select(stream("fts_a", true), stream("nofts_b", false));
+    searchObj.data.query = "timeout";
+    await wrapper.vm.openFilterCreator(
+      {},
+      { name: "msg_text", ftsKey: false, streams: ["nofts_b"] },
+    );
+    expect(valuesSql()).toEqual([]);
+    expect(wrapper.vm.fieldValues.msg_text.isLoading).toBe(false);
+    expect(wrapper.vm.fieldValues.msg_text.errMsg).toBe(
+      "nofts_b was skipped because it has no full-text search fields configured.",
+    );
   });
 
   it("keeps today's values SQL for a field filter", async () => {

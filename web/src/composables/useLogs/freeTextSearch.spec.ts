@@ -22,6 +22,9 @@ import {
   freeTextHighlight,
   freeTextWhereByStream,
   noFtsStreams,
+  noFtsRecoveryTerm,
+  noFtsRecoveryStreams,
+  rewrittenFilter,
   planStreamsFilter,
   recoveryCardsFor,
   refreshFreeTextSchemas,
@@ -93,6 +96,22 @@ describe("buildFilterContext", () => {
     const ctx = buildFilterContext(makeSearchObj("x", [stream]), { default_fts_keys: [] });
     expect(ctx.targets.s).toEqual({ mode: "fts", fields: ["_all_values"] });
     expect(ctx.fieldNames.has("_all_values")).toBe(true);
+  });
+
+  it("passes the configured backend UDS limit into stream target resolution", () => {
+    const stream = {
+      ...fts("app"),
+      settings: { defined_schema_fields: ["level", "code"] },
+    };
+    const obj = makeSearchObj("error", [stream]);
+    expect(
+      buildFilterContext(obj, { ...zoConfig, quick_mode_num_fields: 2 }).targets.app.mode,
+    ).toBe("blocked");
+    const ctx = buildFilterContext(obj, { ...zoConfig, quick_mode_num_fields: 1 });
+    expect(ctx.targets.app).toEqual({ mode: "fts", fields: ["body"] });
+    expect(freeTextWhereByStream(obj, { ...zoConfig, quick_mode_num_fields: 1 })?.get("app")).toBe(
+      "match_all('error')",
+    );
   });
 
   it("disables text while a selected stream has no schema, so the filter is sent unchanged", () => {
@@ -200,7 +219,7 @@ describe("freeTextWhereByStream and filterForParsing", () => {
     const obj = makeSearchObj("timeout", [fts("app"), noFts("raw")]);
     expect([...(freeTextWhereByStream(obj, zoConfig) ?? new Map())]).toEqual([
       ["app", "match_all('timeout')"],
-      ["raw", ""],
+      ["raw", "FALSE"],
     ]);
   });
 
@@ -302,5 +321,55 @@ describe("refreshFreeTextSchemas (spec 6.3 residual risk)", () => {
     sqlMode.meta.sqlMode = true;
     await refreshFreeTextSchemas(sqlMode, zoConfig, fetchStream);
     expect(fetchStream).not.toHaveBeenCalled();
+  });
+});
+
+describe("recovery terms and editor comment preservation", () => {
+  it("offers only backend-searchable UDS fields at the limit", () => {
+    const entry = noFts("raw");
+    entry.schema = [
+      { name: "level", type: "Utf8" },
+      { name: "extra", type: "Utf8" },
+    ];
+    entry.settings = { defined_schema_fields: ["level"] };
+    const obj = makeSearchObj("error", [entry]);
+    expect(noFtsRecoveryStreams(obj, ["raw"], zoConfig)[0].schema.map((f) => f.name)).toEqual([
+      "level",
+    ]);
+    expect(noFtsRecoveryStreams(obj, ["raw"], { quick_mode_num_fields: 0 })[0].schema).toEqual(
+      entry.schema,
+    );
+  });
+
+  it.each([
+    ["-refused", ""],
+    ["debug -message", "debug"],
+    ["debug timeout", "debug"],
+    ['-"connection refused"', ""],
+    ['"connection refused" -debug', "connection refused"],
+    ["NOT NOT debug", "debug"],
+  ])("prefills one positive unit for %s", (query, expected) => {
+    expect(noFtsRecoveryTerm(makeSearchObj(query, [noFts("raw")]), zoConfig)).toBe(expected);
+  });
+
+  it.each([
+    ["error -- note\nAND level='x'", "-- note\nmatch_all('error') AND level = 'x'"],
+    ["error /* note */ timeout", "/* note */\nmatch_all('error') AND match_all('timeout')"],
+    [
+      "error AND level=/* inside */'x' -- tail",
+      "-- tail\nmatch_all('error') AND level = /* inside */'x'",
+    ],
+    ["error--timeout", "match_all('error--timeout')"],
+    ["'error -- literal'", "match_all('error -- literal')"],
+    ["it's -- note", "-- note\nmatch_all('it''s')"],
+    ["'error -- note' -- note", "-- note\nmatch_all('error -- note')"],
+    ["error /* same */ /* same */", "/* same */\n/* same */\nmatch_all('error')"],
+  ])("retains comments in the editor rendering of %s", (query, expected) => {
+    expect(
+      rewrittenFilter(
+        makeSearchObj(query, [fts("app")]),
+        buildFilterContext(makeSearchObj(query, [fts("app")]), zoConfig),
+      ),
+    ).toBe(expected);
   });
 });

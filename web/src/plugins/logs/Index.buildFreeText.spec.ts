@@ -96,6 +96,7 @@ const ftsStream = {
     { name: "_timestamp", type: "Int64" },
     { name: "body", type: "Utf8" },
     { name: "level", type: "Utf8" },
+    { name: "code", type: "Int64" },
   ],
   settings: { full_text_search_keys: ["body"] },
 };
@@ -170,6 +171,19 @@ describe(
       expect(sentRequests).toEqual([]);
     });
 
+    it("blocks an unsupported negated mix without issuing an unfiltered chart", async () => {
+      await openBuildWith("error AND code=500 AND -debug");
+      const runButton = wrapper.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
+      expect(runButton.attributes("disabled")).toBeDefined();
+      await runButton.trigger("click");
+      wrapper.vm.searchBarRef.handleRunQueryFn();
+      wrapper.vm.searchBarRef.handleRunQueryFn(true);
+      await settled();
+      expect(panelRuns).toEqual([]);
+      expect(panelQueries).toEqual([]);
+      expect(sentRequests).toEqual([]);
+    });
+
     it("Run, Ctrl+Enter and refresh send nothing until the filter is in the builder, which then runs filtered", async () => {
       let release!: () => void;
       parserGate.wait = new Promise<void>((resolve) => (release = resolve));
@@ -192,6 +206,18 @@ describe(
       await settled();
       expect(panelQueries).toEqual([expect.stringMatching(/ WHERE match_all\('timeout'\) /)]);
       expect(sentRequests).toEqual([]);
+    });
+
+    it("an unrun text and predicate mix builds and runs the rendered filter", async () => {
+      showBuild("error AND code=500");
+      await vi.waitFor(() => expect(panelRuns.length).toBe(1));
+      expect(panelQueries[0]).toMatch(/match_all\('error'\)/);
+      expect(panelQueries[0]).toMatch(/code\s*=\s*500/);
+      await wrapper.find('[data-test="logs-search-bar-visualize-refresh-btn"]').trigger("click");
+      await settled();
+      await vi.waitFor(() => expect(panelRuns.length).toBe(2));
+      expect(panelQueries[1]).toMatch(/match_all\('error'\)/);
+      expect(panelQueries[1]).toMatch(/code\s*=\s*500/);
     });
 
     it("a text search the builder can hold still runs on Run click", async () => {

@@ -144,7 +144,7 @@ onMounted(async () => {
         <OFormInput
           name="value"
           :label="t('search.noFtsRecovery.value')"
-          required
+          :required="!!term"
           data-test="logs-no-fts-value"
         />
       </div>

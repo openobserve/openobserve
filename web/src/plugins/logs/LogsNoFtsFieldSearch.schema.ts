@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { z } from "zod";
-import type { SchemaField } from "@/utils/query/freeTextFilter";
+import type { SchemaField, PlanNode } from "@/utils/query/freeTextFilter";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import type { TranslateFn } from "@/types/i18n";
@@ -9,6 +9,7 @@ import type { TranslateFn } from "@/types/i18n";
 export interface NoFtsRecoveryStream {
   name: string;
   schema: SchemaField[];
+  recoveryRoot?: PlanNode;
 }
 
 export type NoFtsFieldValues = {
@@ -39,10 +40,7 @@ export function searchableFields(stream: NoFtsRecoveryStream | undefined): Schem
   );
 }
 
-export function fieldSearchPredicate(
-  values: NoFtsFieldValues,
-  streams: NoFtsRecoveryStream[],
-): string | null {
+function scalarPredicate(values: NoFtsFieldValues, streams: NoFtsRecoveryStream[]): string | null {
   const stream = streams.find((candidate) => candidate.name === values.stream);
   const field = searchableFields(stream).find((candidate) => candidate.name === values.field);
   if (!field || !values.value.trim()) return null;
@@ -72,6 +70,43 @@ export function fieldSearchPredicate(
     : null;
 }
 
+export function fieldSearchPredicate(
+  values: NoFtsFieldValues,
+  streams: NoFtsRecoveryStream[],
+): string | null {
+  const root = streams.find((stream) => stream.name === values.stream)?.recoveryRoot;
+  if (!root) return scalarPredicate(values, streams);
+  let usedPositive = false;
+  function render(node: PlanNode, excluded = false): string | null {
+    if (node.k === "sql") return null;
+    if (node.k === "text") {
+      const firstPositive = !excluded && !usedPositive;
+      if (!excluded) usedPositive = true;
+      return scalarPredicate(
+        {
+          ...values,
+          match: firstPositive ? values.match : "contains",
+          value: firstPositive ? values.value : node.value,
+        },
+        streams,
+      );
+    }
+    if (node.k === "not") {
+      const child = render(node.child, !excluded);
+      return child ? `NOT ${child}` : null;
+    }
+    if (node.k === "group") {
+      const child = render(node.child, excluded);
+      return child ? `(${child})` : null;
+    }
+    const children = node.children.map((child) => render(child, excluded));
+    return children.every((child) => child !== null)
+      ? `(${children.join(node.k === "and" ? " AND " : " OR ")})`
+      : null;
+  }
+  return render(root);
+}
+
 export function fieldSearchDefaults(
   streams: NoFtsRecoveryStream[],
   term: string,
@@ -93,10 +128,17 @@ export function makeNoFtsFieldSchema(t: TranslateFn, streams: () => NoFtsRecover
       stream: z.string(),
       field: z.string().min(1, t("search.noFtsRecovery.fieldRequired")),
       match: z.enum(["contains", "equals"]),
-      value: z.string().refine((value) => !!value.trim(), t("search.noFtsRecovery.valueRequired")),
+      value: z.string(),
     })
     .superRefine((values, context) => {
       const stream = streams().find((candidate) => candidate.name === values.stream);
+      if (!values.value.trim() && !fieldSearchPredicate(values, streams())) {
+        context.addIssue({
+          code: "custom",
+          path: ["value"],
+          message: t("search.noFtsRecovery.valueRequired"),
+        });
+      }
       if (!searchableFields(stream).some((field) => field.name === values.field)) {
         context.addIssue({
           code: "custom",

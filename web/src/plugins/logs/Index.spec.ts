@@ -403,6 +403,18 @@ describe("Logs Index", async () => {
       wrapper.vm.searchObj.meta.quickMode = false;
     };
 
+    it.each(["refused AND level='x' -- note", "/* c */ refused AND level='x'"])(
+      "SQL toggle retains comments in an unrun mix: %s",
+      async (query) => {
+        select(stream("fts_a", true));
+        wrapper.vm.searchObj.data.query = query;
+        await wrapper.vm.setQuery(true);
+        const sql = wrapper.vm.searchObj.data.query;
+        expect(sql).toContain("match_all('refused') AND level = 'x'");
+        expect(sql).toContain(query.includes("--") ? "-- note\n" : "/* c */");
+      },
+    );
+
     it("SQL toggle renders a bare word as match_all per stream (AC6.3)", async () => {
       select(stream("fts_a", true), stream("fts_d", true));
       wrapper.vm.searchObj.data.query = "timeout";
@@ -471,9 +483,18 @@ describe("Logs Index", async () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="logs-no-fts-panel"]').text()).toContain(
-        "Word search is not configured for nofts_b",
+        "Full-text search fields are not configured for nofts_b",
       );
       wrapper.vm.searchObj.data.freeTextBlocked = null;
+    });
+
+    it("SQL mode renders an unrun mix just like Run", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "refused AND level='error'";
+      await wrapper.vm.setQuery(true);
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        `SELECT * FROM "fts_a" WHERE match_all('refused') AND level = 'error'`,
+      );
     });
 
     it("Build gets the rendered WHERE for a pure-text filter", () => {
@@ -482,6 +503,11 @@ describe("Logs Index", async () => {
       wrapper.vm.searchObj.data.query = "timeout";
       expect(wrapper.vm.buildWhereForBuild).toEqual({
         where: "match_all('timeout')",
+        freeText: true,
+      });
+      wrapper.vm.searchObj.data.query = "error AND level='x'";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({
+        where: "match_all('error') AND level='x'",
         freeText: true,
       });
       wrapper.vm.searchObj.data.query = "level='x'";
