@@ -108,6 +108,8 @@ const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 const mockRouterBack = vi.fn();
 // Captures the leave guard ViewDashboard registers so tests can invoke it.
 const routeLeaveGuards: Array<() => unknown> = [];
+type RouteLike = { query: Record<string, string> };
+const routeUpdateGuards: Array<(to: RouteLike, from: RouteLike) => unknown> = [];
 // Mutable so a test can say what the previous history entry was; the back
 // button prefers real history over rebuilding the folder-scoped list route.
 const mockHistoryState: { back: string | null } = { back: null };
@@ -135,6 +137,9 @@ vi.mock("vue-router", () => ({
   }),
   onBeforeRouteLeave: (guard: () => unknown) => {
     routeLeaveGuards.push(guard);
+  },
+  onBeforeRouteUpdate: (guard: (to: RouteLike, from: RouteLike) => unknown) => {
+    routeUpdateGuards.push(guard);
   },
   useRoute: () => ({
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
@@ -250,6 +255,7 @@ import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { getDashboard } from "@/utils/commons.ts";
+import { getManager } from "@/lib/vue-shortcut-manager";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -1574,6 +1580,7 @@ describe("ViewDashboard", () => {
       mockSaveExecute.mockReset();
       mockSyncGrid.mockReset();
       routeLeaveGuards.length = 0;
+      routeUpdateGuards.length = 0;
     });
 
     it("opens in view mode with the layout locked", async () => {
@@ -1754,6 +1761,62 @@ describe("ViewDashboard", () => {
       expect(panelLayout().x).toBe(0);
     });
 
+    it("asks before a drilldown or Back/Forward to another dashboard drops the draft", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      await dragPanelTo(30);
+      const guard = routeUpdateGuards.at(-1)!;
+      const toOther = { query: { dashboard: "other-dashboard", tab: "tab-1" } };
+      const from = { query: { dashboard: "test-dashboard-1", tab: "tab-1" } };
+
+      const stay = guard(toOther, from) as Promise<boolean>;
+      expect(wrapper.vm.discardDialog.open).toBe(true);
+      expect(wrapper.vm.discardDialog.reason).toBe("leave");
+      wrapper.vm.settleDiscard(false);
+      await expect(stay).resolves.toBe(false);
+      expect(wrapper.vm.isEditingLayout).toBe(true);
+      expect(panelLayout().x).toBe(30);
+
+      const leave = guard(toOther, from) as Promise<boolean>;
+      wrapper.vm.settleDiscard(true);
+      await expect(leave).resolves.toBe(true);
+      expect(wrapper.vm.isEditingLayout).toBe(false);
+      expect(panelLayout().x).toBe(0);
+    });
+
+    it("does not ask when the dashboard stays the same or the draft is clean", async () => {
+      await mountDashboard();
+      wrapper.vm.enterLayoutEdit();
+      const guard = routeUpdateGuards.at(-1)!;
+      const from = { query: { dashboard: "test-dashboard-1", tab: "tab-1" } };
+
+      expect(guard({ query: { dashboard: "other-dashboard" } }, from)).toBeUndefined();
+
+      await dragPanelTo(30);
+      expect(
+        guard({ query: { dashboard: "test-dashboard-1", tab: "tab-2" } }, from),
+      ).toBeUndefined();
+      expect(wrapper.vm.discardDialog.open).toBe(false);
+      expect(panelLayout().x).toBe(30);
+    });
+
+    it("moves the grid to a layout saved from the JSON editor", async () => {
+      await mountDashboard();
+      const edited = JSON.parse(JSON.stringify(wrapper.vm.currentDashboardData.data));
+      edited.tabs[0].panels[0].layout.w = 48;
+      vi.mocked(getDashboard).mockResolvedValueOnce(edited);
+      mockSaveExecute.mockResolvedValueOnce(true);
+
+      await wrapper.vm.saveJsonDashboard.execute(edited);
+
+      expect(mockSaveExecute).toHaveBeenCalledTimes(1);
+      expect(panelLayout().w).toBe(48);
+      expect(mockSyncGrid).toHaveBeenCalledTimes(1);
+      expect(mockSyncGrid.mock.invocationCallOrder[0]).toBeGreaterThan(
+        vi.mocked(getDashboard).mock.invocationCallOrder.at(-1)!,
+      );
+    });
+
     it("warns on page unload only while the draft has changes", async () => {
       await mountDashboard();
       wrapper.vm.enterLayoutEdit();
@@ -1794,6 +1857,37 @@ describe("ViewDashboard", () => {
       press({ key: "Escape" });
       await flushPromises();
       expect(wrapper.vm.isEditingLayout).toBe(false);
+    });
+
+    it("leaves Esc to the global shortcuts, like closing the AI chat, outside edit mode", async () => {
+      await mountDashboard();
+      const manager = getManager()!;
+      const closeChat = vi.fn();
+      const chatId = manager.register({ key: "escape", handler: closeChat, allowInInput: true });
+      const pressEscape = () =>
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+      try {
+        pressEscape();
+        expect(closeChat).toHaveBeenCalledTimes(1);
+
+        wrapper.vm.enterLayoutEdit();
+        pressEscape();
+        await flushPromises();
+        expect(wrapper.vm.isEditingLayout).toBe(false);
+        expect(closeChat).toHaveBeenCalledTimes(1);
+
+        pressEscape();
+        expect(closeChat).toHaveBeenCalledTimes(2);
+
+        wrapper.vm.enterLayoutEdit();
+        wrapper.unmount();
+        wrapper = null;
+        pressEscape();
+        expect(closeChat).toHaveBeenCalledTimes(3);
+      } finally {
+        manager.unregisterById(chatId);
+      }
     });
   });
 });

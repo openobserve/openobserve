@@ -881,6 +881,20 @@ describe("RenderDashboardCharts", () => {
         timeout: 2000,
       });
     });
+
+    it.each([
+      [
+        "a 409",
+        { response: { status: 409, data: { message: "Dashboard was changed elsewhere" } } },
+      ],
+      ["a network failure", new Error("Network Error")],
+    ])("keeps the layout draft without reloading on %s in edit mode", async (_label, error) => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+      vi.mocked(updateDashboard).mockRejectedValueOnce(error);
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(wrapper.emitted("refresh")).toBeUndefined();
+    });
   });
 
   describe("Dashboard Operations", () => {

@@ -37,7 +37,6 @@ export default class DashboardPanel {
       '[data-test="dashboard-panel-refresh-panel-btn"]'
     );
     this.editLayout = page.locator('[data-test="dashboard-edit-layout"]');
-    // Layout edits are drafted in an explicit edit mode and saved once from the header.
     this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
     this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
     this.panelHeight = page.locator(
@@ -188,7 +187,7 @@ export default class DashboardPanel {
     await this.refreshBtn.click();
   }
 
-  //edit layout: Edit -> panel menu "Edit layout" -> apply -> Save
+  //edit layout
   async editLayoutPanel(panelName, height) {
     await this.layoutEditBtn.waitFor({ state: "visible" });
     await this.layoutEditBtn.click();

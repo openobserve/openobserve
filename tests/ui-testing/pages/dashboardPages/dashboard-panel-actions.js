@@ -16,7 +16,6 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
-    // Header controls of the explicit layout edit mode (ViewDashboard).
     this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
     this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
     this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
@@ -340,20 +339,17 @@ export default class DashboardactionPage {
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
   }
 
-  // Enter the explicit layout edit mode from the dashboard header.
   async enterLayoutEdit() {
     await this.layoutEditBtn.waitFor({ state: "visible" });
     await this.layoutEditBtn.click();
     await this.layoutEditSaveBtn.waitFor({ state: "visible" });
   }
 
-  // Save the drafted layout changes in one call and wait for view mode.
   async saveLayoutEdit() {
     await this.layoutEditSaveBtn.click();
     await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
   }
 
-  // Discard drafted layout changes, confirming the prompt when there is one.
   async discardLayoutEdit() {
     await this.layoutEditDiscardBtn.click();
     const confirm = this.page.locator(

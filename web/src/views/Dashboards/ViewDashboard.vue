@@ -522,7 +522,7 @@ import { useI18nTyped } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { onBeforeRouteLeave, useRouter } from "vue-router";
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
@@ -560,8 +560,13 @@ import { createDashboardsContextProvider, contextRegistry } from "@/composables/
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { isInputFocused } from "@/utils/keyboardShortcuts";
+import {
+  getManager,
+  getShortcutDef,
+  resolveShortcutKeys,
+  useShortcuts,
+} from "@/lib/vue-shortcut-manager";
+import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { queryClient } from "@/composables/query/queryClient";
 import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
@@ -1045,7 +1050,6 @@ export default defineComponent({
       layoutDraft.record();
     };
 
-    // ===== Layout edit mode =====
     const layoutDraft = useLayoutEditDraft(() => currentDashboardData.data, {
       onApply: () => renderDashboardChartsRef.value?.syncGridToLayout?.(),
     });
@@ -1115,6 +1119,24 @@ export default defineComponent({
       if (document.querySelector('[role="dialog"][data-state="open"], [role="menu"]')) return;
       requestExitLayoutEdit();
     };
+
+    // A dashboard-scoped Esc shadows the global one that closes the AI chat, so it exists only while editing.
+    let layoutEscapeId: string | undefined;
+    const toggleLayoutEscape = (editing: boolean) => {
+      const manager = getManager();
+      if (layoutEscapeId) manager?.unregisterById(layoutEscapeId);
+      layoutEscapeId = undefined;
+      const def = getShortcutDef("dashboardLayoutExit");
+      const key = def && resolveShortcutKeys(def, isMacOS())[0];
+      if (!editing || !manager || !def || !key) return;
+      layoutEscapeId = manager.register({
+        id: def.id,
+        key,
+        scope: def.scope,
+        handler: onLayoutEscape,
+      });
+    };
+    watch(isEditingLayout, toggleLayoutEscape, { flush: "sync" });
 
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!layoutDraft.isDirty.value) return;
@@ -2018,6 +2040,7 @@ export default defineComponent({
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       window.removeEventListener("beforeunload", onBeforeUnload);
+      toggleLayoutEscape(false);
 
       // Clean up AI dashboard event listener
       offDashboardEvent(handleAiDashboardEvent);
@@ -2050,6 +2073,16 @@ export default defineComponent({
         if (!confirmed) return false;
         layoutDraft.discard();
         clearPrintModeOnLeave();
+        return true;
+      });
+    });
+
+    // Drilldown and Back/Forward to another dashboard reuse this page, so the leave guard never sees them.
+    onBeforeRouteUpdate((to, from) => {
+      if (to.query.dashboard === from.query.dashboard || !layoutDraft.isDirty.value) return;
+      return confirmDiscard("leave").then((confirmed) => {
+        if (!confirmed) return false;
+        layoutDraft.discard();
         return true;
       });
     });
@@ -2098,6 +2131,10 @@ export default defineComponent({
 
           // Reload the dashboard to reflect changes
           await loadDashboard();
+
+          // The grid rebuilds only when panel ids change, so a layout-only JSON edit must move the widgets itself.
+          await nextTick();
+          renderDashboardChartsRef.value?.syncGridToLayout?.();
         } else {
           showErrorNotification(t("dashboard.viewDashboard.failedToUpdateJson"));
         }
@@ -2142,10 +2179,6 @@ export default defineComponent({
         handler: () => {
           if (isEditingLayout.value) redoLayout();
         },
-      },
-      {
-        id: "dashboardLayoutExit",
-        handler: onLayoutEscape,
       },
       {
         id: "dashboardFullscreen",

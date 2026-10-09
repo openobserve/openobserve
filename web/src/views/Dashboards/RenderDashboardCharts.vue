@@ -857,8 +857,8 @@ export default defineComponent({
           );
         }
 
-        // refresh dashboard
-        refreshDashboard();
+        // A reload swaps the dashboard object and ends the edit session, so edit mode keeps the draft for a retry.
+        if (props.layoutMode !== "edit") refreshDashboard();
         return false;
       }
     });
@@ -983,7 +983,7 @@ export default defineComponent({
         }
       });
     };
-    // Moves the widgets to the layouts held in the panel data (undo, redo, discard, layout dialog).
+
     const syncGridToLayout = () => {
       const grid = gridStackInstance;
       if (!grid) return;
