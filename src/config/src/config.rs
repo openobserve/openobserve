@@ -95,7 +95,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
 // 97: create query_history.
 // 98: key alert_dedup_state by (org_id, fingerprint).
-pub const DB_SCHEMA_VERSION: u64 = 98;
+// 99: create ai_chat_sessions (server-side AI chat persistence).
+// 100: create ai_chat_shares and add fork columns to ai_chat_sessions.
+// 101: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
+// 102: add redact_tools to ai_chat_shares.
+pub const DB_SCHEMA_VERSION: u64 = 102;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1037,6 +1041,40 @@ pub struct Config {
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
+    pub public_ai_chat: PublicAiChat,
+}
+
+/// Unauthenticated read-only links to shared AI chats.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicAiChat {
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_ENABLED",
+        default = false,
+        help = "Allow AI chats to be shared through public links. Off by default; the public route only exists when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_RPM",
+        default = 60,
+        help = "Per-IP requests-per-minute limit on the public shared-chat route (0 disables)."
+    )]
+    pub rpm: u64,
+    #[env_config(
+        name = "ZO_PUBLIC_AI_CHAT_MAX_EXPIRY_DAYS",
+        default = 90,
+        help = "Longest expiry, in days, a public AI chat link may have; public links must expire (0 means 90)."
+    )]
+    pub max_expiry_days: u64,
+}
+
+impl PublicAiChat {
+    /// Longest expiry of a public link in days: `max_expiry_days`, 90 when unset, at most 365.
+    pub fn expiry_limit_days(&self) -> u64 {
+        match self.max_expiry_days {
+            0 => 90,
+            days => days.min(365),
+        }
+    }
 }
 
 /// Background self CPU/memory profile ingest into `_meta.self_profiles`.

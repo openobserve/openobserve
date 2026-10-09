@@ -67,16 +67,7 @@ export type StreamEffect =
   | { kind: "syncSegments" }
   | { kind: "finalizeText" };
 
-/**
- * The o2-ai (opencode) backend emits streamed text as
- *   {"type":"message_delta","content":"<plain string>"}
- * and non-streamed notices as {"type":"message","content":"..."} — the text
- * is ALWAYS the plain-string `content` field. We also defensively accept the
- * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
- * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
- * agent/proxy variant doesn't silently render nothing. Returns the text, or
- * null when the event carries no assistant text.
- */
+/** Assistant text of a stream event: o2-ai sends plain `content`; RCA proxies may send OpenAI-style shapes instead. */
 export function extractStreamText(data: any): string | null {
   if (data == null || typeof data !== "object") return null;
 
@@ -285,6 +276,28 @@ function reduceComplete(state: StreamState, data: any, ctx: ReducerCtx): StreamE
   return [{ kind: "throttledSave", force: true }];
 }
 
+// A stored turn the user stopped; the live panel marks its own Stop, as the aborted stream never sees this frame.
+/** The marker a turn the user stopped ends with. */
+export function stoppedMarker(t: TranslateFn): ContentBlock {
+  return { type: "status", turnStatus: "stopped", message: t("aiAssistant.responseStoppedByUser") };
+}
+
+function reduceCancelled(state: StreamState, ctx: ReducerCtx): StreamEffect[] {
+  if (state.activeToolCall) {
+    pushCompletedToolCall(state, completedBlockFrom(state.activeToolCall));
+    if (ctx.isActive) state.activeToolCall = null;
+  }
+  const marker = stoppedMarker(ctx.t);
+  const lastMessage = lastMessageOf(state);
+  if (lastMessage?.role === "assistant") {
+    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+    lastMessage.contentBlocks.push(marker);
+  } else {
+    state.messages.push({ role: "assistant", content: raw(""), contentBlocks: [marker] });
+  }
+  return [];
+}
+
 function dashboardEffect(data: any): StreamEffect | null {
   const resolvedToolName = data.tool && data.tool !== "tools_call" ? data.tool : "";
   const callArgs = data.call_args || {};
@@ -475,6 +488,8 @@ function reduceText(
 }
 
 export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
+  // Server-side chat persistence frames (opencode durable events) are for OpenObserve, never the UI; unknown types would otherwise fall through to extractStreamText.
+  if (data && (data.type === "sync" || data.type === "sync_state")) return [];
   if (data && data.type === "title") return reduceTitle(state, data, ctx);
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (data && data.type === "confirmation_required" && ctx.phase === "stream") {
@@ -483,6 +498,7 @@ export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEf
   if (data && data.type === "tool_call") return reduceToolCall(state, data, ctx);
   if (data && data.type === "error") return reduceError(state, data, ctx);
   if (data && data.type === "complete") return reduceComplete(state, data, ctx);
+  if (data && data.type === "cancelled") return reduceCancelled(state, ctx);
   if (data && data.type === "tool_result") return reduceToolResult(state, data, ctx);
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (data && data.type === "navigation_action" && ctx.phase === "stream") {

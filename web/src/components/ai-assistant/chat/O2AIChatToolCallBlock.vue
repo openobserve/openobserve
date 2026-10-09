@@ -19,6 +19,7 @@ const props = defineProps<{
   messageIndex: number;
   blockIndex: number;
   expandedKeys: Set<string>;
+  readonly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -86,7 +87,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
       </span>
       <!-- Navigation icon -->
       <OIcon
-        v-if="block.navigationAction && !block.pendingConfirmation"
+        v-if="block.navigationAction && !block.pendingConfirmation && !readonly"
         name="open-in-new"
         size="xs"
         class="navigation-icon ms-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"

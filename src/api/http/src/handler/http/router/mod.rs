@@ -584,7 +584,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
                     http_method: method,
-                    http_path: path,
+                    http_path: config::axum::middlewares::mask_share_tokens(&path),
                     http_body: body,
                     http_query_params: query_params,
                     http_response_code: response.status().as_u16(),
@@ -825,6 +825,15 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
+    // Unauthenticated like status pages: the share token is checked in the handler.
+    #[cfg(feature = "enterprise")]
+    if get_config().public_ai_chat.enabled {
+        router = router.route(
+            "/api/public/ai_chats/{token}",
+            get(openobserve_api_management::request::ai::shares::get_public),
+        );
+    }
+
     router
 }
 
@@ -856,6 +865,44 @@ pub fn config_routes() -> Router {
 }
 
 /// Create main API service routes
+/// The AI assistant's chat, chat history and chat sharing routes.
+#[cfg(feature = "enterprise")]
+fn ai_chat_routes(router: Router) -> Router {
+    router
+        .route("/{org_id}/ai/chat", post(ai::chat::chat))
+        .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+        .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
+        .route(
+            "/{org_id}/ai/confirm/{session_id}",
+            post(ai::chat::confirm_action),
+        )
+        .route(
+            "/{org_id}/ai/chats",
+            get(ai::chats::list).delete(ai::chats::delete_all),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}",
+            get(ai::chats::get)
+                .patch(ai::chats::rename)
+                .delete(ai::chats::delete),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/cancel",
+            post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/shares",
+            get(ai::shares::list_for_chat).post(ai::shares::create),
+        )
+        .route("/{org_id}/ai/shares", get(ai::shares::list_mine))
+        .route(
+            "/{org_id}/ai/shares/{share_id}",
+            patch(ai::shares::update).delete(ai::shares::revoke),
+        )
+        .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
+        .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+}
+
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -1515,10 +1562,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ratelimit/update", put(ratelimit::update_ratelimit))
 
             // AI
-            .route("/{org_id}/ai/chat", post(ai::chat::chat))
-            .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
-            .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
-            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
@@ -1553,6 +1596,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+        router = ai_chat_routes(router);
 
         if get_o2_config().common.workflows_enabled {
             // workflows

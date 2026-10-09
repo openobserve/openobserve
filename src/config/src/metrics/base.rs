@@ -2494,6 +2494,250 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+// AI chat persistence (server-side chat history; see core::ai_chat)
+pub static AI_CHAT_TURNS_ACTIVE: Lazy<IntGauge> = Lazy::new(|| {
+    IntGauge::with_opts(
+        Opts::new(
+            "ai_chat_turns_active",
+            "Persisted AI chat turns currently running as background tasks",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_TURN_RESULT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_turn_result_total",
+            "Persisted AI chat turns by outcome (result=persisted|persistence_failed|cancelled|deleted|error|busy|turn_limit|timeout|interrupted)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_BATCHES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_persist_batches_total",
+            "Durable-event batches written for AI chats (status=ok|retry|failed|fenced|deleted)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "status"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_persist_events_total",
+            "Durable events committed to the protected chat-events stream",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_BATCH_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_persist_batch_latency_seconds",
+            "Time to durably write one batch of AI chat events, including the watermark update",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_UI_DISCONNECTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_ui_disconnects_total",
+            "Browsers that went away while a persisted turn kept running (reason=closed|lagged)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SEQUENCE_GAPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_sequence_gaps_total",
+            "Turns whose durable events did not continue the committed prefix (persistence refused, not patched)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_restores_total",
+            "o2-ai replicas rebuilt from the chat-events stream before a turn (result=ok|failed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_seconds",
+            "Time to read a chat's committed history and replay it into an o2-ai replica",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_read_integrity_errors_total",
+            "Committed chat history that could not be read back intact (reason=gap|divergence|hash|decode)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "reason"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_turn_lease_conflicts_total",
+            "Chat turns refused with 409 session_busy because another turn held the session",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_LAG_MILLISECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ai_chat_persist_lag_milliseconds",
+            "Time from writing an AI chat event batch to committing its watermark, last batch per org",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_PERSIST_PENDING_EVENTS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "ai_chat_persist_pending_events",
+            "Durable AI chat events received from o2-ai but not yet committed, per org",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_OWNER_WAIT_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_owner_wait_seconds",
+            "Time a persisted turn waited for an unreachable o2-ai session owner",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_OWNER_WAIT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_owner_wait_total",
+            "Owner waits of persisted turns by outcome (outcome=recovered|taken_over|gave_up|cancelled)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "outcome"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_EVENTS: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_events",
+            "Durable events replayed into an o2-ai replica by one restore",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(vec![
+            10.0, 50.0, 100.0, 500.0, 1000.0, 5000.0, 10000.0, 50000.0,
+        ]),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_RESTORE_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "ai_chat_restore_bytes",
+            "Payload bytes replayed into an o2-ai replica by one restore",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels())
+        .buckets(prometheus::exponential_buckets(16384.0, 4.0, 8).expect("valid buckets")),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_REPLICA_PURGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_replica_purges_total",
+            "Deferred removals of deleted chats' o2-ai copies by the retention sweep (result=ok|failed)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["result"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SHARE_OPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_share_ops_total",
+            "AI chat share operations (op=create|update|revoke|fork)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["op"],
+    )
+    .expect("Metric created")
+});
+pub static AI_CHAT_SHARE_READS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ai_chat_share_reads_total",
+            "Shared AI chats served (visibility=org|public)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["visibility"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3152,6 +3396,32 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
+
+    // AI chat persistence
+    for metric in [
+        Box::new(AI_CHAT_TURN_RESULT_TOTAL.clone()) as Box<dyn prometheus::core::Collector>,
+        Box::new(AI_CHAT_PERSIST_BATCHES_TOTAL.clone()),
+        Box::new(AI_CHAT_PERSIST_EVENTS_TOTAL.clone()),
+        Box::new(AI_CHAT_UI_DISCONNECTS_TOTAL.clone()),
+        Box::new(AI_CHAT_SEQUENCE_GAPS_TOTAL.clone()),
+        Box::new(AI_CHAT_TURN_LEASE_CONFLICTS_TOTAL.clone()),
+        Box::new(AI_CHAT_TURNS_ACTIVE.clone()),
+        Box::new(AI_CHAT_PERSIST_BATCH_LATENCY_SECONDS.clone()),
+        Box::new(AI_CHAT_RESTORES_TOTAL.clone()),
+        Box::new(AI_CHAT_RESTORE_SECONDS.clone()),
+        Box::new(AI_CHAT_READ_INTEGRITY_ERRORS_TOTAL.clone()),
+        Box::new(AI_CHAT_SHARE_OPS_TOTAL.clone()),
+        Box::new(AI_CHAT_SHARE_READS_TOTAL.clone()),
+        Box::new(AI_CHAT_PERSIST_LAG_MILLISECONDS.clone()),
+        Box::new(AI_CHAT_PERSIST_PENDING_EVENTS.clone()),
+        Box::new(AI_CHAT_OWNER_WAIT_SECONDS.clone()),
+        Box::new(AI_CHAT_OWNER_WAIT_TOTAL.clone()),
+        Box::new(AI_CHAT_RESTORE_EVENTS.clone()),
+        Box::new(AI_CHAT_RESTORE_BYTES.clone()),
+        Box::new(AI_CHAT_REPLICA_PURGES_TOTAL.clone()),
+    ] {
+        registry.register(metric).expect("Metric registered");
+    }
 }
 
 #[cfg(test)]

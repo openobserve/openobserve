@@ -26,11 +26,13 @@ import {
 } from "@/components/O2AIChat.navigation";
 import {
   reduce,
+  stoppedMarker,
   type ReducerCtx,
   type StreamEffect,
   type StreamPhase,
   type StreamState,
 } from "@/components/O2AIChat.reducer";
+import { isChatPersistenceEnabled } from "@/components/ai-assistant/share/chatShare";
 import useAiChat from "@/composables/useAiChat";
 import {
   isPaidOverageConsentError,
@@ -51,9 +53,10 @@ import type {
   NavigationAction,
 } from "@/ts/interfaces/chat";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { notifyChatListChanged } from "@/utils/chatListRevision";
 import { getUUIDv7 } from "@/utils/zincutils";
 
-const { fetchAiChat } = useAiChat();
+const { fetchAiChat, cancelAiChat } = useAiChat();
 // Module scope is safe: the controller closes over module-level singleton state.
 const { promptForConsent } = usePaidOverageConsent();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -92,6 +95,16 @@ const trackAnswerOutcome = (turn: AbortController | null, event: string, propert
   if (!turn || answerOutcomeTracked.has(turn)) return;
   answerOutcomeTracked.add(turn);
   analytics.track(event, properties);
+};
+
+/** How a turn ended for the caller: `turnLimit` means the server refused it before it started. */
+export type TurnOutcome = "done" | "turnLimit";
+
+// The server refuses a turn past its concurrency caps with 429 before anything is stored.
+export const isTurnLimitResponse = (status: number | undefined, body: unknown): boolean => {
+  if (status !== 429) return false;
+  const b = (body ?? {}) as { error_code?: unknown; code?: unknown };
+  return b.error_code === undefined || b.error_code === "turn_limit" || b.code === "turn_limit";
 };
 
 type Typewriter = ReturnType<typeof useTypewriter>;
@@ -183,9 +196,44 @@ export function useChatStream(options: UseChatStreamOptions) {
   // Set by processStream when the owning replica is gone; the stream already returned 200, so sendMessage reads it after it ends.
   const streamOwnerUnavailable = ref(false);
 
+  // The Stop's final save; the aborted turn's post-turn reload must read it, not an earlier throttled save.
+  let stopSave: Promise<void> | null = null;
+
+  // The turn id the server knows the current request by, so a save made as it ends can name it.
+  const currentTurnId = ref<string | null>(null);
+
+  const persistenceOn = () => isChatPersistenceEnabled(store.state.zoConfig);
+
+  // Steps that already ran survive the Stop; the turn ends with the stopped marker either way.
+  const markStopped = () => {
+    const msgs = chatMessages.value;
+    if (msgs.length === 0) return;
+    const lastMessage = msgs[msgs.length - 1];
+    if (lastMessage.role !== "assistant") {
+      msgs.push({ role: "assistant", content: raw(""), contentBlocks: [stoppedMarker(t)] });
+      return;
+    }
+    if (!lastMessage.contentBlocks) {
+      lastMessage.contentBlocks = lastMessage.content
+        ? [{ type: "text", text: lastMessage.content }]
+        : [];
+    }
+    const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+    if (currentStreamingMessage.value && lastBlock?.type === "text") {
+      lastBlock.text = currentTextSegment.value;
+    }
+    lastMessage.contentBlocks.push(stoppedMarker(t));
+  };
+
   const cancelCurrentRequest = async () => {
     if (currentAbortController.value) {
       trackAnswerOutcome(currentAbortController.value, "ai_assistant_answer_aborted");
+      // A persisted turn outlives this request, so aborting alone would leave it running; fire-and-forget.
+      if (currentSessionId.value && persistenceOn()) {
+        cancelAiChat(store.state.selectedOrganization.identifier, currentSessionId.value).catch(
+          (e: unknown) => console.debug("AI chat cancel request failed", e),
+        );
+      }
       currentAbortController.value.abort();
       currentAbortController.value = null;
 
@@ -203,38 +251,17 @@ export function useChatStream(options: UseChatStreamOptions) {
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
+      // A trailing render flush would overwrite the stopped marker appended below.
+      disposeRenderFlush();
 
-      if (chatMessages.value.length > 0) {
-        const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-        if (lastMessage.role === "assistant") {
-          if (!lastMessage.content) {
-            // Steps that already ran must survive the Stop; only an empty streaming placeholder is dropped.
-            if (lastMessage.contentBlocks?.length) {
-              const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
-              lastMessage.content = raw(stoppedNote);
-              lastMessage.contentBlocks.push({ type: "text", text: stoppedNote });
-            } else {
-              chatMessages.value.pop();
-            }
-          } else if (currentStreamingMessage.value) {
-            if (lastMessage.contentBlocks) {
-              const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-              if (lastBlock && lastBlock.type === "text") {
-                lastBlock.text = currentTextSegment.value;
-              }
-            }
-            lastMessage.content = raw(
-              lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
-            );
-          }
-        }
-      }
+      markStopped();
 
       currentStreamingMessage.value = "";
       currentTextSegment.value = "";
       displayedStreamingContent.value = "";
 
-      await saveToHistory();
+      stopSave = saveToHistory(currentTurnId.value ?? undefined);
+      await stopSave;
 
       await scrollToBottom();
     }
@@ -243,6 +270,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   const processStream = async (
     reader: ReadableStreamDefaultReader<Uint8Array>,
     turn: AbortController,
+    turnId: string | null = null,
   ) => {
     const decoder = new TextDecoder();
     let buffer = "";
@@ -269,7 +297,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
     };
 
-    const saveCtx = async () => {
+    const saveCtx = async (endedTurnId?: string) => {
       if (msgs.length === 0) return;
       if (!ctxSessionId) {
         ctxSessionId = getUUIDv7();
@@ -277,7 +305,7 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
       const title = isActive() ? aiGeneratedTitle.value || undefined : ctxTitle;
       const chatId = isActive() ? currentChatId.value : ctxChatId;
-      const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
+      const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId, endedTurnId);
       if (!chatId && resultId) {
         if (isActive()) {
           currentChatId.value = resultId;
@@ -474,13 +502,13 @@ export function useChatStream(options: UseChatStreamOptions) {
             lastBlock.text = textSegment;
           }
         }
-        await saveCtx();
+        await saveCtx(sawCompleteFrame && turnId ? turnId : undefined);
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         // User cancel is expected; a detached stream still needs its final save.
         if (!isActive() && msgs.length > 0 && ctxSessionId) {
-          await dbSaveToHistory(msgs, ctxSessionId, ctxTitle, ctxChatId);
+          await dbSaveToHistory(msgs, ctxSessionId, ctxTitle, ctxChatId, turnId ?? undefined);
         }
         return;
       } else {
@@ -490,7 +518,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     }
   };
 
-  const saveToHistory = async () => {
+  const saveToHistory = async (endedTurnId?: string) => {
     saveHistoryLoading.value = true;
     if (chatMessages.value.length === 0) {
       saveHistoryLoading.value = false;
@@ -509,6 +537,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         currentSessionId.value,
         title,
         currentChatId.value,
+        endedTurnId,
       );
 
       if (!currentChatId.value && chatId) {
@@ -776,7 +805,11 @@ export function useChatStream(options: UseChatStreamOptions) {
     return false;
   };
 
-  const runTurn = async (hasImages: boolean, messagesToSend: ImageAttachment[]) => {
+  const runTurn = async (
+    hasImages: boolean,
+    messagesToSend: ImageAttachment[],
+  ): Promise<TurnOutcome> => {
+    let outcome: TurnOutcome = "done";
     const isNewSession = !currentSessionId.value;
     // Mint the session id before the try so every exit path's cleanup clears the SAME id, or a re-attached instance spins forever.
     if (!currentSessionId.value) {
@@ -786,6 +819,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
     // Before isLoading: the registry watcher clears a spinner whose session has no live turn.
     sessionStreamingState[streamSessionId] = true;
+    stopSave = null;
 
     isLoading.value = true;
     currentStreamingMessage.value = "";
@@ -806,8 +840,9 @@ export function useChatStream(options: UseChatStreamOptions) {
     const turnOrgId = store.state.selectedOrganization.identifier;
     const turnChatId = currentChatId.value;
     const turnMessages = chatMessages.value;
-    const fetchTurn = () =>
-      fetchAiChat(
+    const fetchTurn = () => {
+      currentTurnId.value = getUUIDv7();
+      return fetchAiChat(
         chatMessages.value,
         "",
         turnOrgId,
@@ -815,7 +850,9 @@ export function useChatStream(options: UseChatStreamOptions) {
         undefined,
         currentSessionId.value ?? undefined,
         hasImages ? messagesToSend : undefined,
+        currentTurnId.value,
       );
+    };
 
     // Clear any flag left by a turn that threw or aborted early; a stale `true` abandons a healthy session.
     streamOwnerUnavailable.value = false;
@@ -826,27 +863,18 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       let response: any;
       try {
-        response = await fetchAiChat(
-          chatMessages.value,
-          "",
-          store.state.selectedOrganization.identifier,
-          currentAbortController.value.signal,
-          undefined, // explicitContext
-          currentSessionId.value,
-          hasImages ? messagesToSend : undefined,
-        );
+        response = await fetchTurn();
       } catch (error) {
         console.error("Error fetching AI chat:", error);
         trackAnswerOutcome(turnController, "ai_assistant_answer_failed", { stage: "request" });
-        return;
+        return outcome;
       }
 
       if (response && response.cancelled) {
-        return;
+        return outcome;
       }
 
-      // Reseed and consent each get an independent one-retry budget; the loop
-      // lets a consent denial after a reseed still be handled, and vice versa.
+      // Reseed and consent each get one retry; the loop lets either follow the other.
       while (response && !response.ok) {
         let errorBody: any = null;
         try {
@@ -855,21 +883,30 @@ export function useChatStream(options: UseChatStreamOptions) {
           // body may not be JSON
         }
 
-        // Session gone but transcript remains: resend under a fresh session for the server to seed; this code only, once only.
+        // Nothing was stored, so the composer gets the prompt back instead of an error turn.
+        if (isTurnLimitResponse(response.status, errorBody)) {
+          outcome = "turnLimit";
+          trackAnswerOutcome(turnController, "ai_assistant_answer_failed", { stage: "request" });
+          return outcome;
+        }
+
+        // Session gone but transcript remains: resend for the server to restore it; this code only, once only.
         if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
           hasReseeded = true;
           console.warn(
-            `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
+            `Session ${currentSessionId.value} is no longer available; restoring the conversation.`,
           );
 
-          // A NEW id, since the old one would be refused again; streamSessionId stays pinned to the original for cleanup.
-          currentSessionId.value = getUUIDv7();
-          reseedNotice = true;
+          // A persisted chat is restored under its own id; otherwise the old id would be refused again.
+          if (!persistenceOn()) {
+            currentSessionId.value = getUUIDv7();
+            reseedNotice = true;
+          }
           response = await fetchTurn();
 
           // A Stop during the retry returns the cancelled envelope, which has no `ok` and would render as a server error.
           if (response && response.cancelled) {
-            return;
+            return outcome;
           }
           continue;
         }
@@ -883,8 +920,7 @@ export function useChatStream(options: UseChatStreamOptions) {
             turnController.signal,
             "chat",
           );
-          // The denied request never started on the server, so a decline or a
-          // superseded turn simply stops: nothing was metered to unwind.
+          // The denied request never started, so a decline or a superseded turn just stops: nothing to unwind.
           const turnStillActive =
             !turnController.signal.aborted &&
             store.state.selectedOrganization.identifier === turnOrgId &&
@@ -894,12 +930,12 @@ export function useChatStream(options: UseChatStreamOptions) {
             if (!accepted && turnStillActive) {
               appendErrorBlock(t("paidUsage.declinedNotice"));
             }
-            return;
+            return outcome;
           }
 
           response = await fetchTurn();
           if (response && response.cancelled) {
-            return;
+            return outcome;
           }
           continue;
         }
@@ -931,48 +967,13 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const streamMsgs = chatMessages.value;
 
-      await processStream(reader, turnController);
+      await processStream(reader, turnController, currentTurnId.value);
 
       // A streaming 409 arrives as an SSE event inside a 200; restore only while this turn is on screen, or it clobbers another chat's session.
       const stillOnScreen = chatMessages.value === streamMsgs;
       if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
-        streamOwnerUnavailable.value = false;
+        await restoreAfterOwnerLoss(turnController, streamSessionId, hasImages, messagesToSend);
         hasReseeded = true;
-
-        backgroundStreams.delete(turnController);
-        if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
-
-        // The streaming registry must follow the new id, or a re-attaching instance never sees this stream finish.
-        const restoredSessionId = getUUIDv7();
-        // Marked before the id is published, or the registry watcher sees a session with no live turn and clears the spinner.
-        sessionStreamingState[restoredSessionId] = true;
-        currentSessionId.value = restoredSessionId;
-
-        const retry: any = await fetchAiChat(
-          chatMessages.value,
-          "",
-          store.state.selectedOrganization.identifier,
-          currentAbortController.value?.signal,
-          undefined,
-          currentSessionId.value,
-          hasImages ? messagesToSend : undefined,
-        );
-
-        if (retry && !retry.cancelled && retry.ok && retry.body) {
-          // Announced only once the replacement is accepted, or the claim can turn out false.
-          appendErrorBlock(RESTORED_NOTICE, true);
-          await processStream(retry.body.getReader(), turnController);
-        } else if (!(retry && retry.cancelled)) {
-          // Retry failed and hasReseeded blocks another attempt, so explain instead of ending silently; a cancel stays silent.
-          trackAnswerOutcome(turnController, "ai_assistant_answer_failed", { stage: "request" });
-          appendErrorBlock(
-            "This conversation was interrupted and could not be restored. Please try sending your message again.",
-          );
-        }
-
-        // Clear the restored turn's entry either way, or a re-attaching instance spins forever.
-        sessionStreamingState[restoredSessionId] = false;
-        backgroundStreamMap.delete(restoredSessionId);
       }
       // Still set here means no restore ran (already used, or the chat left the screen), so the turn ends unanswered.
       if (streamOwnerUnavailable.value) {
@@ -980,6 +981,8 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
       streamOwnerUnavailable.value = false;
 
+      if (turnController.signal.aborted && stopSave) await stopSave;
+      stopSave = null;
       // Only update UI/store if stream was NOT detached (session is still the same)
       const wasDetached = chatMessages.value !== streamMsgs;
       if (!wasDetached) {
@@ -1020,8 +1023,62 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       currentAbortController.value = null;
 
+      if (outcome !== "turnLimit") notifyChatListChanged();
+
       await scrollToBottom();
     }
+    return outcome;
+  };
+
+  // A persisted chat is restored by the server under its own id; a browser-only one needs a fresh session.
+  const restoreAfterOwnerLoss = async (
+    turnController: AbortController,
+    streamSessionId: string,
+    hasImages: boolean,
+    messagesToSend: ImageAttachment[],
+  ) => {
+    streamOwnerUnavailable.value = false;
+    const keepSession = persistenceOn();
+
+    backgroundStreams.delete(turnController);
+    if (!keepSession) backgroundStreamMap.delete(streamSessionId);
+
+    // The streaming registry must follow a new id, or a re-attaching instance never sees this stream finish.
+    const restoredSessionId = keepSession ? streamSessionId : getUUIDv7();
+    if (!keepSession) {
+      // Marked before the id is published, or the registry watcher sees a session with no live turn and clears the spinner.
+      sessionStreamingState[restoredSessionId] = true;
+      currentSessionId.value = restoredSessionId;
+    }
+
+    currentTurnId.value = getUUIDv7();
+    const retry: any = await fetchAiChat(
+      chatMessages.value,
+      "",
+      store.state.selectedOrganization.identifier,
+      currentAbortController.value?.signal,
+      undefined,
+      currentSessionId.value ?? undefined,
+      hasImages ? messagesToSend : undefined,
+      currentTurnId.value,
+    );
+
+    if (retry && !retry.cancelled && retry.ok && retry.body) {
+      // Announced only once the replacement is accepted, or the claim can turn out false.
+      if (!keepSession) appendErrorBlock(RESTORED_NOTICE, true);
+      await processStream(retry.body.getReader(), turnController, currentTurnId.value);
+    } else if (!(retry && retry.cancelled)) {
+      // No further attempt follows, so explain instead of ending silently; a cancel stays silent.
+      trackAnswerOutcome(turnController, "ai_assistant_answer_failed", { stage: "request" });
+      appendErrorBlock(
+        "This conversation was interrupted and could not be restored. Please try sending your message again.",
+      );
+    }
+
+    if (keepSession) return;
+    // Clear the restored turn's entry either way, or a re-attaching instance spins forever.
+    sessionStreamingState[restoredSessionId] = false;
+    backgroundStreamMap.delete(restoredSessionId);
   };
 
   // Throttle the reactive write: each one re-parses and re-highlights the whole markdown, which is O(n^2) at typewriter tick rate.

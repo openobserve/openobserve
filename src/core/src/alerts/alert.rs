@@ -125,6 +125,9 @@ pub enum AlertError {
     #[error("Alert name cannot contain '/'")]
     AlertNameContainsForwardSlash,
 
+    #[error("Alerts cannot be defined on the internal stream '{0}'")]
+    ProtectedStream(String),
+
     #[error("Alert destination or workflows is required")]
     AlertDestinationMissing,
 
@@ -689,6 +692,13 @@ async fn prepare_alert(
     }
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
+    }
+    // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
+    // Case-insensitive, so no spelling of the chat stream slips through.
+    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+        &alert.stream_name.trim().to_lowercase(),
+    ) {
+        return Err(AlertError::ProtectedStream(alert.stream_name.clone()));
     }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
@@ -4858,6 +4868,27 @@ mod tests {
         assert_eq!(
             with_incident_notify_error("wf err".to_string(), Some("slack: 500".to_string())),
             "slack: 500; wf err"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_alert_can_watch_the_chat_history_stream() {
+        let mut alert = Alert::default();
+        alert.name = "exfiltrate".into();
+        alert.is_real_time = true;
+        let err = prepare_alert("org", "_o2_ai_chat_events", "", &mut alert, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_ai_chat_events"));
+        let mut upper = Alert::default();
+        upper.name = "exfiltrate-upper".into();
+        let err = prepare_alert("org", " _O2_AI_CHAT_EVENTS", "", &mut upper, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(_)));
+        assert_eq!(
+            axum::response::Response::from(err).status(),
+            axum::http::StatusCode::BAD_REQUEST
         );
     }
 

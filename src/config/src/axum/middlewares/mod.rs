@@ -19,7 +19,9 @@ mod access_log;
 mod real_ip;
 mod slow_log;
 
-pub use access_log::{AccessLogLayer, AccessLogService, get_http_access_log_format};
+pub use access_log::{
+    AccessLogLayer, AccessLogService, get_http_access_log_format, mask_share_tokens,
+};
 pub use real_ip::{ClientIpSources, RealIp, extract_real_ip, resolve_client_ip_sources};
 pub use slow_log::{SlowLogLayer, SlowLogService};
 // Re-export tower_http compression for convenience

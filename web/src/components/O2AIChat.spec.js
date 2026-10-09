@@ -155,6 +155,7 @@ let fetchMock;
 vi.mock("@/composables/useAiChat", () => ({
   default: () => ({
     fetchAiChat: (...args) => fetchMock(...args),
+    chatHistoryServer: vi.fn(() => ({ enabled: () => false })),
   }),
 }));
 

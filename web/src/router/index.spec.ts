@@ -34,6 +34,13 @@ vi.mock("@/composables/shared/router", () => ({
         path: "/signup",
         redirect: (to: any) => ({ path: "/login", query: { ...to.query, mode: "signup" } }),
       },
+      {
+        // Mirrors the public shared-chat record: readable without signing in.
+        path: "/ai/public/:token",
+        name: "publicSharedChat",
+        component: { template: "<div>Public chat</div>" },
+        meta: { public: true },
+      },
     ],
     homeChildRoutes: [
       {
@@ -199,6 +206,12 @@ describe("router/index (factory)", () => {
       await router.push("/signup?utm_source=blog").catch(() => {});
       expect(router.currentRoute.value.path).toBe("/login");
       expect(router.currentRoute.value.query).toEqual({ utm_source: "blog", mode: "signup" });
+    });
+
+    it("lets a public route through without a session", async () => {
+      await router.push("/ai/public/tok123").catch(() => {});
+      expect(router.currentRoute.value.name).toBe("publicSharedChat");
+      expect(router.currentRoute.value.params.token).toBe("tok123");
     });
 
     it("should redirect to /login when navigating to a protected route without a session", async () => {

@@ -153,6 +153,13 @@ fn validate_branch_handles(
     Ok(())
 }
 
+/// Whether a dynamic `{field}` stream name always resolves into an internal `_o2_` stream.
+fn is_internal_template(stream_name: &str) -> bool {
+    stream_name
+        .split_once('{')
+        .is_some_and(|(prefix, _)| prefix.to_ascii_lowercase().starts_with("_o2_"))
+}
+
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
 pub fn validate_nodes_edges(
@@ -315,6 +322,23 @@ impl Pipeline {
                 return Err(anyhow!(
                     "Node {} is not a pipeline compatible node",
                     node.id
+                ));
+            }
+            let NodeData::Stream(params) = &node.data else {
+                continue;
+            };
+            if crate::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+                &params.stream_name,
+            ) {
+                return Err(anyhow!(
+                    "Stream {} is internal and cannot be used in a pipeline",
+                    params.stream_name
+                ));
+            }
+            if is_internal_template(&params.stream_name) {
+                return Err(anyhow!(
+                    "Destination {} would write an internal stream",
+                    params.stream_name
                 ));
             }
         }
@@ -669,6 +693,12 @@ fn dfs_traversal_check(
 
 pub fn default_status() -> bool {
     true
+}
+
+/// Whether a pipeline must not write `destination`; an internal stream only takes its own records.
+pub fn is_forbidden_destination(source_stream: &str, destination: &str, cross_type: bool) -> bool {
+    crate::meta::self_reporting::usage::is_internal_rollup_stream(destination)
+        && (cross_type || destination != source_stream)
 }
 
 #[cfg(test)]
@@ -2071,5 +2101,68 @@ mod tests {
         ];
 
         assert!(validate_nodes_edges(&nodes, &edges, false).is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_validation_rejects_internal_destination_templates() {
+        let stream = |id: &str, name: &str| {
+            Node::new(
+                id.to_string(),
+                NodeData::Stream(StreamParams::new("test_org", name, StreamType::Logs)),
+                0.0,
+                0.0,
+                "input".to_string(),
+            )
+        };
+        let pipeline = |destination: &str| Pipeline {
+            id: "p".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "p".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "src",
+                StreamType::Logs,
+            )),
+            kind: PipelineKind::User,
+            nodes: vec![stream("1", "src"), stream("2", destination)],
+            edges: vec![Edge {
+                id: "e1-2".to_string(),
+                source: "1".to_string(),
+                target: "2".to_string(),
+                source_handle: None,
+            }],
+        };
+        for bad in ["_o2_{kind}", "_O2_ai_{x}"] {
+            let err = pipeline(bad).validate().unwrap_err().to_string();
+            assert!(err.contains("internal stream"), "{bad}: {err}");
+        }
+        for ok in ["logs_{kind}", "{kind}", "_o2"] {
+            assert!(pipeline(ok).validate().is_ok(), "{ok}");
+        }
+    }
+
+    #[test]
+    fn test_internal_streams_take_back_only_their_own_records() {
+        assert!(is_forbidden_destination("app", "_o2_ai_chat_events", false));
+        assert!(is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_service_graph",
+            false
+        ));
+        assert!(is_forbidden_destination("app", "_agent_signals", false));
+        assert!(is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_dbm_server",
+            true
+        ));
+        assert!(!is_forbidden_destination(
+            "_o2_dbm_server",
+            "_o2_dbm_server",
+            false
+        ));
+        assert!(!is_forbidden_destination("app", "app_copy", true));
     }
 }

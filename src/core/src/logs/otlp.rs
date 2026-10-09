@@ -22,13 +22,16 @@ use config::{
     meta::{
         db_monitoring::is_dbm_server_stream,
         otlp::OtlpRequestType,
-        self_reporting::usage::UsageType,
+        self_reporting::{ai_chat::is_protected_ai_chat_stream, usage::UsageType},
         stream::{StreamParams, StreamType},
     },
     metrics,
     utils::{flatten, json, schema::format_stream_name},
 };
-use infra::{errors::Result, schema::get_flatten_level};
+use infra::{
+    errors::{Error, Result},
+    schema::get_flatten_level,
+};
 use ingestion_common::{IngestionStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
@@ -151,6 +154,12 @@ pub async fn handle_request(
     let stream_name = in_stream_name
         .map(|name| format_stream_name(name.to_string()))
         .unwrap_or_else(|| "default".to_string());
+    // _o2_dbm_server is written by OTLP collectors, so only the chat-events stream is refused here.
+    if is_protected_ai_chat_stream(&stream_name) {
+        return Err(Error::IngestionError(format!(
+            "stream '{stream_name}' is reserved and cannot be ingested into"
+        )));
+    }
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
     // Refused before the pipelines run: a remote-stream destination writes inside them.
     #[cfg(feature = "vectorscan")]
@@ -1093,6 +1102,27 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_logs_refuses_internal_streams() {
+        for stream in ["_o2_ai_chat_events"] {
+            let result = handle_request(
+                0,
+                "test_org_id",
+                ExportLogsServiceRequest {
+                    resource_logs: vec![],
+                },
+                Some(stream),
+                "a@a.com",
+                OtlpRequestType::HttpJson,
+            )
+            .await;
+            assert!(
+                matches!(result, Err(infra::errors::Error::IngestionError(ref m)) if m.contains(stream)),
+                "{stream} must be refused"
+            );
+        }
     }
 
     #[tokio::test]

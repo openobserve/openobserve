@@ -202,13 +202,17 @@ mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
 mod m20260922_000001_add_password_policy_columns_to_users;
 mod m20260922_000002_create_user_password_history_table;
 mod m20260922_000003_create_user_auth_state_table;
+mod m20260923_000001_create_ai_chat_sessions;
 mod m20260923_000001_create_llm_prompts;
 mod m20260924_000001_add_recovery_episode_columns;
 mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261006_000001_create_ai_chat_shares;
+mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
+mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -521,6 +525,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
+            Box::new(m20260923_000001_create_ai_chat_sessions::Migration),
+            Box::new(m20261006_000001_create_ai_chat_shares::Migration),
+            Box::new(m20261007_000001_create_ai_chat_turns::Migration),
+            Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
         ]
     }
 }
@@ -578,6 +586,10 @@ mod tests {
         (96, "m20261003_000001_create_rum_pa_tables"),
         (97, "m20261004_000001_create_query_history"),
         (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
+        (99, "m20260923_000001_create_ai_chat_sessions"),
+        (100, "m20261006_000001_create_ai_chat_shares"),
+        (101, "m20261007_000001_create_ai_chat_turns"),
+        (102, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
     ];
 
     #[test]
@@ -635,6 +647,7 @@ mod tests {
 
         // Registration alone is what makes a migration run at all.
         position("m20260812_000001_create_composite_alerts");
+        position("m20260923_000001_create_ai_chat_sessions");
 
         for (earlier, later) in [
             (
@@ -656,6 +669,18 @@ mod tests {
             (
                 "m20260725_000001_create_alert_states_tables",
                 "m20260924_000001_add_recovery_episode_columns",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261006_000001_create_ai_chat_shares",
+            ),
+            (
+                "m20261006_000001_create_ai_chat_shares",
+                "m20261007_000002_add_redact_tools_to_ai_chat_shares",
+            ),
+            (
+                "m20260923_000001_create_ai_chat_sessions",
+                "m20261007_000001_create_ai_chat_turns",
             ),
         ] {
             assert!(

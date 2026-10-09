@@ -96,6 +96,12 @@ export interface DialogProps {
   secondaryButtonLoading?: boolean;
   /** Shows loading spinner on neutral button (also disables all buttons). */
   neutralButtonLoading?: boolean;
+
+  /**
+   * Footer button focused on open when the body has no form field; "secondary" suits a destructive confirm.
+   * @default "primary"
+   */
+  initialFocus?: "primary" | "secondary";
 }
 
 export interface DialogEmits {

@@ -285,6 +285,54 @@ pub async fn get(email: &str) -> Result<UserRecord, errors::Error> {
     Ok(UserRecord::from(record))
 }
 
+/// The stable `users.id` for an email (uncached: a re-registered email gets a new id).
+pub async fn get_id_by_email(email: &str) -> Result<Option<String>, errors::Error> {
+    get_id_by_email_with(get_orm_client_ro().await, email).await
+}
+
+pub async fn get_id_by_email_with<C: ConnectionTrait>(
+    conn: &C,
+    email: &str,
+) -> Result<Option<String>, errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let lowered = email.to_lowercase();
+    // Exact spellings first, through the unique email index; lower() only for a mixed-case row.
+    let id = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::Email.is_in([email.to_string(), lowered.clone()]))
+        .order_by_desc(Expr::col(Column::Email).eq(email))
+        .into_tuple::<String>()
+        .one(conn)
+        .await
+        .map_err(db_err)?;
+    if id.is_some() {
+        return Ok(id);
+    }
+    Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(lowered))
+        .into_tuple::<String>()
+        .one(conn)
+        .await
+        .map_err(db_err)
+}
+
+/// The `(first_name, last_name)` of the user with stable id `id`, if any.
+pub async fn get_name_by_id(id: &str) -> Result<Option<(String, String)>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::FirstName)
+        .column(Column::LastName)
+        .filter(Column::Id.eq(id))
+        .into_tuple::<(String, String)>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 pub async fn get_root_user() -> Result<UserRecord, errors::Error> {
     let client = get_orm_client_ro().await;
     let record = Entity::find()
@@ -418,6 +466,56 @@ mod tests {
             }],
             is_external,
             password_ext: None,
+        }
+    }
+
+    async fn users_db(emails: &[(&str, &str)]) -> sea_orm::DatabaseConnection {
+        use sea_orm::{ActiveModelTrait, Database, Schema, Set};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        for (id, email) in emails {
+            ActiveModel {
+                id: Set((*id).to_owned()),
+                email: Set((*email).to_owned()),
+                first_name: Set(String::new()),
+                last_name: Set(String::new()),
+                password: Set(String::new()),
+                salt: Set(String::new()),
+                is_root: Set(false),
+                password_ext: Set(None),
+                user_type: Set(0),
+                created_at: Set(0),
+                updated_at: Set(0),
+                must_reset_password: Set(false),
+                password_reset_reason: Set(None),
+                flagged_at: Set(None),
+                password_updated_at: Set(None),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+        }
+        db
+    }
+
+    #[tokio::test]
+    async fn an_email_resolves_to_its_id_whatever_its_case() {
+        let db = users_db(&[("a", "alice@x.com"), ("b", "Bob@X.com")]).await;
+        for (email, id) in [
+            ("alice@x.com", Some("a")),
+            ("ALICE@x.com", Some("a")),
+            ("Bob@X.com", Some("b")),
+            ("bob@x.com", Some("b")),
+            ("carol@x.com", None),
+        ] {
+            assert_eq!(
+                get_id_by_email_with(&db, email).await.unwrap().as_deref(),
+                id,
+                "{email}"
+            );
         }
     }
 

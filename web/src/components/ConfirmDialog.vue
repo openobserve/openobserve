@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="okLabelComputed"
     :primary-button-color="okColor"
+    :primary-button-variant="okVariant"
+    :initial-focus="focusCancel ? 'secondary' : 'primary'"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -39,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, type PropType } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
@@ -54,6 +57,9 @@ export default defineComponent({
     // and `okLabelComputed` already falls back when the prop is absent.
     okLabel: { type: String as unknown as PropType<I18nText> },
     okColor: { type: String, default: "primary" },
+    okVariant: { type: String as PropType<ButtonVariant>, default: "primary" },
+    // A destructive confirm starts on Cancel so Enter cannot delete by accident.
+    focusCancel: { type: Boolean, default: false },
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();

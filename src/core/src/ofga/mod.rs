@@ -75,6 +75,7 @@ struct PendingMigrations {
     prompts: bool,
     prompt_folders: bool,
     query_history: bool,
+    ai_chat_shares: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -339,78 +340,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         );
                     }
                 }
-                if pending.alert_folders {
-                    match migrations::migrate_alert_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Alert folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating alert folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.workflow_folders {
-                    match migrations::migrate_workflow_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Workflow folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating workflow folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.prompt_folders {
-                    match migrations::migrate_prompt_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Prompt folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating prompt folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.report_folders {
-                    match migrations::migrate_report_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Report folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating report folders to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.anomaly_detection {
-                    match migrations::migrate_anomaly_detection().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if pending.stream_names {
-                    match migrations::migrate_stream_names().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Stream names migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating stream names to openfga: {e}"
-                            );
-                        }
-                    }
-                }
+                run_pending_object_migrations(&pending).await;
             }
 
             // Check if there are init ofga tuples that needs to be added now
@@ -444,6 +374,69 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("Failed to release lock");
 
     Ok(())
+}
+
+async fn run_pending_object_migrations(pending: &PendingMigrations) {
+    if pending.alert_folders {
+        match migrations::migrate_alert_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Alert folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating alert folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.workflow_folders {
+        match migrations::migrate_workflow_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating workflow folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.prompt_folders {
+        match migrations::migrate_prompt_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Prompt folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating prompt folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.report_folders {
+        match migrations::migrate_report_folders().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Report folders migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating report folders to openfga: {e}");
+            }
+        }
+    }
+    if pending.anomaly_detection {
+        match migrations::migrate_anomaly_detection().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Anomaly detection migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating anomaly detection to openfga: {e}");
+            }
+        }
+    }
+    if pending.stream_names {
+        match migrations::migrate_stream_names().await {
+            Ok(_) => {
+                log::info!("[OFGA:Local] Stream names migrated to openfga");
+            }
+            Err(e) => {
+                log::error!("[OFGA:Local] Error migrating stream names to openfga: {e}");
+            }
+        }
+    }
 }
 
 /// The resources a pending back-fill needs nothing but an `_all_` org tuple for.
@@ -539,6 +532,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.query_history {
         keys.push("query_history");
     }
+    if pending.ai_chat_shares {
+        keys.push("ai_chat_shares");
+    }
     keys
 }
 
@@ -579,6 +575,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_50 = version_compare::Version::from("0.0.50").unwrap();
     let v0_0_51 = version_compare::Version::from("0.0.51").unwrap();
     let v0_0_53 = version_compare::Version::from("0.0.53").unwrap();
+    let v0_0_55 = version_compare::Version::from("0.0.55").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -698,6 +695,11 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] query history permissions migration needed");
         pending.query_history = true;
     }
+    // 0.0.54 is taken by public dashboards, which needs no back-fill.
+    if existing_model_version < v0_0_55 {
+        log::info!("[OFGA:Local] AI chat share permissions migration needed");
+        pending.ai_chat_shares = true;
+    }
 
     pending
 }
@@ -708,13 +710,24 @@ mod tests {
 
     #[test]
     fn test_query_history_back_fill_below_0_0_53() {
-        let pending = pending_migrations("0.0.53", "0.0.52");
+        let pending = pending_migrations("0.0.55", "0.0.52");
         assert!(pending.query_history);
         assert!(!pending.prompt_folders);
-        assert_eq!(all_org_ownership_keys(&pending), vec!["query_history"]);
+        assert_eq!(
+            all_org_ownership_keys(&pending),
+            vec!["query_history", "ai_chat_shares"]
+        );
 
-        let pending = pending_migrations("0.0.53", "0.0.53");
+        let pending = pending_migrations("0.0.55", "0.0.53");
         assert!(!pending.query_history);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["ai_chat_shares"]);
+    }
+
+    #[test]
+    fn test_ai_chat_shares_back_fill_below_0_0_55() {
+        assert!(pending_migrations("0.0.55", "0.0.54").ai_chat_shares);
+        let pending = pending_migrations("0.0.55", "0.0.55");
+        assert!(!pending.ai_chat_shares);
         assert!(all_org_ownership_keys(&pending).is_empty());
     }
 }

@@ -26,6 +26,9 @@ use pin_project_lite::pin_project;
 use regex::Regex;
 use tower::{Layer, Service};
 
+/// Characters of a share token kept in logs, enough to tell shares apart.
+const SHARE_TOKEN_PREFIX: usize = 6;
+
 /// Request headers whose value is a credential and is never written to the log.
 const REDACTED_REQUEST_HEADERS: [&str; 5] = [
     "authorization",
@@ -35,21 +38,7 @@ const REDACTED_REQUEST_HEADERS: [&str; 5] = [
     "x-o2-mcp",
 ];
 
-/// Returns the HTTP access log format string based on configuration.
-///
-/// Supported format specifiers:
-/// - %a - Remote IP address (resolved via ZO_HTTP_REAL_IP_SOURCE)
-/// - %t - Time the request was received (format: [dd/Mon/yyyyTHH:mm:ss.fff +zzzz])
-/// - %r - Request line (method, path, HTTP version)
-/// - %s - Response status code
-/// - %b - Size of response in bytes (from Content-Length header)
-/// - %U - URL path requested (without query string)
-/// - %T - Time taken to serve the request, in seconds (3 decimal places)
-/// - %D - Time taken to serve the request, in microseconds
-/// - %{HeaderName}i - Any request header (e.g., %{Content-Length}i, %{Referer}i, %{User-Agent}i)
-/// - %{HeaderName}o - Any response header (e.g., %{Content-Type}o, %{Cache-Control}o)
-///
-/// Returns a format string that can be used by the AccessLogLayer middleware.
+/// The access log format: `common`, `json`, or a custom one (%a %t %r %s %b %U %T %D %{Header}i/o).
 pub fn get_http_access_log_format() -> String {
     let log_format = crate::get_config().http.access_log_format.to_string();
     if log_format.is_empty() || log_format.to_lowercase() == "common" {
@@ -119,13 +108,9 @@ where
             .unwrap_or_else(|| "-".to_string());
 
         let method = req.method().to_string();
-        let path_and_query = req
-            .uri()
-            .path_and_query()
-            .map(|x| x.as_str())
-            .unwrap_or("")
-            .to_string();
-        let uri_path = req.uri().path().to_string();
+        let path_and_query =
+            mask_share_tokens(req.uri().path_and_query().map(|x| x.as_str()).unwrap_or(""));
+        let uri_path = mask_share_tokens(req.uri().path());
         let version = format!("{:?}", req.version());
 
         // Extract headers
@@ -136,12 +121,12 @@ where
             .unwrap_or("-")
             .to_string();
 
-        let referer = req
-            .headers()
-            .get("Referer")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("-")
-            .to_string();
+        let referer = mask_share_tokens(
+            req.headers()
+                .get("Referer")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("-"),
+        );
 
         let user_agent = req
             .headers()
@@ -150,16 +135,13 @@ where
             .unwrap_or("-")
             .to_string();
 
-        // Only collect all request headers if the format contains custom header patterns
-        // This optimization avoids unnecessary allocation and iteration
+        // Request headers are collected only when the format names one.
         let request_headers: Vec<(String, String)> = if self.format.contains("}i") {
             req.headers()
                 .iter()
                 .map(|(name, value)| {
-                    (
-                        name.as_str().to_string(),
-                        value.to_str().unwrap_or("-").to_string(),
-                    )
+                    let value = value.to_str().unwrap_or("-");
+                    (name.as_str().to_string(), mask_share_tokens(value))
                 })
                 .collect()
         } else {
@@ -264,8 +246,7 @@ where
                     .replace("%{Referer}i", this.referer)
                     .replace("%{User-Agent}i", this.user_agent);
 
-                // Only parse generic headers if the format contains custom header patterns
-                // This avoids expensive regex operations when not needed
+                // Generic header patterns are parsed only when the format has one (regex work).
                 if this.format.contains("}i") {
                     // Handle generic %{Header}i patterns for request headers
                     let request_header_regex = Regex::new(r"%\{([^}]+)\}i").unwrap();
@@ -278,9 +259,7 @@ where
                         {
                             continue;
                         }
-                        // %{Name}i is substituted raw, so an operator who puts
-                        // Authorization in the format string would write every
-                        // caller's credential to disk in plaintext.
+                        // Substituted raw, so a credential header named in the format is redacted.
                         let header_value = if REDACTED_REQUEST_HEADERS
                             .iter()
                             .any(|h| header_name.eq_ignore_ascii_case(h))
@@ -322,9 +301,65 @@ where
     }
 }
 
+/// `path` (or a URL) with every chat share token, a bearer credential, cut to a short prefix.
+pub fn mask_share_tokens(path: &str) -> String {
+    let segments: Vec<&str> = path.split('/').collect();
+    let mut masked = Vec::with_capacity(segments.len());
+    for (i, segment) in segments.iter().enumerate() {
+        let shares_token = i >= 2
+            && matches!(
+                (segments[i - 2], segments[i - 1]),
+                ("ai", "shared") | ("ai", "public") | ("public", "ai_chats")
+            );
+        if !shares_token {
+            masked.push((*segment).to_string());
+            continue;
+        }
+        let end = segment.find(['?', '#']).unwrap_or(segment.len());
+        let (token, rest) = segment.split_at(end);
+        let prefix: String = token.chars().take(SHARE_TOKEN_PREFIX).collect();
+        masked.push(format!("{prefix}…{rest}"));
+    }
+    masked.join("/")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn share_tokens_never_reach_the_access_log() {
+        let token = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
+        for (path, masked) in [
+            (
+                format!("/api/default/ai/shared/{token}"),
+                "/api/default/ai/shared/AbCdEf…",
+            ),
+            (
+                format!("/api/default/ai/shared/{token}/fork"),
+                "/api/default/ai/shared/AbCdEf…/fork",
+            ),
+            (
+                format!("/api/public/ai_chats/{token}?known_seq=3"),
+                "/api/public/ai_chats/AbCdEf…?known_seq=3",
+            ),
+            (
+                format!("http://host/web/ai/public/{token}#top"),
+                "http://host/web/ai/public/AbCdEf…#top",
+            ),
+        ] {
+            assert_eq!(mask_share_tokens(&path), masked);
+            assert!(!mask_share_tokens(&path).contains(token));
+        }
+        for untouched in [
+            "/api/default/ai/chats/x",
+            "/web/logs",
+            "-",
+            "/api/default/ai/shares",
+        ] {
+            assert_eq!(mask_share_tokens(untouched), untouched);
+        }
+    }
 
     #[test]
     fn test_log_formatting_patterns() {

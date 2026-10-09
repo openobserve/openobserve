@@ -42,10 +42,10 @@ const chats = [
   { id: 2, title: "Second chat", timestamp: "2024-01-02T00:00:00.000Z" },
 ];
 
-function mountMenu(list = chats) {
+function mountMenu(list: Array<Record<string, any>> = chats, shareEnabled = false) {
   return mount(O2AIChatHistoryMenu, {
     global: { plugins: [i18n] },
-    props: { chats: list, searchTerm: "" },
+    props: { chats: list as typeof chats, searchTerm: "", shareEnabled },
   });
 }
 
@@ -82,5 +82,20 @@ describe("O2AIChatHistoryMenu", () => {
     const w = mountMenu();
     await w.find("input").setValue("err");
     expect(w.emitted("update:searchTerm")?.at(-1)).toEqual(["err"]);
+  });
+
+  it("offers Share only on server-stored chats, without also selecting", async () => {
+    const list = [
+      { ...chats[0], sessionId: "s-1", serverBacked: true },
+      { ...chats[1], sessionId: "s-2" },
+    ];
+    const w = mountMenu(list, true);
+    expect(w.find('[data-test="o2-ai-chat-history-menu-share-2"]').exists()).toBe(false);
+    await w.find('[data-test="o2-ai-chat-history-menu-share-1"]').trigger("click");
+    expect(w.emitted("share")).toEqual([[1]]);
+    expect(w.emitted("select")).toBeUndefined();
+
+    const off = mountMenu(list, false);
+    expect(off.find('[data-test="o2-ai-chat-history-menu-share-1"]').exists()).toBe(false);
   });
 });

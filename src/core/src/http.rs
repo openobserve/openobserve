@@ -66,6 +66,7 @@ impl From<AlertError> for Response {
             AlertError::AlertNameMissing
             | AlertError::AlertNameOfgaUnsupported
             | AlertError::AlertNameContainsForwardSlash
+            | AlertError::ProtectedStream(_)
             | AlertError::AlertDestinationMissing
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery

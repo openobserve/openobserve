@@ -10,6 +10,8 @@
     :primary-button-label="currentDialog.confirmLabel || t('common.ok')"
     :secondary-button-label="currentDialog.cancelLabel || t('common.cancel')"
     :persistent="currentDialog.persistent ?? true"
+    :primary-button-variant="currentDialog.confirmVariant ?? 'primary'"
+    :initial-focus="currentDialog.focusCancel ? 'secondary' : 'primary'"
     @click:primary="handleConfirm"
     @click:secondary="handleCancel"
     @update:open="handleUpdateOpen"
