@@ -7270,8 +7270,9 @@
   "alerts": {
     "promRuleMode": "Rule mode",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
-    "promRuleModeDescription": "Evaluates the expression once per check and fires independently for every returned series after the pending period. Leave the stream empty to infer a referenced metrics stream.",
-    "promRuleModeConflict": "Rule mode requires multi alert and no Critical or Warning value thresholds.",
+    "promRuleModeDescription": "Matches when the expression returns any series. Choose Single or Multi alert when the pending period is zero; a pending period enables Multi alert automatically. Leave the stream empty to infer a referenced metrics stream.",
+    "promRuleModePendingMulti": "A pending period requires an independent timer for each series, so Multi alert cannot be disabled.",
+    "promRuleModeConflict": "Rule mode cannot use Critical or Warning value thresholds; a pending period requires Multi alert.",
     "allAlerts": "All Alerts",
     "compositeAlert": "Composite",
     "import": {

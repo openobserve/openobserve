@@ -2582,7 +2582,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // frequency field's display unit). Falls back to 0 for any alert type
       // where the field is absent from the GET response (older cached
       // response shape, etc.) rather than showing NaN.
-      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
+      const pendingMinutes = (Number(data.pending_period_sec) || 0) / 60;
+      data.pending_period_sec =
+        data.query_condition?.type === "promql" && data.query_condition.promql_rule_mode
+          ? pendingMinutes
+          : Math.round(pendingMinutes);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
       // The saved type is the user's earlier answer; ask again only on a switch.
       confirmedSaveMode.value = data.query_condition?.type ?? null;

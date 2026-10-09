@@ -277,6 +277,15 @@ impl Default for Alert {
 }
 
 impl Alert {
+    pub fn normalize_promql_rule_mode(&mut self) {
+        if self.query_condition.query_type == super::QueryType::PromQL
+            && self.query_condition.promql_rule_mode
+            && self.pending_period_sec > 0
+        {
+            self.query_condition.promql_multi_alert = true;
+        }
+    }
+
     /// Get the unique identifier of the alert.
     /// For now it ruturns the `stream_type` and `stream_name` concatenated
     /// along with alert name. In future, once the migration to v2 alerts
@@ -515,6 +524,32 @@ mod tests {
 
     use super::*;
     use crate::ider;
+
+    #[test]
+    fn rule_pending_normalizes_multi_but_zero_keeps_the_choice() {
+        for (pending, initial, expected) in [(0, false, false), (0, true, true), (240, false, true)]
+        {
+            let mut alert = Alert {
+                query_condition: QueryCondition {
+                    query_type: crate::meta::alerts::QueryType::PromQL,
+                    promql_rule_mode: true,
+                    promql_multi_alert: initial,
+                    ..Default::default()
+                },
+                pending_period_sec: pending,
+                ..Default::default()
+            };
+            alert.normalize_promql_rule_mode();
+            assert_eq!(alert.query_condition.promql_multi_alert, expected);
+        }
+        let mut ordinary = Alert {
+            pending_period_sec: 240,
+            ..Default::default()
+        };
+        ordinary.query_condition.query_type = crate::meta::alerts::QueryType::PromQL;
+        ordinary.normalize_promql_rule_mode();
+        assert!(!ordinary.query_condition.promql_multi_alert);
+    }
 
     #[test]
     fn test_alert_default() {

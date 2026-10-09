@@ -21,7 +21,7 @@ use super::{
         resolve_group_update,
     },
     level::AlertLevel,
-    state::{AlertState, ROLLUP_GROUP_KEY, apply_outcome},
+    state::{AlertState, ROLLUP_GROUP_KEY, StateUpdate, apply_outcome},
 };
 use crate::meta::self_reporting::usage::RunOutcome;
 
@@ -111,6 +111,21 @@ pub fn plan_rule_updates(
         updates,
         evicted: vec![],
     }
+}
+
+pub fn apply_rule_rollup_outcome(
+    alert_id: &str,
+    previous: Option<&AlertState>,
+    outcome: RunOutcome,
+    level: Option<AlertLevel>,
+    at: i64,
+    value: Option<&str>,
+) -> StateUpdate {
+    let mut update = apply_outcome(alert_id, ROLLUP_GROUP_KEY, previous, outcome, level, at);
+    if let Some(transition) = update.transition.as_mut() {
+        transition.rule_value = value.map(str::to_string);
+    }
+    update
 }
 
 fn rule_outcome(previous: Option<&AlertState>, at: i64, pending_sec: i64) -> RunOutcome {

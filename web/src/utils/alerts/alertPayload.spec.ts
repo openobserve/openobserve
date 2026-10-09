@@ -57,6 +57,30 @@ describe("alertPayload", () => {
       ...overrides,
     });
 
+    it.each([0, 0.5, 4])(
+      "normalizes rule Multi only with positive pending (%s minutes)",
+      (pending) => {
+        const formData = {
+          ...createBaseFormData(),
+          pending_period_sec: pending,
+          query_condition: {
+            ...createBaseFormData().query_condition,
+            type: "promql",
+            promql_rule_mode: true,
+            promql_multi_alert: false,
+            promql: "up",
+            promql_condition: null,
+          },
+        };
+        const payload = getAlertPayload(
+          formData,
+          createBaseContext({ getSelectedTab: { value: "promql" } }),
+        );
+        expect(payload.pending_period_sec).toBe(pending * 60);
+        expect(payload.query_condition.promql_multi_alert).toBe(pending > 0);
+      },
+    );
+
     it("should transform form data to API payload", () => {
       const formData = createBaseFormData();
       const context = createBaseContext();
