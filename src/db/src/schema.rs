@@ -223,6 +223,8 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
         Field::new("gen_ai_input_messages", DataType::Utf8, true),
         Field::new("gen_ai_output_messages", DataType::Utf8, true),
         Field::new("gen_ai_system_instructions", DataType::Utf8, true),
+        // Session span SQL always selects this, so a chat with no tool call still has the column.
+        Field::new("gen_ai_tool_name", DataType::Utf8, true),
         Field::new("user_id", DataType::Utf8, true),
         Field::new("gen_ai_conversation_id", DataType::Utf8, true),
         Field::new("gen_ai_request_model", DataType::Utf8, true),
@@ -940,6 +942,7 @@ mod tests {
         assert!(fields.contains(&"gen_ai_usage_cost_net_cache_impact".to_string()));
         assert!(fields.contains(&"gen_ai_agent_env".to_string()));
         assert!(fields.contains(&"gen_ai_agent_version".to_string()));
+        assert!(fields.contains(&"gen_ai_tool_name".to_string()));
         assert!(fields.contains(&O2_INGEST_TS_COL_NAME.to_string()));
     }
 
