@@ -1,4 +1,4 @@
-// IAM → Edit Role · enforcement, end to end (E-01 .. E-06)
+// IAM → Edit Role · enforcement, end to end (E-01 .. E-07)
 //
 // Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md (Wave 2, flows 1-6)
 //
@@ -28,7 +28,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    ns, req, reqAs, allowed, listRoles, listUsers, createRole, setRolePerms, clearRolePerms,
+    ns, req, reqAs, reqAsV2, allowed, listRoles, listUsers, createRole, setRolePerms, clearRolePerms,
     makeTracker, loginAs, MEMBER_PASSWORD, org, rbacEnabled,
     createDashboardFolder, createDashboardIn,
 } = require('./iam-fixtures.js');
@@ -55,12 +55,14 @@ const U_PAIR = `${NS}_e_pair@example.com`;
 const U_BASE = `${NS}_e_base@example.com`;    // nothing, ever — the baseline
 const U_FOLDER = `${NS}_e_folder@example.com`;
 const U_ITEM = `${NS}_e_item@example.com`;
+const U_BULK = `${NS}_e_bulk@example.com`;
 
 const R_STREAM = `${NS}_e_role_stream`;
 const R_TYPE = `${NS}_e_role_type`;
 const R_PAIR = `${NS}_e_role_pair`;
 const R_FOLDER = `${NS}_e_role_folder`;
 const R_ITEM = `${NS}_e_role_item`;
+const R_BULK = `${NS}_e_role_bulk`;
 
 // One folder with two dashboards, plus a dashboard in a second folder. The neighbour
 // proves a grant does not widen inside a folder; the other folder proves it does not
@@ -107,6 +109,23 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         await pm.rolesPage.waitForGrantsSettled(held);
     };
 
+    /**
+     * Opens the logs module and brings ONE stream's row into view.
+     *
+     * The pane pages at 25 and sorts by name, so a fixture stream is only on page 1
+     * while the org holds few streams. pentest holds 29 logs streams and
+     * `ui_auto_enf_e_s_granted` sorts to #26, which put it on page 2 and failed every
+     * tick here with "waiting for ...-col-AllowGet-checkbox to be visible" — a pass
+     * that depended on how cluttered the env happened to be. Filter to the row instead
+     * of trusting its position.
+     */
+    const openStreamRow = async (name) => {
+        await pm.rolesPage.openStreamType('logs');
+        await pm.rolesPage.paneSearch.fill(name);
+        await pm.rolesPage.entityCheckbox(name, 'AllowGet')
+            .waitFor({ state: 'visible', timeout: 15000 });
+    };
+
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
@@ -142,7 +161,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
 
             // Base role `user` carries nothing, so the custom role is the whole of each
             // account's access. `admin` would make every assertion pass for the wrong reason.
-            for (const email of [U_STREAM, U_TYPE, U_PAIR, U_BASE, U_FOLDER, U_ITEM]) {
+            for (const email of [U_STREAM, U_TYPE, U_PAIR, U_BASE, U_FOLDER, U_ITEM, U_BULK]) {
                 made.user(email);
                 await req(page, 'POST', '/users', {
                     email, password: MEMBER_PASSWORD,
@@ -151,7 +170,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
             }
             for (const [role, user] of [
                 [R_STREAM, U_STREAM], [R_TYPE, U_TYPE], [R_PAIR, U_PAIR],
-                [R_FOLDER, U_FOLDER], [R_ITEM, U_ITEM],
+                [R_FOLDER, U_FOLDER], [R_ITEM, U_ITEM], [R_BULK, U_BULK],
             ]) {
                 made.role(role);
                 await createRole(page, role);
@@ -180,7 +199,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
     // grant was still on R_STREAM when E-06 opened it expecting none — test-scope
     // instance of the same isolation bug the per-file namespaces fix at file scope.
     test.beforeEach(async ({ page }) => {
-        for (const role of [R_STREAM, R_TYPE, R_PAIR, R_FOLDER, R_ITEM]) {
+        for (const role of [R_STREAM, R_TYPE, R_PAIR, R_FOLDER, R_ITEM, R_BULK]) {
             await clearRolePerms(page, role);
         }
     });
@@ -219,7 +238,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
 
         // Tick ONE stream's Get in the editor and save.
         await openRole(R_STREAM);
-        await pm.rolesPage.openStreamType('logs');
+        await openStreamRow(S_GRANTED);
         await pm.rolesPage.grantEntity(S_GRANTED, 'AllowGet');
         const payload = await pm.rolesPage.saveAndCapture();
         expect(payload?.add, 'the editor sent no grant').toEqual([
@@ -242,7 +261,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         const base = await baseline(browser);
 
         await openRole(R_STREAM);
-        await pm.rolesPage.openStreamType('logs');
+        await openStreamRow(S_GRANTED);
         await pm.rolesPage.grantEntity(S_GRANTED, 'AllowGet');
         await pm.rolesPage.saveAndCapture();
 
@@ -251,7 +270,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
 
         // Untick the same box in the editor — the removal path, not an API delete.
         await openRole(R_STREAM, 1);
-        await pm.rolesPage.openStreamType('logs');
+        await openStreamRow(S_GRANTED);
         await pm.rolesPage.setCheckbox(pm.rolesPage.entityCheckbox(S_GRANTED, 'AllowGet'), false);
         const payload = await pm.rolesPage.saveAndCapture();
         expect(payload?.remove).toEqual([{ object: `logs:${S_GRANTED}`, permission: 'AllowGet' }]);
@@ -292,7 +311,7 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
         await openRole(R_PAIR);
         await pm.rolesPage.openModule('function');
         await pm.rolesPage.grantScope('function', 'AllowList');
-        await pm.rolesPage.openStreamType('logs');
+        await openStreamRow(S_GRANTED);
         await pm.rolesPage.grantEntity(S_GRANTED, 'AllowGet');
         const saved = await pm.rolesPage.saveAndCapture();
         expect(saved?.add, 'the editor did not send both grants in one save').toHaveLength(2);
@@ -395,5 +414,67 @@ test.describe('IAM · Edit Role · enforcement', { tag: '@enterprise' }, () => {
             allowed(await reqAs(user, 'GET', `/dashboards?folder=${fMain}`)),
             'a single-dashboard grant allowed listing the whole folder',
         ).toBe(false);
+    });
+
+    // ---------------- All Modules column select-all ----------------
+
+    test('E-07 · a role granted ONLY from the All Modules headers really opens every module', {
+        tag: ['@iam', '@iamRolesEnforcement', '@P0', '@all']
+    }, async ({ page, browser }) => {
+        test.setTimeout(240000);
+
+        // Six endpoints in six different modules. The point of the spread is that the
+        // All Modules rows are the FOLDER parents for dashboards, alerts and reports —
+        // the editor never writes `dashboard:`/`alert:`/`report:` tuples from here, so
+        // these three only pass if the folder grant genuinely cascades to the items.
+        const modules = {
+            streams: (p) => reqAs(p, 'GET', '/streams?type=logs').then(allowed),
+            dashboards: (p) => reqAs(p, 'GET', '/dashboards').then(allowed),
+            // v2 wherever a v2 route exists — see the note on reqAsV2: the v1 alert and
+            // report routes are deprecated AND check a different object, so probing them
+            // would measure a dead route instead of this grant.
+            alerts: (p) => reqAsV2(p, 'GET', '/alerts').then(allowed),
+            reports: (p) => reqAsV2(p, 'GET', '/reports').then(allowed),
+            functions: (p) => reqAs(p, 'GET', '/functions').then(allowed),
+            pipelines: (p) => reqAs(p, 'GET', '/pipelines').then(allowed),
+        };
+        // Concurrent, not sequential. Six serial round trips make one poll attempt cost
+        // 6-12s under load, which left only a handful of attempts inside the budget
+        // below and failed this test once in a full-file run while passing it alone.
+        const reach = async (p) => {
+            const names = Object.keys(modules);
+            const got = await Promise.all(names.map((name) => modules[name](p)));
+            return Object.fromEntries(names.map((name, i) => [name, got[i]]));
+        };
+        const allOf = (value) => Object.fromEntries(Object.keys(modules).map((k) => [k, value]));
+
+        const basePage = await signIn(browser, U_BASE);
+        expect(await reach(basePage), 'an ungranted user could already reach a module — the fixture is wrong')
+            .toEqual(allOf(false));
+
+        // The grant is made ONLY by ticking the six column headers. Seeding it over the
+        // API would test OpenFGA, which the ENT pytest suite already covers; only this
+        // path tests the one click the feature actually ships.
+        await openRole(R_BULK);
+        await pm.rolesPage.openAllModules();
+        for (const action of ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'AllowPut', 'AllowDelete']) {
+            await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox(action), true);
+        }
+        const payload = await pm.rolesPage.saveAndCapture();
+        expect(payload?.add?.length, 'the headers staged nothing').toBeGreaterThan(0);
+        // Proves the cascade claim above rather than assuming it: no item-level tuple
+        // for the three folder-backed modules was ever written.
+        for (const item of ['dashboard', 'alert', 'report']) {
+            expect(
+                payload.add.some((p) => p.object.startsWith(`${item}:`)),
+                `the headers wrote a ${item}: tuple, so this no longer tests the folder cascade`,
+            ).toBe(false);
+        }
+
+        const user = await signIn(browser, U_BULK);
+        // 90s, not the 30s the single-grant tests above use: this one writes 315 tuples
+        // in one save and OpenFGA has to settle all of them before the last module opens.
+        // On failure the poll prints the per-module map, naming which one stayed shut.
+        await expect.poll(async () => await reach(user), { timeout: 90000 }).toEqual(allOf(true));
     });
 });
