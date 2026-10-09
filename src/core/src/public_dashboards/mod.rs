@@ -929,18 +929,18 @@ pub async fn resume_link(
     Ok(link)
 }
 
-/// Build a link's absolute ranges again, picking up dashboard edits and late data.
+/// Build every range of a link now, picking up dashboard edits and late data.
 pub async fn rebuild_now(
     mut link: PublicDashboard,
     user_id: &str,
 ) -> Result<PublicDashboard, anyhow::Error> {
-    if time_ranges(&link).ranges.iter().all(TimeRange::is_relative) {
-        return Err(anyhow::anyhow!(
-            "this link has no absolute time range; relative ranges rebuild on their own"
-        ));
-    }
     if !link.enabled {
         return Err(anyhow::anyhow!("resume this link before rebuilding it"));
+    }
+    if is_expired(link.expires_at, now_micros()) {
+        return Err(anyhow::anyhow!(
+            "this link has expired; extend its expiry date to bring it back"
+        ));
     }
     ensure_current_format(&link.org_id, &link.dashboard_id).await?;
     link.updated_by = Some(user_id.to_string());

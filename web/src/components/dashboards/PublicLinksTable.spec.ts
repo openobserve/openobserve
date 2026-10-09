@@ -380,7 +380,21 @@ describe("PublicLinksTable", () => {
     await find(w, "dashboards-public-links-l1-rebuild-menu").trigger("click");
     await flushPromises();
     expect(admin.rebuild).toHaveBeenCalledWith("default", "dash-1", "l1");
-    expect(notify.positive).toHaveBeenCalled();
+    expect(notify.positive).toHaveBeenCalledWith("Link rebuilt");
+  });
+
+  it("offers Rebuild now on relative, paused and expired links, and shows the server's reason", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: { list: [link({ status: "paused", enabled: false })] },
+    } as never);
+    vi.mocked(admin.rebuild).mockRejectedValue({
+      response: { status: 400, data: { message: "resume this link before rebuilding it" } },
+    });
+    const w = build();
+    await flushPromises();
+    await find(w, "dashboards-public-links-l1-rebuild-menu").trigger("click");
+    await flushPromises();
+    expect(notify.error).toHaveBeenCalledWith("resume this link before rebuilding it");
   });
 
   it("revokes only after the confirmation, even for a deleted dashboard", async () => {

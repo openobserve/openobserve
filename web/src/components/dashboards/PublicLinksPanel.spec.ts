@@ -462,11 +462,15 @@ describe("PublicLinksPanel", () => {
     expect(notify.positive).toHaveBeenCalled();
   });
 
-  it("offers no rebuild for a link of only relative ranges", async () => {
+  it("offers Rebuild now on a link of only relative ranges", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+    vi.mocked(admin.rebuild).mockResolvedValue({ data: link() } as never);
     const w = build();
     await flushPromises();
-    expect(has(w, "dashboards-public-links-panel-l1-rebuild-menu")).toBe(false);
+    await w.find('[data-test="dashboards-public-links-panel-l1-rebuild-menu"]').trigger("click");
+    await flushPromises();
+    expect(admin.rebuild).toHaveBeenCalledTimes(1);
+    expect(notify.positive).toHaveBeenCalledWith("Link rebuilt");
   });
 
   it("offers refresh intervals from 10 seconds and keeps the link's own", async () => {

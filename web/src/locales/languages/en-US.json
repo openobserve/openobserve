@@ -5319,7 +5319,7 @@
       "publishFailed": "Failed to publish",
       "revokedToast": "Public link revoked and deleted",
       "revokeFailed": "Failed to revoke and delete the link",
-      "noPublishPermission": "You don't have permission to publish dashboards publicly. Ask an admin for the Public Dashboards permission.",
+      "noPublishPermission": "You don't have permission to view this dashboard's public links. Ask an admin for the Public Dashboards permission.",
       "linkCopied": "Link copied",
       "copyLink": "Copy link",
       "expired": "This link has expired. Ask the person who shared it to extend it."
@@ -6733,7 +6733,7 @@
       "refreshOnce": "Once",
       "refreshEveryHint": "How often the public page gets new data. A shorter time keeps it fresher but runs more queries. Absolute time ranges don't refresh.",
       "rebuildNow": "Rebuild now",
-      "rebuiltToast": "Absolute time ranges rebuilt",
+      "rebuiltToast": "Link rebuilt",
       "openDashboard": "Open dashboard",
       "folderDashboard": "Folder / Dashboard",
       "dashboardMissing": "Dashboard no longer exists",

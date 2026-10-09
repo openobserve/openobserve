@@ -270,8 +270,7 @@ pub async fn resume(
     }
 }
 
-/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild — build the absolute
-/// ranges again.
+/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild — build every range now.
 pub async fn rebuild(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
@@ -288,7 +287,7 @@ pub async fn rebuild(
     };
     match openobserve_core::public_dashboards::rebuild_now(link, &user.user_id).await {
         Ok(link) => view_response("rebuild", &org_id, link).await,
-        Err(e) if e.to_string().contains("absolute") || e.to_string().contains("resume") => {
+        Err(e) if e.to_string().contains("expired") || e.to_string().contains("resume") => {
             MetaHttpResponse::bad_request(e)
         }
         Err(e) => map_err("rebuild", e),

@@ -118,8 +118,9 @@ export function hasRelativeRange(link: PublicLink): boolean {
 }
 
 /** Only absolute ranges wait for a rebuild; a paused link builds nothing. */
+// Offered on every link with a dashboard; a paused or expired one gets the server's reason.
 export function canRebuild(link: PublicLink): boolean {
-  return link.enabled && link.time_range.ranges.some((r) => r.type === "absolute");
+  return link.status !== "dashboard_deleted";
 }
 
 export function isDefaultRange(link: PublicLink, range: PublicLinkRange): boolean {
