@@ -64,8 +64,7 @@ pub async fn write_if_unchanged(
     Ok(true)
 }
 
-/// [set] for a row that extends `parent_id`: writes only if the parent still has
-/// `expected_updated_at`.
+/// [set] for a follow-up row, written only while `parent_id` still has `expected_updated_at`.
 pub async fn set_if_parent_unchanged(
     downtime: &Downtime,
     parent_id: &str,

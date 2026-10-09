@@ -866,53 +866,6 @@ async fn commit_status(
     write_pass_status(db, slo, result, watermark_end, &durations, now_secs).await
 }
 
-/// The pass's status write, with the burn cache folded onto the rollup row it locks first.
-pub(super) async fn write_pass_status(
-    db: &sea_orm::DatabaseConnection,
-    slo: &Slo,
-    result: &PassResult,
-    watermark_end: i64,
-    durations: &[i64],
-    now_secs: i64,
-) -> Result<slo_table::WriteOutcome, anyhow::Error> {
-    use sea_orm::TransactionTrait;
-
-    let txn = db.begin().await?;
-    // Read under the row lock, so a re-measure's burn rebuild cannot land before the write.
-    let rollup = match slo_table::load_rollup_for_update(&txn, &slo.id).await {
-        Ok(row) => row,
-        Err(e) => {
-            let _ = txn.rollback().await;
-            return Err(e.into());
-        }
-    };
-    let (trailing_slices, burn_windows) =
-        build_burn_cache(slo, rollup.as_ref(), result, watermark_end, durations);
-    let write = slo_table::StatusWrite {
-        slo_id: slo.id.clone(),
-        definition_generation: slo.definition_generation,
-        writer: config::meta::slo::slice::Writer::Incremental,
-        deltas: group_deltas(&result.slices),
-        watermark_end: Some(watermark_end),
-        trailing_slices,
-        burn_windows,
-        computed_at: now_secs,
-    };
-    let outcome = match slo_table::apply_status_in_txn(&txn, &write).await {
-        Ok(outcome) => outcome,
-        Err(e) => {
-            let _ = txn.rollback().await;
-            return Err(e.into());
-        }
-    };
-    if matches!(outcome, slo_table::WriteOutcome::FencedByGeneration { .. }) {
-        let _ = txn.rollback().await;
-        return Ok(outcome);
-    }
-    txn.commit().await?;
-    Ok(outcome)
-}
-
 /// Build the trailing buffer and the burn-window aggregates for this pass.
 ///
 /// Both live on the **rollup** row only: a grouped SLO's per-group rows carry
@@ -986,6 +939,53 @@ fn fold_burn_cache(
     let buf = burn::fold_trailing(buf, rollup, watermark_end, burn::retain_secs(durations));
     let windows = burn::burn_windows_json(&buf, durations, watermark_end, slice_interval_secs);
     (burn::trailing_to_json(&buf), windows)
+}
+
+/// The pass's status write, with the burn cache folded onto the rollup row it locks first.
+pub(super) async fn write_pass_status(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+    result: &PassResult,
+    watermark_end: i64,
+    durations: &[i64],
+    now_secs: i64,
+) -> Result<slo_table::WriteOutcome, anyhow::Error> {
+    use sea_orm::TransactionTrait;
+
+    let txn = db.begin().await?;
+    // Read under the row lock, so a re-measure's burn rebuild cannot land before the write.
+    let rollup = match slo_table::load_rollup_for_update(&txn, &slo.id).await {
+        Ok(row) => row,
+        Err(e) => {
+            let _ = txn.rollback().await;
+            return Err(e.into());
+        }
+    };
+    let (trailing_slices, burn_windows) =
+        build_burn_cache(slo, rollup.as_ref(), result, watermark_end, durations);
+    let write = slo_table::StatusWrite {
+        slo_id: slo.id.clone(),
+        definition_generation: slo.definition_generation,
+        writer: config::meta::slo::slice::Writer::Incremental,
+        deltas: group_deltas(&result.slices),
+        watermark_end: Some(watermark_end),
+        trailing_slices,
+        burn_windows,
+        computed_at: now_secs,
+    };
+    let outcome = match slo_table::apply_status_in_txn(&txn, &write).await {
+        Ok(outcome) => outcome,
+        Err(e) => {
+            let _ = txn.rollback().await;
+            return Err(e.into());
+        }
+    };
+    if matches!(outcome, slo_table::WriteOutcome::FencedByGeneration { .. }) {
+        let _ = txn.rollback().await;
+        return Ok(outcome);
+    }
+    txn.commit().await?;
+    Ok(outcome)
 }
 
 /// Measure an explicit `[start, end)` and publish it.

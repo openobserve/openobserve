@@ -41,7 +41,6 @@ use crate::{
     errors::{self, Error},
 };
 
-/// A delete retries its compare-and-swap this often before it gives up on a busy row.
 const TOMBSTONE_ATTEMPTS: usize = 8;
 const DELETE_CHUNK: usize = 500;
 
