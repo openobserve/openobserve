@@ -2650,7 +2650,11 @@ describe("PromQL rule preview", () => {
         stream_name: "",
         stream_type: "metrics",
         trigger_condition: { period: 5, threshold: 1, operator: ">=" },
-        query_condition: { prom_rule_mode: true, promql_multi_alert: true, promql_condition: null },
+        query_condition: {
+          promql_rule_mode: true,
+          promql_multi_alert: true,
+          promql_condition: null,
+        },
       },
     });
     await flushPromises();

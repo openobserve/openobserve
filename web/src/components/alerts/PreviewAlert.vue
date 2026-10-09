@@ -1091,7 +1091,7 @@ const evaluateAndSetStatus = (resultCount: number) => {
 const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (writeRealTimeStatus()) return;
 
-  if (props.formData.query_condition?.prom_rule_mode) return;
+  if (props.formData.query_condition?.promql_rule_mode) return;
   const promqlCondition = props.formData.query_condition?.promql_condition;
   const critical = finiteThreshold(promqlCondition?.value);
   const warning = finiteThreshold(props.formData.query_condition?.promql_warning_value);
@@ -1245,7 +1245,7 @@ const refreshRulePreview = async (at: number) => {
     if (
       generation !== rulePreviewGeneration ||
       expression !== props.query ||
-      !props.formData.query_condition?.prom_rule_mode
+      !props.formData.query_condition?.promql_rule_mode
     )
       return;
     evaluationStatus.value = {
@@ -1273,7 +1273,7 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
-  if (props.selectedTab === "promql" && props.formData.query_condition?.prom_rule_mode)
+  if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
     void refreshRulePreview(endTime / 1_000_000);
   else rulePreviewGeneration++;
 
@@ -1479,7 +1479,7 @@ watch(
     props.formData.trigger_condition?.threshold,
     props.formData.trigger_condition?.operator,
     props.formData.query_condition?.promql_condition?.value,
-    props.formData.query_condition?.prom_rule_mode,
+    props.formData.query_condition?.promql_rule_mode,
     props.selectedTab,
     props.isUsingBackendSql,
   ],
@@ -1516,7 +1516,7 @@ watch(
 onMounted(() => {
   // Skip for PromQL to avoid duplicate API calls (watchers handle it)
   if (props.selectedTab === "promql") {
-    if (props.formData.query_condition?.prom_rule_mode) refreshDataOnce();
+    if (props.formData.query_condition?.promql_rule_mode) refreshDataOnce();
     return;
   }
   if (props.query) {

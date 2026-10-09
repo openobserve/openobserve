@@ -898,7 +898,7 @@ describe("QueryConfig.vue", () => {
       await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
       await flushPromises();
       const value = hostForm().state.values;
-      expect(value.query_condition.prom_rule_mode).toBe(true);
+      expect(value.query_condition.promql_rule_mode).toBe(true);
       expect(value.query_condition.promql_condition).toBeNull();
       expect(value.query_condition.promql_warning_value).toBeNull();
       expect(value.query_condition.promql_multi_alert).toBe(true);
@@ -907,7 +907,7 @@ describe("QueryConfig.vue", () => {
       expect(await submit()).toBe(true);
       await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
       await flushPromises();
-      expect(hostForm().state.values.query_condition.prom_rule_mode).toBe(false);
+      expect(hostForm().state.values.query_condition.promql_rule_mode).toBe(false);
       expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
     });
 
@@ -924,7 +924,7 @@ describe("QueryConfig.vue", () => {
       await setQCProps({ tab: "promql" });
       await flushPromises();
       const query = hostForm().state.values.query_condition;
-      expect(query.prom_rule_mode).toBe(true);
+      expect(query.promql_rule_mode).toBe(true);
       expect(query.promql_multi_alert).toBe(true);
       expect(query.promql_condition).toBeNull();
       expect(await submit()).toBe(true);

@@ -426,7 +426,7 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
 // the size from this lint); boxing the error is not worth the churn here.
 #[allow(clippy::result_large_err)]
 fn validate_multi_alert_config(alert: &Alert) -> Result<(), AlertError> {
-    if alert.query_condition.prom_rule_mode && alert.stream_type != StreamType::Metrics {
+    if alert.query_condition.promql_rule_mode && alert.stream_type != StreamType::Metrics {
         return Err(AlertError::PromRuleStreamMissing(
             "rule mode requires stream_type=metrics".into(),
         ));
@@ -640,14 +640,14 @@ async fn prepare_alert(
     }
     alert.org_id = org_id.to_string();
     if alert.query_condition.query_type == QueryType::PromQL
-        && !alert.query_condition.prom_rule_mode
+        && !alert.query_condition.promql_rule_mode
         && alert.query_condition.promql_condition.is_none()
     {
         return Err(AlertError::PromqlMissingQuery);
     }
 
     let stream_type = alert.stream_type;
-    let stream_name = if stream_name.is_empty() && alert.query_condition.prom_rule_mode {
+    let stream_name = if stream_name.is_empty() && alert.query_condition.promql_rule_mode {
         super::prom_rule::infer_stream(org_id, &alert.query_condition)
             .await
             .map_err(|e| AlertError::PromRuleStreamMissing(e.to_string()))?
@@ -835,7 +835,7 @@ async fn prepare_alert(
         if let Some(settings) = unwrap_stream_settings(&schema) {
             let max_query_range = settings.max_query_range;
             if max_query_range > 0
-                && !alert.query_condition.prom_rule_mode
+                && !alert.query_condition.promql_rule_mode
                 && !alert.is_real_time
                 && alert.trigger_condition.period > max_query_range * 60
             {
@@ -1043,7 +1043,7 @@ async fn prepare_alert(
         QueryType::PromQL
             if (alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || (!alert.query_condition.prom_rule_mode
+                || (!alert.query_condition.promql_rule_mode
                     && alert.query_condition.promql_condition.is_none())) =>
         {
             return Err(AlertError::PromqlMissingQuery);
@@ -2782,7 +2782,7 @@ impl AlertExt for Alert {
                 ),
                 (
                     "alert_threshold",
-                    if self.query_condition.prom_rule_mode {
+                    if self.query_condition.promql_rule_mode {
                         Value::String(String::new())
                     } else {
                         self.trigger_condition.threshold.into()
@@ -3725,7 +3725,7 @@ fn process_row_templates_plain(
             )
             .replace(
                 "{alert_threshold}",
-                &if alert.query_condition.prom_rule_mode {
+                &if alert.query_condition.promql_rule_mode {
                     String::new()
                 } else {
                     alert.trigger_condition.threshold.to_string()
@@ -3804,7 +3804,7 @@ fn workflow_alert_count(alert: &Alert, rows_len: usize, actual_value: Option<f64
     // Aggregation/PromQL payloads are groups/series; their length stands.
     let is_count_family = alert.query_condition.aggregation.is_none()
         && alert.query_condition.promql_condition.is_none()
-        && !alert.query_condition.prom_rule_mode;
+        && !alert.query_condition.promql_rule_mode;
     match actual_value {
         Some(v) if is_count_family && v.is_finite() && v.fract() == 0.0 && v >= 0.0 => {
             Value::from(v as u64)
@@ -3893,7 +3893,7 @@ async fn build_notification_context(
     // Aggregation/PromQL payloads are groups/series; their length stands.
     let is_count_family = alert.query_condition.aggregation.is_none()
         && alert.query_condition.promql_condition.is_none()
-        && !alert.query_condition.prom_rule_mode;
+        && !alert.query_condition.promql_rule_mode;
     let alert_count = match actual_value {
         Some(v) if is_count_family => fmt_observed(v),
         _ => rows.len().to_string(),
@@ -3986,7 +3986,7 @@ async fn build_notification_context(
     };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
-            if alert.query_condition.prom_rule_mode {
+            if alert.query_condition.promql_rule_mode {
                 alert_query = promql.clone();
             } else {
                 let condition = alert.query_condition.promql_condition.as_ref().unwrap();
@@ -4091,13 +4091,13 @@ async fn build_notification_context(
         alert_type: alert_type.to_string(),
         alert_period: alert.trigger_condition.period.to_string(),
         alert_operator: alert.trigger_condition.operator.to_string(),
-        alert_threshold: if alert.query_condition.prom_rule_mode {
+        alert_threshold: if alert.query_condition.promql_rule_mode {
             String::new()
         } else {
             alert.trigger_condition.threshold.to_string()
         },
         alert_count,
-        alert_agg_value: if alert.query_condition.prom_rule_mode {
+        alert_agg_value: if alert.query_condition.promql_rule_mode {
             rows.first()
                 .and_then(|r| r.get("value"))
                 .and_then(Value::as_str)
@@ -4116,7 +4116,7 @@ async fn build_notification_context(
         episode_id,
         alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
         alert_tags: alert.tags.join(","),
-        alert_threshold_crit: if alert.query_condition.prom_rule_mode {
+        alert_threshold_crit: if alert.query_condition.promql_rule_mode {
             String::new()
         } else {
             fmt_observed(family_crit)
@@ -8614,7 +8614,7 @@ mod rule_notification_tests {
     #[tokio::test]
     async fn rule_notifications_preserve_strings_and_render_empty_thresholds() {
         let mut alert = Alert::default();
-        alert.query_condition.prom_rule_mode = true;
+        alert.query_condition.promql_rule_mode = true;
         alert.query_condition.query_type = QueryType::PromQL;
         alert.query_condition.promql_multi_alert = true;
         alert.query_condition.promql = Some("rate(foo[5m]) > 4".into());

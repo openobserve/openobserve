@@ -14,7 +14,7 @@ describe("PromQL rule display", () => {
   it("shows the complete rule expression", () => {
     expect(
       alertConditionText({
-        query_condition: { type: "promql", prom_rule_mode: true, promql: "foo > 4" },
+        query_condition: { type: "promql", promql_rule_mode: true, promql: "foo > 4" },
       }),
     ).toBe("foo > 4");
   });

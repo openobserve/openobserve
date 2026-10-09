@@ -105,7 +105,7 @@ async fn persist_alert_run_state(
             }
         };
         let at = now_micros();
-        let plan = if alert.query_condition.prom_rule_mode {
+        let plan = if alert.query_condition.promql_rule_mode {
             config::meta::alerts::prom_rule::plan_rule_updates(
                 alert_id,
                 classification,
@@ -507,7 +507,7 @@ async fn dispatch_per_group(
                 start_time,
                 triggered_at,
                 Some(item.level),
-                (!alert.query_condition.prom_rule_mode).then_some(item.actual_value),
+                (!alert.query_condition.promql_rule_mode).then_some(item.actual_value),
                 // M-4: this group's labels become `{group.*}`, substituted
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
@@ -2680,7 +2680,7 @@ async fn handle_alert_triggers(
         config::meta::alerts::level::AlertLevel::Warning => ctx_warning.unwrap_or(ctx_critical),
         _ => ctx_critical,
     });
-    if alert.query_condition.prom_rule_mode {
+    if alert.query_condition.promql_rule_mode {
         trigger_data_stream.threshold_operator = None;
         trigger_data_stream.threshold_value = None;
     }

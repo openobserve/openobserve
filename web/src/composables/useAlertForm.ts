@@ -159,7 +159,7 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
-      prom_rule_mode: false,
+      promql_rule_mode: false,
       // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
       // backend enforces `query_type == slo` IFF this is present, so an empty
       // object here would make every ordinary alert fail validation.
@@ -2821,7 +2821,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         isUsingBackendSql.value = false;
         if (
           !formData.value.query_condition.promql_condition &&
-          !formData.value.query_condition.prom_rule_mode
+          !formData.value.query_condition.promql_rule_mode
         ) {
           setF("query_condition.promql_condition", {
             column: "value",
