@@ -56,17 +56,12 @@ pub(crate) fn prepare_modifiers(
 ) -> PreparedTemplate {
     let mut prepared = PreparedTemplate::plain(String::with_capacity(tpl.len()));
     let mut cursor = 0;
-    while let Some((start, end, closed)) = next_placeholder(tpl, cursor) {
+    while let Some((start, end)) = next_placeholder(tpl, cursor) {
         prepared.template.push_str(&tpl[cursor..start]);
-        let expression_end = if closed { end - 1 } else { end };
-        let expression = &tpl[start + 1..expression_end];
-        let literal = is_literal_placeholder(expression, &mut literal_field_exists)
-            || (!closed
-                && tpl[..end].ends_with('}')
-                && is_literal_placeholder(&tpl[start + 1..end - 1], &mut literal_field_exists));
+        let expression = &tpl[start + 1..end - 1];
+        let literal = is_literal_placeholder(expression, &mut literal_field_exists);
         if let Some((field, function)) = expression.split_once('|').filter(|_| !literal) {
-            let replacement = if closed
-                && !field.is_empty()
+            let replacement = if !field.is_empty()
                 && !tpl[..start].ends_with('{')
                 && (!field.contains(':') || literal_field_exists(field))
             {
@@ -89,44 +84,45 @@ pub(crate) fn prepare_modifiers(
     prepared
 }
 
-fn next_placeholder(tpl: &str, cursor: usize) -> Option<(usize, usize, bool)> {
-    let mut start = None;
-    let mut modifier = false;
-    let mut quoted = false;
-    let mut escaped = false;
-    let mut nested = 0usize;
-    for (index, ch) in tpl[cursor..].char_indices() {
-        let index = cursor + index;
-        if quoted {
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == '"' {
-                quoted = false;
-            }
-            continue;
-        }
-        match ch {
-            '{' if modifier => nested += 1,
-            '{' => {
-                start = (!tpl[index + 1..].trim_start().starts_with('"')).then_some(index);
-                modifier = false;
-            }
-            '|' if start.is_some() => modifier = true,
-            '"' if modifier => quoted = true,
-            '}' if nested > 0 => nested -= 1,
-            '}' => {
-                if let Some(start) = start {
-                    return Some((start, index + 1, true));
+fn next_placeholder(tpl: &str, mut cursor: usize) -> Option<(usize, usize)> {
+    loop {
+        let mut start = None;
+        let mut modifier = false;
+        let mut quoted = false;
+        let mut escaped = false;
+        let mut nested = 0usize;
+        for (index, ch) in tpl[cursor..].char_indices() {
+            let index = cursor + index;
+            if quoted {
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == '"' {
+                    quoted = false;
                 }
+                continue;
             }
-            _ => {}
+            match ch {
+                '{' if modifier => nested += 1,
+                '{' => {
+                    start = (!tpl[index + 1..].trim_start().starts_with('"')).then_some(index);
+                    modifier = false;
+                }
+                '|' if start.is_some() => modifier = true,
+                '"' if modifier => quoted = true,
+                '}' if nested > 0 => nested -= 1,
+                '}' => {
+                    if let Some(start) = start {
+                        return Some((start, index + 1));
+                    }
+                }
+                _ => {}
+            }
         }
+        // An unclosed modifier is literal text, so later placeholders still substitute.
+        cursor = start.filter(|_| modifier)? + 1;
     }
-    start
-        .filter(|_| modifier)
-        .map(|start| (start, tpl.len(), false))
 }
 
 fn is_literal_placeholder(
@@ -191,6 +187,33 @@ mod tests {
                 .then(|| "1200".into())),
             r#"{"value":"1.2k"}"#
         );
+    }
+
+    #[test]
+    fn unclosed_modifier_does_not_swallow_later_placeholders() {
+        let lookup = |field: &str| (field == "v").then(|| "1200".to_string());
+        for (tpl, expected) in [
+            (
+                "{v|humanize fired {v|humanize} {v}",
+                "{v|humanize fired 1.2k {v}",
+            ),
+            (
+                r#"{v|formatTimestamp("x} {v|humanize}"#,
+                r#"{v|formatTimestamp("x} 1.2k"#,
+            ),
+            (
+                "{v|humanize {v|humanize {v|humanize}",
+                "{v|humanize {v|humanize 1.2k",
+            ),
+            ("{v|humanize", "{v|humanize"),
+        ] {
+            let prepared = prepare_modifiers(tpl, lookup, |_| false, true);
+            assert_eq!(
+                prepared.finish(prepared.template.clone()),
+                expected,
+                "{tpl}"
+            );
+        }
     }
 
     #[test]

@@ -829,16 +829,27 @@ mod golden {
             r#"{t|formatTimestamp("{host} %Y",)}"#,
             r#"{t|formatTimestamp({host})}"#,
             r#"{t|unknown("{host}")}"#,
-            r#"{t|formatTimestamp("{host} %Y)}"#,
         ] {
             for is_email in [false, true] {
                 assert_eq!(apply_custom_template(tpl, &ctx, is_email), tpl);
             }
         }
-        assert_eq!(
-            apply_custom_template(r#"{t|formatTimestamp("{host} %Q")} {host}"#, &ctx, true),
-            r#"{t|formatTimestamp("{host} %Q")} expanded"#
-        );
+        for (tpl, expected) in [
+            (
+                r#"{t|formatTimestamp("{host} %Q")} {host}"#,
+                r#"{t|formatTimestamp("{host} %Q")} expanded"#,
+            ),
+            (
+                r#"{t|formatTimestamp("{host} %Y)} {host} {t|formatTimestamp("%Y")}"#,
+                r#"{t|formatTimestamp("expanded %Y)} expanded 1970"#,
+            ),
+            (
+                "{t|formatTimestamp fired on {host} at {t}",
+                "{t|formatTimestamp fired on expanded at 0",
+            ),
+        ] {
+            assert_eq!(apply_custom_template(tpl, &ctx, true), expected);
+        }
     }
 
     #[test]

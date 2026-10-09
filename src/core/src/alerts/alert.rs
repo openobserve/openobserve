@@ -8415,7 +8415,6 @@ mod modifier_tests {
             r#"{t|formatTimestamp("{host} %Y",)}"#,
             r#"{t|formatTimestamp({host})}"#,
             r#"{t|unknown("{host}")}"#,
-            r#"{t|formatTimestamp("{host} %Y)}"#,
         ] {
             for row_type in [RowTemplateType::String, RowTemplateType::Json] {
                 assert_eq!(
@@ -8424,19 +8423,31 @@ mod modifier_tests {
                 );
             }
         }
-        let tpl = r#"{t|formatTimestamp("{host} %Q")} {host}"#;
-        assert_eq!(
-            process_row_template(
-                "default",
-                tpl,
-                &Alert::default(),
-                RowTemplateType::String,
-                &rows
+        for (tpl, expected) in [
+            (
+                r#"{t|formatTimestamp("{host} %Q")} {host}"#,
+                r#"{t|formatTimestamp("{host} %Q")} expanded"#,
             ),
-            vec![Value::String(
-                r#"{t|formatTimestamp("{host} %Q")} expanded"#.into()
-            )]
-        );
+            (
+                r#"{t|formatTimestamp("{host} %Y)} {host} {t|formatTimestamp("%Y")}"#,
+                r#"{t|formatTimestamp("expanded %Y)} expanded 1970"#,
+            ),
+            (
+                "{t|formatTimestamp fired on {host} at {t}",
+                "{t|formatTimestamp fired on expanded at 0",
+            ),
+        ] {
+            assert_eq!(
+                process_row_template(
+                    "default",
+                    tpl,
+                    &Alert::default(),
+                    RowTemplateType::String,
+                    &rows
+                ),
+                vec![Value::String(expected.into())]
+            );
+        }
     }
 
     #[test]
