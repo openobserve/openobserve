@@ -444,9 +444,7 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
   }, async ({ page }) => {
     testLogger.info('Testing include/exclude search terms persistence in open log details after query run');
 
-    // Run initial query to get log results
-    await pageManager.logsPage.clickSearchBarRefreshButton();
-    await page.waitForTimeout(2000);
+    await pageManager.logsPage.runQueryAndWaitForResults();
 
     // Verify logs table is visible
     await pageManager.logsPage.expectLogsSearchResultLogsTableVisible();
@@ -458,9 +456,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
     await pageManager.logsPage.addIncludeSearchTermFromLogDetails();
     testLogger.info('✓ First include search term added');
 
-    // Run the query (this is where the bug occurred - include terms would disappear from open details)
-    await pageManager.logsPage.clickSearchBarRefreshButton();
-    await page.waitForTimeout(2000);
+    // Re-running must preserve terms in the already-open details panel.
+    await pageManager.logsPage.runQueryAndWaitForResults();
 
     // Verify include/exclude buttons are still visible after query run
     await pageManager.logsPage.expectIncludeExcludeButtonsVisibleInLogDetails();
